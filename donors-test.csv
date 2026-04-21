@@ -1,0 +1,5 @@
+full_name,email,phone,donor_type
+Ahmed Hassan,ahmed@example.com,555-111-2222,individual
+Fatima Ali,fatima@example.com,555-333-4444,individual
+Islamic Relief Foundation,info@irf.org,555-777-8888,organization
+,missingname@example.com,555-000-0000,individual
