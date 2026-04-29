@@ -346,10 +346,11 @@ export default function ReconcilePage() {
     const { error } = await supabase
       .from("payments")
       .update({
-        donor_id: donor.id,
-        pledge_id: bestPledge.id,
-        status: "allocated",
-      })
+  donor_id: donor.id,
+  pledge_id: bestPledge.id,
+  status: "allocated",
+  reconciled_at: new Date().toISOString(),
+})
       .eq("id", selectedPayment.id)
 
     setAllocating(false)
@@ -535,7 +536,7 @@ export default function ReconcilePage() {
       amount: Number(p.amount || 0),
       date: p.payment_date || null,
       memo: p.memo || "",
-      status: "pending",
+      status: p.status || "pending_review",
     }))
 
     setPayments(formatted)
@@ -683,7 +684,7 @@ export default function ReconcilePage() {
                   <p className="text-2xl font-bold">
                     $
                     {payments
-                      .filter((p) => p.status === "pending")
+                      .filter((p) => ["pending_review", "unallocated"].includes(p.status))
                       .reduce((sum, p) => sum + p.amount, 0)
                       .toLocaleString()}
                   </p>
