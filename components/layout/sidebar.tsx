@@ -163,7 +163,6 @@ const navItems: NavItem[] = [
       { label: "Donors", href: "/donations/donors", matchPrefix: "/donations/donors" },
       { label: "Pledges", href: "/donations/pledges", matchPrefix: "/donations/pledges" },
       { label: "Import", href: "/donations/import", matchPrefix: "/donations/import" },
-      { label: "Import History", href: "/donations/import-history", matchPrefix: "/donations/import-history" },
       { label: "Reconcile", href: "/donations/reconcile", matchPrefix: "/donations/reconcile" },
       { label: "Reports", href: "/donations/reports", matchPrefix: "/donations/reports" },
       { label: "Settings", href: "/donations/settings", matchPrefix: "/donations/settings" },
