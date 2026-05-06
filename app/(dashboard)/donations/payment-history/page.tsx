@@ -29,7 +29,7 @@ interface PaymentHistoryProps {
   payments: Payment[]
 }
 
-export function PaymentHistory({ payments }: PaymentHistoryProps) {
+export default function PaymentHistory({ payments }: PaymentHistoryProps) {
   if (!payments || payments.length === 0) {
     return (
       <div className="rounded-md border p-4 text-sm text-muted-foreground">
