@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useEffect, useState, useMemo } from "react"
 import Link from "next/link"
 import { Header } from "@/components/layout/header"
 import { Card, CardContent } from "@/components/ui/card"
@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { createClient } from "@/lib/supabase/client"
+import { getCurrentOrganizationId } from "@/lib/current-organization"
 import {
   Table,
   TableBody,
@@ -55,6 +57,7 @@ interface Contact {
   email: string
   phone: string
   type: ContactType
+  roles: ContactType[]
   status: ContactStatus
   organization?: string
   createdAt: string
@@ -85,59 +88,127 @@ const statusColors: Record<ContactStatus, string> = {
   "Major Donor": "bg-purple-100 text-purple-700",
 }
 
-// Combined mock contacts from all sources
-const mockContacts: Contact[] = [
-  // Customers
-  { id: "c-1", name: "Sarah Johnson", email: "sarah.johnson@email.com", phone: "+1 (555) 123-4567", type: "Customer", status: "Active", createdAt: "2024-01-15", lastActivity: "2024-01-15" },
-  { id: "c-2", name: "Michael Chen", email: "michael.chen@email.com", phone: "+1 (555) 234-5678", type: "Customer", status: "Active", createdAt: "2024-01-08", lastActivity: "2024-01-08" },
-  { id: "c-3", name: "Emily Rodriguez", email: "emily.r@email.com", phone: "+1 (555) 345-6789", type: "Customer", status: "VIP", createdAt: "2024-01-20", lastActivity: "2024-01-20" },
-  { id: "c-4", name: "Springfield Community Center", email: "rwilliams@springfieldcc.org", phone: "+1 (555) 111-2222", type: "Customer", status: "Active", organization: "Non-Profit", createdAt: "2024-01-18", lastActivity: "2024-01-18" },
-  // Volunteers
-  { id: "v-1", name: "Amira Hassan", email: "amira.hassan@email.com", phone: "(555) 345-6789", type: "Volunteer", status: "Active", createdAt: "2024-06-05", lastActivity: "2024-03-15" },
-  { id: "v-2", name: "David Williams", email: "david.williams@email.com", phone: "(555) 456-7890", type: "Volunteer", status: "Inactive", createdAt: "2024-09-20", lastActivity: "2024-10-05" },
-  { id: "v-3", name: "Lisa Park", email: "lisa.park@email.com", phone: "(555) 567-8901", type: "Volunteer", status: "Active", createdAt: "2024-02-10", lastActivity: "2024-03-10" },
-  // Vendors
-  { id: "vn-1", name: "Ahmed Hassan", email: "ahmed@islamicarts.com", phone: "+1 (555) 123-4567", type: "Vendor", status: "Active", organization: "Islamic Arts & Crafts", createdAt: "2026-02-15" },
-  { id: "vn-2", name: "Fatima Ali", email: "fatima@modestfashion.com", phone: "+1 (555) 234-5678", type: "Vendor", status: "Active", organization: "Modest Fashion Hub", createdAt: "2026-02-14" },
-  { id: "vn-3", name: "Omar Khan", email: "omar@halaleats.com", phone: "+1 (555) 345-6789", type: "Vendor", status: "Pending", organization: "Halal Eats Co.", createdAt: "2026-02-20" },
-  // Service Providers
-  { id: "sp-1", name: "John Smith", email: "john@cleanpro.com", phone: "(555) 123-4567", type: "Service Provider", status: "Active", organization: "CleanPro Carpet Services", createdAt: "2024-01-01" },
-  { id: "sp-2", name: "Mike Johnson", email: "mike@secureguard.com", phone: "(555) 234-5678", type: "Service Provider", status: "Active", organization: "SecureGuard Systems", createdAt: "2024-01-01" },
-  // Donors
-  { id: "d-1", name: "Ahmed Hassan", email: "ahmed.hassan@email.com", phone: "+1 (555) 123-4567", type: "Donor", status: "Active", createdAt: "2024-01-15", lastActivity: "2024-01-15" },
-  { id: "d-2", name: "Fatima Al-Rahman", email: "fatima.ar@email.com", phone: "+1 (555) 234-5678", type: "Donor", status: "Active", createdAt: "2024-01-08", lastActivity: "2024-01-08" },
-  { id: "d-3", name: "Omar Khalil", email: "omar.k@email.com", phone: "+1 (555) 345-6789", type: "Donor", status: "Major Donor", createdAt: "2024-01-20", lastActivity: "2024-01-20" },
-  { id: "d-4", name: "Al-Noor Foundation", email: "contact@alnoor.org", phone: "+1 (555) 111-2222", type: "Donor", status: "Major Donor", organization: "Non-Profit", createdAt: "2024-01-18", lastActivity: "2024-01-18" },
-]
 
 export default function ContactsPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [typeFilter, setTypeFilter] = useState<ContactType | "all">("all")
   const [statusFilter, setStatusFilter] = useState<ContactStatus | "all">("all")
   const [showAddDialog, setShowAddDialog] = useState(false)
+  const [contactName, setContactName] = useState("")
+  const [contactEmail, setContactEmail] = useState("")
+  const [contactPhone, setContactPhone] = useState("")
+  const [contactOrganization, setContactOrganization] = useState("")
+  const [contactType, setContactType] = useState("individual")
+  const [contactRole, setContactRole] = useState("customer")
+  const [contactNotes, setContactNotes] = useState("")
+  const supabase = createClient()
+  const [contacts, setContacts] = useState<Contact[]>([])
 
+  async function loadContacts() {
+    const orgId = await getCurrentOrganizationId()
+
+    if (!orgId) {
+      setContacts([])
+      return
+    }
+
+    let allRows: any[] = []
+let from = 0
+const pageSize = 1000
+
+while (true) {
+  const { data, error } = await supabase
+    .from("contacts")
+    .select(`
+      id,
+      full_name,
+      email,
+      phone,
+      contact_type,
+      status,
+      created_at,
+      contact_roles(role)
+    `)
+    .eq("organization_id", orgId)
+    .order("full_name", { ascending: true })
+    .range(from, from + pageSize - 1)
+
+  if (error) {
+    console.error("Error loading contacts:", error)
+    setContacts([])
+    return
+  }
+
+  allRows = [...allRows, ...(data || [])]
+
+  if (!data || data.length < pageSize) break
+
+  from += pageSize
+}
+
+setContacts(
+  allRows.map((c: any) => {
+        const roles = (c.contact_roles || []).map((r: any) => {
+          if (r.role === "donor") return "Donor"
+          if (r.role === "volunteer") return "Volunteer"
+          if (r.role === "vendor") return "Vendor"
+          if (r.role === "service_provider") return "Service Provider"
+          return "Customer"
+        })
+
+        const uniqueRoles = Array.from(new Set(roles)) as ContactType[]
+
+        return {
+          id: c.id,
+          name: c.full_name || "",
+          email: c.email || "",
+          phone: c.phone || "",
+          type: uniqueRoles[0] || "Customer",
+          roles: uniqueRoles.length > 0 ? uniqueRoles : ["Customer"],
+          status:
+            c.status === "inactive"
+              ? "Inactive"
+              : c.status === "pending"
+              ? "Pending"
+              : "Active",
+          organization: c.contact_type === "organization" ? c.full_name : "",
+          createdAt: c.created_at,
+          lastActivity: c.created_at,
+        }
+      })
+    )
+  }
+
+useEffect(() => {
+  
+  loadContacts()
+}, [])
   const filteredContacts = useMemo(() => {
-    return mockContacts.filter((contact) => {
+
+  if (!searchQuery.trim()) return []
+
+
+    return contacts.filter((contact) => {
       const matchesSearch =
         contact.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         contact.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
         contact.phone.includes(searchQuery)
-      const matchesType = typeFilter === "all" || contact.type === typeFilter
+      const matchesType = typeFilter === "all" || (contact.roles || []).includes(typeFilter)
       const matchesStatus = statusFilter === "all" || contact.status === statusFilter
       return matchesSearch && matchesType && matchesStatus
     })
-  }, [searchQuery, typeFilter, statusFilter])
+  }, [searchQuery, typeFilter, statusFilter, contacts])
 
   const stats = useMemo(() => {
     return {
-      total: mockContacts.length,
-      customers: mockContacts.filter((c) => c.type === "Customer").length,
-      volunteers: mockContacts.filter((c) => c.type === "Volunteer").length,
-      vendors: mockContacts.filter((c) => c.type === "Vendor").length,
-      serviceProviders: mockContacts.filter((c) => c.type === "Service Provider").length,
-      donors: mockContacts.filter((c) => c.type === "Donor").length,
+      total: contacts.length,
+      customers: contacts.filter((c) => (c.roles || []).includes("Customer")).length,
+volunteers: contacts.filter((c) => (c.roles || []).includes("Volunteer")).length,
+vendors: contacts.filter((c) => (c.roles || []).includes("Vendor")).length,
+serviceProviders: contacts.filter((c) => (c.roles || []).includes("Service Provider")).length,
+donors: contacts.filter((c) => (c.roles || []).includes("Donor")).length,
     }
-  }, [])
+  }, [contacts])
 
   const getInitials = (name: string) => {
     return name
@@ -147,6 +218,125 @@ export default function ContactsPage() {
       .toUpperCase()
       .slice(0, 2)
   }
+
+ async function handleAddContact() {
+  const orgId = await getCurrentOrganizationId()
+
+  if (!orgId) {
+    alert("No organization selected")
+    return
+  }
+
+  if (!contactName.trim()) {
+    alert("Contact name is required")
+    return
+  }
+
+  const cleanEmail = contactEmail.trim()
+  const cleanPhone = contactPhone.replace(/[^\d]/g, "")
+  const cleanName = contactName.trim()
+
+  let existingContact: any = null
+
+  if (cleanEmail || cleanPhone) {
+    const { data: matches, error: matchError } = await supabase
+      .from("contacts")
+      .select("id, full_name, email, phone")
+      .eq("organization_id", orgId)
+      .or(
+        [
+          cleanEmail ? `email.eq.${cleanEmail}` : "",
+          cleanPhone ? `phone.eq.${cleanPhone}` : "",
+        ]
+          .filter(Boolean)
+          .join(",")
+      )
+
+    if (matchError) {
+      console.error("Error checking existing contacts:", matchError)
+      alert(matchError.message)
+      return
+    }
+
+    existingContact = matches?.[0] || null
+  }
+
+  if (!existingContact) {
+    const { data: nameMatches, error: nameMatchError } = await supabase
+      .from("contacts")
+      .select("id, full_name, email, phone")
+      .eq("organization_id", orgId)
+      .ilike("full_name", cleanName)
+
+    if (nameMatchError) {
+      console.error("Error checking contact name:", nameMatchError)
+      alert(nameMatchError.message)
+      return
+    }
+
+    existingContact = nameMatches?.[0] || null
+  }
+
+  let contactId = existingContact?.id
+
+  if (!contactId) {
+    const { data: newContact, error: contactError } = await supabase
+      .from("contacts")
+      .insert({
+        organization_id: orgId,
+        full_name: cleanName,
+        email: cleanEmail || null,
+        phone: cleanPhone || null,
+        contact_type: contactType,
+        notes: contactNotes.trim() || null,
+        status: "active",
+      })
+      .select("id")
+      .single()
+
+    if (contactError || !newContact) {
+      console.error("Error adding contact:", contactError)
+      alert(contactError?.message || "Could not add contact")
+      return
+    }
+
+    contactId = newContact.id
+  }
+
+  const { error: roleError } = await supabase
+    .from("contact_roles")
+    .upsert(
+      {
+        organization_id: orgId,
+        contact_id: contactId,
+        role: contactRole,
+      },
+      { onConflict: "contact_id,role" }
+    )
+
+  if (roleError) {
+    console.error("Error adding contact role:", roleError)
+    alert(roleError.message)
+    return
+  }
+
+  setContactName("")
+  setContactEmail("")
+  setContactPhone("")
+  setContactOrganization("")
+  setContactType("individual")
+  setContactRole("customer")
+  setContactNotes("")
+  setShowAddDialog(false)
+
+  await loadContacts()
+
+if (existingContact) {
+  alert("Contact already exists. Added missing role only.")
+} else {
+  alert("Contact added")
+}
+}
 
   return (
     <>
@@ -268,7 +458,7 @@ export default function ContactsPage() {
               </TableHeader>
               <TableBody>
                 {filteredContacts.map((contact) => {
-                  const TypeIcon = typeIcons[contact.type]
+                  
                   return (
                     <TableRow key={contact.id}>
                       <TableCell>
@@ -285,11 +475,23 @@ export default function ContactsPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="secondary" className={cn("gap-1", typeColors[contact.type])}>
-                          <TypeIcon className="h-3 w-3" />
-                          {contact.type}
-                        </Badge>
-                      </TableCell>
+  <div className="flex flex-wrap gap-1">
+    {contact.roles.map((role) => {
+      const TypeIcon = typeIcons[role]
+
+      return (
+        <Badge
+          key={role}
+          variant="secondary"
+          className={cn("gap-1", typeColors[role])}
+        >
+          <TypeIcon className="h-3 w-3" />
+          {role}
+        </Badge>
+      )
+    })}
+  </div>
+</TableCell>
                       <TableCell className="hidden md:table-cell">
                         <div className="flex items-center gap-1 text-sm text-muted-foreground">
                           <Phone className="h-3 w-3" />
@@ -313,7 +515,9 @@ export default function ContactsPage() {
                 {filteredContacts.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                      No contacts found.
+                      {searchQuery.trim()
+  ? "No contacts found."
+  : "Start typing to search contacts."}.
                     </TableCell>
                   </TableRow>
                 )}
@@ -333,45 +537,89 @@ export default function ContactsPage() {
           <div className="flex flex-col gap-4 py-4">
             <div className="flex flex-col gap-2">
               <Label htmlFor="name">Full Name</Label>
-              <Input id="name" placeholder="Enter full name" />
+             <Input
+  id="name"
+  placeholder="Enter full name"
+  value={contactName}
+  onChange={(e) => setContactName(e.target.value)}
+/>
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" placeholder="Enter email address" />
+              <Input
+  id="email"
+  type="email"
+  placeholder="Enter email address"
+  value={contactEmail}
+  onChange={(e) => setContactEmail(e.target.value)}
+/>
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="phone">Phone</Label>
-              <Input id="phone" type="tel" placeholder="Enter phone number" />
+              <Input
+  id="phone"
+  type="tel"
+  placeholder="Enter phone number"
+  value={contactPhone}
+  onChange={(e) => setContactPhone(e.target.value)}
+/>
             </div>
             <div className="flex flex-col gap-2">
-              <Label htmlFor="type">Contact Type</Label>
-              <Select>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Customer">Customer</SelectItem>
-                  <SelectItem value="Volunteer">Volunteer</SelectItem>
-                  <SelectItem value="Vendor">Vendor</SelectItem>
-                  <SelectItem value="Service Provider">Service Provider</SelectItem>
-                  <SelectItem value="Donor">Donor</SelectItem>
-                </SelectContent>
-              </Select>
+  <Label htmlFor="type">Contact Role</Label>
+
+  <Select value={contactRole} onValueChange={setContactRole}>
+    <SelectTrigger>
+      <SelectValue placeholder="Select role" />
+    </SelectTrigger>
+
+    <SelectContent>
+      <SelectItem value="customer">Customer</SelectItem>
+      <SelectItem value="volunteer">Volunteer</SelectItem>
+      <SelectItem value="vendor">Vendor</SelectItem>
+      <SelectItem value="service_provider">Service Provider</SelectItem>
+      <SelectItem value="donor">Donor</SelectItem>
+    </SelectContent>
+  </Select>
+
+  <div className="flex flex-col gap-2">
+  <Label>Record Type</Label>
+
+  <Select value={contactType} onValueChange={setContactType}>
+    <SelectTrigger>
+      <SelectValue />
+    </SelectTrigger>
+
+    <SelectContent>
+      <SelectItem value="individual">Individual</SelectItem>
+      <SelectItem value="organization">Organization</SelectItem>
+    </SelectContent>
+  </Select>
+</div>
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="organization">Organization (Optional)</Label>
-              <Input id="organization" placeholder="Enter organization name" />
+              <Input
+  id="organization"
+  placeholder="Enter organization name"
+  value={contactOrganization}
+  onChange={(e) => setContactOrganization(e.target.value)}
+/>
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="notes">Notes (Optional)</Label>
-              <Textarea id="notes" placeholder="Add any notes..." />
+              <Textarea
+  id="notes"
+  placeholder="Add any notes..."
+  value={contactNotes}
+  onChange={(e) => setContactNotes(e.target.value)}
+/>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAddDialog(false)}>
               Cancel
             </Button>
-            <Button onClick={() => setShowAddDialog(false)}>Add Contact</Button>
+            <Button onClick={handleAddContact}>Add Contact</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

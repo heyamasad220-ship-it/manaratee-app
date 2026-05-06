@@ -409,42 +409,122 @@ export default function DonationsImportPage() {
 
     setImportingDonorRows(true);
 
-    const donorPayload = readyRows.map((row) => ({
-      organization_id: orgId,
-      full_name: row.normalized_full_name,
-      email: row.normalized_email || null,
-      phone: row.normalized_phone || null,
-      donor_type: row.normalized_donor_type || null,
-    }));
-
-    const { error: donorInsertError } = await supabase
+    // Check for existing donors to avoid duplicates
+    const { data: existingDonors, error: existingError } = await supabase
       .from("donors")
-      .insert(donorPayload);
+      .select("id, full_name, email, phone")
+      .eq("organization_id", orgId);
 
-    if (donorInsertError) {
-      console.error(donorInsertError);
-      alert("Could not import donors");
+    if (existingError) {
+      console.error(existingError);
+      alert(existingError.message || "Could not check existing donors");
       setImportingDonorRows(false);
       return;
     }
 
-    const readyRowIds = readyRows.map((row) => row.id);
-
-    const { error: updateError } = await supabase
-      .from("donor_import_rows")
-      .update({ import_status: "imported" })
-      .in("id", readyRowIds);
-
-    setImportingDonorRows(false);
-
-    if (updateError) {
-      console.error(updateError);
-      alert("Donors were imported, but staging rows could not be updated");
-      return;
+    function makeDonorKey(row: {
+      full_name: string | null;
+      email: string | null;
+      phone: string | null;
+    }) {
+      return [
+        (row.full_name || "").trim().toLowerCase(),
+        (row.email || "").trim().toLowerCase(),
+        (row.phone || "").trim().toLowerCase(),
+      ].join("|");
     }
 
-    alert("Ready donor rows imported successfully");
+    const existingKeys = new Set(
+      (existingDonors || []).map((donor: any) =>
+        makeDonorKey({
+          full_name: donor.full_name,
+          email: donor.email,
+          phone: donor.phone,
+        })
+      )
+    );
+
+    const batchSeenKeys = new Set<string>();
+    const rowsToInsert: typeof readyRows = [];
+    const duplicateRows: typeof readyRows = [];
+
+    for (const row of readyRows) {
+      const key = makeDonorKey({
+        full_name: row.normalized_full_name,
+        email: row.normalized_email,
+        phone: row.normalized_phone,
+      });
+
+      if (existingKeys.has(key) || batchSeenKeys.has(key)) {
+        duplicateRows.push(row);
+        continue;
+      }
+
+      batchSeenKeys.add(key);
+      rowsToInsert.push(row);
+    }
+
+    if (rowsToInsert.length > 0) {
+      const donorPayload = rowsToInsert.map((row) => ({
+        organization_id: orgId,
+        full_name: row.normalized_full_name,
+        email: row.normalized_email || null,
+        phone: row.normalized_phone || null,
+        donor_type: row.normalized_donor_type || null,
+      }));
+
+      const { error: donorInsertError } = await supabase
+        .from("donors")
+        .insert(donorPayload);
+
+      if (donorInsertError) {
+        console.error(donorInsertError);
+        alert("Could not import donors");
+        setImportingDonorRows(false);
+        return;
+      }
+    }
+
+    const importedRowIds = rowsToInsert.map((row) => row.id);
+    const duplicateRowIds = duplicateRows.map((row) => row.id);
+
+    if (importedRowIds.length > 0) {
+      const { error: importedUpdateError } = await supabase
+        .from("donor_import_rows")
+        .update({ import_status: "imported" })
+        .in("id", importedRowIds);
+
+      if (importedUpdateError) {
+        console.error(importedUpdateError);
+        alert("Donors were imported, but imported staging rows were not updated");
+        setImportingDonorRows(false);
+        return;
+      }
+    }
+
+    if (duplicateRowIds.length > 0) {
+      const { error: duplicateUpdateError } = await supabase
+        .from("donor_import_rows")
+        .update({
+  import_status: "error",
+  error_message: "Duplicate: matched existing donor by email or phone",
+})
+        .in("id", duplicateRowIds);
+
+      if (duplicateUpdateError) {
+        console.error(duplicateUpdateError);
+        alert("Donors checked, but duplicate staging rows were not updated");
+        setImportingDonorRows(false);
+        return;
+      }
+    }
+
+    setImportingDonorRows(false);
     await loadStagedDonorRows();
+
+    alert(
+      `Imported ${importedRowIds.length} donor(s). Skipped ${duplicateRowIds.length} duplicate(s).`
+    );
   }
 
   async function handleImportReadyPaymentRows() {
@@ -595,7 +675,34 @@ export default function DonationsImportPage() {
   useEffect(() => {
     resetLoadedRows();
   }, [mode]);
+async function handleClearDonorStaging() {
+  const orgId = await getCurrentOrganizationId()
 
+  if (!orgId) {
+    alert("No organization selected")
+    return
+  }
+
+  const confirmed = window.confirm(
+    "Clear all staged donor rows? This will not delete real donors."
+  )
+
+  if (!confirmed) return
+
+  const { error } = await supabase
+    .from("donor_import_rows")
+    .delete()
+    .eq("organization_id", orgId)
+
+  if (error) {
+    console.error(error)
+    alert("Could not clear donor staging rows")
+    return
+  }
+
+  await loadStagedDonorRows()
+  alert("Donor staging rows cleared")
+}
   return (
     <>
       <Header title="Donations Import" />
@@ -797,6 +904,13 @@ export default function DonationsImportPage() {
                 >
                   {importingDonorRows ? "Importing..." : "Import Ready Donor Rows"}
                 </Button>
+                <Button
+  variant="outline"
+  onClick={handleClearDonorStaging}
+  disabled={stagedDonorRows.length === 0}
+>
+  Clear Staging Rows
+</Button>
               </div>
 
               {loadingStagedDonorRows ? (

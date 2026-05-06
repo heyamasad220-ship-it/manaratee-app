@@ -1,6 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { createClient } from "@/lib/supabase/client"
+
 import { useParams } from "next/navigation"
 import Link from "next/link"
 import {
@@ -51,142 +53,79 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 
-// Mock individual donor data
-const mockDonors: Record<string, {
-  id: string
-  name: string
-  email: string
-  phone: string
-  address: {
-    street: string
-    city: string
-    state: string
-    zip: string
-  }
-  totalDonations: number
-  donationCount: number
-  hasPledge: boolean
-  pledgeInfo?: {
-    amount: number
-    frequency: string
-    nextPayment: string
-    remaining: number
-  }
-  preferredCategory: string
-  notes: string
-  status: string
-  donationHistory: {
-    id: string
-    date: string
-    amount: number
-    category: string
-    method: string
-    receipt: string
-  }[]
-  createdAt: string
-  lastDonation: string
-}> = {
-  "ind-1": {
-    id: "ind-1",
-    name: "Ahmed Hassan",
-    email: "ahmed.hassan@email.com",
-    phone: "+1 (555) 123-4567",
-    address: {
-      street: "123 Oak Street",
-      city: "Springfield",
-      state: "IL",
-      zip: "62701",
-    },
-    totalDonations: 12500,
-    donationCount: 15,
-    hasPledge: true,
-    pledgeInfo: {
-      amount: 500,
-      frequency: "Monthly",
-      nextPayment: "2024-02-15",
-      remaining: 4500,
-    },
-    preferredCategory: "Operations",
-    notes: "Prefers to donate during Ramadan. Interested in youth programs.",
-    status: "Active",
-    donationHistory: [
-      { id: "d1", date: "2024-01-15", amount: 500, category: "Operations", method: "Credit Card", receipt: "REC-001" },
-      { id: "d2", date: "2023-12-15", amount: 500, category: "Operations", method: "Credit Card", receipt: "REC-002" },
-      { id: "d3", date: "2023-11-15", amount: 500, category: "Operations", method: "Credit Card", receipt: "REC-003" },
-      { id: "d4", date: "2023-10-15", amount: 500, category: "Operations", method: "Credit Card", receipt: "REC-004" },
-      { id: "d5", date: "2023-09-15", amount: 2000, category: "Ramadan", method: "Bank Transfer", receipt: "REC-005" },
-    ],
-    createdAt: "2022-03-15",
-    lastDonation: "2024-01-15",
-  },
-  "ind-3": {
-    id: "ind-3",
-    name: "Omar Khalil",
-    email: "omar.k@email.com",
-    phone: "+1 (555) 345-6789",
-    address: {
-      street: "789 Pine Road",
-      city: "Naperville",
-      state: "IL",
-      zip: "60540",
-    },
-    totalDonations: 25000,
-    donationCount: 24,
-    hasPledge: true,
-    pledgeInfo: {
-      amount: 1000,
-      frequency: "Monthly",
-      nextPayment: "2024-02-20",
-      remaining: 9000,
-    },
-    preferredCategory: "Community Support",
-    notes: "Major donor. Board member interest. Prefers quarterly recognition.",
-    status: "Major Donor",
-    donationHistory: [
-      { id: "d1", date: "2024-01-20", amount: 1000, category: "Community Support", method: "Bank Transfer", receipt: "REC-101" },
-      { id: "d2", date: "2023-12-20", amount: 1000, category: "Community Support", method: "Bank Transfer", receipt: "REC-102" },
-      { id: "d3", date: "2023-11-20", amount: 5000, category: "Special Campaign", method: "Check", receipt: "REC-103" },
-      { id: "d4", date: "2023-10-20", amount: 1000, category: "Community Support", method: "Bank Transfer", receipt: "REC-104" },
-    ],
-    createdAt: "2020-06-10",
-    lastDonation: "2024-01-20",
-  },
-}
-
-// Default donor for unknown IDs
-const defaultDonor = {
-  id: "unknown",
-  name: "Fatima Al-Rahman",
-  email: "fatima.ar@email.com",
-  phone: "+1 (555) 234-5678",
-  address: {
-    street: "456 Maple Ave",
-    city: "Chicago",
-    state: "IL",
-    zip: "60601",
-  },
-  totalDonations: 8750,
-  donationCount: 8,
-  hasPledge: false,
-  preferredCategory: "Programs",
-  notes: "Interested in education initiatives.",
-  status: "Active",
-  donationHistory: [
-    { id: "d1", date: "2024-01-08", amount: 1000, category: "Programs", method: "Credit Card", receipt: "REC-201" },
-    { id: "d2", date: "2023-11-25", amount: 750, category: "Programs", method: "Credit Card", receipt: "REC-202" },
-    { id: "d3", date: "2023-09-10", amount: 2000, category: "Zakat", method: "Check", receipt: "REC-203" },
-  ],
-  createdAt: "2021-08-20",
-  lastDonation: "2024-01-08",
-}
 
 export default function IndividualDonorDetailPage() {
+  const [donor, setDonor] = useState<any>(null)
   const params = useParams()
-  const donor = mockDonors[params.id as string] || defaultDonor
   
   const [isEditing, setIsEditing] = useState(false)
   const [showRecordDonation, setShowRecordDonation] = useState(false)
+  const supabase = createClient()
 
+useEffect(() => {
+  const fetchDonor = async () => {
+    const { data, error } = await supabase
+      .from("donors")
+      .select("*")
+      .eq("id", params.id as string)
+      .single()
+
+    console.log("Donor detail data:", data)
+
+    if (error) {
+      console.error("Error loading donor detail:", error)
+      return
+    }
+
+    const { data: payments, error: paymentsError } = await supabase
+      .from("payments")
+      .select("*")
+      .eq("donor_id", data.id)
+      .order("payment_date", { ascending: false })
+
+    if (paymentsError) {
+      console.error("Error loading donor payments:", paymentsError)
+    }
+
+    setDonor({
+      id: data.id,
+      name: data.full_name,
+      email: data.email,
+      phone: data.phone,
+     totalDonations: (payments || []).reduce(
+  (sum: number, p: any) => sum + Number(p.amount || 0),
+  0
+),
+donationCount: (payments || []).length,
+lastDonation: payments && payments.length > 0
+  ? payments[0].payment_date
+  : "",
+      preferredCategory: data.preferred_category || "",
+      status: data.status || "Active",
+      hasPledge: data.has_pledge || false,
+      address: {
+        street: data.street || "",
+        city: data.city || "",
+        state: data.state || "",
+        zip: data.zip || "",
+      },
+      notes: data.notes || "",
+      donationHistory: (payments || []).map((p: any) => ({
+        id: p.id,
+        date: p.payment_date,
+        amount: p.amount,
+        category: p.category || "General",
+        method: p.source || "Unknown",
+        receipt: p.id,
+      })),
+      createdAt: data.created_at,
+    })
+  }
+
+  fetchDonor()
+}, [params.id])
+
+if (!donor) return <div className="p-6">Loading...</div>
   return (
     <>
       <Header title="Donor Details" />
@@ -285,7 +224,9 @@ export default function IndividualDonorDetailPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                ${Math.round(donor.totalDonations / donor.donationCount).toLocaleString()}
+                ${donor.donationCount > 0
+  ? Math.round(donor.totalDonations / donor.donationCount).toLocaleString()
+  : "0"}
               </div>
               <p className="text-xs text-muted-foreground">Per donation</p>
             </CardContent>
@@ -299,10 +240,17 @@ export default function IndividualDonorDetailPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {new Date(donor.lastDonation).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                {donor.lastDonation
+  ? new Date(donor.lastDonation).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    })
+  : "N/A"}
               </div>
               <p className="text-xs text-muted-foreground">
-                {new Date(donor.lastDonation).getFullYear()}
+                {donor.lastDonation
+  ? new Date(donor.lastDonation).getFullYear()
+  : ""}
               </p>
             </CardContent>
           </Card>
@@ -434,7 +382,7 @@ export default function IndividualDonorDetailPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {donor.donationHistory.map((donation) => (
+                    {donor.donationHistory.map((donation: any) => (
                       <TableRow key={donation.id}>
                         <TableCell>
                           {new Date(donation.date).toLocaleDateString()}

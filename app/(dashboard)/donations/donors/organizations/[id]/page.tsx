@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { createClient } from "@/lib/supabase/client"
 import { useParams } from "next/navigation"
 import Link from "next/link"
 import {
@@ -52,156 +53,81 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 
-// Mock organization donor data
-const mockOrganizations: Record<string, {
-  id: string
-  name: string
-  type: string
-  contact: string
-  email: string
-  phone: string
-  address: {
-    street: string
-    city: string
-    state: string
-    zip: string
-  }
-  totalDonations: number
-  donationCount: number
-  hasPledge: boolean
-  pledgeInfo?: {
-    amount: number
-    frequency: string
-    nextPayment: string
-    remaining: number
-  }
-  preferredCategory: string
-  notes: string
-  status: string
-  donationHistory: {
-    id: string
-    date: string
-    amount: number
-    category: string
-    method: string
-    receipt: string
-  }[]
-  createdAt: string
-  lastDonation: string
-}> = {
-  "org-1": {
-    id: "org-1",
-    name: "Al-Noor Foundation",
-    type: "Non-Profit",
-    contact: "Sarah Williams",
-    email: "contact@alnoor.org",
-    phone: "+1 (555) 111-2222",
-    address: {
-      street: "100 Foundation Drive",
-      city: "Springfield",
-      state: "IL",
-      zip: "62702",
-    },
-    totalDonations: 75000,
-    donationCount: 24,
-    hasPledge: true,
-    pledgeInfo: {
-      amount: 5000,
-      frequency: "Monthly",
-      nextPayment: "2024-02-18",
-      remaining: 45000,
-    },
-    preferredCategory: "Operations",
-    notes: "Long-term partner. Interested in joint programs. Annual gala sponsor.",
-    status: "Major Donor",
-    donationHistory: [
-      { id: "d1", date: "2024-01-18", amount: 5000, category: "Operations", method: "Bank Transfer", receipt: "REC-O001" },
-      { id: "d2", date: "2023-12-18", amount: 5000, category: "Operations", method: "Bank Transfer", receipt: "REC-O002" },
-      { id: "d3", date: "2023-11-18", amount: 10000, category: "Special Campaign", method: "Check", receipt: "REC-O003" },
-      { id: "d4", date: "2023-10-18", amount: 5000, category: "Operations", method: "Bank Transfer", receipt: "REC-O004" },
-      { id: "d5", date: "2023-09-18", amount: 5000, category: "Operations", method: "Bank Transfer", receipt: "REC-O005" },
-    ],
-    createdAt: "2019-01-10",
-    lastDonation: "2024-01-18",
-  },
-  "org-4": {
-    id: "org-4",
-    name: "Barakah Holdings LLC",
-    type: "Corporate",
-    contact: "Michael Chen",
-    email: "csr@barakahholdings.com",
-    phone: "+1 (555) 444-5555",
-    address: {
-      street: "750 Business Park",
-      city: "Schaumburg",
-      state: "IL",
-      zip: "60173",
-    },
-    totalDonations: 100000,
-    donationCount: 36,
-    hasPledge: true,
-    pledgeInfo: {
-      amount: 10000,
-      frequency: "Quarterly",
-      nextPayment: "2024-04-01",
-      remaining: 30000,
-    },
-    preferredCategory: "Special Campaigns",
-    notes: "Corporate matching program. CEO on advisory board. Prefer naming opportunities.",
-    status: "Major Donor",
-    donationHistory: [
-      { id: "d1", date: "2024-01-22", amount: 10000, category: "Special Campaigns", method: "Wire Transfer", receipt: "REC-B001" },
-      { id: "d2", date: "2023-10-01", amount: 10000, category: "Special Campaigns", method: "Wire Transfer", receipt: "REC-B002" },
-      { id: "d3", date: "2023-07-01", amount: 25000, category: "Building Fund", method: "Check", receipt: "REC-B003" },
-      { id: "d4", date: "2023-04-01", amount: 10000, category: "Special Campaigns", method: "Wire Transfer", receipt: "REC-B004" },
-    ],
-    createdAt: "2018-05-15",
-    lastDonation: "2024-01-22",
-  },
-}
-
-// Default organization for unknown IDs
-const defaultOrganization = {
-  id: "unknown",
-  name: "Crescent Medical Group",
-  type: "Corporate",
-  contact: "Dr. James Foster",
-  email: "giving@crescentmed.com",
-  phone: "+1 (555) 222-3333",
-  address: {
-    street: "500 Health Blvd",
-    city: "Chicago",
-    state: "IL",
-    zip: "60606",
-  },
-  totalDonations: 50000,
-  donationCount: 12,
-  hasPledge: true,
-  pledgeInfo: {
-    amount: 2500,
-    frequency: "Monthly",
-    nextPayment: "2024-02-12",
-    remaining: 22500,
-  },
-  preferredCategory: "Programs",
-  notes: "Healthcare focus. Interested in health education programs.",
-  status: "Active",
-  donationHistory: [
-    { id: "d1", date: "2024-01-12", amount: 2500, category: "Programs", method: "Bank Transfer", receipt: "REC-C001" },
-    { id: "d2", date: "2023-12-12", amount: 2500, category: "Programs", method: "Bank Transfer", receipt: "REC-C002" },
-    { id: "d3", date: "2023-11-12", amount: 5000, category: "Health Initiative", method: "Check", receipt: "REC-C003" },
-  ],
-  createdAt: "2020-09-01",
-  lastDonation: "2024-01-12",
-}
 
 export default function OrganizationDonorDetailPage() {
-  const params = useParams()
-  const org = mockOrganizations[params.id as string] || defaultOrganization
+  const [donor, setDonor] = useState<any>(null)
+
+const params = useParams()
+const supabase = createClient()
   
   const [isEditing, setIsEditing] = useState(false)
   const [showRecordDonation, setShowRecordDonation] = useState(false)
+  useEffect(() => {
+  const fetchDonor = async () => {
+    const { data, error } = await supabase
+      .from("donors")
+      .select("*")
+      .eq("id", params.id as string)
+      .single()
 
+    if (error) {
+      console.error("Error loading organization donor:", error)
+      return
+    }
+
+    const { data: payments } = await supabase
+      .from("payments")
+      .select("*")
+      .eq("donor_id", data.id)
+      .order("payment_date", { ascending: false })
+
+    setDonor({
+      id: data.id,
+      name: data.full_name,
+      email: data.email,
+      phone: data.phone,
+      status: data.status || "Active",
+      hasPledge: data.has_pledge || false,
+      preferredCategory: data.preferred_category || "",
+      address: {
+        street: data.street || "",
+        city: data.city || "",
+        state: data.state || "",
+        zip: data.zip || "",
+      },
+      contact: data.contact_person || "",
+      type: data.organization_type || "",
+
+      totalDonations: (payments || []).reduce(
+        (sum: number, p: any) => sum + Number(p.amount || 0),
+        0
+      ),
+
+      donationCount: (payments || []).length,
+
+      lastDonation:
+        payments && payments.length > 0
+          ? payments[0].payment_date
+          : "",
+
+      notes: data.notes || "",
+
+      donationHistory: (payments || []).map((p: any) => ({
+        id: p.id,
+        date: p.payment_date,
+        amount: p.amount,
+        category: p.category || "General",
+        method: p.source || "Unknown",
+        receipt: p.id,
+      })),
+
+      createdAt: data.created_at,
+    })
+  }
+
+  fetchDonor()
+}, [params.id])
+if (!donor) return <div className="p-6">Loading...</div>
   return (
     <>
       <Header title="Organization Donor Details" />
@@ -224,17 +150,17 @@ export default function OrganizationDonorDetailPage() {
             </div>
             <div>
               <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold">{org.name}</h1>
-                <Badge variant={org.status === "Major Donor" ? "default" : "secondary"}>
-                  {org.status}
+                <h1 className="text-2xl font-bold">{donor.name}</h1>
+                <Badge variant={donor.status === "Major Donor" ? "default" : "secondary"}>
+                  {donor.status}
                 </Badge>
-                {org.hasPledge && (
+                {donor.hasPledge && (
                   <Badge variant="outline">Active Pledge</Badge>
                 )}
               </div>
-              <p className="text-muted-foreground">{org.type} Organization</p>
+              <p className="text-muted-foreground">{donor.type} Organization</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                Partner since {new Date(org.createdAt).toLocaleDateString()}
+                Partner since {new Date(donor.createdAt).toLocaleDateString()}
               </p>
             </div>
           </div>
@@ -275,7 +201,7 @@ export default function OrganizationDonorDetailPage() {
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${org.totalDonations.toLocaleString()}</div>
+              <div className="text-2xl font-bold">${donor.totalDonations.toLocaleString()}</div>
               <p className="text-xs text-muted-foreground">All-time contributions</p>
             </CardContent>
           </Card>
@@ -287,7 +213,7 @@ export default function OrganizationDonorDetailPage() {
               <Heart className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{org.donationCount}</div>
+              <div className="text-2xl font-bold">{donor.donationCount}</div>
               <p className="text-xs text-muted-foreground">Total donations made</p>
             </CardContent>
           </Card>
@@ -300,7 +226,9 @@ export default function OrganizationDonorDetailPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                ${Math.round(org.totalDonations / org.donationCount).toLocaleString()}
+                ${donor.donationCount > 0
+  ? Math.round(donor.totalDonations / donor.donationCount).toLocaleString()
+  : "0"}
               </div>
               <p className="text-xs text-muted-foreground">Per donation</p>
             </CardContent>
@@ -314,10 +242,17 @@ export default function OrganizationDonorDetailPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {new Date(org.lastDonation).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                {donor.lastDonation
+  ? new Date(donor.lastDonation).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    })
+  : "N/A"}
               </div>
               <p className="text-xs text-muted-foreground">
-                {new Date(org.lastDonation).getFullYear()}
+                {donor.lastDonation
+  ? new Date(donor.lastDonation).getFullYear()
+  : ""}
               </p>
             </CardContent>
           </Card>
@@ -327,7 +262,7 @@ export default function OrganizationDonorDetailPage() {
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="donations">Donation History</TabsTrigger>
-            {org.hasPledge && <TabsTrigger value="pledge">Pledge</TabsTrigger>}
+            {donor.hasPledge && <TabsTrigger value="pledge">Pledge</TabsTrigger>}
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
@@ -343,7 +278,7 @@ export default function OrganizationDonorDetailPage() {
                     <div className="flex-1">
                       <Label className="text-xs text-muted-foreground">Organization Type</Label>
                       {isEditing ? (
-                        <Select defaultValue={org.type}>
+                        <Select defaultValue={donor.type}>
                           <SelectTrigger className="mt-1">
                             <SelectValue />
                           </SelectTrigger>
@@ -356,7 +291,7 @@ export default function OrganizationDonorDetailPage() {
                           </SelectContent>
                         </Select>
                       ) : (
-                        <p className="font-medium">{org.type}</p>
+                        <p className="font-medium">{donor.type}</p>
                       )}
                     </div>
                   </div>
@@ -366,9 +301,9 @@ export default function OrganizationDonorDetailPage() {
                     <div className="flex-1">
                       <Label className="text-xs text-muted-foreground">Contact Person</Label>
                       {isEditing ? (
-                        <Input defaultValue={org.contact} className="mt-1" />
+                        <Input defaultValue={donor.contact} className="mt-1" />
                       ) : (
-                        <p className="font-medium">{org.contact}</p>
+                        <p className="font-medium">{donor.contact}</p>
                       )}
                     </div>
                   </div>
@@ -378,9 +313,9 @@ export default function OrganizationDonorDetailPage() {
                     <div className="flex-1">
                       <Label className="text-xs text-muted-foreground">Email</Label>
                       {isEditing ? (
-                        <Input defaultValue={org.email} className="mt-1" />
+                        <Input defaultValue={donor.email} className="mt-1" />
                       ) : (
-                        <p className="font-medium">{org.email}</p>
+                        <p className="font-medium">{donor.email}</p>
                       )}
                     </div>
                   </div>
@@ -390,9 +325,9 @@ export default function OrganizationDonorDetailPage() {
                     <div className="flex-1">
                       <Label className="text-xs text-muted-foreground">Phone</Label>
                       {isEditing ? (
-                        <Input defaultValue={org.phone} className="mt-1" />
+                        <Input defaultValue={donor.phone} className="mt-1" />
                       ) : (
-                        <p className="font-medium">{org.phone}</p>
+                        <p className="font-medium">{donor.phone}</p>
                       )}
                     </div>
                   </div>
@@ -403,17 +338,17 @@ export default function OrganizationDonorDetailPage() {
                       <Label className="text-xs text-muted-foreground">Address</Label>
                       {isEditing ? (
                         <div className="mt-1 space-y-2">
-                          <Input defaultValue={org.address.street} placeholder="Street" />
+                          <Input defaultValue={donor.address.street} placeholder="Street" />
                           <div className="grid grid-cols-3 gap-2">
-                            <Input defaultValue={org.address.city} placeholder="City" />
-                            <Input defaultValue={org.address.state} placeholder="State" />
-                            <Input defaultValue={org.address.zip} placeholder="ZIP" />
+                            <Input defaultValue={donor.address.city} placeholder="City" />
+                            <Input defaultValue={donor.address.state} placeholder="State" />
+                            <Input defaultValue={donor.address.zip} placeholder="ZIP" />
                           </div>
                         </div>
                       ) : (
                         <p className="font-medium">
-                          {org.address.street}<br />
-                          {org.address.city}, {org.address.state} {org.address.zip}
+                          {donor.address.street}<br />
+                          {donor.address.city}, {donor.address.state} {donor.address.zip}
                         </p>
                       )}
                     </div>
@@ -430,7 +365,7 @@ export default function OrganizationDonorDetailPage() {
                   <div>
                     <Label className="text-xs text-muted-foreground">Preferred Category</Label>
                     {isEditing ? (
-                      <Select defaultValue={org.preferredCategory}>
+                      <Select defaultValue={donor.preferredCategory}>
                         <SelectTrigger className="mt-1">
                           <SelectValue />
                         </SelectTrigger>
@@ -443,16 +378,16 @@ export default function OrganizationDonorDetailPage() {
                         </SelectContent>
                       </Select>
                     ) : (
-                      <p className="mt-1 font-medium">{org.preferredCategory}</p>
+                      <p className="mt-1 font-medium">{donor.preferredCategory}</p>
                     )}
                   </div>
                   <Separator />
                   <div>
                     <Label className="text-xs text-muted-foreground">Notes</Label>
                     {isEditing ? (
-                      <Textarea defaultValue={org.notes} className="mt-1" rows={4} />
+                      <Textarea defaultValue={donor.notes} className="mt-1" rows={4} />
                     ) : (
-                      <p className="mt-1 text-sm">{org.notes || "No notes"}</p>
+                      <p className="mt-1 text-sm">{donor.notes || "No notes"}</p>
                     )}
                   </div>
                 </CardContent>
@@ -484,7 +419,7 @@ export default function OrganizationDonorDetailPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {org.donationHistory.map((donation) => (
+                    {donor.donationHistory.map((donation: any) => (
                       <TableRow key={donation.id}>
                         <TableCell>
                           {new Date(donation.date).toLocaleDateString()}
@@ -507,7 +442,7 @@ export default function OrganizationDonorDetailPage() {
             </Card>
           </TabsContent>
 
-          {org.hasPledge && org.pledgeInfo && (
+          {donor.hasPledge && donor.pledgeInfo && (
             <TabsContent value="pledge">
               <Card>
                 <CardHeader>
@@ -518,18 +453,18 @@ export default function OrganizationDonorDetailPage() {
                   <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
                     <div>
                       <Label className="text-xs text-muted-foreground">Pledge Amount</Label>
-                      <p className="mt-1 text-2xl font-bold">${org.pledgeInfo.amount.toLocaleString()}</p>
-                      <p className="text-sm text-muted-foreground">{org.pledgeInfo.frequency}</p>
+                      <p className="mt-1 text-2xl font-bold">${donor.pledgeInfo.amount.toLocaleString()}</p>
+                      <p className="text-sm text-muted-foreground">{donor.pledgeInfo.frequency}</p>
                     </div>
                     <div>
                       <Label className="text-xs text-muted-foreground">Next Payment</Label>
                       <p className="mt-1 text-lg font-medium">
-                        {new Date(org.pledgeInfo.nextPayment).toLocaleDateString()}
+                        {new Date(donor.pledgeInfo.nextPayment).toLocaleDateString()}
                       </p>
                     </div>
                     <div>
                       <Label className="text-xs text-muted-foreground">Remaining Balance</Label>
-                      <p className="mt-1 text-lg font-medium">${org.pledgeInfo.remaining.toLocaleString()}</p>
+                      <p className="mt-1 text-lg font-medium">${donor.pledgeInfo.remaining.toLocaleString()}</p>
                     </div>
                     <div>
                       <Label className="text-xs text-muted-foreground">Status</Label>
@@ -549,7 +484,7 @@ export default function OrganizationDonorDetailPage() {
           <DialogHeader>
             <DialogTitle>Record Donation</DialogTitle>
             <DialogDescription>
-              Record a new donation from {org.name}
+              Record a new donation from {donor.name}
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-4 py-4">

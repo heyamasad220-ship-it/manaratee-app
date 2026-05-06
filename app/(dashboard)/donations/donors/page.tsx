@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { createClient } from "@/lib/supabase/client"
 import Link from "next/link"
 import { Header } from "@/components/layout/header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -50,153 +51,8 @@ import {
 const tabs = ["Individuals", "Organizations"] as const
 type Tab = (typeof tabs)[number]
 
-// Mock individual donors
-const individuals = [
-  {
-    id: "ind-1",
-    name: "Ahmed Hassan",
-    email: "ahmed.hassan@email.com",
-    phone: "+1 (555) 123-4567",
-    address: "123 Oak Street, Springfield, IL 62701",
-    totalDonations: 12500,
-    donationCount: 15,
-    lastDonation: "2024-01-15",
-    preferredCategory: "Operations",
-    status: "Active",
-    hasPledge: true,
-  },
-  {
-    id: "ind-2",
-    name: "Fatima Al-Rahman",
-    email: "fatima.ar@email.com",
-    phone: "+1 (555) 234-5678",
-    address: "456 Maple Ave, Chicago, IL 60601",
-    totalDonations: 8750,
-    donationCount: 8,
-    lastDonation: "2024-01-08",
-    preferredCategory: "Programs",
-    status: "Active",
-    hasPledge: false,
-  },
-  {
-    id: "ind-3",
-    name: "Omar Khalil",
-    email: "omar.k@email.com",
-    phone: "+1 (555) 345-6789",
-    address: "789 Pine Road, Naperville, IL 60540",
-    totalDonations: 25000,
-    donationCount: 24,
-    lastDonation: "2024-01-20",
-    preferredCategory: "Community Support",
-    status: "Major Donor",
-    hasPledge: true,
-  },
-  {
-    id: "ind-4",
-    name: "Aisha Mahmoud",
-    email: "aisha.m@email.com",
-    phone: "+1 (555) 456-7890",
-    address: "321 Elm Street, Evanston, IL 60201",
-    totalDonations: 3200,
-    donationCount: 4,
-    lastDonation: "2023-12-10",
-    preferredCategory: "Zakat",
-    status: "Active",
-    hasPledge: false,
-  },
-  {
-    id: "ind-5",
-    name: "Yusuf Ibrahim",
-    email: "y.ibrahim@email.com",
-    phone: "+1 (555) 567-8901",
-    address: "654 Cedar Lane, Oak Park, IL 60302",
-    totalDonations: 950,
-    donationCount: 2,
-    lastDonation: "2023-11-25",
-    preferredCategory: "Sadaqah",
-    status: "New",
-    hasPledge: false,
-  },
-]
 
-// Mock organization donors
-const organizations = [
-  {
-    id: "org-1",
-    name: "Al-Noor Foundation",
-    type: "Non-Profit",
-    contact: "Sarah Williams",
-    email: "contact@alnoor.org",
-    phone: "+1 (555) 111-2222",
-    address: "100 Foundation Drive, Springfield, IL 62702",
-    totalDonations: 75000,
-    donationCount: 24,
-    lastDonation: "2024-01-18",
-    preferredCategory: "Operations",
-    status: "Major Donor",
-    hasPledge: true,
-  },
-  {
-    id: "org-2",
-    name: "Crescent Medical Group",
-    type: "Corporate",
-    contact: "Dr. James Foster",
-    email: "giving@crescentmed.com",
-    phone: "+1 (555) 222-3333",
-    address: "500 Health Blvd, Chicago, IL 60606",
-    totalDonations: 50000,
-    donationCount: 12,
-    lastDonation: "2024-01-12",
-    preferredCategory: "Programs",
-    status: "Active",
-    hasPledge: true,
-  },
-  {
-    id: "org-3",
-    name: "Unity Islamic School",
-    type: "Educational",
-    contact: "Patricia Moore",
-    email: "admin@unityschool.edu",
-    phone: "+1 (555) 333-4444",
-    address: "200 School Street, Lincoln, IL 62656",
-    totalDonations: 15000,
-    donationCount: 8,
-    lastDonation: "2024-01-05",
-    preferredCategory: "Community Support",
-    status: "Active",
-    hasPledge: false,
-  },
-  {
-    id: "org-4",
-    name: "Barakah Holdings LLC",
-    type: "Corporate",
-    contact: "Michael Chen",
-    email: "csr@barakahholdings.com",
-    phone: "+1 (555) 444-5555",
-    address: "750 Business Park, Schaumburg, IL 60173",
-    totalDonations: 100000,
-    donationCount: 36,
-    lastDonation: "2024-01-22",
-    preferredCategory: "Special Campaigns",
-    status: "Major Donor",
-    hasPledge: true,
-  },
-  {
-    id: "org-5",
-    name: "Helping Hands Charity",
-    type: "Non-Profit",
-    contact: "Linda Garcia",
-    email: "info@helpinghands.org",
-    phone: "+1 (555) 555-6666",
-    address: "300 Charity Lane, Aurora, IL 60506",
-    totalDonations: 8500,
-    donationCount: 6,
-    lastDonation: "2023-12-20",
-    preferredCategory: "Zakat",
-    status: "Active",
-    hasPledge: false,
-  },
-]
+
 
 export default function DonorsPage() {
   const [activeTab, setActiveTab] = useState<Tab>("Individuals")
@@ -206,18 +62,61 @@ export default function DonorsPage() {
   const [statusFilterOrg, setStatusFilterOrg] = useState("all")
   const [showAddIndividualDialog, setShowAddIndividualDialog] = useState(false)
   const [showAddOrganizationDialog, setShowAddOrganizationDialog] = useState(false)
+  const [allDonors, setAllDonors] = useState<any[]>([])
+const supabase = createClient()
+
+useEffect(() => {
+  const fetchDonors = async () => {
+    const { data, error } = await supabase
+      .from("donors") // Make sure this matches your actual table name
+      .select("*")
+
+    if (error) {
+      console.error("Error fetching donors:", error)
+    } else {
+      setAllDonors(
+  (data || []).map((d) => ({
+    id: d.id,
+    donor_type: d.donor_type,
+    name: d.full_name, // adjust if needed
+    email: d.email,
+    phone: d.phone,
+    totalDonations: d.total_donations || 0,
+    donationCount: d.donation_count || 0,
+    lastDonation: d.last_donation || "",
+    preferredCategory: d.preferred_category || "",
+    status: d.status || "Active",
+    hasPledge: d.has_pledge || false,
+    contact: d.contact_person || "",
+    type: d.organization_type || "",
+  }))
+)
+    }
+  }
+
+  fetchDonors()
+
+}, [])
+  
+ const individuals = allDonors.filter(
+  (d) => (d.donor_type || "").toLowerCase() === "individual"
+)
+
+const organizations = allDonors.filter(
+  (d) => (d.donor_type || "").toLowerCase() === "organization"
+)
 
   const filteredIndividuals = individuals.filter((ind) => {
-    const matchesSearch = ind.name.toLowerCase().includes(searchIndividuals.toLowerCase()) ||
-      ind.email.toLowerCase().includes(searchIndividuals.toLowerCase())
+    const matchesSearch = (ind.name || "").toLowerCase().includes(searchIndividuals.toLowerCase()) ||
+    (ind.email || "").toLowerCase().includes(searchIndividuals.toLowerCase())
     const matchesStatus = statusFilterInd === "all" || ind.status === statusFilterInd
     return matchesSearch && matchesStatus
   })
 
   const filteredOrganizations = organizations.filter((org) => {
-    const matchesSearch = org.name.toLowerCase().includes(searchOrganizations.toLowerCase()) ||
-      org.email.toLowerCase().includes(searchOrganizations.toLowerCase()) ||
-      org.contact.toLowerCase().includes(searchOrganizations.toLowerCase())
+    const matchesSearch = (org.name || "").toLowerCase().includes(searchOrganizations.toLowerCase()) ||
+      (org.email || "").toLowerCase().includes(searchOrganizations.toLowerCase()) ||
+      (org.contact || "").toLowerCase().includes(searchOrganizations.toLowerCase())
     const matchesStatus = statusFilterOrg === "all" || org.status === statusFilterOrg
     return matchesSearch && matchesStatus
   })
@@ -378,7 +277,7 @@ export default function DonorsPage() {
                           <div className="flex items-center gap-3">
                             <Avatar className="h-9 w-9">
                               <AvatarFallback className="bg-primary/10 text-primary">
-                                {donor.name.split(" ").map(n => n[0]).join("")}
+                                {donor.name.split(" ").map((n: string) => n[0]).join("")}
                               </AvatarFallback>
                             </Avatar>
                             <div>
@@ -498,6 +397,13 @@ export default function DonorsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
+                    {filteredOrganizations.length === 0 && (
+  <TableRow>
+    <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+      No organization donors found.
+    </TableCell>
+  </TableRow>
+)}
                     {filteredOrganizations.map((org) => (
                       <TableRow key={org.id}>
                         <TableCell>

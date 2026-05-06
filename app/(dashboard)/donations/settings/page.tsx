@@ -1,6 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { createClient } from "@/lib/supabase/client"
+import { getCurrentOrganizationId } from "@/lib/current-organization"
 import { Header } from "@/components/layout/header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -37,22 +39,19 @@ import { cn } from "@/lib/utils"
 const settingsTabs = ["General", "Campaigns", "Categories", "Payment Methods", "Receipts", "Notifications"] as const
 type SettingsTab = (typeof settingsTabs)[number]
 
-const defaultCategories = [
-  { id: "c-1", name: "Zakat", description: "Obligatory alms giving", taxDeductible: true },
-  { id: "c-2", name: "Sadaqah", description: "Voluntary charity", taxDeductible: true },
-  { id: "c-3", name: "Operations", description: "General operating expenses", taxDeductible: true },
-  { id: "c-4", name: "Building Fund", description: "Construction and renovation", taxDeductible: true },
-  { id: "c-5", name: "Youth Programs", description: "Youth education and activities", taxDeductible: true },
-  { id: "c-6", name: "Community Support", description: "Assistance for community members", taxDeductible: false },
-]
+interface Category {
+  id: string
+  name: string
+  description: string
+  taxDeductible: boolean
+}
 
-const defaultPaymentMethods = [
-  { id: "pm-1", name: "Credit Card", enabled: true, fee: "2.9% + $0.30" },
-  { id: "pm-2", name: "Bank Transfer", enabled: true, fee: "None" },
-  { id: "pm-3", name: "Check", enabled: true, fee: "None" },
-  { id: "pm-4", name: "Cash", enabled: true, fee: "None" },
-  { id: "pm-5", name: "PayPal", enabled: false, fee: "2.9% + $0.30" },
-]
+interface PaymentMethod {
+  id: string
+  name: string
+  enabled: boolean
+  fee: string
+}
 
 interface Campaign {
   id: string
@@ -63,28 +62,169 @@ interface Campaign {
   startDate: string
   endDate: string
   status: "Active" | "Completed" | "Draft" | "Paused"
+  campaignCode?: string
 }
 
-const defaultCampaigns: Campaign[] = [
-  { id: "camp-1", name: "Building Fund 2024", description: "Expansion and renovation project", goalAmount: 500000, raisedAmount: 245000, startDate: "2024-01-01", endDate: "2024-12-31", status: "Active" },
-  { id: "camp-2", name: "Ramadan Campaign 2024", description: "Support community programs during Ramadan", goalAmount: 75000, raisedAmount: 75000, startDate: "2024-03-01", endDate: "2024-04-15", status: "Completed" },
-  { id: "camp-3", name: "Youth Programs 2024", description: "Fund youth education and activities", goalAmount: 50000, raisedAmount: 28000, startDate: "2024-01-01", endDate: "2024-12-31", status: "Active" },
-  { id: "camp-4", name: "Zakat Fund", description: "Ongoing zakat collection for eligible recipients", goalAmount: 100000, raisedAmount: 67500, startDate: "2024-01-01", endDate: "2024-12-31", status: "Active" },
-  { id: "camp-5", name: "Education Fund", description: "Scholarships and educational resources", goalAmount: 30000, raisedAmount: 12000, startDate: "2024-06-01", endDate: "2025-05-31", status: "Active" },
-  { id: "camp-6", name: "Summer Camp 2025", description: "Annual summer camp for youth", goalAmount: 25000, raisedAmount: 0, startDate: "2025-06-01", endDate: "2025-08-31", status: "Draft" },
-]
-
 export default function DonationsSettingsPage() {
+  const supabase = createClient()
   const [activeTab, setActiveTab] = useState<SettingsTab>("General")
-  const [categories, setCategories] = useState(defaultCategories)
-  const [paymentMethods, setPaymentMethods] = useState(defaultPaymentMethods)
-  const [campaigns, setCampaigns] = useState(defaultCampaigns)
+  const [categories, setCategories] = useState<Category[]>([])
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([])
+  const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [showAddCategoryDialog, setShowAddCategoryDialog] = useState(false)
   const [showCampaignDialog, setShowCampaignDialog] = useState(false)
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null)
+  const [campaignForm, setCampaignForm] = useState({
+    name: "",
+    description: "",
+    goalAmount: "",
+    startDate: "",
+    endDate: "",
+    status: "Draft" as Campaign["status"],
+    campaignCode: "",
+  })
 
+async function loadCampaigns() {
+  const orgId = await getCurrentOrganizationId()
+
+  if (!orgId) {
+    setCampaigns([])
+    return
+  }
+
+  const { data, error } = await supabase
+    .from("campaigns")
+    .select("*")
+    .eq("organization_id", orgId)
+    .order("created_at", { ascending: false })
+
+  if (error) {
+    console.error("Error loading campaigns:", error)
+    setCampaigns([])
+    return
+  }
+
+  setCampaigns(
+    (data || []).map((c: any) => ({
+      id: c.id,
+      name: c.name,
+      description: "",
+      goalAmount: 0,
+      raisedAmount: 0,
+      startDate: c.start_date || "",
+      endDate: c.end_date || "",
+      status: c.status || "Draft",
+      campaignCode: c.code || "",
+    }))
+  )
+}
+
+async function loadCategories() {
+  const orgId = await getCurrentOrganizationId()
+
+  if (!orgId) {
+    setCategories([])
+    return
+  }
+
+  const { data, error } = await supabase
+    .from("donation_categories")
+    .select("*")
+    .eq("organization_id", orgId)
+    .order("created_at", { ascending: false })
+
+  if (error) {
+    console.error("Error loading categories:", error)
+    setCategories([])
+    return
+  }
+
+  setCategories(
+    (data || []).map((c: any) => ({
+      id: c.id,
+      name: c.name,
+      description: c.description || "",
+      taxDeductible: c.tax_deductible || false,
+    }))
+  )
+}
+
+async function loadPaymentMethods() {
+  const orgId = await getCurrentOrganizationId()
+
+  if (!orgId) {
+    setPaymentMethods([])
+    return
+  }
+
+  const { data, error } = await supabase
+    .from("payment_methods")
+    .select("*")
+    .eq("organization_id", orgId)
+    .order("created_at", { ascending: false })
+
+  if (error) {
+    console.error("Error loading payment methods:", error)
+    setPaymentMethods([])
+    return
+  }
+
+  setPaymentMethods(
+    (data || []).map((pm: any) => ({
+      id: pm.id,
+      name: pm.name,
+      enabled: pm.enabled || false,
+      fee: pm.fee || "None",
+    }))
+  )
+}
+
+useEffect(() => {
+  loadCampaigns()
+  loadCategories()
+  loadPaymentMethods()
+}, [])
+
+useEffect(() => {
+  if (editingCampaign) {
+    setCampaignForm({
+      name: editingCampaign.name,
+      description: editingCampaign.description,
+      goalAmount: editingCampaign.goalAmount.toString(),
+      startDate: editingCampaign.startDate,
+      endDate: editingCampaign.endDate,
+      status: editingCampaign.status,
+      campaignCode: editingCampaign.campaignCode || "",
+    })
+  } else {
+    setCampaignForm({
+      name: "",
+      description: "",
+      goalAmount: "",
+      startDate: "",
+      endDate: "",
+      status: "Draft",
+      campaignCode: "",
+    })
+  }
+}, [editingCampaign])
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(amount)
+  }
+
+  const formatDate = (dateString: string) => {
+    if (!dateString) return ""
+    // Parse date as local date to avoid timezone offset issues
+    const date = new Date(dateString + "T00:00:00")
+    return date.toLocaleDateString()
+  }
+
+  const generateCampaignCode = (campaignName: string) => {
+    // Create a code from the campaign name: take first letter of each word, uppercase, and add random suffix
+    const words = campaignName.trim().split(/\s+/)
+    const codePrefix = words.map(word => word.charAt(0).toUpperCase()).join('')
+    const randomSuffix = Math.random().toString(36).substring(2, 5).toUpperCase()
+    return `${codePrefix}${randomSuffix}`
   }
 
   const getCampaignStatusBadge = (status: Campaign["status"]) => {
@@ -99,7 +239,101 @@ export default function DonationsSettingsPage() {
         return <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700">Paused</span>
     }
   }
+async function handleSaveCampaign() {
+  const orgId = await getCurrentOrganizationId()
 
+  if (!orgId) {
+    alert("No organization selected")
+    return
+  }
+
+  if (!campaignForm.name.trim()) {
+    alert("Campaign name is required")
+    return
+  }
+
+  // Check for duplicate campaign names (excluding current campaign if editing)
+  const existingCampaign = campaigns.find(c => 
+    c.name.toLowerCase() === campaignForm.name.trim().toLowerCase() && 
+    (!editingCampaign || c.id !== editingCampaign.id)
+  )
+  
+  if (existingCampaign) {
+    alert("A campaign with this name already exists")
+    return
+  }
+
+  const campaignData = {
+    organization_id: orgId,
+    name: campaignForm.name.trim(),
+    start_date: campaignForm.startDate || null,
+    end_date: campaignForm.endDate || null,
+    status: campaignForm.status.toLowerCase(),
+  }
+
+  if (editingCampaign) {
+    // Update existing campaign
+    const { error } = await supabase
+      .from("campaigns")
+      .update(campaignData)
+      .eq("id", editingCampaign.id)
+
+    if (error) {
+      console.error("Error updating campaign:", error)
+      alert(error.message)
+      return
+    }
+  } else {
+    // Create new campaign with generated code
+    const campaignDataWithCode = {
+      ...campaignData,
+      code: generateCampaignCode(campaignForm.name.trim())
+    }
+
+    const { error } = await supabase
+      .from("campaigns")
+      .insert(campaignDataWithCode)
+
+    if (error) {
+      console.error("Error saving campaign:", error)
+      alert(error.message)
+      return
+    }
+  }
+
+  setShowCampaignDialog(false)
+  setEditingCampaign(null)
+  setCampaignForm({
+    name: "",
+    description: "",
+    goalAmount: "",
+    startDate: "",
+    endDate: "",
+    status: "Draft",
+    campaignCode: "",
+  })
+
+  await loadCampaigns()
+}
+
+async function handleDeleteCampaign(campaignId: string) {
+  if (!confirm("Are you sure you want to delete this campaign? This action cannot be undone.")) {
+    return
+  }
+
+  const { error } = await supabase
+    .from("campaigns")
+    .delete()
+    .eq("id", campaignId)
+
+  if (error) {
+    console.error("Error deleting campaign:", error)
+    alert(error.message)
+    return
+  }
+
+  await loadCampaigns()
+}
   return (
     <>
       <Header title="Donations Settings" />
@@ -231,6 +465,7 @@ export default function DonationsSettingsPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Campaign</TableHead>
+                      <TableHead>Code</TableHead>
                       <TableHead>Goal</TableHead>
                       <TableHead>Raised</TableHead>
                       <TableHead>Progress</TableHead>
@@ -248,6 +483,7 @@ export default function DonationsSettingsPage() {
                             <p className="text-sm text-muted-foreground">{campaign.description}</p>
                           </div>
                         </TableCell>
+                        <TableCell className="font-mono text-sm">{campaign.campaignCode || "—"}</TableCell>
                         <TableCell className="font-medium">{formatCurrency(campaign.goalAmount)}</TableCell>
                         <TableCell className="text-emerald-600 font-medium">{formatCurrency(campaign.raisedAmount)}</TableCell>
                         <TableCell>
@@ -264,7 +500,7 @@ export default function DonationsSettingsPage() {
                           </div>
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
-                          {new Date(campaign.startDate).toLocaleDateString()} - {new Date(campaign.endDate).toLocaleDateString()}
+                          {formatDate(campaign.startDate)} - {formatDate(campaign.endDate)}
                         </TableCell>
                         <TableCell>{getCampaignStatusBadge(campaign.status)}</TableCell>
                         <TableCell>
@@ -281,7 +517,7 @@ export default function DonationsSettingsPage() {
                               variant="ghost"
                               size="icon"
                               className="h-8 w-8 text-muted-foreground hover:text-red-600"
-                              onClick={() => setCampaigns(campaigns.filter((c) => c.id !== campaign.id))}
+                              onClick={() => handleDeleteCampaign(campaign.id)}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -584,18 +820,31 @@ export default function DonationsSettingsPage() {
             <div className="flex flex-col gap-2">
               <Label htmlFor="camp-name">Campaign Name</Label>
               <Input
-                id="camp-name"
-                placeholder="e.g., Building Fund 2025"
-                defaultValue={editingCampaign?.name || ""}
+  id="camp-name"
+  placeholder="e.g., Building Fund 2025"
+  value={campaignForm.name}
+  onChange={(e) => setCampaignForm(prev => ({ ...prev, name: e.target.value }))}
               />
             </div>
+            {editingCampaign && campaignForm.campaignCode && (
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="camp-code">Campaign Code</Label>
+                <Input
+                  id="camp-code"
+                  value={campaignForm.campaignCode}
+                  readOnly
+                  className="font-mono bg-muted"
+                />
+              </div>
+            )}
             <div className="flex flex-col gap-2">
               <Label htmlFor="camp-description">Description</Label>
               <Textarea
                 id="camp-description"
                 placeholder="Brief description of this campaign"
                 rows={2}
-                defaultValue={editingCampaign?.description || ""}
+                value={campaignForm.description}
+                onChange={(e) => setCampaignForm(prev => ({ ...prev, description: e.target.value }))}
               />
             </div>
             <div className="flex flex-col gap-2">
@@ -607,7 +856,8 @@ export default function DonationsSettingsPage() {
                   type="number"
                   placeholder="50000"
                   className="pl-7"
-                  defaultValue={editingCampaign?.goalAmount || ""}
+                  value={campaignForm.goalAmount}
+                  onChange={(e) => setCampaignForm(prev => ({ ...prev, goalAmount: e.target.value }))}
                 />
               </div>
             </div>
@@ -617,7 +867,8 @@ export default function DonationsSettingsPage() {
                 <Input
                   id="camp-start"
                   type="date"
-                  defaultValue={editingCampaign?.startDate || ""}
+                  value={campaignForm.startDate}
+                  onChange={(e) => setCampaignForm(prev => ({ ...prev, startDate: e.target.value }))}
                 />
               </div>
               <div className="flex flex-col gap-2">
@@ -625,13 +876,14 @@ export default function DonationsSettingsPage() {
                 <Input
                   id="camp-end"
                   type="date"
-                  defaultValue={editingCampaign?.endDate || ""}
+                  value={campaignForm.endDate}
+                  onChange={(e) => setCampaignForm(prev => ({ ...prev, endDate: e.target.value }))}
                 />
               </div>
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="camp-status">Status</Label>
-              <Select defaultValue={editingCampaign?.status || "Draft"}>
+              <Select value={campaignForm.status} onValueChange={(value: Campaign["status"]) => setCampaignForm(prev => ({ ...prev, status: value }))}>
                 <SelectTrigger id="camp-status">
                   <SelectValue />
                 </SelectTrigger>
@@ -646,7 +898,7 @@ export default function DonationsSettingsPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCampaignDialog(false)}>Cancel</Button>
-            <Button onClick={() => setShowCampaignDialog(false)}>
+            <Button onClick={handleSaveCampaign}>
               {editingCampaign ? "Save Changes" : "Add Campaign"}
             </Button>
           </DialogFooter>

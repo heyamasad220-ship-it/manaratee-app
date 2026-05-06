@@ -57,6 +57,7 @@ type PledgeStatus = "Open" | "Partial" | "Fulfilled";
 
 interface PledgeRow {
   id: string;
+  donor_id: string | null;
   donor_name: string;
   donor_type: string | null;
   campaign_name: string | null;
@@ -70,6 +71,7 @@ interface PledgeRow {
 
 interface Pledge {
   id: string;
+  donorId: string | null;
   donorName: string;
   donorType: string;
   totalAmount: number;
@@ -116,7 +118,7 @@ function formatDonorType(value: string | null): string {
 
 export default function PledgesPage() {
   const supabase = createClient();
-
+  const [showDonorList, setShowDonorList] = useState(false)
   const [organizationId, setOrganizationId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -141,6 +143,8 @@ export default function PledgesPage() {
   const [donorId, setDonorId] = useState("");
   const [campaignId, setCampaignId] = useState("");
   const [amount, setAmount] = useState("");
+  const [date, setDate] = useState("")
+  const [method, setMethod] = useState("cash")
   const [pledgeDate, setPledgeDate] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
@@ -150,6 +154,7 @@ export default function PledgesPage() {
   const [paymentSource, setPaymentSource] = useState("cash");
   const [paymentMemo, setPaymentMemo] = useState("");
   const [savingPayment, setSavingPayment] = useState(false);
+  const [donorSearch, setDonorSearch] = useState("")
 
   const fetchPledges = async () => {
     setLoading(true);
@@ -170,12 +175,12 @@ export default function PledgesPage() {
 
     const { data: donorsData, error: donorsError } = await supabase
       .from("donors")
-      .select("id, full_name")
+      .select("id,full_name")
       .eq("organization_id", orgId)
       .order("full_name", { ascending: true });
 
     if (donorsError) {
-      console.error("Error loading donors:", donorsError);
+      console.error("Error loading donors:", JSON.stringify(donorsError, null, 2));
       setDonors([]);
     } else {
       setDonors((donorsData || []) as DonorOption[]);
@@ -198,6 +203,7 @@ export default function PledgesPage() {
       .from("pledge_status_view")
       .select(`
         id,
+        donor_id,
         donor_name,
         donor_type,
         campaign_name,
@@ -220,6 +226,7 @@ export default function PledgesPage() {
 
     const mapped: Pledge[] = (data as PledgeRow[]).map((row) => ({
       id: row.id,
+      donorId: row.donor_id,
       donorName: row.donor_name,
       donorType: formatDonorType(row.donor_type),
       totalAmount: Number(row.amount_pledged ?? 0),
@@ -353,7 +360,7 @@ export default function PledgesPage() {
 
     const { error } = await supabase.from("payments").insert({
       organization_id: orgId,
-      donor_id: null,
+      donor_id: paymentPledge.donorId,
       pledge_id: paymentPledge.id,
       campaign_id: null,
       amount: Number(paymentAmount),
@@ -384,6 +391,7 @@ export default function PledgesPage() {
       .from("pledge_status_view")
       .select(`
         id,
+        donor_id,
         donor_name,
         donor_type,
         campaign_name,
@@ -405,6 +413,7 @@ export default function PledgesPage() {
 
     const updatedPledge: Pledge = {
       id: updatedPledgeRow.id,
+      donorId: updatedPledgeRow.donor_id ?? null,
       donorName: updatedPledgeRow.donor_name,
       donorType: formatDonorType(updatedPledgeRow.donor_type),
       totalAmount: Number(updatedPledgeRow.amount_pledged ?? 0),
@@ -455,6 +464,9 @@ export default function PledgesPage() {
     }
   };
 
+  const filteredDonorOptions = donors.filter((donor) =>
+  donor.full_name.toLowerCase().includes(donorSearch.toLowerCase())
+)
   return (
     <>
       <Header title="Pledges" />
@@ -684,18 +696,43 @@ export default function PledgesPage() {
           <div className="flex flex-col gap-4 py-4">
             <div className="flex flex-col gap-2">
               <Label htmlFor="donor">Donor</Label>
-              <Select value={donorId} onValueChange={setDonorId}>
-                <SelectTrigger id="donor">
-                  <SelectValue placeholder="Select donor" />
-                </SelectTrigger>
-                <SelectContent>
-                  {donors.map((donor) => (
-                    <SelectItem key={donor.id} value={donor.id}>
-                      {donor.full_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Input
+  placeholder="Search donor by name..."
+  value={donorSearch}
+  onFocus={() => setShowDonorList(true)}
+  onChange={(e) => {
+    setDonorSearch(e.target.value)
+    setShowDonorList(true)
+  }}
+/>
+{donorId && (
+  <div className="text-sm text-muted-foreground">
+    Selected:{" "}
+    <span className="font-medium">
+      {donors.find((d) => d.id === donorId)?.full_name}
+    </span>
+  </div>
+)}
+{showDonorList && (
+  <div className="max-h-48 overflow-y-auto rounded-md border">
+  {filteredDonorOptions.map((donor) => (
+    <button
+      key={donor.id}
+      type="button"
+      className={`block w-full px-3 py-2 text-left text-sm hover:bg-muted ${
+        donorId === donor.id ? "bg-muted font-medium" : ""
+      }`}
+      onClick={() => {
+        setDonorId(donor.id)
+        setDonorSearch(donor.full_name)
+        setShowDonorList(false)
+      }}
+    >
+      {donor.full_name}
+    </button>
+  ))}
+</div>
+)}
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
