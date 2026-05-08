@@ -460,7 +460,11 @@ if (existingContact) {
                 {filteredContacts.map((contact) => {
                   
                   return (
-                    <TableRow key={contact.id}>
+                    <TableRow
+  key={contact.id}
+  onClick={() => window.location.href = `/contacts/${contact.id}`}
+  className="cursor-pointer hover:bg-muted/50"
+>
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <Avatar className="h-9 w-9">

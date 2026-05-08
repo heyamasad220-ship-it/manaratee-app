@@ -45,7 +45,9 @@ const navItems: NavItem[] = [
   // Main
   { label: "Dashboard", href: "/dashboard", icon: Home, matchPrefix: "/dashboard" },
   
+  
   // Operations
+  /*
   {
     label: "Ticketing",
     href: "/events/tickets",
@@ -57,6 +59,8 @@ const navItems: NavItem[] = [
       { label: "Settings", href: "/tickets/settings", matchPrefix: "/tickets/settings" },
     ],
   },
+  */
+ /*
   {
     label: "Bookings",
     href: "/bookings/overview",
@@ -69,6 +73,8 @@ const navItems: NavItem[] = [
       { label: "Requests", href: "/events/external/emails", matchPrefix: "/events/external/emails" },
     ],
   },
+  */
+ /*
   {
     label: "Spaces",
     href: "/events/external/venues",
@@ -80,6 +86,8 @@ const navItems: NavItem[] = [
       { label: "Settings", href: "/bookings/settings", matchPrefix: "/bookings/settings" },
     ],
   },
+  */
+ /*
   {
     label: "Programs",
     href: "/programs",
@@ -96,6 +104,8 @@ const navItems: NavItem[] = [
       { label: "Settings", href: "/programs/settings", matchPrefix: "/programs/settings" },
     ],
   },
+  */
+ /*
   {
     label: "Bazaar",
     href: "/bazaar",
@@ -116,6 +126,7 @@ const navItems: NavItem[] = [
       { label: "Settings", href: "/bazaar/settings", matchPrefix: "/bazaar/settings" },
     ],
   },
+  */
 
   // People
   {
@@ -133,6 +144,7 @@ const navItems: NavItem[] = [
       { label: "Donors", href: "/donations/donors", matchPrefix: "/donations/donors" },
     ],
   },
+  /*
   {
     label: "Human Resources",
     href: "/hr",
@@ -149,6 +161,7 @@ const navItems: NavItem[] = [
       { label: "Settings", href: "/hr/settings", matchPrefix: "/hr/settings" },
     ],
   },
+  */
 
   // Financial
   {
@@ -168,6 +181,7 @@ const navItems: NavItem[] = [
       { label: "Settings", href: "/donations/settings", matchPrefix: "/donations/settings" },
     ],
   },
+  /*
   {
     label: "Billing",
     href: "/billing",
@@ -179,8 +193,10 @@ const navItems: NavItem[] = [
       { label: "Venue Payments", href: "/events/external/payments", matchPrefix: "/events/external/payments" },
     ],
   },
+  */
 
   // System
+  /*
   {
     label: "Reports",
     href: "/reports",
@@ -209,6 +225,7 @@ const navItems: NavItem[] = [
       { label: "Venue Rentals", href: "/events/external/settings", matchPrefix: "/events/external/settings" },
     ],
   },
+  */
 ]
 
 // Sidebar context for mobile state
