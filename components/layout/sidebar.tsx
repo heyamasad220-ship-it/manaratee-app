@@ -130,20 +130,12 @@ const navItems: NavItem[] = [
 
   // People
   {
-    label: "Contacts",
-    href: "/contacts",
-    icon: Users,
-    matchPrefix: "/contacts",
-    group: "People",
-    children: [
-      { label: "All Contacts", href: "/contacts", matchPrefix: "/contacts" },
-      { label: "Customers", href: "/contacts/customers", matchPrefix: "/contacts/customers" },
-      { label: "Volunteers", href: "/contacts/volunteers", matchPrefix: "/contacts/volunteers" },
-      { label: "Vendors", href: "/contacts/vendors", matchPrefix: "/contacts/vendors" },
-      { label: "Service Providers", href: "/contacts/service-providers", matchPrefix: "/contacts/service-providers" },
-      { label: "Donors", href: "/donations/donors", matchPrefix: "/donations/donors" },
-    ],
-  },
+  label: "Contacts",
+  href: "/contacts",
+  icon: Users,
+  matchPrefix: "/contacts",
+  group: "People",
+},
   /*
   {
     label: "Human Resources",

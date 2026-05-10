@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { useEffect } from "react"
+import { createClient } from "@/lib/supabase/client"
 import {
   Table,
   TableBody,
@@ -46,14 +48,8 @@ interface PlatformUser {
   status: "Active" | "Inactive"
 }
 
-const platformUsers: PlatformUser[] = [
-  { id: "u-1", name: "Ahmed Hassan", email: "ahmed@manaratee.com", role: "Super Admin", lastLogin: "Feb 23, 2026 - 9:15 AM", status: "Active" },
-  { id: "u-2", name: "Sarah Martinez", email: "sarah@manaratee.com", role: "Admin", lastLogin: "Feb 23, 2026 - 8:30 AM", status: "Active" },
-  { id: "u-3", name: "Omar Khalil", email: "omar@manaratee.com", role: "Admin", lastLogin: "Feb 22, 2026 - 4:45 PM", status: "Active" },
-  { id: "u-4", name: "Fatima Ali", email: "fatima@manaratee.com", role: "Support", lastLogin: "Feb 22, 2026 - 2:00 PM", status: "Active" },
-  { id: "u-5", name: "David Chen", email: "david@manaratee.com", role: "Support", lastLogin: "Feb 20, 2026 - 11:00 AM", status: "Active" },
-  { id: "u-6", name: "Aisha Patel", email: "aisha@manaratee.com", role: "Admin", lastLogin: "Feb 10, 2026 - 3:20 PM", status: "Inactive" },
-]
+const [platformUsers, setPlatformUsers] = useState<PlatformUser[]>([])
+const [loading, setLoading] = useState(true)
 
 const roleStyles: Record<string, string> = {
   "Super Admin": "bg-emerald-100 text-emerald-700 hover:bg-emerald-100",
@@ -76,6 +72,55 @@ export default function PlatformUsersPage() {
     return u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)
   })
 
+  const supabase = createClient()
+
+useEffect(() => {
+  async function loadUsers() {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select(`
+        id,
+        email,
+        role,
+        is_platform_admin,
+        updated_at
+      `)
+
+    if (error) {
+      console.error(error)
+      return
+    }
+
+    const mapped: PlatformUser[] =
+      data.map((user: any) => ({
+        id: user.id,
+        name: user.email?.split("@")[0] || "User",
+        email: user.email,
+        role: user.is_platform_admin
+          ? "Super Admin"
+          : user.role === "admin"
+          ? "Admin"
+          : "Support",
+        lastLogin: user.updated_at
+          ? new Date(user.updated_at).toLocaleString()
+          : "Never",
+        status: "Active",
+      })) || []
+
+    setPlatformUsers(mapped)
+    setLoading(false)
+  }
+
+  loadUsers()
+}, [])
+
+if (loading) {
+  return (
+    <div className="p-6">
+      Loading users...
+    </div>
+  )
+}
   return (
     <>
       <PlatformHeader title="Platform Users" />

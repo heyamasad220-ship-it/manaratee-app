@@ -196,6 +196,7 @@ export default function OrganizationsPage() {
     return
   }
 
+
   const mapped: Organization[] = (result.organizations || []).map((org: any) => ({
     id: org.id,
     name: org.name ?? "Unnamed Organization",
@@ -357,6 +358,33 @@ if (!result.organization) {
   }
 }
 
+const inviteOrganizationAdmin = async (org: Organization) => {
+  if (!org.contactEmail) {
+    alert("This organization does not have a contact email.")
+    return
+  }
+
+  const response = await fetch("/api/platform/invite-admin", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      email: org.contactEmail,
+      organizationId: org.id,
+      organizationName: org.name,
+    }),
+  })
+
+  const result = await response.json()
+
+  if (!response.ok) {
+    alert(result.error || "Failed to invite admin.")
+    return
+  }
+
+  alert(`Invite sent to ${org.contactEmail}`)
+}
   return (
     <>
       <PlatformHeader title="Organizations" />
@@ -510,9 +538,14 @@ if (!result.organization) {
                             <DropdownMenuItem onClick={() => handleEditClick(org)}>
                               Edit
                             </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => inviteOrganizationAdmin(org)}>
+  Send Admin Login Invite
+</DropdownMenuItem>
 
                             {org.status === "Active" && (
   <DropdownMenuItem
+
+  
     className="text-destructive"
     onClick={() => updateOrganizationStatus(org.id, "Suspended")}
   >
@@ -534,6 +567,8 @@ if (!result.organization) {
   >
     Approve
   </DropdownMenuItem>
+
+  
 )}
                           </DropdownMenuContent>
                         </DropdownMenu>
