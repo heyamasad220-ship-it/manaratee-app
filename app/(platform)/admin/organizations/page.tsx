@@ -44,6 +44,7 @@ import {
   CreditCard,
   Settings,
   Boxes,
+  Users,
 } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
@@ -141,14 +142,6 @@ const statusStyles: Record<Organization["status"], string> = {
   Pending: "bg-amber-100 text-amber-700 hover:bg-amber-100",
 }
 
-function slugify(value: string) {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, "-")
-    .replace(/[^a-z0-9-]/g, "")
-}
-
 function formatDate(value: string | null) {
   if (!value) return "—"
 
@@ -161,11 +154,14 @@ function formatDate(value: string | null) {
     year: "numeric",
   })
 }
+
 function toDbStatus(status: "Active" | "Pending" | "Suspended") {
   return status.toLowerCase()
 }
+
 export default function OrganizationsPage() {
   const supabase = createClient()
+
   const [organizations, setOrganizations] = useState<Organization[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -178,43 +174,47 @@ export default function OrganizationsPage() {
 
   const [newOrgName, setNewOrgName] = useState("")
   const [newOrgEmail, setNewOrgEmail] = useState("")
-  const [newOrgStatus, setNewOrgStatus] = useState<"Active" | "Pending">("Pending")
+  const [newOrgStatus, setNewOrgStatus] = useState<"Active" | "Pending">(
+    "Pending"
+  )
   const [saving, setSaving] = useState(false)
   const [editingOrgId, setEditingOrgId] = useState<string | null>(null)
 
   const fetchOrgs = async () => {
-  setLoading(true)
+    setLoading(true)
 
-  const response = await fetch("/api/platform/organizations")
-  const result = await response.json()
+    const response = await fetch("/api/platform/organizations")
+    const result = await response.json()
 
-  console.log("PLATFORM ORGS API RESULT:", result)
+    console.log("PLATFORM ORGS API RESULT:", result)
 
-  if (!response.ok) {
-    alert(result.error || "Failed to load organizations")
+    if (!response.ok) {
+      alert(result.error || "Failed to load organizations")
+      setLoading(false)
+      return
+    }
+
+    const mapped: Organization[] = (result.organizations || []).map(
+      (org: any) => ({
+        id: org.id,
+        name: org.name ?? "Unnamed Organization",
+        status:
+          org.status === "suspended"
+            ? "Suspended"
+            : org.status === "pending"
+            ? "Pending"
+            : "Active",
+        members: org.members ?? 0,
+        created: formatDate(org.created_at),
+        mrr: org.mrr ?? 0,
+        contactEmail: org.contact_email ?? org.contactEmail ?? "",
+      })
+    )
+
+    setOrganizations(mapped)
     setLoading(false)
-    return
   }
 
-
-  const mapped: Organization[] = (result.organizations || []).map((org: any) => ({
-    id: org.id,
-    name: org.name ?? "Unnamed Organization",
-    status:
-      org.status === "suspended"
-        ? "Suspended"
-        : org.status === "pending"
-        ? "Pending"
-        : "Active",
-    members: org.members ?? 0,
-    created: formatDate(org.created_at),
-    mrr: org.mrr ?? 0,
-    contactEmail: org.contact_email ?? org.contactEmail ?? "",
-  }))
-
-  setOrganizations(mapped)
-  setLoading(false)
-}
   useEffect(() => {
     fetchOrgs()
   }, [])
@@ -263,128 +263,186 @@ export default function OrganizationsPage() {
     setNewOrgStatus("Pending")
     setEditingOrgId(null)
   }
+
   const updateOrganizationStatus = async (
-  orgId: string,
-  status: "Active" | "Pending" | "Suspended"
+    orgId: string,
+    status: "Active" | "Pending" | "Suspended"
   ) => {
+    const { error } = await supabase
+      .from("organizations")
+      .update({ status: toDbStatus(status) })
+      .eq("id", orgId)
+
+    console.log("STATUS UPDATE ERROR:", error)
+
+    if (error) {
+      alert(error.message)
+      return
+    }
+
+    fetchOrgs()
+  }
+
+  const deleteOrganization = async (org: Organization) => {
+  const confirmed = window.confirm(
+    `Delete "${org.name}"? This cannot be undone.`
+  )
+
+  if (!confirmed) return
+
   const { error } = await supabase
     .from("organizations")
-    .update({ status: toDbStatus(status) })
-    .eq("id", orgId)
-
-  console.log("STATUS UPDATE ERROR:", error)
+    .delete()
+    .eq("id", org.id)
 
   if (error) {
     alert(error.message)
     return
   }
 
+  alert("Organization deleted.")
   fetchOrgs()
+}
+
+  const inviteOrganizationAdmin = async (org: Organization) => {
+    if (!org.contactEmail) {
+      alert("This organization does not have an admin/contact email.")
+      return
+    }
+
+    const response = await fetch("/api/platform/invite-admin", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email: org.contactEmail,
+        organizationId: org.id,
+        organizationName: org.name,
+      }),
+    })
+
+    const result = await response.json()
+
+    if (!response.ok) {
+      alert(result.error || "Failed to invite admin.")
+      return
+    }
+
+    alert(`Admin invite sent to ${org.contactEmail}`)
   }
+
   const handleAddOrganization = async () => {
-  if (!newOrgName.trim()) {
-    alert("Organization name is required.")
-    return
-  }
+    if (!newOrgName.trim()) {
+      alert("Organization name is required.")
+      return
+    }
 
-  setSaving(true)
+    if (!newOrgEmail.trim()) {
+      alert("Admin email is required.")
+      return
+    }
 
-  try {
-    if (editingOrgId) {
-      const { error } = await supabase
-        .from("organizations")
-        .update({
-          name: newOrgName.trim(),
-          status: toDbStatus(newOrgStatus),
-          contact_email: newOrgEmail.trim() || null,
-        })
-        .eq("id", editingOrgId)
+    setSaving(true)
 
-      console.log("UPDATE ERROR:", error)
+    try {
+      if (editingOrgId) {
+        const { error } = await supabase
+          .from("organizations")
+          .update({
+            name: newOrgName.trim(),
+            status: toDbStatus(newOrgStatus),
+            contact_email: newOrgEmail.trim() || null,
+          })
+          .eq("id", editingOrgId)
 
-      if (error) {
-        alert(error.message)
+        console.log("UPDATE ERROR:", error)
+
+        if (error) {
+          alert(error.message)
+          return
+        }
+
+        resetAddForm()
+        setAddOrgOpen(false)
+        fetchOrgs()
         return
+      }
+
+      const { data: userData, error: userError } = await supabase.auth.getUser()
+      const user = userData?.user
+
+      if (userError || !user) {
+        alert(userError?.message || "No logged-in user found.")
+        return
+      }
+
+      const createResponse = await fetch("/api/organizations/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userId: user.id,
+          name: newOrgName.trim(),
+          contact_email: newOrgEmail.trim(),
+          status: newOrgStatus.toLowerCase(),
+        }),
+      })
+
+      const createResult = await createResponse.json()
+
+      console.log("CREATE ORG RESULT:", createResult)
+      console.log("CREATE ORG STATUS:", createResponse.status)
+      console.log("CREATE ORG OK:", createResponse.ok)
+
+      if (!createResponse.ok) {
+        throw new Error(createResult.error || "Failed to create organization")
+      }
+
+      if (!createResult.organization) {
+        throw new Error("No organization returned from API")
+      }
+
+      const inviteResponse = await fetch("/api/platform/invite-admin", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: newOrgEmail.trim(),
+          organizationId: createResult.organization.id,
+          organizationName: createResult.organization.name,
+        }),
+      })
+
+      const inviteResult = await inviteResponse.json()
+
+      console.log("INVITE ADMIN RESULT:", inviteResult)
+      console.log("INVITE ADMIN STATUS:", inviteResponse.status)
+      console.log("INVITE ADMIN OK:", inviteResponse.ok)
+
+      if (!inviteResponse.ok) {
+        alert(
+          `Organization was created, but the admin invite failed: ${
+            inviteResult.error || "Unknown error"
+          }`
+        )
+      } else {
+        alert(`Organization created and admin invite sent to ${newOrgEmail}`)
       }
 
       resetAddForm()
       setAddOrgOpen(false)
       fetchOrgs()
-      return
+    } catch (error: any) {
+      console.error("SAVE ERROR:", error)
+      alert(error?.message || "Something went wrong while saving.")
+    } finally {
+      setSaving(false)
     }
-
-    const { data: userData, error: userError } = await supabase.auth.getUser()
-    const user = userData?.user
-
-    if (userError || !user) {
-      alert(userError?.message || "No logged-in user found.")
-      return
-    }
-
-    const response = await fetch("/api/organizations/create", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({
-    userId: user.id,
-    name: newOrgName,
-    contact_email: newOrgEmail,
-    status: newOrgStatus.toLowerCase(),
-  }),
-})
-
-const result = await response.json()
-console.log("CREATE ORG RESULT:", result)
-console.log("CREATE ORG STATUS:", response.status)
-console.log("CREATE ORG OK:", response.ok)
-
-if (!response.ok) {
-  throw new Error(result.error || "Failed to create organization")
-}
-
-if (!result.organization) {
-  throw new Error("No organization returned from API")
-}
-
-    resetAddForm()
-    setAddOrgOpen(false)
-    fetchOrgs()
-  } catch (error: any) {
-    console.error("SAVE ERROR:", error)
-    alert(error?.message || "Something went wrong while saving.")
-  } finally {
-    setSaving(false)
-  }
-}
-
-const inviteOrganizationAdmin = async (org: Organization) => {
-  if (!org.contactEmail) {
-    alert("This organization does not have a contact email.")
-    return
   }
 
-  const response = await fetch("/api/platform/invite-admin", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      email: org.contactEmail,
-      organizationId: org.id,
-      organizationName: org.name,
-    }),
-  })
-
-  const result = await response.json()
-
-  if (!response.ok) {
-    alert(result.error || "Failed to invite admin.")
-    return
-  }
-
-  alert(`Invite sent to ${org.contactEmail}`)
-}
   return (
     <>
       <PlatformHeader title="Organizations" />
@@ -421,17 +479,22 @@ const inviteOrganizationAdmin = async (org: Organization) => {
                   ))}
                 </div>
               </div>
-
-              <Button
-                className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700"
-                onClick={() => {
-                  resetAddForm()
-                  setAddOrgOpen(true)
-                }}
-              >
-                <Plus className="h-4 w-4" />
-                Add Organization
-              </Button>
+<Button
+  type="button"
+  onClick={() => {
+    resetAddForm()
+    setAddOrgOpen(true)
+  }}
+  style={{
+    backgroundColor: "#000",
+    color: "#fff",
+  }}
+  className="flex items-center gap-2 rounded-md px-4 py-2 hover:opacity-90"
+>
+  <Plus className="h-4 w-4" />
+  Add Organization
+</Button>
+              
             </div>
 
             <div className="flex items-center gap-4 border-b border-border bg-muted/30 px-5 py-2.5 text-xs">
@@ -464,7 +527,7 @@ const inviteOrganizationAdmin = async (org: Organization) => {
                   <TableHead className="font-medium text-muted-foreground">
                     MRR
                   </TableHead>
-                  <TableHead className="w-[50px]"></TableHead>
+                  <TableHead className="w-[50px]" />
                 </TableRow>
               </TableHeader>
 
@@ -496,7 +559,9 @@ const inviteOrganizationAdmin = async (org: Organization) => {
                     >
                       <TableCell>
                         <div>
-                          <p className="font-medium text-foreground">{org.name}</p>
+                          <p className="font-medium text-foreground">
+                            {org.name}
+                          </p>
                           <p className="text-xs text-muted-foreground">
                             {org.contactEmail || "—"}
                           </p>
@@ -515,9 +580,11 @@ const inviteOrganizationAdmin = async (org: Organization) => {
                       <TableCell className="text-muted-foreground">
                         {org.members}
                       </TableCell>
+
                       <TableCell className="text-muted-foreground">
                         {org.created}
                       </TableCell>
+
                       <TableCell className="font-medium text-foreground">
                         ${org.mrr.toLocaleString("en-US")}
                       </TableCell>
@@ -525,7 +592,11 @@ const inviteOrganizationAdmin = async (org: Organization) => {
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                            >
                               <MoreHorizontal className="h-4 w-4" />
                               <span className="sr-only">Actions</span>
                             </Button>
@@ -535,41 +606,52 @@ const inviteOrganizationAdmin = async (org: Organization) => {
                             <DropdownMenuItem onClick={() => handleOrgClick(org)}>
                               View Details
                             </DropdownMenuItem>
+
                             <DropdownMenuItem onClick={() => handleEditClick(org)}>
                               Edit
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => inviteOrganizationAdmin(org)}>
-  Send Admin Login Invite
-</DropdownMenuItem>
+
+                            <DropdownMenuItem
+                              onClick={() => inviteOrganizationAdmin(org)}
+                            >
+                              Send Admin Login Invite
+                            </DropdownMenuItem>
 
                             {org.status === "Active" && (
-  <DropdownMenuItem
+                              <DropdownMenuItem
+                                className="text-destructive"
+                                onClick={() =>
+                                  updateOrganizationStatus(org.id, "Suspended")
+                                }
+                              >
+                                Suspend
+                              </DropdownMenuItem>
+                            )}
+<DropdownMenuItem
+  className="text-destructive"
+  onClick={() => deleteOrganization(org)}
+>
+  Delete
+</DropdownMenuItem>
+                            {org.status === "Suspended" && (
+                              <DropdownMenuItem
+                                onClick={() =>
+                                  updateOrganizationStatus(org.id, "Active")
+                                }
+                              >
+                                Activate
+                              </DropdownMenuItem>
+                            )}
 
-  
-    className="text-destructive"
-    onClick={() => updateOrganizationStatus(org.id, "Suspended")}
-  >
-    Suspend
-  </DropdownMenuItem>
-)}
-
-{org.status === "Suspended" && (
-  <DropdownMenuItem
-    onClick={() => updateOrganizationStatus(org.id, "Active")}
-  >
-    Activate
-  </DropdownMenuItem>
-)}
-
-{org.status === "Pending" && (
-  <DropdownMenuItem
-    onClick={() => updateOrganizationStatus(org.id, "Active")}
-  >
-    Approve
-  </DropdownMenuItem>
-
-  
-)}
+                            {org.status === "Pending" && (
+                              <DropdownMenuItem
+                                onClick={() =>
+                                  updateOrganizationStatus(org.id, "Active")
+                                }
+                              >
+                                Approve
+                              </DropdownMenuItem>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -586,7 +668,7 @@ const inviteOrganizationAdmin = async (org: Organization) => {
         open={!!selectedOrg}
         onOpenChange={(open) => !open && setSelectedOrg(null)}
       >
-        <SheetContent className="w-full overflow-y-auto sm:max-w-[600px]">
+        <SheetContent className="w-[95vw] max-w-none overflow-y-auto sm:max-w-none lg:w-[1100px]">
           <SheetHeader className="border-b pb-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -602,52 +684,80 @@ const inviteOrganizationAdmin = async (org: Organization) => {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                {selectedOrg && (
-                  <Badge
-                    variant="secondary"
-                    className={statusStyles[selectedOrg.status]}
-                  >
-                    {selectedOrg.status}
-                  </Badge>
-                )}
-              </div>
+              {selectedOrg && (
+                <Badge
+                  variant="secondary"
+                  className={statusStyles[selectedOrg.status]}
+                >
+                  {selectedOrg.status}
+                </Badge>
+              )}
             </div>
           </SheetHeader>
 
           <Tabs defaultValue="overview" className="mt-6">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="overview" className="gap-1.5">
-                <Building2 className="h-4 w-4" />
-                Overview
-              </TabsTrigger>
-              <TabsTrigger value="modules" className="gap-1.5">
-                <Boxes className="h-4 w-4" />
-                Modules
-              </TabsTrigger>
-              <TabsTrigger value="billing" className="gap-1.5">
-                <CreditCard className="h-4 w-4" />
-                Billing
-              </TabsTrigger>
-              <TabsTrigger value="settings" className="gap-1.5">
-                <Settings className="h-4 w-4" />
-                Settings
-              </TabsTrigger>
-            </TabsList>
+           <TabsList className="flex w-full flex-nowrap items-center gap-2 overflow-hidden rounded-lg bg-muted p-1">
+  <TabsTrigger
+    value="overview"
+    className="flex min-w-0 flex-1 items-center justify-center gap-1.5 px-3 py-2 text-sm whitespace-nowrap"
+  >
+    <Building2 className="h-4 w-4 shrink-0" />
+    Overview
+  </TabsTrigger>
+
+  <TabsTrigger
+    value="members"
+    className="flex min-w-0 flex-1 items-center justify-center gap-1.5 px-3 py-2 text-sm whitespace-nowrap"
+  >
+    <Users className="h-4 w-4 shrink-0" />
+    Members
+  </TabsTrigger>
+
+  <TabsTrigger
+    value="modules"
+    className="flex min-w-0 flex-1 items-center justify-center gap-1.5 px-3 py-2 text-sm whitespace-nowrap"
+  >
+    <Boxes className="h-4 w-4 shrink-0" />
+    Modules
+  </TabsTrigger>
+
+  <TabsTrigger
+    value="billing"
+    className="flex min-w-0 flex-1 items-center justify-center gap-1.5 px-3 py-2 text-sm whitespace-nowrap"
+  >
+    <CreditCard className="h-4 w-4 shrink-0" />
+    Billing
+  </TabsTrigger>
+
+  <TabsTrigger
+    value="settings"
+    className="flex min-w-0 flex-1 items-center justify-center gap-1.5 px-3 py-2 text-sm whitespace-nowrap"
+  >
+    <Settings className="h-4 w-4 shrink-0" />
+    Settings
+  </TabsTrigger>
+</TabsList>
+
 
             <TabsContent value="overview" className="mt-6 space-y-6">
               <div className="grid grid-cols-1 gap-4">
                 <Card>
                   <CardContent className="pt-4">
                     <p className="text-sm text-muted-foreground">Members</p>
-                    <p className="text-2xl font-semibold">{selectedOrg?.members}</p>
+                    <p className="text-2xl font-semibold">
+                      {selectedOrg?.members}
+                    </p>
                   </CardContent>
                 </Card>
 
                 <Card>
                   <CardContent className="pt-4">
-                    <p className="text-sm text-muted-foreground">Monthly Revenue</p>
-                    <p className="text-2xl font-semibold">${selectedOrg?.mrr}</p>
+                    <p className="text-sm text-muted-foreground">
+                      Monthly Revenue
+                    </p>
+                    <p className="text-2xl font-semibold">
+                      ${selectedOrg?.mrr}
+                    </p>
                   </CardContent>
                 </Card>
               </div>
@@ -660,10 +770,12 @@ const inviteOrganizationAdmin = async (org: Organization) => {
                     </span>
                     <span className="text-sm font-mono">{selectedOrg?.id}</span>
                   </div>
+
                   <div className="flex justify-between">
                     <span className="text-sm text-muted-foreground">Created</span>
                     <span className="text-sm">{selectedOrg?.created}</span>
                   </div>
+
                   <div className="flex justify-between">
                     <span className="text-sm text-muted-foreground">Status</span>
                     <span className="text-sm">{selectedOrg?.status}</span>
@@ -671,6 +783,65 @@ const inviteOrganizationAdmin = async (org: Organization) => {
                 </CardContent>
               </Card>
             </TabsContent>
+
+            <TabsContent value="members" className="mt-6 space-y-4">
+  <div>
+    <h3 className="font-medium">Organization Members</h3>
+    <p className="text-sm text-muted-foreground">
+      Manage admins and members for this organization.
+    </p>
+  </div>
+
+  <Card>
+    <CardContent className="p-0">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Name</TableHead>
+            <TableHead>Email</TableHead>
+            <TableHead>Role</TableHead>
+            <TableHead>Status</TableHead>
+          </TableRow>
+        </TableHeader>
+
+        <TableBody>
+          <TableRow>
+            <TableCell className="font-medium">
+              {selectedOrg?.name} Admin
+            </TableCell>
+            <TableCell className="text-muted-foreground">
+              {selectedOrg?.contactEmail || "—"}
+            </TableCell>
+            <TableCell>
+              <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                Admin
+              </Badge>
+            </TableCell>
+            <TableCell>
+              <Badge
+                variant="secondary"
+                className={
+                  selectedOrg?.status === "Active"
+                    ? "bg-emerald-100 text-emerald-700"
+                    : "bg-zinc-100 text-zinc-700"
+                }
+              >
+                {selectedOrg?.status}
+              </Badge>
+            </TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
+    </CardContent>
+  </Card>
+
+  <Button
+    className="bg-emerald-600 text-white hover:bg-emerald-700"
+    onClick={() => selectedOrg && inviteOrganizationAdmin(selectedOrg)}
+  >
+    Send Admin Login Invite
+  </Button>
+</TabsContent>
 
             <TabsContent value="modules" className="mt-6 space-y-4">
               <div>
@@ -709,12 +880,6 @@ const inviteOrganizationAdmin = async (org: Organization) => {
                   ))}
                 </CardContent>
               </Card>
-
-              <p className="text-xs text-muted-foreground">
-                Modules marked as &quot;Plan Default&quot; are included in the
-                organization&apos;s current plan. You can override these settings
-                for this specific organization.
-              </p>
             </TabsContent>
 
             <TabsContent value="billing" className="mt-6 space-y-4">
@@ -728,26 +893,6 @@ const inviteOrganizationAdmin = async (org: Organization) => {
                     <Button variant="outline" size="sm">
                       Change Plan
                     </Button>
-                  </div>
-
-                  <div className="border-t pt-4">
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">
-                        Monthly Revenue
-                      </span>
-                      <span className="text-sm font-medium">
-                        ${selectedOrg?.mrr}/mo
-                      </span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent className="pt-4">
-                  <h4 className="mb-3 font-medium">Recent Invoices</h4>
-                  <div className="py-4 text-center text-sm text-muted-foreground">
-                    No invoices yet
                   </div>
                 </CardContent>
               </Card>
@@ -781,27 +926,6 @@ const inviteOrganizationAdmin = async (org: Organization) => {
                   </div>
                 </CardContent>
               </Card>
-
-              <div className="flex gap-2">
-                <Button className="bg-emerald-600 text-white hover:bg-emerald-700">
-                  Save Changes
-                </Button>
-                <Button variant="outline" onClick={() => setSelectedOrg(null)}>
-                  Cancel
-                </Button>
-              </div>
-
-              <Card className="border-red-200">
-                <CardContent className="pt-4">
-                  <h4 className="mb-2 font-medium text-red-600">Danger Zone</h4>
-                  <p className="mb-3 text-sm text-muted-foreground">
-                    Permanently delete this organization and all its data.
-                  </p>
-                  <Button variant="destructive" size="sm">
-                    Delete Organization
-                  </Button>
-                </CardContent>
-              </Card>
             </TabsContent>
           </Tabs>
         </SheetContent>
@@ -827,7 +951,7 @@ const inviteOrganizationAdmin = async (org: Organization) => {
             </div>
 
             <div className="flex flex-col gap-2">
-              <Label htmlFor="org-email">Contact Email</Label>
+              <Label htmlFor="org-email">Admin Email</Label>
               <Input
                 id="org-email"
                 type="email"
@@ -835,26 +959,27 @@ const inviteOrganizationAdmin = async (org: Organization) => {
                 value={newOrgEmail}
                 onChange={(e) => setNewOrgEmail(e.target.value)}
               />
+              <p className="text-xs text-muted-foreground">
+                This person will receive the login invite for this organization.
+              </p>
             </div>
 
-            <div className="grid grid-cols-1 gap-4">
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="org-status">Status</Label>
-                <Select
-                  value={newOrgStatus}
-                  onValueChange={(value: "Active" | "Pending") =>
-                    setNewOrgStatus(value)
-                  }
-                >
-                  <SelectTrigger id="org-status">
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Active">Active</SelectItem>
-                    <SelectItem value="Pending">Pending</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="org-status">Status</Label>
+              <Select
+                value={newOrgStatus}
+                onValueChange={(value: "Active" | "Pending") =>
+                  setNewOrgStatus(value)
+                }
+              >
+                <SelectTrigger id="org-status">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Active">Active</SelectItem>
+                  <SelectItem value="Pending">Pending</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
@@ -878,7 +1003,7 @@ const inviteOrganizationAdmin = async (org: Organization) => {
                 ? "Saving..."
                 : editingOrgId
                 ? "Save Changes"
-                : "Add Organization"}
+                : "Create Organization + Invite Admin"}
             </Button>
           </DialogFooter>
         </DialogContent>

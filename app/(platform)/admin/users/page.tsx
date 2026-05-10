@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { createClient } from "@/lib/supabase/client"
 import {
   Table,
   TableBody,
@@ -59,8 +58,6 @@ const statusStyles: Record<string, string> = {
 }
 
 export default function PlatformUsersPage() {
-  const supabase = createClient()
-
   const [platformUsers, setPlatformUsers] = useState<PlatformUser[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
@@ -70,44 +67,42 @@ export default function PlatformUsersPage() {
     async function loadUsers() {
       setLoading(true)
 
-      const { data, error } = await supabase
-        .from("profiles")
-        .select(`
-          id,
-          email,
-          role,
-          is_platform_admin,
-          updated_at
-        `)
+      try {
+        const response = await fetch("/api/platform/users")
+        const result = await response.json()
 
-      if (error) {
+        if (!response.ok) {
+          console.error("LOAD USERS ERROR:", result)
+          setLoading(false)
+          return
+        }
+
+        const users = result.users || []
+
+const mapped: PlatformUser[] = users.map((user: any) => ({
+  id: user.id,
+  name: user.email?.split("@")[0] || "Platform User",
+  email: user.email || "No email",
+  role: user.is_platform_admin
+    ? "Super Admin"
+    : user.role === "admin"
+    ? "Admin"
+    : "Support",
+  lastLogin: user.updated_at
+    ? new Date(user.updated_at).toLocaleString()
+    : "Never",
+  status: "Active",
+}))
+        setPlatformUsers(mapped)
+      } catch (error) {
         console.error("LOAD USERS ERROR:", error)
+      } finally {
         setLoading(false)
-        return
       }
-
-      const mapped: PlatformUser[] =
-        data?.map((user: any) => ({
-          id: user.id,
-          name: user.email?.split("@")[0] || "User",
-          email: user.email || "",
-          role: user.is_platform_admin
-            ? "Super Admin"
-            : user.role === "admin"
-            ? "Admin"
-            : "Support",
-          lastLogin: user.updated_at
-            ? new Date(user.updated_at).toLocaleString()
-            : "Never",
-          status: "Active",
-        })) || []
-
-      setPlatformUsers(mapped)
-      setLoading(false)
     }
 
     loadUsers()
-  }, [supabase])
+  }, [])
 
   const filtered = platformUsers.filter((user) => {
     if (!search) return true
@@ -130,6 +125,7 @@ export default function PlatformUsersPage() {
             <div className="flex items-center justify-between gap-4 border-b border-border px-5 py-4">
               <div className="relative w-[280px]">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+
                 <Input
                   placeholder="Search users..."
                   value={search}
@@ -150,21 +146,11 @@ export default function PlatformUsersPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="font-medium text-muted-foreground">
-                    Name
-                  </TableHead>
-                  <TableHead className="font-medium text-muted-foreground">
-                    Email
-                  </TableHead>
-                  <TableHead className="font-medium text-muted-foreground">
-                    Role
-                  </TableHead>
-                  <TableHead className="font-medium text-muted-foreground">
-                    Last Login
-                  </TableHead>
-                  <TableHead className="font-medium text-muted-foreground">
-                    Status
-                  </TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Last Login</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead className="w-[50px]" />
                 </TableRow>
               </TableHeader>
@@ -201,6 +187,7 @@ export default function PlatformUsersPage() {
                               .slice(0, 2)
                               .toUpperCase()}
                           </div>
+
                           <span className="font-medium text-foreground">
                             {user.name}
                           </span>
@@ -214,7 +201,7 @@ export default function PlatformUsersPage() {
                       <TableCell>
                         <Badge
                           variant="secondary"
-                          className={roleStyles[user.role] || ""}
+                          className={roleStyles[user.role]}
                         >
                           {user.role}
                         </Badge>
@@ -227,7 +214,7 @@ export default function PlatformUsersPage() {
                       <TableCell>
                         <Badge
                           variant="secondary"
-                          className={statusStyles[user.status] || ""}
+                          className={statusStyles[user.status]}
                         >
                           {user.status}
                         </Badge>
@@ -242,19 +229,26 @@ export default function PlatformUsersPage() {
                               className="h-8 w-8"
                             >
                               <MoreHorizontal className="h-4 w-4" />
-                              <span className="sr-only">Actions</span>
                             </Button>
                           </DropdownMenuTrigger>
 
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>Edit Role</DropdownMenuItem>
-                            <DropdownMenuItem>Reset Password</DropdownMenuItem>
+                            <DropdownMenuItem>
+                              Edit Role
+                            </DropdownMenuItem>
+
+                            <DropdownMenuItem>
+                              Reset Password
+                            </DropdownMenuItem>
+
                             {user.status === "Active" ? (
                               <DropdownMenuItem className="text-destructive">
                                 Deactivate
                               </DropdownMenuItem>
                             ) : (
-                              <DropdownMenuItem>Activate</DropdownMenuItem>
+                              <DropdownMenuItem>
+                                Activate
+                              </DropdownMenuItem>
                             )}
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -282,6 +276,7 @@ export default function PlatformUsersPage() {
 
             <div className="flex flex-col gap-2">
               <Label htmlFor="invite-email">Email Address</Label>
+
               <Input
                 id="invite-email"
                 type="email"
@@ -291,10 +286,12 @@ export default function PlatformUsersPage() {
 
             <div className="flex flex-col gap-2">
               <Label htmlFor="invite-role">Role</Label>
+
               <Select>
                 <SelectTrigger id="invite-role">
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
+
                 <SelectContent>
                   <SelectItem value="admin">Admin</SelectItem>
                   <SelectItem value="support">Support</SelectItem>
@@ -304,7 +301,10 @@ export default function PlatformUsersPage() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setInviteOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setInviteOpen(false)}
+            >
               Cancel
             </Button>
 

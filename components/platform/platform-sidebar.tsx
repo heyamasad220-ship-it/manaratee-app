@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import Image from "next/image"
 import {
   LayoutDashboard,
   Building2,
@@ -10,7 +11,6 @@ import {
   Banknote,
   Users,
   ScrollText,
-  ShieldCheck,
   LogOut,
   Boxes,
   Settings,
@@ -38,15 +38,26 @@ export function PlatformSidebar() {
 
   if (!mounted) {
     return (
-      <aside className="flex h-screen w-[220px] shrink-0 flex-col bg-zinc-950 text-zinc-100">
-        <div className="flex items-center gap-2.5 px-5 py-5">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-600">
-            <ShieldCheck className="h-4 w-4 text-white" />
-          </div>
-          <span className="text-base font-semibold tracking-tight text-zinc-100">
-            Platform Admin
-          </span>
-        </div>
+      <aside className="flex h-screen w-[220px] shrink-0 flex-col border-r border-zinc-200 bg-white text-zinc-900">
+        <div className="flex items-center gap-3 px-4 py-4">
+  <Image
+    src="/logo.png"
+    alt="Manaratee"
+    width={42}
+    height={42}
+    className="h-10 w-10 object-contain"
+  />
+
+  <div className="flex flex-col leading-none">
+    <span className="text-sm font-semibold tracking-[0.18em] text-white">
+      MANARATEE
+    </span>
+
+    <span className="text-[9px] text-zinc-400">
+      Guiding Every Part
+    </span>
+  </div>
+</div>
         <nav className="flex flex-1 flex-col gap-2 px-3 pt-2">
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="h-9 animate-pulse rounded-md bg-zinc-800/50" />
@@ -57,15 +68,17 @@ export function PlatformSidebar() {
   }
 
   return (
-    <aside className="flex h-screen w-[220px] shrink-0 flex-col bg-zinc-950 text-zinc-100">
-      <div className="flex items-center gap-2.5 px-5 py-5">
-        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-600">
-          <ShieldCheck className="h-4 w-4 text-white" />
-        </div>
-        <span className="text-base font-semibold tracking-tight text-zinc-100">
-          Platform Admin
-        </span>
-      </div>
+    <aside className="flex h-screen w-[220px] shrink-0 flex-col border-r border-zinc-200 bg-white text-zinc-900">
+      <div className="flex items-center justify-center px-4 py-5">
+  <Image
+    src="/logo.png"
+    alt="Manaratee"
+    width={180}
+    height={60}
+    className="h-auto w-auto object-contain"
+    priority
+  />
+</div>
 
       <nav className="flex flex-1 flex-col gap-0.5 px-3 pt-2">
         {navItems.map((item) => {
@@ -77,12 +90,12 @@ export function PlatformSidebar() {
               className={cn(
                 "relative flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
                 isActive
-                  ? "bg-zinc-800 text-white"
-                  : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
+                ? "bg-amber-50 text-amber-700"
+                : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
               )}
             >
               {isActive && (
-                <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-r-full bg-emerald-500" />
+                <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-r-full bg-black" />
               )}
               <item.icon className="h-[18px] w-[18px] shrink-0" />
               {item.label}
