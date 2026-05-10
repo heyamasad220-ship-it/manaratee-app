@@ -1,13 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { PlatformHeader } from "@/components/platform/platform-header"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import {
   Table,
@@ -48,9 +47,6 @@ interface PlatformUser {
   status: "Active" | "Inactive"
 }
 
-const [platformUsers, setPlatformUsers] = useState<PlatformUser[]>([])
-const [loading, setLoading] = useState(true)
-
 const roleStyles: Record<string, string> = {
   "Super Admin": "bg-emerald-100 text-emerald-700 hover:bg-emerald-100",
   Admin: "bg-blue-100 text-blue-700 hover:bg-blue-100",
@@ -63,81 +59,89 @@ const statusStyles: Record<string, string> = {
 }
 
 export default function PlatformUsersPage() {
+  const supabase = createClient()
+
+  const [platformUsers, setPlatformUsers] = useState<PlatformUser[]>([])
+  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
   const [inviteOpen, setInviteOpen] = useState(false)
 
-  const filtered = platformUsers.filter((u) => {
-    if (!search) return true
-    const q = search.toLowerCase()
-    return u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)
-  })
+  useEffect(() => {
+    async function loadUsers() {
+      setLoading(true)
 
-  const supabase = createClient()
+      const { data, error } = await supabase
+        .from("profiles")
+        .select(`
+          id,
+          email,
+          role,
+          is_platform_admin,
+          updated_at
+        `)
 
-useEffect(() => {
-  async function loadUsers() {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select(`
-        id,
-        email,
-        role,
-        is_platform_admin,
-        updated_at
-      `)
+      if (error) {
+        console.error("LOAD USERS ERROR:", error)
+        setLoading(false)
+        return
+      }
 
-    if (error) {
-      console.error(error)
-      return
+      const mapped: PlatformUser[] =
+        data?.map((user: any) => ({
+          id: user.id,
+          name: user.email?.split("@")[0] || "User",
+          email: user.email || "",
+          role: user.is_platform_admin
+            ? "Super Admin"
+            : user.role === "admin"
+            ? "Admin"
+            : "Support",
+          lastLogin: user.updated_at
+            ? new Date(user.updated_at).toLocaleString()
+            : "Never",
+          status: "Active",
+        })) || []
+
+      setPlatformUsers(mapped)
+      setLoading(false)
     }
 
-    const mapped: PlatformUser[] =
-      data.map((user: any) => ({
-        id: user.id,
-        name: user.email?.split("@")[0] || "User",
-        email: user.email,
-        role: user.is_platform_admin
-          ? "Super Admin"
-          : user.role === "admin"
-          ? "Admin"
-          : "Support",
-        lastLogin: user.updated_at
-          ? new Date(user.updated_at).toLocaleString()
-          : "Never",
-        status: "Active",
-      })) || []
+    loadUsers()
+  }, [supabase])
 
-    setPlatformUsers(mapped)
-    setLoading(false)
-  }
+  const filtered = platformUsers.filter((user) => {
+    if (!search) return true
 
-  loadUsers()
-}, [])
+    const q = search.toLowerCase()
 
-if (loading) {
-  return (
-    <div className="p-6">
-      Loading users...
-    </div>
-  )
-}
+    return (
+      user.name.toLowerCase().includes(q) ||
+      user.email.toLowerCase().includes(q)
+    )
+  })
+
   return (
     <>
       <PlatformHeader title="Platform Users" />
+
       <div className="flex flex-col gap-5 p-6">
         <Card className="border border-border shadow-sm">
           <CardContent className="p-0">
-            <div className="flex items-center justify-between gap-4 px-5 py-4 border-b border-border">
+            <div className="flex items-center justify-between gap-4 border-b border-border px-5 py-4">
               <div className="relative w-[280px]">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   placeholder="Search users..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="pl-9 h-9"
+                  className="h-9 pl-9"
                 />
               </div>
-              <Button className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => setInviteOpen(true)}>
+
+              <Button
+                className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700"
+                onClick={() => setInviteOpen(true)}
+              >
                 <Plus className="h-4 w-4" />
                 Invite User
               </Button>
@@ -146,79 +150,145 @@ if (loading) {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="font-medium text-muted-foreground">Name</TableHead>
-                  <TableHead className="font-medium text-muted-foreground">Email</TableHead>
-                  <TableHead className="font-medium text-muted-foreground">Role</TableHead>
-                  <TableHead className="font-medium text-muted-foreground">Last Login</TableHead>
-                  <TableHead className="font-medium text-muted-foreground">Status</TableHead>
-                  <TableHead className="w-[50px]"></TableHead>
+                  <TableHead className="font-medium text-muted-foreground">
+                    Name
+                  </TableHead>
+                  <TableHead className="font-medium text-muted-foreground">
+                    Email
+                  </TableHead>
+                  <TableHead className="font-medium text-muted-foreground">
+                    Role
+                  </TableHead>
+                  <TableHead className="font-medium text-muted-foreground">
+                    Last Login
+                  </TableHead>
+                  <TableHead className="font-medium text-muted-foreground">
+                    Status
+                  </TableHead>
+                  <TableHead className="w-[50px]" />
                 </TableRow>
               </TableHeader>
+
               <TableBody>
-                {filtered.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground">
-                          {user.name.split(" ").map((n) => n[0]).join("")}
-                        </div>
-                        <span className="font-medium text-foreground">{user.name}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{user.email}</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className={roleStyles[user.role] || ""}>
-                        {user.role}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-xs">{user.lastLogin}</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className={statusStyles[user.status] || ""}>
-                        {user.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreHorizontal className="h-4 w-4" />
-                            <span className="sr-only">Actions</span>
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem>Edit Role</DropdownMenuItem>
-                          <DropdownMenuItem>Reset Password</DropdownMenuItem>
-                          {user.status === "Active" ? (
-                            <DropdownMenuItem className="text-destructive">Deactivate</DropdownMenuItem>
-                          ) : (
-                            <DropdownMenuItem>Activate</DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                {loading ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={6}
+                      className="h-24 text-center text-muted-foreground"
+                    >
+                      Loading users...
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : filtered.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={6}
+                      className="h-24 text-center text-muted-foreground"
+                    >
+                      No users found.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filtered.map((user) => (
+                    <TableRow key={user.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground">
+                            {user.name
+                              .split(" ")
+                              .map((n) => n[0])
+                              .join("")
+                              .slice(0, 2)
+                              .toUpperCase()}
+                          </div>
+                          <span className="font-medium text-foreground">
+                            {user.name}
+                          </span>
+                        </div>
+                      </TableCell>
+
+                      <TableCell className="text-muted-foreground">
+                        {user.email}
+                      </TableCell>
+
+                      <TableCell>
+                        <Badge
+                          variant="secondary"
+                          className={roleStyles[user.role] || ""}
+                        >
+                          {user.role}
+                        </Badge>
+                      </TableCell>
+
+                      <TableCell className="text-xs text-muted-foreground">
+                        {user.lastLogin}
+                      </TableCell>
+
+                      <TableCell>
+                        <Badge
+                          variant="secondary"
+                          className={statusStyles[user.status] || ""}
+                        >
+                          {user.status}
+                        </Badge>
+                      </TableCell>
+
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
+                              <span className="sr-only">Actions</span>
+                            </Button>
+                          </DropdownMenuTrigger>
+
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem>Edit Role</DropdownMenuItem>
+                            <DropdownMenuItem>Reset Password</DropdownMenuItem>
+                            {user.status === "Active" ? (
+                              <DropdownMenuItem className="text-destructive">
+                                Deactivate
+                              </DropdownMenuItem>
+                            ) : (
+                              <DropdownMenuItem>Activate</DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </CardContent>
         </Card>
       </div>
 
-      {/* Invite User Dialog */}
       <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
         <DialogContent className="sm:max-w-[420px]">
           <DialogHeader>
             <DialogTitle>Invite User</DialogTitle>
           </DialogHeader>
+
           <div className="flex flex-col gap-4 py-2">
             <div className="flex flex-col gap-2">
               <Label htmlFor="invite-name">Full Name</Label>
               <Input id="invite-name" placeholder="e.g. Jane Doe" />
             </div>
+
             <div className="flex flex-col gap-2">
               <Label htmlFor="invite-email">Email Address</Label>
-              <Input id="invite-email" type="email" placeholder="jane@manaratee.com" />
+              <Input
+                id="invite-email"
+                type="email"
+                placeholder="jane@manaratee.com"
+              />
             </div>
+
             <div className="flex flex-col gap-2">
               <Label htmlFor="invite-role">Role</Label>
               <Select>
@@ -232,11 +302,16 @@ if (loading) {
               </Select>
             </div>
           </div>
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setInviteOpen(false)}>
               Cancel
             </Button>
-            <Button className="bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => setInviteOpen(false)}>
+
+            <Button
+              className="bg-emerald-600 text-white hover:bg-emerald-700"
+              onClick={() => setInviteOpen(false)}
+            >
               Send Invite
             </Button>
           </DialogFooter>
