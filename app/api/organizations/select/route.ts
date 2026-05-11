@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server"
-import { cookies } from "next/headers"
 
 export async function POST(req: Request) {
   try {
@@ -13,9 +12,9 @@ export async function POST(req: Request) {
       )
     }
 
-    const cookieStore = await cookies()
+    const response = NextResponse.json({ success: true })
 
-    cookieStore.set("selected_organization_id", organizationId, {
+    response.cookies.set("selected_organization_id", organizationId, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
@@ -23,9 +22,10 @@ export async function POST(req: Request) {
       maxAge: 60 * 60 * 24 * 30,
     })
 
-    return NextResponse.json({ success: true })
+    return response
   } catch (error) {
     console.error("Select organization route error:", error)
+
     return NextResponse.json(
       { error: "Unexpected server error" },
       { status: 500 }

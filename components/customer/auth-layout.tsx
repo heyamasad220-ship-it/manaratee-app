@@ -1,3 +1,4 @@
+import Image from "next/image"
 import Link from "next/link"
 
 export function AuthLayout({
@@ -12,31 +13,26 @@ export function AuthLayout({
   return (
     <div className="flex min-h-screen">
       {/* Left decorative panel */}
-      <div className="hidden lg:flex lg:w-1/2 flex-col justify-between bg-foreground p-12 text-background">
-        <div>
-          <Link href="/login" className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-background/10">
-              <span className="text-sm font-bold text-background">M</span>
-            </div>
-            <span className="text-lg font-semibold tracking-tight text-background">
-              Your Organization
-            </span>
-          </Link>
-        </div>
+<div className="hidden lg:flex lg:w-1/2 flex-col items-center justify-center bg-white p-12">
+  <div className="flex flex-col items-center justify-center">
+    <Link href="/login">
+      <Image
+        src="/logo.png"
+        alt="Manaratee Logo"
+        width={700}
+        height={300}
+        className="h-auto w-[80%] max-w-[700px] object-contain"
+        priority
+      />
+    </Link>
+  </div>
 
-        <div className="flex flex-col gap-6">
-          <blockquote className="text-xl font-medium leading-relaxed text-background/90 text-pretty">
-            &ldquo;A place for your community to connect, participate, and stay informed.&rdquo;
-          </blockquote>
-          <p className="text-sm text-background/50">
-            Powered by Manaratee
-          </p>
-        </div>
+      
 
         <div className="flex gap-6">
-          <span className="text-xs text-background/40">Privacy</span>
-          <span className="text-xs text-background/40">Terms</span>
-          <span className="text-xs text-background/40">Help</span>
+          <span className="text-xs text-black/40">Privacy</span>
+          <span className="text-xs text-black/40">Terms</span>
+          <span className="text-xs text-black/40">Help</span>
         </div>
       </div>
 
