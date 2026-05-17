@@ -1,5 +1,6 @@
 "use client"
 
+import { createClient } from "@/lib/supabase/client"
 import { useState } from "react"
 import {
   Sheet,
@@ -47,6 +48,7 @@ import { cn } from "@/lib/utils"
 interface CreateBazaarEventDrawerProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  eventData?: any
 }
 
 // Mock data for dropdowns
@@ -72,8 +74,14 @@ interface BoothType {
   price: string
   quantity: string
 }
-
-export function CreateBazaarEventDrawer({ open, onOpenChange }: CreateBazaarEventDrawerProps) {
+export function CreateBazaarEventDrawer({
+  open,
+  onOpenChange,
+  eventData,
+}: CreateBazaarEventDrawerProps) {
+  const supabase = createClient()
+  const isEditing = !!eventData
+const [saving, setSaving] = useState(false)
   // Section collapse states
   const [vendorAppSection, setVendorAppSection] = useState(false)
   const [boothSetupSection, setBoothSetupSection] = useState(false)
@@ -95,13 +103,20 @@ export function CreateBazaarEventDrawer({ open, onOpenChange }: CreateBazaarEven
   const [enableTicketing, setEnableTicketing] = useState(false)
 
   // Form data
-  const [eventName, setEventName] = useState("")
-  const [eventType, setEventType] = useState("")
-  const [startDate, setStartDate] = useState("")
+  const [eventName, setEventName] = useState(eventData?.name || "")
+const [eventType, setEventType] = useState(eventData?.event_type || "")
+const [startDate, setStartDate] = useState(eventData?.event_date || "")
+const [location, setLocation] = useState(eventData?.location || "")
   const [endDate, setEndDate] = useState("")
   const [startTime, setStartTime] = useState("")
   const [endTime, setEndTime] = useState("")
-  const [location, setLocation] = useState("")
+  const [startHour, setStartHour] = useState("")
+const [startMinute, setStartMinute] = useState("")
+const [startPeriod, setStartPeriod] = useState("AM")
+
+const [endHour, setEndHour] = useState("")
+const [endMinute, setEndMinute] = useState("")
+const [endPeriod, setEndPeriod] = useState("PM")
   const [linkedSpace, setLinkedSpace] = useState("")
   const [organizerName, setOrganizerName] = useState("")
   const [primaryContact, setPrimaryContact] = useState("")
@@ -145,12 +160,70 @@ export function CreateBazaarEventDrawer({ open, onOpenChange }: CreateBazaarEven
       prev.includes(method) ? prev.filter((m) => m !== method) : [...prev, method]
     )
   }
+function formatTimeForSupabase(hour: string, minute: string, period: string) {
+  if (!hour || !minute) return null
 
-  const handleCreate = () => {
-    // Handle form submission
-    console.log("Creating bazaar event...")
-    onOpenChange(false)
+  let hourNumber = Number(hour)
+
+  if (period === "PM" && hourNumber !== 12) {
+    hourNumber += 12
   }
+
+  if (period === "AM" && hourNumber === 12) {
+    hourNumber = 0
+  }
+
+  return `${String(hourNumber).padStart(2, "0")}:${minute}:00`
+}
+  const handleSave = async () => {
+  if (!eventName.trim()) {
+    alert("Please enter an event name.")
+    return
+  }
+
+  setSaving(true)
+
+  const payload = {
+  name: eventName.trim(),
+  event_type: eventType || null,
+  event_date: startDate || null,
+  start_time: formatTimeForSupabase(startHour, startMinute, startPeriod),
+  end_time: formatTimeForSupabase(endHour, endMinute, endPeriod),
+  location: location || null,
+  description: null,
+  expected_attendees: 0,
+  total_booths: boothTypes.reduce(
+    (total, booth) => total + Number(booth.quantity || 0),
+    0
+  ),
+  status: "draft",
+  calendar_status: publishToCalendar
+    ? "ready_to_publish"
+    : "not_published",
+}
+
+let error = null
+
+if (isEditing) {
+  const response = await supabase
+    .from("vendor_hub_events")
+    .update(payload)
+    .eq("id", eventData.id)
+
+  error = response.error
+} else {
+  const response = await supabase
+    .from("vendor_hub_events")
+    .insert(payload)
+
+  error = response.error
+}
+  
+
+  alert("Event created successfully.")
+  onOpenChange(false)
+  window.location.reload()
+}
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -217,25 +290,98 @@ export function CreateBazaarEventDrawer({ open, onOpenChange }: CreateBazaarEven
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <Label htmlFor="startTime">Start Time</Label>
-                    <Input
-                      id="startTime"
-                      type="time"
-                      value={startTime}
-                      onChange={(e) => setStartTime(e.target.value)}
-                      className="mt-1.5"
-                    />
-                  </div>
+  <Label>Start Time</Label>
+  <div className="mt-1.5 grid grid-cols-3 gap-2">
+    <Select value={startHour} onValueChange={setStartHour}>
+      <SelectTrigger>
+        <SelectValue placeholder="Hour" />
+      </SelectTrigger>
+      <SelectContent>
+        {["01","02","03","04","05","06","07","08","09","10","11","12"].map((hour) => (
+          <SelectItem key={hour} value={hour}>{hour}</SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+
+    <Select value={startMinute} onValueChange={setStartMinute}>
+      <SelectTrigger>
+        <SelectValue placeholder="Min" />
+      </SelectTrigger>
+      <SelectContent>
+        {["00","15","30","45"].map((minute) => (
+          <SelectItem key={minute} value={minute}>{minute}</SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+
+    <Select value={startPeriod} onValueChange={setStartPeriod}>
+      <SelectTrigger>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="AM">AM</SelectItem>
+        <SelectItem value="PM">PM</SelectItem>
+      </SelectContent>
+    </Select>
+  </div>
+</div>
                   <div>
-                    <Label htmlFor="endTime">End Time</Label>
-                    <Input
-                      id="endTime"
-                      type="time"
-                      value={endTime}
-                      onChange={(e) => setEndTime(e.target.value)}
-                      className="mt-1.5"
-                    />
-                  </div>
+  <Label>End Time</Label>
+
+  <div className="mt-1.5 grid grid-cols-3 gap-2">
+    <Select value={endHour} onValueChange={setEndHour}>
+      <SelectTrigger>
+        <SelectValue placeholder="Hour" />
+      </SelectTrigger>
+
+      <SelectContent>
+        {[
+          "01",
+          "02",
+          "03",
+          "04",
+          "05",
+          "06",
+          "07",
+          "08",
+          "09",
+          "10",
+          "11",
+          "12",
+        ].map((hour) => (
+          <SelectItem key={hour} value={hour}>
+            {hour}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+
+    <Select value={endMinute} onValueChange={setEndMinute}>
+      <SelectTrigger>
+        <SelectValue placeholder="Min" />
+      </SelectTrigger>
+
+      <SelectContent>
+        {["00", "15", "30", "45"].map((minute) => (
+          <SelectItem key={minute} value={minute}>
+            {minute}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+
+    <Select value={endPeriod} onValueChange={setEndPeriod}>
+      <SelectTrigger>
+        <SelectValue />
+      </SelectTrigger>
+
+      <SelectContent>
+        <SelectItem value="AM">AM</SelectItem>
+        <SelectItem value="PM">PM</SelectItem>
+      </SelectContent>
+    </Select>
+  </div>
+</div>
                 </div>
                 <div>
                   <Label htmlFor="location">Location</Label>
@@ -876,7 +1022,15 @@ export function CreateBazaarEventDrawer({ open, onOpenChange }: CreateBazaarEven
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleCreate}>Create Event</Button>
+          <Button onClick={handleSave} disabled={saving}>
+  {saving
+    ? isEditing
+      ? "Saving..."
+      : "Creating..."
+    : isEditing
+      ? "Save Changes"
+      : "Create Event"}
+</Button>
         </SheetFooter>
       </SheetContent>
     </Sheet>

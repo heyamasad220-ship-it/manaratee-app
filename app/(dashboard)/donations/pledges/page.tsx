@@ -1,8 +1,8 @@
 "use client";
 
 import { PaymentHistory } from "@/components/donations/payment-history";
-import { getCurrentOrganizationId } from "@/lib/current-organization";
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Label } from "@/components/ui/label";
+import Link from "next/link";
 import {
   Table,
   TableBody,
@@ -50,28 +51,27 @@ import {
   CheckCircle2,
   ArrowUpDown,
 } from "lucide-react";
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
 type PledgeStatus = "Open" | "Partial" | "Fulfilled";
 
-interface PledgeRow {
+type DonationPledgeRow = {
   id: string;
-  donor_id: string | null;
-  donor_name: string;
-  donor_type: string | null;
-  campaign_name: string | null;
-  campaign_code: string | null;
-  amount_pledged: number;
-  amount_paid: number;
-  balance_remaining: number;
-  payment_status: string;
-  pledge_date: string | null;
-}
+  organization_id: string;
+  contact_id: string | null;
+  donor_name: string | null;
+  amount: number | string | null;
+  collected_amount: number | string | null;
+  status: string | null;
+  fund_name: string | null;
+  frequency: string | null;
+  start_date: string | null;
+  end_date: string | null;
+};
 
 interface Pledge {
   id: string;
-  donorId: string | null;
+  contactId: string | null;
   donorName: string;
   donorType: string;
   totalAmount: number;
@@ -79,22 +79,22 @@ interface Pledge {
   balance: number;
   frequency: string;
   startDate: string;
-  endDate: string;
   nextPayment: string | null;
   status: PledgeStatus;
-  campaign: string;
+  fundName: string;
   notes?: string;
 }
 
-interface DonorOption {
+interface ContactOption {
   id: string;
-  full_name: string;
+  full_name: string | null;
+  email: string | null;
 }
 
-interface CampaignOption {
+type FundOption = {
   id: string;
   name: string;
-}
+};
 
 type PaymentHistoryItem = {
   id: string;
@@ -104,28 +104,73 @@ type PaymentHistoryItem = {
   memo: string | null;
 };
 
-function mapStatus(status: string): PledgeStatus {
+function formatPlainDate(date?: string | null) {
+  if (!date) return "N/A";
+  return date.slice(0, 10);
+}
+
+function normalizeDateInput(date?: string | null) {
+  if (!date) return null;
+  return date.slice(0, 10);
+}
+
+function getTodayPlainDate() {
+  const today = new Date();
+  const timezoneOffset = today.getTimezoneOffset() * 60 * 1000;
+  return new Date(today.getTime() - timezoneOffset).toISOString().slice(0, 10);
+}
+
+function mapStatus(status: string | null, amount: number, paid: number): PledgeStatus {
   const normalized = status?.toLowerCase();
+
   if (normalized === "fulfilled" || normalized === "paid") return "Fulfilled";
   if (normalized === "partial" || normalized === "partially_paid") return "Partial";
+
+  if (amount > 0 && paid >= amount) return "Fulfilled";
+  if (paid > 0) return "Partial";
+
   return "Open";
 }
 
-function formatDonorType(value: string | null): string {
-  if (!value) return "Unknown";
-  return value.charAt(0).toUpperCase() + value.slice(1);
+function formatCurrency(value: number) {
+  return `$${value.toLocaleString()}`;
+}
+
+function pledgeFromRow(row: DonationPledgeRow): Pledge {
+  const totalAmount = Number(row.amount || 0);
+  const paidAmount = Number(row.collected_amount || 0);
+  const balance = Math.max(totalAmount - paidAmount, 0);
+
+  return {
+    id: row.id,
+    contactId: row.contact_id,
+    donorName: row.donor_name || "Unknown donor",
+    donorType: "Customer",
+    totalAmount,
+    paidAmount,
+    balance,
+    frequency: row.frequency || "One-Time",
+    startDate: normalizeDateInput(row.start_date) || "",
+    nextPayment: null,
+    status: mapStatus(row.status, totalAmount, paidAmount),
+    fundName: row.fund_name || "General Fund",
+    notes: undefined,
+  };
 }
 
 export default function PledgesPage() {
   const supabase = createClient();
-  const [showDonorList, setShowDonorList] = useState(false)
+  const router = useRouter();
+
+  const [showDonorList, setShowDonorList] = useState(false);
   const [organizationId, setOrganizationId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [campaignFilter, setCampaignFilter] = useState<string>("all");
+  const [fundFilter, setFundFilter] = useState<string>("all");
 
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
+  const [editingPledge, setEditingPledge] = useState<Pledge | null>(null);
 
   const [selectedPledge, setSelectedPledge] = useState<Pledge | null>(null);
   const [paymentPledge, setPaymentPledge] = useState<Pledge | null>(null);
@@ -137,111 +182,159 @@ export default function PledgesPage() {
   const [loadingPledgePayments, setLoadingPledgePayments] = useState(false);
   const [pledgePaymentsError, setPledgePaymentsError] = useState<string | null>(null);
 
-  const [donors, setDonors] = useState<DonorOption[]>([]);
-  const [campaignOptions, setCampaignOptions] = useState<CampaignOption[]>([]);
+  const [contacts, setContacts] = useState<ContactOption[]>([]);
+  const [contactId, setContactId] = useState("");
 
-  const [donorId, setDonorId] = useState("");
-  const [campaignId, setCampaignId] = useState("");
+  const [fundOptions, setFundOptions] = useState<FundOption[]>([]);
+
+  const [fundName, setFundName] = useState("");
   const [amount, setAmount] = useState("");
-  const [date, setDate] = useState("")
-  const [method, setMethod] = useState("cash")
   const [pledgeDate, setPledgeDate] = useState("");
+  const [frequency, setFrequency] = useState("One-Time");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
+
+  const [editAmount, setEditAmount] = useState("");
+  const [editFundName, setEditFundName] = useState("");
+  const [editPledgeDate, setEditPledgeDate] = useState("");
+  const [editFrequency, setEditFrequency] = useState("One-Time");
+  const [editStatus, setEditStatus] = useState<PledgeStatus>("Open");
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentDate, setPaymentDate] = useState("");
   const [paymentSource, setPaymentSource] = useState("cash");
   const [paymentMemo, setPaymentMemo] = useState("");
   const [savingPayment, setSavingPayment] = useState(false);
-  const [donorSearch, setDonorSearch] = useState("")
+
+  const [donorSearch, setDonorSearch] = useState("");
+
+  async function getOrgIdForCurrentUser() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) return null;
+
+    const { data: profile, error } = await supabase
+      .from("profiles")
+      .select("organization_id, role")
+      .eq("id", user.id)
+      .single();
+
+    if (error || !profile?.organization_id) return null;
+
+    if (!["owner", "admin"].includes(profile.role || "")) return null;
+
+    return profile.organization_id as string;
+  }
+
+  async function searchContacts(searchValue: string, orgIdOverride?: string) {
+    const orgId = orgIdOverride || organizationId;
+
+    if (!orgId) return;
+
+    let query = supabase
+      .from("contacts")
+      .select("id, full_name, email")
+      .eq("organization_id", orgId)
+      .order("full_name", { ascending: true })
+      .limit(50);
+
+    if (searchValue.trim().length >= 1) {
+      const cleanSearch = searchValue.trim().replaceAll(",", "").replaceAll("%", "");
+      query = query.or(`full_name.ilike.%${cleanSearch}%,email.ilike.%${cleanSearch}%`);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error("Error searching contacts:", JSON.stringify(error, null, 2));
+      setContacts([]);
+      return;
+    }
+
+    setContacts((data || []) as ContactOption[]);
+  }
+
+  async function loadFundOptions(orgId: string, currentPledges: Pledge[] = []) {
+    const optionsFromPledges = currentPledges
+      .map((pledge) => pledge.fundName)
+      .filter(Boolean)
+      .map((name) => ({ id: name, name }));
+
+    const { data, error } = await supabase
+      .from("campaigns")
+      .select("id, name")
+      .eq("organization_id", orgId)
+      .order("name", { ascending: true });
+
+    if (error) {
+      console.warn("Could not load campaigns table. Using funds already found on pledges.", error);
+      setFundOptions(dedupeFundOptions(optionsFromPledges));
+      return;
+    }
+
+    const campaignOptions = (data || [])
+      .filter((campaign: any) => campaign.name)
+      .map((campaign: any) => ({
+        id: String(campaign.id),
+        name: String(campaign.name),
+      }));
+
+    setFundOptions(dedupeFundOptions([...campaignOptions, ...optionsFromPledges]));
+  }
+
+  function dedupeFundOptions(options: FundOption[]) {
+    const seen = new Set<string>();
+
+    return options.filter((option) => {
+      const key = option.name.toLowerCase();
+
+      if (seen.has(key)) return false;
+
+      seen.add(key);
+      return true;
+    });
+  }
 
   const fetchPledges = async () => {
     setLoading(true);
 
-    const orgId = await getCurrentOrganizationId();
+    const orgId = await getOrgIdForCurrentUser();
 
     if (!orgId) {
-      console.error("No selected organization");
       setOrganizationId(null);
       setPledges([]);
-      setDonors([]);
-      setCampaignOptions([]);
+      setContacts([]);
+      setFundOptions([]);
       setLoading(false);
       return;
     }
 
     setOrganizationId(orgId);
 
-    const { data: donorsData, error: donorsError } = await supabase
-      .from("donors")
-      .select("id,full_name")
+    await searchContacts("", orgId);
+
+    const { data: pledgeData, error: pledgeError } = await supabase
+      .from("donation_pledges")
+      .select(
+        "id, organization_id, contact_id, donor_name, amount, collected_amount, status, fund_name, frequency, start_date, end_date"
+      )
       .eq("organization_id", orgId)
-      .order("full_name", { ascending: true });
+      .order("start_date", { ascending: false });
 
-    if (donorsError) {
-      console.error("Error loading donors:", JSON.stringify(donorsError, null, 2));
-      setDonors([]);
-    } else {
-      setDonors((donorsData || []) as DonorOption[]);
-    }
-
-    const { data: campaignsData, error: campaignsError } = await supabase
-      .from("campaigns")
-      .select("id, name")
-      .eq("organization_id", orgId)
-      .order("name", { ascending: true });
-
-    if (campaignsError) {
-      console.error("Error loading campaigns:", campaignsError);
-      setCampaignOptions([]);
-    } else {
-      setCampaignOptions((campaignsData || []) as CampaignOption[]);
-    }
-
-    const { data, error } = await supabase
-      .from("pledge_status_view")
-      .select(`
-        id,
-        donor_id,
-        donor_name,
-        donor_type,
-        campaign_name,
-        campaign_code,
-        amount_pledged,
-        amount_paid,
-        balance_remaining,
-        payment_status,
-        pledge_date
-      `)
-      .eq("organization_id", orgId)
-      .order("donor_name", { ascending: true });
-
-    if (error) {
-      console.error("Error loading pledges:", error);
+    if (pledgeError) {
+      console.error("Error loading donation pledges:", pledgeError);
       setPledges([]);
       setLoading(false);
       return;
     }
 
-    const mapped: Pledge[] = (data as PledgeRow[]).map((row) => ({
-      id: row.id,
-      donorId: row.donor_id,
-      donorName: row.donor_name,
-      donorType: formatDonorType(row.donor_type),
-      totalAmount: Number(row.amount_pledged ?? 0),
-      paidAmount: Number(row.amount_paid ?? 0),
-      balance: Number(row.balance_remaining ?? 0),
-      frequency: "One-Time",
-      startDate: row.pledge_date ?? new Date().toISOString(),
-      endDate: row.pledge_date ?? new Date().toISOString(),
-      nextPayment: null,
-      status: mapStatus(row.payment_status),
-      campaign: row.campaign_name ?? row.campaign_code ?? "No Campaign",
-      notes: undefined,
-    }));
+    const mapped = ((pledgeData || []) as DonationPledgeRow[]).map(pledgeFromRow);
 
     setPledges(mapped);
+    await loadFundOptions(orgId, mapped);
     setLoading(false);
   };
 
@@ -250,12 +343,11 @@ export default function PledgesPage() {
     setPledgePaymentsError(null);
 
     const { data, error } = await supabase
-      .from("payments")
-      .select("id, amount, payment_date, source, memo, created_at")
+      .from("donation_payments")
+      .select("id, amount, payment_date, source, payment_method")
       .eq("organization_id", orgId)
       .eq("pledge_id", pledgeId)
-      .order("payment_date", { ascending: false })
-      .order("created_at", { ascending: false });
+      .order("payment_date", { ascending: false });
 
     if (error) {
       console.error("Error loading pledge payments:", error);
@@ -265,7 +357,15 @@ export default function PledgesPage() {
       return;
     }
 
-    setPledgePayments((data ?? []) as PaymentHistoryItem[]);
+    const mappedPayments: PaymentHistoryItem[] = (data || []).map((payment: any) => ({
+      id: payment.id,
+      amount: payment.amount,
+      payment_date: normalizeDateInput(payment.payment_date),
+      source: payment.payment_method || payment.source,
+      memo: null,
+    }));
+
+    setPledgePayments(mappedPayments);
     setLoadingPledgePayments(false);
   };
 
@@ -286,11 +386,14 @@ export default function PledgesPage() {
   }, [selectedPledge, organizationId]);
 
   const resetAddPledgeForm = () => {
-    setDonorId("");
-    setCampaignId("");
+    setContactId("");
+    setFundName("");
     setAmount("");
     setPledgeDate("");
+    setFrequency("One-Time");
     setNotes("");
+    setDonorSearch("");
+    setShowDonorList(false);
   };
 
   const resetPaymentForm = () => {
@@ -300,33 +403,48 @@ export default function PledgesPage() {
     setPaymentMemo("");
   };
 
+  const openEditPledge = (pledge: Pledge) => {
+    setEditingPledge(pledge);
+    setEditAmount(String(pledge.totalAmount || ""));
+    setEditFundName(pledge.fundName || "General Fund");
+    setEditPledgeDate(pledge.startDate || "");
+    setEditFrequency(pledge.frequency || "One-Time");
+    setEditStatus(pledge.status || "Open");
+  };
+
   const handleAddPledge = async () => {
-    const orgId = organizationId || (await getCurrentOrganizationId());
+    const orgId = organizationId || (await getOrgIdForCurrentUser());
 
     if (!orgId) {
-      alert("No organization selected");
+      alert("No organization found for this admin user.");
       return;
     }
 
-    if (!donorId) {
-      alert("Please select a donor");
+    if (!contactId) {
+      alert("Please select a contact.");
       return;
     }
 
     if (!amount || Number(amount) <= 0) {
-      alert("Please enter a valid amount");
+      alert("Please enter a valid amount.");
       return;
     }
 
+    const selectedContact = contacts.find((contact) => contact.id === contactId);
+
     setSaving(true);
 
-    const { error } = await supabase.from("pledges").insert({
+    const { error } = await supabase.from("donation_pledges").insert({
       organization_id: orgId,
-      donor_id: donorId,
-      campaign_id: campaignId || null,
-      amount_pledged: Number(amount),
-      pledge_date: pledgeDate || null,
-      notes: notes || null,
+      contact_id: contactId,
+      donor_name: selectedContact?.full_name || selectedContact?.email || null,
+      amount: Number(amount),
+      collected_amount: 0,
+      fund_name: fundName || "General Fund",
+      frequency,
+      start_date: normalizeDateInput(pledgeDate) || getTodayPlainDate(),
+      end_date: null,
+      status: "Open",
     });
 
     setSaving(false);
@@ -341,43 +459,125 @@ export default function PledgesPage() {
     await fetchPledges();
   };
 
+  const refreshSelectedPledge = async (pledgeId: string, orgId: string) => {
+    const { data, error } = await supabase
+      .from("donation_pledges")
+      .select(
+        "id, organization_id, contact_id, donor_name, amount, collected_amount, status, fund_name, frequency, start_date, end_date"
+      )
+      .eq("organization_id", orgId)
+      .eq("id", pledgeId)
+      .single();
+
+    if (error || !data) return;
+
+    const updatedPledge = pledgeFromRow(data as DonationPledgeRow);
+
+    setSelectedPledge(updatedPledge);
+    setPaymentPledge(updatedPledge);
+  };
+
+  const handleUpdatePledge = async () => {
+    if (!editingPledge) return;
+
+    const orgId = organizationId || (await getOrgIdForCurrentUser());
+
+    if (!orgId) {
+      alert("No organization found for this admin user.");
+      return;
+    }
+
+    if (!editAmount || Number(editAmount) <= 0) {
+      alert("Please enter a valid amount.");
+      return;
+    }
+
+    setSavingEdit(true);
+
+    const { error } = await supabase
+      .from("donation_pledges")
+      .update({
+        amount: Number(editAmount),
+        fund_name: editFundName || "General Fund",
+        frequency: editFrequency,
+        start_date: normalizeDateInput(editPledgeDate) || getTodayPlainDate(),
+        status: editStatus,
+      })
+      .eq("id", editingPledge.id)
+      .eq("organization_id", orgId);
+
+    setSavingEdit(false);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setEditingPledge(null);
+    await fetchPledges();
+
+    if (selectedPledge?.id === editingPledge.id) {
+      await refreshSelectedPledge(editingPledge.id, orgId);
+    }
+  };
+
   const handleRecordPayment = async () => {
     if (!paymentPledge) return;
 
-    const orgId = organizationId || (await getCurrentOrganizationId());
+    const orgId = organizationId || (await getOrgIdForCurrentUser());
 
     if (!orgId) {
-      alert("No organization selected");
+      alert("No organization found for this admin user.");
       return;
     }
 
     if (!paymentAmount || Number(paymentAmount) <= 0) {
-      alert("Enter valid amount");
+      alert("Enter a valid amount.");
       return;
     }
 
     setSavingPayment(true);
 
-    const { error } = await supabase.from("payments").insert({
+    const newPaidAmount = Number(paymentPledge.paidAmount || 0) + Number(paymentAmount || 0);
+    const newStatus =
+      newPaidAmount >= Number(paymentPledge.totalAmount || 0)
+        ? "Fulfilled"
+        : newPaidAmount > 0
+          ? "Partial"
+          : "Open";
+
+    const { error: paymentError } = await supabase.from("donation_payments").insert({
       organization_id: orgId,
-      donor_id: paymentPledge.donorId,
+      contact_id: paymentPledge.contactId,
       pledge_id: paymentPledge.id,
-      campaign_id: null,
+      donor_name: paymentPledge.donorName,
       amount: Number(paymentAmount),
-      payment_date: paymentDate
-        ? `${paymentDate}T12:00:00`
-        : new Date().toISOString(),
+      payment_date: normalizeDateInput(paymentDate) || getTodayPlainDate(),
       source: paymentSource,
-      source_type: "manual",
-      memo: paymentMemo || null,
-      status: "allocated",
-      is_verified: true,
+      payment_method: paymentSource,
+      fund_name: paymentPledge.fundName,
+      status: "Allocated",
     });
+
+    if (paymentError) {
+      setSavingPayment(false);
+      alert(paymentError.message);
+      return;
+    }
+
+    const { error: pledgeUpdateError } = await supabase
+      .from("donation_pledges")
+      .update({
+        collected_amount: newPaidAmount,
+        status: newStatus,
+      })
+      .eq("id", paymentPledge.id)
+      .eq("organization_id", orgId);
 
     setSavingPayment(false);
 
-    if (error) {
-      alert(error.message);
+    if (pledgeUpdateError) {
+      alert(pledgeUpdateError.message);
       return;
     }
 
@@ -386,70 +586,35 @@ export default function PledgesPage() {
 
     await fetchPledges();
     await loadPledgePayments(paymentPledge.id, orgId);
-
-    const { data: updatedPledgeRow, error: updatedPledgeError } = await supabase
-      .from("pledge_status_view")
-      .select(`
-        id,
-        donor_id,
-        donor_name,
-        donor_type,
-        campaign_name,
-        campaign_code,
-        amount_pledged,
-        amount_paid,
-        balance_remaining,
-        payment_status,
-        pledge_date
-      `)
-      .eq("organization_id", orgId)
-      .eq("id", paymentPledge.id)
-      .single();
-
-    if (updatedPledgeError) {
-      console.error("Error reloading updated pledge:", updatedPledgeError);
-      return;
-    }
-
-    const updatedPledge: Pledge = {
-      id: updatedPledgeRow.id,
-      donorId: updatedPledgeRow.donor_id ?? null,
-      donorName: updatedPledgeRow.donor_name,
-      donorType: formatDonorType(updatedPledgeRow.donor_type),
-      totalAmount: Number(updatedPledgeRow.amount_pledged ?? 0),
-      paidAmount: Number(updatedPledgeRow.amount_paid ?? 0),
-      balance: Number(updatedPledgeRow.balance_remaining ?? 0),
-      frequency: "One-Time",
-      startDate: updatedPledgeRow.pledge_date ?? new Date().toISOString(),
-      endDate: updatedPledgeRow.pledge_date ?? new Date().toISOString(),
-      nextPayment: null,
-      status: mapStatus(updatedPledgeRow.payment_status),
-      campaign:
-        updatedPledgeRow.campaign_name ??
-        updatedPledgeRow.campaign_code ??
-        "No Campaign",
-      notes: paymentPledge.notes,
-    };
-
-    setSelectedPledge(updatedPledge);
-    setPaymentPledge(updatedPledge);
+    await refreshSelectedPledge(paymentPledge.id, orgId);
   };
 
-  const campaignFilterOptions = useMemo(() => {
-    return Array.from(new Set(pledges.map((p) => p.campaign))).sort();
+  const fundFilterOptions = useMemo(() => {
+    return Array.from(new Set(pledges.map((pledge) => pledge.fundName))).sort();
   }, [pledges]);
+
+  const pledgeFundOptions = useMemo(() => {
+    const options = fundOptions.length > 0 ? fundOptions : [{ id: "General Fund", name: "General Fund" }];
+
+    if (!options.some((option) => option.name === "General Fund")) {
+      return [{ id: "General Fund", name: "General Fund" }, ...options];
+    }
+
+    return options;
+  }, [fundOptions]);
 
   const filteredPledges = pledges.filter((pledge) => {
     const matchesSearch = pledge.donorName.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === "all" || pledge.status === statusFilter;
-    const matchesCampaign = campaignFilter === "all" || pledge.campaign === campaignFilter;
-    return matchesSearch && matchesStatus && matchesCampaign;
+    const matchesFund = fundFilter === "all" || pledge.fundName === fundFilter;
+
+    return matchesSearch && matchesStatus && matchesFund;
   });
 
-  const totalPledged = pledges.reduce((sum, p) => sum + p.totalAmount, 0);
-  const totalCollected = pledges.reduce((sum, p) => sum + p.paidAmount, 0);
-  const totalRemaining = pledges.reduce((sum, p) => sum + p.balance, 0);
-  const activePledges = pledges.filter((p) => p.status !== "Fulfilled").length;
+  const totalPledged = pledges.reduce((sum, pledge) => sum + pledge.totalAmount, 0);
+  const totalCollected = pledges.reduce((sum, pledge) => sum + pledge.paidAmount, 0);
+  const totalRemaining = pledges.reduce((sum, pledge) => sum + pledge.balance, 0);
+  const activePledges = pledges.filter((pledge) => pledge.status !== "Fulfilled").length;
 
   const getStatusBadge = (status: PledgeStatus) => {
     switch (status) {
@@ -464,12 +629,12 @@ export default function PledgesPage() {
     }
   };
 
-  const filteredDonorOptions = donors.filter((donor) =>
-  donor.full_name.toLowerCase().includes(donorSearch.toLowerCase())
-)
+  const filteredContactOptions = contacts;
+
   return (
     <>
       <Header title="Pledges" />
+
       <div className="p-6">
         <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Card>
@@ -480,7 +645,7 @@ export default function PledgesPage() {
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${totalPledged.toLocaleString()}</div>
+              <div className="text-2xl font-bold">{formatCurrency(totalPledged)}</div>
               <p className="text-xs text-muted-foreground">Across {pledges.length} pledges</p>
             </CardContent>
           </Card>
@@ -493,7 +658,7 @@ export default function PledgesPage() {
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${totalCollected.toLocaleString()}</div>
+              <div className="text-2xl font-bold">{formatCurrency(totalCollected)}</div>
               <p className="text-xs text-muted-foreground">
                 {totalPledged > 0 ? Math.round((totalCollected / totalPledged) * 100) : 0}% of total
               </p>
@@ -508,7 +673,7 @@ export default function PledgesPage() {
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${totalRemaining.toLocaleString()}</div>
+              <div className="text-2xl font-bold">{formatCurrency(totalRemaining)}</div>
               <p className="text-xs text-muted-foreground">Yet to be collected</p>
             </CardContent>
           </Card>
@@ -534,7 +699,7 @@ export default function PledgesPage() {
               <Input
                 placeholder="Search pledges..."
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(event) => setSearch(event.target.value)}
                 className="pl-9"
               />
             </div>
@@ -551,15 +716,15 @@ export default function PledgesPage() {
               </SelectContent>
             </Select>
 
-            <Select value={campaignFilter} onValueChange={setCampaignFilter}>
+            <Select value={fundFilter} onValueChange={setFundFilter}>
               <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Campaign" />
+                <SelectValue placeholder="Fund" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Campaigns</SelectItem>
-                {campaignFilterOptions.map((campaign) => (
-                  <SelectItem key={campaign} value={campaign}>
-                    {campaign}
+                <SelectItem value="all">All Funds</SelectItem>
+                {fundFilterOptions.map((fund) => (
+                  <SelectItem key={fund} value={fund}>
+                    {fund}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -587,7 +752,7 @@ export default function PledgesPage() {
                   <TableHead>Amount Paid</TableHead>
                   <TableHead>Balance</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Campaign</TableHead>
+                  <TableHead>Fund</TableHead>
                   <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -620,11 +785,11 @@ export default function PledgesPage() {
                       </TableCell>
 
                       <TableCell className="font-medium">
-                        ${pledge.totalAmount.toLocaleString()}
+                        {formatCurrency(pledge.totalAmount)}
                       </TableCell>
 
                       <TableCell className="font-medium text-emerald-600">
-                        ${pledge.paidAmount.toLocaleString()}
+                        {formatCurrency(pledge.paidAmount)}
                       </TableCell>
 
                       <TableCell
@@ -634,13 +799,13 @@ export default function PledgesPage() {
                             : "text-muted-foreground"
                         }
                       >
-                        ${pledge.balance.toLocaleString()}
+                        {formatCurrency(pledge.balance)}
                       </TableCell>
 
                       <TableCell>{getStatusBadge(pledge.status)}</TableCell>
 
                       <TableCell>
-                        <Badge variant="outline">{pledge.campaign}</Badge>
+                        <Badge variant="outline">{pledge.fundName}</Badge>
                       </TableCell>
 
                       <TableCell>
@@ -650,26 +815,40 @@ export default function PledgesPage() {
                               variant="ghost"
                               size="icon"
                               className="h-8 w-8"
-                              onClick={(e) => e.stopPropagation()}
+                              onClick={(event) => event.stopPropagation()}
                             >
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => setSelectedPledge(pledge)}>
+                            <DropdownMenuItem
+                              onClick={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                setSelectedPledge(pledge);
+                              }}
+                            >
                               View Details
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
+                              onClick={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
                                 setPaymentPledge(pledge);
                                 setShowPaymentDialog(true);
                               }}
                             >
                               Record Payment
                             </DropdownMenuItem>
-                            <DropdownMenuItem>Edit Pledge</DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                openEditPledge(pledge);
+                              }}
+                            >
+                              Edit Pledge
+                            </DropdownMenuItem>
                             <DropdownMenuItem>Send Reminder</DropdownMenuItem>
                             <DropdownMenuItem className="text-red-600">
                               Cancel Pledge
@@ -697,42 +876,56 @@ export default function PledgesPage() {
             <div className="flex flex-col gap-2">
               <Label htmlFor="donor">Donor</Label>
               <Input
-  placeholder="Search donor by name..."
-  value={donorSearch}
-  onFocus={() => setShowDonorList(true)}
-  onChange={(e) => {
-    setDonorSearch(e.target.value)
-    setShowDonorList(true)
-  }}
-/>
-{donorId && (
-  <div className="text-sm text-muted-foreground">
-    Selected:{" "}
-    <span className="font-medium">
-      {donors.find((d) => d.id === donorId)?.full_name}
-    </span>
-  </div>
-)}
-{showDonorList && (
-  <div className="max-h-48 overflow-y-auto rounded-md border">
-  {filteredDonorOptions.map((donor) => (
-    <button
-      key={donor.id}
-      type="button"
-      className={`block w-full px-3 py-2 text-left text-sm hover:bg-muted ${
-        donorId === donor.id ? "bg-muted font-medium" : ""
-      }`}
-      onClick={() => {
-        setDonorId(donor.id)
-        setDonorSearch(donor.full_name)
-        setShowDonorList(false)
-      }}
-    >
-      {donor.full_name}
-    </button>
-  ))}
-</div>
-)}
+                id="donor"
+                placeholder="Search contact by name or email..."
+                value={donorSearch}
+                onFocus={() => setShowDonorList(true)}
+                onChange={async (event) => {
+                  const value = event.target.value;
+
+                  setDonorSearch(value);
+                  setShowDonorList(true);
+
+                  await searchContacts(value.trim());
+                }}
+              />
+
+              {contactId && (
+                <div className="text-sm text-muted-foreground">
+                  Selected:{" "}
+                  <span className="font-medium">
+                    {contacts.find((contact) => contact.id === contactId)?.full_name ||
+                      contacts.find((contact) => contact.id === contactId)?.email}
+                  </span>
+                </div>
+              )}
+
+              {showDonorList && (
+                <div className="max-h-48 overflow-y-auto rounded-md border">
+                  {filteredContactOptions.length === 0 ? (
+                    <div className="px-3 py-2 text-sm text-muted-foreground">
+                      No contacts found.
+                    </div>
+                  ) : (
+                    filteredContactOptions.map((contact) => (
+                      <button
+                        key={contact.id}
+                        type="button"
+                        className={`block w-full px-3 py-2 text-left text-sm hover:bg-muted ${
+                          contactId === contact.id ? "bg-muted font-medium" : ""
+                        }`}
+                        onClick={() => {
+                          setContactId(contact.id);
+                          setDonorSearch(contact.full_name || contact.email || "");
+                          setShowDonorList(false);
+                        }}
+                      >
+                        {contact.full_name || contact.email || "Unnamed contact"}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
@@ -748,21 +941,21 @@ export default function PledgesPage() {
                     placeholder="0.00"
                     className="pl-7"
                     value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
+                    onChange={(event) => setAmount(event.target.value)}
                   />
                 </div>
               </div>
 
               <div className="flex flex-col gap-2">
-                <Label htmlFor="campaign">Campaign</Label>
-                <Select value={campaignId} onValueChange={setCampaignId}>
-                  <SelectTrigger id="campaign">
-                    <SelectValue placeholder="Select campaign" />
+                <Label htmlFor="fund">Fund</Label>
+                <Select value={fundName || "General Fund"} onValueChange={setFundName}>
+                  <SelectTrigger id="fund">
+                    <SelectValue placeholder="Select a campaign or fund" />
                   </SelectTrigger>
                   <SelectContent>
-                    {campaignOptions.map((campaign) => (
-                      <SelectItem key={campaign.id} value={campaign.id}>
-                        {campaign.name}
+                    {pledgeFundOptions.map((fund) => (
+                      <SelectItem key={fund.id} value={fund.name}>
+                        {fund.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -777,12 +970,23 @@ export default function PledgesPage() {
                   id="pledge-date"
                   type="date"
                   value={pledgeDate}
-                  onChange={(e) => setPledgeDate(e.target.value)}
+                  onChange={(event) => setPledgeDate(event.target.value)}
                 />
               </div>
+
               <div className="flex flex-col gap-2">
                 <Label htmlFor="pledge-type">Pledge Type</Label>
-                <Input id="pledge-type" value="One-Time" disabled />
+                <Select value={frequency} onValueChange={setFrequency}>
+                  <SelectTrigger id="pledge-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="One-Time">One-Time</SelectItem>
+                    <SelectItem value="Monthly">Monthly</SelectItem>
+                    <SelectItem value="Quarterly">Quarterly</SelectItem>
+                    <SelectItem value="Yearly">Yearly</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -793,8 +997,11 @@ export default function PledgesPage() {
                 placeholder="Add any additional notes..."
                 rows={2}
                 value={notes}
-                onChange={(e) => setNotes(e.target.value)}
+                onChange={(event) => setNotes(event.target.value)}
               />
+              <p className="text-xs text-muted-foreground">
+                Notes are not saved yet because the shared donation_pledges table does not currently have a notes column.
+              </p>
             </div>
           </div>
 
@@ -808,8 +1015,112 @@ export default function PledgesPage() {
             >
               Cancel
             </Button>
+
             <Button onClick={handleAddPledge} disabled={saving}>
               {saving ? "Saving..." : "Add Pledge"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!editingPledge} onOpenChange={(open) => !open && setEditingPledge(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Pledge</DialogTitle>
+            <DialogDescription>Update pledge details without changing the donor.</DialogDescription>
+          </DialogHeader>
+
+          {editingPledge && (
+            <div className="flex flex-col gap-4 py-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Donor</p>
+                <p className="font-medium">{editingPledge.donorName}</p>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="edit-total-amount">Total Amount</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                      $
+                    </span>
+                    <Input
+                      id="edit-total-amount"
+                      type="number"
+                      className="pl-7"
+                      value={editAmount}
+                      onChange={(event) => setEditAmount(event.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="edit-fund">Fund</Label>
+                  <Select value={editFundName || "General Fund"} onValueChange={setEditFundName}>
+                    <SelectTrigger id="edit-fund">
+                      <SelectValue placeholder="Select a campaign or fund" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {pledgeFundOptions.map((fund) => (
+                        <SelectItem key={fund.id} value={fund.name}>
+                          {fund.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="edit-pledge-date">Pledge Date</Label>
+                  <Input
+                    id="edit-pledge-date"
+                    type="date"
+                    value={editPledgeDate}
+                    onChange={(event) => setEditPledgeDate(event.target.value)}
+                  />
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="edit-pledge-type">Pledge Type</Label>
+                  <Select value={editFrequency} onValueChange={setEditFrequency}>
+                    <SelectTrigger id="edit-pledge-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="One-Time">One-Time</SelectItem>
+                      <SelectItem value="Monthly">Monthly</SelectItem>
+                      <SelectItem value="Quarterly">Quarterly</SelectItem>
+                      <SelectItem value="Yearly">Yearly</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="edit-status">Status</Label>
+                <Select value={editStatus} onValueChange={(value) => setEditStatus(value as PledgeStatus)}>
+                  <SelectTrigger id="edit-status">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Open">Open</SelectItem>
+                    <SelectItem value="Partial">Partial</SelectItem>
+                    <SelectItem value="Fulfilled">Fulfilled</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingPledge(null)}>
+              Cancel
+            </Button>
+
+            <Button onClick={handleUpdatePledge} disabled={savingEdit}>
+              {savingEdit ? "Saving..." : "Save Changes"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -834,7 +1145,7 @@ export default function PledgesPage() {
                 <Input
                   type="number"
                   value={paymentAmount}
-                  onChange={(e) => setPaymentAmount(e.target.value)}
+                  onChange={(event) => setPaymentAmount(event.target.value)}
                 />
               </div>
 
@@ -843,7 +1154,7 @@ export default function PledgesPage() {
                 <Input
                   type="date"
                   value={paymentDate}
-                  onChange={(e) => setPaymentDate(e.target.value)}
+                  onChange={(event) => setPaymentDate(event.target.value)}
                 />
               </div>
 
@@ -868,8 +1179,11 @@ export default function PledgesPage() {
                 <Label>Memo</Label>
                 <Textarea
                   value={paymentMemo}
-                  onChange={(e) => setPaymentMemo(e.target.value)}
+                  onChange={(event) => setPaymentMemo(event.target.value)}
                 />
+                <p className="text-xs text-muted-foreground">
+                  Memo is not saved yet because the shared donation_payments table does not currently have a memo column.
+                </p>
               </div>
             </div>
           )}
@@ -904,28 +1218,32 @@ export default function PledgesPage() {
             <div className="flex-1 overflow-y-auto flex flex-col gap-6 py-4 pr-2">
               <div className="flex flex-wrap gap-2">
                 {getStatusBadge(selectedPledge.status)}
-                <Badge variant="outline">{selectedPledge.campaign}</Badge>
+                <Badge variant="outline">{selectedPledge.fundName}</Badge>
                 <Badge variant="secondary">{selectedPledge.frequency}</Badge>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-3">
                 <div className="rounded-lg border p-4 text-center">
-                  <p className="text-2xl font-bold">${selectedPledge.totalAmount.toLocaleString()}</p>
+                  <p className="text-2xl font-bold">
+                    {formatCurrency(selectedPledge.totalAmount)}
+                  </p>
                   <p className="text-xs text-muted-foreground">Amount Pledged</p>
                 </div>
+
                 <div className="rounded-lg border p-4 text-center">
                   <p className="text-2xl font-bold text-emerald-600">
-                    ${selectedPledge.paidAmount.toLocaleString()}
+                    {formatCurrency(selectedPledge.paidAmount)}
                   </p>
                   <p className="text-xs text-muted-foreground">Amount Paid</p>
                 </div>
+
                 <div className="rounded-lg border p-4 text-center">
                   <p
                     className={`text-2xl font-bold ${
                       selectedPledge.balance > 0 ? "text-amber-600" : "text-muted-foreground"
                     }`}
                   >
-                    ${selectedPledge.balance.toLocaleString()}
+                    {formatCurrency(selectedPledge.balance)}
                   </p>
                   <p className="text-xs text-muted-foreground">Balance</p>
                 </div>
@@ -957,24 +1275,18 @@ export default function PledgesPage() {
                   <span className="font-medium">{selectedPledge.donorName}</span>
                   <span className="text-sm text-muted-foreground">{selectedPledge.donorType}</span>
                 </div>
+
                 <div className="flex flex-col gap-1">
                   <span className="text-xs text-muted-foreground">Next Payment</span>
                   <span className="font-medium">
-                    {selectedPledge.nextPayment
-                      ? new Date(selectedPledge.nextPayment).toLocaleDateString()
-                      : "N/A"}
+                    {formatPlainDate(selectedPledge.nextPayment)}
                   </span>
                 </div>
+
                 <div className="flex flex-col gap-1">
                   <span className="text-xs text-muted-foreground">Start Date</span>
                   <span className="font-medium">
-                    {new Date(selectedPledge.startDate).toLocaleDateString()}
-                  </span>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <span className="text-xs text-muted-foreground">End Date</span>
-                  <span className="font-medium">
-                    {new Date(selectedPledge.endDate).toLocaleDateString()}
+                    {formatPlainDate(selectedPledge.startDate)}
                   </span>
                 </div>
               </div>
@@ -1003,21 +1315,38 @@ export default function PledgesPage() {
           )}
 
           <DialogFooter className="border-t pt-4 flex-col gap-2 sm:flex-row">
-            <Button variant="outline" onClick={() => setSelectedPledge(null)}>
-              Close
-            </Button>
-            <Button variant="outline" asChild>
-              <Link href="/donations/donors">View Donor</Link>
-            </Button>
-            <Button
-              onClick={() => {
-                setPaymentPledge(selectedPledge);
-                setShowPaymentDialog(true);
-              }}
-            >
-              Record Payment
-            </Button>
-          </DialogFooter>
+  <Button variant="outline" asChild>
+  <Link
+    href={
+      selectedPledge?.contactId
+        ? `/contacts/${selectedPledge.contactId}`
+        : "/contacts"
+    }
+  >
+    View Donor
+  </Link>
+</Button>
+
+  <Button
+    variant="outline"
+    onClick={() => {
+      if (!selectedPledge) return;
+      openEditPledge(selectedPledge);
+    }}
+  >
+    Edit Pledge
+  </Button>
+
+  <Button
+    onClick={() => {
+      if (!selectedPledge) return;
+      setPaymentPledge(selectedPledge);
+      setShowPaymentDialog(true);
+    }}
+  >
+    Record Payment
+  </Button>
+</DialogFooter>
         </DialogContent>
       </Dialog>
     </>

@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { createClient } from "@/lib/supabase/client"
 import { Header } from "@/components/layout/header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -38,73 +39,90 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Search, Plus, MoreHorizontal, Pencil, Trash2, Shield, Mail, Users, UserCheck, UserX } from "lucide-react"
 
-const users = [
-  {
-    id: "user-1",
-    name: "Ahmad Hassan",
-    email: "ahmad.hassan@example.com",
-    role: "Admin",
-    status: "Active",
-    lastLogin: "2026-03-01",
-    createdAt: "2024-06-15",
-  },
-  {
-    id: "user-2",
-    name: "Sarah Johnson",
-    email: "sarah.johnson@example.com",
-    role: "Manager",
-    status: "Active",
-    lastLogin: "2026-02-28",
-    createdAt: "2024-08-20",
-  },
-  {
-    id: "user-3",
-    name: "Mohammed Ali",
-    email: "mohammed.ali@example.com",
-    role: "Staff",
-    status: "Active",
-    lastLogin: "2026-03-02",
-    createdAt: "2025-01-10",
-  },
-  {
-    id: "user-4",
-    name: "Fatima Khan",
-    email: "fatima.khan@example.com",
-    role: "Staff",
-    status: "Active",
-    lastLogin: "2026-02-25",
-    createdAt: "2025-03-05",
-  },
-  {
-    id: "user-5",
-    name: "Omar Ibrahim",
-    email: "omar.ibrahim@example.com",
-    role: "Volunteer",
-    status: "Inactive",
-    lastLogin: "2026-01-15",
-    createdAt: "2024-11-22",
-  },
-  {
-    id: "user-6",
-    name: "Aisha Rahman",
-    email: "aisha.rahman@example.com",
-    role: "Manager",
-    status: "Active",
-    lastLogin: "2026-03-01",
-    createdAt: "2024-09-18",
-  },
-]
+type OrgUser = {
+  id: string
+  name: string
+  email: string
+  role: string
+  status: string
+  lastLogin: string | null
+  createdAt: string | null
+}
 
 const roles = ["Admin", "Manager", "Staff", "Volunteer", "Read Only"]
 
 export default function UsersSettingsPage() {
+  const supabase = createClient()
+
+  const [users, setUsers] = useState<OrgUser[]>([])
+  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
   const [roleFilter, setRoleFilter] = useState("All")
   const [statusFilter, setStatusFilter] = useState("All")
   const [showAddDialog, setShowAddDialog] = useState(false)
 
+  useEffect(() => {
+    async function loadUsers() {
+      setLoading(true)
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!user) {
+        setUsers([])
+        setLoading(false)
+        return
+      }
+
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("organization_id")
+        .eq("id", user.id)
+        .maybeSingle()
+
+      if (profileError || !profile?.organization_id) {
+        console.error("Profile / organization error:", profileError)
+        setUsers([])
+        setLoading(false)
+        return
+      }
+
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, first_name, last_name, email, role, created_at, updated_at")
+        .eq("organization_id", profile.organization_id)
+        .order("created_at", { ascending: false })
+
+      if (error) {
+        console.error("Users load error:", error)
+        setUsers([])
+        setLoading(false)
+        return
+      }
+
+      const formattedUsers: OrgUser[] = (data || []).map((person: any) => ({
+        id: person.id,
+        name: `${person.first_name || ""} ${person.last_name || ""}`.trim() || person.email,
+        email: person.email,
+        role: person.role
+          ? person.role.charAt(0).toUpperCase() + person.role.slice(1)
+          : "Staff",
+        status: "Active",
+        lastLogin: person.updated_at,
+        createdAt: person.created_at,
+      }))
+
+      setUsers(formattedUsers)
+      setLoading(false)
+    }
+
+    loadUsers()
+  }, [supabase])
+
   const filteredUsers = users.filter((user) => {
-    const matchesSearch = user.name.toLowerCase().includes(search.toLowerCase()) ||
+    const matchesSearch =
+      user.name.toLowerCase().includes(search.toLowerCase()) ||
       user.email.toLowerCase().includes(search.toLowerCase())
     const matchesRole = roleFilter === "All" || user.role === roleFilter
     const matchesStatus = statusFilter === "All" || user.status === statusFilter
@@ -136,12 +154,13 @@ export default function UsersSettingsPage() {
                     <Users className="h-5 w-5 text-primary" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold">{totalUsers}</p>
+                    <p className="text-2xl font-bold">{loading ? "—" : totalUsers}</p>
                     <p className="text-xs text-muted-foreground">Total Users</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
+
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
@@ -149,12 +168,13 @@ export default function UsersSettingsPage() {
                     <UserCheck className="h-5 w-5 text-green-600" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold">{activeUsers}</p>
+                    <p className="text-2xl font-bold">{loading ? "—" : activeUsers}</p>
                     <p className="text-xs text-muted-foreground">Active Users</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
+
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
@@ -162,12 +182,13 @@ export default function UsersSettingsPage() {
                     <Shield className="h-5 w-5 text-amber-600" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold">{adminUsers}</p>
+                    <p className="text-2xl font-bold">{loading ? "—" : adminUsers}</p>
                     <p className="text-xs text-muted-foreground">Administrators</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
+
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
@@ -175,7 +196,9 @@ export default function UsersSettingsPage() {
                     <UserX className="h-5 w-5 text-red-600" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold">{totalUsers - activeUsers}</p>
+                    <p className="text-2xl font-bold">
+                      {loading ? "—" : totalUsers - activeUsers}
+                    </p>
                     <p className="text-xs text-muted-foreground">Inactive Users</p>
                   </div>
                 </div>
@@ -270,10 +293,10 @@ export default function UsersSettingsPage() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-muted-foreground">
-                          {new Date(user.lastLogin).toLocaleDateString()}
+                          {user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : "—"}
                         </TableCell>
                         <TableCell className="text-muted-foreground">
-                          {new Date(user.createdAt).toLocaleDateString()}
+                          {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : "—"}
                         </TableCell>
                         <TableCell>
                           <DropdownMenu>

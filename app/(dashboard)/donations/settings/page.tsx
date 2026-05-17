@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
-import { getCurrentOrganizationId } from "@/lib/current-organization"
 import { Header } from "@/components/layout/header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -67,6 +66,26 @@ interface Campaign {
 
 export default function DonationsSettingsPage() {
   const supabase = createClient()
+  async function getOrganizationId() {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) return null
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("organization_id")
+    .eq("id", user.id)
+    .single()
+
+  if (error) {
+    console.error("Error loading organization:", error)
+    return null
+  }
+
+  return data?.organization_id || null
+}
   const [activeTab, setActiveTab] = useState<SettingsTab>("General")
   const [categories, setCategories] = useState<Category[]>([])
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([])
@@ -74,6 +93,15 @@ export default function DonationsSettingsPage() {
   const [showAddCategoryDialog, setShowAddCategoryDialog] = useState(false)
   const [showCampaignDialog, setShowCampaignDialog] = useState(false)
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null)
+  const [categoryName, setCategoryName] = useState("")
+const [categoryDescription, setCategoryDescription] = useState("")
+const [editingCategory, setEditingCategory] = useState<Category | null>(null)
+const [categoryTaxDeductible, setCategoryTaxDeductible] = useState(true)
+const [editingPaymentMethod, setEditingPaymentMethod] = useState<PaymentMethod | null>(null)
+const [paymentMethodName, setPaymentMethodName] = useState("")
+const [paymentMethodFee, setPaymentMethodFee] = useState("")
+const [paymentMethodEnabled, setPaymentMethodEnabled] = useState(true)
+const [showPaymentMethodDialog, setShowPaymentMethodDialog] = useState(false)
   const [campaignForm, setCampaignForm] = useState({
     name: "",
     description: "",
@@ -83,9 +111,40 @@ export default function DonationsSettingsPage() {
     status: "Draft" as Campaign["status"],
     campaignCode: "",
   })
+async function handleAddCategory() {
+  const orgId = await getOrganizationId()
 
+  if (!orgId) {
+    alert("No organization found.")
+    return
+  }
+
+  if (!categoryName.trim()) {
+    alert("Category name is required.")
+    return
+  }
+
+  const { error } = await supabase.from("donation_categories").insert({
+    organization_id: orgId,
+    name: categoryName.trim(),
+    description: categoryDescription.trim() || null,
+    tax_deductible: categoryTaxDeductible,
+  })
+
+  if (error) {
+    alert(error.message)
+    return
+  }
+
+  setCategoryName("")
+  setCategoryDescription("")
+  setCategoryTaxDeductible(true)
+  setShowAddCategoryDialog(false)
+
+  await loadCategories()
+}
 async function loadCampaigns() {
-  const orgId = await getCurrentOrganizationId()
+  const orgId = await getOrganizationId()
 
   if (!orgId) {
     setCampaigns([])
@@ -120,7 +179,7 @@ async function loadCampaigns() {
 }
 
 async function loadCategories() {
-  const orgId = await getCurrentOrganizationId()
+  const orgId = await getOrganizationId()
 
   if (!orgId) {
     setCategories([])
@@ -148,9 +207,46 @@ async function loadCategories() {
     }))
   )
 }
+async function handleSavePaymentMethod() {
+  const orgId = await getOrganizationId()
 
+  if (!orgId) {
+    alert("No organization found.")
+    return
+  }
+
+  if (!paymentMethodName.trim()) {
+    alert("Payment method name is required.")
+    return
+  }
+
+  if (!editingPaymentMethod) return
+
+  const { error } = await supabase
+    .from("payment_methods")
+    .update({
+      name: paymentMethodName.trim(),
+      fee: paymentMethodFee.trim() || "None",
+      enabled: paymentMethodEnabled,
+    })
+    .eq("id", editingPaymentMethod.id)
+    .eq("organization_id", orgId)
+
+  if (error) {
+    alert(error.message)
+    return
+  }
+
+  setEditingPaymentMethod(null)
+  setPaymentMethodName("")
+  setPaymentMethodFee("")
+  setPaymentMethodEnabled(true)
+  setShowPaymentMethodDialog(false)
+
+  await loadPaymentMethods()
+}
 async function loadPaymentMethods() {
-  const orgId = await getCurrentOrganizationId()
+  const orgId = await getOrganizationId()
 
   if (!orgId) {
     setPaymentMethods([])
@@ -240,7 +336,7 @@ useEffect(() => {
     }
   }
 async function handleSaveCampaign() {
-  const orgId = await getCurrentOrganizationId()
+  const orgId = await getOrganizationId()
 
   if (!orgId) {
     alert("No organization selected")
@@ -315,7 +411,71 @@ async function handleSaveCampaign() {
 
   await loadCampaigns()
 }
+async function handleDeleteCategory(categoryId: string) {
+  if (!confirm("Delete this category?")) return
 
+  const { error } = await supabase
+    .from("donation_categories")
+    .delete()
+    .eq("id", categoryId)
+
+  if (error) {
+    alert(error.message)
+    return
+  }
+
+  await loadCategories()
+}
+async function handleSaveCategory() {
+  const orgId = await getOrganizationId()
+
+  if (!orgId) {
+    alert("No organization found.")
+    return
+  }
+
+  if (!categoryName.trim()) {
+    alert("Category name is required.")
+    return
+  }
+
+  if (editingCategory) {
+    const { error } = await supabase
+      .from("donation_categories")
+      .update({
+        name: categoryName.trim(),
+        description: categoryDescription.trim() || null,
+        tax_deductible: categoryTaxDeductible,
+      })
+      .eq("id", editingCategory.id)
+      .eq("organization_id", orgId)
+
+    if (error) {
+      alert(error.message)
+      return
+    }
+  } else {
+    const { error } = await supabase.from("donation_categories").insert({
+      organization_id: orgId,
+      name: categoryName.trim(),
+      description: categoryDescription.trim() || null,
+      tax_deductible: categoryTaxDeductible,
+    })
+
+    if (error) {
+      alert(error.message)
+      return
+    }
+  }
+
+  setEditingCategory(null)
+  setCategoryName("")
+  setCategoryDescription("")
+  setCategoryTaxDeductible(true)
+  setShowAddCategoryDialog(false)
+
+  await loadCategories()
+}
 async function handleDeleteCampaign(campaignId: string) {
   if (!confirm("Are you sure you want to delete this campaign? This action cannot be undone.")) {
     return
@@ -369,16 +529,16 @@ async function handleDeleteCampaign(campaignId: string) {
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="flex flex-col gap-2">
                     <Label htmlFor="org-name">Organization Name</Label>
-                    <Input id="org-name" defaultValue="Islamic Center of Example" />
+                   <Input id="org-name" placeholder="Organization name" />
                   </div>
                   <div className="flex flex-col gap-2">
                     <Label htmlFor="tax-id">Tax ID / EIN</Label>
-                    <Input id="tax-id" defaultValue="12-3456789" />
+                    <Input id="tax-id" placeholder="Tax ID / EIN" />
                   </div>
                 </div>
                 <div className="flex flex-col gap-2">
                   <Label htmlFor="address">Address</Label>
-                  <Input id="address" defaultValue="123 Main Street, City, State 12345" />
+                 <Input id="address" placeholder="Organization address" />
                 </div>
               </CardContent>
             </Card>
@@ -407,7 +567,7 @@ async function handleDeleteCampaign(campaignId: string) {
                     <Label htmlFor="min-donation">Minimum Donation Amount</Label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-                      <Input id="min-donation" type="number" defaultValue="5" className="pl-7" />
+                      <Input id="min-donation" type="number" placeholder="5" className="pl-7" />
                     </div>
                   </div>
                 </div>
@@ -420,7 +580,7 @@ async function handleDeleteCampaign(campaignId: string) {
                         Allow donors to give without providing their name
                       </p>
                     </div>
-                    <Switch defaultChecked />
+                    <Switch />
                   </div>
                 </div>
 
@@ -505,14 +665,7 @@ async function handleDeleteCampaign(campaignId: string) {
                         <TableCell>{getCampaignStatusBadge(campaign.status)}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => { setEditingCampaign(campaign); setShowCampaignDialog(true); }}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
+                          
                             <Button
                               variant="ghost"
                               size="icon"
@@ -541,10 +694,10 @@ async function handleDeleteCampaign(campaignId: string) {
                   Manage categories for organizing donations
                 </p>
               </div>
-              <Button onClick={() => setShowAddCategoryDialog(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Category
-              </Button>
+             <Button onClick={() => setShowAddCategoryDialog(true)}>
+  <Plus className="mr-2 h-4 w-4" />
+  Add Category
+</Button>
             </div>
 
             <Card>
@@ -566,14 +719,25 @@ async function handleDeleteCampaign(campaignId: string) {
                         <TableCell>{category.taxDeductible ? "Yes" : "No"}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1">
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <Pencil className="h-4 w-4" />
-                            </Button>
+                            <Button
+  variant="ghost"
+  size="icon"
+  className="h-8 w-8"
+  onClick={() => {
+    setEditingCategory(category)
+    setCategoryName(category.name)
+    setCategoryDescription(category.description)
+    setCategoryTaxDeductible(category.taxDeductible)
+    setShowAddCategoryDialog(true)
+  }}
+>
+  <Pencil className="h-4 w-4" />
+</Button>
                             <Button
                               variant="ghost"
                               size="icon"
                               className="h-8 w-8 text-muted-foreground hover:text-red-600"
-                              onClick={() => setCategories(categories.filter((c) => c.id !== category.id))}
+                              onClick={() => handleDeleteCategory(category.id)}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -626,9 +790,20 @@ async function handleDeleteCampaign(campaignId: string) {
                           />
                         </TableCell>
                         <TableCell>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <Pencil className="h-4 w-4" />
-                          </Button>
+                          <Button
+  variant="ghost"
+  size="icon"
+  className="h-8 w-8"
+  onClick={() => {
+    setEditingPaymentMethod(method)
+    setPaymentMethodName(method.name)
+    setPaymentMethodFee(method.fee)
+    setPaymentMethodEnabled(method.enabled)
+    setShowPaymentMethodDialog(true)
+  }}
+>
+  <Pencil className="h-4 w-4" />
+</Button>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -685,7 +860,7 @@ async function handleDeleteCampaign(campaignId: string) {
             <Card>
               <CardHeader>
                 <CardTitle>Year-End Statements</CardTitle>
-                <CardDescription>Configure annual giving statements</CardDescription>
+                <CardDescription>Configure annual donation statements</CardDescription>
               </CardHeader>
               <CardContent className="flex flex-col gap-4">
                 <div className="rounded-lg border p-4">
@@ -693,7 +868,7 @@ async function handleDeleteCampaign(campaignId: string) {
                     <div>
                       <Label>Generate Year-End Statements</Label>
                       <p className="text-sm text-muted-foreground">
-                        Automatically generate annual giving summaries in January
+                        Automatically generate annual donation summaries in January
                       </p>
                     </div>
                     <Switch defaultChecked />
@@ -778,34 +953,132 @@ async function handleDeleteCampaign(campaignId: string) {
           </div>
         )}
       </div>
+      {/* Edit Payment Method Dialog */}
+<Dialog open={showPaymentMethodDialog} onOpenChange={setShowPaymentMethodDialog}>
+  <DialogContent>
+    <DialogHeader>
+      <DialogTitle>Edit Payment Method</DialogTitle>
+      <DialogDescription>
+        Update this accepted payment method
+      </DialogDescription>
+    </DialogHeader>
 
-      {/* Add Category Dialog */}
-      <Dialog open={showAddCategoryDialog} onOpenChange={setShowAddCategoryDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add Donation Category</DialogTitle>
-            <DialogDescription>Create a new category for organizing donations</DialogDescription>
-          </DialogHeader>
-          <div className="flex flex-col gap-4 py-4">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="cat-name">Category Name</Label>
-              <Input id="cat-name" placeholder="e.g., Education Fund" />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="cat-description">Description</Label>
-              <Textarea id="cat-description" placeholder="Brief description of this category" rows={2} />
-            </div>
-            <div className="flex items-center gap-2">
-              <Switch id="cat-tax" defaultChecked />
-              <Label htmlFor="cat-tax">Tax Deductible</Label>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddCategoryDialog(false)}>Cancel</Button>
-            <Button onClick={() => setShowAddCategoryDialog(false)}>Add Category</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+    <div className="flex flex-col gap-4 py-4">
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="payment-method-name">Method Name</Label>
+        <Input
+          id="payment-method-name"
+          value={paymentMethodName}
+          onChange={(event) => setPaymentMethodName(event.target.value)}
+        />
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="payment-method-fee">Processing Fee</Label>
+        <Input
+          id="payment-method-fee"
+          placeholder="None"
+          value={paymentMethodFee}
+          onChange={(event) => setPaymentMethodFee(event.target.value)}
+        />
+      </div>
+
+      <div className="flex items-center gap-2">
+        <Switch
+          id="payment-method-enabled"
+          checked={paymentMethodEnabled}
+          onCheckedChange={setPaymentMethodEnabled}
+        />
+        <Label htmlFor="payment-method-enabled">Enabled</Label>
+      </div>
+    </div>
+
+    <DialogFooter>
+      <Button
+        variant="outline"
+        onClick={() => {
+          setEditingPaymentMethod(null)
+          setPaymentMethodName("")
+          setPaymentMethodFee("")
+          setPaymentMethodEnabled(true)
+          setShowPaymentMethodDialog(false)
+        }}
+      >
+        Cancel
+      </Button>
+
+      <Button onClick={handleSavePaymentMethod}>
+        Save Changes
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
+        {/* Add/Edit Category Dialog */}
+<Dialog open={showAddCategoryDialog} onOpenChange={setShowAddCategoryDialog}>
+  <DialogContent>
+    <DialogHeader>
+      <DialogTitle>
+        {editingCategory ? "Edit Donation Category" : "Add Donation Category"}
+      </DialogTitle>
+      <DialogDescription>
+        {editingCategory
+          ? "Update this donation category"
+          : "Create a new category for organizing donations"}
+      </DialogDescription>
+    </DialogHeader>
+
+    <div className="flex flex-col gap-4 py-4">
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="cat-name">Category Name</Label>
+        <Input
+          id="cat-name"
+          placeholder="e.g., Education Fund"
+          value={categoryName}
+          onChange={(event) => setCategoryName(event.target.value)}
+        />
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="cat-description">Description</Label>
+        <Textarea
+          id="cat-description"
+          placeholder="Brief description of this category"
+          rows={2}
+          value={categoryDescription}
+          onChange={(event) => setCategoryDescription(event.target.value)}
+        />
+      </div>
+
+      <div className="flex items-center gap-2">
+        <Switch
+          id="cat-tax"
+          checked={categoryTaxDeductible}
+          onCheckedChange={setCategoryTaxDeductible}
+        />
+        <Label htmlFor="cat-tax">Tax Deductible</Label>
+      </div>
+    </div>
+
+    <DialogFooter>
+      <Button
+        variant="outline"
+        onClick={() => {
+          setEditingCategory(null)
+          setCategoryName("")
+          setCategoryDescription("")
+          setCategoryTaxDeductible(true)
+          setShowAddCategoryDialog(false)
+        }}
+      >
+        Cancel
+      </Button>
+
+      <Button onClick={handleSaveCategory}>
+        {editingCategory ? "Save Changes" : "Add Category"}
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
 
       {/* Campaign Dialog */}
       <Dialog open={showCampaignDialog} onOpenChange={setShowCampaignDialog}>

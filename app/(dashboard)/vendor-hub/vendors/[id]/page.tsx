@@ -194,7 +194,7 @@ export default function VendorDetailPage() {
         {/* Back Link & Actions */}
         <div className="flex items-center justify-between">
           <Link
-            href="/bazaar/vendors"
+            href="/vendor-hub/vendors"
             className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" />

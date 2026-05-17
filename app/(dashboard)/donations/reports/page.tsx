@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
+import { createClient } from "@/lib/supabase/client"
 import { Header } from "@/components/layout/header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -34,31 +35,149 @@ import { Download, Heart, DollarSign, Users, TrendingUp, FileText, Send, Search,
 import { cn } from "@/lib/utils"
 
 const reportsTabs = ["Overview", "Donations", "Donors", "Campaigns", "Tax Receipts"] as const
+
 type ReportsTab = (typeof reportsTabs)[number]
 
-const taxReceiptDonors = [
-  { id: "d-1", name: "Ahmed Foundation", type: "Organization", email: "info@ahmedfoundation.org", totalDonations: "$25,000", donationCount: 12, receiptStatus: "Not Generated", lastReceipt: null },
-  { id: "d-2", name: "Mohamed Ali", type: "Individual", email: "mohamed.ali@email.com", totalDonations: "$12,500", donationCount: 24, receiptStatus: "Generated", lastReceipt: "2025" },
-  { id: "d-3", name: "Sarah Johnson", type: "Individual", email: "sarah.j@email.com", totalDonations: "$8,200", donationCount: 8, receiptStatus: "Sent", lastReceipt: "2025" },
-  { id: "d-4", name: "Community Trust", type: "Organization", email: "contact@communitytrust.org", totalDonations: "$10,000", donationCount: 4, receiptStatus: "Generated", lastReceipt: "2025" },
-  { id: "d-5", name: "Fatima Hassan", type: "Individual", email: "fatima.h@email.com", totalDonations: "$3,500", donationCount: 14, receiptStatus: "Not Generated", lastReceipt: null },
-  { id: "d-6", name: "Omar Khan", type: "Individual", email: "omar.khan@email.com", totalDonations: "$6,800", donationCount: 18, receiptStatus: "Sent", lastReceipt: "2025" },
-  { id: "d-7", name: "Islamic Relief Fund", type: "Organization", email: "donations@islamicrelief.org", totalDonations: "$15,000", donationCount: 6, receiptStatus: "Not Generated", lastReceipt: "2024" },
-]
+interface DonationPayment {
+  id: string
+  donor_name: string | null
+  amount: number | null
+  payment_date: string | null
+  fund_name: string | null
+  payment_method: string | null
+  contact_id: string | null
+}
+
+interface Contact {
+  id: string
+  full_name: string | null
+  email: string | null
+}
 
 export default function DonationsReportsPage() {
+  const supabase = createClient()
+
   const [activeTab, setActiveTab] = useState<ReportsTab>("Overview")
   const [dateRange, setDateRange] = useState("30d")
   const [taxYear, setTaxYear] = useState("2025")
   const [taxSearch, setTaxSearch] = useState("")
   const [selectedDonors, setSelectedDonors] = useState<string[]>([])
   const [showPreviewDialog, setShowPreviewDialog] = useState(false)
-  const [previewDonor, setPreviewDonor] = useState<typeof taxReceiptDonors[0] | null>(null)
+  const [previewDonor, setPreviewDonor] = useState<any | null>(null)
 
-  const filteredTaxDonors = taxReceiptDonors.filter((donor) =>
-    donor.name.toLowerCase().includes(taxSearch.toLowerCase()) ||
-    donor.email.toLowerCase().includes(taxSearch.toLowerCase())
-  )
+  const [payments, setPayments] = useState<DonationPayment[]>([])
+  const [contacts, setContacts] = useState<Contact[]>([])
+  const [organizationId, setOrganizationId] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  async function getOrganizationId() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) return null
+
+    const { data } = await supabase
+      .from("profiles")
+      .select("organization_id")
+      .eq("id", user.id)
+      .single()
+
+    return data?.organization_id || null
+  }
+
+  useEffect(() => {
+    async function loadData() {
+      setLoading(true)
+
+      const orgId = await getOrganizationId()
+
+      if (!orgId) {
+        setLoading(false)
+        return
+      }
+
+      setOrganizationId(orgId)
+
+      const { data: paymentData } = await supabase
+        .from("donation_payments")
+        .select("*")
+        .eq("organization_id", orgId)
+        .order("payment_date", { ascending: false })
+
+      const { data: contactsData } = await supabase
+        .from("contacts")
+        .select("id, full_name, email")
+        .eq("organization_id", orgId)
+
+      setPayments((paymentData || []) as DonationPayment[])
+      setContacts((contactsData || []) as Contact[])
+
+      setLoading(false)
+    }
+
+    loadData()
+  }, [])
+
+  const donorTotals = useMemo(() => {
+    const grouped: Record<string, any> = {}
+
+    payments.forEach((payment) => {
+      const key = payment.contact_id || payment.donor_name || payment.id
+
+      if (!grouped[key]) {
+        const contact = contacts.find((c) => c.id === payment.contact_id)
+
+        grouped[key] = {
+          id: key,
+          name: contact?.full_name || payment.donor_name || "Unknown Donor",
+          email: contact?.email || "",
+          donationCount: 0,
+          total: 0,
+          lastDonation: payment.payment_date || "",
+        }
+      }
+
+      grouped[key].donationCount += 1
+      grouped[key].total += Number(payment.amount || 0)
+    })
+
+    return Object.values(grouped)
+  }, [payments, contacts])
+
+  const filteredTaxDonors = donorTotals.filter((donor) => {
+    return (
+      donor.name.toLowerCase().includes(taxSearch.toLowerCase()) ||
+      donor.email.toLowerCase().includes(taxSearch.toLowerCase())
+    )
+  })
+
+  const totalDonations = payments.reduce((sum, payment) => {
+    return sum + Number(payment.amount || 0)
+  }, 0)
+
+  const averageDonation = payments.length > 0
+    ? totalDonations / payments.length
+    : 0
+
+  const uniqueDonors = donorTotals.length
+
+  const donationCategories = useMemo(() => {
+    const grouped: Record<string, number> = {}
+
+    payments.forEach((payment) => {
+      const fund = payment.fund_name || "General Fund"
+      grouped[fund] = (grouped[fund] || 0) + Number(payment.amount || 0)
+    })
+
+    return Object.entries(grouped)
+      .map(([name, amount]) => ({ name, amount }))
+      .sort((a, b) => b.amount - a.amount)
+  }, [payments])
+
+  const topDonors = [...donorTotals]
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 5)
 
   const handleSelectAll = () => {
     if (selectedDonors.length === filteredTaxDonors.length) {
@@ -79,6 +198,7 @@ export default function DonationsReportsPage() {
   return (
     <>
       <Header title="Donations Reports" />
+
       <div className="p-6">
         <div className="mb-6 flex items-center justify-between">
           <div className="flex gap-0 border-b border-border">
@@ -100,6 +220,7 @@ export default function DonationsReportsPage() {
               </button>
             ))}
           </div>
+
           <div className="flex items-center gap-3">
             <Select value={dateRange} onValueChange={setDateRange}>
               <SelectTrigger className="w-[150px]">
@@ -110,9 +231,9 @@ export default function DonationsReportsPage() {
                 <SelectItem value="30d">Last 30 days</SelectItem>
                 <SelectItem value="90d">Last 90 days</SelectItem>
                 <SelectItem value="1y">Last year</SelectItem>
-                <SelectItem value="ytd">Year to date</SelectItem>
               </SelectContent>
             </Select>
+
             <Button variant="outline">
               <Download className="mr-2 h-4 w-4" />
               Export
@@ -125,50 +246,53 @@ export default function DonationsReportsPage() {
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Total Donations</CardTitle>
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Total Donations
+                  </CardTitle>
                   <DollarSign className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">$128,450</div>
-                  <p className="text-xs text-muted-foreground">
-                    <span className="text-green-600">+18%</span> from last period
-                  </p>
+                  <div className="text-2xl font-bold">
+                    ${totalDonations.toLocaleString()}
+                  </div>
                 </CardContent>
               </Card>
+
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Active Donors</CardTitle>
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Active Donors
+                  </CardTitle>
                   <Users className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">342</div>
-                  <p className="text-xs text-muted-foreground">
-                    <span className="text-green-600">+24</span> new this period
-                  </p>
+                  <div className="text-2xl font-bold">{uniqueDonors}</div>
                 </CardContent>
               </Card>
+
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Avg. Donation</CardTitle>
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Avg. Donation
+                  </CardTitle>
                   <Heart className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">$375</div>
-                  <p className="text-xs text-muted-foreground">
-                    <span className="text-green-600">+8%</span> from last period
-                  </p>
+                  <div className="text-2xl font-bold">
+                    ${averageDonation.toFixed(0)}
+                  </div>
                 </CardContent>
               </Card>
+
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Pledge Fulfillment</CardTitle>
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Total Payments
+                  </CardTitle>
                   <TrendingUp className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">87%</div>
-                  <p className="text-xs text-muted-foreground">
-                    <span className="text-green-600">+5%</span> from last period
-                  </p>
+                  <div className="text-2xl font-bold">{payments.length}</div>
                 </CardContent>
               </Card>
             </div>
@@ -176,39 +300,30 @@ export default function DonationsReportsPage() {
             <div className="grid gap-6 lg:grid-cols-2">
               <Card>
                 <CardHeader>
-                  <CardTitle>Donations by Category</CardTitle>
-                  <CardDescription>Breakdown by donation category</CardDescription>
+                  <CardTitle>Donations by Fund</CardTitle>
+                  <CardDescription>Breakdown by donation fund</CardDescription>
                 </CardHeader>
+
                 <CardContent className="p-0">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Category</TableHead>
-                        <TableHead>Count</TableHead>
+                        <TableHead>Fund</TableHead>
                         <TableHead className="text-right">Amount</TableHead>
                       </TableRow>
                     </TableHeader>
+
                     <TableBody>
-                      <TableRow>
-                        <TableCell className="font-medium">Zakat</TableCell>
-                        <TableCell>156</TableCell>
-                        <TableCell className="text-right">$52,400</TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell className="font-medium">Sadaqah</TableCell>
-                        <TableCell>89</TableCell>
-                        <TableCell className="text-right">$28,200</TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell className="font-medium">Operations</TableCell>
-                        <TableCell>64</TableCell>
-                        <TableCell className="text-right">$24,850</TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell className="font-medium">Building Fund</TableCell>
-                        <TableCell>33</TableCell>
-                        <TableCell className="text-right">$23,000</TableCell>
-                      </TableRow>
+                      {donationCategories.map((category) => (
+                        <TableRow key={category.name}>
+                          <TableCell className="font-medium">
+                            {category.name}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            ${category.amount.toLocaleString()}
+                          </TableCell>
+                        </TableRow>
+                      ))}
                     </TableBody>
                   </Table>
                 </CardContent>
@@ -217,33 +332,31 @@ export default function DonationsReportsPage() {
               <Card>
                 <CardHeader>
                   <CardTitle>Top Donors</CardTitle>
-                  <CardDescription>Highest contributors this period</CardDescription>
+                  <CardDescription>
+                    Highest contributors
+                  </CardDescription>
                 </CardHeader>
+
                 <CardContent className="p-0">
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Donor</TableHead>
-                        <TableHead>Type</TableHead>
                         <TableHead className="text-right">Total</TableHead>
                       </TableRow>
                     </TableHeader>
+
                     <TableBody>
-                      <TableRow>
-                        <TableCell className="font-medium">Ahmed Foundation</TableCell>
-                        <TableCell>Organization</TableCell>
-                        <TableCell className="text-right">$25,000</TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell className="font-medium">Mohamed Ali</TableCell>
-                        <TableCell>Individual</TableCell>
-                        <TableCell className="text-right">$12,500</TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell className="font-medium">Community Trust</TableCell>
-                        <TableCell>Organization</TableCell>
-                        <TableCell className="text-right">$10,000</TableCell>
-                      </TableRow>
+                      {topDonors.map((donor) => (
+                        <TableRow key={donor.id}>
+                          <TableCell className="font-medium">
+                            {donor.name}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            ${donor.total.toLocaleString()}
+                          </TableCell>
+                        </TableRow>
+                      ))}
                     </TableBody>
                   </Table>
                 </CardContent>
@@ -256,48 +369,49 @@ export default function DonationsReportsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Donation Transactions</CardTitle>
-              <CardDescription>All donations received this period</CardDescription>
+              <CardDescription>
+                Real donation payment history
+              </CardDescription>
             </CardHeader>
+
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Date</TableHead>
                     <TableHead>Donor</TableHead>
-                    <TableHead>Category</TableHead>
+                    <TableHead>Fund</TableHead>
                     <TableHead>Method</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
                   </TableRow>
                 </TableHeader>
+
                 <TableBody>
-                  <TableRow>
-                    <TableCell>Mar 1, 2026</TableCell>
-                    <TableCell className="font-medium">Ahmed Foundation</TableCell>
-                    <TableCell>Building Fund</TableCell>
-                    <TableCell>Bank Transfer</TableCell>
-                    <TableCell className="text-right">$10,000</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell>Feb 28, 2026</TableCell>
-                    <TableCell className="font-medium">Sarah Johnson</TableCell>
-                    <TableCell>Zakat</TableCell>
-                    <TableCell>Credit Card</TableCell>
-                    <TableCell className="text-right">$2,500</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell>Feb 27, 2026</TableCell>
-                    <TableCell className="font-medium">Mohamed Ali</TableCell>
-                    <TableCell>Operations</TableCell>
-                    <TableCell>Check</TableCell>
-                    <TableCell className="text-right">$1,500</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell>Feb 26, 2026</TableCell>
-                    <TableCell className="font-medium">Anonymous</TableCell>
-                    <TableCell>Sadaqah</TableCell>
-                    <TableCell>Cash</TableCell>
-                    <TableCell className="text-right">$500</TableCell>
-                  </TableRow>
+                  {payments.map((payment) => (
+                    <TableRow key={payment.id}>
+                      <TableCell>
+                        {payment.payment_date
+                          ? payment.payment_date.slice(0, 10)
+                          : "N/A"}
+                      </TableCell>
+
+                      <TableCell className="font-medium">
+                        {payment.donor_name || "Unknown"}
+                      </TableCell>
+
+                      <TableCell>
+                        {payment.fund_name || "General Fund"}
+                      </TableCell>
+
+                      <TableCell>
+                        {payment.payment_method || "N/A"}
+                      </TableCell>
+
+                      <TableCell className="text-right">
+                        ${Number(payment.amount || 0).toLocaleString()}
+                      </TableCell>
+                    </TableRow>
+                  ))}
                 </TableBody>
               </Table>
             </CardContent>
@@ -308,45 +422,42 @@ export default function DonationsReportsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Donor Analysis</CardTitle>
-              <CardDescription>Donor giving patterns and retention</CardDescription>
+              <CardDescription>
+                Real donor contribution totals
+              </CardDescription>
             </CardHeader>
+
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Donor</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>First Donation</TableHead>
+                    <TableHead>Email</TableHead>
                     <TableHead>Donations</TableHead>
-                    <TableHead>Frequency</TableHead>
                     <TableHead className="text-right">Lifetime Value</TableHead>
                   </TableRow>
                 </TableHeader>
+
                 <TableBody>
-                  <TableRow>
-                    <TableCell className="font-medium">Ahmed Foundation</TableCell>
-                    <TableCell>Organization</TableCell>
-                    <TableCell>Jan 2022</TableCell>
-                    <TableCell>48</TableCell>
-                    <TableCell>Monthly</TableCell>
-                    <TableCell className="text-right">$125,000</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="font-medium">Mohamed Ali</TableCell>
-                    <TableCell>Individual</TableCell>
-                    <TableCell>Mar 2020</TableCell>
-                    <TableCell>36</TableCell>
-                    <TableCell>Monthly</TableCell>
-                    <TableCell className="text-right">$54,000</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="font-medium">Sarah Johnson</TableCell>
-                    <TableCell>Individual</TableCell>
-                    <TableCell>Jun 2023</TableCell>
-                    <TableCell>12</TableCell>
-                    <TableCell>Quarterly</TableCell>
-                    <TableCell className="text-right">$18,000</TableCell>
-                  </TableRow>
+                  {donorTotals.map((donor) => (
+                    <TableRow key={donor.id}>
+                      <TableCell className="font-medium">
+                        {donor.name}
+                      </TableCell>
+
+                      <TableCell>
+                        {donor.email || "N/A"}
+                      </TableCell>
+
+                      <TableCell>
+                        {donor.donationCount}
+                      </TableCell>
+
+                      <TableCell className="text-right">
+                        ${donor.total.toLocaleString()}
+                      </TableCell>
+                    </TableRow>
+                  ))}
                 </TableBody>
               </Table>
             </CardContent>
@@ -357,150 +468,61 @@ export default function DonationsReportsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Campaign Performance</CardTitle>
-              <CardDescription>Fundraising campaign results</CardDescription>
+              <CardDescription>
+                Campaign tables not connected yet
+              </CardDescription>
             </CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Campaign</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Goal</TableHead>
-                    <TableHead>Raised</TableHead>
-                    <TableHead>Donors</TableHead>
-                    <TableHead className="text-right">Progress</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  <TableRow>
-                    <TableCell className="font-medium">Ramadan 2026</TableCell>
-                    <TableCell><span className="text-green-600">Active</span></TableCell>
-                    <TableCell>$100,000</TableCell>
-                    <TableCell>$72,500</TableCell>
-                    <TableCell>245</TableCell>
-                    <TableCell className="text-right">73%</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="font-medium">Building Expansion</TableCell>
-                    <TableCell><span className="text-green-600">Active</span></TableCell>
-                    <TableCell>$500,000</TableCell>
-                    <TableCell>$325,000</TableCell>
-                    <TableCell>89</TableCell>
-                    <TableCell className="text-right">65%</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="font-medium">Youth Programs 2025</TableCell>
-                    <TableCell><span className="text-muted-foreground">Completed</span></TableCell>
-                    <TableCell>$50,000</TableCell>
-                    <TableCell>$58,200</TableCell>
-                    <TableCell>156</TableCell>
-                    <TableCell className="text-right text-green-600">116%</TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
+
+            <CardContent>
+              <div className="rounded-md border border-dashed p-8 text-center text-muted-foreground">
+                Connect this tab after campaign/fund tables are finalized.
+              </div>
             </CardContent>
           </Card>
         )}
 
         {activeTab === "Tax Receipts" && (
           <div className="flex flex-col gap-6">
-            {/* Stats Cards */}
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Total Donors</CardTitle>
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Total Donors
+                  </CardTitle>
                   <Users className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
+
                 <CardContent>
-                  <div className="text-2xl font-bold">342</div>
-                  <p className="text-xs text-muted-foreground">Eligible for {taxYear} receipts</p>
+                  <div className="text-2xl font-bold">
+                    {uniqueDonors}
+                  </div>
                 </CardContent>
               </Card>
+
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Receipts Generated</CardTitle>
-                  <FileText className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">156</div>
-                  <p className="text-xs text-muted-foreground">46% of eligible donors</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Receipts Sent</CardTitle>
-                  <Send className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">89</div>
-                  <p className="text-xs text-muted-foreground">26% of eligible donors</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Total Donations</CardTitle>
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Total Donations
+                  </CardTitle>
                   <DollarSign className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
+
                 <CardContent>
-                  <div className="text-2xl font-bold">$428,500</div>
-                  <p className="text-xs text-muted-foreground">For tax year {taxYear}</p>
+                  <div className="text-2xl font-bold">
+                    ${totalDonations.toLocaleString()}
+                  </div>
                 </CardContent>
               </Card>
             </div>
 
-            {/* Controls */}
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <Select value={taxYear} onValueChange={setTaxYear}>
-                  <SelectTrigger className="w-[140px]">
-                    <SelectValue placeholder="Tax Year" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="2025">2025</SelectItem>
-                    <SelectItem value="2024">2024</SelectItem>
-                    <SelectItem value="2023">2023</SelectItem>
-                  </SelectContent>
-                </Select>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    placeholder="Search donors..."
-                    value={taxSearch}
-                    onChange={(e) => setTaxSearch(e.target.value)}
-                    className="w-full pl-9 sm:w-[250px]"
-                  />
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  disabled={selectedDonors.length === 0}
-                  onClick={() => {}}
-                >
-                  <FileText className="mr-2 h-4 w-4" />
-                  Generate Selected ({selectedDonors.length})
-                </Button>
-                <Button
-                  variant="outline"
-                  disabled={selectedDonors.length === 0}
-                  onClick={() => {}}
-                >
-                  <Send className="mr-2 h-4 w-4" />
-                  Email Selected
-                </Button>
-                <Button onClick={() => {}}>
-                  <FileText className="mr-2 h-4 w-4" />
-                  Generate All
-                </Button>
-              </div>
-            </div>
-
-            {/* Donors Table */}
             <Card>
               <CardHeader>
-                <CardTitle>Donor Tax Receipts - {taxYear}</CardTitle>
-                <CardDescription>Generate and send year-end tax receipts to donors</CardDescription>
+                <CardTitle>Tax Receipts</CardTitle>
+                <CardDescription>
+                  Real donor donation totals
+                </CardDescription>
               </CardHeader>
+
               <CardContent className="p-0">
                 <Table>
                   <TableHeader>
@@ -511,15 +533,15 @@ export default function DonationsReportsPage() {
                           onCheckedChange={handleSelectAll}
                         />
                       </TableHead>
+
                       <TableHead>Donor</TableHead>
-                      <TableHead>Type</TableHead>
                       <TableHead>Email</TableHead>
                       <TableHead>Donations</TableHead>
                       <TableHead>Total</TableHead>
-                      <TableHead>Status</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
+
                   <TableBody>
                     {filteredTaxDonors.map((donor) => (
                       <TableRow key={donor.id}>
@@ -529,29 +551,23 @@ export default function DonationsReportsPage() {
                             onCheckedChange={() => handleSelectDonor(donor.id)}
                           />
                         </TableCell>
-                        <TableCell className="font-medium">{donor.name}</TableCell>
-                        <TableCell>{donor.type}</TableCell>
-                        <TableCell className="text-muted-foreground">{donor.email}</TableCell>
-                        <TableCell>{donor.donationCount}</TableCell>
-                        <TableCell className="font-medium">{donor.totalDonations}</TableCell>
-                        <TableCell>
-                          <Badge
-                            variant={
-                              donor.receiptStatus === "Sent"
-                                ? "default"
-                                : donor.receiptStatus === "Generated"
-                                ? "secondary"
-                                : "outline"
-                            }
-                            className={
-                              donor.receiptStatus === "Sent"
-                                ? "bg-green-100 text-green-800 hover:bg-green-100"
-                                : ""
-                            }
-                          >
-                            {donor.receiptStatus}
-                          </Badge>
+
+                        <TableCell className="font-medium">
+                          {donor.name}
                         </TableCell>
+
+                        <TableCell>
+                          {donor.email || "N/A"}
+                        </TableCell>
+
+                        <TableCell>
+                          {donor.donationCount}
+                        </TableCell>
+
+                        <TableCell>
+                          ${donor.total.toLocaleString()}
+                        </TableCell>
+
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
                             <Button
@@ -564,9 +580,11 @@ export default function DonationsReportsPage() {
                             >
                               <FileText className="h-4 w-4" />
                             </Button>
+
                             <Button variant="ghost" size="sm">
                               <Printer className="h-4 w-4" />
                             </Button>
+
                             <Button variant="ghost" size="sm">
                               <Send className="h-4 w-4" />
                             </Button>
@@ -582,7 +600,6 @@ export default function DonationsReportsPage() {
         )}
       </div>
 
-      {/* Receipt Preview Dialog */}
       <Dialog open={showPreviewDialog} onOpenChange={setShowPreviewDialog}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
@@ -591,66 +608,46 @@ export default function DonationsReportsPage() {
               Year-end donation receipt for {previewDonor?.name}
             </DialogDescription>
           </DialogHeader>
+
           {previewDonor && (
             <div className="rounded-lg border bg-white p-6">
               <div className="mb-6 text-center">
                 <h2 className="text-xl font-bold">Organization Name</h2>
-                <p className="text-sm text-muted-foreground">123 Main Street, City, State 12345</p>
-                <p className="text-sm text-muted-foreground">Tax ID: 12-3456789</p>
+                <p className="text-sm text-muted-foreground">
+                  Donation Receipt
+                </p>
               </div>
-              <div className="mb-6 text-center">
-                <h3 className="text-lg font-semibold">Official Donation Receipt</h3>
-                <p className="text-sm text-muted-foreground">For Tax Year {taxYear}</p>
-              </div>
-              <div className="mb-6 space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Receipt Number:</span>
-                  <span className="font-medium">RCP-{taxYear}-{previewDonor.id.split("-")[1].padStart(4, "0")}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Date Issued:</span>
-                  <span className="font-medium">{new Date().toLocaleDateString()}</span>
-                </div>
-              </div>
+
               <div className="mb-6 rounded-md bg-muted/50 p-4">
                 <p className="mb-2 font-medium">Donor Information</p>
                 <p>{previewDonor.name}</p>
-                <p className="text-sm text-muted-foreground">{previewDonor.email}</p>
+                <p className="text-sm text-muted-foreground">
+                  {previewDonor.email}
+                </p>
               </div>
-              <div className="mb-6">
-                <p className="mb-2 font-medium">Donation Summary</p>
-                <div className="rounded-md border">
-                  <div className="flex justify-between border-b p-3">
-                    <span>Total Donations ({previewDonor.donationCount} transactions)</span>
-                    <span className="font-bold">{previewDonor.totalDonations}</span>
-                  </div>
-                  <div className="flex justify-between bg-muted/30 p-3">
-                    <span className="font-medium">Tax Deductible Amount</span>
-                    <span className="font-bold">{previewDonor.totalDonations}</span>
-                  </div>
+
+              <div className="rounded-md border">
+                <div className="flex justify-between border-b p-3">
+                  <span>Total Donations</span>
+                  <span className="font-bold">
+                    ${previewDonor.total.toLocaleString()}
+                  </span>
                 </div>
-              </div>
-              <div className="text-center text-xs text-muted-foreground">
-                <p>This receipt is issued for income tax purposes.</p>
-                <p>No goods or services were provided in exchange for these donations.</p>
               </div>
             </div>
           )}
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPreviewDialog(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setShowPreviewDialog(false)}
+            >
               Close
             </Button>
+
             <Button variant="outline">
               <Printer className="mr-2 h-4 w-4" />
               Print
-            </Button>
-            <Button variant="outline">
-              <Download className="mr-2 h-4 w-4" />
-              Download PDF
-            </Button>
-            <Button>
-              <Send className="mr-2 h-4 w-4" />
-              Email to Donor
             </Button>
           </DialogFooter>
         </DialogContent>
