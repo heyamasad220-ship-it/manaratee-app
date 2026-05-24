@@ -40,31 +40,32 @@ import { Check, ChevronsUpDown, Plus } from "lucide-react";
 
 type Payment = {
   id: string;
-  amount: number;
+  amount: number | string | null;
   payment_date: string | null;
   source: string | null;
-  payment_method: string | null;
-  fund_name: string | null;
+  memo: string | null;
   pledge_id: string | null;
-  contact_id: string | null;
+  donor_id: string | null;
   status: string | null;
-  donor_name: string | null;
+  sender_name: string | null;
 };
 
-type ContactOption = {
+type DonorOption = {
   id: string;
   full_name: string | null;
   email: string | null;
+  donor_type: string | null;
 };
 
 type PledgeOption = {
   id: string;
+  donor_id: string | null;
   donor_name: string | null;
-  amount: number;
-  collected_amount: number | null;
-  fund_name: string | null;
-  contact_id: string | null;
-  status: string | null;
+  campaign_name: string | null;
+  amount_pledged: number | string | null;
+  amount_paid: number | string | null;
+  balance_remaining: number | string | null;
+  calculated_status: string | null;
 };
 
 function formatCurrency(value: number) {
@@ -105,17 +106,16 @@ export default function PaymentsPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [contacts, setContacts] = useState<ContactOption[]>([]);
+  const [donors, setDonors] = useState<DonorOption[]>([]);
   const [pledges, setPledges] = useState<PledgeOption[]>([]);
 
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const [contactId, setContactId] = useState("none");
-  const [contactOpen, setContactOpen] = useState(false);
-  const [contactSearch, setContactSearch] = useState("");
+  const [donorId, setDonorId] = useState("none");
+  const [donorOpen, setDonorOpen] = useState(false);
+  const [donorSearch, setDonorSearch] = useState("");
 
-  const [fundName, setFundName] = useState("");
   const [amount, setAmount] = useState("");
   const [paymentDate, setPaymentDate] = useState("");
   const [source, setSource] = useState("cash");
@@ -126,32 +126,32 @@ export default function PaymentsPage() {
   const [selectedPledgeId, setSelectedPledgeId] = useState("");
   const [allocating, setAllocating] = useState(false);
 
-  const selectedContactName = useMemo(() => {
-    if (contactId === "none") return "No donor selected";
+  const selectedDonorName = useMemo(() => {
+    if (donorId === "none") return "No donor selected";
 
-    const contact = contacts.find((item) => item.id === contactId);
+    const donor = donors.find((item) => item.id === donorId);
 
-    return contact?.full_name || contact?.email || "No donor selected";
-  }, [contactId, contacts]);
+    return donor?.full_name || donor?.email || "No donor selected";
+  }, [donorId, donors]);
 
-  const uniqueContacts = contacts.filter(
-    (contact, index, self) =>
+  const uniqueDonors = donors.filter(
+    (donor, index, self) =>
       index ===
       self.findIndex(
         (item) =>
           normalizeName(item.full_name || item.email || "") ===
-          normalizeName(contact.full_name || contact.email || "")
+          normalizeName(donor.full_name || donor.email || "")
       )
   );
 
-  const filteredContacts = uniqueContacts.filter((contact) =>
-    normalizeName(contact.full_name || contact.email || "").includes(
-      normalizeName(contactSearch)
+  const filteredDonors = uniqueDonors.filter((donor) =>
+    normalizeName(donor.full_name || donor.email || "").includes(
+      normalizeName(donorSearch)
     )
   );
 
-  const allocationPledges = selectedPayment?.contact_id
-    ? pledges.filter((pledge) => pledge.contact_id === selectedPayment.contact_id)
+  const allocationPledges = selectedPayment?.donor_id
+    ? pledges.filter((pledge) => pledge.donor_id === selectedPayment.donor_id)
     : pledges;
 
   async function getOrgIdForCurrentUser() {
@@ -182,7 +182,7 @@ export default function PaymentsPage() {
     if (!orgId) {
       setOrganizationId(null);
       setPayments([]);
-      setContacts([]);
+      setDonors([]);
       setPledges([]);
       setLoading(false);
       return;
@@ -190,22 +190,24 @@ export default function PaymentsPage() {
 
     setOrganizationId(orgId);
 
-    const { data: contactData, error: contactError } = await supabase
-      .from("contacts")
-      .select("id, full_name, email")
+    const { data: donorData, error: donorError } = await supabase
+      .from("donors")
+      .select("id, full_name, email, donor_type")
       .eq("organization_id", orgId)
       .order("full_name", { ascending: true });
 
-    if (contactError) {
-      console.error("Error loading contacts:", contactError);
-      setContacts([]);
+    if (donorError) {
+      console.error("Error loading donors:", donorError);
+      setDonors([]);
     } else {
-      setContacts((contactData || []) as ContactOption[]);
+      setDonors((donorData || []) as DonorOption[]);
     }
 
     const { data: pledgeData, error: pledgeError } = await supabase
-      .from("donation_pledges")
-      .select("id, donor_name, amount, collected_amount, fund_name, contact_id, status")
+      .from("pledge_status_view")
+      .select(
+        "id, donor_id, donor_name, campaign_name, amount_pledged, amount_paid, balance_remaining, calculated_status"
+      )
       .eq("organization_id", orgId)
       .order("donor_name", { ascending: true });
 
@@ -217,15 +219,15 @@ export default function PaymentsPage() {
     }
 
     const { data, error } = await supabase
-      .from("donation_payments")
+      .from("payments")
       .select(
-        "id, amount, payment_date, source, payment_method, fund_name, pledge_id, contact_id, status, donor_name"
+        "id, amount, payment_date, source, memo, pledge_id, donor_id, status, sender_name"
       )
       .eq("organization_id", orgId)
       .order("payment_date", { ascending: false });
 
     if (error) {
-      console.error("Error loading donation payments:", error);
+      console.error("Error loading payments:", error);
       setPayments([]);
     } else {
       setPayments((data || []) as Payment[]);
@@ -240,10 +242,9 @@ export default function PaymentsPage() {
   }, []);
 
   function resetForm() {
-    setContactId("none");
-    setContactOpen(false);
-    setContactSearch("");
-    setFundName("");
+    setDonorId("none");
+    setDonorOpen(false);
+    setDonorSearch("");
     setAmount("");
     setPaymentDate("");
     setSource("cash");
@@ -263,24 +264,25 @@ export default function PaymentsPage() {
       return;
     }
 
-    const selectedContact =
-      contactId === "none"
+    const selectedDonor =
+      donorId === "none"
         ? null
-        : contacts.find((contact) => contact.id === contactId);
+        : donors.find((donor) => donor.id === donorId);
 
     setSaving(true);
 
-    const { error } = await supabase.from("donation_payments").insert({
+    const { error } = await supabase.from("payments").insert({
       organization_id: orgId,
-      contact_id: contactId === "none" ? null : contactId,
+      donor_id: donorId === "none" ? null : donorId,
       pledge_id: null,
-      donor_name: selectedContact?.full_name || selectedContact?.email || null,
+      sender_name: selectedDonor?.full_name || selectedDonor?.email || null,
       amount: Number(amount),
       payment_date: paymentDate ? `${paymentDate}T12:00:00` : new Date().toISOString(),
       source,
-      payment_method: source,
-      fund_name: fundName || null,
-      status: "Unallocated",
+      source_type: "manual",
+      memo: memo || null,
+      status: donorId === "none" ? "pending_review" : "unallocated",
+      is_verified: false,
     });
 
     setSaving(false);
@@ -316,13 +318,12 @@ export default function PaymentsPage() {
     setAllocating(true);
 
     const { error } = await supabase
-      .from("donation_payments")
+      .from("payments")
       .update({
         pledge_id: selectedPledge.id,
-        contact_id: selectedPayment.contact_id || selectedPledge.contact_id || null,
-        donor_name: selectedPayment.donor_name || selectedPledge.donor_name || null,
-        fund_name: selectedPayment.fund_name || selectedPledge.fund_name || null,
-        status: "Allocated",
+        donor_id: selectedPayment.donor_id || selectedPledge.donor_id || null,
+        status: "allocated",
+        reconciled_at: new Date().toISOString(),
       })
       .eq("id", selectedPayment.id);
 
@@ -337,6 +338,14 @@ export default function PaymentsPage() {
     setSelectedPledgeId("");
     setShowAllocateDialog(false);
     await loadPayments();
+  }
+
+  function getPaymentDonorName(payment: Payment) {
+    const donor = payment.donor_id
+      ? donors.find((item) => item.id === payment.donor_id)
+      : null;
+
+    return donor?.full_name || donor?.email || payment.sender_name || "—";
   }
 
   return (
@@ -369,8 +378,7 @@ export default function PaymentsPage() {
                 <thead className="bg-muted/50">
                   <tr className="border-b">
                     <th className="text-left p-3">Date</th>
-                    <th className="text-left p-3">Donor</th>
-                    <th className="text-left p-3">Fund</th>
+                    <th className="text-left p-3">Donor / Sender</th>
                     <th className="text-left p-3">Amount</th>
                     <th className="text-left p-3">Method</th>
                     <th className="text-left p-3">Pledge</th>
@@ -379,21 +387,28 @@ export default function PaymentsPage() {
                     <th className="text-left p-3">Action</th>
                   </tr>
                 </thead>
+
                 <tbody>
                   {payments.map((payment) => (
                     <tr key={payment.id} className="border-b">
                       <td className="p-3">{formatDate(payment.payment_date)}</td>
-                      <td className="p-3">{payment.donor_name || "—"}</td>
-                      <td className="p-3">{payment.fund_name || "—"}</td>
+
+                      <td className="p-3">{getPaymentDonorName(payment)}</td>
+
                       <td className="p-3 font-medium">
                         {formatCurrency(Number(payment.amount || 0))}
                       </td>
+
                       <td className="p-3 capitalize">
-                        {payment.payment_method || payment.source || "—"}
+                        {payment.source || "—"}
                       </td>
+
                       <td className="p-3">{payment.pledge_id ? "Linked" : "Unlinked"}</td>
+
                       <td className="p-3 capitalize">{formatStatus(payment.status)}</td>
-                      <td className="p-3">—</td>
+
+                      <td className="p-3">{payment.memo || "—"}</td>
+
                       <td className="p-3">
                         {!payment.pledge_id ? (
                           <Button
@@ -430,86 +445,76 @@ export default function PaymentsPage() {
           </DialogHeader>
 
           <div className="flex flex-col gap-4 py-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="flex flex-col gap-2">
-                <Label>Donor</Label>
-                <Popover open={contactOpen} onOpenChange={setContactOpen} modal={true}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      role="combobox"
-                      aria-expanded={contactOpen}
-                      className="w-full justify-between font-normal"
-                    >
-                      <span className="truncate">{selectedContactName}</span>
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
+            <div className="flex flex-col gap-2">
+              <Label>Donor</Label>
 
-                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                    <Command shouldFilter={false}>
-                      <CommandInput
-                        placeholder="Search donor name..."
-                        value={contactSearch}
-                        onValueChange={setContactSearch}
-                      />
+              <Popover open={donorOpen} onOpenChange={setDonorOpen} modal={true}>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={donorOpen}
+                    className="w-full justify-between font-normal"
+                  >
+                    <span className="truncate">{selectedDonorName}</span>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
 
-                      <CommandList>
-                        <CommandEmpty>No donor found.</CommandEmpty>
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                  <Command shouldFilter={false}>
+                    <CommandInput
+                      placeholder="Search donor name..."
+                      value={donorSearch}
+                      onValueChange={setDonorSearch}
+                    />
 
-                        <CommandGroup>
+                    <CommandList>
+                      <CommandEmpty>No donor found.</CommandEmpty>
+
+                      <CommandGroup>
+                        <CommandItem
+                          value="No donor selected"
+                          onSelect={() => {
+                            setDonorId("none");
+                            setDonorOpen(false);
+                            setDonorSearch("");
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              donorId === "none" ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          No donor selected
+                        </CommandItem>
+
+                        {filteredDonors.map((donor) => (
                           <CommandItem
-                            value="No donor selected"
+                            key={donor.id}
+                            value={donor.full_name || donor.email || donor.id}
                             onSelect={() => {
-                              setContactId("none");
-                              setContactOpen(false);
-                              setContactSearch("");
+                              setDonorId(donor.id);
+                              setDonorOpen(false);
+                              setDonorSearch("");
                             }}
                           >
                             <Check
                               className={cn(
                                 "mr-2 h-4 w-4",
-                                contactId === "none" ? "opacity-100" : "opacity-0"
+                                donorId === donor.id ? "opacity-100" : "opacity-0"
                               )}
                             />
-                            No donor selected
+                            {donor.full_name || donor.email || "Unnamed donor"}
                           </CommandItem>
-
-                          {filteredContacts.map((contact) => (
-                            <CommandItem
-                              key={contact.id}
-                              value={contact.full_name || contact.email || contact.id}
-                              onSelect={() => {
-                                setContactId(contact.id);
-                                setContactOpen(false);
-                                setContactSearch("");
-                              }}
-                            >
-                              <Check
-                                className={cn(
-                                  "mr-2 h-4 w-4",
-                                  contactId === contact.id ? "opacity-100" : "opacity-0"
-                                )}
-                              />
-                              {contact.full_name || contact.email || "Unnamed contact"}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <Label>Fund</Label>
-                <Input
-                  placeholder="General Fund"
-                  value={fundName}
-                  onChange={(event) => setFundName(event.target.value)}
-                />
-              </div>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
@@ -546,6 +551,7 @@ export default function PaymentsPage() {
                   <SelectItem value="venmo">Venmo</SelectItem>
                   <SelectItem value="paypal">PayPal</SelectItem>
                   <SelectItem value="stripe">Stripe</SelectItem>
+                  <SelectItem value="import">Import</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -557,9 +563,6 @@ export default function PaymentsPage() {
                 onChange={(event) => setMemo(event.target.value)}
                 placeholder="Optional note"
               />
-              <p className="text-xs text-muted-foreground">
-                Memo is not saved yet because the shared donation_payments table does not currently have a memo column.
-              </p>
             </div>
           </div>
 
@@ -598,29 +601,34 @@ export default function PaymentsPage() {
                       {formatCurrency(Number(selectedPayment.amount || 0))}
                     </span>
                   </div>
+
                   <div>
                     <span className="text-muted-foreground">Method:</span>{" "}
                     <span className="font-medium capitalize">
-                      {selectedPayment.payment_method || selectedPayment.source || "—"}
+                      {selectedPayment.source || "—"}
                     </span>
                   </div>
+
                   <div>
-                    <span className="text-muted-foreground">Donor:</span>{" "}
-                    <span className="font-medium">{selectedPayment.donor_name || "—"}</span>
+                    <span className="text-muted-foreground">Donor / Sender:</span>{" "}
+                    <span className="font-medium">{getPaymentDonorName(selectedPayment)}</span>
                   </div>
+
                   <div>
-                    <span className="text-muted-foreground">Fund:</span>{" "}
-                    <span className="font-medium">{selectedPayment.fund_name || "—"}</span>
+                    <span className="text-muted-foreground">Memo:</span>{" "}
+                    <span className="font-medium">{selectedPayment.memo || "—"}</span>
                   </div>
                 </div>
               </div>
 
               <div className="flex flex-col gap-2">
                 <Label>Select Pledge</Label>
+
                 <Select value={selectedPledgeId} onValueChange={setSelectedPledgeId}>
                   <SelectTrigger>
                     <SelectValue placeholder="Choose a pledge" />
                   </SelectTrigger>
+
                   <SelectContent>
                     {allocationPledges.length === 0 ? (
                       <SelectItem value="no-pledges" disabled>
@@ -630,11 +638,8 @@ export default function PaymentsPage() {
                       allocationPledges.map((pledge) => (
                         <SelectItem key={pledge.id} value={pledge.id}>
                           {pledge.donor_name || "Unknown donor"} —{" "}
-                          {pledge.fund_name || "No Fund"} — Balance:{" "}
-                          {formatCurrency(
-                            Number(pledge.amount || 0) -
-                              Number(pledge.collected_amount || 0)
-                          )}
+                          {pledge.campaign_name || "No Campaign"} — Balance:{" "}
+                          {formatCurrency(Number(pledge.balance_remaining || 0))}
                         </SelectItem>
                       ))
                     )}

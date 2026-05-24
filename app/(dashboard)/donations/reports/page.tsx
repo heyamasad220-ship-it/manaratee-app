@@ -20,8 +20,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
@@ -31,27 +29,34 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Download, Heart, DollarSign, Users, TrendingUp, FileText, Send, Search, Printer } from "lucide-react"
+import { Download, Heart, DollarSign, Users, TrendingUp, FileText, Send, Printer } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const reportsTabs = ["Overview", "Donations", "Donors", "Campaigns", "Tax Receipts"] as const
 
 type ReportsTab = (typeof reportsTabs)[number]
 
-interface DonationPayment {
+interface Payment {
   id: string
-  donor_name: string | null
-  amount: number | null
-  payment_date: string | null
-  fund_name: string | null
-  payment_method: string | null
-  contact_id: string | null
+  donor_id?: string | null
+  sender_name?: string | null
+  amount?: number | null
+  payment_date?: string | null
+  source?: string | null
+  category_id?: string | null
+  pledge_id?: string | null
+  status?: string | null
 }
 
-interface Contact {
+interface DonorSummary {
   id: string
   full_name: string | null
   email: string | null
+  donor_type: string | null
+  donation_count: number | null
+  total_donations: number | null
+  last_donation_date: string | null
+  has_open_pledge: boolean | null
 }
 
 export default function DonationsReportsPage() {
@@ -59,15 +64,13 @@ export default function DonationsReportsPage() {
 
   const [activeTab, setActiveTab] = useState<ReportsTab>("Overview")
   const [dateRange, setDateRange] = useState("30d")
-  const [taxYear, setTaxYear] = useState("2025")
   const [taxSearch, setTaxSearch] = useState("")
   const [selectedDonors, setSelectedDonors] = useState<string[]>([])
   const [showPreviewDialog, setShowPreviewDialog] = useState(false)
-  const [previewDonor, setPreviewDonor] = useState<any | null>(null)
+  const [previewDonor, setPreviewDonor] = useState<DonorSummary | null>(null)
 
-  const [payments, setPayments] = useState<DonationPayment[]>([])
-  const [contacts, setContacts] = useState<Contact[]>([])
-  const [organizationId, setOrganizationId] = useState<string | null>(null)
+  const [payments, setPayments] = useState<Payment[]>([])
+  const [donors, setDonors] = useState<DonorSummary[]>([])
   const [loading, setLoading] = useState(true)
 
   async function getOrganizationId() {
@@ -97,21 +100,21 @@ export default function DonationsReportsPage() {
         return
       }
 
-      setOrganizationId(orgId)
-
       const { data: paymentData } = await supabase
-        .from("donation_payments")
-        .select("*")
+        .from("payments")
+        .select(
+          "id, donor_id, sender_name, amount, payment_date, source, category_id, pledge_id, status"
+        )
         .eq("organization_id", orgId)
         .order("payment_date", { ascending: false })
 
-      const { data: contactsData } = await supabase
-        .from("contacts")
-        .select("id, full_name, email")
+      const { data: donorData } = await supabase
+        .from("donor_summary_view")
+        .select("*")
         .eq("organization_id", orgId)
 
-      setPayments((paymentData || []) as DonationPayment[])
-      setContacts((contactsData || []) as Contact[])
+      setPayments((paymentData || []) as Payment[])
+      setDonors((donorData || []) as DonorSummary[])
 
       setLoading(false)
     }
@@ -120,30 +123,16 @@ export default function DonationsReportsPage() {
   }, [])
 
   const donorTotals = useMemo(() => {
-    const grouped: Record<string, any> = {}
-
-    payments.forEach((payment) => {
-      const key = payment.contact_id || payment.donor_name || payment.id
-
-      if (!grouped[key]) {
-        const contact = contacts.find((c) => c.id === payment.contact_id)
-
-        grouped[key] = {
-          id: key,
-          name: contact?.full_name || payment.donor_name || "Unknown Donor",
-          email: contact?.email || "",
-          donationCount: 0,
-          total: 0,
-          lastDonation: payment.payment_date || "",
-        }
-      }
-
-      grouped[key].donationCount += 1
-      grouped[key].total += Number(payment.amount || 0)
-    })
-
-    return Object.values(grouped)
-  }, [payments, contacts])
+    return donors.map((donor) => ({
+      id: donor.id,
+      name: donor.full_name || "Unknown Donor",
+      email: donor.email || "",
+      donationCount: Number(donor.donation_count || 0),
+      total: Number(donor.total_donations || 0),
+      lastDonation: donor.last_donation_date || "",
+      hasPledge: donor.has_open_pledge || false,
+    }))
+  }, [donors])
 
   const filteredTaxDonors = donorTotals.filter((donor) => {
     return (
@@ -156,24 +145,12 @@ export default function DonationsReportsPage() {
     return sum + Number(payment.amount || 0)
   }, 0)
 
-  const averageDonation = payments.length > 0
-    ? totalDonations / payments.length
-    : 0
+  const averageDonation =
+    payments.length > 0
+      ? totalDonations / payments.length
+      : 0
 
   const uniqueDonors = donorTotals.length
-
-  const donationCategories = useMemo(() => {
-    const grouped: Record<string, number> = {}
-
-    payments.forEach((payment) => {
-      const fund = payment.fund_name || "General Fund"
-      grouped[fund] = (grouped[fund] || 0) + Number(payment.amount || 0)
-    })
-
-    return Object.entries(grouped)
-      .map(([name, amount]) => ({ name, amount }))
-      .sort((a, b) => b.amount - a.amount)
-  }, [payments])
 
   const topDonors = [...donorTotals]
     .sort((a, b) => b.total - a.total)
@@ -193,6 +170,15 @@ export default function DonationsReportsPage() {
     } else {
       setSelectedDonors([...selectedDonors, id])
     }
+  }
+
+  if (loading) {
+    return (
+      <>
+        <Header title="Donations Reports" />
+        <div className="p-6">Loading...</div>
+      </>
+    )
   }
 
   return (
@@ -226,6 +212,7 @@ export default function DonationsReportsPage() {
               <SelectTrigger className="w-[150px]">
                 <SelectValue />
               </SelectTrigger>
+
               <SelectContent>
                 <SelectItem value="7d">Last 7 days</SelectItem>
                 <SelectItem value="30d">Last 30 days</SelectItem>
@@ -251,6 +238,7 @@ export default function DonationsReportsPage() {
                   </CardTitle>
                   <DollarSign className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
+
                 <CardContent>
                   <div className="text-2xl font-bold">
                     ${totalDonations.toLocaleString()}
@@ -265,8 +253,11 @@ export default function DonationsReportsPage() {
                   </CardTitle>
                   <Users className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
+
                 <CardContent>
-                  <div className="text-2xl font-bold">{uniqueDonors}</div>
+                  <div className="text-2xl font-bold">
+                    {uniqueDonors}
+                  </div>
                 </CardContent>
               </Card>
 
@@ -277,6 +268,7 @@ export default function DonationsReportsPage() {
                   </CardTitle>
                   <Heart className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
+
                 <CardContent>
                   <div className="text-2xl font-bold">
                     ${averageDonation.toFixed(0)}
@@ -291,77 +283,48 @@ export default function DonationsReportsPage() {
                   </CardTitle>
                   <TrendingUp className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
+
                 <CardContent>
-                  <div className="text-2xl font-bold">{payments.length}</div>
+                  <div className="text-2xl font-bold">
+                    {payments.length}
+                  </div>
                 </CardContent>
               </Card>
             </div>
 
-            <div className="grid gap-6 lg:grid-cols-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Donations by Fund</CardTitle>
-                  <CardDescription>Breakdown by donation fund</CardDescription>
-                </CardHeader>
+            <Card>
+              <CardHeader>
+                <CardTitle>Top Donors</CardTitle>
+                <CardDescription>
+                  Highest contributors
+                </CardDescription>
+              </CardHeader>
 
-                <CardContent className="p-0">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Fund</TableHead>
-                        <TableHead className="text-right">Amount</TableHead>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Donor</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                    </TableRow>
+                  </TableHeader>
+
+                  <TableBody>
+                    {topDonors.map((donor) => (
+                      <TableRow key={donor.id}>
+                        <TableCell className="font-medium">
+                          {donor.name}
+                        </TableCell>
+
+                        <TableCell className="text-right">
+                          ${donor.total.toLocaleString()}
+                        </TableCell>
                       </TableRow>
-                    </TableHeader>
-
-                    <TableBody>
-                      {donationCategories.map((category) => (
-                        <TableRow key={category.name}>
-                          <TableCell className="font-medium">
-                            {category.name}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            ${category.amount.toLocaleString()}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Top Donors</CardTitle>
-                  <CardDescription>
-                    Highest contributors
-                  </CardDescription>
-                </CardHeader>
-
-                <CardContent className="p-0">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Donor</TableHead>
-                        <TableHead className="text-right">Total</TableHead>
-                      </TableRow>
-                    </TableHeader>
-
-                    <TableBody>
-                      {topDonors.map((donor) => (
-                        <TableRow key={donor.id}>
-                          <TableCell className="font-medium">
-                            {donor.name}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            ${donor.total.toLocaleString()}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            </div>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
           </div>
         )}
 
@@ -370,7 +333,7 @@ export default function DonationsReportsPage() {
             <CardHeader>
               <CardTitle>Donation Transactions</CardTitle>
               <CardDescription>
-                Real donation payment history
+                Real payment ledger
               </CardDescription>
             </CardHeader>
 
@@ -379,9 +342,9 @@ export default function DonationsReportsPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Date</TableHead>
-                    <TableHead>Donor</TableHead>
-                    <TableHead>Fund</TableHead>
-                    <TableHead>Method</TableHead>
+                    <TableHead>Sender</TableHead>
+                    <TableHead>Source</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -396,15 +359,15 @@ export default function DonationsReportsPage() {
                       </TableCell>
 
                       <TableCell className="font-medium">
-                        {payment.donor_name || "Unknown"}
+                        {payment.sender_name || "Unknown"}
                       </TableCell>
 
                       <TableCell>
-                        {payment.fund_name || "General Fund"}
+                        {payment.source || "Manual"}
                       </TableCell>
 
                       <TableCell>
-                        {payment.payment_method || "N/A"}
+                        {payment.status || "pending_review"}
                       </TableCell>
 
                       <TableCell className="text-right">
@@ -469,134 +432,103 @@ export default function DonationsReportsPage() {
             <CardHeader>
               <CardTitle>Campaign Performance</CardTitle>
               <CardDescription>
-                Campaign tables not connected yet
+                Connect campaigns later
               </CardDescription>
             </CardHeader>
 
             <CardContent>
               <div className="rounded-md border border-dashed p-8 text-center text-muted-foreground">
-                Connect this tab after campaign/fund tables are finalized.
+                Campaign reporting can be added after campaign allocation is finalized.
               </div>
             </CardContent>
           </Card>
         )}
 
         {activeTab === "Tax Receipts" && (
-          <div className="flex flex-col gap-6">
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    Total Donors
-                  </CardTitle>
-                  <Users className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
+          <Card>
+            <CardHeader>
+              <CardTitle>Tax Receipts</CardTitle>
+              <CardDescription>
+                Year-end donor summaries
+              </CardDescription>
+            </CardHeader>
 
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {uniqueDonors}
-                  </div>
-                </CardContent>
-              </Card>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[50px]">
+                      <Checkbox
+                        checked={
+                          selectedDonors.length === filteredTaxDonors.length &&
+                          filteredTaxDonors.length > 0
+                        }
+                        onCheckedChange={handleSelectAll}
+                      />
+                    </TableHead>
 
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    Total Donations
-                  </CardTitle>
-                  <DollarSign className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
+                    <TableHead>Donor</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Donations</TableHead>
+                    <TableHead>Total</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
 
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    ${totalDonations.toLocaleString()}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Tax Receipts</CardTitle>
-                <CardDescription>
-                  Real donor donation totals
-                </CardDescription>
-              </CardHeader>
-
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[50px]">
+                <TableBody>
+                  {filteredTaxDonors.map((donor) => (
+                    <TableRow key={donor.id}>
+                      <TableCell>
                         <Checkbox
-                          checked={selectedDonors.length === filteredTaxDonors.length && filteredTaxDonors.length > 0}
-                          onCheckedChange={handleSelectAll}
+                          checked={selectedDonors.includes(donor.id)}
+                          onCheckedChange={() => handleSelectDonor(donor.id)}
                         />
-                      </TableHead>
+                      </TableCell>
 
-                      <TableHead>Donor</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Donations</TableHead>
-                      <TableHead>Total</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableCell className="font-medium">
+                        {donor.name}
+                      </TableCell>
+
+                      <TableCell>
+                        {donor.email || "N/A"}
+                      </TableCell>
+
+                      <TableCell>
+                        {donor.donationCount}
+                      </TableCell>
+
+                      <TableCell>
+                        ${donor.total.toLocaleString()}
+                      </TableCell>
+
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setPreviewDonor(donor as any)
+                              setShowPreviewDialog(true)
+                            }}
+                          >
+                            <FileText className="h-4 w-4" />
+                          </Button>
+
+                          <Button variant="ghost" size="sm">
+                            <Printer className="h-4 w-4" />
+                          </Button>
+
+                          <Button variant="ghost" size="sm">
+                            <Send className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-
-                  <TableBody>
-                    {filteredTaxDonors.map((donor) => (
-                      <TableRow key={donor.id}>
-                        <TableCell>
-                          <Checkbox
-                            checked={selectedDonors.includes(donor.id)}
-                            onCheckedChange={() => handleSelectDonor(donor.id)}
-                          />
-                        </TableCell>
-
-                        <TableCell className="font-medium">
-                          {donor.name}
-                        </TableCell>
-
-                        <TableCell>
-                          {donor.email || "N/A"}
-                        </TableCell>
-
-                        <TableCell>
-                          {donor.donationCount}
-                        </TableCell>
-
-                        <TableCell>
-                          ${donor.total.toLocaleString()}
-                        </TableCell>
-
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                setPreviewDonor(donor)
-                                setShowPreviewDialog(true)
-                              }}
-                            >
-                              <FileText className="h-4 w-4" />
-                            </Button>
-
-                            <Button variant="ghost" size="sm">
-                              <Printer className="h-4 w-4" />
-                            </Button>
-
-                            <Button variant="ghost" size="sm">
-                              <Send className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </div>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         )}
       </div>
 
@@ -604,23 +536,31 @@ export default function DonationsReportsPage() {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Tax Receipt Preview</DialogTitle>
+
             <DialogDescription>
-              Year-end donation receipt for {previewDonor?.name}
+              Year-end donation receipt for {previewDonor?.full_name}
             </DialogDescription>
           </DialogHeader>
 
           {previewDonor && (
             <div className="rounded-lg border bg-white p-6">
               <div className="mb-6 text-center">
-                <h2 className="text-xl font-bold">Organization Name</h2>
+                <h2 className="text-xl font-bold">
+                  Organization Name
+                </h2>
+
                 <p className="text-sm text-muted-foreground">
                   Donation Receipt
                 </p>
               </div>
 
               <div className="mb-6 rounded-md bg-muted/50 p-4">
-                <p className="mb-2 font-medium">Donor Information</p>
-                <p>{previewDonor.name}</p>
+                <p className="mb-2 font-medium">
+                  Donor Information
+                </p>
+
+                <p>{previewDonor.full_name}</p>
+
                 <p className="text-sm text-muted-foreground">
                   {previewDonor.email}
                 </p>
@@ -629,8 +569,9 @@ export default function DonationsReportsPage() {
               <div className="rounded-md border">
                 <div className="flex justify-between border-b p-3">
                   <span>Total Donations</span>
+
                   <span className="font-bold">
-                    ${previewDonor.total.toLocaleString()}
+                    ${Number(previewDonor.total_donations || 0).toLocaleString()}
                   </span>
                 </div>
               </div>

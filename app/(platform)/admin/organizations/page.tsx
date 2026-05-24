@@ -66,75 +66,25 @@ interface Organization {
   created: string
   mrr: number
   contactEmail: string
+  plan_id?: string | null
+  plan_name?: string | null
+}
+
+interface Plan {
+  id: string
+  name: string
+  monthly_price: number
 }
 
 interface ModuleConfig {
   id: string
   name: string
   slug: string
-  description: string
+  description: string | null
   enabled: boolean
   isDefault: boolean
+  organizationModuleId?: string
 }
-
-const defaultModules: ModuleConfig[] = [
-  {
-    id: "mod-1",
-    name: "Bookings",
-    slug: "bookings",
-    description: "Space and venue bookings",
-    enabled: true,
-    isDefault: true,
-  },
-  {
-    id: "mod-2",
-    name: "Ticketing",
-    slug: "ticketing",
-    description: "Event ticketing and sales",
-    enabled: true,
-    isDefault: true,
-  },
-  {
-    id: "mod-3",
-    name: "Bazaar",
-    slug: "bazaar",
-    description: "Bazaar and vendor management",
-    enabled: false,
-    isDefault: false,
-  },
-  {
-    id: "mod-4",
-    name: "Programs",
-    slug: "programs",
-    description: "Educational programs and classes",
-    enabled: true,
-    isDefault: true,
-  },
-  {
-    id: "mod-5",
-    name: "Donations",
-    slug: "donations",
-    description: "Donation and fundraising",
-    enabled: false,
-    isDefault: false,
-  },
-  {
-    id: "mod-6",
-    name: "Contacts",
-    slug: "contacts",
-    description: "Contact and CRM management",
-    enabled: true,
-    isDefault: true,
-  },
-  {
-    id: "mod-7",
-    name: "Human Resources",
-    slug: "hr",
-    description: "HR and employee management",
-    enabled: false,
-    isDefault: false,
-  },
-]
 
 const statusStyles: Record<Organization["status"], string> = {
   Active: "bg-emerald-100 text-emerald-700 hover:bg-emerald-100",
@@ -144,7 +94,6 @@ const statusStyles: Record<Organization["status"], string> = {
 
 function formatDate(value: string | null) {
   if (!value) return "—"
-
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return "—"
 
@@ -163,6 +112,7 @@ export default function OrganizationsPage() {
   const supabase = createClient()
 
   const [organizations, setOrganizations] = useState<Organization[]>([])
+  const [plans, setPlans] = useState<Plan[]>([])
   const [loading, setLoading] = useState(true)
 
   const [search, setSearch] = useState("")
@@ -170,7 +120,8 @@ export default function OrganizationsPage() {
     useState<(typeof filterTabs)[number]>("All")
   const [addOrgOpen, setAddOrgOpen] = useState(false)
   const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null)
-  const [orgModules, setOrgModules] = useState<ModuleConfig[]>(defaultModules)
+  const [selectedPlanId, setSelectedPlanId] = useState("")
+  const [orgModules, setOrgModules] = useState<ModuleConfig[]>([])
 
   const [newOrgName, setNewOrgName] = useState("")
   const [newOrgEmail, setNewOrgEmail] = useState("")
@@ -178,15 +129,39 @@ export default function OrganizationsPage() {
     "Pending"
   )
   const [saving, setSaving] = useState(false)
+  const [savingPlan, setSavingPlan] = useState(false)
   const [editingOrgId, setEditingOrgId] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetchOrgs()
+    loadPlans()
+  }, [])
+
+  const loadPlans = async () => {
+    const { data, error } = await supabase
+      .from("plans")
+      .select("id, name, monthly_price")
+      .eq("is_active", true)
+      .order("monthly_price", { ascending: true })
+
+    if (error) {
+      console.error(error)
+      alert("Failed to load plans.")
+      return
+    }
+
+    setPlans((data || []).map((plan: any) => ({
+      id: plan.id,
+      name: plan.name,
+      monthly_price: Number(plan.monthly_price || 0),
+    })))
+  }
 
   const fetchOrgs = async () => {
     setLoading(true)
 
     const response = await fetch("/api/platform/organizations")
     const result = await response.json()
-
-    console.log("PLATFORM ORGS API RESULT:", result)
 
     if (!response.ok) {
       alert(result.error || "Failed to load organizations")
@@ -208,16 +183,14 @@ export default function OrganizationsPage() {
         created: formatDate(org.created_at),
         mrr: org.mrr ?? 0,
         contactEmail: org.contact_email ?? org.contactEmail ?? "",
+        plan_id: org.plan_id ?? null,
+        plan_name: org.plan_name ?? org.plans?.name ?? null,
       })
     )
 
     setOrganizations(mapped)
     setLoading(false)
   }
-
-  useEffect(() => {
-    fetchOrgs()
-  }, [])
 
   const filtered = useMemo(() => {
     let result = organizations
@@ -238,9 +211,101 @@ export default function OrganizationsPage() {
     return result
   }, [organizations, search, activeFilter])
 
-  const handleOrgClick = (org: Organization) => {
+  const handleOrgClick = async (org: Organization) => {
     setSelectedOrg(org)
-    setOrgModules(defaultModules.map((m) => ({ ...m })))
+    setSelectedPlanId(org.plan_id || "")
+
+    const { data: orgData } = await supabase
+      .from("organizations")
+      .select("plan_id, plans(name)")
+      .eq("id", org.id)
+      .single()
+
+    if (orgData) {
+      const updatedOrg: Organization = {
+        ...org,
+        plan_id: orgData.plan_id,
+        plan_name: (orgData as any).plans?.name ?? null,
+      }
+
+      setSelectedOrg(updatedOrg)
+      setSelectedPlanId(orgData.plan_id || "")
+    }
+
+    const { data, error } = await supabase
+      .from("organization_modules")
+      .select(`
+        id,
+        enabled,
+        enabled_by_plan,
+        modules (
+          id,
+          name,
+          slug,
+          description
+        )
+      `)
+      .eq("organization_id", org.id)
+      .order("created_at", { ascending: true })
+
+    if (error) {
+      console.error(error)
+      alert("Failed to load organization modules.")
+      return
+    }
+
+    const mapped: ModuleConfig[] = (data || []).map((item: any) => ({
+      id: item.modules.id,
+      name: item.modules.name,
+      slug: item.modules.slug,
+      description: item.modules.description,
+      enabled: item.enabled,
+      isDefault: item.enabled_by_plan,
+      organizationModuleId: item.id,
+    }))
+
+    setOrgModules(mapped)
+  }
+
+  const saveOrganizationPlan = async () => {
+    if (!selectedOrg || !selectedPlanId) {
+      alert("Please select a plan.")
+      return
+    }
+
+    setSavingPlan(true)
+
+    const { error } = await supabase.rpc("assign_plan_to_organization", {
+      p_organization_id: selectedOrg.id,
+      p_plan_id: selectedPlanId,
+    })
+
+    if (error) {
+      console.error(error)
+      alert("Failed to assign plan.")
+      setSavingPlan(false)
+      return
+    }
+
+    const selectedPlan = plans.find((plan) => plan.id === selectedPlanId)
+
+    const updatedOrg: Organization = {
+      ...selectedOrg,
+      plan_id: selectedPlanId,
+      plan_name: selectedPlan?.name || null,
+      mrr: selectedPlan?.monthly_price ?? selectedOrg.mrr,
+    }
+
+    setSelectedOrg(updatedOrg)
+    setOrganizations((prev) =>
+      prev.map((org) => (org.id === updatedOrg.id ? updatedOrg : org))
+    )
+
+    await handleOrgClick(updatedOrg)
+    await fetchOrgs()
+
+    alert("Plan assigned successfully.")
+    setSavingPlan(false)
   }
 
   const handleEditClick = (org: Organization) => {
@@ -251,10 +316,33 @@ export default function OrganizationsPage() {
     setAddOrgOpen(true)
   }
 
-  const toggleModule = (moduleId: string) => {
+  const toggleModule = async (moduleId: string) => {
+    if (!selectedOrg) return
+
+    const existing = orgModules.find((m) => m.id === moduleId)
+    if (!existing) return
+
+    const nextEnabled = !existing.enabled
+
     setOrgModules((prev) =>
-      prev.map((m) => (m.id === moduleId ? { ...m, enabled: !m.enabled } : m))
+      prev.map((m) =>
+        m.id === moduleId ? { ...m, enabled: nextEnabled } : m
+      )
     )
+
+    const { error } = await supabase
+      .from("organization_modules")
+      .update({
+        enabled: nextEnabled,
+        manually_overridden: true,
+      })
+      .eq("organization_id", selectedOrg.id)
+      .eq("module_id", moduleId)
+
+    if (error) {
+      console.error(error)
+      alert("Failed to update module.")
+    }
   }
 
   const resetAddForm = () => {
@@ -273,8 +361,6 @@ export default function OrganizationsPage() {
       .update({ status: toDbStatus(status) })
       .eq("id", orgId)
 
-    console.log("STATUS UPDATE ERROR:", error)
-
     if (error) {
       alert(error.message)
       return
@@ -284,25 +370,25 @@ export default function OrganizationsPage() {
   }
 
   const deleteOrganization = async (org: Organization) => {
-  const confirmed = window.confirm(
-    `Delete "${org.name}"? This cannot be undone.`
-  )
+    const confirmed = window.confirm(
+      `Delete "${org.name}"? This cannot be undone.`
+    )
 
-  if (!confirmed) return
+    if (!confirmed) return
 
-  const { error } = await supabase
-    .from("organizations")
-    .delete()
-    .eq("id", org.id)
+    const { error } = await supabase
+      .from("organizations")
+      .delete()
+      .eq("id", org.id)
 
-  if (error) {
-    alert(error.message)
-    return
+    if (error) {
+      alert(error.message)
+      return
+    }
+
+    alert("Organization deleted.")
+    fetchOrgs()
   }
-
-  alert("Organization deleted.")
-  fetchOrgs()
-}
 
   const inviteOrganizationAdmin = async (org: Organization) => {
     if (!org.contactEmail) {
@@ -356,8 +442,6 @@ export default function OrganizationsPage() {
           })
           .eq("id", editingOrgId)
 
-        console.log("UPDATE ERROR:", error)
-
         if (error) {
           alert(error.message)
           return
@@ -392,10 +476,6 @@ export default function OrganizationsPage() {
 
       const createResult = await createResponse.json()
 
-      console.log("CREATE ORG RESULT:", createResult)
-      console.log("CREATE ORG STATUS:", createResponse.status)
-      console.log("CREATE ORG OK:", createResponse.ok)
-
       if (!createResponse.ok) {
         throw new Error(createResult.error || "Failed to create organization")
       }
@@ -417,10 +497,6 @@ export default function OrganizationsPage() {
       })
 
       const inviteResult = await inviteResponse.json()
-
-      console.log("INVITE ADMIN RESULT:", inviteResult)
-      console.log("INVITE ADMIN STATUS:", inviteResponse.status)
-      console.log("INVITE ADMIN OK:", inviteResponse.ok)
 
       if (!inviteResponse.ok) {
         alert(
@@ -479,22 +555,22 @@ export default function OrganizationsPage() {
                   ))}
                 </div>
               </div>
-<Button
-  type="button"
-  onClick={() => {
-    resetAddForm()
-    setAddOrgOpen(true)
-  }}
-  style={{
-    backgroundColor: "#000",
-    color: "#fff",
-  }}
-  className="flex items-center gap-2 rounded-md px-4 py-2 hover:opacity-90"
->
-  <Plus className="h-4 w-4" />
-  Add Organization
-</Button>
-              
+
+              <Button
+                type="button"
+                onClick={() => {
+                  resetAddForm()
+                  setAddOrgOpen(true)
+                }}
+                style={{
+                  backgroundColor: "#000",
+                  color: "#fff",
+                }}
+                className="flex items-center gap-2 rounded-md px-4 py-2 hover:opacity-90"
+              >
+                <Plus className="h-4 w-4" />
+                Add Organization
+              </Button>
             </div>
 
             <div className="flex items-center gap-4 border-b border-border bg-muted/30 px-5 py-2.5 text-xs">
@@ -627,12 +703,14 @@ export default function OrganizationsPage() {
                                 Suspend
                               </DropdownMenuItem>
                             )}
-<DropdownMenuItem
-  className="text-destructive"
-  onClick={() => deleteOrganization(org)}
->
-  Delete
-</DropdownMenuItem>
+
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={() => deleteOrganization(org)}
+                            >
+                              Delete
+                            </DropdownMenuItem>
+
                             {org.status === "Suspended" && (
                               <DropdownMenuItem
                                 onClick={() =>
@@ -696,48 +774,47 @@ export default function OrganizationsPage() {
           </SheetHeader>
 
           <Tabs defaultValue="overview" className="mt-6">
-           <TabsList className="flex w-full flex-nowrap items-center gap-2 overflow-hidden rounded-lg bg-muted p-1">
-  <TabsTrigger
-    value="overview"
-    className="flex min-w-0 flex-1 items-center justify-center gap-1.5 px-3 py-2 text-sm whitespace-nowrap"
-  >
-    <Building2 className="h-4 w-4 shrink-0" />
-    Overview
-  </TabsTrigger>
+            <TabsList className="flex w-full flex-nowrap items-center gap-2 overflow-hidden rounded-lg bg-muted p-1">
+              <TabsTrigger
+                value="overview"
+                className="flex min-w-0 flex-1 items-center justify-center gap-1.5 px-3 py-2 text-sm whitespace-nowrap"
+              >
+                <Building2 className="h-4 w-4 shrink-0" />
+                Overview
+              </TabsTrigger>
 
-  <TabsTrigger
-    value="members"
-    className="flex min-w-0 flex-1 items-center justify-center gap-1.5 px-3 py-2 text-sm whitespace-nowrap"
-  >
-    <Users className="h-4 w-4 shrink-0" />
-    Members
-  </TabsTrigger>
+              <TabsTrigger
+                value="members"
+                className="flex min-w-0 flex-1 items-center justify-center gap-1.5 px-3 py-2 text-sm whitespace-nowrap"
+              >
+                <Users className="h-4 w-4 shrink-0" />
+                Members
+              </TabsTrigger>
 
-  <TabsTrigger
-    value="modules"
-    className="flex min-w-0 flex-1 items-center justify-center gap-1.5 px-3 py-2 text-sm whitespace-nowrap"
-  >
-    <Boxes className="h-4 w-4 shrink-0" />
-    Modules
-  </TabsTrigger>
+              <TabsTrigger
+                value="modules"
+                className="flex min-w-0 flex-1 items-center justify-center gap-1.5 px-3 py-2 text-sm whitespace-nowrap"
+              >
+                <Boxes className="h-4 w-4 shrink-0" />
+                Modules
+              </TabsTrigger>
 
-  <TabsTrigger
-    value="billing"
-    className="flex min-w-0 flex-1 items-center justify-center gap-1.5 px-3 py-2 text-sm whitespace-nowrap"
-  >
-    <CreditCard className="h-4 w-4 shrink-0" />
-    Billing
-  </TabsTrigger>
+              <TabsTrigger
+                value="billing"
+                className="flex min-w-0 flex-1 items-center justify-center gap-1.5 px-3 py-2 text-sm whitespace-nowrap"
+              >
+                <CreditCard className="h-4 w-4 shrink-0" />
+                Billing
+              </TabsTrigger>
 
-  <TabsTrigger
-    value="settings"
-    className="flex min-w-0 flex-1 items-center justify-center gap-1.5 px-3 py-2 text-sm whitespace-nowrap"
-  >
-    <Settings className="h-4 w-4 shrink-0" />
-    Settings
-  </TabsTrigger>
-</TabsList>
-
+              <TabsTrigger
+                value="settings"
+                className="flex min-w-0 flex-1 items-center justify-center gap-1.5 px-3 py-2 text-sm whitespace-nowrap"
+              >
+                <Settings className="h-4 w-4 shrink-0" />
+                Settings
+              </TabsTrigger>
+            </TabsList>
 
             <TabsContent value="overview" className="mt-6 space-y-6">
               <div className="grid grid-cols-1 gap-4">
@@ -780,68 +857,75 @@ export default function OrganizationsPage() {
                     <span className="text-sm text-muted-foreground">Status</span>
                     <span className="text-sm">{selectedOrg?.status}</span>
                   </div>
+
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Plan</span>
+                    <span className="text-sm">
+                      {selectedOrg?.plan_name || "Not set"}
+                    </span>
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
 
             <TabsContent value="members" className="mt-6 space-y-4">
-  <div>
-    <h3 className="font-medium">Organization Members</h3>
-    <p className="text-sm text-muted-foreground">
-      Manage admins and members for this organization.
-    </p>
-  </div>
+              <div>
+                <h3 className="font-medium">Organization Members</h3>
+                <p className="text-sm text-muted-foreground">
+                  Manage admins and members for this organization.
+                </p>
+              </div>
 
-  <Card>
-    <CardContent className="p-0">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Email</TableHead>
-            <TableHead>Role</TableHead>
-            <TableHead>Status</TableHead>
-          </TableRow>
-        </TableHeader>
+              <Card>
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
 
-        <TableBody>
-          <TableRow>
-            <TableCell className="font-medium">
-              {selectedOrg?.name} Admin
-            </TableCell>
-            <TableCell className="text-muted-foreground">
-              {selectedOrg?.contactEmail || "—"}
-            </TableCell>
-            <TableCell>
-              <Badge variant="secondary" className="bg-blue-100 text-blue-700">
-                Admin
-              </Badge>
-            </TableCell>
-            <TableCell>
-              <Badge
-                variant="secondary"
-                className={
-                  selectedOrg?.status === "Active"
-                    ? "bg-emerald-100 text-emerald-700"
-                    : "bg-zinc-100 text-zinc-700"
-                }
+                    <TableBody>
+                      <TableRow>
+                        <TableCell className="font-medium">
+                          {selectedOrg?.name} Admin
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {selectedOrg?.contactEmail || "—"}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                            Admin
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="secondary"
+                            className={
+                              selectedOrg?.status === "Active"
+                                ? "bg-emerald-100 text-emerald-700"
+                                : "bg-zinc-100 text-zinc-700"
+                            }
+                          >
+                            {selectedOrg?.status}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+
+              <Button
+                className="bg-emerald-600 text-white hover:bg-emerald-700"
+                onClick={() => selectedOrg && inviteOrganizationAdmin(selectedOrg)}
               >
-                {selectedOrg?.status}
-              </Badge>
-            </TableCell>
-          </TableRow>
-        </TableBody>
-      </Table>
-    </CardContent>
-  </Card>
-
-  <Button
-    className="bg-emerald-600 text-white hover:bg-emerald-700"
-    onClick={() => selectedOrg && inviteOrganizationAdmin(selectedOrg)}
-  >
-    Send Admin Login Invite
-  </Button>
-</TabsContent>
+                Send Admin Login Invite
+              </Button>
+            </TabsContent>
 
             <TabsContent value="modules" className="mt-6 space-y-4">
               <div>
@@ -852,34 +936,47 @@ export default function OrganizationsPage() {
               </div>
 
               <Card>
-                <CardContent className="divide-y p-0">
-                  {orgModules.map((module) => (
-                    <div
-                      key={module.id}
-                      className="flex items-center justify-between p-4"
-                    >
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium">{module.name}</p>
-                          {module.isDefault && (
-                            <Badge variant="outline" className="text-xs">
-                              Plan Default
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                          {module.description}
-                        </p>
-                      </div>
+                <CardContent className="space-y-3 p-4">
+                  <div>
+                    <h3 className="text-sm font-semibold">Subscription Plan</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Assign a plan to control included modules and billing access.
+                    </p>
+                  </div>
 
-                      <Switch
-                        checked={module.enabled}
-                        onCheckedChange={() => toggleModule(module.id)}
-                      />
-                    </div>
-                  ))}
+                  <div className="flex flex-col gap-3 sm:flex-row">
+                    <Select
+                      value={selectedPlanId}
+                      onValueChange={setSelectedPlanId}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="No Plan Selected" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {plans.map((plan) => (
+                          <SelectItem key={plan.id} value={plan.id}>
+                            {plan.name} (${plan.monthly_price}/month)
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    <Button
+                      className="bg-emerald-600 text-white hover:bg-emerald-700"
+                      onClick={saveOrganizationPlan}
+                      disabled={savingPlan}
+                    >
+                      {savingPlan ? "Saving..." : "Save Plan"}
+                    </Button>
+                  </div>
+
+                  <p className="text-xs text-muted-foreground">
+                    Current plan: {selectedOrg?.plan_name || "Not set"}
+                  </p>
                 </CardContent>
               </Card>
+
+              
             </TabsContent>
 
             <TabsContent value="billing" className="mt-6 space-y-4">
@@ -888,9 +985,20 @@ export default function OrganizationsPage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-medium">Current Plan</p>
-                      <p className="text-sm text-muted-foreground">Not set yet</p>
+                      <p className="text-sm text-muted-foreground">
+                        {selectedOrg?.plan_name || "Not set yet"}
+                      </p>
                     </div>
-                    <Button variant="outline" size="sm">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const modulesTab = document.querySelector(
+                          '[data-value="modules"]'
+                        ) as HTMLButtonElement | null
+                        modulesTab?.click()
+                      }}
+                    >
                       Change Plan
                     </Button>
                   </div>

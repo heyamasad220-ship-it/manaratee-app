@@ -47,7 +47,7 @@ export default function PaymentHistory({ payments }: PaymentHistoryProps) {
       <div className="flex items-start justify-between">
         <div>
           <h3 className="text-base font-semibold">Payment History</h3>
-          <p className="text-sm text-muted-foreground">
+      <p className="text-sm text-muted-foreground">
             All payments recorded for this pledge.
           </p>
         </div>

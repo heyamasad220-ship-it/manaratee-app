@@ -53,7 +53,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
-type PledgeStatus = "Open" | "Partial" | "Fulfilled";
+type calculated_status = "Open" | "Partial" | "Fulfilled";
 
 type DonationPledgeRow = {
   id: string;
@@ -61,7 +61,7 @@ type DonationPledgeRow = {
   contact_id: string | null;
   donor_name: string | null;
   amount: number | string | null;
-  collected_amount: number | string | null;
+  amount_paid: number | string | null;
   status: string | null;
   fund_name: string | null;
   frequency: string | null;
@@ -74,13 +74,13 @@ interface Pledge {
   contactId: string | null;
   donorName: string;
   donorType: string;
-  totalAmount: number;
-  paidAmount: number;
-  balance: number;
+  amount_pledged: number;
+  amount_paid: number;
+  balance_remaining: number;
   frequency: string;
   startDate: string;
   nextPayment: string | null;
-  status: PledgeStatus;
+  status: calculated_status;
   fundName: string;
   notes?: string;
 }
@@ -120,7 +120,7 @@ function getTodayPlainDate() {
   return new Date(today.getTime() - timezoneOffset).toISOString().slice(0, 10);
 }
 
-function mapStatus(status: string | null, amount: number, paid: number): PledgeStatus {
+function mapStatus(status: string | null, amount: number, paid: number): calculated_status {
   const normalized = status?.toLowerCase();
 
   if (normalized === "fulfilled" || normalized === "paid") return "Fulfilled";
@@ -136,25 +136,25 @@ function formatCurrency(value: number) {
   return `$${value.toLocaleString()}`;
 }
 
-function pledgeFromRow(row: DonationPledgeRow): Pledge {
-  const totalAmount = Number(row.amount || 0);
-  const paidAmount = Number(row.collected_amount || 0);
-  const balance = Math.max(totalAmount - paidAmount, 0);
-
+function pledgeFromRow(row: any): Pledge {
   return {
     id: row.id,
-    contactId: row.contact_id,
+    contactId: null,
     donorName: row.donor_name || "Unknown donor",
-    donorType: "Customer",
-    totalAmount,
-    paidAmount,
-    balance,
+    donorType: "Donor",
+    amount_pledged: Number(row.amount_pledged || 0),
+    amount_paid: Number(row.amount_paid || 0),
+    balance_remaining: Number(row.balance_remaining || 0),
     frequency: row.frequency || "One-Time",
-    startDate: normalizeDateInput(row.start_date) || "",
+    startDate: normalizeDateInput(row.pledge_date) || "",
     nextPayment: null,
-    status: mapStatus(row.status, totalAmount, paidAmount),
-    fundName: row.fund_name || "General Fund",
-    notes: undefined,
+    status: mapStatus(
+      row.calculated_status,
+      Number(row.amount_pledged || 0),
+      Number(row.amount_paid || 0)
+    ),
+    fundName: row.campaign_name || "General Fund",
+    notes: row.notes || undefined,
   };
 }
 
@@ -187,7 +187,7 @@ export default function PledgesPage() {
 
   const [fundOptions, setFundOptions] = useState<FundOption[]>([]);
 
-  const [fundName, setFundName] = useState("");
+  const [campaignId, setCampaignId] = useState("");
   const [amount, setAmount] = useState("");
   const [pledgeDate, setPledgeDate] = useState("");
   const [frequency, setFrequency] = useState("One-Time");
@@ -198,7 +198,7 @@ export default function PledgesPage() {
   const [editFundName, setEditFundName] = useState("");
   const [editPledgeDate, setEditPledgeDate] = useState("");
   const [editFrequency, setEditFrequency] = useState("One-Time");
-  const [editStatus, setEditStatus] = useState<PledgeStatus>("Open");
+  const [editStatus, setEditStatus] = useState<calculated_status>("Open");
   const [savingEdit, setSavingEdit] = useState(false);
 
   const [paymentAmount, setPaymentAmount] = useState("");
@@ -235,7 +235,7 @@ export default function PledgesPage() {
     if (!orgId) return;
 
     let query = supabase
-      .from("contacts")
+      .from("donors")
       .select("id, full_name, email")
       .eq("organization_id", orgId)
       .order("full_name", { ascending: true })
@@ -256,7 +256,44 @@ export default function PledgesPage() {
 
     setContacts((data || []) as ContactOption[]);
   }
+async function handleDeletePledge(pledgeId: string) {
+  if (!confirm("Delete this pledge? Related payments will stay in Payments but will be unallocated from this pledge.")) return
 
+  const orgId = organizationId || (await getOrgIdForCurrentUser())
+
+  if (!orgId) {
+    alert("No organization found.")
+    return
+  }
+
+  const { error: unlinkPaymentsError } = await supabase
+    .from("payments")
+    .update({ pledge_id: null })
+    .eq("pledge_id", pledgeId)
+    .eq("organization_id", orgId)
+
+  if (unlinkPaymentsError) {
+    alert(unlinkPaymentsError.message)
+    return
+  }
+
+  const { error: pledgeError } = await supabase
+    .from("pledge_status_view")
+    .delete()
+    .eq("id", pledgeId)
+    .eq("organization_id", orgId)
+
+  if (pledgeError) {
+    alert(pledgeError.message)
+    return
+  }
+
+  setSelectedPledge(null)
+  setPaymentPledge(null)
+  setPledgePayments([])
+
+  await fetchPledges()
+}
   async function loadFundOptions(orgId: string, currentPledges: Pledge[] = []) {
     const optionsFromPledges = currentPledges
       .map((pledge) => pledge.fundName)
@@ -317,13 +354,12 @@ export default function PledgesPage() {
     await searchContacts("", orgId);
 
     const { data: pledgeData, error: pledgeError } = await supabase
-      .from("donation_pledges")
-      .select(
-        "id, organization_id, contact_id, donor_name, amount, collected_amount, status, fund_name, frequency, start_date, end_date"
-      )
-      .eq("organization_id", orgId)
-      .order("start_date", { ascending: false });
-
+  .from("pledge_status_view")
+  .select(
+    "id, organization_id, donor_id, donor_name, campaign_id, campaign_name, amount_pledged, amount_paid, balance_remaining, calculated_status, frequency, pledge_date, notes"
+  )
+  .eq("organization_id", orgId)
+  .order("pledge_date", { ascending: false });
     if (pledgeError) {
       console.error("Error loading donation pledges:", pledgeError);
       setPledges([]);
@@ -331,7 +367,7 @@ export default function PledgesPage() {
       return;
     }
 
-    const mapped = ((pledgeData || []) as DonationPledgeRow[]).map(pledgeFromRow);
+    const mapped = (pledgeData || []).map(pledgeFromRow);
 
     setPledges(mapped);
     await loadFundOptions(orgId, mapped);
@@ -343,7 +379,7 @@ export default function PledgesPage() {
     setPledgePaymentsError(null);
 
     const { data, error } = await supabase
-      .from("donation_payments")
+      .from("payments")
       .select("id, amount, payment_date, source, payment_method")
       .eq("organization_id", orgId)
       .eq("pledge_id", pledgeId)
@@ -387,7 +423,7 @@ export default function PledgesPage() {
 
   const resetAddPledgeForm = () => {
     setContactId("");
-    setFundName("");
+    setCampaignId("");
     setAmount("");
     setPledgeDate("");
     setFrequency("One-Time");
@@ -405,7 +441,7 @@ export default function PledgesPage() {
 
   const openEditPledge = (pledge: Pledge) => {
     setEditingPledge(pledge);
-    setEditAmount(String(pledge.totalAmount || ""));
+    setEditAmount(String(pledge.amount_pledged || ""));
     setEditFundName(pledge.fundName || "General Fund");
     setEditPledgeDate(pledge.startDate || "");
     setEditFrequency(pledge.frequency || "One-Time");
@@ -434,18 +470,17 @@ export default function PledgesPage() {
 
     setSaving(true);
 
-    const { error } = await supabase.from("donation_pledges").insert({
-      organization_id: orgId,
-      contact_id: contactId,
-      donor_name: selectedContact?.full_name || selectedContact?.email || null,
-      amount: Number(amount),
-      collected_amount: 0,
-      fund_name: fundName || "General Fund",
-      frequency,
-      start_date: normalizeDateInput(pledgeDate) || getTodayPlainDate(),
-      end_date: null,
-      status: "Open",
-    });
+    const { error } = await supabase.from("pledges").insert({
+  organization_id: orgId,
+  donor_id: contactId,
+  campaign_id: campaignId || null,
+  amount_pledged: Number(amount),
+  pledge_date: normalizeDateInput(pledgeDate) || getTodayPlainDate(),
+  pledge_type: frequency.toLowerCase().replace("-", "_"),
+frequency: frequency.toLowerCase().replace("-", "_"),
+  status: "open",
+  notes: notes || null,
+});
 
     setSaving(false);
 
@@ -463,7 +498,7 @@ export default function PledgesPage() {
     const { data, error } = await supabase
       .from("donation_pledges")
       .select(
-        "id, organization_id, contact_id, donor_name, amount, collected_amount, status, fund_name, frequency, start_date, end_date"
+        "id, organization_id, contact_id, donor_name, amount, amount_paid, status, fund_name, frequency, start_date, end_date"
       )
       .eq("organization_id", orgId)
       .eq("id", pledgeId)
@@ -538,15 +573,15 @@ export default function PledgesPage() {
 
     setSavingPayment(true);
 
-    const newPaidAmount = Number(paymentPledge.paidAmount || 0) + Number(paymentAmount || 0);
+    const newPaidAmount = Number(paymentPledge.amount_paid || 0) + Number(paymentAmount || 0);
     const newStatus =
-      newPaidAmount >= Number(paymentPledge.totalAmount || 0)
+      newPaidAmount >= Number(paymentPledge.amount_pledged || 0)
         ? "Fulfilled"
         : newPaidAmount > 0
           ? "Partial"
           : "Open";
 
-    const { error: paymentError } = await supabase.from("donation_payments").insert({
+    const { error: paymentError } = await supabase.from("payments").insert({
       organization_id: orgId,
       contact_id: paymentPledge.contactId,
       pledge_id: paymentPledge.id,
@@ -568,7 +603,7 @@ export default function PledgesPage() {
     const { error: pledgeUpdateError } = await supabase
       .from("donation_pledges")
       .update({
-        collected_amount: newPaidAmount,
+        amount_paid: newPaidAmount,
         status: newStatus,
       })
       .eq("id", paymentPledge.id)
@@ -611,12 +646,12 @@ export default function PledgesPage() {
     return matchesSearch && matchesStatus && matchesFund;
   });
 
-  const totalPledged = pledges.reduce((sum, pledge) => sum + pledge.totalAmount, 0);
-  const totalCollected = pledges.reduce((sum, pledge) => sum + pledge.paidAmount, 0);
-  const totalRemaining = pledges.reduce((sum, pledge) => sum + pledge.balance, 0);
+  const totalPledged = pledges.reduce((sum, pledge) => sum + pledge.amount_pledged, 0);
+  const totalCollected = pledges.reduce((sum, pledge) => sum + pledge.amount_paid, 0);
+  const totalRemaining = pledges.reduce((sum, pledge) => sum + pledge.balance_remaining, 0);
   const activePledges = pledges.filter((pledge) => pledge.status !== "Fulfilled").length;
 
-  const getStatusBadge = (status: PledgeStatus) => {
+  const getStatusBadge = (status: calculated_status) => {
     switch (status) {
       case "Open":
         return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">Open</Badge>;
@@ -785,21 +820,21 @@ export default function PledgesPage() {
                       </TableCell>
 
                       <TableCell className="font-medium">
-                        {formatCurrency(pledge.totalAmount)}
+                        {formatCurrency(pledge.amount_pledged)}
                       </TableCell>
 
                       <TableCell className="font-medium text-emerald-600">
-                        {formatCurrency(pledge.paidAmount)}
+                        {formatCurrency(pledge.amount_paid)}
                       </TableCell>
 
                       <TableCell
                         className={
-                          pledge.balance > 0
+                          pledge.balance_remaining > 0
                             ? "font-medium text-amber-600"
                             : "text-muted-foreground"
                         }
                       >
-                        {formatCurrency(pledge.balance)}
+                        {formatCurrency(pledge.balance_remaining)}
                       </TableCell>
 
                       <TableCell>{getStatusBadge(pledge.status)}</TableCell>
@@ -850,9 +885,16 @@ export default function PledgesPage() {
                               Edit Pledge
                             </DropdownMenuItem>
                             <DropdownMenuItem>Send Reminder</DropdownMenuItem>
-                            <DropdownMenuItem className="text-red-600">
-                              Cancel Pledge
-                            </DropdownMenuItem>
+                            <DropdownMenuItem
+  className="text-red-600"
+  onClick={(event) => {
+    event.preventDefault()
+    event.stopPropagation()
+    handleDeletePledge(pledge.id)
+  }}
+>
+  Delete Pledge
+</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -948,13 +990,13 @@ export default function PledgesPage() {
 
               <div className="flex flex-col gap-2">
                 <Label htmlFor="fund">Fund</Label>
-                <Select value={fundName || "General Fund"} onValueChange={setFundName}>
+                <Select value={campaignId} onValueChange={setCampaignId}>
                   <SelectTrigger id="fund">
                     <SelectValue placeholder="Select a campaign or fund" />
                   </SelectTrigger>
                   <SelectContent>
                     {pledgeFundOptions.map((fund) => (
-                      <SelectItem key={fund.id} value={fund.name}>
+                      <SelectItem key={fund.id} value={fund.id}>
                         {fund.name}
                       </SelectItem>
                     ))}
@@ -1062,7 +1104,7 @@ export default function PledgesPage() {
                     </SelectTrigger>
                     <SelectContent>
                       {pledgeFundOptions.map((fund) => (
-                        <SelectItem key={fund.id} value={fund.name}>
+                        <SelectItem key={fund.id} value={fund.id}>
                           {fund.name}
                         </SelectItem>
                       ))}
@@ -1100,7 +1142,7 @@ export default function PledgesPage() {
 
               <div className="flex flex-col gap-2">
                 <Label htmlFor="edit-status">Status</Label>
-                <Select value={editStatus} onValueChange={(value) => setEditStatus(value as PledgeStatus)}>
+                <Select value={editStatus} onValueChange={(value) => setEditStatus(value as calculated_status)}>
                   <SelectTrigger id="edit-status">
                     <SelectValue />
                   </SelectTrigger>
@@ -1225,14 +1267,14 @@ export default function PledgesPage() {
               <div className="grid gap-4 sm:grid-cols-3">
                 <div className="rounded-lg border p-4 text-center">
                   <p className="text-2xl font-bold">
-                    {formatCurrency(selectedPledge.totalAmount)}
+                    {formatCurrency(selectedPledge.amount_pledged)}
                   </p>
                   <p className="text-xs text-muted-foreground">Amount Pledged</p>
                 </div>
 
                 <div className="rounded-lg border p-4 text-center">
                   <p className="text-2xl font-bold text-emerald-600">
-                    {formatCurrency(selectedPledge.paidAmount)}
+                    {formatCurrency(selectedPledge.amount_paid)}
                   </p>
                   <p className="text-xs text-muted-foreground">Amount Paid</p>
                 </div>
@@ -1240,10 +1282,10 @@ export default function PledgesPage() {
                 <div className="rounded-lg border p-4 text-center">
                   <p
                     className={`text-2xl font-bold ${
-                      selectedPledge.balance > 0 ? "text-amber-600" : "text-muted-foreground"
+                      selectedPledge.balance_remaining > 0 ? "text-amber-600" : "text-muted-foreground"
                     }`}
                   >
-                    {formatCurrency(selectedPledge.balance)}
+                    {formatCurrency(selectedPledge.balance_remaining)}
                   </p>
                   <p className="text-xs text-muted-foreground">Balance</p>
                 </div>
@@ -1253,16 +1295,16 @@ export default function PledgesPage() {
                 <div className="mb-2 flex justify-between text-sm">
                   <span>Progress</span>
                   <span className="font-medium">
-                    {selectedPledge.totalAmount > 0
-                      ? Math.round((selectedPledge.paidAmount / selectedPledge.totalAmount) * 100)
+                    {selectedPledge.amount_pledged > 0
+                      ? Math.round((selectedPledge.amount_paid / selectedPledge.amount_pledged) * 100)
                       : 0}
                     %
                   </span>
                 </div>
                 <Progress
                   value={
-                    selectedPledge.totalAmount > 0
-                      ? (selectedPledge.paidAmount / selectedPledge.totalAmount) * 100
+                    selectedPledge.amount_pledged > 0
+                      ? (selectedPledge.amount_paid / selectedPledge.amount_pledged) * 100
                       : 0
                   }
                   className="h-3"

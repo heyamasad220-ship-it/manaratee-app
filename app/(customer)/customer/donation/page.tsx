@@ -170,7 +170,7 @@ export default function CustomerDonationsPage() {
 
       // Load real payments
       const { data: paymentsData, error: paymentsError } = await supabase
-  .from("donation_payments")
+  .from("payments")
   .select("*")
   .eq("contact_id", contactData.id)
   .eq("organization_id", contactData.organization_id)

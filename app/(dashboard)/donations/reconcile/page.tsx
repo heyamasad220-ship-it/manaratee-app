@@ -19,13 +19,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
   AlertCircle,
   CheckCircle2,
   ChevronLeft,
@@ -33,28 +26,30 @@ import {
   Clock,
   DollarSign,
   Link2,
-  Plus,
   Search,
   User,
-  UserPlus,
   XCircle,
   Zap,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-interface UnmatchedPayment {
+type QueueStatus = "pending_review" | "unallocated" | "unresolved"
+
+interface QueuePayment {
   id: string
-  importDate: string | null
   source: string
   senderName: string
   amount: number
   date: string | null
   memo: string
-  status: "pending" | "matched" | "unresolved" | "new_donor"
+  status: QueueStatus
+  donorId: string | null
+  contactId: string | null
 }
 
 interface DonorMatch {
   id: string
+  contactId: string | null
   name: string
   email: string
   phone: string
@@ -66,6 +61,7 @@ interface DonorMatch {
 
 interface Pledge {
   id: string
+  donorId: string | null
   donorName: string
   campaign: string
   totalAmount: number
@@ -81,18 +77,19 @@ const sourceColors: Record<string, string> = {
   venmo: "bg-blue-100 text-blue-700",
   paypal: "bg-amber-100 text-amber-700",
   cash: "bg-slate-100 text-slate-700",
+  check: "bg-slate-100 text-slate-700",
   stripe: "bg-indigo-100 text-indigo-700",
   import: "bg-gray-100 text-gray-700",
+  manual: "bg-gray-100 text-gray-700",
 }
 
 const statusConfig: Record<
-  UnmatchedPayment["status"],
+  QueueStatus,
   { label: string; color: string; icon: typeof CheckCircle2 }
 > = {
-  pending: { label: "Pending", color: "bg-amber-100 text-amber-700", icon: Clock },
-  matched: { label: "Matched", color: "bg-emerald-100 text-emerald-700", icon: CheckCircle2 },
+  pending_review: { label: "Pending Review", color: "bg-amber-100 text-amber-700", icon: Clock },
+  unallocated: { label: "Matched", color: "bg-emerald-100 text-emerald-700", icon: CheckCircle2 },
   unresolved: { label: "Unresolved", color: "bg-red-100 text-red-700", icon: XCircle },
-  new_donor: { label: "New Donor", color: "bg-blue-100 text-blue-700", icon: UserPlus },
 }
 
 function getConfidenceColor(score: number): string {
@@ -133,9 +130,7 @@ function calculateMatchScore(paymentName: string, donorName: string) {
   const sharedParts = paymentParts.filter((part) => donorParts.includes(part))
   const sharedCount = sharedParts.length
 
-  if (sharedCount === 0) {
-    return { score: 0, reason: "No name match" }
-  }
+  if (sharedCount === 0) return { score: 0, reason: "No name match" }
 
   if (sharedCount === paymentParts.length || sharedCount === donorParts.length) {
     return { score: 85, reason: "Strong partial name match" }
@@ -150,44 +145,35 @@ function calculateMatchScore(paymentName: string, donorName: string) {
 
 function formatDate(value: string | null) {
   if (!value) return "—"
-
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return "—"
-
   return date.toLocaleDateString()
 }
 
 export default function ReconcilePage() {
   const [allPledges, setAllPledges] = useState<Pledge[]>([])
   const [donorMatches, setDonorMatches] = useState<DonorMatch[]>([])
-  const [payments, setPayments] = useState<UnmatchedPayment[]>([])
-  const [selectedPayment, setSelectedPayment] = useState<UnmatchedPayment | null>(null)
+  const [payments, setPayments] = useState<QueuePayment[]>([])
+  const [selectedPayment, setSelectedPayment] = useState<QueuePayment | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
-  const [statusFilter, setStatusFilter] = useState<string>("pending")
-  const [showNewDonorDialog, setShowNewDonorDialog] = useState(false)
+  const [statusFilter, setStatusFilter] = useState<string>("pending_review")
   const [showPledgeDialog, setShowPledgeDialog] = useState(false)
   const [selectedDonor, setSelectedDonor] = useState<DonorMatch | null>(null)
   const [donorPledges, setDonorPledges] = useState<Pledge[]>([])
   const [selectedPledgeId, setSelectedPledgeId] = useState("")
   const [allocating, setAllocating] = useState(false)
 
-  const [newDonorFullName, setNewDonorFullName] = useState("")
-  const [newDonorEmail, setNewDonorEmail] = useState("")
-  const [newDonorPhone, setNewDonorPhone] = useState("")
-  const [newDonorNotes, setNewDonorNotes] = useState("")
-  const [creatingDonor, setCreatingDonor] = useState(false)
-
   const filteredPayments = payments.filter((payment) => {
     const matchesSearch =
       payment.senderName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (payment.memo || "").toLowerCase().includes(searchQuery.toLowerCase())
+      payment.memo.toLowerCase().includes(searchQuery.toLowerCase())
 
     const matchesStatus = statusFilter === "all" || payment.status === statusFilter
     return matchesSearch && matchesStatus
   })
 
-  const pendingCount = payments.filter((p) => p.status === "pending").length
-  const matchedCount = payments.filter((p) => p.status === "matched").length
+  const pendingCount = payments.filter((p) => p.status === "pending_review").length
+  const matchedCount = payments.filter((p) => p.status === "unallocated").length
   const unresolvedCount = payments.filter((p) => p.status === "unresolved").length
 
   const currentIndex = selectedPayment
@@ -199,15 +185,8 @@ export default function ReconcilePage() {
   const showingFallbackPledges =
     selectedDonor !== null && donorPledges.length === 0 && allPledges.length > 0
 
-  const moveToNextPendingPayment = (currentPaymentId: string) => {
-    const nextPending = payments.find((p) => p.status === "pending" && p.id !== currentPaymentId)
-    setSelectedPayment(nextPending || null)
-  }
-
   const goToPrevious = () => {
-    if (currentIndex > 0) {
-      setSelectedPayment(filteredPayments[currentIndex - 1])
-    }
+    if (currentIndex > 0) setSelectedPayment(filteredPayments[currentIndex - 1])
   }
 
   const goToNext = () => {
@@ -216,74 +195,124 @@ export default function ReconcilePage() {
     }
   }
 
- const handleMatchToDonor = async (donor: DonorMatch) => {
-  if (!selectedPayment) return
+  const moveToNextPayment = (currentPaymentId: string) => {
+    const next = payments.find((p) => p.id !== currentPaymentId && p.status === "pending_review")
+    setSelectedPayment(next || null)
+  }
 
-  const paymentId = selectedPayment.id
+  async function loadPayments() {
+    const orgId = await getCurrentOrganizationId()
+    if (!orgId) return
 
-  const { error } = await supabase
-    .from("payments")
-    .update({
-      donor_id: donor.id,
-      status: "unallocated",
+    const { data, error } = await supabase
+      .from("payments")
+      .select(`
+        id,
+        amount,
+        payment_date,
+        source,
+        memo,
+        status,
+        donor_id,
+        contact_id,
+        sender_name,
+        donors ( full_name )
+      `)
+      .eq("organization_id", orgId)
+      .in("status", ["pending_review", "unallocated", "unresolved"])
+      .is("pledge_id", null)
+      .order("payment_date", { ascending: false })
+
+    if (error) {
+      console.error(error)
+      setPayments([])
+      return
+    }
+
+    const formatted: QueuePayment[] = (data || []).map((p: any) => ({
+      id: p.id,
+      source: (p.source || "manual").toLowerCase(),
+      senderName: p.sender_name || p.donors?.full_name || "Unknown",
+      amount: Number(p.amount || 0),
+      date: p.payment_date || null,
+      memo: p.memo || "",
+      status: (p.status || "pending_review") as QueueStatus,
+      donorId: p.donor_id || null,
+      contactId: p.contact_id || null,
+    }))
+
+    setPayments(formatted)
+
+    setSelectedPayment((current) => {
+      if (formatted.length === 0) return null
+      if (!current) return formatted[0]
+      return formatted.find((p) => p.id === current.id) || formatted[0]
     })
-    .eq("id", paymentId)
-
-  if (error) {
-    console.error(error)
-    alert(error.message || "Could not match payment to donor")
-    return
   }
 
-  setSelectedDonor(donor)
+  async function loadAllPledges() {
+    const orgId = await getCurrentOrganizationId()
 
-  await loadPayments()
+    if (!orgId) {
+      setAllPledges([])
+      return
+    }
 
-  const nextPending = payments.find((p) => p.id !== paymentId)
-  setSelectedPayment(nextPending || null)
+    const { data, error } = await supabase
+      .from("pledge_status_view")
+      .select(`
+        id,
+        donor_id,
+        donor_name,
+        campaign_name,
+        amount_pledged,
+        amount_paid,
+        balance_remaining,
+        pledge_date
+      `)
+      .eq("organization_id", orgId)
+      .gt("balance_remaining", 0)
+      .order("donor_name", { ascending: true })
 
-  alert("Payment matched to donor")
-}
+    if (error) {
+      console.error(error)
+      setAllPledges([])
+      return
+    }
 
-  const handleCreateNewDonor = () => {
-    if (!selectedPayment) return
-
-    setNewDonorFullName(selectedPayment.senderName || "")
-    setNewDonorEmail("")
-    setNewDonorPhone("")
-    setNewDonorNotes(selectedPayment.memo || "")
-    setShowNewDonorDialog(true)
-  }
-
-  const handleMarkUnresolved = () => {
-    if (!selectedPayment) return
-
-    setPayments((prev) =>
-      prev.map((p) => (p.id === selectedPayment.id ? { ...p, status: "unresolved" } : p))
+    setAllPledges(
+      (data || []).map((p: any) => ({
+        id: p.id,
+        donorId: p.donor_id || null,
+        donorName: p.donor_name || "Unknown",
+        campaign: p.campaign_name || "No Campaign",
+        totalAmount: Number(p.amount_pledged || 0),
+        paidAmount: Number(p.amount_paid || 0),
+        remainingAmount: Number(p.balance_remaining || 0),
+        dueDate: p.pledge_date || null,
+      }))
     )
-
-    moveToNextPendingPayment(selectedPayment.id)
   }
 
   async function fetchDonorPledges(donorId: string): Promise<Pledge[]> {
     const orgId = await getCurrentOrganizationId()
-
     if (!orgId) return []
 
     const { data, error } = await supabase
       .from("pledge_status_view")
       .select(`
         id,
+        donor_id,
         donor_name,
         campaign_name,
         amount_pledged,
         amount_paid,
         balance_remaining,
-        pledge_date,
-        donor_id
+        pledge_date
       `)
       .eq("organization_id", orgId)
       .eq("donor_id", donorId)
+      .gt("balance_remaining", 0)
       .order("balance_remaining", { ascending: false })
 
     if (error) {
@@ -293,6 +322,7 @@ export default function ReconcilePage() {
 
     return (data || []).map((p: any) => ({
       id: p.id,
+      donorId: p.donor_id || null,
       donorName: p.donor_name || "Unknown",
       campaign: p.campaign_name || "No Campaign",
       totalAmount: Number(p.amount_pledged || 0),
@@ -302,16 +332,96 @@ export default function ReconcilePage() {
     }))
   }
 
-  async function loadDonorPledges(donorId: string) {
-    const pledges = await fetchDonorPledges(donorId)
-    setDonorPledges(pledges)
+  async function loadDonorMatches(payment: QueuePayment) {
+    if (!payment.senderName || payment.senderName === "Unknown") {
+      setDonorMatches([])
+      return
+    }
+
+    const orgId = await getCurrentOrganizationId()
+    if (!orgId) {
+      setDonorMatches([])
+      return
+    }
+
+    const paymentParts = getNameParts(payment.senderName)
+    if (paymentParts.length === 0) {
+      setDonorMatches([])
+      return
+    }
+
+    const searchTerms = paymentParts.slice(0, 2)
+    const orFilter = searchTerms
+      .map((part) => `full_name.ilike.%${part}%,email.ilike.%${part}%`)
+      .join(",")
+
+    const { data, error } = await supabase
+      .from("donor_summary_view")
+      .select(`
+        id,
+        contact_id,
+        full_name,
+        email,
+        phone,
+        total_donations,
+        last_donation_date
+      `)
+      .eq("organization_id", orgId)
+      .or(orFilter)
+      .limit(30)
+
+    if (error) {
+      console.error(error)
+      setDonorMatches([])
+      return
+    }
+
+    const formatted: DonorMatch[] = (data || [])
+      .map((d: any) => {
+        const match = calculateMatchScore(payment.senderName, d.full_name || "")
+
+        return {
+          id: d.id,
+          contactId: d.contact_id || null,
+          name: d.full_name || "Unnamed donor",
+          email: d.email || "",
+          phone: d.phone || "",
+          totalDonations: Number(d.total_donations || 0),
+          lastDonation: d.last_donation_date || "",
+          confidenceScore: match.score,
+          matchReason: match.reason,
+        }
+      })
+      .filter((d) => d.confidenceScore > 0)
+      .sort((a, b) => b.confidenceScore - a.confidenceScore)
+      .slice(0, 5)
+
+    setDonorMatches(formatted)
   }
 
-  const handleApplyToPledge = async (donor: DonorMatch) => {
-    setSelectedDonor(donor)
-    setSelectedPledgeId("")
-    await loadDonorPledges(donor.id)
-    setShowPledgeDialog(true)
+  async function handleMatchToDonor(donor: DonorMatch) {
+    if (!selectedPayment) return
+
+    const paymentId = selectedPayment.id
+
+    const { error } = await supabase
+      .from("payments")
+      .update({
+        donor_id: donor.id,
+        contact_id: donor.contactId,
+        status: "unallocated",
+        reconciled_at: new Date().toISOString(),
+      })
+      .eq("id", paymentId)
+
+    if (error) {
+      console.error(error)
+      alert(error.message || "Could not match payment to donor")
+      return
+    }
+
+    await loadPayments()
+    moveToNextPayment(paymentId)
   }
 
   async function handleQuickApply(donor: DonorMatch) {
@@ -320,16 +430,6 @@ export default function ReconcilePage() {
     setAllocating(true)
 
     const pledges = await fetchDonorPledges(donor.id)
-
-    if (pledges.length === 0) {
-      setAllocating(false)
-      setSelectedDonor(donor)
-      setSelectedPledgeId("")
-      setDonorPledges([])
-      setShowPledgeDialog(true)
-      return
-    }
-
     const bestPledge = pledges
       .filter((p) => p.remainingAmount > 0)
       .sort((a, b) => b.remainingAmount - a.remainingAmount)[0]
@@ -338,7 +438,7 @@ export default function ReconcilePage() {
       setAllocating(false)
       setSelectedDonor(donor)
       setSelectedPledgeId("")
-      setDonorPledges(pledges)
+      setDonorPledges([])
       setShowPledgeDialog(true)
       return
     }
@@ -346,11 +446,12 @@ export default function ReconcilePage() {
     const { error } = await supabase
       .from("payments")
       .update({
-  donor_id: donor.id,
-  pledge_id: bestPledge.id,
-  status: "allocated",
-  reconciled_at: new Date().toISOString(),
-})
+        donor_id: donor.id,
+        contact_id: donor.contactId,
+        pledge_id: bestPledge.id,
+        status: "allocated",
+        reconciled_at: new Date().toISOString(),
+      })
       .eq("id", selectedPayment.id)
 
     setAllocating(false)
@@ -362,85 +463,36 @@ export default function ReconcilePage() {
     }
 
     await loadPayments()
+    await loadAllPledges()
     setDonorMatches([])
   }
 
-  const handleSaveNewDonor = async () => {
-    if (!selectedPayment) return
-
-    const orgId = await getCurrentOrganizationId()
-
-    if (!orgId) {
-      alert("No organization selected")
-      return
-    }
-
-    if (!newDonorFullName.trim()) {
-      alert("Full name is required")
-      return
-    }
-
-    setCreatingDonor(true)
-
-    const { data: donor, error: donorError } = await supabase
-      .from("donors")
-      .insert({
-        organization_id: orgId,
-        full_name: newDonorFullName.trim(),
-        email: newDonorEmail.trim() || null,
-        phone: newDonorPhone.trim() || null,
-        notes: newDonorNotes.trim() || null,
-      })
-      .select("id")
-      .single()
-
-    if (donorError || !donor) {
-      console.error(donorError)
-      alert(donorError?.message || "Could not create donor")
-      setCreatingDonor(false)
-      return
-    }
-
-    const { error: paymentError } = await supabase
-      .from("payments")
-      .update({
-        donor_id: donor.id,
-        status: "unallocated",
-      })
-      .eq("id", selectedPayment.id)
-
-    setCreatingDonor(false)
-
-    if (paymentError) {
-      console.error(paymentError)
-      alert(paymentError.message || "Donor created, but payment could not be linked")
-      return
-    }
-
-    setShowNewDonorDialog(false)
-    setNewDonorFullName("")
-    setNewDonorEmail("")
-    setNewDonorPhone("")
-    setNewDonorNotes("")
-
-    await loadPayments()
+  async function handleApplyToPledge(donor: DonorMatch) {
+    setSelectedDonor(donor)
+    setSelectedPledgeId("")
+    const pledges = await fetchDonorPledges(donor.id)
+    setDonorPledges(pledges)
+    setShowPledgeDialog(true)
   }
 
-  const handleApplyPledgePayment = async () => {
-    if (!selectedPayment) return
-
-    if (!selectedPledgeId) {
+  async function handleApplyPledgePayment() {
+    if (!selectedPayment || !selectedPledgeId) {
       alert("Please select a pledge")
       return
     }
+
+    const pledge = pledgeOptionsToShow.find((item) => item.id === selectedPledgeId)
 
     setAllocating(true)
 
     const { error } = await supabase
       .from("payments")
       .update({
+        donor_id: selectedDonor?.id || pledge?.donorId || selectedPayment.donorId || null,
+        contact_id: selectedDonor?.contactId || selectedPayment.contactId || null,
         pledge_id: selectedPledgeId,
         status: "allocated",
+        reconciled_at: new Date().toISOString(),
       })
       .eq("id", selectedPayment.id)
 
@@ -457,160 +509,28 @@ export default function ReconcilePage() {
     setDonorPledges([])
 
     await loadPayments()
+    await loadAllPledges()
   }
 
-  async function loadAllPledges() {
-    const orgId = await getCurrentOrganizationId()
+  async function handleMarkUnresolved() {
+    if (!selectedPayment) return
 
-    if (!orgId) {
-      setAllPledges([])
-      return
-    }
+    const paymentId = selectedPayment.id
 
-    const { data, error } = await supabase
-      .from("pledge_status_view")
-      .select(`
-        id,
-        donor_name,
-        campaign_name,
-        amount_pledged,
-        amount_paid,
-        balance_remaining,
-        pledge_date
-      `)
-      .eq("organization_id", orgId)
-      .order("donor_name", { ascending: true })
-
-    if (error) {
-      console.error(error)
-      setAllPledges([])
-      return
-    }
-
-    const formatted: Pledge[] = (data || []).map((p: any) => ({
-      id: p.id,
-      donorName: p.donor_name || "Unknown",
-      campaign: p.campaign_name || "No Campaign",
-      totalAmount: Number(p.amount_pledged || 0),
-      paidAmount: Number(p.amount_paid || 0),
-      remainingAmount: Number(p.balance_remaining || 0),
-      dueDate: p.pledge_date || null,
-    }))
-
-    setAllPledges(formatted)
-  }
-
-  async function loadPayments() {
-    const orgId = await getCurrentOrganizationId()
-
-    if (!orgId) return
-
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from("payments")
-      .select(`
-        id,
-        amount,
-        payment_date,
-        source,
-        memo,
-        status,
-        donor_id,
-        sender_name,
-        donors ( full_name )
-      `)
-      .eq("organization_id", orgId)
-      .in("status", ["unallocated", "pending_review"])
-      .order("payment_date", { ascending: false })
+      .update({
+        status: "unresolved",
+      })
+      .eq("id", paymentId)
 
     if (error) {
-      console.error(error)
-      setPayments([])
+      alert(error.message)
       return
     }
 
-    const formatted: UnmatchedPayment[] = (data || []).map((p: any) => ({
-      id: p.id,
-      importDate: p.payment_date || null,
-      source: (p.source || "cash").toLowerCase(),
-      senderName: p.sender_name || p.donors?.full_name || "Unknown",
-      amount: Number(p.amount || 0),
-      date: p.payment_date || null,
-      memo: p.memo || "",
-      status: p.status || "pending_review",
-    }))
-
-    setPayments(formatted)
-
-    if (formatted.length > 0) {
-      setSelectedPayment((current) => {
-        if (!current) return formatted[0]
-        return formatted.find((p) => p.id === current.id) || formatted[0]
-      })
-    } else {
-      setSelectedPayment(null)
-    }
-  }
-
-  async function loadDonorMatches(payment: UnmatchedPayment) {
-    if (!payment.senderName || payment.senderName === "Unknown") {
-      setDonorMatches([])
-      return
-    }
-
-    const orgId = await getCurrentOrganizationId()
-
-    if (!orgId) {
-      setDonorMatches([])
-      return
-    }
-
-    const paymentParts = getNameParts(payment.senderName)
-
-    if (paymentParts.length === 0) {
-      setDonorMatches([])
-      return
-    }
-
-    const searchTerm = paymentParts[0]
-
-    const { data, error } = await supabase
-      .from("donors")
-      .select(`
-        id,
-        full_name,
-        email,
-        phone
-      `)
-      .eq("organization_id", orgId)
-      .ilike("full_name", `%${searchTerm}%`)
-      .limit(20)
-
-    if (error) {
-      console.error(error)
-      setDonorMatches([])
-      return
-    }
-
-    const formatted: DonorMatch[] = (data || [])
-      .map((d: any) => {
-        const match = calculateMatchScore(payment.senderName, d.full_name || "")
-
-        return {
-          id: d.id,
-          name: d.full_name,
-          email: d.email || "",
-          phone: d.phone || "",
-          totalDonations: 0,
-          lastDonation: "",
-          confidenceScore: match.score,
-          matchReason: match.reason,
-        }
-      })
-      .filter((d) => d.confidenceScore > 0)
-      .sort((a, b) => b.confidenceScore - a.confidenceScore)
-      .slice(0, 5)
-
-    setDonorMatches(formatted)
+    await loadPayments()
+    moveToNextPayment(paymentId)
   }
 
   useEffect(() => {
@@ -654,7 +574,7 @@ export default function ReconcilePage() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold">{matchedCount}</p>
-                  <p className="text-xs text-muted-foreground">Matched</p>
+                  <p className="text-xs text-muted-foreground">Matched, Not Allocated</p>
                 </div>
               </div>
             </CardContent>
@@ -682,13 +602,9 @@ export default function ReconcilePage() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold">
-                    $
-                    {payments
-                      .filter((p) => ["pending_review", "unallocated"].includes(p.status))
-                      .reduce((sum, p) => sum + p.amount, 0)
-                      .toLocaleString()}
+                    ${payments.reduce((sum, p) => sum + p.amount, 0).toLocaleString()}
                   </p>
-                  <p className="text-xs text-muted-foreground">Pending Amount</p>
+                  <p className="text-xs text-muted-foreground">Queue Amount</p>
                 </div>
               </div>
             </CardContent>
@@ -704,18 +620,16 @@ export default function ReconcilePage() {
                   <CardDescription>Select a payment to reconcile</CardDescription>
                 </div>
 
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-[140px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="matched">Matched</SelectItem>
-                    <SelectItem value="unresolved">Unresolved</SelectItem>
-                    <SelectItem value="new_donor">New Donor</SelectItem>
-                  </SelectContent>
-                </Select>
+                <select
+                  className="h-9 rounded-md border bg-background px-3 text-sm"
+                  value={statusFilter}
+                  onChange={(event) => setStatusFilter(event.target.value)}
+                >
+                  <option value="all">All Status</option>
+                  <option value="pending_review">Pending Review</option>
+                  <option value="unallocated">Matched</option>
+                  <option value="unresolved">Unresolved</option>
+                </select>
               </div>
 
               <div className="relative mt-2">
@@ -746,6 +660,7 @@ export default function ReconcilePage() {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <span className="truncate font-medium">{payment.senderName}</span>
+
                           <Badge
                             variant="secondary"
                             className={cn(
@@ -753,9 +668,7 @@ export default function ReconcilePage() {
                               sourceColors[payment.source] || "bg-slate-100 text-slate-700"
                             )}
                           >
-                            {payment.source
-                              ? payment.source.charAt(0).toUpperCase() + payment.source.slice(1)
-                              : "—"}
+                            {payment.source}
                           </Badge>
                         </div>
 
@@ -770,6 +683,7 @@ export default function ReconcilePage() {
                         <span className="font-semibold text-emerald-600">
                           ${payment.amount.toLocaleString()}
                         </span>
+
                         <Badge
                           variant="secondary"
                           className={cn("text-xs", statusConfig[payment.status].color)}
@@ -834,6 +748,7 @@ export default function ReconcilePage() {
                       <div>
                         <div className="flex items-center gap-2">
                           <h3 className="font-semibold">{selectedPayment.senderName}</h3>
+
                           <Badge
                             variant="secondary"
                             className={
@@ -894,7 +809,7 @@ export default function ReconcilePage() {
                                 </div>
 
                                 <p className="mt-0.5 text-xs text-muted-foreground">
-                                  {donor.email} | {donor.phone}
+                                  {donor.email || "No email"} | {donor.phone || "No phone"}
                                 </p>
 
                                 <p className="mt-1 text-xs text-muted-foreground">
@@ -906,7 +821,7 @@ export default function ReconcilePage() {
                                     Total: <strong>${donor.totalDonations.toLocaleString()}</strong>
                                   </span>
                                   <span>
-                                    Last: <strong>{donor.lastDonation}</strong>
+                                    Last: <strong>{formatDate(donor.lastDonation)}</strong>
                                   </span>
                                 </div>
                               </div>
@@ -930,7 +845,7 @@ export default function ReconcilePage() {
                                 onClick={() => handleMatchToDonor(donor)}
                               >
                                 <Link2 className="mr-1.5 h-3.5 w-3.5" />
-                                Match
+                                Match Only
                               </Button>
 
                               <Button
@@ -949,9 +864,10 @@ export default function ReconcilePage() {
                     ) : (
                       <div className="rounded-lg border border-dashed p-4 text-center">
                         <AlertCircle className="mx-auto h-8 w-8 text-muted-foreground/50" />
+
                         <p className="mt-2 text-sm text-muted-foreground">
                           {selectedPayment.senderName === "Unknown"
-                            ? "This payment has no donor name to match against"
+                            ? "This payment has no sender name to match against"
                             : "No matching donors found"}
                         </p>
                       </div>
@@ -960,12 +876,8 @@ export default function ReconcilePage() {
 
                   <div className="border-t pt-4">
                     <h4 className="mb-3 text-sm font-medium">Quick Actions</h4>
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button variant="outline" onClick={handleCreateNewDonor}>
-                        <UserPlus className="mr-1.5 h-4 w-4" />
-                        Create New Donor
-                      </Button>
 
+                    <div className="grid grid-cols-2 gap-2">
                       <Button
                         variant="outline"
                         className="text-red-600 hover:text-red-700"
@@ -981,6 +893,7 @@ export default function ReconcilePage() {
             ) : (
               <CardContent className="flex flex-1 flex-col items-center justify-center py-12">
                 <User className="h-12 w-12 text-muted-foreground/30" />
+
                 <p className="mt-2 text-sm text-muted-foreground">
                   Select a payment from the queue to begin matching
                 </p>
@@ -990,82 +903,11 @@ export default function ReconcilePage() {
         </div>
       </div>
 
-      <Dialog open={showNewDonorDialog} onOpenChange={setShowNewDonorDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Create New Donor</DialogTitle>
-            <DialogDescription>
-              Create a new donor record from this payment
-            </DialogDescription>
-          </DialogHeader>
-
-          {selectedPayment && (
-            <div className="flex flex-col gap-4 py-4">
-              <div className="rounded-lg bg-muted/50 p-3">
-                <p className="text-xs text-muted-foreground">Payment Info</p>
-                <p className="font-medium">{selectedPayment.senderName}</p>
-                <p className="text-sm text-emerald-600">
-                  ${selectedPayment.amount.toLocaleString()}
-                </p>
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <Label>Full Name</Label>
-                <Input
-                  value={newDonorFullName}
-                  onChange={(e) => setNewDonorFullName(e.target.value)}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <Label>Email</Label>
-                  <Input
-                    type="email"
-                    placeholder="email@example.com"
-                    value={newDonorEmail}
-                    onChange={(e) => setNewDonorEmail(e.target.value)}
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <Label>Phone</Label>
-                  <Input
-                    type="tel"
-                    placeholder="(555) 123-4567"
-                    value={newDonorPhone}
-                    onChange={(e) => setNewDonorPhone(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <Label>Notes</Label>
-                <Textarea
-                  placeholder="Add any notes about this donor..."
-                  value={newDonorNotes}
-                  onChange={(e) => setNewDonorNotes(e.target.value)}
-                />
-              </div>
-            </div>
-          )}
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowNewDonorDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSaveNewDonor} disabled={creatingDonor}>
-              <Plus className="mr-1.5 h-4 w-4" />
-              {creatingDonor ? "Creating..." : "Create & Match"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       <Dialog open={showPledgeDialog} onOpenChange={setShowPledgeDialog}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Apply to Pledge</DialogTitle>
+
             <DialogDescription>
               Select a pledge to apply this payment to
             </DialogDescription>
@@ -1079,6 +921,7 @@ export default function ReconcilePage() {
                     <p className="text-xs text-muted-foreground">Payment</p>
                     <p className="font-medium">{selectedPayment.senderName}</p>
                   </div>
+
                   <div className="text-right">
                     <p className="text-xs text-muted-foreground">Amount</p>
                     <p className="font-semibold text-emerald-600">
@@ -1094,7 +937,7 @@ export default function ReconcilePage() {
 
                   {showingFallbackPledges && (
                     <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                      No pledges were found for this donor. Showing all organization pledges instead.
+                      No pledges were found for this donor. Showing all open organization pledges instead.
                     </div>
                   )}
 
@@ -1108,9 +951,10 @@ export default function ReconcilePage() {
                         selectedPledgeId === pledge.id && "border-primary bg-primary/5"
                       )}
                     >
-                      <div className="flex justify-between">
+                      <div className="flex justify-between gap-4">
                         <div>
-                          <p className="font-medium">{pledge.campaign}</p>
+                          <p className="font-medium">{pledge.donorName}</p>
+                          <p className="text-xs text-muted-foreground">{pledge.campaign}</p>
                           <p className="text-xs text-muted-foreground">
                             Due: {pledge.dueDate ? new Date(pledge.dueDate).toLocaleDateString() : "—"}
                           </p>
@@ -1123,6 +967,7 @@ export default function ReconcilePage() {
                               ${pledge.remainingAmount.toLocaleString()}
                             </span>
                           </p>
+
                           <p className="text-xs text-muted-foreground">
                             ${pledge.paidAmount.toLocaleString()} / ${pledge.totalAmount.toLocaleString()} paid
                           </p>
@@ -1146,7 +991,7 @@ export default function ReconcilePage() {
               ) : (
                 <div className="rounded-lg border border-dashed p-4 text-center">
                   <p className="text-sm text-muted-foreground">
-                    No pledges found in this organization
+                    No open pledges found in this organization
                   </p>
                 </div>
               )}
@@ -1157,6 +1002,7 @@ export default function ReconcilePage() {
             <Button variant="outline" onClick={() => setShowPledgeDialog(false)}>
               Cancel
             </Button>
+
             <Button
               onClick={handleApplyPledgePayment}
               disabled={pledgeOptionsToShow.length === 0 || !selectedPledgeId || allocating}

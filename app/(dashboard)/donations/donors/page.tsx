@@ -68,8 +68,8 @@ const supabase = createClient()
 useEffect(() => {
   const fetchDonors = async () => {
     const { data, error } = await supabase
-      .from("donors") // Make sure this matches your actual table name
-      .select("*")
+      .from("donor_summary_view")
+.select("*")
 
     if (error) {
       console.error("Error fetching donors:", error)
@@ -81,12 +81,12 @@ useEffect(() => {
     name: d.full_name, // adjust if needed
     email: d.email,
     phone: d.phone,
-    totalDonations: d.total_donations || 0,
-    donationCount: d.donation_count || 0,
-    lastDonation: d.last_donation || "",
+    totalDonations: Number(d.total_donations || 0),
+donationCount: Number(d.donation_count || 0),
+lastDonation: d.last_donation_date || "",
     preferredCategory: d.preferred_category || "",
     status: d.status || "Active",
-    hasPledge: d.has_pledge || false,
+    hasPledge: d.has_open_pledge || false,
     contact: d.contact_person || "",
     type: d.organization_type || "",
   }))

@@ -42,13 +42,19 @@ export async function GET() {
     const { data: organizations, error } = await admin
       .from("organizations")
       .select(`
+  id,
+  name,
+  status,
+  created_at,
+  contact_email,
+  plan_id,
+  plans (
     id,
     name,
-    status,
-    created_at,
-    contact_email,
-    organization_members ( id )
-  `)
+    monthly_price
+  ),
+  organization_members ( id )
+`)
       .order("created_at", { ascending: false })
 
     if (error) {
@@ -58,6 +64,9 @@ export async function GET() {
     const formatted = (organizations || []).map((org: any) => ({
   ...org,
   members: org.organization_members?.length || 0,
+  plan_id: org.plan_id || null,
+  plan_name: org.plans?.name || null,
+  mrr: Number(org.plans?.monthly_price || 0),
 }))
 
 return NextResponse.json({ organizations: formatted })

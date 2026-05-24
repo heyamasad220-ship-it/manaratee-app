@@ -1,14 +1,21 @@
-"use client"
-
-import { useState } from "react"
 import Link from "next/link"
+import {
+  Archive,
+  Calendar,
+  Eye,
+  LayoutGrid,
+  List,
+  Plus,
+  Search,
+  Users,
+} from "lucide-react"
+
 import { Header } from "@/components/layout/header"
-import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { Textarea } from "@/components/ui/textarea"
+import { createClient } from "@/lib/supabase/server"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Table,
   TableBody,
@@ -17,391 +24,335 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Plus, Search, MoreHorizontal, Pencil, Trash2, Eye } from "lucide-react"
+
+import { getPrograms } from "@/lib/programs/program-queries"
+import type { Program } from "@/lib/programs/program-types"
+import { getProgramStatusLabel } from "@/lib/programs/program-status"
 import { cn } from "@/lib/utils"
 
-// Mock data
-const programs = [
-  {
-    id: "prog-1",
-    name: "Youth Soccer League",
-    department: "Events",
-    ageGroup: "6-12 years",
-    schedule: "Sat & Sun, 4:00 PM",
-    duration: "12 weeks",
-    fee: "$150",
-    capacity: 80,
-    enrolled: 64,
-    instructor: "Coach Ahmad",
-    status: "Active",
-  },
-  {
-    id: "prog-2",
-    name: "Taekwondo Classes",
-    department: "Events",
-    ageGroup: "8-16 years",
-    schedule: "Mon, Wed, Fri 5:00 PM",
-    duration: "Ongoing",
-    fee: "$120/month",
-    capacity: 50,
-    enrolled: 45,
-    instructor: "Master Kim",
-    status: "Active",
-  },
-  {
-    id: "prog-3",
-    name: "Summer Camp 2026",
-    department: "Community Outreach",
-    ageGroup: "5-14 years",
-    schedule: "Mon-Fri, 9:00 AM - 3:00 PM",
-    duration: "8 weeks",
-    fee: "$350/week",
-    capacity: 150,
-    enrolled: 120,
-    instructor: "Various",
-    status: "Open",
-  },
-  {
-    id: "prog-4",
-    name: "Adult Fitness Aerobics",
-    department: "Events",
-    ageGroup: "18+ years",
-    schedule: "Tue & Thu, 6:30 PM",
-    duration: "Ongoing",
-    fee: "$80/month",
-    capacity: 40,
-    enrolled: 32,
-    instructor: "Sarah Johnson",
-    status: "Active",
-  },
-  {
-    id: "prog-5",
-    name: "After School Tutoring",
-    department: "Education",
-    ageGroup: "6-18 years",
-    schedule: "Mon-Thu, 3:30 PM",
-    duration: "Semester",
-    fee: "$200/month",
-    capacity: 30,
-    enrolled: 28,
-    instructor: "Various",
-    status: "Active",
-  },
-  {
-    id: "prog-6",
-    name: "Weekend Quran Class",
-    department: "Education",
-    ageGroup: "All ages",
-    schedule: "Sat & Sun, 10:00 AM",
-    duration: "Ongoing",
-    fee: "Free",
-    capacity: 100,
-    enrolled: 75,
-    instructor: "Imam Hassan",
-    status: "Active",
-  },
-  {
-    id: "prog-7",
-    name: "Basketball Training",
-    department: "Events",
-    ageGroup: "10-18 years",
-    schedule: "Wed & Fri, 4:00 PM",
-    duration: "16 weeks",
-    fee: "$180",
-    capacity: 30,
-    enrolled: 22,
-    instructor: "Coach Williams",
-    status: "Active",
-  },
-  {
-    id: "prog-8",
-    name: "Art & Crafts Workshop",
-    department: "Community Outreach",
-    ageGroup: "5-12 years",
-    schedule: "Saturday, 2:00 PM",
-    duration: "8 weeks",
-    fee: "$100",
-    capacity: 20,
-    enrolled: 18,
-    instructor: "Ms. Rivera",
-    status: "Active",
-  },
-]
+type PageSearchParams = {
+  q?: string
+  status?: string
+  department?: string
+  view?: string
+}
 
-const departments = ["All", "Administration", "Education", "Operations", "Technology", "Events", "Finance", "Marketing", "Community Outreach"]
-const statuses = ["All", "Active", "Open", "Closed", "Draft"]
+function getValue(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value
+}
 
-export default function ProgramsCatalogPage() {
-  const [search, setSearch] = useState("")
-  const [departmentFilter, setDepartmentFilter] = useState("All")
-  const [statusFilter, setStatusFilter] = useState("All")
-  const [showAddDialog, setShowAddDialog] = useState(false)
+function formatDate(value: string | null) {
+  if (!value) return "TBD"
 
-  const filteredPrograms = programs.filter((program) => {
-    const matchesSearch = program.name.toLowerCase().includes(search.toLowerCase()) ||
-      program.instructor.toLowerCase().includes(search.toLowerCase())
-    const matchesDepartment = departmentFilter === "All" || program.department === departmentFilter
-    const matchesStatus = statusFilter === "All" || program.status === statusFilter
-    return matchesSearch && matchesDepartment && matchesStatus
+  return new Date(value).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
   })
+}
+
+function getEnrollmentPercent(program: Program) {
+  if (!program.capacity || program.capacity <= 0) return 0
+  return Math.min(Math.round((program.enrolled / program.capacity) * 100), 100)
+}
+
+function getEnrollmentColor(program: Program) {
+  const percent = getEnrollmentPercent(program)
+
+  if (percent >= 90) return "bg-red-500"
+  if (percent >= 70) return "bg-amber-500"
+
+  return "bg-green-500"
+}
+
+function matchesProgram(program: Program, filters: PageSearchParams) {
+  const query = filters.q?.trim().toLowerCase()
+  const status = filters.status || "all"
+  const department = filters.department || "all"
+
+  const matchesSearch =
+    !query ||
+    program.name.toLowerCase().includes(query) ||
+    program.description?.toLowerCase().includes(query)
+
+  const matchesStatus = status === "all" || program.status === status
+
+  const matchesDepartment =
+    department === "all" || program.department_id === department
+
+  return matchesSearch && matchesStatus && matchesDepartment
+}
+
+function ProgramCard({ program }: { program: Program }) {
+  const percent = getEnrollmentPercent(program)
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <CardTitle className="text-lg">{program.name}</CardTitle>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {program.description || "No description"}
+            </p>
+          </div>
+
+          <Badge>{getProgramStatusLabel(program.status)}</Badge>
+        </div>
+      </CardHeader>
+
+      <CardContent className="space-y-4">
+        <div className="flex flex-wrap gap-2">
+          {program.age_groups?.length ? (
+            program.age_groups.map((age) => (
+              <Badge key={age} variant="secondary">
+                {age}
+              </Badge>
+            ))
+          ) : (
+            <Badge variant="secondary">No age group</Badge>
+          )}
+        </div>
+
+        <div>
+          <div className="mb-2 flex justify-between text-sm">
+            <span className="text-muted-foreground">Enrollment</span>
+            <span>
+              {program.enrolled}/{program.capacity}
+              {program.waitlist > 0 ? ` (+${program.waitlist} waitlist)` : ""}
+            </span>
+          </div>
+
+          <div className="h-2 overflow-hidden rounded-full bg-muted">
+            <div
+              className={cn("h-full rounded-full", getEnrollmentColor(program))}
+              style={{ width: `${percent}%` }}
+            />
+          </div>
+        </div>
+
+        <div className="grid gap-3 text-sm sm:grid-cols-2">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Calendar className="h-4 w-4" />
+            <span>
+              {formatDate(program.start_date)} - {formatDate(program.end_date)}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Users className="h-4 w-4" />
+            <span>{program.gender || "All"}</span>
+          </div>
+        </div>
+
+        <Button variant="outline" size="sm" asChild>
+          <Link href={`/programs/${program.id}`}>
+            <Eye className="mr-2 h-4 w-4" />
+            View Details
+          </Link>
+        </Button>
+      </CardContent>
+    </Card>
+  )
+}
+
+function ProgramsTable({ programs }: { programs: Program[] }) {
+  return (
+    <Card>
+      <CardContent className="p-0">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Program</TableHead>
+              <TableHead>Dates</TableHead>
+              <TableHead>Enrollment</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="w-[120px]" />
+            </TableRow>
+          </TableHeader>
+
+          <TableBody>
+            {programs.map((program) => (
+              <TableRow key={program.id}>
+                <TableCell>
+                  <p className="font-medium">{program.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {program.description || "No description"}
+                  </p>
+                </TableCell>
+
+                <TableCell className="text-muted-foreground">
+                  {formatDate(program.start_date)} - {formatDate(program.end_date)}
+                </TableCell>
+
+                <TableCell>
+                  {program.enrolled}/{program.capacity}
+                </TableCell>
+
+                <TableCell>
+                  <Badge>{getProgramStatusLabel(program.status)}</Badge>
+                </TableCell>
+
+                <TableCell>
+                  <Button variant="outline" size="sm" asChild>
+                    <Link href={`/programs/${program.id}`}>View</Link>
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  )
+}
+
+export default async function ProgramsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>
+}) {
+  const resolvedSearchParams = await searchParams
+
+  const filters: PageSearchParams = {
+    q: getValue(resolvedSearchParams?.q),
+    status: getValue(resolvedSearchParams?.status) || "all",
+    department: getValue(resolvedSearchParams?.department) || "all",
+    view: getValue(resolvedSearchParams?.view) || "cards",
+  }
+
+  const supabase = await createClient()
+
+const programs = await getPrograms()
+
+const { data: departmentsData } = await supabase
+  .from("departments")
+  .select("id, name")
+  .order("name")
+
+const departments = departmentsData || []
+  const filteredPrograms = programs.filter((program) =>
+    matchesProgram(program, filters)
+  )
+
+  const viewMode = filters.view === "table" ? "table" : "cards"
 
   return (
     <>
       <Header title="Programs" />
-      <div className="p-6">
-        <div className="mb-6 flex items-center justify-between">
+
+      <div className="flex flex-col gap-6 p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-xl font-semibold text-foreground">Program Catalog</h2>
-            <p className="text-sm text-muted-foreground">
-              Manage all programs, classes, and activities
+            <h1 className="text-2xl font-semibold tracking-tight">Programs</h1>
+            <p className="text-muted-foreground">
+              Manage programs, classes, camps, and activities.
             </p>
           </div>
-          <Button onClick={() => setShowAddDialog(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            New Program
+
+          <Button asChild>
+            <Link href="/programs/create">
+              <Plus className="mr-2 h-4 w-4" />
+              Create Program
+            </Link>
           </Button>
         </div>
 
-        {/* Filters */}
-        <Card className="mb-6">
-          <CardContent className="p-4">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Search programs..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-              <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-                <SelectTrigger className="w-full sm:w-[180px]">
-                  <SelectValue placeholder="Department" />
-                </SelectTrigger>
-                <SelectContent>
-                  {departments.map((dept) => (
-                    <SelectItem key={dept} value={dept}>{dept}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-full sm:w-[140px]">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  {statuses.map((status) => (
-                    <SelectItem key={status} value={status}>{status}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Programs Table */}
         <Card>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Program Name</TableHead>
-                  <TableHead>Department</TableHead>
-                  <TableHead>Age Group</TableHead>
-                  <TableHead>Schedule</TableHead>
-                  <TableHead>Fee</TableHead>
-                  <TableHead>Enrollment</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="w-[60px]"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredPrograms.map((program) => (
-                  <TableRow key={program.id}>
-                    <TableCell>
-                      <Link
-                        href={`/programs/catalog/${program.id}`}
-                        className="font-medium text-primary hover:underline"
-                      >
-                        {program.name}
-                      </Link>
-                      <p className="text-xs text-muted-foreground">{program.instructor}</p>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{program.department}</Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{program.ageGroup}</TableCell>
-                    <TableCell className="text-muted-foreground">{program.schedule}</TableCell>
-                    <TableCell className="font-medium">{program.fee}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <div className="h-2 w-20 overflow-hidden rounded-full bg-muted">
-                          <div
-                            className={cn(
-                              "h-full rounded-full",
-                              program.enrolled / program.capacity >= 0.9
-                                ? "bg-red-500"
-                                : program.enrolled / program.capacity >= 0.7
-                                ? "bg-amber-500"
-                                : "bg-green-500"
-                            )}
-                            style={{ width: `${(program.enrolled / program.capacity) * 100}%` }}
-                          />
-                        </div>
-                        <span className="text-xs text-muted-foreground">
-                          {program.enrolled}/{program.capacity}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          program.status === "Active"
-                            ? "default"
-                            : program.status === "Open"
-                            ? "outline"
-                            : "secondary"
-                        }
-                      >
-                        {program.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem asChild>
-                            <Link href={`/programs/catalog/${program.id}`}>
-                              <Eye className="mr-2 h-4 w-4" />
-                              View Details
-                            </Link>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Pencil className="mr-2 h-4 w-4" />
-                            Edit Program
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-red-600">
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+          <CardContent className="p-4">
+            <form className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex flex-1 flex-col gap-4 sm:flex-row">
+                <div className="relative flex-1 lg:max-w-sm">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    name="q"
+                    defaultValue={filters.q}
+                    placeholder="Search programs..."
+                    className="pl-9"
+                  />
+                </div>
+
+                <select
+                  name="status"
+                  defaultValue={filters.status}
+                  className="h-10 rounded-md border bg-background px-3 text-sm"
+                >
+                  <option value="all">All Statuses</option>
+                  <option value="draft">Draft</option>
+                  <option value="active">Active</option>
+                  <option value="paused">Paused</option>
+                  <option value="archived">Archived</option>
+                </select>
+
+                <select
+  name="department"
+  defaultValue={filters.department}
+  className="h-10 rounded-md border bg-background px-3 text-sm"
+>
+  <option value="all">All Departments</option>
+
+  {departments.map((department) => (
+  <option key={department.id} value={department.id}>
+    {department.name}
+  </option>
+))}
+</select>
+
+                <input type="hidden" name="view" value={viewMode} />
+
+                <Button type="submit">Apply</Button>
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  variant={viewMode === "cards" ? "secondary" : "outline"}
+                  asChild
+                >
+                  <Link href="/programs?view=cards">
+                    <LayoutGrid className="mr-2 h-4 w-4" />
+                    Cards
+                  </Link>
+                </Button>
+
+                <Button
+                  variant={viewMode === "table" ? "secondary" : "outline"}
+                  asChild
+                >
+                  <Link href="/programs?view=table">
+                    <List className="mr-2 h-4 w-4" />
+                    Table
+                  </Link>
+                </Button>
+              </div>
+            </form>
           </CardContent>
         </Card>
-      </div>
 
-      {/* Add Program Dialog */}
-      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Create New Program</DialogTitle>
-            <DialogDescription>
-              Add a new program, class, or activity to your catalog
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="program-name">Program Name</Label>
-                <Input id="program-name" placeholder="e.g., Youth Soccer League" />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="program-department">Department</Label>
-                <Select>
-                  <SelectTrigger id="program-department">
-                    <SelectValue placeholder="Select department" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {departments.slice(1).map((dept) => (
-                      <SelectItem key={dept} value={dept}>{dept}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="program-description">Description</Label>
-              <Textarea
-                id="program-description"
-                placeholder="Describe the program..."
-                rows={3}
-              />
-            </div>
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="age-group">Age Group</Label>
-                <Input id="age-group" placeholder="e.g., 6-12 years" />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="capacity">Capacity</Label>
-                <Input id="capacity" type="number" placeholder="Max participants" />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="fee">Fee</Label>
-                <Input id="fee" placeholder="e.g., $150" />
-              </div>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="schedule">Schedule</Label>
-                <Input id="schedule" placeholder="e.g., Mon & Wed, 4:00 PM" />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="duration">Duration</Label>
-                <Input id="duration" placeholder="e.g., 12 weeks" />
-              </div>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="instructor">Instructor</Label>
-                <Input id="instructor" placeholder="Instructor name" />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="location">Location</Label>
-                <Input id="location" placeholder="e.g., Field A, Gym" />
-              </div>
-            </div>
+        {filteredPrograms.length === 0 ? (
+          <Card className="flex flex-col items-center justify-center py-12">
+            <Archive className="mb-4 h-12 w-12 text-muted-foreground/50" />
+            <h3 className="text-lg font-medium">No programs found</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Create a program or adjust your filters.
+            </p>
+
+            <Button className="mt-4" asChild>
+              <Link href="/programs/create">
+                <Plus className="mr-2 h-4 w-4" />
+                Create Program
+              </Link>
+            </Button>
+          </Card>
+        ) : viewMode === "table" ? (
+          <ProgramsTable programs={filteredPrograms} />
+        ) : (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {filteredPrograms.map((program) => (
+              <ProgramCard key={program.id} program={program} />
+            ))}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={() => setShowAddDialog(false)}>
-              Create Program
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        )}
+      </div>
     </>
   )
 }

@@ -65,8 +65,8 @@ const supabase = createClient()
   useEffect(() => {
   const fetchDonor = async () => {
     const { data, error } = await supabase
-      .from("donors")
-      .select("*")
+      .from("donor_summary_view")
+.select("*")
       .eq("id", params.id as string)
       .single()
 
@@ -87,7 +87,7 @@ const supabase = createClient()
       email: data.email,
       phone: data.phone,
       status: data.status || "Active",
-      hasPledge: data.has_pledge || false,
+      hasPledge: data.has_open_pledge || false,
       preferredCategory: data.preferred_category || "",
       address: {
         street: data.street || "",
@@ -98,17 +98,9 @@ const supabase = createClient()
       contact: data.contact_person || "",
       type: data.organization_type || "",
 
-      totalDonations: (payments || []).reduce(
-        (sum: number, p: any) => sum + Number(p.amount || 0),
-        0
-      ),
-
-      donationCount: (payments || []).length,
-
-      lastDonation:
-        payments && payments.length > 0
-          ? payments[0].payment_date
-          : "",
+      totalDonations: Number(data.total_donations || 0),
+donationCount: Number(data.donation_count || 0),
+lastDonation: data.last_donation_date || "",
 
       notes: data.notes || "",
 

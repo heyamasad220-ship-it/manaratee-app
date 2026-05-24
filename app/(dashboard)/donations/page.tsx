@@ -162,7 +162,7 @@ export default function DonationsPage() {
       const organizationId = profile.organization_id
 
       let paymentsQuery = supabase
-        .from("donation_payments")
+        .from("payments")
         .select("id, donor_name, amount, payment_date, source, status")
         .eq("organization_id", organizationId)
         .order("payment_date", { ascending: false })

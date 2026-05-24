@@ -65,8 +65,8 @@ export default function IndividualDonorDetailPage() {
 useEffect(() => {
   const fetchDonor = async () => {
     const { data, error } = await supabase
-      .from("donors")
-      .select("*")
+      .from("donor_summary_view")
+.select("*")
       .eq("id", params.id as string)
       .single()
 
@@ -92,17 +92,12 @@ useEffect(() => {
       name: data.full_name,
       email: data.email,
       phone: data.phone,
-     totalDonations: (payments || []).reduce(
-  (sum: number, p: any) => sum + Number(p.amount || 0),
-  0
-),
-donationCount: (payments || []).length,
-lastDonation: payments && payments.length > 0
-  ? payments[0].payment_date
-  : "",
+     totalDonations: Number(data.total_donations || 0),
+donationCount: Number(data.donation_count || 0),
+lastDonation: data.last_donation_date || "",
       preferredCategory: data.preferred_category || "",
       status: data.status || "Active",
-      hasPledge: data.has_pledge || false,
+      hasPledge: data.has_open_pledge || false,
       address: {
         street: data.street || "",
         city: data.city || "",

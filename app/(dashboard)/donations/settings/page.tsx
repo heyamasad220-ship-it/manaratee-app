@@ -63,7 +63,26 @@ interface Campaign {
   status: "Active" | "Completed" | "Draft" | "Paused"
   campaignCode?: string
 }
+function getCampaignStatusBadge(status?: string) {
+  if (!status) return "Draft"
 
+  switch (status.toLowerCase()) {
+    case "active":
+      return "Active"
+
+    case "draft":
+      return "Draft"
+
+    case "completed":
+      return "Completed"
+
+    case "paused":
+      return "Paused"
+
+    default:
+      return status
+  }
+}
 export default function DonationsSettingsPage() {
   const supabase = createClient()
   async function getOrganizationId() {
@@ -172,7 +191,14 @@ async function loadCampaigns() {
       raisedAmount: 0,
       startDate: c.start_date || "",
       endDate: c.end_date || "",
-      status: c.status || "Draft",
+      status:
+  c.status === "active"
+    ? "Active"
+    : c.status === "completed"
+      ? "Completed"
+      : c.status === "paused"
+        ? "Paused"
+        : "Draft",
       campaignCode: c.code || "",
     }))
   )
@@ -411,6 +437,27 @@ async function handleSaveCampaign() {
 
   await loadCampaigns()
 }
+async function handleTogglePaymentMethod(methodId: string, enabled: boolean) {
+  const orgId = await getOrganizationId()
+
+  if (!orgId) {
+    alert("No organization found.")
+    return
+  }
+
+  const { error } = await supabase
+    .from("payment_methods")
+    .update({ enabled })
+    .eq("id", methodId)
+    .eq("organization_id", orgId)
+
+  if (error) {
+    alert(error.message)
+    return
+  }
+
+  await loadPaymentMethods()
+}
 async function handleDeleteCategory(categoryId: string) {
   if (!confirm("Delete this category?")) return
 
@@ -494,6 +541,7 @@ async function handleDeleteCampaign(campaignId: string) {
 
   await loadCampaigns()
 }
+
   return (
     <>
       <Header title="Donations Settings" />
@@ -649,12 +697,23 @@ async function handleDeleteCampaign(campaignId: string) {
                         <TableCell>
                           <div className="w-24">
                             <div className="mb-1 flex justify-between text-xs">
-                              <span>{Math.round((campaign.raisedAmount / campaign.goalAmount) * 100)}%</span>
+                             <span>
+  {campaign.goalAmount > 0
+    ? Math.round((campaign.raisedAmount / campaign.goalAmount) * 100)
+    : 0}
+  %
+</span>
                             </div>
                             <div className="h-2 w-full rounded-full bg-muted">
                               <div
                                 className="h-2 rounded-full bg-primary"
-                                style={{ width: `${Math.min((campaign.raisedAmount / campaign.goalAmount) * 100, 100)}%` }}
+                                style={{
+  width: `${
+    campaign.goalAmount > 0
+      ? Math.min((campaign.raisedAmount / campaign.goalAmount) * 100, 100)
+      : 0
+  }%`,
+}}
                               />
                             </div>
                           </div>
@@ -662,10 +721,24 @@ async function handleDeleteCampaign(campaignId: string) {
                         <TableCell className="text-sm text-muted-foreground">
                           {formatDate(campaign.startDate)} - {formatDate(campaign.endDate)}
                         </TableCell>
-                        <TableCell>{getCampaignStatusBadge(campaign.status)}</TableCell>
+                       <TableCell>
+  <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700">
+    {getCampaignStatusBadge(campaign.status)}
+  </span>
+</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1">
-                          
+                          <Button
+  variant="ghost"
+  size="icon"
+  className="h-8 w-8"
+  onClick={() => {
+    setEditingCampaign(campaign)
+    setShowCampaignDialog(true)
+  }}
+>
+  <Pencil className="h-4 w-4" />
+</Button>
                             <Button
                               variant="ghost"
                               size="icon"
@@ -780,13 +853,7 @@ async function handleDeleteCampaign(campaignId: string) {
                         <TableCell>
                           <Switch
                             checked={method.enabled}
-                            onCheckedChange={(checked) =>
-                              setPaymentMethods(
-                                paymentMethods.map((m) =>
-                                  m.id === method.id ? { ...m, enabled: checked } : m
-                                )
-                              )
-                            }
+                            onCheckedChange={(checked) => handleTogglePaymentMethod(method.id, checked)}
                           />
                         </TableCell>
                         <TableCell>
