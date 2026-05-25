@@ -151,7 +151,7 @@ export default function DonationsPage() {
         return
       }
 
-      if (!["owner", "admin"].includes(profile.role || "")) {
+      if (!["super_admin", "admin"].includes(profile.role || "")) {
         setErrorMessage("You do not have permission to view donations.")
         setPayments([])
         setPledges([])

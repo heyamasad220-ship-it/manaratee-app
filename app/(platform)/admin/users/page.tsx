@@ -41,13 +41,13 @@ interface PlatformUser {
   id: string
   name: string
   email: string
-  role: "Super Admin" | "Admin" | "Support"
+  role: "Owner" | "Admin" | "Support"
   lastLogin: string
   status: "Active" | "Inactive"
 }
 
 const roleStyles: Record<string, string> = {
-  "Super Admin": "bg-emerald-100 text-emerald-700 hover:bg-emerald-100",
+  "Owner": "bg-emerald-100 text-emerald-700 hover:bg-emerald-100",
   Admin: "bg-blue-100 text-blue-700 hover:bg-blue-100",
   Support: "bg-zinc-100 text-zinc-700 hover:bg-zinc-100",
 }
@@ -84,7 +84,7 @@ const mapped: PlatformUser[] = users.map((user: any) => ({
   name: user.email?.split("@")[0] || "Platform User",
   email: user.email || "No email",
   role: user.is_platform_admin
-    ? "Super Admin"
+    ? "Owner"
     : user.role === "admin"
     ? "Admin"
     : "Support",

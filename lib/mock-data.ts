@@ -40,7 +40,7 @@ export interface Order {
   }
 }
 
-export type TeamRole = "Owner" | "Admin" | "Editor" | "Viewer"
+export type TeamRole = "super_admin" | "Admin" | "Editor" | "Viewer"
 
 export interface TeamMember {
   id: string
@@ -257,8 +257,8 @@ export const teamMembers: TeamMember[] = [
   {
     id: "tm-1",
     name: "Alex Tremo",
-    email: "Owner",
-    role: "Owner",
+    email: "super_admin",
+    role: "super_admin",
   },
   {
     id: "tm-2",

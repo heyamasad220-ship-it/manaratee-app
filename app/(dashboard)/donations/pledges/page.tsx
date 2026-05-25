@@ -224,7 +224,7 @@ export default function PledgesPage() {
 
     if (error || !profile?.organization_id) return null;
 
-    if (!["owner", "admin"].includes(profile.role || "")) return null;
+    if (!["super_admin", "admin"].includes(profile.role || "")) return null;
 
     return profile.organization_id as string;
   }

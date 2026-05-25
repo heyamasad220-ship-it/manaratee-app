@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   first_name TEXT,
   last_name TEXT,
   email TEXT,
-  role TEXT DEFAULT 'member' CHECK (role IN ('owner', 'admin', 'member', 'viewer')),
+  role TEXT DEFAULT 'member' CHECK (role IN ('super_admin', 'admin', 'member', 'viewer')),
   avatar_url TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -96,9 +96,9 @@ CREATE POLICY "Users can view their own organization" ON public.organizations
     id IN (SELECT organization_id FROM public.profiles WHERE id = auth.uid())
   );
 
-CREATE POLICY "Owners and admins can update their organization" ON public.organizations
+CREATE POLICY "super_admins and admins can update their organization" ON public.organizations
   FOR UPDATE USING (
-    id IN (SELECT organization_id FROM public.profiles WHERE id = auth.uid() AND role IN ('owner', 'admin'))
+    id IN (SELECT organization_id FROM public.profiles WHERE id = auth.uid() AND role IN ('super_admin', 'admin'))
   );
 
 -- RLS Policies for profiles
@@ -124,15 +124,15 @@ CREATE POLICY "Users can view their organization subscriptions" ON public.subscr
     organization_id IN (SELECT organization_id FROM public.profiles WHERE id = auth.uid())
   );
 
-CREATE POLICY "Owners can manage subscriptions" ON public.subscriptions
+CREATE POLICY "super_admins can manage subscriptions" ON public.subscriptions
   FOR ALL USING (
-    organization_id IN (SELECT organization_id FROM public.profiles WHERE id = auth.uid() AND role = 'owner')
+    organization_id IN (SELECT organization_id FROM public.profiles WHERE id = auth.uid() AND role = 'super_admin')
   );
 
 -- RLS Policies for organization_invites
 CREATE POLICY "Admins can view and manage invites" ON public.organization_invites
   FOR ALL USING (
-    organization_id IN (SELECT organization_id FROM public.profiles WHERE id = auth.uid() AND role IN ('owner', 'admin'))
+    organization_id IN (SELECT organization_id FROM public.profiles WHERE id = auth.uid() AND role IN ('super_admin', 'admin'))
   );
 
 CREATE POLICY "Anyone can view their own invite by token" ON public.organization_invites

@@ -76,7 +76,7 @@ export async function POST(req: Request) {
       .insert({
         user_id: userId,
         organization_id: organization.id,
-        role: "owner",
+        role: "super_admin",
       })
 
     if (memberError) {
