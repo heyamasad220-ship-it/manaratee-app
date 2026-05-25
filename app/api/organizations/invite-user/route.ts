@@ -78,11 +78,24 @@ export async function POST(request: Request) {
     })
 
     if (error) {
-      return NextResponse.json(
-        { success: false, error: error.message },
-        { status: 400 }
-      )
-    }
+  console.error("SUPABASE INVITE ERROR:", {
+    message: error.message,
+    status: error.status,
+    code: error.code,
+    name: error.name,
+  })
+
+  return NextResponse.json(
+    {
+      success: false,
+      error: error.message || "Error sending invite email",
+      status: error.status,
+      code: error.code,
+      name: error.name,
+    },
+    { status: 400 }
+  )
+}
 
     return NextResponse.json({
       success: true,
