@@ -15,40 +15,18 @@ type AuthMode = "login" | "signup"
 
 function GoogleIcon({ className }: { className?: string }) {
   return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <path
-        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-        fill="#4285F4"
-      />
-      <path
-        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-        fill="#34A853"
-      />
-      <path
-        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-        fill="#FBBC05"
-      />
-      <path
-        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-        fill="#EA4335"
-      />
+    <svg className={className} viewBox="0 0 24 24" fill="none">
+      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
+      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
     </svg>
   )
 }
 
 function AppleIcon({ className }: { className?: string }) {
   return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="currentColor"
-      xmlns="http://www.w3.org/2000/svg"
-    >
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
       <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" />
     </svg>
   )
@@ -64,58 +42,61 @@ export default function LoginPage() {
   const [repeatPassword, setRepeatPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [socialLoading, setSocialLoading] = useState<"google" | "apple" | null>(
-    null
-  )
+  const [socialLoading, setSocialLoading] = useState<"google" | "apple" | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  async function setSelectedOrganization(organizationId: string) {
+    const response = await fetch("/api/organizations/select", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ organizationId }),
+    })
+
+    if (!response.ok) {
+      throw new Error("Failed to set selected organization")
+    }
+  }
+
   async function routeUserByRole(userId: string) {
-    /**
-     * Route priority:
-     * 1. Platform admin
-     * 2. Organization member/admin
-     * 3. Customer
-     * 4. Customer fallback
-     */
-
     const { data: profile, error: profileError } = await supabase
-  .from("profiles")
-  .select("is_platform_admin")
-  .eq("id", userId)
-  .maybeSingle()
+      .from("profiles")
+      .select("is_platform_admin")
+      .eq("id", userId)
+      .maybeSingle()
 
-if (profileError) throw profileError
+    if (profileError) throw profileError
 
-if (profile?.is_platform_admin === true) {
-  router.push("/admin/dashboard")
-  return
-}
+    if (profile?.is_platform_admin === true) {
+      router.push("/admin/dashboard")
+      return
+    }
 
     const { data: memberships, error: membershipError } = await supabase
       .from("organization_members")
-      .select("organization_id, role")
+      .select("organization_id, role, status")
       .eq("user_id", userId)
+      .eq("status", "active")
 
     if (membershipError) throw membershipError
 
-    if (memberships && memberships.length > 0) {
-      const firstOrgId = memberships[0].organization_id
+    const orgAdminMembership = memberships?.find((membership) =>
+      ["super_admin", "admin", "coordinator", "viewer"].includes(membership.role)
+    )
 
-      const selectResponse = await fetch("/api/organizations/select", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          organizationId: firstOrgId,
-        }),
-      })
-
-      if (!selectResponse.ok) {
-        throw new Error("Failed to set selected organization")
-      }
-
+    if (orgAdminMembership) {
+      await setSelectedOrganization(orgAdminMembership.organization_id)
       router.push("/dashboard")
+      return
+    }
+
+    const customerMembership = memberships?.find(
+      (membership) => membership.role === "customer"
+    )
+
+    if (customerMembership) {
+      router.push("/customer/dashboard")
       return
     }
 
@@ -128,7 +109,7 @@ if (profile?.is_platform_admin === true) {
     if (customerError) throw customerError
 
     if (customerProfile?.organization_id) {
-      router.push(`/organizations/${customerProfile.organization_id}`)
+      router.push("/customer/dashboard")
       return
     }
 
@@ -136,49 +117,21 @@ if (profile?.is_platform_admin === true) {
   }
 
   async function handleEmailPasswordLogin() {
-  const adminResponse = await fetch("/api/admin/login", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      email,
-      password,
-    }),
-  })
-
-  const adminResult = await adminResponse.json()
-
-  console.log("ADMIN RESULT:", adminResult)
-
-  if (adminResult.success) {
-    const { error: authError } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     })
 
-    if (authError) throw authError
+    if (error) {
+      throw new Error(error.message)
+    }
 
-    router.push("/admin/dashboard")
-    return
+    if (!data.user) {
+      throw new Error("Login failed")
+    }
+
+    await routeUserByRole(data.user.id)
   }
-
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  })
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  if (!data.user) {
-    throw new Error("Login failed")
-  }
-
-  await routeUserByRole(data.user.id)
-}
- 
 
   async function handleSignUp() {
     if (password !== repeatPassword) {
@@ -199,10 +152,6 @@ if (profile?.is_platform_admin === true) {
       throw new Error("Sign up failed")
     }
 
-    /**
-     * If email confirmation is enabled, Supabase will require the user
-     * to confirm before signing in.
-     */
     if (!data.session) {
       router.push("/auth/confirm")
       return
@@ -223,9 +172,10 @@ if (profile?.is_platform_admin === true) {
         await handleEmailPasswordLogin()
       }
     } catch (err: unknown) {
-  console.error("LOGIN ERROR:", err)
-  setError(err instanceof Error ? err.message : "Authentication failed")
-}
+      console.error("LOGIN ERROR:", err)
+      setError(err instanceof Error ? err.message : "Authentication failed")
+      setIsLoading(false)
+    }
   }
 
   async function handleSocialSignIn(provider: "google" | "apple") {
@@ -267,7 +217,7 @@ if (profile?.is_platform_admin === true) {
         <Button
           type="button"
           variant="outline"
-          className="w-full h-11"
+          className="h-11 w-full"
           onClick={() => handleSocialSignIn("google")}
           disabled={socialLoading !== null || isLoading}
         >
@@ -282,7 +232,7 @@ if (profile?.is_platform_admin === true) {
         <Button
           type="button"
           variant="outline"
-          className="w-full h-11"
+          className="h-11 w-full"
           onClick={() => handleSocialSignIn("apple")}
           disabled={socialLoading !== null || isLoading}
         >
@@ -342,10 +292,8 @@ if (profile?.is_platform_admin === true) {
               type={showPassword ? "text" : "password"}
               placeholder="Enter your password"
               required
-              autoComplete={
-                mode === "login" ? "current-password" : "new-password"
-              }
-              className="pr-10 h-11"
+              autoComplete={mode === "login" ? "current-password" : "new-password"}
+              className="h-11 pr-10"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={isLoading || socialLoading !== null}
@@ -388,7 +336,7 @@ if (profile?.is_platform_admin === true) {
 
         <Button
           type="submit"
-          className="w-full h-11"
+          className="h-11 w-full"
           disabled={isLoading || socialLoading !== null}
         >
           {isLoading ? (

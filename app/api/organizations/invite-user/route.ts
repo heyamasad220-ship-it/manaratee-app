@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { createClient as createServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +21,8 @@ export async function POST(req: NextRequest) {
 
     if (!email || !organizationId || !roleId) {
       return json(400, {
-        error: "Missing required fields",
+        success: false,
+        error: "Missing required fields.",
         required: ["email", "organizationId", "roleId"],
       });
     }
@@ -31,7 +33,7 @@ export async function POST(req: NextRequest) {
     const appUrl =
       process.env.NEXT_PUBLIC_APP_URL ||
       process.env.NEXT_PUBLIC_SITE_URL ||
-      process.env.VERCEL_URL && `https://${process.env.VERCEL_URL}`;
+      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "");
 
     if (!supabaseUrl || !serviceRoleKey || !appUrl) {
       console.error("Invite config missing", {
@@ -41,7 +43,22 @@ export async function POST(req: NextRequest) {
       });
 
       return json(500, {
-        error: "Server invite configuration is incomplete",
+        success: false,
+        error: "Server invite configuration is incomplete.",
+      });
+    }
+
+    const supabaseUser = await createServerClient();
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabaseUser.auth.getUser();
+
+    if (userError || !user) {
+      return json(401, {
+        success: false,
+        error: "Unauthorized.",
       });
     }
 
@@ -52,21 +69,106 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // 1. Confirm role belongs to this organization.
-    const { data: role, error: roleError } = await admin
+    /**
+     * 1. Confirm current user belongs to the organization.
+     * organization_members.role = hidden system/platform access
+     * organization_members.role_id = visible organization role
+     */
+    const { data: currentMembership, error: currentMembershipError } =
+      await admin
+        .from("organization_members")
+        .select("id, organization_id, user_id, role, role_id")
+        .eq("organization_id", organizationId)
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+    if (currentMembershipError) {
+      console.error("Current membership lookup failed", {
+        currentMembershipError,
+        organizationId,
+        userId: user.id,
+      });
+
+      return json(500, {
+        success: false,
+        error: currentMembershipError.message,
+      });
+    }
+
+    if (!currentMembership) {
+      return json(403, {
+        success: false,
+        error: "You are not a member of this organization.",
+      });
+    }
+
+    /**
+     * 2. Confirm current user has permission to invite users.
+     * This avoids requiring platform admin privileges.
+     */
+    const { data: invitePermission, error: invitePermissionError } =
+      await admin
+        .from("role_permissions")
+        .select("id")
+        .eq("role_id", currentMembership.role_id)
+        .eq("permission_key", "users.invite")
+        .eq("enabled", true)
+        .maybeSingle();
+
+    if (invitePermissionError) {
+      console.error("Invite permission lookup failed", {
+        invitePermissionError,
+        roleId: currentMembership.role_id,
+      });
+
+      return json(500, {
+        success: false,
+        error: invitePermissionError.message,
+      });
+    }
+
+    const isSystemAdmin =
+  currentMembership.role === "owner" ||
+  currentMembership.role === "admin" ||
+  currentMembership.role === "super_admin";
+
+if (!isSystemAdmin && !invitePermission) {
+  return json(403, {
+    success: false,
+    error: "You do not have permission to invite users.",
+  });
+}
+
+    /**
+     * 3. Confirm invited role belongs to this organization.
+     */
+    const { data: invitedRole, error: invitedRoleError } = await admin
       .from("organization_roles")
       .select("id, name, organization_id")
       .eq("id", roleId)
       .eq("organization_id", organizationId)
       .single();
 
-    if (roleError || !role) {
-      console.error("Invalid role for invite", { roleError, roleId, organizationId });
-      return json(400, { error: "Invalid organization role" });
+    if (invitedRoleError || !invitedRole) {
+      console.error("Invalid invited role", {
+        invitedRoleError,
+        roleId,
+        organizationId,
+      });
+
+      return json(400, {
+        success: false,
+        error: "Invalid organization role.",
+      });
     }
 
-    // 2. Send Supabase invite email.
-    const redirectTo = `${appUrl.replace(/\/$/, "")}/auth/callback?next=/dashboard`;
+    /**
+     * 4. Send Supabase invite email.
+     */
+    const redirectTo = `${appUrl.replace(
+      /\/$/,
+      ""
+    )}/auth/callback?next=/dashboard`;
 
     const { data: inviteData, error: inviteError } =
       await admin.auth.admin.inviteUserByEmail(email, {
@@ -76,73 +178,79 @@ export async function POST(req: NextRequest) {
           last_name: lastName,
           organization_id: organizationId,
           organization_role_id: roleId,
-          organization_role_name: role.name || roleName,
+          organization_role_name: invitedRole.name || roleName,
         },
       });
 
     if (inviteError || !inviteData?.user?.id) {
-      console.error("Supabase invite failed", {
+      console.error("SUPABASE INVITE ERROR:", {
         email,
         redirectTo,
-        inviteError,
+        message: inviteError?.message,
+        status: inviteError?.status,
+        code: inviteError?.code,
+        name: inviteError?.name,
+        fullError: inviteError,
       });
 
       return json(502, {
-        error: "Failed to send invite email",
+        success: false,
+        error: "Failed to send invite email.",
         details: inviteError?.message,
+        status: inviteError?.status,
+        code: inviteError?.code,
+        name: inviteError?.name,
       });
     }
 
-    const userId = inviteData.user.id;
+    const invitedUserId = inviteData.user.id;
 
-    // 3. Upsert membership using service-role client to avoid RLS blockage.
-    // organization_members.role stays hidden/system-level access.
-    // organization_members.role_id is the visible custom org role.
-    const { data: membership, error: memberError } = await admin
-      .from("organization_members")
-      .upsert(
-        {
-          organization_id: organizationId,
-          user_id: userId,
-          email,
-          first_name: firstName || null,
-          last_name: lastName || null,
-          role: "member",
-          role_id: roleId,
-          status: "invited",
-          invited_at: new Date().toISOString(),
-        },
-        {
-          onConflict: "organization_id,user_id",
-        }
-      )
-      .select("*")
-      .single();
-
-    if (memberError) {
-      console.error("Membership insert/upsert failed", {
-        memberError,
-        organizationId,
-        userId,
-        roleId,
-      });
-
-      return json(500, {
-        error: "Invite email sent, but organization membership failed",
-        details: memberError.message,
-      });
+    /**
+     * 5. Create/update organization membership.
+     */
+    const { data: membership, error: membershipError } = await admin
+  .from("organization_members")
+  .upsert(
+    {
+      organization_id: organizationId,
+      user_id: invitedUserId,
+      role: "member",
+      role_id: roleId,
+    },
+    {
+      onConflict: "organization_id,user_id",
     }
+  )
+  .select("*")
+  .single();
+
+if (membershipError) {
+  console.error("MEMBERSHIP UPSERT FAILED:", {
+    message: membershipError.message,
+    details: membershipError.details,
+    hint: membershipError.hint,
+    code: membershipError.code,
+  });
+
+  return json(500, {
+    success: false,
+    error: "Invite email sent, but organization membership failed.",
+    details: membershipError.message,
+    hint: membershipError.hint,
+    code: membershipError.code,
+  });
+}
 
     return json(200, {
       success: true,
-      message: "Invite sent",
-      userId,
+      message: "Invite sent.",
+      user: inviteData.user,
       membership,
       debug: {
         email,
         organizationId,
         roleId,
-        roleName: role.name,
+        roleName: invitedRole.name,
         redirectTo,
       },
     });
@@ -150,7 +258,8 @@ export async function POST(req: NextRequest) {
     console.error("Unhandled invite-user error", error);
 
     return json(500, {
-      error: "Unexpected invite failure",
+      success: false,
+      error: "Unexpected invite failure.",
       details: error?.message,
     });
   }

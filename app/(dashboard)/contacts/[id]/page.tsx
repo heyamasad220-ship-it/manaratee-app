@@ -6,6 +6,7 @@ import { Header } from "@/components/layout/header"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { PersonTagsCard } from "@/components/people/person-tags-card"
 import { createClient } from "@/lib/supabase/client"
 import {
   ArrowLeft,
@@ -93,6 +94,7 @@ export default function ContactDetailPage() {
       .from("contacts")
       .select(`
         id,
+        person_id,
         full_name,
         email,
         phone,
@@ -105,6 +107,7 @@ export default function ContactDetailPage() {
         status,
         created_at,
         contact_roles(role)
+        
       `)
       .eq("id", contactId)
       .single()
@@ -327,6 +330,7 @@ export default function ContactDetailPage() {
             </div>
           </CardContent>
         </Card>
+                <PersonTagsCard contactId={contact.id} personId={contact.person_id} />
 
         {hasRole("customer") && (
           <Card>

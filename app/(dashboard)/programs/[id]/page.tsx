@@ -15,6 +15,11 @@ import {
 import { Header } from "@/components/layout/header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { DiscountForm } from "./discounts/discount-form"
+import {
+  getActiveDiscountTags,
+  getProgramDiscounts,
+} from "@/lib/programs/program-discount-queries"
 import {
   Card,
   CardContent,
@@ -62,11 +67,14 @@ export default async function ProgramDetailsPage({
 }) {
   const { id } = await params
 
-  const [program, scheduleItems] = await Promise.all([
-    getProgramById(id),
-    getProgramScheduleItems(id),
-  ])
-
+  const [program, scheduleItems, discountTags, programDiscounts] = await Promise.all([
+    
+  getProgramById(id),
+  getProgramScheduleItems(id),
+  getActiveDiscountTags(),
+  getProgramDiscounts(id),
+])
+console.log(programDiscounts)
   if (!program) {
     notFound()
   }
@@ -103,13 +111,18 @@ export default async function ProgramDetailsPage({
               {program.description || "No description provided."}
             </p>
           </div>
-
+          <Button asChild>
+  <Link href={`/programs/${program.id}/sessions`}>
+    Sessions
+  </Link>
+</Button>
           <Button asChild>
             <Link href={`/programs/${program.id}/edit`}>
               <Edit className="mr-2 h-4 w-4" />
               Edit Program
             </Link>
           </Button>
+          
         </div>
 
         <Tabs defaultValue="overview" className="space-y-6">
@@ -124,7 +137,7 @@ export default async function ProgramDetailsPage({
             </TabsTrigger>
             <TabsTrigger value="discounts" className="gap-2">
               <Percent className="h-4 w-4" />
-              Discount Codes
+              Discounts
             </TabsTrigger>
             <TabsTrigger value="lunch" className="gap-2">
               <Utensils className="h-4 w-4" />
@@ -410,15 +423,62 @@ export default async function ProgramDetailsPage({
           <TabsContent value="discounts">
             <Card>
               <CardHeader>
-                <CardTitle>Discount Codes</CardTitle>
+                <CardTitle>Discounts</CardTitle>
                 <CardDescription>
-                  Discount code management will be connected here.
+                  Configure staff, member, scholarship, and other program discounts.
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-                  No discount codes connected yet.
-                </div>
+                <div className="space-y-4">
+  <Button>
+    Add Discount
+  </Button>
+<DiscountForm
+  programId={program.id}
+  organizationId={program.organization_id}
+  discountTags={discountTags}
+/>
+  {programDiscounts.length === 0 ? (
+  <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+    No discounts configured yet.
+  </div>
+) : (
+  <div className="rounded-lg border">
+    {programDiscounts.map((discount) => (
+      <div
+        key={discount.id}
+        className="flex items-center justify-between border-b p-4 last:border-b-0"
+      >
+        <div>
+          <p className="font-medium">
+            {discountTags.find((tag) => tag.id === discount.discount_tag_id)
+              ?.name || "Unknown tag"}
+          </p>
+
+          <p className="text-sm text-muted-foreground">
+            {discount.discount_type === "percent"
+              ? `${discount.amount}% Off`
+              : `$${Number(discount.amount).toFixed(2)} Off`}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Badge variant={discount.is_active ? "default" : "secondary"}>
+            {discount.is_active ? "Active" : "Inactive"}
+          </Badge>
+
+          <DiscountForm
+            programId={program.id}
+            organizationId={program.organization_id}
+            discountTags={discountTags}
+            discount={discount}
+          />
+        </div>
+      </div>
+    ))}
+  </div>
+)}
+</div>
               </CardContent>
             </Card>
           </TabsContent>

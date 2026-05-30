@@ -493,7 +493,7 @@ const payload = {
             </TabsTrigger>
             <TabsTrigger value="discounts" className="gap-2">
               <Percent className="size-4" />
-              Discount Codes
+                Promo Codes
             </TabsTrigger>
           </TabsList>
 
@@ -904,15 +904,15 @@ const payload = {
             <div className="flex flex-col gap-4">
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-base font-semibold">Discount Codes</h2>
+                  <h2 className="text-base font-semibold">Promo Codes</h2>
                   <p className="text-sm text-muted-foreground">
-                    Create and manage registration discount codes.
+                    Create and manage registration promo codes.
                   </p>
                 </div>
 
                 <Button onClick={openAddDiscountDialog}>
                   <Plus className="mr-2 size-4" />
-                  Add Discount
+                  Add Promo Code
                 </Button>
               </div>
 

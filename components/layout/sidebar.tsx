@@ -76,6 +76,7 @@ const iconMap: Record<string, LucideIcon> = {
 const modulePermissionMap: Record<string, string> = {
   programs: "programs.view",
   donations: "donations.view",
+  hr: "staff.view",
   staff: "staff.view",
   applications: "applications.view",
   contacts: "contacts.view",
@@ -132,6 +133,32 @@ const moduleChildren: Record<string, SubItem[]> = {
     { label: "Reports", href: "/donations/reports", matchPrefix: "/donations/reports", permissionKey: "reports.view" },
     { label: "Settings", href: "/donations/settings", matchPrefix: "/donations/settings", permissionKey: "donations.manage" },
   ],
+hr: [
+  {
+    label: "Members",
+    href: "/hr/members",
+    matchPrefix: "/hr/members",
+    permissionKey: "staff.view",
+  },
+  {
+    label: "Employees",
+    href: "/hr/employees",
+    matchPrefix: "/hr/employees",
+    permissionKey: "staff.view",
+  },
+  {
+    label: "Volunteers",
+    href: "/resources/volunteers",
+    matchPrefix: "/resources/volunteers",
+    permissionKey: "staff.view",
+  },
+  {
+    label: "Discount Policies",
+    href: "/hr/discount-policies",
+    matchPrefix: "/hr/discount-policies",
+    permissionKey: "staff.view",
+  },
+],
 }
 
 function userCanAccess(permissionContext: UserPermissionContext, permissionKey?: string) {

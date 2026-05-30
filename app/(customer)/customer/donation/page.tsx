@@ -37,9 +37,21 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 
 type Contact = {
   id: string
-  full_name: string
+  full_name: string | null
   email: string | null
   organization_id: string
+}
+
+type DonationFund = {
+  id: string
+  name: string
+  category_id: string
+}
+
+type DonationCategory = {
+  id: string
+  name: string
+  funds: DonationFund[]
 }
 
 type DonationPledge = {
@@ -67,43 +79,16 @@ type DonationPayment = {
 
 type SavedPaymentMethod = {
   id: string
-  type: string
-  last4: string
-  isDefault: boolean
+  name: string
+  fee: string | null
 }
-
-const donationCategories = [
-  {
-    id: "operations",
-    label: "Operations",
-    subcategories: [
-      { id: "general", label: "General Fund" },
-      { id: "building", label: "Building & Maintenance" },
-    ],
-  },
-  {
-    id: "programs",
-    label: "Programs",
-    subcategories: [
-      { id: "youth", label: "Youth Programs" },
-      { id: "education", label: "Education" },
-    ],
-  },
-  {
-    id: "community",
-    label: "Community",
-    subcategories: [
-      { id: "outreach", label: "Community Outreach" },
-      { id: "emergency", label: "Emergency Relief" },
-    ],
-  },
-]
 
 export default function CustomerDonationsPage() {
   const supabase = createClient()
 
   const [loading, setLoading] = useState(true)
   const [contact, setContact] = useState<Contact | null>(null)
+  const [donationCategories, setDonationCategories] = useState<DonationCategory[]>([])
   const [pledges, setPledges] = useState<DonationPledge[]>([])
   const [payments, setPayments] = useState<DonationPayment[]>([])
   const [savedPaymentMethods, setSavedPaymentMethods] = useState<SavedPaymentMethod[]>([])
@@ -111,17 +96,27 @@ export default function CustomerDonationsPage() {
   const [selectedPledge, setSelectedPledge] = useState<DonationPledge | null>(null)
   const [showPaymentDialog, setShowPaymentDialog] = useState(false)
   const [showNewPledgeDialog, setShowNewPledgeDialog] = useState(false)
+  const [showOneTimeDonationDialog, setShowOneTimeDonationDialog] = useState(false)
+
   const [paymentAmount, setPaymentAmount] = useState("")
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("")
   const [isProcessing, setIsProcessing] = useState(false)
   const [paymentSuccess, setPaymentSuccess] = useState(false)
+  const [oneTimeDonationSuccess, setOneTimeDonationSuccess] = useState(false)
+  const [formError, setFormError] = useState("")
 
   const [newPledgeForm, setNewPledgeForm] = useState({
     amount: "",
     frequency: "one-time",
     payments: "1",
     category: "",
-    subcategory: "",
+    fund: "",
+  })
+
+  const [oneTimeDonationForm, setOneTimeDonationForm] = useState({
+    amount: "",
+    category: "",
+    fund: "",
     paymentMethod: "",
   })
 
@@ -135,6 +130,7 @@ export default function CustomerDonationsPage() {
 
       if (!user) {
         setContact(null)
+        setDonationCategories([])
         setPledges([])
         setPayments([])
         setSavedPaymentMethods([])
@@ -142,15 +138,15 @@ export default function CustomerDonationsPage() {
         return
       }
 
-      const { data: contactData, error: contactError } = await supabase
+      const { data: contactData } = await supabase
         .from("contacts")
         .select("id, full_name, email, organization_id")
         .eq("auth_user_id", user.id)
         .maybeSingle()
 
-      if (contactError || !contactData) {
-        console.error("Customer donations contact load error:", contactError)
+      if (!contactData) {
         setContact(null)
+        setDonationCategories([])
         setPledges([])
         setPayments([])
         setSavedPaymentMethods([])
@@ -160,7 +156,48 @@ export default function CustomerDonationsPage() {
 
       setContact(contactData)
 
-            // Load real pledges
+      const { data: categoriesData } = await supabase
+        .from("donation_categories")
+        .select("id, name")
+        .eq("organization_id", contactData.organization_id)
+        .order("name", { ascending: true })
+
+      const { data: subcategoriesData } = await supabase
+        .from("donation_subcategories")
+        .select("id, name, category_id")
+        .eq("organization_id", contactData.organization_id)
+        .order("name", { ascending: true })
+
+      const formattedCategories: DonationCategory[] = (categoriesData || []).map((category) => ({
+        id: category.id,
+        name: category.name,
+        funds: (subcategoriesData || [])
+          .filter((fund) => fund.category_id === category.id)
+          .map((fund) => ({
+            id: fund.id,
+            name: fund.name,
+            category_id: fund.category_id,
+          })),
+      }))
+
+      setDonationCategories(formattedCategories)
+
+      const { data: paymentMethodsData } = await supabase
+        .from("payment_methods")
+        .select("id, name, fee")
+        .eq("organization_id", contactData.organization_id)
+        .eq("enabled", true)
+        .order("name", { ascending: true })
+
+      const formattedPaymentMethods: SavedPaymentMethod[] = (paymentMethodsData || []).map((method) => ({
+        id: method.id,
+        name: method.name || "Payment Method",
+        fee: method.fee || null,
+      }))
+
+      setSavedPaymentMethods(formattedPaymentMethods)
+      setSelectedPaymentMethod(formattedPaymentMethods[0]?.id || "")
+
       const { data: pledgesData } = await supabase
         .from("donation_pledges")
         .select("*")
@@ -168,16 +205,12 @@ export default function CustomerDonationsPage() {
         .eq("organization_id", contactData.organization_id)
         .order("created_at", { ascending: false })
 
-      // Load real payments
-      const { data: paymentsData, error: paymentsError } = await supabase
-  .from("payments")
-  .select("*")
-  .eq("contact_id", contactData.id)
-  .eq("organization_id", contactData.organization_id)
-  .order("payment_date", { ascending: false })
-
-console.log("PAYMENTS DATA:", paymentsData)
-console.log("PAYMENTS ERROR:", paymentsError)
+      const { data: paymentsData } = await supabase
+        .from("donation_payments")
+        .select("*")
+        .eq("contact_id", contactData.id)
+        .eq("organization_id", contactData.organization_id)
+        .order("payment_date", { ascending: false })
 
       const formattedPledges: DonationPledge[] = (pledgesData || []).map((p) => ({
         id: p.id,
@@ -200,17 +233,12 @@ console.log("PAYMENTS ERROR:", paymentsError)
         date: p.payment_date || "",
         amount: Number(p.amount || 0),
         campaign: p.fund_name || "General Fund",
-        method: p.payment_method || p.source || "Card",
-        status: p.status || "Completed",
+        method: p.payment_method || p.source || "Unknown",
+        status: p.status || "Unallocated",
       }))
 
       setPledges(formattedPledges)
       setPayments(formattedPayments)
-
-      // Keep payment methods empty for now
-      setSavedPaymentMethods([])
-      setSelectedPaymentMethod("")
-
       setLoading(false)
     }
 
@@ -226,8 +254,21 @@ console.log("PAYMENTS ERROR:", paymentsError)
     }).format(amount)
   }
 
+  const getSelectedFundName = (categoryId: string, fundId: string) => {
+    const category = donationCategories.find((cat) => cat.id === categoryId)
+    const fund = category?.funds.find((f) => f.id === fundId)
+    return fund?.name || category?.name || "General Fund"
+  }
+
+  const getSelectedPaymentMethodName = (paymentMethodId: string) => {
+    const method = savedPaymentMethods.find((item) => item.id === paymentMethodId)
+    return method?.name || "Unknown"
+  }
+
   const totalPledged = pledges.reduce((sum, pledge) => sum + Number(pledge.totalAmount || 0), 0)
-  const totalPaid = pledges.reduce((sum, pledge) => sum + Number(pledge.paidAmount || 0), 0)
+  const totalPaid = payments
+    .filter((payment) => payment.status !== "Voided")
+    .reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
   const outstandingBalance = pledges.reduce((sum, pledge) => sum + Number(pledge.balance || 0), 0)
   const activePledges = pledges.filter((p) => p.status === "Active")
   const upcomingPaymentTotal = activePledges.reduce(
@@ -243,16 +284,185 @@ console.log("PAYMENTS ERROR:", paymentsError)
     setSelectedPaymentMethod(savedPaymentMethods[0]?.id || "")
     setShowPaymentDialog(true)
     setPaymentSuccess(false)
+    setFormError("")
+  }
+
+  const handleOpenOneTimeDonation = () => {
+    setOneTimeDonationForm({
+      amount: "",
+      category: "",
+      fund: "",
+      paymentMethod: savedPaymentMethods[0]?.id || "",
+    })
+    setOneTimeDonationSuccess(false)
+    setFormError("")
+    setShowOneTimeDonationDialog(true)
+  }
+
+  const handleOpenNewPledge = () => {
+    setNewPledgeForm({
+      amount: "",
+      frequency: "one-time",
+      payments: "1",
+      category: "",
+      fund: "",
+    })
+    setFormError("")
+    setShowNewPledgeDialog(true)
   }
 
   const processPayment = async () => {
-    setIsProcessing(true)
+    if (!contact || !selectedPledge) return
 
-    // Payment processing is intentionally not connected yet.
-    await new Promise((resolve) => setTimeout(resolve, 500))
+    setIsProcessing(true)
+    setFormError("")
+
+    const paymentMethodName = getSelectedPaymentMethodName(selectedPaymentMethod)
+
+    const { data, error } = await supabase
+      .from("donation_payments")
+      .insert({
+        organization_id: contact.organization_id,
+        contact_id: contact.id,
+        pledge_id: selectedPledge.id,
+        donor_name: contact.full_name || contact.email || null,
+        amount: Number(paymentAmount || 0),
+        payment_date: new Date().toISOString().split("T")[0],
+        fund_name: selectedPledge.campaign,
+        payment_method: paymentMethodName,
+        source: "Customer Portal",
+        status: "Unallocated",
+      })
+      .select("*")
+      .single()
+
+    if (error) {
+      setFormError("Payment could not be saved. Please try again.")
+      setIsProcessing(false)
+      return
+    }
+
+    setPayments((currentPayments) => [
+      {
+        id: data.id,
+        date: data.payment_date || "",
+        amount: Number(data.amount || 0),
+        campaign: data.fund_name || "General Fund",
+        method: data.payment_method || data.source || "Unknown",
+        status: data.status || "Unallocated",
+      },
+      ...currentPayments,
+    ])
 
     setIsProcessing(false)
     setPaymentSuccess(true)
+  }
+
+  const processOneTimeDonation = async () => {
+    if (!contact) return
+
+    setIsProcessing(true)
+    setFormError("")
+
+    const selectedFundName = getSelectedFundName(
+      oneTimeDonationForm.category,
+      oneTimeDonationForm.fund
+    )
+    const paymentMethodName = getSelectedPaymentMethodName(oneTimeDonationForm.paymentMethod)
+
+    const { data, error } = await supabase
+      .from("donation_payments")
+      .insert({
+        organization_id: contact.organization_id,
+        contact_id: contact.id,
+        pledge_id: null,
+        donor_name: contact.full_name || contact.email || null,
+        amount: Number(oneTimeDonationForm.amount || 0),
+        payment_date: new Date().toISOString().split("T")[0],
+        fund_name: selectedFundName,
+        payment_method: paymentMethodName,
+        source: "Customer Portal",
+        status: "Unallocated",
+      })
+      .select("*")
+      .single()
+
+    if (error) {
+      setFormError("Donation could not be saved. Please try again.")
+      setIsProcessing(false)
+      return
+    }
+
+    setPayments((currentPayments) => [
+      {
+        id: data.id,
+        date: data.payment_date || "",
+        amount: Number(data.amount || 0),
+        campaign: data.fund_name || "General Fund",
+        method: data.payment_method || data.source || "Unknown",
+        status: data.status || "Unallocated",
+      },
+      ...currentPayments,
+    ])
+
+    setIsProcessing(false)
+    setOneTimeDonationSuccess(true)
+  }
+
+  const createPledge = async () => {
+    if (!contact) return
+
+    setIsProcessing(true)
+    setFormError("")
+
+    const selectedFundName = getSelectedFundName(newPledgeForm.category, newPledgeForm.fund)
+    const numberOfPayments =
+      newPledgeForm.frequency === "one-time" ? 1 : Number(newPledgeForm.payments || 1)
+    const totalAmount = Number(newPledgeForm.amount || 0) * numberOfPayments
+
+    const { data, error } = await supabase
+      .from("donation_pledges")
+      .insert({
+        organization_id: contact.organization_id,
+        contact_id: contact.id,
+        fund_name: selectedFundName,
+        amount: totalAmount,
+        pledged_amount: totalAmount,
+        collected_amount: 0,
+        frequency: newPledgeForm.frequency,
+        status: "Active",
+        start_date: new Date().toISOString().split("T")[0],
+      })
+      .select("*")
+      .single()
+
+    if (error) {
+      setFormError("Pledge could not be saved. Please try again.")
+      setIsProcessing(false)
+      return
+    }
+
+    setPledges((currentPledges) => [
+      {
+        id: data.id,
+        campaign: data.fund_name || "General Fund",
+        totalAmount: Number(data.pledged_amount || data.amount || 0),
+        paidAmount: Number(data.collected_amount || 0),
+        balance:
+          Number(data.pledged_amount || data.amount || 0) -
+          Number(data.collected_amount || 0),
+        frequency: data.frequency || "one-time",
+        nextPaymentDate: null,
+        nextPaymentAmount: 0,
+        startDate: data.start_date || null,
+        endDate: data.end_date || null,
+        status: data.status || "Active",
+      },
+      ...currentPledges,
+    ])
+
+    setIsProcessing(false)
+    setShowNewPledgeDialog(false)
   }
 
   const getStatusBadge = (status: string) => {
@@ -265,6 +475,8 @@ console.log("PAYMENTS ERROR:", paymentsError)
         return <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">Completed</Badge>
       case "Pending":
         return <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">Pending</Badge>
+      case "Unallocated":
+        return <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-100">Unallocated</Badge>
       default:
         return <Badge variant="secondary">{status}</Badge>
     }
@@ -272,7 +484,6 @@ console.log("PAYMENTS ERROR:", paymentsError)
 
   return (
     <div className="flex flex-col gap-8">
-      {/* Header */}
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-foreground">My Donations</h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -280,7 +491,6 @@ console.log("PAYMENTS ERROR:", paymentsError)
         </p>
       </div>
 
-      {/* Balance Summary Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="border-l-4 border-l-primary">
           <CardContent className="p-5">
@@ -348,7 +558,6 @@ console.log("PAYMENTS ERROR:", paymentsError)
         </Card>
       </div>
 
-      {/* Quick Action */}
       {activePledges.length > 0 && (
         <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-primary/10">
           <CardContent className="p-5">
@@ -368,22 +577,26 @@ console.log("PAYMENTS ERROR:", paymentsError)
         </Card>
       )}
 
-      {/* Tabs */}
       <Tabs defaultValue="pledges" className="w-full">
         <TabsList className="grid w-full max-w-md grid-cols-2">
           <TabsTrigger value="pledges">My Pledges</TabsTrigger>
           <TabsTrigger value="payments">Payment History</TabsTrigger>
         </TabsList>
 
-        {/* Pledges Tab */}
         <TabsContent value="pledges" className="mt-6">
           <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <h2 className="text-lg font-semibold text-foreground">Your Pledges</h2>
-              <Button variant="outline" size="sm" onClick={() => setShowNewPledgeDialog(true)}>
-                <Plus className="mr-1 h-4 w-4" />
-                New Pledge
-              </Button>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button size="sm" onClick={handleOpenOneTimeDonation}>
+                  <Heart className="mr-1 h-4 w-4" />
+                  One-Time Donation
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleOpenNewPledge}>
+                  <Plus className="mr-1 h-4 w-4" />
+                  New Pledge
+                </Button>
+              </div>
             </div>
 
             <div className="flex flex-col gap-4">
@@ -400,13 +613,9 @@ console.log("PAYMENTS ERROR:", paymentsError)
                     <div>
                       <p className="text-sm font-medium text-foreground">No pledges yet</p>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        Create a pledge when you are ready to support a fund.
+                        Create a pledge or make a one-time donation when you are ready to support a fund.
                       </p>
                     </div>
-                    <Button size="sm" onClick={() => setShowNewPledgeDialog(true)}>
-                      <Plus className="mr-1 h-4 w-4" />
-                      New Pledge
-                    </Button>
                   </CardContent>
                 </Card>
               ) : (
@@ -414,7 +623,6 @@ console.log("PAYMENTS ERROR:", paymentsError)
                   <Card key={pledge.id} className="overflow-hidden">
                     <CardContent className="p-0">
                       <div className="flex flex-col lg:flex-row">
-                        {/* Pledge Info */}
                         <div className="flex-1 p-5">
                           <div className="flex items-start justify-between">
                             <div>
@@ -428,7 +636,6 @@ console.log("PAYMENTS ERROR:", paymentsError)
                             </div>
                           </div>
 
-                          {/* Progress */}
                           <div className="mt-4">
                             <div className="mb-2 flex justify-between text-sm">
                               <span className="text-muted-foreground">Progress</span>
@@ -452,7 +659,6 @@ console.log("PAYMENTS ERROR:", paymentsError)
                           </div>
                         </div>
 
-                        {/* Action Panel */}
                         {pledge.status === "Active" && (
                           <div className="flex flex-col justify-center gap-3 border-t border-border bg-muted/30 p-5 lg:w-64 lg:border-l lg:border-t-0">
                             <div className="text-center lg:text-left">
@@ -490,7 +696,6 @@ console.log("PAYMENTS ERROR:", paymentsError)
           </div>
         </TabsContent>
 
-        {/* Payments Tab */}
         <TabsContent value="payments" className="mt-6">
           <div className="flex flex-col gap-4">
             <h2 className="text-lg font-semibold text-foreground">Payment History</h2>
@@ -539,6 +744,218 @@ console.log("PAYMENTS ERROR:", paymentsError)
         </TabsContent>
       </Tabs>
 
+      {/* One-Time Donation Dialog */}
+      <Dialog open={showOneTimeDonationDialog} onOpenChange={setShowOneTimeDonationDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {oneTimeDonationSuccess ? "Donation Successful" : "Make a One-Time Donation"}
+            </DialogTitle>
+            <DialogDescription>
+              {oneTimeDonationSuccess
+                ? "Thank you for your contribution!"
+                : "Choose an amount, fund, and payment method for your one-time donation."}
+            </DialogDescription>
+          </DialogHeader>
+
+          {oneTimeDonationSuccess ? (
+            <div className="flex flex-col items-center gap-4 py-6">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100">
+                <CheckCircle2 className="h-8 w-8 text-emerald-600" />
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-foreground">
+                  {formatCurrency(Number(oneTimeDonationForm.amount))}
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Donation saved as unallocated
+                </p>
+              </div>
+              <Button className="mt-4 w-full" onClick={() => setShowOneTimeDonationDialog(false)}>
+                Done
+              </Button>
+            </div>
+          ) : (
+            <>
+              <div className="flex flex-col gap-4 py-4">
+                <div className="flex flex-col gap-2">
+                  <Label>Donation Amount</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                      $
+                    </span>
+                    <Input
+                      type="number"
+                      value={oneTimeDonationForm.amount}
+                      onChange={(e) =>
+                        setOneTimeDonationForm({
+                          ...oneTimeDonationForm,
+                          amount: e.target.value,
+                        })
+                      }
+                      className="pl-7"
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <Label>Donation Category</Label>
+                  <Select
+                    value={oneTimeDonationForm.category}
+                    onValueChange={(v) =>
+                      setOneTimeDonationForm({
+                        ...oneTimeDonationForm,
+                        category: v,
+                        fund: "",
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {donationCategories.map((cat) => (
+                        <SelectItem key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {oneTimeDonationForm.category && (
+                  <div className="flex flex-col gap-2">
+                    <Label>Specific Fund</Label>
+                    <Select
+                      value={oneTimeDonationForm.fund}
+                      onValueChange={(v) =>
+                        setOneTimeDonationForm({
+                          ...oneTimeDonationForm,
+                          fund: v,
+                        })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select fund" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {donationCategories
+                          .find((c) => c.id === oneTimeDonationForm.category)
+                          ?.funds.map((fund) => (
+                            <SelectItem key={fund.id} value={fund.id}>
+                              {fund.name}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-2">
+                  <Label>Payment Method</Label>
+                  {savedPaymentMethods.length === 0 ? (
+                    <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                      No payment methods are available yet.
+                    </div>
+                  ) : (
+                    <RadioGroup
+                      value={oneTimeDonationForm.paymentMethod}
+                      onValueChange={(v) =>
+                        setOneTimeDonationForm({
+                          ...oneTimeDonationForm,
+                          paymentMethod: v,
+                        })
+                      }
+                      className="flex flex-col gap-2"
+                    >
+                      {savedPaymentMethods.map((method) => (
+                        <div key={method.id} className="flex items-center gap-3 rounded-lg border p-3">
+                          <RadioGroupItem value={method.id} id={`one-time-${method.id}`} />
+                          <Label htmlFor={`one-time-${method.id}`} className="flex-1 cursor-pointer">
+                            <div className="flex items-center justify-between">
+                              <span>{method.name}</span>
+                              {method.fee && (
+                                <Badge variant="secondary" className="text-xs">
+                                  {method.fee}
+                                </Badge>
+                              )}
+                            </div>
+                          </Label>
+                        </div>
+                      ))}
+                    </RadioGroup>
+                  )}
+
+                  <Button variant="ghost" size="sm" className="w-fit text-primary">
+                    <Plus className="mr-1 h-4 w-4" />
+                    Add new card
+                  </Button>
+                </div>
+
+                {formError && (
+                  <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                    {formError}
+                  </div>
+                )}
+
+                {oneTimeDonationForm.amount && (
+                  <div className="rounded-lg bg-muted/50 p-4">
+                    <p className="text-sm font-medium text-foreground">Donation Summary</p>
+                    <div className="mt-2 flex justify-between text-sm">
+                      <span className="text-muted-foreground">One-Time Donation:</span>
+                      <span className="font-bold text-foreground">
+                        {formatCurrency(Number(oneTimeDonationForm.amount))}
+                      </span>
+                    </div>
+                    {oneTimeDonationForm.category && (
+                      <div className="mt-1 flex justify-between text-sm">
+                        <span className="text-muted-foreground">Fund:</span>
+                        <span className="font-medium text-foreground">
+                          {getSelectedFundName(
+                            oneTimeDonationForm.category,
+                            oneTimeDonationForm.fund
+                          )}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowOneTimeDonationDialog(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={processOneTimeDonation}
+                  disabled={
+                    !oneTimeDonationForm.amount ||
+                    !oneTimeDonationForm.category ||
+                    !oneTimeDonationForm.fund ||
+                    !oneTimeDonationForm.paymentMethod ||
+                    isProcessing
+                  }
+                  className="gap-2"
+                >
+                  {isProcessing ? (
+                    <>
+                      <Clock className="h-4 w-4 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <CreditCard className="h-4 w-4" />
+                      Donate {formatCurrency(Number(oneTimeDonationForm.amount) || 0)}
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Payment Dialog */}
       <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
         <DialogContent className="max-w-md">
@@ -563,7 +980,7 @@ console.log("PAYMENTS ERROR:", paymentsError)
                   {formatCurrency(Number(paymentAmount))}
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Payment processed successfully
+                  Payment saved as unallocated
                 </p>
               </div>
               <Button className="mt-4 w-full" onClick={() => setShowPaymentDialog(false)}>
@@ -573,7 +990,6 @@ console.log("PAYMENTS ERROR:", paymentsError)
           ) : (
             <>
               <div className="flex flex-col gap-4 py-4">
-                {/* Amount */}
                 <div className="flex flex-col gap-2">
                   <Label>Payment Amount</Label>
                   <div className="relative">
@@ -610,12 +1026,11 @@ console.log("PAYMENTS ERROR:", paymentsError)
                   )}
                 </div>
 
-                {/* Payment Method */}
                 <div className="flex flex-col gap-2">
                   <Label>Payment Method</Label>
                   {savedPaymentMethods.length === 0 ? (
                     <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-                      No saved payment methods yet.
+                      No payment methods are available yet.
                     </div>
                   ) : (
                     <RadioGroup
@@ -628,12 +1043,10 @@ console.log("PAYMENTS ERROR:", paymentsError)
                           <RadioGroupItem value={method.id} id={method.id} />
                           <Label htmlFor={method.id} className="flex-1 cursor-pointer">
                             <div className="flex items-center justify-between">
-                              <span>
-                                {method.type} **** {method.last4}
-                              </span>
-                              {method.isDefault && (
+                              <span>{method.name}</span>
+                              {method.fee && (
                                 <Badge variant="secondary" className="text-xs">
-                                  Default
+                                  {method.fee}
                                 </Badge>
                               )}
                             </div>
@@ -647,6 +1060,12 @@ console.log("PAYMENTS ERROR:", paymentsError)
                     Add new card
                   </Button>
                 </div>
+
+                {formError && (
+                  <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                    {formError}
+                  </div>
+                )}
               </div>
 
               <DialogFooter>
@@ -655,7 +1074,7 @@ console.log("PAYMENTS ERROR:", paymentsError)
                 </Button>
                 <Button
                   onClick={processPayment}
-                  disabled={!paymentAmount || isProcessing || savedPaymentMethods.length === 0}
+                  disabled={!paymentAmount || !selectedPaymentMethod || isProcessing}
                   className="gap-2"
                 >
                   {isProcessing ? (
@@ -687,7 +1106,6 @@ console.log("PAYMENTS ERROR:", paymentsError)
           </DialogHeader>
 
           <div className="flex flex-col gap-4 py-4">
-            {/* Amount */}
             <div className="flex flex-col gap-2">
               <Label>Amount per Payment</Label>
               <div className="relative">
@@ -704,7 +1122,6 @@ console.log("PAYMENTS ERROR:", paymentsError)
               </div>
             </div>
 
-            {/* Frequency */}
             <div className="flex flex-col gap-2">
               <Label>Frequency</Label>
               <Select
@@ -723,7 +1140,6 @@ console.log("PAYMENTS ERROR:", paymentsError)
               </Select>
             </div>
 
-            {/* Number of Payments (if recurring) */}
             {newPledgeForm.frequency !== "one-time" && (
               <div className="flex flex-col gap-2">
                 <Label>Number of Payments</Label>
@@ -744,13 +1160,12 @@ console.log("PAYMENTS ERROR:", paymentsError)
               </div>
             )}
 
-            {/* Category */}
             <div className="flex flex-col gap-2">
               <Label>Donation Category</Label>
               <Select
                 value={newPledgeForm.category}
                 onValueChange={(v) =>
-                  setNewPledgeForm({ ...newPledgeForm, category: v, subcategory: "" })
+                  setNewPledgeForm({ ...newPledgeForm, category: v, fund: "" })
                 }
               >
                 <SelectTrigger>
@@ -759,20 +1174,19 @@ console.log("PAYMENTS ERROR:", paymentsError)
                 <SelectContent>
                   {donationCategories.map((cat) => (
                     <SelectItem key={cat.id} value={cat.id}>
-                      {cat.label}
+                      {cat.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Subcategory */}
             {newPledgeForm.category && (
               <div className="flex flex-col gap-2">
                 <Label>Specific Fund</Label>
                 <Select
-                  value={newPledgeForm.subcategory}
-                  onValueChange={(v) => setNewPledgeForm({ ...newPledgeForm, subcategory: v })}
+                  value={newPledgeForm.fund}
+                  onValueChange={(v) => setNewPledgeForm({ ...newPledgeForm, fund: v })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select fund" />
@@ -780,9 +1194,9 @@ console.log("PAYMENTS ERROR:", paymentsError)
                   <SelectContent>
                     {donationCategories
                       .find((c) => c.id === newPledgeForm.category)
-                      ?.subcategories.map((sub) => (
-                        <SelectItem key={sub.id} value={sub.id}>
-                          {sub.label}
+                      ?.funds.map((fund) => (
+                        <SelectItem key={fund.id} value={fund.id}>
+                          {fund.name}
                         </SelectItem>
                       ))}
                   </SelectContent>
@@ -790,7 +1204,12 @@ console.log("PAYMENTS ERROR:", paymentsError)
               </div>
             )}
 
-            {/* Summary */}
+            {formError && (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                {formError}
+              </div>
+            )}
+
             {newPledgeForm.amount && (
               <div className="rounded-lg bg-muted/50 p-4">
                 <p className="text-sm font-medium text-foreground">Pledge Summary</p>
@@ -805,6 +1224,14 @@ console.log("PAYMENTS ERROR:", paymentsError)
                     )}
                   </span>
                 </div>
+                {newPledgeForm.category && (
+                  <div className="mt-1 flex justify-between text-sm">
+                    <span className="text-muted-foreground">Fund:</span>
+                    <span className="font-medium text-foreground">
+                      {getSelectedFundName(newPledgeForm.category, newPledgeForm.fund)}
+                    </span>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -814,10 +1241,23 @@ console.log("PAYMENTS ERROR:", paymentsError)
               Cancel
             </Button>
             <Button
-              onClick={() => setShowNewPledgeDialog(false)}
-              disabled={!newPledgeForm.amount || !newPledgeForm.category}
+              onClick={createPledge}
+              disabled={
+                !newPledgeForm.amount ||
+                !newPledgeForm.category ||
+                !newPledgeForm.fund ||
+                isProcessing
+              }
+              className="gap-2"
             >
-              Create Pledge
+              {isProcessing ? (
+                <>
+                  <Clock className="h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Create Pledge"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
