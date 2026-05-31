@@ -222,12 +222,27 @@ function safeMonthYear(value: string) {
   }
 }
 
+function formatRelationship(value: string) {
+  const labels: Record<string, string> = {
+    child: "Child / Grandchild",
+    guardian: "Guardian",
+    spouse: "Spouse",
+    parent: "Parent",
+    sibling: "Sibling",
+    other: "Other",
+  }
+
+  return labels[value] || value
+}
+
 export default function CustomerProfilePage() {
   const supabase = createClient()
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [contactId, setContactId] = useState<string | null>(null)
+  const [personId, setPersonId] = useState<string | null>(null)
+  const [organizationId, setOrganizationId] = useState<string | null>(null)
   const [profile, setProfile] = useState<ProfileData>(emptyProfile)
   const [editData, setEditData] = useState<ProfileData>(emptyProfile)
   const [isEditing, setIsEditing] = useState(false)
@@ -274,7 +289,7 @@ export default function CustomerProfilePage() {
 
       const { data, error } = await supabase
         .from("contacts")
-        .select("id, full_name, email, phone, address, city, state, zip, country, notes, created_at")
+        .select("id, organization_id, person_id, full_name, email, phone, address, city, state, zip, country, notes, created_at")
         .eq("auth_user_id", user.id)
         .maybeSingle()
 
@@ -307,11 +322,18 @@ export default function CustomerProfilePage() {
       }
 
       setContactId(data.id)
+      setPersonId(data.person_id)
+      setOrganizationId(data.organization_id)
       setProfile(loadedProfile)
       setEditData(loadedProfile)
 
-      // These remain empty until real tables exist for family members, payment methods, applications, and notification preferences.
-      setFamilyMembers([])
+      if (data.person_id) {
+        await loadFamilyMembers(data.person_id)
+      } else {
+        setFamilyMembers([])
+      }
+
+      // These remain empty until real tables exist for payment methods, applications, and notification preferences.
       setPaymentMethods([])
       setUserApplications([])
       setNotifications(defaultNotifications)
@@ -377,18 +399,102 @@ export default function CustomerProfilePage() {
     setNotifications((prev) => ({ ...prev, [field]: value }))
   }
 
-  function handleAddFamilyMember() {
-    const newMember: FamilyMember = {
-      id: `fm-${Date.now()}`,
-      ...newFamilyMember,
+  async function loadFamilyMembers(parentPersonId: string) {
+    const { data, error } = await supabase
+      .from("person_relationships")
+      .select(`
+        id,
+        relationship_type,
+        related_person_id,
+        people:related_person_id (
+          id,
+          first_name,
+          last_name,
+          gender,
+          date_of_birth
+        )
+      `)
+      .eq("person_id", parentPersonId)
+
+    if (error) {
+      console.error("Family members load error:", error)
+      return
     }
-    setFamilyMembers((prev) => [...prev, newMember])
-    setNewFamilyMember({ firstName: "", lastName: "", gender: "", dateOfBirth: "", relationship: "" })
-    setIsAddFamilyDialogOpen(false)
+
+    const members =
+      data?.map((row: any) => ({
+        id: row.people.id,
+        firstName: row.people.first_name || "",
+        lastName: row.people.last_name || "",
+        gender: row.people.gender || "",
+        dateOfBirth: row.people.date_of_birth || "",
+        relationship: row.relationship_type || "",
+      })) || []
+
+    setFamilyMembers(members)
   }
 
-  function handleRemoveFamilyMember(id: string) {
-    setFamilyMembers((prev) => prev.filter((m) => m.id !== id))
+  async function handleAddFamilyMember() {
+    if (!organizationId || !personId) {
+      alert("Missing customer profile connection. Please refresh and try again.")
+      return
+    }
+
+    const { data: createdPerson, error: personError } = await supabase
+      .from("people")
+      .insert({
+        organization_id: organizationId,
+        first_name: newFamilyMember.firstName,
+        last_name: newFamilyMember.lastName,
+        gender: newFamilyMember.gender || null,
+        date_of_birth: newFamilyMember.dateOfBirth || null,
+        person_type: "participant",
+      })
+      .select("id")
+      .single()
+
+    if (personError || !createdPerson) {
+      console.error("Family member create error:", personError)
+      alert(personError?.message || "Could not create family member.")
+      return
+    }
+
+    const { error: relationshipError } = await supabase
+      .from("person_relationships")
+      .insert({
+        organization_id: organizationId,
+        person_id: personId,
+        related_person_id: createdPerson.id,
+        relationship_type: newFamilyMember.relationship,
+      })
+
+    if (relationshipError) {
+      console.error("Family relationship create error:", relationshipError)
+      alert(relationshipError.message)
+      return
+    }
+
+    setNewFamilyMember({ firstName: "", lastName: "", gender: "", dateOfBirth: "", relationship: "" })
+    setIsAddFamilyDialogOpen(false)
+    await loadFamilyMembers(personId)
+  }
+
+  async function handleRemoveFamilyMember(id: string) {
+    if (!personId) return
+
+    const { error } = await supabase
+      .from("person_relationships")
+      .delete()
+      .eq("person_id", personId)
+      .eq("related_person_id", id)
+
+    if (error) {
+      console.error("Family member remove error:", error)
+      alert(error.message)
+      return
+    }
+
+    await loadFamilyMembers(personId)
   }
 
   function detectCardType(cardNumber: string): "visa" | "mastercard" | "amex" | "discover" {
@@ -661,7 +767,7 @@ export default function CustomerProfilePage() {
                       <Avatar className="h-12 w-12 border border-border"><AvatarFallback className="bg-primary/10 text-sm font-medium text-primary">{member.firstName[0]}{member.lastName[0]}</AvatarFallback></Avatar>
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-2"><span className="text-sm font-medium text-foreground">{member.firstName} {member.lastName}</span>{isMinor && <Badge variant="secondary" className="text-xs">Minor</Badge>}</div>
-                        <div className="flex items-center gap-3 text-xs text-muted-foreground"><span>{member.relationship}</span><span className="text-muted-foreground/50">|</span><span>{member.gender}</span><span className="text-muted-foreground/50">|</span><span>{age} years old</span></div>
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground"><span>{formatRelationship(member.relationship)}</span><span className="text-muted-foreground/50">|</span><span>{member.gender}</span><span className="text-muted-foreground/50">|</span><span>{age} years old</span></div>
                       </div>
                     </div>
                     <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive" onClick={() => handleRemoveFamilyMember(member.id)}><Trash2 className="h-4 w-4" /></Button>
@@ -684,7 +790,7 @@ export default function CustomerProfilePage() {
             <div className="flex flex-col gap-2"><Label htmlFor="fm-dob">Date of Birth</Label><Input id="fm-dob" type="date" value={newFamilyMember.dateOfBirth} onChange={(e) => setNewFamilyMember((prev) => ({ ...prev, dateOfBirth: e.target.value }))} /></div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-2"><Label htmlFor="fm-gender">Gender</Label><Select value={newFamilyMember.gender} onValueChange={(val) => setNewFamilyMember((prev) => ({ ...prev, gender: val }))}><SelectTrigger id="fm-gender"><SelectValue placeholder="Select gender" /></SelectTrigger><SelectContent><SelectItem value="Male">Male</SelectItem><SelectItem value="Female">Female</SelectItem><SelectItem value="Non-binary">Non-binary</SelectItem><SelectItem value="Prefer not to say">Prefer not to say</SelectItem></SelectContent></Select></div>
-              <div className="flex flex-col gap-2"><Label htmlFor="fm-relationship">Relationship</Label><Select value={newFamilyMember.relationship} onValueChange={(val) => setNewFamilyMember((prev) => ({ ...prev, relationship: val }))}><SelectTrigger id="fm-relationship"><SelectValue placeholder="Select relationship" /></SelectTrigger><SelectContent><SelectItem value="Spouse">Spouse</SelectItem><SelectItem value="Son">Son</SelectItem><SelectItem value="Daughter">Daughter</SelectItem><SelectItem value="Parent">Parent</SelectItem><SelectItem value="Sibling">Sibling</SelectItem><SelectItem value="Grandchild">Grandchild</SelectItem><SelectItem value="Other">Other</SelectItem></SelectContent></Select></div>
+              <div className="flex flex-col gap-2"><Label htmlFor="fm-relationship">Relationship</Label><Select value={newFamilyMember.relationship} onValueChange={(val) => setNewFamilyMember((prev) => ({ ...prev, relationship: val }))}><SelectTrigger id="fm-relationship"><SelectValue placeholder="Select relationship" /></SelectTrigger><SelectContent><SelectItem value="child">Child / Grandchild</SelectItem><SelectItem value="guardian">Guardian</SelectItem><SelectItem value="spouse">Spouse</SelectItem><SelectItem value="parent">Parent</SelectItem><SelectItem value="sibling">Sibling</SelectItem><SelectItem value="other">Other</SelectItem></SelectContent></Select></div>
             </div>
           </div>
           <DialogFooter><Button variant="outline" onClick={() => setIsAddFamilyDialogOpen(false)}>Cancel</Button><Button onClick={handleAddFamilyMember} disabled={!newFamilyMember.firstName || !newFamilyMember.lastName || !newFamilyMember.dateOfBirth || !newFamilyMember.gender || !newFamilyMember.relationship}>Add Member</Button></DialogFooter>

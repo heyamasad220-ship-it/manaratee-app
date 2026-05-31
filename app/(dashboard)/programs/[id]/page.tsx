@@ -111,11 +111,7 @@ console.log(programDiscounts)
               {program.description || "No description provided."}
             </p>
           </div>
-          <Button asChild>
-  <Link href={`/programs/${program.id}/sessions`}>
-    Sessions
-  </Link>
-</Button>
+          
           <Button asChild>
             <Link href={`/programs/${program.id}/edit`}>
               <Edit className="mr-2 h-4 w-4" />

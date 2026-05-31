@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, CalendarIcon, Check, ChevronDown } from "lucide-react"
+import { ArrowLeft, CalendarIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -39,6 +39,12 @@ const GRADE_LEVELS = [
 
 const AGES = Array.from({ length: 19 }, (_, index) => index.toString())
 
+function getNumberOrNull(value: FormDataEntryValue | null) {
+  const stringValue = String(value || "")
+  if (!stringValue) return null
+  return Number(stringValue)
+}
+
 export function CreateProgramForm({
   departments,
 }: {
@@ -48,7 +54,9 @@ export function CreateProgramForm({
 
   const [isSaving, setIsSaving] = React.useState(false)
   const [gradeLevels, setGradeLevels] = React.useState<string[]>([])
-  const [gradeDropdownOpen, setGradeDropdownOpen] = React.useState(false)
+  const [registrationType, setRegistrationType] = React.useState<
+    "full_program" | "sessions"
+  >("full_program")
 
   function toggleGradeLevel(value: string) {
     setGradeLevels((current) =>
@@ -64,27 +72,11 @@ export function CreateProgramForm({
     )
   }
 
-  function getGradeLabel() {
-    if (gradeLevels.length === 0) return "Select grade levels..."
-    if (gradeLevels.length === GRADE_LEVELS.length) return "All grades"
-    if (gradeLevels.length <= 2) return gradeLevels.join(", ")
-    return `${gradeLevels.length} grades selected`
-  }
-
   async function handleSubmit(formData: FormData) {
     setIsSaving(true)
 
-    const minAge = String(formData.get("min_age") || "")
-    const maxAge = String(formData.get("max_age") || "")
-
-    const ageGroups =
-      minAge && maxAge
-        ? [`${minAge}-${maxAge} years`]
-        : minAge
-          ? [`${minAge}+ years`]
-          : maxAge
-            ? [`Up to ${maxAge} years`]
-            : []
+    const minAge = getNumberOrNull(formData.get("min_age"))
+    const maxAge = getNumberOrNull(formData.get("max_age"))
 
     await createProgram({
       name: String(formData.get("name") || ""),
@@ -96,9 +88,11 @@ export function CreateProgramForm({
         String(formData.get("enrollment_open_date") || "") || null,
       enrollment_close_date:
         String(formData.get("enrollment_close_date") || "") || null,
-      age_groups: ageGroups,
+      min_age: minAge,
+      max_age: maxAge,
       grade_levels: gradeLevels,
       gender: String(formData.get("gender") || "All"),
+      session_registration_enabled: registrationType === "sessions",
       capacity: Number(formData.get("capacity") || 0),
       status: String(formData.get("status") || "draft"),
     })
@@ -137,60 +131,60 @@ export function CreateProgramForm({
 
         <div className="grid gap-6">
           <Card>
-  <CardHeader>
-    <CardTitle>Program Information</CardTitle>
-    <CardDescription>
-      Basic details about your program.
-    </CardDescription>
-  </CardHeader>
+            <CardHeader>
+              <CardTitle>Program Information</CardTitle>
+              <CardDescription>
+                Basic details about your program.
+              </CardDescription>
+            </CardHeader>
 
-  <CardContent className="space-y-5">
-    <div className="grid gap-4 md:grid-cols-3">
-      <div className="space-y-2 md:col-span-2">
-        <Label htmlFor="name">Program Name *</Label>
-        <Input
-          id="name"
-          name="name"
-          required
-          placeholder="Summer Adventure Camp"
-        />
-      </div>
+            <CardContent className="space-y-5">
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="name">Program Name *</Label>
+                  <Input
+                    id="name"
+                    name="name"
+                    required
+                    placeholder="Summer Adventure Camp"
+                  />
+                </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="department_id">Department</Label>
-        <select
-          id="department_id"
-          name="department_id"
-          defaultValue=""
-          className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-        >
-          <option value="">No department</option>
-          {departments.map((department) => (
-            <option key={department.id} value={department.id}>
-              {department.name}
-            </option>
-          ))}
-        </select>
-      </div>
-    </div>
+                <div className="space-y-2">
+                  <Label htmlFor="department_id">Department</Label>
+                  <select
+                    id="department_id"
+                    name="department_id"
+                    defaultValue=""
+                    className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                  >
+                    <option value="">No department</option>
+                    {departments.map((department) => (
+                      <option key={department.id} value={department.id}>
+                        {department.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
 
-    {departments.length === 0 && (
-      <p className="text-xs text-muted-foreground">
-        No departments found. Add departments in Settings first.
-      </p>
-    )}
+              {departments.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  No departments found. Add departments in Settings first.
+                </p>
+              ) : null}
 
-    <div className="space-y-2">
-      <Label htmlFor="description">Description</Label>
-      <Textarea
-        id="description"
-        name="description"
-        rows={4}
-        placeholder="Describe what participants will experience..."
-      />
-    </div>
-  </CardContent>
-</Card>
+              <div className="space-y-2">
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  name="description"
+                  rows={4}
+                  placeholder="Describe what participants will experience..."
+                />
+              </div>
+            </CardContent>
+          </Card>
 
           <Card>
             <CardHeader>
@@ -257,11 +251,11 @@ export function CreateProgramForm({
             <CardHeader>
               <CardTitle>Eligibility</CardTitle>
               <CardDescription>
-                Define who can register for this program.
+                Define who can register for this program. Leave fields blank to allow everyone.
               </CardDescription>
             </CardHeader>
 
-            <CardContent>
+            <CardContent className="space-y-6">
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <div className="space-y-2">
                   <Label htmlFor="min_age">Minimum Age</Label>
@@ -297,62 +291,8 @@ export function CreateProgramForm({
                   </select>
                 </div>
 
-                <div className="relative space-y-2">
-                  <Label>Grade Levels</Label>
-
-                  <button
-                    type="button"
-                    onClick={() => setGradeDropdownOpen((open) => !open)}
-                    className="flex h-10 w-full items-center justify-between rounded-md border bg-background px-3 text-left text-sm"
-                  >
-                    <span className="truncate">{getGradeLabel()}</span>
-                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                  </button>
-
-                  {gradeDropdownOpen && (
-  <>
-    <button
-      type="button"
-      className="fixed inset-0 z-10 cursor-default"
-      onClick={() => setGradeDropdownOpen(false)}
-      aria-label="Close grade levels menu"
-    />
-
-    <div className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-md border bg-background p-2 shadow-md">
-                      <label className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm hover:bg-muted">
-                        <input
-                          type="checkbox"
-                          checked={gradeLevels.length === GRADE_LEVELS.length}
-                          onChange={toggleAllGrades}
-                        />
-                        <span className="font-medium">Select All</span>
-                      </label>
-
-                      <div className="my-1 border-t" />
-
-                      {GRADE_LEVELS.map((grade) => (
-                        <label
-                          key={grade}
-                          className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm hover:bg-muted"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={gradeLevels.includes(grade)}
-                            onChange={() => toggleGradeLevel(grade)}
-                          />
-                          <span>{grade}</span>
-                          {gradeLevels.includes(grade) && (
-                            <Check className="ml-auto h-3 w-3" />
-                          )}
-                        </label>
-                      ))}
-                    </div>
-                  </>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="gender">Gender</Label>
+                <div className="space-y-2 xl:col-span-2">
+                  <Label>Gender</Label>
                   <select
                     id="gender"
                     name="gender"
@@ -364,6 +304,92 @@ export function CreateProgramForm({
                     <option value="Female">Female Only</option>
                   </select>
                 </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <Label>Grade Levels</Label>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Leave all unchecked to allow all grades.
+                    </p>
+                  </div>
+
+                  <Button type="button" variant="outline" size="sm" onClick={toggleAllGrades}>
+                    {gradeLevels.length === GRADE_LEVELS.length
+                      ? "Clear grades"
+                      : "Select all grades"}
+                  </Button>
+                </div>
+
+                <div className="grid gap-2 rounded-lg border bg-muted/20 p-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                  {GRADE_LEVELS.map((grade) => (
+                    <label
+                      key={grade}
+                      className="flex cursor-pointer items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm hover:bg-muted"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={gradeLevels.includes(grade)}
+                        onChange={() => toggleGradeLevel(grade)}
+                      />
+                      <span>{grade}</span>
+                    </label>
+                  ))}
+                </div>
+
+                <p className="text-xs text-muted-foreground">
+                  {gradeLevels.length === 0
+                    ? "All grades are allowed."
+                    : `${gradeLevels.length} grade${gradeLevels.length === 1 ? "" : "s"} selected.`}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Registration Type</CardTitle>
+              <CardDescription>
+                Choose how customers register for this program.
+              </CardDescription>
+            </CardHeader>
+
+            <CardContent>
+              <div className="grid gap-3 md:grid-cols-2">
+                <label className="flex cursor-pointer items-start gap-3 rounded-lg border p-4 hover:bg-muted/40">
+                  <input
+                    type="radio"
+                    name="registration_type"
+                    value="full_program"
+                    checked={registrationType === "full_program"}
+                    onChange={() => setRegistrationType("full_program")}
+                    className="mt-1"
+                  />
+                  <div>
+                    <p className="font-medium">Full Program Registration</p>
+                    <p className="text-sm text-muted-foreground">
+                      Customers register once for the entire program. Use this for camps or full-length classes.
+                    </p>
+                  </div>
+                </label>
+
+                <label className="flex cursor-pointer items-start gap-3 rounded-lg border p-4 hover:bg-muted/40">
+                  <input
+                    type="radio"
+                    name="registration_type"
+                    value="sessions"
+                    checked={registrationType === "sessions"}
+                    onChange={() => setRegistrationType("sessions")}
+                    className="mt-1"
+                  />
+                  <div>
+                    <p className="font-medium">Session-Based Registration</p>
+                    <p className="text-sm text-muted-foreground">
+                      Customers can choose one or more sessions. Use this for programs like swimming or multi-session workshops.
+                    </p>
+                  </div>
+                </label>
               </div>
             </CardContent>
           </Card>
