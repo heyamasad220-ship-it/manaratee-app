@@ -3,7 +3,12 @@
 import * as React from "react"
 import { Header } from "@/components/layout/header"
 import { createClient } from "@/lib/supabase/client"
-import { createDepartment } from "@/lib/departments/department-actions"
+import {
+  createDepartment,
+  deleteDepartment,
+  fetchDepartmentsWithProgramCounts,
+  updateDepartment,
+} from "@/lib/departments/department-actions"
 import { cn } from "@/lib/utils"
 
 import {
@@ -223,22 +228,19 @@ export default function SettingsPage() {
     setLoading(true)
 
     try {
-      const [settingsResult, departmentsResult, programsResult, discountsResult] =
-        await Promise.all([
-          supabase.from("program_settings").select("settings").eq("id", "default").maybeSingle(),
-          supabase.from("departments").select("id, name, description, color").order("name"),
-          supabase.from("programs").select("id, department_id"),
-          supabase
-            .from("discount_codes")
-            .select(
-              "id, code, description, discount_type, discount_value, starts_at, expires_at, max_uses, used_count, active"
-            )
-            .order("created_at", { ascending: false }),
-        ])
+      const [settingsResult, departments, discountsResult] = await Promise.all([
+        supabase.from("program_settings").select("settings").eq("id", "default").maybeSingle(),
+        fetchDepartmentsWithProgramCounts(),
+        supabase
+          .from("discount_codes")
+          .select(
+            "id, code, description, discount_type, discount_value, starts_at, expires_at, max_uses, used_count, active"
+          )
+          .order("created_at", { ascending: false }),
+      ])
 
       const missingTableErrors = [
         settingsResult.error,
-        departmentsResult.error,
         discountsResult.error,
       ].filter((error) => error?.code === "42P01" || error?.code === "42703")
 
@@ -250,26 +252,7 @@ export default function SettingsPage() {
         console.warn("program_settings could not be loaded:", settingsResult.error.message)
       }
 
-      if (!departmentsResult.error) {
-        const programCounts = new Map<string, number>()
-
-        if (!programsResult.error) {
-          ;(programsResult.data || []).forEach((program: any) => {
-            if (!program.department_id) return
-            programCounts.set(program.department_id, (programCounts.get(program.department_id) || 0) + 1)
-          })
-        }
-
-        setDepartments(
-          ((departmentsResult.data || []) as Department[]).map((department) => ({
-            ...department,
-            programs_count: programCounts.get(department.id) || 0,
-          }))
-        )
-      } else {
-        console.warn("departments could not be loaded:", departmentsResult.error.message)
-        setDepartments([])
-      }
+      setDepartments(departments)
 
       if (!discountsResult.error) {
         setDiscountCodes((discountsResult.data || []) as DiscountCode[])
@@ -332,27 +315,20 @@ export default function SettingsPage() {
     setSaving(true)
 
     try {
-      const {
-  data: { user },
-} = await supabase.auth.getUser()
-
-if (!user) {
-  alert("You must be logged in.")
-  return
-}
-
-const payload = {
-  organization_id: user.id,
-  name: editingDepartment.name.trim(),
-  description: editingDepartment.description.trim() || null,
-  color: editingDepartment.color || "#3b82f6",
-}
-
-      const { error } = editingDepartment.id
-        ? await supabase.from("departments").update(payload).eq("id", editingDepartment.id)
-        : await supabase.from("departments").insert(payload)
-
-      if (error) throw error
+      if (editingDepartment.id) {
+        await updateDepartment({
+          id: editingDepartment.id,
+          name: editingDepartment.name.trim(),
+          description: editingDepartment.description.trim() || undefined,
+          color: editingDepartment.color || "#3b82f6",
+        })
+      } else {
+        await createDepartment({
+          name: editingDepartment.name.trim(),
+          description: editingDepartment.description.trim() || undefined,
+          color: editingDepartment.color || "#3b82f6",
+        })
+      }
 
       setDepartmentDialogOpen(false)
       setEditingDepartment(emptyDepartment)
@@ -374,15 +350,13 @@ const payload = {
     const confirmed = window.confirm("Delete this department?")
     if (!confirmed) return
 
-    const { error } = await supabase.from("departments").delete().eq("id", department.id)
-
-    if (error) {
+    try {
+      await deleteDepartment(department.id)
+      await fetchSettingsData()
+    } catch (error: any) {
       console.error("Delete department error:", error)
-      alert(error.message)
-      return
+      alert(error?.message || "Could not delete department.")
     }
-
-    await fetchSettingsData()
   }
 
   function openAddDiscountDialog() {

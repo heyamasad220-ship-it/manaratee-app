@@ -9,6 +9,7 @@ type CreateProgramInput = {
   name: string
   description?: string
   department_id?: string | null
+  program_type?: "adult" | "youth" | "family"
   start_date?: string | null
   end_date?: string | null
   enrollment_open_date?: string | null
@@ -17,9 +18,13 @@ type CreateProgramInput = {
   gender?: string | null
   capacity?: number
   status?: string
+  full_program_registration_enabled?: boolean
   session_registration_enabled?: boolean
   min_age?: number | null
   max_age?: number | null
+  require_guardian?: boolean
+  require_grade?: boolean
+  require_emergency_contact?: boolean
 }
 
 export async function createProgram(input: CreateProgramInput) {
@@ -30,30 +35,43 @@ export async function createProgram(input: CreateProgramInput) {
     throw new Error("No organization selected")
   }
 
-  const { error } = await supabase.from("programs").insert({
-    organization_id: organizationId,
-    name: input.name,
-    description: input.description || null,
-    department_id: input.department_id || null,
-    start_date: input.start_date || null,
-    end_date: input.end_date || null,
-    enrollment_open_date: input.enrollment_open_date || null,
-    enrollment_close_date: input.enrollment_close_date || null,
+  const { data, error } = await supabase
+    .from("programs")
+    .insert({
+      organization_id: organizationId,
+      name: input.name,
+      description: input.description || null,
+      department_id: input.department_id || null,
+      start_date: input.start_date || null,
+      end_date: input.end_date || null,
+      enrollment_open_date: input.enrollment_open_date || null,
+      enrollment_close_date: input.enrollment_close_date || null,
 
-    age_groups: [],
-    grade_levels: input.grade_levels || [],
-    gender: input.gender || "All",
-    min_age: input.min_age ?? null,
-    max_age: input.max_age ?? null,
+      program_type: input.program_type || "youth",
+      age_groups: [],
+      grade_levels: input.grade_levels || [],
+      gender: input.gender || "All",
+      min_age: input.min_age ?? null,
+      max_age: input.max_age ?? null,
 
-    session_registration_enabled:
-      input.session_registration_enabled ?? false,
+      require_guardian:
+        input.require_guardian ??
+        (input.program_type === "adult" ? false : true),
+      require_grade: input.require_grade ?? false,
+      require_emergency_contact: input.require_emergency_contact ?? true,
 
-    capacity: input.capacity || 0,
-    enrolled: 0,
-    waitlist: 0,
-    status: input.status || "draft",
-  })
+      full_program_registration_enabled:
+        input.full_program_registration_enabled ?? true,
+      session_registration_enabled:
+        input.session_registration_enabled ?? false,
+
+      capacity: input.capacity || 0,
+      enrolled: 0,
+      waitlist: 0,
+      status: input.status || "draft",
+    })
+    .select("id")
+    .single()
 
   if (error) {
     console.error(error)
@@ -61,6 +79,8 @@ export async function createProgram(input: CreateProgramInput) {
   }
 
   revalidatePath("/programs")
+
+  return data.id
 }
 
 type UpdateProgramInput = {
@@ -78,6 +98,7 @@ type UpdateProgramInput = {
   capacity?: number
   status?: string
 
+  full_program_registration_enabled?: boolean
   session_registration_enabled?: boolean
 
   financial_assistance_enabled?: boolean
@@ -139,6 +160,8 @@ export async function updateProgram(input: UpdateProgramInput) {
       min_grade: input.min_grade ?? null,
       max_grade: input.max_grade ?? null,
 
+      full_program_registration_enabled:
+        input.full_program_registration_enabled ?? true,
       session_registration_enabled:
         input.session_registration_enabled ?? false,
 

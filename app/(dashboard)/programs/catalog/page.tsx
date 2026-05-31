@@ -14,8 +14,8 @@ import { Header } from "@/components/layout/header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { createClient } from "@/lib/supabase/server"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { getDepartments } from "@/lib/departments/department-queries"
 import {
   Table,
   TableBody,
@@ -221,16 +221,10 @@ export default async function ProgramsPage({
     view: getValue(resolvedSearchParams?.view) || "cards",
   }
 
-  const supabase = await createClient()
-
-const programs = await getPrograms()
-
-const { data: departmentsData } = await supabase
-  .from("departments")
-  .select("id, name")
-  .order("name")
-
-const departments = departmentsData || []
+  const [programs, departments] = await Promise.all([
+    getPrograms(),
+    getDepartments(),
+  ])
   const filteredPrograms = programs.filter((program) =>
     matchesProgram(program, filters)
   )
@@ -308,7 +302,7 @@ const departments = departmentsData || []
                   variant={viewMode === "cards" ? "secondary" : "outline"}
                   asChild
                 >
-                  <Link href="/programs?view=cards">
+                  <Link href="/programs/catalog?view=cards">
                     <LayoutGrid className="mr-2 h-4 w-4" />
                     Cards
                   </Link>
@@ -318,7 +312,7 @@ const departments = departmentsData || []
                   variant={viewMode === "table" ? "secondary" : "outline"}
                   asChild
                 >
-                  <Link href="/programs?view=table">
+                  <Link href="/programs/catalog?view=table">
                     <List className="mr-2 h-4 w-4" />
                     Table
                   </Link>

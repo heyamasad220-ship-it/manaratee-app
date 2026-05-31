@@ -6,8 +6,6 @@ import { useRouter } from "next/navigation"
 import {
   ArrowLeft,
   CalendarIcon,
-  CheckCircle2,
-  Layers,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -22,27 +20,24 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import {
+  getGradeRange,
+  getMinMaxGradeFromLevels,
+  GradeLevelsMultiSelect,
+} from "@/components/programs/grade-levels-multi-select"
+import { ProgramCapacityGroupEditor } from "@/components/programs/program-capacity-group-editor"
+import {
+  getInitialFullProgramRegistrationEnabled,
+  RegistrationTypeSelector,
+} from "@/components/programs/registration-type-selector"
+import { ProgramSessionsEditor } from "@/components/programs/program-sessions-editor"
 import type { Department } from "@/lib/departments/department-types"
+import { replaceProgramCapacityGroups } from "@/lib/programs/program-capacity-group-actions"
+import type { ProgramCapacityGroupInput } from "@/lib/programs/program-capacity-group-types"
 import { updateProgram } from "@/lib/programs/program-actions"
 import { replaceProgramFeeOptions } from "@/lib/programs/program-fee-actions"
+import type { ProgramSession } from "@/lib/programs/program-session-types"
 import type { Program } from "@/lib/programs/program-types"
-
-const GRADE_LEVELS = [
-  "Pre-K",
-  "Kindergarten",
-  "1st Grade",
-  "2nd Grade",
-  "3rd Grade",
-  "4th Grade",
-  "5th Grade",
-  "6th Grade",
-  "7th Grade",
-  "8th Grade",
-  "9th Grade",
-  "10th Grade",
-  "11th Grade",
-  "12th Grade",
-]
 
 const AGE_OPTIONS = Array.from({ length: 100 }, (_, index) => index)
 
@@ -69,19 +64,16 @@ type VisibilityType = "public" | "private" | "members_only"
 
 type ProgramWithExtraFields = Program & {
   visibility?: VisibilityType
+  full_program_registration_enabled?: boolean
   session_registration_enabled?: boolean
 }
 
-function getGradeRange(minGrade: string | null, maxGrade: string | null) {
-  if (!minGrade || !maxGrade) return []
+function getInitialGradeLevels(program: Program) {
+  if (program.grade_levels?.length) {
+    return program.grade_levels
+  }
 
-  const minIndex = GRADE_LEVELS.indexOf(minGrade)
-  const maxIndex = GRADE_LEVELS.indexOf(maxGrade)
-
-  if (minIndex === -1 || maxIndex === -1) return []
-  if (minIndex > maxIndex) return []
-
-  return GRADE_LEVELS.slice(minIndex, maxIndex + 1)
+  return getGradeRange(program.min_grade || null, program.max_grade || null)
 }
 
 function getAgeGroups(minAge: number | null, maxAge: number | null) {
@@ -108,10 +100,14 @@ export function EditProgramForm({
   program,
   departments,
   feeOptions,
+  capacityGroups: initialCapacityGroups,
+  sessions,
 }: {
   program: Program
   departments: Department[]
   feeOptions: ProgramFeeOption[]
+  capacityGroups: ProgramCapacityGroupInput[]
+  sessions: ProgramSession[]
 }) {
   const router = useRouter()
   const typedProgram = program as ProgramWithExtraFields
@@ -121,6 +117,8 @@ export function EditProgramForm({
   const initialVisibility = (typedProgram.visibility || "public") as VisibilityType
   const initialSessionRegistrationEnabled =
     typedProgram.session_registration_enabled || false
+  const initialFullProgramRegistrationEnabled =
+    getInitialFullProgramRegistrationEnabled(typedProgram)
 
   const [isSaving, setIsSaving] = React.useState(false)
   const [programType, setProgramType] =
@@ -129,12 +127,25 @@ export function EditProgramForm({
     React.useState<BillingType>(initialBillingType)
   const [sessionRegistrationEnabled, setSessionRegistrationEnabled] =
     React.useState(initialSessionRegistrationEnabled)
-  const [minGrade, setMinGrade] = React.useState<string>(
-    program.min_grade || ""
+  const [fullProgramRegistrationEnabled, setFullProgramRegistrationEnabled] =
+    React.useState(initialFullProgramRegistrationEnabled)
+  const [programGender, setProgramGender] = React.useState<
+    "All" | "Male" | "Female"
+  >((program.gender as "All" | "Male" | "Female") || "All")
+  const [gradeLevels, setGradeLevels] = React.useState<string[]>(
+    getInitialGradeLevels(program)
   )
-  const [maxGrade, setMaxGrade] = React.useState<string>(
-    program.max_grade || ""
-  )
+  const [capacityGroups, setCapacityGroups] =
+    React.useState<ProgramCapacityGroupInput[]>(
+      initialCapacityGroups.map((group) => ({
+        id: group.id,
+        name: group.name,
+        grade_levels: group.grade_levels || [],
+        genders: group.genders || [],
+        capacity: group.capacity,
+      }))
+    )
+  const [totalCapacity, setTotalCapacity] = React.useState(program.capacity ?? 0)
   const [fees, setFees] = React.useState<ProgramFeeOption[]>(
     feeOptions.length > 0
       ? feeOptions
@@ -183,16 +194,13 @@ export function EditProgramForm({
   )
 
   const showGradeFields = programType !== "adult"
-  const selectedGradeLevels = showGradeFields
-    ? getGradeRange(minGrade || null, maxGrade || null)
-    : []
 
   function handleProgramTypeChange(value: ProgramType) {
     setProgramType(value)
 
     if (value === "adult") {
-      setMinGrade("")
-      setMaxGrade("")
+      setGradeLevels([])
+      setCapacityGroups([])
     }
   }
 
@@ -244,14 +252,12 @@ export function EditProgramForm({
     ) as VisibilityType
     const selectedGender = String(formData.get("gender") || "All")
 
-    const finalMinGrade =
-      selectedProgramType === "adult" ? null : minGrade || null
-    const finalMaxGrade =
-      selectedProgramType === "adult" ? null : maxGrade || null
     const finalGradeLevels =
+      selectedProgramType === "adult" ? [] : gradeLevels
+    const { minGrade: finalMinGrade, maxGrade: finalMaxGrade } =
       selectedProgramType === "adult"
-        ? []
-        : getGradeRange(finalMinGrade, finalMaxGrade)
+        ? { minGrade: null, maxGrade: null }
+        : getMinMaxGradeFromLevels(finalGradeLevels)
     const finalAgeGroups = getAgeGroups(minAge, maxAge)
 
     await updateProgram({
@@ -274,21 +280,14 @@ export function EditProgramForm({
       age_groups: finalAgeGroups,
       grade_levels: finalGradeLevels,
       gender: selectedGender,
-      require_guardian:
-        selectedProgramType === "adult"
-          ? false
-          : formData.get("require_guardian") === "on",
-      require_grade:
-        selectedProgramType === "adult"
-          ? false
-          : formData.get("require_grade") === "on",
-      require_emergency_contact:
-        formData.get("require_emergency_contact") === "on",
+      require_guardian: selectedProgramType !== "adult",
+      require_grade: false,
+      require_emergency_contact: true,
 
-      session_registration_enabled:
-        formData.get("session_registration_enabled") === "on",
+      full_program_registration_enabled: fullProgramRegistrationEnabled,
+      session_registration_enabled: sessionRegistrationEnabled,
 
-      capacity: Number(formData.get("capacity") || 0),
+      capacity: totalCapacity,
       enable_waitlist: formData.get("enable_waitlist") === "on",
       waitlist_capacity: getNumberOrNull(formData.get("waitlist_capacity")),
       status: String(formData.get("status") || "draft"),
@@ -309,6 +308,18 @@ export function EditProgramForm({
         String(formData.get("financial_assistance_close_date") || "") || null,
       financial_assistance_instructions:
         String(formData.get("financial_assistance_instructions") || "") || null,
+    })
+
+    await replaceProgramCapacityGroups({
+      program_id: program.id,
+      groups:
+        selectedProgramType === "adult"
+          ? []
+          : capacityGroups.filter(
+              (group) =>
+                (group.grade_levels.length > 0 || group.genders.length > 0) &&
+                Number(group.capacity) >= 0
+            ),
     })
 
     await replaceProgramFeeOptions({
@@ -359,9 +370,9 @@ export function EditProgramForm({
               </CardDescription>
             </CardHeader>
 
-            <CardContent className="space-y-6">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2 md:col-span-2">
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="space-y-2">
                   <Label htmlFor="name">Program Name *</Label>
                   <Input
                     id="name"
@@ -370,23 +381,6 @@ export function EditProgramForm({
                     defaultValue={program.name}
                     placeholder="Summer Adventure Camp"
                   />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="department_id">Department</Label>
-                  <select
-                    id="department_id"
-                    name="department_id"
-                    defaultValue={program.department_id || ""}
-                    className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-                  >
-                    <option value="">No department</option>
-                    {departments.map((department) => (
-                      <option key={department.id} value={department.id}>
-                        {department.name}
-                      </option>
-                    ))}
-                  </select>
                 </div>
 
                 <div className="space-y-2">
@@ -403,6 +397,23 @@ export function EditProgramForm({
                     <option value="adult">Adult</option>
                     <option value="youth">Youth</option>
                     <option value="family">Family</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="department_id">Department</Label>
+                  <select
+                    id="department_id"
+                    name="department_id"
+                    defaultValue={program.department_id || ""}
+                    className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                  >
+                    <option value="">No department</option>
+                    {departments.map((department) => (
+                      <option key={department.id} value={department.id}>
+                        {department.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -428,8 +439,8 @@ export function EditProgramForm({
               </CardDescription>
             </CardHeader>
 
-            <CardContent className="space-y-6">
-              <div className="grid gap-4 md:grid-cols-2">
+            <CardContent>
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <div className="space-y-2">
                   <Label htmlFor="start_date">Start Date</Label>
                   <div className="relative">
@@ -457,9 +468,7 @@ export function EditProgramForm({
                     />
                   </div>
                 </div>
-              </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="enrollment_open_date">
                     Enrollment Open Date
@@ -495,8 +504,25 @@ export function EditProgramForm({
               </CardDescription>
             </CardHeader>
 
-            <CardContent className="space-y-6">
-              <div className="grid gap-4 lg:grid-cols-5">
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <div className="space-y-2">
+                  <Label htmlFor="max_age">Maximum Age</Label>
+                  <select
+                    id="max_age"
+                    name="max_age"
+                    defaultValue={program.max_age ?? ""}
+                    className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                  >
+                    <option value="">No maximum</option>
+                    {AGE_OPTIONS.map((age) => (
+                      <option key={age} value={age}>
+                        {age}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="min_age">Minimum Age</Label>
                   <select
@@ -515,72 +541,30 @@ export function EditProgramForm({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="max_age">Maximum Age</Label>
-                  <select
-                    id="max_age"
-                    name="max_age"
-                    defaultValue={program.max_age ?? ""}
-                    className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-                  >
-                    <option value="">No maximum</option>
-                    {AGE_OPTIONS.map((age) => (
-                      <option key={age} value={age}>
-                        {age}
-                      </option>
-                    ))}
-                  </select>
+                  <Label>Grade Levels</Label>
+                  {showGradeFields ? (
+                    <GradeLevelsMultiSelect
+                      selectedGrades={gradeLevels}
+                      onChange={setGradeLevels}
+                    />
+                  ) : (
+                    <div className="flex h-10 items-center rounded-md border bg-muted/40 px-3 text-sm text-muted-foreground">
+                      Hidden for adult programs
+                    </div>
+                  )}
                 </div>
-
-                {showGradeFields ? (
-                  <>
-                    <div className="space-y-2">
-                      <Label htmlFor="min_grade">Minimum Grade</Label>
-                      <select
-                        id="min_grade"
-                        name="min_grade"
-                        value={minGrade}
-                        onChange={(event) => setMinGrade(event.target.value)}
-                        className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-                      >
-                        <option value="">No minimum</option>
-                        {GRADE_LEVELS.map((grade) => (
-                          <option key={grade} value={grade}>
-                            {grade}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="max_grade">Maximum Grade</Label>
-                      <select
-                        id="max_grade"
-                        name="max_grade"
-                        value={maxGrade}
-                        onChange={(event) => setMaxGrade(event.target.value)}
-                        className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-                      >
-                        <option value="">No maximum</option>
-                        {GRADE_LEVELS.map((grade) => (
-                          <option key={grade} value={grade}>
-                            {grade}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </>
-                ) : (
-                  <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground lg:col-span-2">
-                    Grade fields are hidden for adult programs.
-                  </div>
-                )}
 
                 <div className="space-y-2">
                   <Label htmlFor="gender">Gender</Label>
                   <select
                     id="gender"
                     name="gender"
-                    defaultValue={program.gender || "All"}
+                    value={programGender}
+                    onChange={(event) =>
+                      setProgramGender(
+                        event.target.value as "All" | "Male" | "Female"
+                      )
+                    }
                     className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                   >
                     <option value="All">All genders</option>
@@ -589,164 +573,6 @@ export function EditProgramForm({
                   </select>
                 </div>
               </div>
-
-              <div className="grid gap-3 md:grid-cols-3">
-                <label className="flex items-start gap-3 rounded-lg border p-4">
-                  <input
-                    type="checkbox"
-                    name="require_guardian"
-                    defaultChecked={
-                      programType === "adult" ? false : program.require_guardian
-                    }
-                    disabled={programType === "adult"}
-                    className="mt-1"
-                  />
-                  <div>
-                    <p className="font-medium">Require Guardian</p>
-                    <p className="text-sm text-muted-foreground">
-                      Required for youth and family programs.
-                    </p>
-                  </div>
-                </label>
-
-                <label className="flex items-start gap-3 rounded-lg border p-4">
-                  <input
-                    type="checkbox"
-                    name="require_grade"
-                    defaultChecked={
-                      programType === "adult" ? false : program.require_grade
-                    }
-                    disabled={programType === "adult"}
-                    className="mt-1"
-                  />
-                  <div>
-                    <p className="font-medium">Require Grade</p>
-                    <p className="text-sm text-muted-foreground">
-                      Ask for participant grade during registration.
-                    </p>
-                  </div>
-                </label>
-
-                <label className="flex items-start gap-3 rounded-lg border p-4">
-                  <input
-                    type="checkbox"
-                    name="require_emergency_contact"
-                    defaultChecked={program.require_emergency_contact}
-                    className="mt-1"
-                  />
-                  <div>
-                    <p className="font-medium">Require Emergency Contact</p>
-                    <p className="text-sm text-muted-foreground">
-                      Useful for youth programs and long-running classes.
-                    </p>
-                  </div>
-                </label>
-              </div>
-
-              {selectedGradeLevels.length > 0 ? (
-                <div className="rounded-md border bg-muted/40 p-4 text-sm text-muted-foreground">
-                  Grade range saved as: {selectedGradeLevels.join(", ")}
-                </div>
-              ) : (
-                <div className="rounded-md border bg-muted/40 p-4 text-sm text-muted-foreground">
-                  Empty age or grade fields mean the program is open to all for
-                  that rule.
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Registration Type</CardTitle>
-              <CardDescription>
-                Decide whether customers register for the full program or choose
-                one or more sessions.
-              </CardDescription>
-            </CardHeader>
-
-            <CardContent className="space-y-4">
-              <input
-                type="hidden"
-                name="session_registration_enabled"
-                value={sessionRegistrationEnabled ? "on" : ""}
-              />
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <button
-                  type="button"
-                  onClick={() => setSessionRegistrationEnabled(false)}
-                  className={`rounded-lg border p-4 text-left transition hover:bg-muted ${
-                    !sessionRegistrationEnabled
-                      ? "border-primary bg-primary/5"
-                      : "bg-background"
-                  }`}
-                >
-                  <div className="flex items-start gap-3">
-                    <div
-                      className={`mt-0.5 rounded-full border p-1 ${
-                        !sessionRegistrationEnabled
-                          ? "border-primary text-primary"
-                          : "text-transparent"
-                      }`}
-                    >
-                      <CheckCircle2 className="h-4 w-4" />
-                    </div>
-
-                    <div>
-                      <p className="font-medium">Full Program Registration</p>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        Customers register once for the entire program dates.
-                        Use this for camps, full-season programs, and fixed
-                        courses.
-                      </p>
-                    </div>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setSessionRegistrationEnabled(true)}
-                  className={`rounded-lg border p-4 text-left transition hover:bg-muted ${
-                    sessionRegistrationEnabled
-                      ? "border-primary bg-primary/5"
-                      : "bg-background"
-                  }`}
-                >
-                  <div className="flex items-start gap-3">
-                    <div
-                      className={`mt-0.5 rounded-full border p-1 ${
-                        sessionRegistrationEnabled
-                          ? "border-primary text-primary"
-                          : "text-transparent"
-                      }`}
-                    >
-                      <CheckCircle2 className="h-4 w-4" />
-                    </div>
-
-                    <div>
-                      <p className="font-medium">Session-Based Registration</p>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        Customers can select one or more sessions. Use this for
-                        swimming lessons, workshops, and programs with separate
-                        weeks or sections.
-                      </p>
-                    </div>
-                  </div>
-                </button>
-              </div>
-
-              {sessionRegistrationEnabled ? (
-                <div className="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground">
-                  <div className="flex gap-3">
-                    <Layers className="mt-0.5 h-4 w-4 shrink-0" />
-                    <p>
-                      After saving, manage session dates, prices, and capacity
-                      from the sessions section connected to this program.
-                    </p>
-                  </div>
-                </div>
-              ) : null}
             </CardContent>
           </Card>
 
@@ -759,19 +585,50 @@ export function EditProgramForm({
             </CardHeader>
 
             <CardContent className="space-y-6">
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <div className="space-y-2">
-                  <Label htmlFor="capacity">Capacity</Label>
-                  <Input
-                    id="capacity"
-                    name="capacity"
-                    type="number"
-                    min="0"
-                    defaultValue={program.capacity}
-                    placeholder="50"
-                  />
+              {showGradeFields ? (
+                <ProgramCapacityGroupEditor
+                  selectedGrades={gradeLevels}
+                  programGender={programGender}
+                  groups={capacityGroups}
+                  onChange={setCapacityGroups}
+                  totalCapacity={totalCapacity}
+                  onTotalCapacityChange={setTotalCapacity}
+                />
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="capacity">Capacity</Label>
+                    <Input
+                      id="capacity"
+                      type="number"
+                      min="0"
+                      value={totalCapacity}
+                      onChange={(event) =>
+                        setTotalCapacity(Number(event.target.value || 0))
+                      }
+                      placeholder="50"
+                    />
+                  </div>
                 </div>
+              )}
 
+              <label className="flex items-start gap-3 rounded-lg border p-4">
+                <input
+                  type="checkbox"
+                  name="enable_waitlist"
+                  defaultChecked={program.enable_waitlist}
+                  className="mt-1"
+                />
+                <div>
+                  <p className="font-medium">Enable Waitlist</p>
+                  <p className="text-sm text-muted-foreground">
+                    When the program reaches capacity, customers can join the
+                    waitlist if this is enabled.
+                  </p>
+                </div>
+              </label>
+
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <div className="space-y-2">
                   <Label htmlFor="waitlist_capacity">Waitlist Capacity</Label>
                   <Input
@@ -813,24 +670,34 @@ export function EditProgramForm({
                   </select>
                 </div>
               </div>
-
-              <label className="flex items-start gap-3 rounded-lg border p-4">
-                <input
-                  type="checkbox"
-                  name="enable_waitlist"
-                  defaultChecked={program.enable_waitlist}
-                  className="mt-1"
-                />
-                <div>
-                  <p className="font-medium">Enable Waitlist</p>
-                  <p className="text-sm text-muted-foreground">
-                    When the program reaches capacity, customers can join the
-                    waitlist if this is enabled.
-                  </p>
-                </div>
-              </label>
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Registration Type</CardTitle>
+              <CardDescription>
+                Choose how customers can register. You can enable one or both
+                options.
+              </CardDescription>
+            </CardHeader>
+
+            <CardContent className="space-y-4">
+              <RegistrationTypeSelector
+                fullProgramEnabled={fullProgramRegistrationEnabled}
+                sessionRegistrationEnabled={sessionRegistrationEnabled}
+                onFullProgramChange={setFullProgramRegistrationEnabled}
+                onSessionChange={setSessionRegistrationEnabled}
+              />
+            </CardContent>
+          </Card>
+
+          {sessionRegistrationEnabled ? (
+            <ProgramSessionsEditor
+              programId={program.id}
+              sessions={sessions}
+            />
+          ) : null}
 
           <Card>
             <CardHeader>

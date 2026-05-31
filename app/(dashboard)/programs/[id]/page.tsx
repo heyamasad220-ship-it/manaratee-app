@@ -35,6 +35,20 @@ import {
 } from "@/components/ui/tabs"
 
 import { getProgramById } from "@/lib/programs/program-queries"
+import { getProgramCapacityGroups } from "@/lib/programs/program-capacity-group-queries"
+import {
+  getGroupGenderLabel,
+  getTotalCapacityFromGroups,
+} from "@/lib/programs/program-capacity-group-types"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 import { getProgramScheduleItems } from "@/lib/programs/program-schedule-queries"
 import { getProgramStatusLabel } from "@/lib/programs/program-status"
 import { ScheduleForm } from "./schedule-form"
@@ -67,14 +81,15 @@ export default async function ProgramDetailsPage({
 }) {
   const { id } = await params
 
-  const [program, scheduleItems, discountTags, programDiscounts] = await Promise.all([
-    
-  getProgramById(id),
-  getProgramScheduleItems(id),
-  getActiveDiscountTags(),
-  getProgramDiscounts(id),
-])
-console.log(programDiscounts)
+  const [program, scheduleItems, discountTags, programDiscounts, capacityGroups] =
+    await Promise.all([
+      getProgramById(id),
+      getProgramScheduleItems(id),
+      getActiveDiscountTags(),
+      getProgramDiscounts(id),
+      getProgramCapacityGroups(id),
+    ])
+
   if (!program) {
     notFound()
   }
@@ -84,6 +99,7 @@ console.log(programDiscounts)
   const waitlist = program.waitlist ?? 0
   const available = Math.max(capacity - enrolled, 0)
   const filledPercent = capacity > 0 ? Math.round((enrolled / capacity) * 100) : 0
+  const capacityGroupsTotal = getTotalCapacityFromGroups(capacityGroups)
 
   return (
     <>
@@ -403,15 +419,100 @@ console.log(programDiscounts)
 
             <Card>
               <CardHeader>
-                <CardTitle>Capacity by Group</CardTitle>
+                <div className="flex flex-wrap items-center gap-2">
+                  <CardTitle>Capacity Groups</CardTitle>
+                  {capacityGroups.length > 0 ? (
+                    <Badge variant="secondary">
+                      {capacityGroups.length} group
+                      {capacityGroups.length === 1 ? "" : "s"} · Total capacity:{" "}
+                      {capacityGroupsTotal}
+                    </Badge>
+                  ) : null}
+                </div>
                 <CardDescription>
-                  Group-level capacity will appear here after capacity groups are connected.
+                  Enrollment limits by grade level, gender, or both.
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-                  No capacity groups connected yet. Current total capacity is {capacity}.
-                </div>
+                {capacityGroups.length === 0 ? (
+                  <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+                    No capacity groups yet. Edit the program to add grade or
+                    gender groups.
+                  </div>
+                ) : (
+                  <div className="rounded-lg border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Group Name</TableHead>
+                          <TableHead>Grades</TableHead>
+                          <TableHead>Gender</TableHead>
+                          <TableHead className="text-right">Capacity</TableHead>
+                          <TableHead className="text-right">Enrolled</TableHead>
+                          <TableHead className="text-right">Spots Left</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {capacityGroups.map((group) => {
+                          const groupAvailable = Math.max(
+                            group.capacity - group.enrolled,
+                            0
+                          )
+
+                          return (
+                            <TableRow key={group.id}>
+                              <TableCell className="font-medium whitespace-normal">
+                                {group.name}
+                              </TableCell>
+                              <TableCell className="whitespace-normal">
+                                {group.grade_levels.length > 0
+                                  ? group.grade_levels.join(", ")
+                                  : "All grades"}
+                              </TableCell>
+                              <TableCell>
+                                {getGroupGenderLabel(group.genders)}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {group.capacity}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {group.enrolled}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {groupAvailable}
+                              </TableCell>
+                            </TableRow>
+                          )
+                        })}
+                      </TableBody>
+                      <TableFooter>
+                        <TableRow>
+                          <TableCell colSpan={3} className="font-medium">
+                            Total capacity ({capacityGroups.length}{" "}
+                            {capacityGroups.length === 1 ? "group" : "groups"})
+                          </TableCell>
+                          <TableCell className="text-right text-base font-semibold">
+                            {capacityGroupsTotal}
+                          </TableCell>
+                          <TableCell className="text-right font-semibold">
+                            {capacityGroups.reduce(
+                              (sum, group) => sum + group.enrolled,
+                              0
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right font-semibold">
+                            {capacityGroups.reduce(
+                              (sum, group) =>
+                                sum +
+                                Math.max(group.capacity - group.enrolled, 0),
+                              0
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      </TableFooter>
+                    </Table>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

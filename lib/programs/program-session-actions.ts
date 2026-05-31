@@ -75,4 +75,6 @@ export async function createProgramSession(
   }
 
   revalidatePath(`/programs/${input.program_id}/sessions`)
+  revalidatePath(`/programs/${input.program_id}/edit`)
+  revalidatePath(`/programs/${input.program_id}`)
 }

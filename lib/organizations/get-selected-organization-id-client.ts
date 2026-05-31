@@ -1,6 +1,24 @@
 import { createClient } from "@/lib/supabase/client"
 
+function getSelectedOrganizationIdFromCookie() {
+  if (typeof document === "undefined") {
+    return null
+  }
+
+  const match = document.cookie.match(
+    /(?:^|;\s*)selected_organization_id=([^;]*)/
+  )
+
+  return match ? decodeURIComponent(match[1]) : null
+}
+
 export async function getSelectedOrganizationIdClient() {
+  const cookieOrganizationId = getSelectedOrganizationIdFromCookie()
+
+  if (cookieOrganizationId) {
+    return cookieOrganizationId
+  }
+
   const supabase = createClient()
 
   const {
