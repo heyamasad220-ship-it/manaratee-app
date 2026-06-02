@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Eye, EyeOff, Loader2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { selectOrganization } from "@/lib/organizations/organization-actions"
@@ -35,16 +35,47 @@ function AppleIcon({ className }: { className?: string }) {
 
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
 
   const [mode, setMode] = useState<AuthMode>("login")
-  const [email, setEmail] = useState("")
+  const [email, setEmail] = useState(() => searchParams.get("email") ?? "")
   const [password, setPassword] = useState("")
   const [repeatPassword, setRepeatPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [socialLoading, setSocialLoading] = useState<"google" | "apple" | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(
+    () => searchParams.get("error") ?? null
+  )
+
+  useEffect(() => {
+    async function recoverInviteSession() {
+      const hash = window.location.hash
+      if (!hash.includes("access_token") && !hash.includes("refresh_token")) {
+        return
+      }
+
+      const { error: sessionError } = await supabase.auth.getSession()
+      window.history.replaceState(null, "", window.location.pathname + window.location.search)
+
+      if (sessionError) {
+        setError(sessionError.message)
+        return
+      }
+
+      router.replace("/auth/set-password")
+    }
+
+    void recoverInviteSession()
+  }, [router, supabase.auth])
+
+  useEffect(() => {
+    const emailParam = searchParams.get("email")
+    if (emailParam) {
+      setEmail(emailParam)
+    }
+  }, [searchParams])
 
   async function setSelectedOrganization(organizationId: string) {
     await selectOrganization(organizationId)
@@ -134,11 +165,23 @@ export default function LoginPage() {
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: `${window.location.origin}/auth/accept?next=/dashboard`,
       },
     })
 
-    if (error) throw error
+    if (error) {
+      const normalized = error.message.toLowerCase()
+      if (
+        normalized.includes("already registered") ||
+        normalized.includes("already been registered") ||
+        normalized.includes("already exists")
+      ) {
+        throw new Error(
+          "This email already has an account (likely from an organization invite). Open your invite email and use that link to set your password, or use Forgot password on the sign-in page."
+        )
+      }
+      throw error
+    }
 
     if (!data.user) {
       throw new Error("Sign up failed")
@@ -175,14 +218,21 @@ export default function LoginPage() {
     setError(null)
 
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: `${window.location.origin}/auth/accept?next=/dashboard`,
         },
       })
 
       if (error) throw error
+
+      if (data?.url) {
+        window.location.assign(data.url)
+        return
+      }
+
+      throw new Error(`${provider} sign-in did not return a redirect URL. Check provider settings in Supabase.`)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Social sign-in failed")
       setSocialLoading(null)

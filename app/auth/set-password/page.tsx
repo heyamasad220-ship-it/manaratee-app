@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Loader2 } from "lucide-react"
 import { AuthLayout } from "@/components/customer/auth-layout"
 import { Button } from "@/components/ui/button"
@@ -14,6 +14,7 @@ import { profileRoleFromSystemRole } from "@/lib/organizations/sync-profile-orga
 
 export default function SetPasswordPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
 
   const [checkingSession, setCheckingSession] = useState(true)
@@ -35,7 +36,14 @@ export default function SetPasswordPage() {
       } = await supabase.auth.getUser()
 
       if (!user) {
-        router.replace("/login")
+        const emailParam = searchParams.get("email")
+        const loginParams = new URLSearchParams()
+        if (emailParam) loginParams.set("email", emailParam)
+        loginParams.set(
+          "error",
+          "Your invite link expired or was already used. Sign in with your password, or ask for a new invite."
+        )
+        router.replace(`/login?${loginParams.toString()}`)
         return
       }
 

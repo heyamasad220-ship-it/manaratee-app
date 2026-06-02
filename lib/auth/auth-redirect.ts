@@ -27,11 +27,14 @@ export function authCallbackUrl(nextPath: string = DEFAULT_POST_AUTH_PATH, baseU
 }
 
 export function inviteAcceptRedirectUrl(baseUrl?: string) {
-  return authCallbackUrl(SET_PASSWORD_PATH, baseUrl)
+  const base = resolveBaseUrl(baseUrl)
+  const params = new URLSearchParams()
+  params.set("next", SET_PASSWORD_PATH)
+  return `${base}/auth/accept?${params.toString()}`
 }
 
 export function passwordResetRedirectUrl(baseUrl?: string) {
-  return authCallbackUrl(SET_PASSWORD_PATH, baseUrl)
+  return inviteAcceptRedirectUrl(baseUrl)
 }
 
 export function authConfirmUrl(nextPath: string = SET_PASSWORD_PATH, baseUrl?: string) {
