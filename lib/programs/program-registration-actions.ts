@@ -2,24 +2,18 @@
 
 import { redirect } from "next/navigation"
 
+import { getActiveOrganization } from "@/lib/organizations/get-active-organization"
 import { createClient } from "@/lib/supabase/server"
+import { getDefaultOfferingForProgramByOrg } from "@/lib/programs/program-offering-queries"
 import {
   getRegistrationOptionById,
   isRegistrationOptionAvailable,
 } from "@/lib/programs/program-registration-option-queries"
-import type {
-  ParticipantType,
-  ProgramRegistrationOptionType,
-  RegistrantType,
-} from "@/lib/programs/program-registration-option-types"
+import type { ProgramRegistrationOptionType } from "@/lib/programs/program-registration-option-types"
+import { getActiveSessionIdsForOffering } from "@/lib/programs/program-registration-session-access"
 import {
-  createSessionAccessRows,
-  getActiveSessionIdsForOffering,
-} from "@/lib/programs/program-registration-session-access"
-import { getDefaultOfferingForProgramByOrg } from "@/lib/programs/program-offering-queries"
-import {
-  lookupContactByPersonId,
-  verifyContactInOrganization,
+  getCustomerContactForUser,
+  verifyParticipantInRegistrantFamily,
 } from "@/lib/programs/registration-contact-resolver"
 
 type ProgramSession = {
@@ -28,23 +22,11 @@ type ProgramSession = {
   price: number | null
 }
 
-function calculateAge(dateOfBirth?: string | null) {
-  if (!dateOfBirth) return null
-
-  const today = new Date()
-  const birthDate = new Date(`${dateOfBirth}T00:00:00`)
-
-  let age = today.getFullYear() - birthDate.getFullYear()
-  const monthDiff = today.getMonth() - birthDate.getMonth()
-
-  if (
-    monthDiff < 0 ||
-    (monthDiff === 0 && today.getDate() < birthDate.getDate())
-  ) {
-    age--
-  }
-
-  return age
+type RegisterForProgramRpcResult = {
+  ok: boolean
+  mode?: string
+  enrollment_id?: string
+  waitlist_id?: string
 }
 
 function isEnrollmentOpen(open?: string | null, close?: string | null) {
@@ -79,19 +61,6 @@ function getRegistrationMode(program: {
   if (!enrollmentOpen) return "closed"
   if (isFull(program)) return program.waitlist > 0 ? "waitlist" : "full"
   return "enroll"
-}
-
-function resolveParticipantType(
-  programType: string,
-  isAdultSelf: boolean
-): ParticipantType {
-  if (isAdultSelf) return "adult"
-  if (programType === "family") return "family"
-  return "youth"
-}
-
-function resolveRegistrantType(isAdultSelf: boolean): RegistrantType {
-  return isAdultSelf ? "adult_self" : "guardian"
 }
 
 function validateSessionsForOption(
@@ -137,23 +106,82 @@ async function resolveSessionIdsForRegistration(input: {
   return validateSessionsForOption(input.optionType, input.selectedSessionIds)
 }
 
+function mapRegisterForProgramError(
+  message: string | undefined,
+  redirectBase: string,
+  programId: string
+): never {
+  const normalized = message || ""
+
+  if (normalized.includes("register_for_program:unauthorized")) {
+    redirect(`${redirectBase}?error=unauthorized`)
+  }
+
+  if (normalized.includes("register_for_program:invalid-participant")) {
+    redirect(`${redirectBase}?error=invalid-participant`)
+  }
+
+  if (normalized.includes("register_for_program:missing-participant-contact")) {
+    redirect(`${redirectBase}?error=missing-participant-contact`)
+  }
+
+  if (normalized.includes("register_for_program:capacity-full")) {
+    redirect(`${redirectBase}?error=capacity-full`)
+  }
+
+  if (normalized.includes("register_for_program:already-enrolled")) {
+    redirect(`${redirectBase}?error=already-enrolled`)
+  }
+
+  if (normalized.includes("register_for_program:already-waitlisted")) {
+    redirect(`${redirectBase}?error=already-waitlisted`)
+  }
+
+  if (
+    normalized.includes("register_for_program:enrollment-closed") ||
+    normalized.includes("register_for_program:invalid-program")
+  ) {
+    redirect(`/customer/programs/${programId}?registration=unavailable`)
+  }
+
+  if (
+    normalized.includes("register_for_program:invalid-option") ||
+    normalized.includes("register_for_program:invalid-offering")
+  ) {
+    redirect(`${redirectBase}?error=invalid-option`)
+  }
+
+  if (normalized.includes("register_for_program:invalid-session")) {
+    redirect(`${redirectBase}?error=invalid-session`)
+  }
+
+  redirect(`${redirectBase}?error=save-failed`)
+}
+
 export async function registerForProgram(formData: FormData) {
   const supabase = await createClient()
 
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser()
+
+  if (userError || !user) {
+    redirect("/login")
+  }
+
+  const { activeOrganization } = await getActiveOrganization()
+
+  if (!activeOrganization?.organization_id) {
+    redirect("/customer/programs?error=unauthorized")
+  }
+
+  const organizationId = activeOrganization.organization_id
+
   const programId = String(formData.get("program_id") || "")
-  const organizationId = String(formData.get("organization_id") || "")
-  const departmentId = String(formData.get("department_id") || "") || null
-  const offeringId = String(formData.get("offering_id") || "")
   const registrationOptionId = String(formData.get("registration_option_id") || "")
   const mode = String(formData.get("mode") || "")
-  const programType = String(formData.get("program_type") || "youth")
-  const isAdultSelf = formData.get("is_adult_self") === "true"
-
-  const registrantContactId = String(formData.get("registrant_contact_id") || "").trim()
-  const payerContactId =
-    String(formData.get("payer_contact_id") || "").trim() || registrantContactId
   const participantContactId = String(formData.get("participant_contact_id") || "").trim()
-  const childPersonId = String(formData.get("child_person_id") || "").trim()
 
   const parentName = String(formData.get("parent_name") || "").trim()
   const parentEmail = String(formData.get("parent_email") || "").trim()
@@ -172,110 +200,14 @@ export async function registerForProgram(formData: FormData) {
 
   const redirectBase = `/customer/programs/${programId}/register`
 
-  if (
-    !programId ||
-    !organizationId ||
-    !offeringId ||
-    !registrationOptionId ||
-    !registrantContactId
-  ) {
+  if (!programId || !registrationOptionId) {
     redirect(`${redirectBase}?error=missing-fields`)
   }
 
-  const registrationOption = await getRegistrationOptionById(
-    registrationOptionId,
-    organizationId
-  )
+  const customerContact = await getCustomerContactForUser(organizationId, user.id)
 
-  if (
-    !registrationOption ||
-    registrationOption.offering_id !== offeringId ||
-    registrationOption.program_id !== programId ||
-    !isRegistrationOptionAvailable(registrationOption)
-  ) {
-    redirect(`${redirectBase}?error=invalid-option`)
-  }
-
-  const registrantContact = await verifyContactInOrganization(
-    organizationId,
-    registrantContactId
-  )
-
-  if (!registrantContact) {
-    redirect(`${redirectBase}?error=invalid-registrant`)
-  }
-
-  const payerContact = await verifyContactInOrganization(
-    organizationId,
-    payerContactId
-  )
-
-  if (!payerContact) {
-    redirect(`${redirectBase}?error=invalid-payer`)
-  }
-
-  let resolvedParticipantContactId = participantContactId || null
-  let childName = ""
-  let childAge: number | null = null
-  let resolvedChildPersonId: string | null = null
-
-  if (isAdultSelf) {
-    resolvedParticipantContactId = registrantContactId
-    childName = registrantContact.full_name || parentName || "Participant"
-    resolvedChildPersonId = registrantContact.person_id ?? null
-  } else {
-    if (!childPersonId && !participantContactId) {
-      redirect(`${redirectBase}?error=missing-fields`)
-    }
-
-    if (participantContactId) {
-      const participantContact = await verifyContactInOrganization(
-        organizationId,
-        participantContactId
-      )
-
-      if (!participantContact) {
-        redirect(`${redirectBase}?error=invalid-participant`)
-      }
-
-      resolvedParticipantContactId = participantContact.id
-      resolvedChildPersonId = participantContact.person_id ?? childPersonId ?? null
-      childName = participantContact.full_name || parentName || "Participant"
-    } else if (childPersonId) {
-      const { data: childPerson, error: childError } = await supabase
-        .from("people")
-        .select("id, first_name, last_name, date_of_birth")
-        .eq("id", childPersonId)
-        .eq("organization_id", organizationId)
-        .maybeSingle()
-
-      if (childError || !childPerson) {
-        redirect(`${redirectBase}?error=invalid-participant`)
-      }
-
-      childName = `${childPerson.first_name || ""} ${childPerson.last_name || ""}`.trim()
-      childAge = calculateAge(childPerson.date_of_birth)
-      resolvedChildPersonId = childPerson.id
-
-      const contactLookup = await lookupContactByPersonId(
-        organizationId,
-        childPerson.id
-      )
-
-      if (!contactLookup.contactId) {
-        console.warn("Registration blocked — missing participant contact", {
-          organizationId,
-          personId: childPerson.id,
-        })
-        redirect(`${redirectBase}?error=missing-participant-contact`)
-      }
-
-      resolvedParticipantContactId = contactLookup.contactId
-    }
-  }
-
-  if (!childName) {
-    redirect(`${redirectBase}?error=invalid-participant`)
+  if (!customerContact) {
+    redirect(`${redirectBase}?error=unauthorized`)
   }
 
   const { data: program, error: programError } = await supabase
@@ -285,6 +217,7 @@ export async function registerForProgram(formData: FormData) {
       id,
       organization_id,
       department_id,
+      program_type,
       capacity,
       enrolled,
       waitlist,
@@ -302,10 +235,46 @@ export async function registerForProgram(formData: FormData) {
     redirect("/customer/programs")
   }
 
+  const isAdultProgram = program.program_type === "adult"
+
+  if (!isAdultProgram && !participantContactId) {
+    redirect(`${redirectBase}?error=missing-fields`)
+  }
+
+  if (
+    !isAdultProgram &&
+    participantContactId &&
+    customerContact.person_id
+  ) {
+    const isFamilyParticipant = await verifyParticipantInRegistrantFamily({
+      organizationId,
+      registrantPersonId: customerContact.person_id,
+      participantContactId,
+    })
+
+    if (!isFamilyParticipant) {
+      redirect(`${redirectBase}?error=invalid-participant`)
+    }
+  }
+
   const offering = await getDefaultOfferingForProgramByOrg(programId, organizationId)
 
-  if (!offering || offering.id !== offeringId) {
-    redirect(`${redirectBase}?error=invalid-offering`)
+  if (!offering) {
+    redirect(`${redirectBase}?error=invalid-option`)
+  }
+
+  const registrationOption = await getRegistrationOptionById(
+    registrationOptionId,
+    organizationId
+  )
+
+  if (
+    !registrationOption ||
+    registrationOption.offering_id !== offering.id ||
+    registrationOption.program_id !== programId ||
+    !isRegistrationOptionAvailable(registrationOption)
+  ) {
+    redirect(`${redirectBase}?error=invalid-option`)
   }
 
   const enrollmentOpen = isEnrollmentOpen(
@@ -349,7 +318,7 @@ export async function registerForProgram(formData: FormData) {
     sessionIdsForAccess = await resolveSessionIdsForRegistration({
       organizationId,
       programId,
-      offeringId,
+      offeringId: offering.id,
       optionType: registrationOption.option_type,
       selectedSessionIds,
     })
@@ -392,159 +361,40 @@ export async function registerForProgram(formData: FormData) {
   }, 0)
 
   const totalAmount = sessionTotal + lunchPrice
-  const today = new Date().toISOString().slice(0, 10)
-  const weeksLegacy =
-    registrationOption.option_type === "full_program"
-      ? sessionIdsForAccess
-      : sessionIdsForAccess
+  const rpcMode = currentMode === "waitlist" || mode === "waitlist" ? "waitlist" : "enroll"
 
-  const participantType = resolveParticipantType(programType, isAdultSelf)
-  const registrantType = resolveRegistrantType(isAdultSelf)
+  const { data: rpcData, error: rpcError } = await supabase.rpc("register_for_program", {
+    p_organization_id: organizationId,
+    p_program_id: programId,
+    p_registration_option_id: registrationOptionId,
+    p_participant_contact_id: isAdultProgram ? null : participantContactId,
+    p_session_ids: sessionIdsForAccess,
+    p_mode: rpcMode,
+    p_parent_name: parentName || customerContact.full_name,
+    p_parent_email: parentEmail || customerContact.email,
+    p_parent_phone: parentPhone || customerContact.phone,
+    p_notes: notes || null,
+    p_before_care: beforeCare,
+    p_after_care: afterCare,
+    p_lunch_type: lunchType,
+    p_total_amount: totalAmount,
+    p_session_name: pricedSessions.length === 1 ? pricedSessions[0].name : null,
+  })
 
-  if (currentMode === "waitlist" || mode === "waitlist") {
-    const duplicatePersonId = resolvedChildPersonId
-
-    if (duplicatePersonId) {
-      const { data: existingWaitlistRegistration } = await supabase
-        .from("program_waitlist")
-        .select("id")
-        .eq("organization_id", organizationId)
-        .eq("program_id", programId)
-        .eq("child_person_id", duplicatePersonId)
-        .maybeSingle()
-
-      if (existingWaitlistRegistration) {
-        redirect(`${redirectBase}?error=already-waitlisted`)
-      }
-    }
-
-    const { count: waitlistCount } = await supabase
-      .from("program_waitlist")
-      .select("id", { count: "exact", head: true })
-      .eq("organization_id", organizationId)
-      .eq("program_id", programId)
-
-    const nextPosition = (waitlistCount || 0) + 1
-
-    const { error } = await supabase.from("program_waitlist").insert({
-      organization_id: organizationId,
-      program_id: programId,
-      child_person_id: resolvedChildPersonId,
-      child_name: childName,
-      child_age: childAge,
-      parent_name: parentName || registrantContact.full_name,
-      parent_email: parentEmail || registrantContact.email,
-      parent_phone: parentPhone || registrantContact.phone,
-      preferred_weeks: weeksLegacy.length > 0 ? weeksLegacy : null,
-      added_date: today,
-      position: nextPosition,
-      status: "waiting",
-      priority: "normal",
-      notes: notes || null,
-    })
-
-    if (error) {
-      if (error.code === "23505") {
-        redirect(`${redirectBase}?error=already-waitlisted`)
-      }
-
-      throw new Error(error.message)
-    }
-
-    await supabase
-      .from("programs")
-      .update({ waitlist: (program.waitlist || 0) + 1 })
-      .eq("id", programId)
-      .eq("organization_id", organizationId)
-
-    redirect(`/customer/programs/${programId}?registration=waitlist-success`)
+  if (rpcError) {
+    console.error("registerForProgram RPC failed:", rpcError)
+    mapRegisterForProgramError(rpcError.message, redirectBase, programId)
   }
 
-  if (resolvedParticipantContactId) {
-    const { data: existingByContact } = await supabase
-      .from("program_enrollments")
-      .select("id")
-      .eq("organization_id", organizationId)
-      .eq("program_id", programId)
-      .eq("participant_contact_id", resolvedParticipantContactId)
-      .maybeSingle()
+  const result = rpcData as RegisterForProgramRpcResult | null
 
-    if (existingByContact) {
-      redirect(`${redirectBase}?error=already-enrolled`)
-    }
-  }
-
-  if (resolvedChildPersonId) {
-    const { data: existingEnrollment } = await supabase
-      .from("program_enrollments")
-      .select("id")
-      .eq("organization_id", organizationId)
-      .eq("program_id", programId)
-      .eq("child_person_id", resolvedChildPersonId)
-      .maybeSingle()
-
-    if (existingEnrollment) {
-      redirect(`${redirectBase}?error=already-enrolled`)
-    }
-  }
-
-  const { data: enrollmentRow, error } = await supabase
-    .from("program_enrollments")
-    .insert({
-      organization_id: organizationId,
-      program_id: programId,
-      offering_id: offeringId,
-      department_id: departmentId,
-      registration_option_id: registrationOptionId,
-      participant_contact_id: resolvedParticipantContactId,
-      registrant_contact_id: registrantContactId,
-      payer_contact_id: payerContactId,
-      participant_type: participantType,
-      registrant_type: registrantType,
-      child_person_id: resolvedChildPersonId,
-      child_name: childName,
-      child_age: childAge,
-      parent_name: parentName || registrantContact.full_name,
-      parent_email: parentEmail || registrantContact.email,
-      parent_phone: parentPhone || registrantContact.phone,
-      session_name:
-        pricedSessions.length === 1 ? pricedSessions[0].name : null,
-      weeks: weeksLegacy.length > 0 ? weeksLegacy : null,
-      enrollment_date: today,
-      status: "pending",
-      payment_status: "pending",
-      amount_paid: 0,
-      total_amount: totalAmount,
-      before_care: beforeCare,
-      after_care: afterCare,
-      lunch_type: lunchType,
-      notes: notes || null,
-    })
-    .select("id")
-    .single()
-
-  if (error) {
-    if (error.code === "23505") {
-      redirect(`${redirectBase}?error=already-enrolled`)
-    }
-
-    console.error("registerForProgram insert failed:", error)
+  if (!result?.ok) {
     redirect(`${redirectBase}?error=save-failed`)
   }
 
-  if (sessionIdsForAccess.length > 0) {
-    await createSessionAccessRows({
-      organizationId,
-      enrollmentId: enrollmentRow.id,
-      sessionIds: sessionIdsForAccess,
-    })
+  if (result.mode === "waitlist") {
+    redirect(`/customer/programs/${programId}?registration=waitlist-success`)
   }
-
-  await supabase
-    .from("programs")
-    .update({ enrolled: (program.enrolled || 0) + 1 })
-    .eq("id", programId)
-    .eq("organization_id", organizationId)
 
   redirect(`/customer/programs/${programId}?registration=success`)
 }

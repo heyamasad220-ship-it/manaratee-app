@@ -1,0 +1,2 @@
+-- Lifecycle RPCs are merged into 018_program_lifecycle_foundation.sql.
+-- Run that file in Supabase SQL Editor after 017.

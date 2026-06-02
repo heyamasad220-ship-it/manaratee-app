@@ -5,47 +5,12 @@ import { redirect } from "next/navigation"
 
 import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
-import { getDefaultOfferingForProgramByOrg } from "@/lib/programs/program-offering-queries"
-import { createSessionAccessRows } from "@/lib/programs/program-registration-session-access"
-
-type EnrollmentLookup = {
-  id: string
-  program_id: string | null
-  organization_id: string | null
-  status: string | null
-}
-
-type ProgramCounterLookup = {
-  enrolled: number | null
-  waitlist?: number | null
-}
-
-type WaitlistLookup = {
-  id: string
-  program_id: string | null
-  organization_id: string | null
-}
-
-type WaitlistMoveLookup = {
-  id: string
-  organization_id: string | null
-  program_id: string | null
-  child_name: string
-  child_age: number | null
-  parent_name: string | null
-  parent_email: string | null
-  parent_phone: string | null
-  preferred_weeks: string[] | null
-  notes: string | null
-}
-
-type ProgramMoveLookup = {
-  id: string
-  department_id: string | null
-  enrolled: number | null
-  waitlist: number | null
-  capacity: number | null
-}
+import {
+  advanceEnrollmentStatusRpc,
+  cancelEnrollmentRpc,
+  promoteWaitlistRpc,
+  removeWaitlistRpc,
+} from "@/lib/programs/program-lifecycle-actions"
 
 function refreshAndRedirect(path: string): never {
   revalidatePath("/programs/registrations")
@@ -61,49 +26,6 @@ async function requireOrganizationId() {
   }
 
   return organizationId
-}
-
-async function resolveSessionAccessForWaitlistMove(input: {
-  organizationId: string
-  programId: string
-  preferredWeeks: string[] | null
-}) {
-  if (input.preferredWeeks && input.preferredWeeks.length > 0) {
-    return input.preferredWeeks
-  }
-
-  const offering = await getDefaultOfferingForProgramByOrg(
-    input.programId,
-    input.organizationId
-  )
-
-  if (!offering) {
-    return []
-  }
-
-  const supabase = await createClient()
-
-  const { data: fullProgramOption } = await supabase
-    .from("program_registration_options")
-    .select("option_type")
-    .eq("organization_id", input.organizationId)
-    .eq("offering_id", offering.id)
-    .eq("option_type", "full_program")
-    .eq("is_active", true)
-    .maybeSingle()
-
-  if (!fullProgramOption) {
-    return []
-  }
-
-  const { data: sessions } = await supabase
-    .from("program_sessions")
-    .select("id")
-    .eq("organization_id", input.organizationId)
-    .eq("program_id", input.programId)
-    .eq("status", "active")
-
-  return (sessions || []).map((row) => row.id as string)
 }
 
 export async function markEnrollmentPaymentAction(formData: FormData) {
@@ -160,94 +82,48 @@ export async function markEnrollmentPaymentAction(formData: FormData) {
   refreshAndRedirect(redirectTo)
 }
 
-export async function updateEnrollmentStatusAction(formData: FormData) {
+export async function cancelEnrollmentAction(formData: FormData) {
   const organizationId = await requireOrganizationId()
   const enrollmentId = String(formData.get("enrollment_id") || "")
-  const status = String(formData.get("status") || "")
+  const cancelReason = String(formData.get("cancel_reason") || "")
   const redirectTo = String(
     formData.get("redirect_to") || "/programs/registrations"
   )
 
-  const allowedStatuses = [
-    "enrolled",
-    "active",
-    "pending",
-    "completed",
-    "cancelled",
-  ]
-
-  if (!enrollmentId || !allowedStatuses.includes(status)) {
+  if (!enrollmentId) {
     refreshAndRedirect(redirectTo)
   }
 
-  const supabase = await createClient()
+  await cancelEnrollmentRpc({
+    organizationId,
+    enrollmentId,
+    cancelReason: cancelReason || null,
+  })
 
-  const { data: enrollmentData, error: enrollmentError } = await supabase
-    .from("program_enrollments")
-    .select("id, program_id, organization_id, status")
-    .eq("organization_id", organizationId)
-    .eq("id", enrollmentId)
-    .maybeSingle()
+  refreshAndRedirect(redirectTo)
+}
 
-  if (enrollmentError) {
-    throw new Error(enrollmentError.message)
-  }
+export async function advanceEnrollmentStatusAction(formData: FormData) {
+  const organizationId = await requireOrganizationId()
+  const enrollmentId = String(formData.get("enrollment_id") || "")
+  const targetStatus = String(formData.get("target_status") || "")
+  const reason = String(formData.get("reason") || "")
+  const redirectTo = String(
+    formData.get("redirect_to") || "/programs/registrations"
+  )
 
-  const enrollment = enrollmentData as EnrollmentLookup | null
+  const allowedTargets = ["enrolled", "active", "completed"]
 
-  if (!enrollment) {
+  if (!enrollmentId || !allowedTargets.includes(targetStatus)) {
     refreshAndRedirect(redirectTo)
   }
 
-  const previousStatus = String(enrollment.status || "").toLowerCase()
-  const nextStatus = status.toLowerCase()
-
-  const { error } = await supabase
-    .from("program_enrollments")
-    .update({
-      status,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("organization_id", organizationId)
-    .eq("id", enrollmentId)
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  const wasCounted = previousStatus !== "cancelled"
-  const shouldBeCounted = nextStatus !== "cancelled"
-
-  if (enrollment.program_id && wasCounted !== shouldBeCounted) {
-    const { data: programData, error: programError } = await supabase
-      .from("programs")
-      .select("enrolled")
-      .eq("organization_id", organizationId)
-      .eq("id", enrollment.program_id)
-      .maybeSingle()
-
-    if (programError) {
-      throw new Error(programError.message)
-    }
-
-    const program = programData as ProgramCounterLookup | null
-    const currentEnrolled = Number(program?.enrolled || 0)
-
-    const { error: updateProgramError } = await supabase
-      .from("programs")
-      .update({
-        enrolled: shouldBeCounted
-          ? currentEnrolled + 1
-          : Math.max(currentEnrolled - 1, 0),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("organization_id", organizationId)
-      .eq("id", enrollment.program_id)
-
-    if (updateProgramError) {
-      throw new Error(updateProgramError.message)
-    }
-  }
+  await advanceEnrollmentStatusRpc({
+    organizationId,
+    enrollmentId,
+    targetStatus,
+    reason: reason || null,
+  })
 
   refreshAndRedirect(redirectTo)
 }
@@ -255,73 +131,27 @@ export async function updateEnrollmentStatusAction(formData: FormData) {
 export async function removeWaitlistEntryAction(formData: FormData) {
   const organizationId = await requireOrganizationId()
   const waitlistId = String(formData.get("waitlist_id") || "")
+  const reason = String(formData.get("reason") || "")
+  const redirectTo = String(
+    formData.get("redirect_to") || "/programs/registrations"
+  )
 
   if (!waitlistId) {
-    refreshAndRedirect("/programs/registrations")
+    refreshAndRedirect(redirectTo)
   }
 
-  const supabase = await createClient()
-
-  const { data: waitlistData, error: waitlistError } = await supabase
-    .from("program_waitlist")
-    .select("id, program_id, organization_id")
-    .eq("organization_id", organizationId)
-    .eq("id", waitlistId)
-    .maybeSingle()
-
-  if (waitlistError) {
-    throw new Error(waitlistError.message)
-  }
-
-  const waitlistEntry = waitlistData as WaitlistLookup | null
-
-  if (!waitlistEntry) {
-    refreshAndRedirect("/programs/registrations")
-  }
-
-  const { error } = await supabase
-    .from("program_waitlist")
-    .delete()
-    .eq("organization_id", organizationId)
-    .eq("id", waitlistId)
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  if (waitlistEntry.program_id) {
-    const { data: programData, error: programError } = await supabase
-      .from("programs")
-      .select("waitlist")
-      .eq("organization_id", organizationId)
-      .eq("id", waitlistEntry.program_id)
-      .maybeSingle()
-
-    if (programError) {
-      throw new Error(programError.message)
-    }
-
-    const program = programData as ProgramCounterLookup | null
-
-    const { error: updateProgramError } = await supabase
-      .from("programs")
-      .update({
-        waitlist: Math.max(Number(program?.waitlist || 0) - 1, 0),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("organization_id", organizationId)
-      .eq("id", waitlistEntry.program_id)
-
-    if (updateProgramError) {
-      throw new Error(updateProgramError.message)
-    }
-  }
+  await removeWaitlistRpc({
+    organizationId,
+    waitlistId,
+    reason: reason || null,
+  })
 
   revalidatePath("/programs/registrations")
-  redirect("/programs/registrations")
+  revalidatePath(redirectTo)
+  redirect(redirectTo)
 }
 
-export async function moveWaitlistToEnrollmentAction(formData: FormData) {
+export async function promoteWaitlistAction(formData: FormData) {
   const organizationId = await requireOrganizationId()
   const waitlistId = String(formData.get("waitlist_id") || "")
   const redirectTo = String(
@@ -332,143 +162,39 @@ export async function moveWaitlistToEnrollmentAction(formData: FormData) {
     refreshAndRedirect(redirectTo)
   }
 
-  const supabase = await createClient()
-
-  const { data: waitlistData, error: waitlistError } = await supabase
-    .from("program_waitlist")
-    .select(
-      `
-      id,
-      organization_id,
-      program_id,
-      child_name,
-      child_age,
-      parent_name,
-      parent_email,
-      parent_phone,
-      preferred_weeks,
-      notes
-    `
-    )
-    .eq("organization_id", organizationId)
-    .eq("id", waitlistId)
-    .maybeSingle()
-
-  if (waitlistError) {
-    throw new Error(waitlistError.message)
-  }
-
-  const waitlistEntry = waitlistData as WaitlistMoveLookup | null
-
-  if (!waitlistEntry || !waitlistEntry.program_id) {
-    refreshAndRedirect(redirectTo)
-  }
-
-  const { data: programData, error: programError } = await supabase
-    .from("programs")
-    .select("id, department_id, enrolled, waitlist, capacity")
-    .eq("organization_id", organizationId)
-    .eq("id", waitlistEntry.program_id)
-    .maybeSingle()
-
-  if (programError) {
-    throw new Error(programError.message)
-  }
-
-  const program = programData as ProgramMoveLookup | null
-
-  if (!program) {
-    refreshAndRedirect(redirectTo)
-  }
-
-  const capacity = Number(program.capacity || 0)
-  const enrolled = Number(program.enrolled || 0)
-
-  if (capacity > 0 && enrolled >= capacity) {
-    refreshAndRedirect(redirectTo)
-  }
-
-  const offering = await getDefaultOfferingForProgramByOrg(
-    waitlistEntry.program_id,
-    organizationId
-  )
-
-  const sessionIds = await resolveSessionAccessForWaitlistMove({
+  const result = await promoteWaitlistRpc({
     organizationId,
-    programId: waitlistEntry.program_id,
-    preferredWeeks: waitlistEntry.preferred_weeks,
+    waitlistId,
   })
-
-  const today = new Date().toISOString().slice(0, 10)
-
-  const { data: newEnrollmentData, error: insertError } = await supabase
-    .from("program_enrollments")
-    .insert({
-      organization_id: organizationId,
-      program_id: waitlistEntry.program_id,
-      offering_id: offering?.id ?? null,
-      department_id: program.department_id,
-      child_name: waitlistEntry.child_name,
-      child_age: waitlistEntry.child_age,
-      parent_name: waitlistEntry.parent_name,
-      parent_email: waitlistEntry.parent_email,
-      parent_phone: waitlistEntry.parent_phone,
-      session_name: null,
-      weeks: sessionIds.length > 0 ? sessionIds : waitlistEntry.preferred_weeks,
-      enrollment_date: today,
-      status: "enrolled",
-      payment_status: "pending",
-      amount_paid: 0,
-      total_amount: 0,
-      before_care: false,
-      after_care: false,
-      lunch_type: null,
-      notes: waitlistEntry.notes,
-      participant_type: "youth",
-      registrant_type: "guardian",
-    })
-    .select("id")
-    .single()
-
-  if (insertError) {
-    throw new Error(insertError.message)
-  }
-
-  const newEnrollment = newEnrollmentData as { id: string }
-
-  if (sessionIds.length > 0) {
-    await createSessionAccessRows({
-      organizationId,
-      enrollmentId: newEnrollment.id,
-      sessionIds,
-    })
-  }
-
-  const { error: deleteError } = await supabase
-    .from("program_waitlist")
-    .delete()
-    .eq("organization_id", organizationId)
-    .eq("id", waitlistId)
-
-  if (deleteError) {
-    throw new Error(deleteError.message)
-  }
-
-  const { error: updateProgramError } = await supabase
-    .from("programs")
-    .update({
-      enrolled: enrolled + 1,
-      waitlist: Math.max(Number(program.waitlist || 0) - 1, 0),
-      updated_at: new Date().toISOString(),
-    })
-    .eq("organization_id", organizationId)
-    .eq("id", waitlistEntry.program_id)
-
-  if (updateProgramError) {
-    throw new Error(updateProgramError.message)
-  }
 
   revalidatePath("/programs/registrations")
   revalidatePath(`/programs/registrations/waitlist/${waitlistId}`)
-  redirect(`/programs/registrations/enrollment/${newEnrollment.id}`)
+
+  if (result.enrollment_id) {
+    redirect(`/programs/registrations/enrollment/${result.enrollment_id}`)
+  }
+
+  redirect(redirectTo)
+}
+
+/** @deprecated Use cancelEnrollmentAction or advanceEnrollmentStatusAction */
+export async function updateEnrollmentStatusAction(formData: FormData) {
+  const status = String(formData.get("status") || "").toLowerCase()
+
+  if (status === "cancelled") {
+    return cancelEnrollmentAction(formData)
+  }
+
+  const nextFormData = new FormData()
+  for (const [key, value] of formData.entries()) {
+    nextFormData.append(key, value)
+  }
+  nextFormData.set("target_status", status)
+
+  return advanceEnrollmentStatusAction(nextFormData)
+}
+
+/** @deprecated Use promoteWaitlistAction */
+export async function moveWaitlistToEnrollmentAction(formData: FormData) {
+  return promoteWaitlistAction(formData)
 }

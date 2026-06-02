@@ -1,5 +1,13 @@
 import { createClient } from "@/lib/supabase/server"
 
+export type CustomerContact = {
+  id: string
+  person_id: string | null
+  full_name: string | null
+  email: string | null
+  phone: string | null
+}
+
 export type ContactLookupResult = {
   contactId: string | null
   warning: string | null
@@ -74,6 +82,59 @@ export async function lookupContactsByPersonIds(
   }
 
   return map
+}
+
+export async function getCustomerContactForUser(
+  organizationId: string,
+  userId: string
+): Promise<CustomerContact | null> {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from("contacts")
+    .select("id, person_id, full_name, email, phone")
+    .eq("organization_id", organizationId)
+    .eq("auth_user_id", userId)
+    .maybeSingle()
+
+  if (error || !data) {
+    return null
+  }
+
+  return data as CustomerContact
+}
+
+export async function verifyParticipantInRegistrantFamily(input: {
+  organizationId: string
+  registrantPersonId: string
+  participantContactId: string
+}) {
+  const supabase = await createClient()
+
+  const { data: participantContact, error: participantError } = await supabase
+    .from("contacts")
+    .select("id, person_id")
+    .eq("organization_id", input.organizationId)
+    .eq("id", input.participantContactId)
+    .maybeSingle()
+
+  if (participantError || !participantContact?.person_id) {
+    return false
+  }
+
+  const { data: relationship, error: relationshipError } = await supabase
+    .from("person_relationships")
+    .select("id")
+    .eq("organization_id", input.organizationId)
+    .eq("person_id", input.registrantPersonId)
+    .eq("related_person_id", participantContact.person_id)
+    .maybeSingle()
+
+  if (relationshipError) {
+    return false
+  }
+
+  return Boolean(relationship)
 }
 
 export async function verifyContactInOrganization(

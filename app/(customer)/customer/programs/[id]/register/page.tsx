@@ -458,6 +458,10 @@ export default async function CustomerProgramRegisterPage({
   }
 
   const errorMessages: Record<string, string> = {
+    unauthorized:
+      "Your account is not authorized to register for this organization. Make sure you are signed in and linked to a contact record.",
+    "capacity-full":
+      "This program is full. No seats are available for new registrations.",
     "missing-fields": "Please complete all required fields before continuing.",
     "invalid-participant": "The selected participant could not be found.",
     "missing-participant-contact":
@@ -556,26 +560,7 @@ export default async function CustomerProgramRegisterPage({
                 ) : (
                   <form action={registerForProgram} className="space-y-6">
                     <input type="hidden" name="program_id" value={program.id} />
-                    <input type="hidden" name="organization_id" value={organizationId} />
-                    <input type="hidden" name="department_id" value={program.department_id || ""} />
-                    <input type="hidden" name="offering_id" value={offering.id} />
-                    <input type="hidden" name="program_type" value={program.program_type || "youth"} />
                     <input type="hidden" name="mode" value={mode} />
-                    <input
-                      type="hidden"
-                      name="registrant_contact_id"
-                      value={customerContact.id}
-                    />
-                    <input
-                      type="hidden"
-                      name="payer_contact_id"
-                      value={customerContact.id}
-                    />
-                    <input
-                      type="hidden"
-                      name="is_adult_self"
-                      value={isAdultProgram ? "true" : "false"}
-                    />
 
                     <CustomerRegistrationOptionPicker options={registrationOptions} />
 
@@ -586,11 +571,6 @@ export default async function CustomerProgramRegisterPage({
                           You are registering yourself as{" "}
                           {customerContact.full_name || "the participant"}.
                         </p>
-                        <input
-                          type="hidden"
-                          name="participant_contact_id"
-                          value={customerContact.id}
-                        />
                       </div>
                     ) : (
                       <div className="space-y-3">

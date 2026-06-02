@@ -31,11 +31,18 @@ import {
 } from "@/lib/programs/registration-display-helpers"
 
 import {
+  cancelEnrollmentAction,
+  advanceEnrollmentStatusAction,
   markEnrollmentPaymentAction,
-  moveWaitlistToEnrollmentAction,
+  promoteWaitlistAction,
   removeWaitlistEntryAction,
-  updateEnrollmentStatusAction,
 } from "@/app/(dashboard)/programs/registrations/actions"
+import {
+  canCancelEnrollmentStatus,
+  canPromoteWaitlist,
+  forwardEnrollmentActionLabel,
+  nextForwardEnrollmentStatus,
+} from "@/lib/programs/program-lifecycle-types"
 
 type PageParams = {
   type: string
@@ -412,8 +419,11 @@ export default async function ProgramRegistrationDetailPage({
   const canMoveWaitlist =
     type === "waitlist" &&
     program &&
-    program.capacity > 0 &&
-    program.enrolled < program.capacity
+    canPromoteWaitlist(waitlist?.status, program)
+
+  const enrollmentStatus = (enrollment?.status || "").toLowerCase()
+  const nextStatus = nextForwardEnrollmentStatus(enrollmentStatus)
+  const showCancel = type === "enrollment" && canCancelEnrollmentStatus(enrollmentStatus)
 
   return (
     <>
@@ -496,24 +506,36 @@ export default async function ProgramRegistrationDetailPage({
                   </Button>
                 </form>
 
-                <form action={updateEnrollmentStatusAction}>
-                  <input type="hidden" name="enrollment_id" value={enrollment.id} />
-                  <input type="hidden" name="status" value="cancelled" />
-                  <input type="hidden" name="redirect_to" value={detailPath} />
-                  <Button type="submit" variant="destructive">
-                    Cancel Enrollment
-                  </Button>
-                </form>
+                {nextStatus ? (
+                  <form action={advanceEnrollmentStatusAction}>
+                    <input type="hidden" name="enrollment_id" value={enrollment.id} />
+                    <input type="hidden" name="target_status" value={nextStatus} />
+                    <input type="hidden" name="redirect_to" value={detailPath} />
+                    <Button type="submit">
+                      {forwardEnrollmentActionLabel(nextStatus)}
+                    </Button>
+                  </form>
+                ) : null}
+
+                {showCancel ? (
+                  <form action={cancelEnrollmentAction}>
+                    <input type="hidden" name="enrollment_id" value={enrollment.id} />
+                    <input type="hidden" name="redirect_to" value={detailPath} />
+                    <Button type="submit" variant="destructive">
+                      Cancel Enrollment
+                    </Button>
+                  </form>
+                ) : null}
               </>
             ) : null}
 
             {type === "waitlist" && waitlist ? (
               <>
-                <form action={moveWaitlistToEnrollmentAction}>
+                <form action={promoteWaitlistAction}>
                   <input type="hidden" name="waitlist_id" value={waitlist.id} />
                   <input type="hidden" name="redirect_to" value={detailPath} />
                   <Button type="submit" disabled={!canMoveWaitlist}>
-                    Move to Enrolled
+                    Promote to Registration
                   </Button>
                 </form>
 
@@ -527,7 +549,7 @@ export default async function ProgramRegistrationDetailPage({
 
                 {!canMoveWaitlist ? (
                   <p className="flex items-center text-sm text-muted-foreground">
-                    This waitlist entry cannot move to enrolled because the program is full or capacity is not set.
+                    This waitlist entry cannot be promoted because the program is full or the entry is no longer active.
                   </p>
                 ) : null}
               </>
