@@ -1,9 +1,8 @@
 "use client"
 
 import * as React from "react"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { CalendarDays, ExternalLink, Plus, Users } from "lucide-react"
+import { CalendarDays, Plus, Users } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -126,22 +125,11 @@ export function ProgramSessionsEditor({
   return (
     <Card>
       <CardHeader>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <CardTitle>Sessions</CardTitle>
-            <CardDescription>
-              Add weeks, months, or class sections customers can register for
-              individually.
-            </CardDescription>
-          </div>
-
-          <Button variant="outline" size="sm" asChild>
-            <Link href={`/programs/${programId}/sessions`}>
-              Open sessions page
-              <ExternalLink className="ml-2 h-4 w-4" />
-            </Link>
-          </Button>
-        </div>
+        <CardTitle>Sessions</CardTitle>
+        <CardDescription>
+          Add weeks, months, or class sections customers can register for
+          individually.
+        </CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-6">

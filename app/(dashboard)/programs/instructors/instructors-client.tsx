@@ -4,6 +4,7 @@ import * as React from "react"
 import { useEffect, useMemo, useState } from "react"
 import { Header } from "@/components/layout/header"
 import { createClient } from "@/lib/supabase/client"
+import { linkStaffToContact } from "@/lib/contacts/contact-actions"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -38,7 +39,6 @@ import {
   Banknote,
   Timer,
   FolderOpen,
-  CircleDollarSign,
   AlertCircle,
   Upload,
   Download,
@@ -54,11 +54,41 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
-type StaffType = "instructor" | "assistant" | "volunteer"
+type StaffType = "full_time" | "part_time" | "temporary" | "contract" | "seasonal"
+type AssignmentRole = "instructor" | "assistant" | "volunteer"
 type StaffStatus = "active" | "inactive" | "on_leave" | "pending"
 type BackgroundCheckStatus = "cleared" | "pending" | "expired" | "not_started"
 
+const STAFF_TYPE_OPTIONS: { value: StaffType; label: string }[] = [
+  { value: "full_time", label: "Full-Time" },
+  { value: "part_time", label: "Part-Time" },
+  { value: "temporary", label: "Temporary" },
+  { value: "contract", label: "Contract" },
+  { value: "seasonal", label: "Seasonal" },
+]
+
+const STAFF_TYPE_LABELS: Record<string, string> = {
+  full_time: "Full-Time",
+  part_time: "Part-Time",
+  temporary: "Temporary",
+  contract: "Contract",
+  seasonal: "Seasonal",
+  instructor: "Instructor",
+  assistant: "Assistant",
+  volunteer: "Volunteer",
+}
+
 type Department = {
+  id: string
+  name: string
+}
+
+type HrPositionOption = {
+  id: string
+  name: string
+}
+
+type HrJobRoleOption = {
   id: string
   name: string
 }
@@ -80,7 +110,13 @@ type StaffMember = {
   staff_type: StaffType
   status: StaffStatus
   position: string | null
+  position_id: string | null
+  position_name: string | null
+  hr_job_role_id: string | null
+  hr_job_role_name: string | null
   hire_date: string | null
+  department_id: string | null
+  department_name: string | null
   background_check_status?: BackgroundCheckStatus
   assigned_programs: string[]
 }
@@ -90,7 +126,7 @@ type StaffAssignment = {
   organization_id: string
   staff_id: string
   program_id: string
-  role: StaffType
+  role: AssignmentRole
   start_date: string | null
   end_date: string | null
   schedule: string | null
@@ -126,6 +162,8 @@ export function InstructorsClient({
   const [assignments, setAssignments] = useState<StaffAssignment[]>([])
   const [documents, setDocuments] = useState<StaffDocument[]>([])
   const [departments, setDepartments] = useState<Department[]>([])
+  const [hrPositions, setHrPositions] = useState<HrPositionOption[]>([])
+  const [hrJobRoles, setHrJobRoles] = useState<HrJobRoleOption[]>([])
   const [programs, setPrograms] = useState<Program[]>([])
 
   const [searchQuery, setSearchQuery] = useState("")
@@ -146,16 +184,18 @@ export function InstructorsClient({
     last_name: "",
     email: "",
     phone: "",
-    staff_type: "instructor" as StaffType,
+    staff_type: "full_time" as StaffType,
     status: "active" as StaffStatus,
-    position: "",
+    position_id: "",
+    hr_job_role_id: "",
     hire_date: "",
+    department_id: "",
   })
 
   const [newAssignment, setNewAssignment] = useState({
     staff_id: "",
     program_id: "",
-    role: "instructor" as StaffType,
+    role: "instructor" as AssignmentRole,
     start_date: "",
     end_date: "",
     start_time: "",
@@ -176,6 +216,8 @@ export function InstructorsClient({
       setDocuments([])
       setPrograms([])
       setDepartments([])
+      setHrPositions([])
+      setHrJobRoles([])
       setLoading(false)
       return
     }
@@ -192,6 +234,26 @@ export function InstructorsClient({
       if (departmentsError) throw departmentsError
       setDepartments((departmentsData || []) as Department[])
 
+      const { data: positionsData, error: positionsError } = await supabase
+        .from("hr_positions")
+        .select("id, name")
+        .eq("organization_id", organizationId)
+        .eq("is_active", true)
+        .order("name")
+
+      if (positionsError && positionsError.code !== "42P01") throw positionsError
+      setHrPositions((positionsData || []) as HrPositionOption[])
+
+      const { data: jobRolesData, error: jobRolesError } = await supabase
+        .from("hr_job_roles")
+        .select("id, name")
+        .eq("organization_id", organizationId)
+        .eq("is_active", true)
+        .order("name")
+
+      if (jobRolesError && jobRolesError.code !== "42P01") throw jobRolesError
+      setHrJobRoles((jobRolesData || []) as HrJobRoleOption[])
+
       const { data: programsData, error: programsError } = await supabase
         .from("programs")
         .select("id, name, department_id, organization_id")
@@ -203,7 +265,12 @@ export function InstructorsClient({
 
       const { data: staffData, error: staffError } = await supabase
         .from("staff")
-        .select("*")
+        .select(`
+          *,
+          hr_positions:position_id (name),
+          hr_job_roles:hr_job_role_id (name),
+          departments:department_id (name)
+        `)
         .eq("organization_id", organizationId)
         .order("last_name")
 
@@ -291,10 +358,16 @@ export function InstructorsClient({
         last_name: person.last_name,
         email: person.email,
         phone: person.phone,
-        staff_type: person.staff_type || "instructor",
+        staff_type: (person.staff_type || "full_time") as StaffType,
         status: person.status || "active",
         position: person.position,
+        position_id: person.position_id || null,
+        position_name: person.hr_positions?.name || null,
+        hr_job_role_id: person.hr_job_role_id || null,
+        hr_job_role_name: person.hr_job_roles?.name || null,
         hire_date: person.hire_date,
+        department_id: person.department_id || null,
+        department_name: person.departments?.name || null,
         background_check_status: person.background_check_status || "not_started",
         assigned_programs: formattedAssignments
           .filter((assignment) => assignment.staff_id === person.id)
@@ -315,17 +388,26 @@ export function InstructorsClient({
   async function handleAddStaff() {
     if (!organizationId || !newStaff.first_name || !newStaff.last_name) return
 
-    const { error } = await supabase.from("staff").insert({
-      organization_id: organizationId,
-      first_name: newStaff.first_name,
-      last_name: newStaff.last_name,
-      email: newStaff.email || null,
-      phone: newStaff.phone || null,
-      staff_type: newStaff.staff_type,
-      status: newStaff.status,
-      position: newStaff.position || null,
-      hire_date: newStaff.hire_date || null,
-    })
+    const selectedPosition = hrPositions.find((item) => item.id === newStaff.position_id)
+
+    const { data: createdStaff, error } = await supabase
+      .from("staff")
+      .insert({
+        organization_id: organizationId,
+        first_name: newStaff.first_name,
+        last_name: newStaff.last_name,
+        email: newStaff.email || null,
+        phone: newStaff.phone || null,
+        staff_type: newStaff.staff_type,
+        status: newStaff.status,
+        position: selectedPosition?.name || null,
+        position_id: newStaff.position_id || null,
+        hr_job_role_id: newStaff.hr_job_role_id || null,
+        hire_date: newStaff.hire_date || null,
+        department_id: newStaff.department_id || null,
+      })
+      .select("id")
+      .single()
 
     if (error) {
       console.error("Add staff error:", error)
@@ -333,15 +415,30 @@ export function InstructorsClient({
       return
     }
 
+    if (createdStaff?.id) {
+      try {
+        await linkStaffToContact({
+          staffId: createdStaff.id,
+          fullName: `${newStaff.first_name} ${newStaff.last_name}`.trim(),
+          email: newStaff.email || null,
+          phone: newStaff.phone || null,
+        })
+      } catch (linkError: any) {
+        console.warn("Staff saved but contact link failed:", linkError?.message)
+      }
+    }
+
     setNewStaff({
       first_name: "",
       last_name: "",
       email: "",
       phone: "",
-      staff_type: "instructor",
+      staff_type: "full_time",
       status: "active",
-      position: "",
+      position_id: "",
+      hr_job_role_id: "",
       hire_date: "",
+      department_id: "",
     })
 
     setIsAddStaffOpen(false)
@@ -350,6 +447,8 @@ export function InstructorsClient({
 
   async function handleUpdateStaff() {
     if (!organizationId || !editingStaff) return
+
+    const selectedPosition = hrPositions.find((item) => item.id === editingStaff.position_id)
 
     const { error } = await supabase
       .from("staff")
@@ -360,8 +459,11 @@ export function InstructorsClient({
         phone: editingStaff.phone || null,
         staff_type: editingStaff.staff_type,
         status: editingStaff.status,
-        position: editingStaff.position || null,
+        position: selectedPosition?.name || editingStaff.position_name || editingStaff.position || null,
+        position_id: editingStaff.position_id || null,
+        hr_job_role_id: editingStaff.hr_job_role_id || null,
         hire_date: editingStaff.hire_date || null,
+        department_id: editingStaff.department_id || null,
       })
       .eq("id", editingStaff.id)
       .eq("organization_id", organizationId)
@@ -452,9 +554,11 @@ export function InstructorsClient({
     return {
       total: staff.length,
       active: staff.filter((person) => person.status === "active").length,
-      instructors: staff.filter((person) => person.staff_type === "instructor").length,
-      assistants: staff.filter((person) => person.staff_type === "assistant").length,
-      volunteers: staff.filter((person) => person.staff_type === "volunteer").length,
+      fullTime: staff.filter((person) => person.staff_type === "full_time").length,
+      partTime: staff.filter((person) => person.staff_type === "part_time").length,
+      temporary: staff.filter((person) => person.staff_type === "temporary").length,
+      contract: staff.filter((person) => person.staff_type === "contract").length,
+      seasonal: staff.filter((person) => person.staff_type === "seasonal").length,
       expiredCertifications: 0,
       pendingBgChecks: staff.filter(
         (person) =>
@@ -472,7 +576,10 @@ export function InstructorsClient({
       const matchesSearch =
         fullName.includes(search) ||
         person.email?.toLowerCase().includes(search) ||
-        person.position?.toLowerCase().includes(search)
+        person.position_name?.toLowerCase().includes(search) ||
+        person.position?.toLowerCase().includes(search) ||
+        person.department_name?.toLowerCase().includes(search) ||
+        person.hr_job_role_name?.toLowerCase().includes(search)
 
       const matchesType = typeFilter === "all" || person.staff_type === typeFilter
       const matchesStatus = statusFilter === "all" || person.status === statusFilter
@@ -480,6 +587,7 @@ export function InstructorsClient({
       const personAssignments = assignments.filter((assignment) => assignment.staff_id === person.id)
       const matchesDepartment =
         departmentFilter === "all" ||
+        person.department_id === departmentFilter ||
         personAssignments.some((assignment) => assignment.department_id === departmentFilter)
 
       return Boolean(matchesSearch && matchesType && matchesStatus && matchesDepartment)
@@ -533,9 +641,14 @@ export function InstructorsClient({
     return `${person.first_name?.[0] || ""}${person.last_name?.[0] || ""}`.toUpperCase()
   }
 
-  function getTypeBadge(type: StaffType) {
-    if (type === "instructor") return <Badge variant="outline">Instructor</Badge>
-    if (type === "assistant") return <Badge variant="outline">Assistant</Badge>
+  function getStaffTypeBadge(type: StaffType | string) {
+    const label = STAFF_TYPE_LABELS[type] || type.replace(/_/g, " ")
+    return <Badge variant="outline">{label}</Badge>
+  }
+
+  function getAssignmentRoleBadge(role: AssignmentRole) {
+    if (role === "instructor") return <Badge variant="outline">Instructor</Badge>
+    if (role === "assistant") return <Badge variant="outline">Assistant</Badge>
     return <Badge variant="outline">Volunteer</Badge>
   }
 
@@ -628,14 +741,14 @@ export function InstructorsClient({
 
   return (
     <>
-      <Header title="Staff" />
+      <Header title="Employees" />
 
       <div className="p-6 space-y-6 w-full">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Staff Management</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">Employees</h1>
             <p className="text-muted-foreground">
-              Manage instructors, assistants, volunteers, and their records.
+              Manage Employees and their records.
             </p>
           </div>
 
@@ -700,9 +813,11 @@ export function InstructorsClient({
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="instructor">Instructor</SelectItem>
-                        <SelectItem value="assistant">Assistant</SelectItem>
-                        <SelectItem value="volunteer">Volunteer</SelectItem>
+                        {STAFF_TYPE_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -728,11 +843,79 @@ export function InstructorsClient({
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
+                    <Label>Department</Label>
+                    <Select
+                      value={newStaff.department_id || "none"}
+                      onValueChange={(value) =>
+                        setNewStaff({
+                          ...newStaff,
+                          department_id: value === "none" ? "" : value,
+                        })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select department" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No department</SelectItem>
+                        {departments.map((department) => (
+                          <SelectItem key={department.id} value={department.id}>
+                            {department.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
                     <Label>Position</Label>
-                    <Input
-                      value={newStaff.position}
-                      onChange={(event) => setNewStaff({ ...newStaff, position: event.target.value })}
-                    />
+                    <Select
+                      value={newStaff.position_id || "none"}
+                      onValueChange={(value) =>
+                        setNewStaff({
+                          ...newStaff,
+                          position_id: value === "none" ? "" : value,
+                        })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select position" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No position</SelectItem>
+                        {hrPositions.map((position) => (
+                          <SelectItem key={position.id} value={position.id}>
+                            {position.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Role</Label>
+                    <Select
+                      value={newStaff.hr_job_role_id || "none"}
+                      onValueChange={(value) =>
+                        setNewStaff({
+                          ...newStaff,
+                          hr_job_role_id: value === "none" ? "" : value,
+                        })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No role</SelectItem>
+                        {hrJobRoles.map((role) => (
+                          <SelectItem key={role.id} value={role.id}>
+                            {role.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-2">
                     <Label>Start Date</Label>
@@ -781,10 +964,6 @@ export function InstructorsClient({
               <Banknote className="size-4 mr-2" />
               Salaries & Pay
             </TabsTrigger>
-            <TabsTrigger value="tuition">
-              <CircleDollarSign className="size-4 mr-2" />
-              Tuition Deductions
-            </TabsTrigger>
             <TabsTrigger value="attendance">
               <Timer className="size-4 mr-2" />
               Time & Attendance
@@ -806,13 +985,14 @@ export function InstructorsClient({
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium">By Type</CardTitle>
+                  <CardTitle className="text-sm font-medium">Full-Time</CardTitle>
                   <Briefcase className="size-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold">{stats.instructors}</div>
+                  <div className="text-3xl font-bold">{stats.fullTime}</div>
                   <p className="text-xs text-muted-foreground">
-                    {stats.assistants} assistants, {stats.volunteers} volunteers
+                    {stats.partTime} part-time, {stats.temporary} temporary, {stats.contract} contract,{" "}
+                    {stats.seasonal} seasonal
                   </p>
                 </CardContent>
               </Card>
@@ -844,7 +1024,7 @@ export function InstructorsClient({
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search by name, email, or position..."
+                  placeholder="Search by name, email, department, position, or role..."
                   className="pl-9"
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
@@ -857,9 +1037,11 @@ export function InstructorsClient({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="instructor">Instructor</SelectItem>
-                  <SelectItem value="assistant">Assistant</SelectItem>
-                  <SelectItem value="volunteer">Volunteer</SelectItem>
+                  {STAFF_TYPE_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
 
@@ -899,7 +1081,9 @@ export function InstructorsClient({
                     <TableRow>
                       <TableHead>Name</TableHead>
                       <TableHead>Type</TableHead>
+                      <TableHead>Department</TableHead>
                       <TableHead>Position</TableHead>
+                      <TableHead>Role</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Background Check</TableHead>
                       <TableHead>Programs</TableHead>
@@ -909,13 +1093,13 @@ export function InstructorsClient({
                   <TableBody>
                     {loading ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                           Loading staff...
                         </TableCell>
                       </TableRow>
                     ) : filteredStaff.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                           No staff members found.
                         </TableCell>
                       </TableRow>
@@ -935,8 +1119,10 @@ export function InstructorsClient({
                               </div>
                             </div>
                           </TableCell>
-                          <TableCell>{getTypeBadge(person.staff_type)}</TableCell>
-                          <TableCell>{person.position || "-"}</TableCell>
+                          <TableCell>{getStaffTypeBadge(person.staff_type)}</TableCell>
+                          <TableCell>{person.department_name || "-"}</TableCell>
+                          <TableCell>{person.position_name || person.position || "-"}</TableCell>
+                          <TableCell>{person.hr_job_role_name || "-"}</TableCell>
                           <TableCell>{getStatusBadge(person.status)}</TableCell>
                           <TableCell>{getBgCheckBadge(person.background_check_status)}</TableCell>
                           <TableCell>
@@ -1085,7 +1271,7 @@ export function InstructorsClient({
                     <Label>Role</Label>
                     <Select
                       value={newAssignment.role}
-                      onValueChange={(value) => setNewAssignment({ ...newAssignment, role: value as StaffType })}
+                      onValueChange={(value) => setNewAssignment({ ...newAssignment, role: value as AssignmentRole })}
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -1235,7 +1421,7 @@ export function InstructorsClient({
                             <div className="font-medium">{assignment.staff_name}</div>
                             <div className="text-sm text-muted-foreground">{assignment.staff_email || ""}</div>
                           </TableCell>
-                          <TableCell>{getTypeBadge(assignment.role)}</TableCell>
+                          <TableCell>{getAssignmentRoleBadge(assignment.role)}</TableCell>
                           <TableCell>{assignment.program_name}</TableCell>
                           <TableCell>{assignment.schedule || "-"}</TableCell>
                           <TableCell>
@@ -1462,10 +1648,6 @@ export function InstructorsClient({
             <ComingSoon title="Salaries & Pay" />
           </TabsContent>
 
-          <TabsContent value="tuition">
-            <ComingSoon title="Tuition Deductions" />
-          </TabsContent>
-
           <TabsContent value="attendance">
             <ComingSoon title="Time & Attendance" />
           </TabsContent>
@@ -1537,9 +1719,11 @@ export function InstructorsClient({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="instructor">Instructor</SelectItem>
-                      <SelectItem value="assistant">Assistant</SelectItem>
-                      <SelectItem value="volunteer">Volunteer</SelectItem>
+                      {STAFF_TYPE_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1567,13 +1751,79 @@ export function InstructorsClient({
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Position</Label>
-                  <Input
-                    value={editingStaff.position || ""}
-                    onChange={(event) =>
-                      setEditingStaff({ ...editingStaff, position: event.target.value })
+                  <Label>Department</Label>
+                  <Select
+                    value={editingStaff.department_id || "none"}
+                    onValueChange={(value) =>
+                      setEditingStaff({
+                        ...editingStaff,
+                        department_id: value === "none" ? null : value,
+                      })
                     }
-                  />
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select department" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No department</SelectItem>
+                      {departments.map((department) => (
+                        <SelectItem key={department.id} value={department.id}>
+                          {department.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Position</Label>
+                  <Select
+                    value={editingStaff.position_id || "none"}
+                    onValueChange={(value) =>
+                      setEditingStaff({
+                        ...editingStaff,
+                        position_id: value === "none" ? null : value,
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select position" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No position</SelectItem>
+                      {hrPositions.map((position) => (
+                        <SelectItem key={position.id} value={position.id}>
+                          {position.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Role</Label>
+                  <Select
+                    value={editingStaff.hr_job_role_id || "none"}
+                    onValueChange={(value) =>
+                      setEditingStaff({
+                        ...editingStaff,
+                        hr_job_role_id: value === "none" ? null : value,
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No role</SelectItem>
+                      {hrJobRoles.map((role) => (
+                        <SelectItem key={role.id} value={role.id}>
+                          {role.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label>Start Date</Label>

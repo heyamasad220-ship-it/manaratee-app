@@ -3,18 +3,11 @@
 import * as React from "react"
 import { Header } from "@/components/layout/header"
 import { createClient } from "@/lib/supabase/client"
-import {
-  createDepartment,
-  deleteDepartment,
-  fetchDepartmentsWithProgramCounts,
-  updateDepartment,
-} from "@/lib/departments/department-actions"
 import { cn } from "@/lib/utils"
 
 import {
   Bell,
   CreditCard,
-  FolderOpen,
   Pencil,
   Percent,
   Plus,
@@ -86,14 +79,6 @@ type ProgramSettings = {
   second_reminder: string
 }
 
-type Department = {
-  id: string
-  name: string
-  description: string | null
-  color: string | null
-  programs_count?: number
-}
-
 type DiscountCode = {
   id: string
   code: string
@@ -130,13 +115,6 @@ const defaultSettings: ProgramSettings = {
   send_waitlist_notifications: true,
   first_reminder: "24h",
   second_reminder: "1h",
-}
-
-const emptyDepartment = {
-  id: "",
-  name: "",
-  description: "",
-  color: "#3b82f6",
 }
 
 type DiscountFormState = {
@@ -210,11 +188,7 @@ export default function SettingsPage() {
   const [tablesAvailable, setTablesAvailable] = React.useState(true)
 
   const [settings, setSettings] = React.useState<ProgramSettings>(defaultSettings)
-  const [departments, setDepartments] = React.useState<Department[]>([])
   const [discountCodes, setDiscountCodes] = React.useState<DiscountCode[]>([])
-
-  const [departmentDialogOpen, setDepartmentDialogOpen] = React.useState(false)
-  const [editingDepartment, setEditingDepartment] = React.useState(emptyDepartment)
 
   const [discountDialogOpen, setDiscountDialogOpen] = React.useState(false)
   const [editingDiscount, setEditingDiscount] = React.useState(emptyDiscount)
@@ -228,9 +202,8 @@ export default function SettingsPage() {
     setLoading(true)
 
     try {
-      const [settingsResult, departments, discountsResult] = await Promise.all([
+      const [settingsResult, discountsResult] = await Promise.all([
         supabase.from("program_settings").select("settings").eq("id", "default").maybeSingle(),
-        fetchDepartmentsWithProgramCounts(),
         supabase
           .from("discount_codes")
           .select(
@@ -252,11 +225,8 @@ export default function SettingsPage() {
         console.warn("program_settings could not be loaded:", settingsResult.error.message)
       }
 
-      setDepartments(departments)
-
-      if (!discountsResult.error) {
-        setDiscountCodes((discountsResult.data || []) as DiscountCode[])
-      } else {
+      setDiscountCodes((discountsResult.data || []) as DiscountCode[])
+      if (discountsResult.error) {
         console.warn("discount_codes could not be loaded:", discountsResult.error.message)
         setDiscountCodes([])
       }
@@ -291,71 +261,6 @@ export default function SettingsPage() {
       alert(error?.message || "Could not save settings.")
     } finally {
       setSaving(false)
-    }
-  }
-
-  function openAddDepartmentDialog() {
-    setEditingDepartment(emptyDepartment)
-    setDepartmentDialogOpen(true)
-  }
-
-  function openEditDepartmentDialog(department: Department) {
-    setEditingDepartment({
-      id: department.id,
-      name: department.name,
-      description: department.description || "",
-      color: department.color || "#3b82f6",
-    })
-    setDepartmentDialogOpen(true)
-  }
-
-  async function handleSaveDepartment() {
-    if (!editingDepartment.name.trim()) return
-
-    setSaving(true)
-
-    try {
-      if (editingDepartment.id) {
-        await updateDepartment({
-          id: editingDepartment.id,
-          name: editingDepartment.name.trim(),
-          description: editingDepartment.description.trim() || undefined,
-          color: editingDepartment.color || "#3b82f6",
-        })
-      } else {
-        await createDepartment({
-          name: editingDepartment.name.trim(),
-          description: editingDepartment.description.trim() || undefined,
-          color: editingDepartment.color || "#3b82f6",
-        })
-      }
-
-      setDepartmentDialogOpen(false)
-      setEditingDepartment(emptyDepartment)
-      await fetchSettingsData()
-    } catch (error: any) {
-      console.error("Save department error:", error)
-      alert(error?.message || "Could not save department.")
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function handleDeleteDepartment(department: Department) {
-    if ((department.programs_count || 0) > 0) {
-      alert("This department is used by programs. Move those programs first, then delete the department.")
-      return
-    }
-
-    const confirmed = window.confirm("Delete this department?")
-    if (!confirmed) return
-
-    try {
-      await deleteDepartment(department.id)
-      await fetchSettingsData()
-    } catch (error: any) {
-      console.error("Delete department error:", error)
-      alert(error?.message || "Could not delete department.")
     }
   }
 
@@ -452,10 +357,6 @@ export default function SettingsPage() {
             <TabsTrigger value="general" className="gap-2">
               <Settings className="size-4" />
               General
-            </TabsTrigger>
-            <TabsTrigger value="departments" className="gap-2">
-              <FolderOpen className="size-4" />
-              Departments
             </TabsTrigger>
             <TabsTrigger value="registration" className="gap-2">
               <ShieldCheck className="size-4" />
@@ -567,92 +468,6 @@ export default function SettingsPage() {
                   {saving ? "Saving..." : "Save Changes"}
                 </Button>
               </div>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="departments">
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-base font-semibold">Departments</h2>
-                  <p className="text-sm text-muted-foreground">
-                    Manage departments for organizing programs.
-                  </p>
-                </div>
-
-                <Button onClick={openAddDepartmentDialog}>
-                  <Plus className="mr-2 size-4" />
-                  Add Department
-                </Button>
-              </div>
-
-              <Card>
-                <CardContent className="p-0">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-[60px]">Color</TableHead>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Description</TableHead>
-                        <TableHead>Programs</TableHead>
-                        <TableHead className="w-[110px]" />
-                      </TableRow>
-                    </TableHeader>
-
-                    <TableBody>
-                      {loading ? (
-                        <TableRow>
-                          <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
-                            Loading departments...
-                          </TableCell>
-                        </TableRow>
-                      ) : departments.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
-                            No departments yet.
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        departments.map((department) => (
-                          <TableRow key={department.id}>
-                            <TableCell>
-                              <div
-                                className="size-6 rounded-full border"
-                                style={{ backgroundColor: department.color || "#3b82f6" }}
-                              />
-                            </TableCell>
-                            <TableCell className="font-medium">{department.name}</TableCell>
-                            <TableCell className="text-muted-foreground">
-                              {department.description || "-"}
-                            </TableCell>
-                            <TableCell>{department.programs_count || 0}</TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="size-8"
-                                  onClick={() => openEditDepartmentDialog(department)}
-                                >
-                                  <Pencil className="size-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="size-8 text-muted-foreground hover:text-red-600"
-                                  onClick={() => handleDeleteDepartment(department)}
-                                >
-                                  <Trash2 className="size-4" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
             </div>
           </TabsContent>
 
@@ -971,73 +786,6 @@ export default function SettingsPage() {
           </TabsContent>
         </Tabs>
       </div>
-
-      <Dialog open={departmentDialogOpen} onOpenChange={setDepartmentDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editingDepartment.id ? "Edit Department" : "Add Department"}</DialogTitle>
-            <DialogDescription>
-              {editingDepartment.id
-                ? "Update this department."
-                : "Create a new program department."}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="flex flex-col gap-4 py-4">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="department-name">Name</Label>
-              <Input
-                id="department-name"
-                value={editingDepartment.name}
-                onChange={(event) =>
-                  setEditingDepartment({ ...editingDepartment, name: event.target.value })
-                }
-                placeholder="e.g., Youth Services"
-              />
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="department-color">Color</Label>
-              <div className="flex items-center gap-3">
-                <Input
-                  id="department-color"
-                  type="color"
-                  className="h-10 w-20 cursor-pointer p-1"
-                  value={editingDepartment.color}
-                  onChange={(event) =>
-                    setEditingDepartment({ ...editingDepartment, color: event.target.value })
-                  }
-                />
-                <span className="text-sm text-muted-foreground">
-                  Choose a color for the department
-                </span>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="department-description">Description</Label>
-              <Textarea
-                id="department-description"
-                value={editingDepartment.description}
-                onChange={(event) =>
-                  setEditingDepartment({ ...editingDepartment, description: event.target.value })
-                }
-                placeholder="Brief description of this department"
-                rows={2}
-              />
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDepartmentDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSaveDepartment} disabled={saving}>
-              {saving ? "Saving..." : editingDepartment.id ? "Save Changes" : "Add Department"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={discountDialogOpen} onOpenChange={setDiscountDialogOpen}>
         <DialogContent>

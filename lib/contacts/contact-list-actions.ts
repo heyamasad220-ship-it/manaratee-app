@@ -1,0 +1,369 @@
+"use server"
+
+import { createClient } from "@/lib/supabase/server"
+import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
+import {
+  type ContactRecordType,
+  type ContactRoleLabel,
+  type ContactRoleValue,
+  type ContactStatus,
+  filterContactRoles,
+  mapRoleValue,
+  mapStatus,
+} from "@/lib/contacts/contact-constants"
+
+export type ContactListTeamSummary = {
+  id: string
+  name: string
+}
+
+export type ContactListRow = {
+  id: string
+  name: string
+  email: string
+  phone: string
+  recordType: ContactRecordType
+  roles: ContactRoleLabel[]
+  roleValues: ContactRoleValue[]
+  status: ContactStatus
+  createdAt: string
+  lastActivity: string | null
+  teams: ContactListTeamSummary[]
+}
+
+export type ContactListStats = {
+  total: number
+  people: number
+  organizations: number
+}
+
+export type FetchContactsListInput = {
+  search?: string
+  role?: ContactRoleValue | "all"
+  recordType?: ContactRecordType | "all"
+  status?: ContactStatus | "all"
+  teamId?: string | "all"
+  page?: number
+  pageSize?: number
+  /** Page-scoped record type (e.g. People) — not treated as an active user filter. */
+  lockedRecordType?: ContactRecordType
+}
+
+export type FetchContactsListResult = {
+  contacts: ContactListRow[]
+  total: number
+  page: number
+  pageSize: number
+  isRecentView: boolean
+}
+
+const DEFAULT_PAGE_SIZE = 50
+
+function escapeIlike(value: string) {
+  return value.replace(/[%_\\,]/g, "\\$&")
+}
+
+function mapContactRow(row: any): ContactListRow {
+  const roleValues = filterContactRoles(
+    Array.from(
+      new Set((row.contact_roles || []).map((r: any) => r.role as string).filter(Boolean))
+    )
+  )
+  const roles = roleValues
+    .map((value) => mapRoleValue(value))
+    .filter(Boolean) as ContactRoleLabel[]
+
+  const recordType: ContactRecordType =
+    row.contact_type === "organization" ? "organization" : "individual"
+
+  const teamMap = new Map<string, ContactListTeamSummary>()
+  for (const membership of row.hr_team_memberships || []) {
+    if (membership.status !== "active") continue
+    const teamId = membership.team_id as string | undefined
+    const teamName = membership.hr_teams?.name as string | undefined
+    if (teamId && teamName && !teamMap.has(teamId)) {
+      teamMap.set(teamId, { id: teamId, name: teamName })
+    }
+  }
+
+  const lastActivity =
+    row.last_activity_at || row.updated_at || row.created_at || null
+
+  return {
+    id: row.id,
+    name: row.full_name || row.email || row.phone || "Unnamed Contact",
+    email: row.email || "",
+    phone: row.phone || "",
+    recordType,
+    roleValues,
+    roles,
+    status: mapStatus(row.status),
+    createdAt: row.created_at,
+    lastActivity,
+    teams: Array.from(teamMap.values()),
+  }
+}
+
+function buildSelect(
+  roleFilter: boolean,
+  teamFilter: boolean,
+  options?: { includeTeams?: boolean; includeActivityColumns?: boolean }
+) {
+  const includeTeams = options?.includeTeams !== false
+  const includeActivityColumns = options?.includeActivityColumns === true
+
+  const roles = roleFilter ? "contact_roles!inner(role)" : "contact_roles(role)"
+  const activityColumns = includeActivityColumns
+    ? "last_activity_at, updated_at,"
+    : ""
+  const teams = includeTeams
+    ? teamFilter
+      ? "hr_team_memberships!inner(status, team_id, hr_teams:team_id(name))"
+      : "hr_team_memberships(status, team_id, hr_teams:team_id(name))"
+    : null
+
+  const nested = teams ? `, ${teams}` : ""
+
+  return `
+    id,
+    full_name,
+    email,
+    phone,
+    contact_type,
+    status,
+    created_at,
+    ${activityColumns}
+    ${roles}
+    ${nested}
+  `
+    .replace(/\n\s+/g, " ")
+    .replace(/,\s*,/g, ",")
+    .replace(/,\s*$/, "")
+    .trim()
+}
+
+function hasListFilters(input: FetchContactsListInput) {
+  const recordTypeFiltered =
+    input.recordType &&
+    input.recordType !== "all" &&
+    input.recordType !== input.lockedRecordType
+
+  return Boolean(
+    input.search?.trim() ||
+      (input.role && input.role !== "all") ||
+      recordTypeFiltered ||
+      (input.status && input.status !== "all") ||
+      (input.teamId && input.teamId !== "all")
+  )
+}
+
+function statusToFilterValue(status: ContactStatus | "all") {
+  if (status === "all") return null
+  if (status === "Major Donor") return "major_donor"
+  return status.toLowerCase()
+}
+
+function isMissingColumnError(error: { code?: string; message?: string } | null) {
+  if (!error) return false
+  if (error.code === "42703" || error.code === "PGRST204") return true
+  const message = error.message?.toLowerCase() || ""
+  return (
+    message.includes("last_activity_at") ||
+    message.includes("updated_at") ||
+    message.includes("does not exist")
+  )
+}
+
+function isMissingTeamsRelationError(error: { code?: string; message?: string } | null) {
+  if (!error) return false
+  if (error.code === "42P01" || error.code === "PGRST200") return true
+  return Boolean(error.message?.includes("hr_team_memberships"))
+}
+
+type QueryOptions = {
+  includeTeams: boolean
+  includeActivityColumns: boolean
+}
+
+async function runContactsQuery(
+  input: FetchContactsListInput,
+  organizationId: string,
+  from: number,
+  to: number,
+  options: QueryOptions
+) {
+  const supabase = await createClient()
+  const roleFilter = input.role && input.role !== "all"
+  const teamFilter = input.teamId && input.teamId !== "all"
+
+  let query = supabase
+    .from("contacts")
+    .select(
+      buildSelect(Boolean(roleFilter), Boolean(teamFilter), {
+        includeTeams: options.includeTeams,
+        includeActivityColumns: options.includeActivityColumns,
+      }),
+      { count: "exact" }
+    )
+    .eq("organization_id", organizationId)
+
+  if (roleFilter) {
+    query = query.eq("contact_roles.role", input.role)
+  }
+
+  if (teamFilter && options.includeTeams) {
+    query = query
+      .eq("hr_team_memberships.team_id", input.teamId)
+      .eq("hr_team_memberships.status", "active")
+  }
+
+  if (input.recordType && input.recordType !== "all") {
+    query = query.eq(
+      "contact_type",
+      input.recordType === "organization" ? "organization" : "individual"
+    )
+  } else if (input.lockedRecordType) {
+    query = query.eq(
+      "contact_type",
+      input.lockedRecordType === "organization" ? "organization" : "individual"
+    )
+  }
+
+  const statusValue = input.status ? statusToFilterValue(input.status) : null
+  if (statusValue) {
+    query = query.eq("status", statusValue)
+  }
+
+  const trimmedSearch = input.search?.trim()
+  if (trimmedSearch) {
+    const pattern = `%${escapeIlike(trimmedSearch)}%`
+    query = query.or(
+      `full_name.ilike.${pattern},email.ilike.${pattern},phone.ilike.${pattern}`
+    )
+  }
+
+  if (options.includeActivityColumns) {
+    query = query
+      .order("last_activity_at", { ascending: false, nullsFirst: false })
+      .order("updated_at", { ascending: false })
+      .order("created_at", { ascending: false })
+  } else {
+    query = query.order("created_at", { ascending: false })
+  }
+
+  return query.range(from, to)
+}
+
+export async function fetchContactListStats(options?: {
+  recordType?: ContactRecordType
+}): Promise<ContactListStats> {
+  const supabase = await createClient()
+  const organizationId = await getSelectedOrganizationId()
+
+  if (!organizationId) {
+    return { total: 0, people: 0, organizations: 0 }
+  }
+
+  const [totalRes, peopleRes, organizationsRes] = await Promise.all([
+    supabase
+      .from("contacts")
+      .select("*", { count: "exact", head: true })
+      .eq("organization_id", organizationId),
+    supabase
+      .from("contacts")
+      .select("*", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .eq("contact_type", "individual"),
+    supabase
+      .from("contacts")
+      .select("*", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .eq("contact_type", "organization"),
+  ])
+
+  const stats = {
+    total: totalRes.count ?? 0,
+    people: peopleRes.count ?? 0,
+    organizations: organizationsRes.count ?? 0,
+  }
+
+  if (options?.recordType === "individual") {
+    return { ...stats, total: stats.people }
+  }
+
+  if (options?.recordType === "organization") {
+    return { ...stats, total: stats.organizations }
+  }
+
+  return stats
+}
+
+export async function fetchContactsList(
+  input: FetchContactsListInput
+): Promise<FetchContactsListResult> {
+  const organizationId = await getSelectedOrganizationId()
+
+  if (!organizationId) {
+    return {
+      contacts: [],
+      total: 0,
+      page: 1,
+      pageSize: DEFAULT_PAGE_SIZE,
+      isRecentView: true,
+    }
+  }
+
+  const page = Math.max(1, input.page ?? 1)
+  const pageSize = input.pageSize ?? DEFAULT_PAGE_SIZE
+  const from = (page - 1) * pageSize
+  const to = from + pageSize - 1
+  const isRecentView = !hasListFilters(input)
+
+  const queryPlans: QueryOptions[] = [
+    { includeTeams: true, includeActivityColumns: true },
+    { includeTeams: true, includeActivityColumns: false },
+    { includeTeams: false, includeActivityColumns: false },
+  ]
+
+  let lastError: { message?: string } | null = null
+
+  for (const plan of queryPlans) {
+    const { data, error, count } = await runContactsQuery(
+      input,
+      organizationId,
+      from,
+      to,
+      plan
+    )
+
+    if (!error) {
+      const rows = data || []
+      const uniqueRows = Array.from(
+        new Map(rows.map((row: any) => [row.id as string, row])).values()
+      )
+
+      return {
+        contacts: uniqueRows.map((row) =>
+          mapContactRow({ ...row, hr_team_memberships: row.hr_team_memberships || [] })
+        ),
+        total: count ?? 0,
+        page,
+        pageSize,
+        isRecentView,
+      }
+    }
+
+    lastError = error
+
+    const canRetry =
+      (plan.includeActivityColumns && isMissingColumnError(error)) ||
+      (plan.includeTeams && isMissingTeamsRelationError(error))
+
+    if (!canRetry) {
+      break
+    }
+  }
+
+  console.error("fetchContactsList error:", lastError)
+  throw new Error(lastError?.message || "Could not load contacts")
+}

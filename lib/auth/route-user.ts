@@ -1,8 +1,9 @@
 import { createClient } from "@/lib/supabase/client"
+import { selectOrganization } from "@/lib/organizations/organization-actions"
 
 export async function routeUserByRole(
   userId: string,
-  router: any
+  router: { push: (path: string) => void; refresh?: () => void }
 ) {
   const supabase = createClient()
 
@@ -23,39 +24,54 @@ export async function routeUserByRole(
     return
   }
 
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("is_platform_admin")
+    .eq("id", userId)
+    .maybeSingle()
+
+  if (profileError) throw profileError
+
+  if (profile?.is_platform_admin === true) {
+    router.push("/admin/dashboard")
+    return
+  }
+
   /**
    * 2. Organization member/admin
    */
   const { data: memberships, error: membershipError } =
     await supabase
       .from("organization_members")
-      .select("organization_id, role")
+      .select("organization_id, role, status")
       .eq("user_id", userId)
+      .eq("status", "active")
 
   if (membershipError) throw membershipError
 
+  const orgAdminMembership = memberships?.find((membership) =>
+    ["super_admin", "admin", "coordinator", "viewer"].includes(membership.role)
+  )
+
+  if (orgAdminMembership) {
+    await selectOrganization(orgAdminMembership.organization_id)
+    router.refresh?.()
+    router.push("/dashboard")
+    return
+  }
+
+  const customerMembership = memberships?.find(
+    (membership) => membership.role === "customer"
+  )
+
+  if (customerMembership) {
+    router.push("/customer/dashboard")
+    return
+  }
+
   if (memberships && memberships.length > 0) {
-    const firstOrgId = memberships[0].organization_id
-
-    const selectResponse = await fetch(
-      "/api/organizations/select",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          organizationId: firstOrgId,
-        }),
-      }
-    )
-
-    if (!selectResponse.ok) {
-      throw new Error(
-        "Failed to set selected organization"
-      )
-    }
-
+    await selectOrganization(memberships[0].organization_id)
+    router.refresh?.()
     router.push("/dashboard")
     return
   }
@@ -73,9 +89,7 @@ export async function routeUserByRole(
   if (customerError) throw customerError
 
   if (customerProfile?.organization_id) {
-    router.push(
-      `/organizations/${customerProfile.organization_id}`
-    )
+    router.push("/customer/dashboard")
     return
   }
 

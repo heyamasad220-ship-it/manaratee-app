@@ -1,13 +1,18 @@
 import { Header } from "@/components/layout/header"
-import { PlaceholderPage } from "@/components/layout/placeholder-page"
+import { ContactsListView } from "@/components/contacts/contacts-list-view"
+import { Button } from "@/components/ui/button"
 
-export default function MembersPage() {
+export default function HrMembersPage() {
   return (
     <>
-      <Header title="People" />
-      <PlaceholderPage
-        title="Members"
-        description="Manage members and membership records. Coming soon."
+      <Header title="Members" />
+      <ContactsListView
+        requiredRole="member"
+        defaultAddRoles={["member"]}
+        hideRoleFilter
+        showStats={false}
+        showTeamFilters
+        emptyMessage="No members yet. Add a contact with the Member role."
       />
     </>
   )

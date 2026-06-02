@@ -270,11 +270,18 @@ export function UsersSettingsClient({
       const result = await response.json()
 
       if (!response.ok || !result.success) {
-        alert(result.error || "Failed to send invitation.")
+        const message = [
+          result.error,
+          result.details,
+          result.fix,
+        ]
+          .filter(Boolean)
+          .join(" — ")
+        alert(message || "Failed to send invitation.")
         return
       }
 
-      alert("Invitation email sent successfully.")
+      alert(result.message || "Invitation email sent successfully.")
 
       resetInviteForm()
       setShowAddDialog(false)

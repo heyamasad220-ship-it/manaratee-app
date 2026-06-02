@@ -2,27 +2,37 @@
 
 ## User Invitations
 
-Status: Open
+Status: Fixed (May 2026) — retest in your environment
 
-File:
+File: `app/api/organizations/invite-user/route.ts`
 
-app/api/organizations/invite-user/route.ts
+Fixes applied:
 
-Potential Causes:
+* Permission check now uses `settings.users.manage` (was incorrectly `users.invite`)
+* Auth callback route exchanges invite/OAuth codes: `app/auth/callback/route.ts`
+* Existing registered emails: user is added to org + sign-in email sent
+* App URL resolves from env or request origin (local dev friendly)
+* Invited users use system role `admin` on `organization_members.role` (permissions come from `role_id`)
+* **Required:** run `scripts/014_organization_members_invite_support.sql` in Supabase SQL Editor if invite still fails with `organization_members_role_check`
 
-* Supabase invite configuration
-* Email provider issues
-* Missing redirect URL
-* Missing environment variables
-* organization_members insert failure
-* role_id assignment issue
-* RLS policies
+If email still does not arrive, verify in Supabase Dashboard:
 
-Goal:
+* **Authentication → URL Configuration** — add these redirect URLs:
+  * `https://manaratee-app.vercel.app/auth/callback`
+  * `https://manaratee-app.vercel.app/auth/confirm`
+  * `http://localhost:3000/auth/callback` (local dev)
+  * `http://localhost:3000/auth/confirm` (local dev)
+* **Authentication → Email Templates** — Invite + Reset password enabled
+* **Project Settings → API** — `SUPABASE_SERVICE_ROLE_KEY` in `.env.local`
+* Set `NEXT_PUBLIC_APP_URL=https://manaratee-app.vercel.app` in Vercel env
 
-* Send invitation email
-* Assign role correctly
-* Add user to organization automatically
+Invite / reset flow:
+
+1. User clicks email link → `/auth/callback` or `/auth/confirm`
+2. Session established → `/auth/set-password` (create password)
+3. Redirect to dashboard with org from invite metadata
+
+Required permission to invite: **Manage Users** (`settings.users.manage`) on the inviter's organization role, or system roles `super_admin`, `admin`, `coordinator`, `owner` on `organization_members.role`.
 
 ---
 

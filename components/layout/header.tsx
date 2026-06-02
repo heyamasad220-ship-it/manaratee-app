@@ -1,5 +1,6 @@
 "use client"
 
+import type { ReactNode } from "react"
 import { useEffect, useState } from "react"
 import Image from "next/image"
 
@@ -16,9 +17,10 @@ import { getCurrentOrganizationId } from "@/lib/current-organization"
 interface HeaderProps {
   title: string
   showSearch?: boolean
+  actions?: ReactNode
 }
 
-export function Header({ title, showSearch = false }: HeaderProps) {
+export function Header({ title, showSearch = false, actions }: HeaderProps) {
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
 
   useEffect(() => {
@@ -61,6 +63,7 @@ export function Header({ title, showSearch = false }: HeaderProps) {
       </div>
 
       <div className="flex items-center gap-2 sm:gap-3">
+        {actions}
         {showSearch && (
           <div className="hidden md:flex relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

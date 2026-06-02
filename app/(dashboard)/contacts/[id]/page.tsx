@@ -2,48 +2,47 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
+import Link from "next/link"
 import { Header } from "@/components/layout/header"
 import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { ContactDonorPanel } from "@/components/contacts/contact-donor-panel"
+import { ContactMemberPanel } from "@/components/contacts/contact-member-panel"
+import { ContactNotesPanel } from "@/components/contacts/contact-notes-panel"
+import { ContactRelationshipSummaryCard } from "@/components/contacts/contact-relationship-summary"
+import { ContactRolesCard } from "@/components/contacts/contact-roles-card"
+import { ContactTimelinePanel } from "@/components/contacts/contact-timeline-panel"
+import { ContactVolunteerDetails } from "@/components/contacts/contact-volunteer-details"
+import { ContactVolunteerPanel } from "@/components/contacts/contact-volunteer-panel"
+import { ContactTeamsPanel } from "@/components/contacts/contact-teams-panel"
+import { ContactApplicationsPanel } from "@/components/contacts/contact-applications-panel"
 import { PersonTagsCard } from "@/components/people/person-tags-card"
 import { createClient } from "@/lib/supabase/client"
+import { getCurrentOrganizationId } from "@/lib/current-organization"
+import {
+  type ContactRoleValue,
+  filterContactRoles,
+} from "@/lib/contacts/contact-constants"
+import {
+  fetchContactProfileData,
+  type ContactProfileData,
+} from "@/lib/contacts/contact-profile-data"
 import {
   ArrowLeft,
+  Briefcase,
   Building2,
   Calendar,
-  Heart,
   Loader2,
   Mail,
   MapPin,
   Phone,
   Store,
   User,
-  Users,
   Wrench,
 } from "lucide-react"
 
-type ContactRole = "customer" | "volunteer" | "vendor" | "service_provider" | "donor"
-
-const roleLabels: Record<ContactRole, string> = {
-  customer: "Customer",
-  volunteer: "Volunteer",
-  vendor: "Vendor",
-  service_provider: "Service Provider",
-  donor: "Donor",
-}
-
-const roleColors: Record<ContactRole, string> = {
-  customer: "bg-blue-100 text-blue-700",
-  volunteer: "bg-emerald-100 text-emerald-700",
-  vendor: "bg-amber-100 text-amber-700",
-  service_provider: "bg-purple-100 text-purple-700",
-  donor: "bg-rose-100 text-rose-700",
-}
-
 function formatText(value: string | null | undefined) {
   if (!value) return "-"
-
   return value
     .replace(/_/g, " ")
     .replace(/\b\w/g, (c: string) => c.toUpperCase())
@@ -51,27 +50,9 @@ function formatText(value: string | null | undefined) {
 
 function formatDate(value: string | null | undefined) {
   if (!value) return "-"
-
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return "-"
-
   return date.toLocaleDateString()
-}
-
-function formatDateTime(value: string | null | undefined) {
-  if (!value) return "-"
-
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return "-"
-
-  return date.toLocaleString()
-}
-
-function formatMoney(value: number | string | null | undefined) {
-  return Number(value || 0).toLocaleString(undefined, {
-    style: "currency",
-    currency: "USD",
-  })
 }
 
 export default function ContactDetailPage() {
@@ -81,10 +62,38 @@ export default function ContactDetailPage() {
   const supabase = useMemo(() => createClient(), [])
 
   const [contact, setContact] = useState<any>(null)
+  const [profileData, setProfileData] = useState<ContactProfileData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [donations, setDonations] = useState<any[]>([])
-  const [notes, setNotes] = useState<any[]>([])
+  const [profileLoading, setProfileLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState("")
+
+  const loadProfileData = useCallback(
+    async (contactRecord: any, roles: ContactRoleValue[]) => {
+      setProfileLoading(true)
+      try {
+        const orgId = await getCurrentOrganizationId()
+        if (!orgId) {
+          setProfileData(null)
+          return
+        }
+
+        const data = await fetchContactProfileData(supabase, orgId, {
+          contactId,
+          personId: contactRecord.person_id,
+          email: contactRecord.email,
+          roles,
+          contactCreatedAt: contactRecord.created_at,
+        })
+        setProfileData(data)
+      } catch (error) {
+        console.error("Error loading contact profile data:", error)
+        setProfileData(null)
+      } finally {
+        setProfileLoading(false)
+      }
+    },
+    [contactId, supabase]
+  )
 
   const loadContact = useCallback(async () => {
     setLoading(true)
@@ -107,7 +116,6 @@ export default function ContactDetailPage() {
         status,
         created_at,
         contact_roles(role)
-        
       `)
       .eq("id", contactId)
       .single()
@@ -115,101 +123,66 @@ export default function ContactDetailPage() {
     if (error || !data) {
       console.error("Error loading contact:", error)
       setContact(null)
+      setProfileData(null)
       setErrorMessage(error?.message || "This contact could not be found.")
       setLoading(false)
+      setProfileLoading(false)
       return
     }
 
     setContact(data)
 
-    const roles = data.contact_roles || []
-    const isDonor = roles.some((role: any) => role.role === "donor")
-
-    if (isDonor && data.full_name) {
-      const { data: donorMatches, error: donorError } = await supabase
-        .from("donors")
-        .select("id")
-        .ilike("full_name", data.full_name)
-
-      if (donorError) {
-        console.error("Error finding donor matches:", donorError)
-      }
-
-      const donorIds = (donorMatches || []).map((d: any) => d.id)
-
-      if (donorIds.length > 0) {
-        const { data: paymentData, error: paymentError } = await supabase
-          .from("payments")
-          .select(`
-            id,
-            amount,
-            payment_date,
-            source,
-            status,
-            memo
-          `)
-          .in("donor_id", donorIds)
-          .order("payment_date", { ascending: false })
-
-        if (paymentError) {
-          console.error("Error loading payments:", paymentError)
-          setDonations([])
-        } else {
-          setDonations(paymentData || [])
-        }
-      } else {
-        setDonations([])
-      }
-    } else {
-      setDonations([])
-    }
-
-    const { data: notesData, error: notesError } = await supabase
-      .from("contact_notes")
-      .select(`
-        id,
-        note,
-        created_at
-      `)
-      .eq("contact_id", contactId)
-      .order("created_at", { ascending: false })
-
-    if (notesError) {
-      console.error("Error loading notes:", notesError)
-      setNotes([])
-    } else {
-      setNotes(notesData || [])
-    }
-
+    const roles = filterContactRoles(
+      ((data.contact_roles || []) as any[]).map((role) => role.role).filter(Boolean)
+    )
+    await loadProfileData(data, roles)
     setLoading(false)
-  }, [contactId, supabase])
+  }, [contactId, loadProfileData, supabase])
 
   useEffect(() => {
     if (contactId) {
-      loadContact()
+      void loadContact()
     }
   }, [contactId, loadContact])
 
   const roles = useMemo(() => {
-    return ((contact?.contact_roles || []) as any[])
-      .map((role) => role.role)
-      .filter(Boolean) as ContactRole[]
+    return filterContactRoles(
+      ((contact?.contact_roles || []) as any[]).map((role) => role.role).filter(Boolean)
+    )
   }, [contact])
 
   const hasRole = useCallback(
-    (roleName: ContactRole) => roles.includes(roleName),
+    (roleName: ContactRoleValue) => roles.includes(roleName),
     [roles]
   )
 
+  const showDonorPanel = useMemo(() => {
+    if (hasRole("donor")) return true
+    if (!profileData) return false
+    return (
+      profileData.donorStats.donationCount > 0 ||
+      profileData.donorStats.totalDonated > 0 ||
+      profileData.donorStats.pledgeCount > 0
+    )
+  }, [hasRole, profileData])
+
   const fullAddress = useMemo(() => {
     if (!contact) return "-"
-
     return (
       [contact.address, contact.city, contact.state, contact.zip, contact.country]
         .filter(Boolean)
         .join(", ") || "-"
     )
   }, [contact])
+
+  const handleNotesChanged = useCallback(async () => {
+    if (!contact) return
+    await loadProfileData(contact, roles)
+  }, [contact, loadProfileData, roles])
+
+  const handleRolesUpdated = useCallback(async () => {
+    await loadContact()
+  }, [loadContact])
 
   if (loading) {
     return (
@@ -249,6 +222,7 @@ export default function ContactDetailPage() {
       <Header title={contact.full_name || "Contact"} />
 
       <div className="flex flex-col gap-6 p-6">
+        {/* 1. Identity / Contact Info */}
         <Card>
           <CardContent className="flex flex-col gap-5 p-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -261,31 +235,13 @@ export default function ContactDetailPage() {
                   )}
                   <h1 className="text-2xl font-bold">{contact.full_name || "Unnamed Contact"}</h1>
                 </div>
-                <p className="mt-1 text-muted-foreground">
-                  {formatText(contact.contact_type)}
-                </p>
+                <p className="mt-1 text-muted-foreground">{formatText(contact.contact_type)}</p>
               </div>
 
               <Button variant="outline" onClick={() => router.push("/contacts")}>
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back to Contacts
               </Button>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              {roles.length === 0 ? (
-                <Badge variant="secondary">No Role</Badge>
-              ) : (
-                roles.map((role) => (
-                  <Badge
-                    key={role}
-                    variant="secondary"
-                    className={roleColors[role] || ""}
-                  >
-                    {roleLabels[role] || formatText(role)}
-                  </Badge>
-                ))
-              )}
             </div>
 
             <div className="grid gap-4 text-sm md:grid-cols-2 lg:grid-cols-3">
@@ -330,65 +286,83 @@ export default function ContactDetailPage() {
             </div>
           </CardContent>
         </Card>
-                <PersonTagsCard contactId={contact.id} personId={contact.person_id} />
 
-        {hasRole("customer") && (
-          <Card>
-            <CardContent className="p-6">
-              <div className="mb-2 flex items-center gap-2">
-                <Users className="h-5 w-5 text-blue-600" />
-                <h2 className="text-lg font-semibold">Customer</h2>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Customer details, bookings, invoices, and activity can appear here.
-              </p>
-            </CardContent>
-          </Card>
-        )}
+        {/* 2. Relationship Summary */}
+        <ContactRelationshipSummaryCard
+          summary={profileData?.summary ?? null}
+          activity={profileData?.activity ?? null}
+          loading={profileLoading}
+        />
 
-        {hasRole("donor") && (
-          <Card>
-            <CardContent className="p-6">
-              <div className="mb-4 flex items-center gap-2">
-                <Heart className="h-5 w-5 text-rose-600" />
-                <h2 className="text-lg font-semibold">Donor History</h2>
-              </div>
+        {/* 3. Affiliations */}
+        <ContactRolesCard
+          contactId={contact.id}
+          roles={roles}
+          contactInfo={{
+            fullName: contact.full_name || "Unnamed Contact",
+            email: contact.email,
+            phone: contact.phone,
+          }}
+          onRolesUpdated={handleRolesUpdated}
+        />
 
-              {donations.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No donations found.</p>
-              ) : (
-                <div className="flex flex-col gap-3">
-                  {donations.map((donation) => (
-                    <div key={donation.id} className="rounded-lg border p-4">
-                      <div className="font-medium">{formatMoney(donation.amount)}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {formatDate(donation.payment_date)}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {formatText(donation.source)}
-                      </div>
-                      {donation.memo && (
-                        <div className="mt-2 text-sm text-muted-foreground">
-                          {donation.memo}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        {/* 4. Teams */}
+        <ContactTeamsPanel
+          contactId={contact.id}
+          contactName={contact.full_name || "Unnamed Contact"}
+        />
+
+        {/* 5. Applications */}
+        <ContactApplicationsPanel contactId={contact.id} />
+
+        {/* 6. Role-specific detail sections */}
+        {hasRole("member") && (
+          <ContactMemberPanel
+            contactStatus={contact.status}
+            contactCreatedAt={contact.created_at}
+            teamsCount={profileData?.activeTeamsCount ?? 0}
+          />
         )}
 
         {hasRole("volunteer") && (
+          <>
+            <ContactVolunteerDetails contactId={contact.id} />
+            <ContactVolunteerPanel
+              contactId={contact.id}
+              contactName={contact.full_name || "Unnamed Contact"}
+              contactEmail={contact.email || ""}
+              contactPhone={contact.phone || ""}
+            />
+          </>
+        )}
+
+        <ContactDonorPanel
+          donorStats={
+            profileData?.donorStats ?? {
+              totalDonated: 0,
+              donationCount: 0,
+              lastDonationDate: null,
+              pledgeCount: 0,
+            }
+          }
+          showPanel={showDonorPanel}
+        />
+
+        {hasRole("employee") && (
           <Card>
             <CardContent className="p-6">
-              <div className="mb-2 flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-emerald-600" />
-                <h2 className="text-lg font-semibold">Volunteer</h2>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Briefcase className="h-5 w-5 text-sky-600" />
+                  <h2 className="text-lg font-semibold">Employee</h2>
+                </div>
+                <Button variant="outline" size="sm" asChild>
+                  <Link href="/programs/instructors">Employee records &amp; assignments</Link>
+                </Button>
               </div>
               <p className="text-sm text-muted-foreground">
-                Volunteer availability, assignments, hours, and event participation can appear here.
+                Employment details, department, documents, and program assignments are managed in
+                Employee records.
               </p>
             </CardContent>
           </Card>
@@ -397,12 +371,18 @@ export default function ContactDetailPage() {
         {hasRole("vendor") && (
           <Card>
             <CardContent className="p-6">
-              <div className="mb-2 flex items-center gap-2">
-                <Store className="h-5 w-5 text-amber-600" />
-                <h2 className="text-lg font-semibold">Vendor</h2>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Store className="h-5 w-5 text-amber-600" />
+                  <h2 className="text-lg font-semibold">Vendor</h2>
+                </div>
+                <Button variant="outline" size="sm" asChild>
+                  <Link href="/vendor-hub/vendors">Vendor Hub</Link>
+                </Button>
               </div>
               <p className="text-sm text-muted-foreground">
-                Vendor applications, products, approval status, booth details, and event history can appear here.
+                Applications, booth assignments, and vendor participation appear in the activity
+                summary and Vendor Hub.
               </p>
             </CardContent>
           </Card>
@@ -416,32 +396,25 @@ export default function ContactDetailPage() {
                 <h2 className="text-lg font-semibold">Service Provider</h2>
               </div>
               <p className="text-sm text-muted-foreground">
-                Service agreements, account details, service history, invoices, and maintenance notes can appear here.
+                Service agreements, invoices, and service history can appear here.
               </p>
             </CardContent>
           </Card>
         )}
 
-        <Card>
-          <CardContent className="p-6">
-            <h2 className="mb-4 text-lg font-semibold">Notes</h2>
+        {/* 7. Eligibility Tags */}
+        <PersonTagsCard contactId={contact.id} personId={contact.person_id} />
 
-            {notes.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No notes yet.</p>
-            ) : (
-              <div className="flex flex-col gap-3">
-                {notes.map((note) => (
-                  <div key={note.id} className="rounded-lg border p-4">
-                    <div className="whitespace-pre-wrap text-sm">{note.note}</div>
-                    <div className="mt-2 text-xs text-muted-foreground">
-                      {formatDateTime(note.created_at)}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        {/* 8. Timeline */}
+        <ContactTimelinePanel items={profileData?.timeline ?? []} loading={profileLoading} />
+
+        {/* 9. Notes */}
+        <ContactNotesPanel
+          contactId={contact.id}
+          notes={profileData?.notes ?? []}
+          loading={profileLoading}
+          onNotesChanged={handleNotesChanged}
+        />
       </div>
     </>
   )

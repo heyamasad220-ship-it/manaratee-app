@@ -33,7 +33,25 @@ export async function createDiscountTag(formData: FormData) {
   }
 
   revalidatePath("/discount-tags")
+  revalidatePath("/hr/settings")
   revalidatePath("/hr/discount-policies")
+}
+
+export async function toggleDiscountTagFromForm(formData: FormData) {
+  const id = String(formData.get("id") || "")
+  const active = String(formData.get("active") || "false") === "true"
+
+  if (!id) return
+
+  await toggleDiscountTagActive(id, active)
+}
+
+export async function deleteDiscountTagFromForm(formData: FormData) {
+  const id = String(formData.get("id") || "")
+
+  if (!id) return
+
+  await deleteDiscountTag(id)
 }
 
 export async function toggleDiscountTagActive(id: string, active: boolean) {
@@ -56,6 +74,7 @@ export async function toggleDiscountTagActive(id: string, active: boolean) {
   }
 
   revalidatePath("/discount-tags")
+  revalidatePath("/hr/settings")
   revalidatePath("/hr/discount-policies")
 }
 
@@ -79,5 +98,6 @@ export async function deleteDiscountTag(id: string) {
   }
 
   revalidatePath("/discount-tags")
+  revalidatePath("/hr/settings")
   revalidatePath("/hr/discount-policies")
 }

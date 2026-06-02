@@ -20,12 +20,19 @@ import {
   X,
   Ticket,
   Boxes,
+  FileText,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 import { createClient } from "@/lib/supabase/client"
+import { PEOPLE_MANAGEMENT_MODULE_LABEL } from "@/lib/hr/hr-module-label"
+import {
+  hrApplicationNavItems,
+  programsFinancialAssistanceNavItem,
+  vendorApplicationNavItem,
+} from "@/lib/applications/application-nav"
 
 interface SubItem {
   label: string
@@ -71,6 +78,7 @@ const iconMap: Record<string, LucideIcon> = {
   GraduationCap,
   Ticket,
   Boxes,
+  FileText,
 }
 
 const modulePermissionMap: Record<string, string> = {
@@ -85,6 +93,10 @@ const modulePermissionMap: Record<string, string> = {
   bookings: "bookings.view",
   spaces: "spaces.view",
   "vendor-hub": "vendor_hub.view",
+}
+
+const moduleDisplayNameMap: Record<string, string> = {
+  hr: PEOPLE_MANAGEMENT_MODULE_LABEL,
 }
 
 const moduleChildren: Record<string, SubItem[]> = {
@@ -105,14 +117,14 @@ const moduleChildren: Record<string, SubItem[]> = {
     { label: "Catalog", href: "/programs/catalog", matchPrefix: "/programs/catalog", permissionKey: "programs.view" },
     { label: "Registrations", href: "/programs/registrations", matchPrefix: "/programs/registrations", permissionKey: "programs.manage" },
     { label: "Schedule", href: "/programs/schedule", matchPrefix: "/programs/schedule", permissionKey: "programs.view" },
-    { label: "Staff Management", href: "/programs/instructors", matchPrefix: "/programs/instructors", permissionKey: "staff.view" },
     { label: "Reports", href: "/programs/reports", matchPrefix: "/programs/reports", permissionKey: "reports.view" },
+    programsFinancialAssistanceNavItem(),
     { label: "Settings", href: "/programs/settings", matchPrefix: "/programs/settings", permissionKey: "programs.manage" },
   ],
   "vendor-hub": [
     { label: "Overview", href: "/vendor-hub", matchPrefix: "/vendor-hub", permissionKey: "vendor_hub.view" },
     { label: "Vendors", href: "/vendor-hub/vendors", matchPrefix: "/vendor-hub/vendors", permissionKey: "vendor_hub.manage" },
-    { label: "Applications", href: "/vendor-hub/applications", matchPrefix: "/vendor-hub/applications", permissionKey: "vendor_hub.manage" },
+    vendorApplicationNavItem(),
     { label: "Booths", href: "/vendor-hub/booths", matchPrefix: "/vendor-hub/booths", permissionKey: "vendor_hub.manage" },
     { label: "Activities", href: "/vendor-hub/activities", matchPrefix: "/vendor-hub/activities", permissionKey: "vendor_hub.manage" },
     { label: "Entertainment", href: "/vendor-hub/entertainment", matchPrefix: "/vendor-hub/entertainment", permissionKey: "vendor_hub.manage" },
@@ -123,9 +135,12 @@ const moduleChildren: Record<string, SubItem[]> = {
   ],
   contacts: [
     { label: "All Contacts", href: "/contacts", matchPrefix: "/contacts", permissionKey: "contacts.view" },
+    { label: "People", href: "/contacts/people", matchPrefix: "/contacts/people", permissionKey: "contacts.view" },
+    { label: "Organizations", href: "/contacts/organizations", matchPrefix: "/contacts/organizations", permissionKey: "contacts.view" },
   ],
   donations: [
     { label: "Overview", href: "/donations", matchPrefix: "/donations", permissionKey: "donations.view" },
+    { label: "Donors", href: "/donations/donors", matchPrefix: "/donations/donors", permissionKey: "donations.view" },
     { label: "Payments", href: "/donations/payments", matchPrefix: "/donations/payments", permissionKey: "donations.view" },
     { label: "Pledges", href: "/donations/pledges", matchPrefix: "/donations/pledges", permissionKey: "donations.view" },
     { label: "Import", href: "/donations/import", matchPrefix: "/donations/import", permissionKey: "donations.manage" },
@@ -148,14 +163,33 @@ hr: [
   },
   {
     label: "Volunteers",
-    href: "/resources/volunteers",
-    matchPrefix: "/resources/volunteers",
+    href: "/hr/volunteers",
+    matchPrefix: "/hr/volunteers",
     permissionKey: "staff.view",
   },
   {
-    label: "Discount Policies",
-    href: "/hr/discount-policies",
-    matchPrefix: "/hr/discount-policies",
+    label: "Child Care",
+    href: "/hr/childcare",
+    matchPrefix: "/hr/childcare",
+    permissionKey: "staff.view",
+  },
+  {
+    label: "Teams",
+    href: "/hr/teams",
+    matchPrefix: "/hr/teams",
+    permissionKey: "staff.view",
+  },
+  ...hrApplicationNavItems(),
+  {
+    label: "Reports",
+    href: "/hr/reports",
+    matchPrefix: "/hr/reports",
+    permissionKey: "reports.view",
+  },
+  {
+    label: "Settings",
+    href: "/hr/settings",
+    matchPrefix: "/hr/settings",
     permissionKey: "staff.view",
   },
 ],
@@ -179,13 +213,13 @@ function filterNavItemsByPermissions(items: NavItem[], permissionContext: UserPe
 
 function buildNavItems(rows: SidebarModuleRow[], permissionContext: UserPermissionContext): NavItem[] {
   const dynamicItems: NavItem[] = rows
-    .filter((row) => row.route)
+    .filter((row) => row.route && row.slug !== "applications")
     .map((row) => {
       const href = row.route || "/dashboard"
       const iconName = row.icon_name || "Boxes"
       const Icon = iconMap[iconName] || Boxes
       return {
-        label: row.name,
+        label: moduleDisplayNameMap[row.slug] ?? row.name,
         href,
         icon: Icon,
         matchPrefix: href,
@@ -208,7 +242,6 @@ function buildNavItems(rows: SidebarModuleRow[], permissionContext: UserPermissi
       group: "System",
       children: [
         { label: "Users", href: "/settings/users", matchPrefix: "/settings/users", permissionKey: "settings.users.view" },
-        { label: "Applications", href: "/settings/applications", matchPrefix: "/settings/applications", permissionKey: "applications.view" },
         { label: "Templates", href: "/settings/templates", matchPrefix: "/settings/templates", permissionKey: "settings.templates.view" },
         { label: "Email Settings", href: "/settings/email", matchPrefix: "/settings/email", permissionKey: "settings.email.view" },
         { label: "Roles & Permissions", href: "/settings/roles-permissions", matchPrefix: "/settings/roles-permissions", permissionKey: "settings.roles.view" },
@@ -324,7 +357,6 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
                 group: "System",
                 children: [
                   { label: "Users", href: "/settings/users", matchPrefix: "/settings/users", permissionKey: "settings.users.view" },
-                  { label: "Applications", href: "/settings/applications", matchPrefix: "/settings/applications", permissionKey: "applications.view" },
                   { label: "Roles & Permissions", href: "/settings/roles-permissions", matchPrefix: "/settings/roles-permissions", permissionKey: "settings.roles.view" },
                 ],
               },
@@ -474,8 +506,15 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
 
 function SidebarHeader() {
   return (
-    <div className="flex items-center justify-center border-b border-zinc-200 px-4 py-6">
-      <Image src="/logo.png" alt="Manaratee" width={180} height={80} className="h-auto w-[160px] object-contain" priority />
+    <div className="flex h-[88px] items-center justify-center overflow-hidden border-b border-zinc-200 px-2">
+      <Image
+        src="/logo.png"
+        alt="Manaratee"
+        width={240}
+        height={120}
+        className="h-auto w-full origin-center scale-[1.45] object-contain"
+        priority
+      />
     </div>
   )
 }
@@ -497,8 +536,17 @@ export function MobileSidebar() {
       <SheetContent side="left" className="w-[280px] border-r border-zinc-200 bg-white p-0 text-zinc-900">
         <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
 
-        <div className="flex items-center justify-between border-b border-zinc-200 px-5 py-4">
-          <Image src="/logo.png" alt="Manaratee" width={160} height={70} className="h-auto w-[140px] object-contain" priority />
+        <div className="flex items-center justify-between border-b border-zinc-200 px-3 py-3">
+          <div className="flex h-[72px] min-w-0 flex-1 items-center overflow-hidden pr-2">
+            <Image
+              src="/logo.png"
+              alt="Manaratee"
+              width={220}
+              height={100}
+              className="h-auto w-full origin-center scale-[1.35] object-contain"
+              priority
+            />
+          </div>
 
           <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-700 hover:bg-amber-50 hover:text-amber-700" onClick={() => setMobileOpen(false)}>
             <X className="h-4 w-4" />

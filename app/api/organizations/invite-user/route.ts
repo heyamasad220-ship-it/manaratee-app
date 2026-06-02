@@ -1,65 +1,179 @@
-import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { createClient as createServerClient } from "@/lib/supabase/server";
+import { NextRequest, NextResponse } from "next/server"
+import { createClient, type SupabaseClient } from "@supabase/supabase-js"
+import { createClient as createServerClient } from "@/lib/supabase/server"
+import { inviteAcceptRedirectUrl } from "@/lib/auth/auth-redirect"
+import {
+  DEFAULT_INVITED_MEMBER_SYSTEM_ROLE,
+  invitedMemberSystemRoleCandidates,
+  type OrganizationMemberSystemRole,
+} from "@/lib/organizations/organization-member-constants"
+import { syncProfileForOrganizationMember } from "@/lib/organizations/sync-profile-organization"
 
-export const dynamic = "force-dynamic";
+export const dynamic = "force-dynamic"
+
+const MANAGE_USERS_PERMISSION = "settings.users.manage"
 
 function json(status: number, body: unknown) {
-  return NextResponse.json(body, { status });
+  return NextResponse.json(body, { status })
+}
+
+function resolveAppUrl(req: NextRequest) {
+  const fromEnv =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "")
+
+  if (fromEnv) {
+    return fromEnv.replace(/\/$/, "")
+  }
+
+  const origin = req.headers.get("origin") || req.headers.get("x-forwarded-host")
+  if (origin) {
+    const host = origin.startsWith("http") ? origin : `https://${origin}`
+    return host.replace(/\/$/, "")
+  }
+
+  return "http://localhost:3000"
+}
+
+function isExistingUserError(message?: string | null) {
+  if (!message) return false
+  const normalized = message.toLowerCase()
+  return (
+    normalized.includes("already been registered") ||
+    normalized.includes("already registered") ||
+    normalized.includes("already exists") ||
+    normalized.includes("email address has already been registered")
+  )
+}
+
+async function findUserByEmail(admin: SupabaseClient, email: string) {
+  let page = 1
+  const perPage = 200
+
+  while (page <= 10) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage })
+    if (error) {
+      throw error
+    }
+
+    const match = data.users.find(
+      (user) => user.email?.trim().toLowerCase() === email
+    )
+    if (match) {
+      return match
+    }
+
+    if (data.users.length < perPage) {
+      return null
+    }
+
+    page += 1
+  }
+
+  return null
+}
+
+async function upsertOrganizationMembership(
+  admin: SupabaseClient,
+  input: {
+    organizationId: string
+    userId: string
+    roleId: string
+    inviterSystemRole?: string | null
+  }
+) {
+  const roleCandidates = invitedMemberSystemRoleCandidates(input.inviterSystemRole)
+  let lastError: { message?: string; hint?: string; code?: string } | null = null
+
+  for (const role of roleCandidates) {
+    const payload: Record<string, unknown> = {
+      organization_id: input.organizationId,
+      user_id: input.userId,
+      role,
+      role_id: input.roleId,
+      status: "active",
+    }
+
+    const { data, error } = await admin
+      .from("organization_members")
+      .upsert(payload, { onConflict: "organization_id,user_id" })
+      .select("*")
+      .single()
+
+    if (!error) {
+      return { data, error: null, roleUsed: role }
+    }
+
+    lastError = error
+
+    const isRoleCheckFailure = error.message?.includes(
+      "organization_members_role_check"
+    )
+    if (!isRoleCheckFailure) {
+      return { data: null, error, roleUsed: role as OrganizationMemberSystemRole }
+    }
+  }
+
+  return {
+    data: null,
+    error: lastError,
+    roleUsed: DEFAULT_INVITED_MEMBER_SYSTEM_ROLE,
+    attemptedRoles: roleCandidates,
+  }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
+    const body = await req.json()
 
-    const email = String(body.email || "").trim().toLowerCase();
-    const organizationId = String(body.organizationId || "").trim();
-    const roleId = String(body.roleId || "").trim();
-    const roleName = String(body.roleName || "").trim();
-    const firstName = String(body.firstName || "").trim();
-    const lastName = String(body.lastName || "").trim();
+    const email = String(body.email || "")
+      .trim()
+      .toLowerCase()
+    const organizationId = String(body.organizationId || "").trim()
+    const roleId = String(body.roleId || "").trim()
+    const roleName = String(body.roleName || "").trim()
+    const firstName = String(body.firstName || "").trim()
+    const lastName = String(body.lastName || "").trim()
 
     if (!email || !organizationId || !roleId) {
       return json(400, {
         success: false,
         error: "Missing required fields.",
         required: ["email", "organizationId", "roleId"],
-      });
+      })
     }
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    const appUrl = resolveAppUrl(req)
 
-    const appUrl =
-      process.env.NEXT_PUBLIC_APP_URL ||
-      process.env.NEXT_PUBLIC_SITE_URL ||
-      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "");
-
-    if (!supabaseUrl || !serviceRoleKey || !appUrl) {
+    if (!supabaseUrl || !serviceRoleKey) {
       console.error("Invite config missing", {
         hasSupabaseUrl: Boolean(supabaseUrl),
         hasServiceRoleKey: Boolean(serviceRoleKey),
-        hasAppUrl: Boolean(appUrl),
-      });
+        appUrl,
+      })
 
       return json(500, {
         success: false,
-        error: "Server invite configuration is incomplete.",
-      });
+        error:
+          "Server invite configuration is incomplete. Check SUPABASE_SERVICE_ROLE_KEY and NEXT_PUBLIC_SUPABASE_URL.",
+      })
     }
 
-    const supabaseUser = await createServerClient();
+    const supabaseUser = await createServerClient()
 
     const {
       data: { user },
       error: userError,
-    } = await supabaseUser.auth.getUser();
+    } = await supabaseUser.auth.getUser()
 
     if (userError || !user) {
       return json(401, {
         success: false,
         error: "Unauthorized.",
-      });
+      })
     }
 
     const admin = createClient(supabaseUrl, serviceRoleKey, {
@@ -67,200 +181,202 @@ export async function POST(req: NextRequest) {
         autoRefreshToken: false,
         persistSession: false,
       },
-    });
+    })
 
-    /**
-     * 1. Confirm current user belongs to the organization.
-     * organization_members.role = hidden system/platform access
-     * organization_members.role_id = visible organization role
-     */
-    const { data: currentMembership, error: currentMembershipError } =
-      await admin
-        .from("organization_members")
-        .select("id, organization_id, user_id, role, role_id")
-        .eq("organization_id", organizationId)
-        .eq("user_id", user.id)
-        .maybeSingle();
+    const { data: currentMembership, error: currentMembershipError } = await admin
+      .from("organization_members")
+      .select("id, organization_id, user_id, role, role_id")
+      .eq("organization_id", organizationId)
+      .eq("user_id", user.id)
+      .maybeSingle()
 
     if (currentMembershipError) {
-      console.error("Current membership lookup failed", {
-        currentMembershipError,
-        organizationId,
-        userId: user.id,
-      });
-
+      console.error("Current membership lookup failed", currentMembershipError)
       return json(500, {
         success: false,
         error: currentMembershipError.message,
-      });
+      })
     }
 
     if (!currentMembership) {
       return json(403, {
         success: false,
         error: "You are not a member of this organization.",
-      });
+      })
     }
 
-    /**
-     * 2. Confirm current user has permission to invite users.
-     * This avoids requiring platform admin privileges.
-     */
-    const { data: invitePermission, error: invitePermissionError } =
-      await admin
+    const isSystemAdmin = ["owner", "admin", "super_admin", "coordinator"].includes(
+      currentMembership.role
+    )
+
+    let canInvite = isSystemAdmin
+
+    if (!canInvite && currentMembership.role_id) {
+      const { data: invitePermission, error: invitePermissionError } = await admin
         .from("role_permissions")
         .select("id")
+        .eq("organization_id", organizationId)
         .eq("role_id", currentMembership.role_id)
-        .eq("permission_key", "users.invite")
+        .eq("permission_key", MANAGE_USERS_PERMISSION)
         .eq("enabled", true)
-        .maybeSingle();
+        .maybeSingle()
 
-    if (invitePermissionError) {
-      console.error("Invite permission lookup failed", {
-        invitePermissionError,
-        roleId: currentMembership.role_id,
-      });
+      if (invitePermissionError) {
+        console.error("Invite permission lookup failed", invitePermissionError)
+        return json(500, {
+          success: false,
+          error: invitePermissionError.message,
+        })
+      }
 
-      return json(500, {
-        success: false,
-        error: invitePermissionError.message,
-      });
+      canInvite = Boolean(invitePermission)
     }
 
-    const isSystemAdmin =
-  currentMembership.role === "owner" ||
-  currentMembership.role === "admin" ||
-  currentMembership.role === "super_admin";
+    if (!canInvite) {
+      return json(403, {
+        success: false,
+        error:
+          "You do not have permission to invite users. Enable Manage Users for your role.",
+      })
+    }
 
-if (!isSystemAdmin && !invitePermission) {
-  return json(403, {
-    success: false,
-    error: "You do not have permission to invite users.",
-  });
-}
-
-    /**
-     * 3. Confirm invited role belongs to this organization.
-     */
     const { data: invitedRole, error: invitedRoleError } = await admin
       .from("organization_roles")
       .select("id, name, organization_id")
       .eq("id", roleId)
       .eq("organization_id", organizationId)
-      .single();
+      .single()
 
     if (invitedRoleError || !invitedRole) {
-      console.error("Invalid invited role", {
-        invitedRoleError,
-        roleId,
-        organizationId,
-      });
-
       return json(400, {
         success: false,
         error: "Invalid organization role.",
-      });
+      })
     }
 
-    /**
-     * 4. Send Supabase invite email.
-     */
-    const redirectTo = `${appUrl.replace(
-      /\/$/,
-      ""
-    )}/auth/callback?next=/dashboard`;
+    const redirectTo = inviteAcceptRedirectUrl(appUrl)
+    const inviteMetadata = {
+      first_name: firstName,
+      last_name: lastName,
+      organization_id: organizationId,
+      organization_role_id: roleId,
+      organization_role_name: invitedRole.name || roleName,
+    }
+
+    let invitedUserId: string | null = null
+    let emailSent = false
+    let existingUser = false
 
     const { data: inviteData, error: inviteError } =
       await admin.auth.admin.inviteUserByEmail(email, {
         redirectTo,
-        data: {
-          first_name: firstName,
-          last_name: lastName,
-          organization_id: organizationId,
-          organization_role_id: roleId,
-          organization_role_name: invitedRole.name || roleName,
-        },
-      });
+        data: inviteMetadata,
+      })
 
-    if (inviteError || !inviteData?.user?.id) {
+    if (!inviteError && inviteData?.user?.id) {
+      invitedUserId = inviteData.user.id
+      emailSent = true
+    } else if (isExistingUserError(inviteError?.message)) {
+      existingUser = true
+      const existingAuthUser = await findUserByEmail(admin, email)
+
+      if (!existingAuthUser) {
+        return json(502, {
+          success: false,
+          error: "This email is already registered, but the account could not be found.",
+          details: inviteError?.message,
+        })
+      }
+
+      invitedUserId = existingAuthUser.id
+
+      const { error: otpError } = await admin.auth.signInWithOtp({
+        email,
+        options: { emailRedirectTo: redirectTo },
+      })
+
+      if (otpError) {
+        console.error("Existing user OTP email failed:", otpError.message)
+      } else {
+        emailSent = true
+      }
+    } else {
       console.error("SUPABASE INVITE ERROR:", {
         email,
         redirectTo,
         message: inviteError?.message,
         status: inviteError?.status,
         code: inviteError?.code,
-        name: inviteError?.name,
-        fullError: inviteError,
-      });
+      })
 
       return json(502, {
         success: false,
         error: "Failed to send invite email.",
         details: inviteError?.message,
-        status: inviteError?.status,
         code: inviteError?.code,
-        name: inviteError?.name,
-      });
+      })
     }
 
-    const invitedUserId = inviteData.user.id;
-
-    /**
-     * 5. Create/update organization membership.
-     */
-    const { data: membership, error: membershipError } = await admin
-  .from("organization_members")
-  .upsert(
-    {
-      organization_id: organizationId,
-      user_id: invitedUserId,
-      role: "member",
-      role_id: roleId,
-    },
-    {
-      onConflict: "organization_id,user_id",
+    if (!invitedUserId) {
+      return json(502, {
+        success: false,
+        error: "Could not resolve invited user account.",
+      })
     }
-  )
-  .select("*")
-  .single();
 
-if (membershipError) {
-  console.error("MEMBERSHIP UPSERT FAILED:", {
-    message: membershipError.message,
-    details: membershipError.details,
-    hint: membershipError.hint,
-    code: membershipError.code,
-  });
+    const { data: membership, error: membershipError, roleUsed, attemptedRoles } =
+      await upsertOrganizationMembership(admin, {
+        organizationId,
+        userId: invitedUserId,
+        roleId,
+        inviterSystemRole: currentMembership.role,
+      })
 
-  return json(500, {
-    success: false,
-    error: "Invite email sent, but organization membership failed.",
-    details: membershipError.message,
-    hint: membershipError.hint,
-    code: membershipError.code,
-  });
-}
+    if (membershipError) {
+      console.error("MEMBERSHIP UPSERT FAILED:", membershipError)
+      return json(500, {
+        success: false,
+        error: emailSent
+          ? "Email sent, but adding the user to your organization failed."
+          : "Could not add the user to your organization.",
+        details: membershipError.message,
+        hint: membershipError.hint,
+        code: membershipError.code,
+        attemptedRoles,
+        fix:
+          "Run scripts/014_organization_members_invite_support.sql in Supabase SQL Editor, then try again.",
+      })
+    }
+
+    await syncProfileForOrganizationMember(admin, {
+      userId: invitedUserId,
+      email,
+      firstName,
+      lastName,
+      organizationId,
+      systemRole: roleUsed ?? DEFAULT_INVITED_MEMBER_SYSTEM_ROLE,
+    })
 
     return json(200, {
       success: true,
-      message: "Invite sent.",
-      user: inviteData.user,
+      message: existingUser
+        ? emailSent
+          ? "User already had an account. They were added to your organization and sent a sign-in email."
+          : "User already had an account and was added to your organization."
+        : "Invitation email sent.",
+      user: { id: invitedUserId, email },
       membership,
-      debug: {
-        email,
-        organizationId,
-        roleId,
-        roleName: invitedRole.name,
-        redirectTo,
-      },
-    });
-  } catch (error: any) {
-    console.error("Unhandled invite-user error", error);
+      existingUser,
+      emailSent,
+      memberSystemRole: roleUsed,
+    })
+  } catch (error: unknown) {
+    console.error("Unhandled invite-user error", error)
 
     return json(500, {
       success: false,
       error: "Unexpected invite failure.",
-      details: error?.message,
-    });
+      details: error instanceof Error ? error.message : String(error),
+    })
   }
 }

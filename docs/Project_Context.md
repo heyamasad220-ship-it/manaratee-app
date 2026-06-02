@@ -147,8 +147,39 @@ All customer pages must respect the active organization.
 
 ## Current Focus
 
+People Management module
+Unified Applications engine
 Programs Module
 Registrations
 Financial Assistance
 Customer Experience
 User Invitations
+
+---
+
+## People Management Module
+
+Display name: **People Management** (database module slug remains `hr`).
+
+Label constant: `lib/hr/hr-module-label.ts` → `PEOPLE_MANAGEMENT_MODULE_LABEL`
+
+Routes remain under `/hr/*` for now. Canonical Applications hub:
+
+`/people-management/applications`
+
+Sidebar (People Management):
+
+* Members
+* Employees
+* Volunteers
+* Child Care
+* Teams
+* Applications → `/people-management/applications`
+* Reports
+* Settings → `/hr/settings` (Discount Policies only)
+
+Other modules link to Applications with filters:
+
+* Vendor Hub → `/applications/all?application_type=vendor`
+* Programs → Financial Assistance filter
+* Employment applications → `/people-management/applications?tab=submissions&application_type=employment`

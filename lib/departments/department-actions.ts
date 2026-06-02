@@ -50,6 +50,8 @@ export async function createDepartment(input: CreateDepartmentInput) {
   revalidatePath("/programs")
   revalidatePath("/programs/catalog")
   revalidatePath("/programs/settings")
+  revalidatePath("/hr/settings")
+  revalidatePath("/hr/employees")
 }
 
 export async function updateDepartment(input: UpdateDepartmentInput) {
@@ -78,6 +80,8 @@ export async function updateDepartment(input: UpdateDepartmentInput) {
   revalidatePath("/programs")
   revalidatePath("/programs/catalog")
   revalidatePath("/programs/settings")
+  revalidatePath("/hr/settings")
+  revalidatePath("/hr/employees")
 }
 
 export async function deleteDepartment(id: string) {
@@ -102,6 +106,8 @@ export async function deleteDepartment(id: string) {
   revalidatePath("/programs")
   revalidatePath("/programs/catalog")
   revalidatePath("/programs/settings")
+  revalidatePath("/hr/settings")
+  revalidatePath("/hr/employees")
 }
 
 export async function fetchDepartmentsWithProgramCounts(): Promise<

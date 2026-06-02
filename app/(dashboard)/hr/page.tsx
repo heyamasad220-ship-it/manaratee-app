@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { Header } from "@/components/layout/header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -14,9 +14,17 @@ import {
   Clock,
   UserPlus,
   ArrowRight,
-  TrendingUp,
-  AlertCircle,
+  UsersRound,
+  Crown,
+  Activity,
+  Baby,
+  FileText,
 } from "lucide-react"
+import {
+  fetchHrTeamDashboardStats,
+  type HrTeamDashboardStats,
+} from "@/lib/hr/hr-team-actions"
+import { PEOPLE_MANAGEMENT_MODULE_LABEL } from "@/lib/hr/hr-module-label"
 
 // Mock data
 const stats = [
@@ -54,9 +62,27 @@ const departmentBreakdown = [
 ]
 
 export default function HROverviewPage() {
+  const [teamStats, setTeamStats] = useState<HrTeamDashboardStats>({
+    totalTeams: 0,
+    activeTeams: 0,
+    totalMembers: 0,
+    teamLeaders: 0,
+  })
+
+  useEffect(() => {
+    void fetchHrTeamDashboardStats().then(setTeamStats).catch(console.error)
+  }, [])
+
+  const teamStatCards = [
+    { label: "Total Teams", value: teamStats.totalTeams, icon: UsersRound },
+    { label: "Active Teams", value: teamStats.activeTeams, icon: Activity },
+    { label: "Team Members", value: teamStats.totalMembers, icon: Users },
+    { label: "Team Leaders", value: teamStats.teamLeaders, icon: Crown },
+  ]
+
   return (
     <>
-      <Header title="Human Resources" />
+      <Header title={PEOPLE_MANAGEMENT_MODULE_LABEL} />
       <div className="p-6">
         <div className="flex flex-col gap-6">
           {/* Stats Cards */}
@@ -80,6 +106,63 @@ export default function HROverviewPage() {
               </Card>
             ))}
           </div>
+
+          <div className="flex items-center justify-between gap-4">
+            <h2 className="text-lg font-semibold">Teams Overview</h2>
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/hr/teams">
+                View Teams
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {teamStatCards.map((stat) => (
+              <Card key={stat.label}>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">{stat.label}</p>
+                      <p className="text-2xl font-bold text-foreground">{stat.value}</p>
+                    </div>
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+                      <stat.icon className="h-6 w-6 text-primary" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <div className="flex items-center justify-between gap-4">
+            <h2 className="text-lg font-semibold">Child Care</h2>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/events/childcare">Registrations</Link>
+              </Button>
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/hr/childcare">
+                  Providers
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
+          </div>
+
+          <Card>
+            <CardContent className="flex items-center gap-4 p-6">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+                <Baby className="h-6 w-6 text-primary" />
+              </div>
+              <div className="flex-1">
+                <p className="font-medium text-foreground">Childcare providers directory</p>
+                <p className="text-sm text-muted-foreground">
+                  Manage approved providers, certifications, and event history.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
 
           <div className="grid gap-6 lg:grid-cols-3">
             {/* Recent Hires */}
@@ -149,35 +232,24 @@ export default function HROverviewPage() {
           </div>
 
           <div className="grid gap-6 lg:grid-cols-2">
-            {/* Pending Time Off Requests */}
+            {/* Employment Applications */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
-                  <CardTitle>Pending Time Off Requests</CardTitle>
-                  <CardDescription>Requests awaiting approval</CardDescription>
+                  <CardTitle>Employment Applications</CardTitle>
+                  <CardDescription>Applications awaiting review</CardDescription>
                 </div>
                 <Button variant="outline" size="sm" asChild>
-                  <Link href="/hr/time-off">
-                    Manage
+                  <Link href="/people-management/applications?application_type=employment">
+                    Review
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
                 </Button>
               </CardHeader>
               <CardContent>
-                <div className="flex flex-col gap-3">
-                  {pendingRequests.map((request) => (
-                    <div key={request.id} className="flex items-center justify-between rounded-lg border p-3">
-                      <div>
-                        <p className="text-sm font-medium">{request.employee}</p>
-                        <p className="text-xs text-muted-foreground">{request.type} - {request.dates}</p>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button size="sm" variant="outline">Deny</Button>
-                        <Button size="sm">Approve</Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <p className="text-sm text-muted-foreground">
+                  Review employment applications in Employees → Applications.
+                </p>
               </CardContent>
             </Card>
 
@@ -225,21 +297,21 @@ export default function HROverviewPage() {
                   </Link>
                 </Button>
                 <Button variant="outline" className="h-auto flex-col gap-2 p-4" asChild>
-                  <Link href="/hr/departments">
+                  <Link href="/hr/employees?tab=departments">
                     <Building className="h-6 w-6" />
                     <span>Manage Departments</span>
                   </Link>
                 </Button>
                 <Button variant="outline" className="h-auto flex-col gap-2 p-4" asChild>
-                  <Link href="/hr/attendance">
-                    <Calendar className="h-6 w-6" />
-                    <span>View Attendance</span>
+                  <Link href="/hr/teams">
+                    <UsersRound className="h-6 w-6" />
+                    <span>Manage Teams</span>
                   </Link>
                 </Button>
                 <Button variant="outline" className="h-auto flex-col gap-2 p-4" asChild>
-                  <Link href="/hr/time-off">
-                    <Clock className="h-6 w-6" />
-                    <span>Time Off Requests</span>
+                  <Link href="/people-management/applications?application_type=employment">
+                    <FileText className="h-6 w-6" />
+                    <span>Employment Applications</span>
                   </Link>
                 </Button>
               </div>

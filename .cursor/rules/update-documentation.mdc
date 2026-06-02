@@ -1,0 +1,20 @@
+---
+description: Update project documentation when making meaningful code or schema changes
+alwaysApply: true
+---
+
+# Keep documentation in sync
+
+When you change behavior, routes, modules, or database schema:
+
+1. Update relevant files in `docs/` in the **same task** — do not wait for the user to ask.
+2. Prefer editing existing docs:
+   - `docs/Features.md` — feature history, routes, key files, pending work
+   - `docs/Module_Inventory.md` — module status and capabilities
+   - `docs/Project_Context.md` — architecture and current focus
+   - `docs/Database_Overview.md` — tables, relationships, migrations
+3. Record: what changed, new/removed routes, SQL scripts to run, and follow-up work.
+4. Remove or revise outdated sections (mock data, deleted tabs, old paths).
+5. Do not create new doc files unless the change is large enough to need a dedicated page.
+
+See `docs/AI_INSTRUCTIONS.md` for full documentation guidelines.

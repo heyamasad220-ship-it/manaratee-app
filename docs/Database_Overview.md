@@ -247,13 +247,51 @@ payments.payment_method_id → payment_methods.id
 
 ## Applications
 
-* applications
+Status: Active Development
 
-Key relationship:
+Tables:
+
+* application_type_definitions (global registry of application types)
+* applications (tenant submissions)
+* application_history (audit trail)
+* application_documents (uploaded files)
+
+Migrations:
+
+* `scripts/012_applications.sql` — core Applications engine
+* `scripts/013_rename_hr_module.sql` — renames HR module display name to People Management
+
+Key relationships:
 
 ```text
 applications.organization_id → organizations.id
+applications.application_type → application_type_definitions.id
+applications.contact_id → contacts.id
+application_history.application_id → applications.id
+application_history.organization_id → organizations.id
+application_documents.application_id → applications.id
+application_documents.organization_id → organizations.id
 ```
+
+Seeded application types:
+
+* volunteer (hr)
+* employment (hr)
+* committee_member (hr)
+* childcare_provider (hr)
+* vendor (vendor_hub)
+* financial_aid (programs)
+
+Status values:
+
+draft, submitted, pending_review, approved, rejected, withdrawn
+
+Key lib paths:
+
+* `lib/applications/application-actions.ts`
+* `lib/applications/application-types.ts`
+* `lib/applications/application-routes.ts`
+* `lib/applications/application-status-tabs.ts`
 
 ---
 

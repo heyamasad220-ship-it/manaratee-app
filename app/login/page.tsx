@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Eye, EyeOff, Loader2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { selectOrganization } from "@/lib/organizations/organization-actions"
 import { AuthLayout } from "@/components/customer/auth-layout"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -46,17 +47,7 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
 
   async function setSelectedOrganization(organizationId: string) {
-    const response = await fetch("/api/organizations/select", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ organizationId }),
-    })
-
-    if (!response.ok) {
-      throw new Error("Failed to set selected organization")
-    }
+    await selectOrganization(organizationId)
   }
 
   async function routeUserByRole(userId: string) {
@@ -87,6 +78,7 @@ export default function LoginPage() {
 
     if (orgAdminMembership) {
       await setSelectedOrganization(orgAdminMembership.organization_id)
+      router.refresh()
       router.push("/dashboard")
       return
     }

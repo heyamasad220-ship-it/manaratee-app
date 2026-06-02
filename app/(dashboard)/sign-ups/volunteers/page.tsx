@@ -1,11 +1,5 @@
-import { Header } from "@/components/layout/header"
-import { VolunteersList } from "@/components/people/volunteers-list"
+import { redirect } from "next/navigation"
 
-export default function VolunteersPage() {
-  return (
-    <>
-      <Header title="People" />
-      <VolunteersList />
-    </>
-  )
+export default function SignUpsVolunteersPage() {
+  redirect("/hr/volunteers")
 }
