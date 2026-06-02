@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { Suspense, useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Loader2 } from "lucide-react"
@@ -10,7 +10,21 @@ import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
 import { SET_PASSWORD_PATH } from "@/lib/auth/auth-redirect"
 
-export default function AuthAcceptPage() {
+function AuthAcceptLoading() {
+  return (
+    <AuthLayout
+      heading="Accepting invitation"
+      subheading="Please wait while we verify your invite link."
+    >
+      <div className="flex items-center justify-center py-8 text-muted-foreground">
+        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+        Loading...
+      </div>
+    </AuthLayout>
+  )
+}
+
+function AuthAcceptContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
@@ -109,5 +123,13 @@ export default function AuthAcceptPage() {
         </div>
       )}
     </AuthLayout>
+  )
+}
+
+export default function AuthAcceptPage() {
+  return (
+    <Suspense fallback={<AuthAcceptLoading />}>
+      <AuthAcceptContent />
+    </Suspense>
   )
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { Suspense, useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Loader2 } from "lucide-react"
 import { AuthLayout } from "@/components/customer/auth-layout"
@@ -12,7 +12,21 @@ import { routeUserByRole } from "@/lib/auth/route-user"
 import { selectOrganization } from "@/lib/organizations/organization-actions"
 import { profileRoleFromSystemRole } from "@/lib/organizations/sync-profile-organization"
 
-export default function SetPasswordPage() {
+function SetPasswordLoading() {
+  return (
+    <AuthLayout
+      heading="Setting up your account"
+      subheading="Please wait while we verify your invitation."
+    >
+      <div className="flex items-center justify-center py-8 text-muted-foreground">
+        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+        Loading...
+      </div>
+    </AuthLayout>
+  )
+}
+
+function SetPasswordContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
@@ -51,7 +65,7 @@ export default function SetPasswordPage() {
     }
 
     void ensureSession()
-  }, [router, supabase.auth])
+  }, [router, searchParams, supabase.auth])
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
@@ -107,17 +121,7 @@ export default function SetPasswordPage() {
   }
 
   if (checkingSession) {
-    return (
-      <AuthLayout
-        heading="Setting up your account"
-        subheading="Please wait while we verify your invitation."
-      >
-        <div className="flex items-center justify-center py-8 text-muted-foreground">
-          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-          Loading...
-        </div>
-      </AuthLayout>
-    )
+    return <SetPasswordLoading />
   }
 
   return (
@@ -168,5 +172,13 @@ export default function SetPasswordPage() {
         </Button>
       </form>
     </AuthLayout>
+  )
+}
+
+export default function SetPasswordPage() {
+  return (
+    <Suspense fallback={<SetPasswordLoading />}>
+      <SetPasswordContent />
+    </Suspense>
   )
 }

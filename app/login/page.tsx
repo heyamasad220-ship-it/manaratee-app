@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { Suspense, useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Eye, EyeOff, Loader2 } from "lucide-react"
@@ -33,7 +33,7 @@ function AppleIcon({ className }: { className?: string }) {
   )
 }
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
@@ -420,5 +420,24 @@ export default function LoginPage() {
         )}
       </p>
     </AuthLayout>
+  )
+}
+
+function LoginLoading() {
+  return (
+    <AuthLayout heading="Welcome back" subheading="Sign in to your account to continue.">
+      <div className="flex items-center justify-center py-8 text-muted-foreground">
+        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+        Loading...
+      </div>
+    </AuthLayout>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoginLoading />}>
+      <LoginContent />
+    </Suspense>
   )
 }
