@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache"
 
 import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
+import { ensureDefaultOffering } from "@/lib/programs/program-offering-actions"
+import { syncRegistrationOptionsFromProgramFlags } from "@/lib/programs/program-registration-option-actions"
 
 type CreateProgramInput = {
   name: string
@@ -78,9 +80,30 @@ export async function createProgram(input: CreateProgramInput) {
     throw new Error("Failed to create program")
   }
 
+  const programId = data.id as string
+
+  const offeringId = await ensureDefaultOffering({
+    organizationId,
+    programId,
+    programName: input.name,
+    startDate: input.start_date,
+    endDate: input.end_date,
+    enrollmentOpenDate: input.enrollment_open_date,
+    enrollmentCloseDate: input.enrollment_close_date,
+    programStatus: input.status || "draft",
+  })
+
+  await syncRegistrationOptionsFromProgramFlags({
+    organizationId,
+    programId,
+    offeringId,
+    fullProgramEnabled: input.full_program_registration_enabled ?? true,
+    sessionRegistrationEnabled: input.session_registration_enabled ?? false,
+  })
+
   revalidatePath("/programs")
 
-  return data.id
+  return programId
 }
 
 type UpdateProgramInput = {
@@ -100,6 +123,8 @@ type UpdateProgramInput = {
 
   full_program_registration_enabled?: boolean
   session_registration_enabled?: boolean
+  single_session_registration_enabled?: boolean
+  drop_in_registration_enabled?: boolean
 
   financial_assistance_enabled?: boolean
   financial_assistance_open?: boolean
@@ -203,6 +228,27 @@ export async function updateProgram(input: UpdateProgramInput) {
     console.error(error)
     throw new Error("Failed to update program")
   }
+
+  const offeringId = await ensureDefaultOffering({
+    organizationId,
+    programId: input.id,
+    programName: input.name,
+    startDate: input.start_date,
+    endDate: input.end_date,
+    enrollmentOpenDate: input.enrollment_open_date,
+    enrollmentCloseDate: input.enrollment_close_date,
+    programStatus: input.status || "draft",
+  })
+
+  await syncRegistrationOptionsFromProgramFlags({
+    organizationId,
+    programId: input.id,
+    offeringId,
+    fullProgramEnabled: input.full_program_registration_enabled ?? true,
+    sessionRegistrationEnabled: input.session_registration_enabled ?? false,
+    singleSessionEnabled: input.single_session_registration_enabled,
+    dropInEnabled: input.drop_in_registration_enabled,
+  })
 
   revalidatePath("/programs")
   revalidatePath(`/programs/${input.id}`)

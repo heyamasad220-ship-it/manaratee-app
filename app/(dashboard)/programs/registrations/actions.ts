@@ -4,10 +4,14 @@ import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 
 import { createClient } from "@/lib/supabase/server"
+import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
+import { getDefaultOfferingForProgramByOrg } from "@/lib/programs/program-offering-queries"
+import { createSessionAccessRows } from "@/lib/programs/program-registration-session-access"
 
 type EnrollmentLookup = {
   id: string
   program_id: string | null
+  organization_id: string | null
   status: string | null
 }
 
@@ -19,6 +23,7 @@ type ProgramCounterLookup = {
 type WaitlistLookup = {
   id: string
   program_id: string | null
+  organization_id: string | null
 }
 
 type WaitlistMoveLookup = {
@@ -48,7 +53,61 @@ function refreshAndRedirect(path: string): never {
   redirect(path)
 }
 
+async function requireOrganizationId() {
+  const organizationId = await getSelectedOrganizationId()
+
+  if (!organizationId) {
+    throw new Error("No organization selected")
+  }
+
+  return organizationId
+}
+
+async function resolveSessionAccessForWaitlistMove(input: {
+  organizationId: string
+  programId: string
+  preferredWeeks: string[] | null
+}) {
+  if (input.preferredWeeks && input.preferredWeeks.length > 0) {
+    return input.preferredWeeks
+  }
+
+  const offering = await getDefaultOfferingForProgramByOrg(
+    input.programId,
+    input.organizationId
+  )
+
+  if (!offering) {
+    return []
+  }
+
+  const supabase = await createClient()
+
+  const { data: fullProgramOption } = await supabase
+    .from("program_registration_options")
+    .select("option_type")
+    .eq("organization_id", input.organizationId)
+    .eq("offering_id", offering.id)
+    .eq("option_type", "full_program")
+    .eq("is_active", true)
+    .maybeSingle()
+
+  if (!fullProgramOption) {
+    return []
+  }
+
+  const { data: sessions } = await supabase
+    .from("program_sessions")
+    .select("id")
+    .eq("organization_id", input.organizationId)
+    .eq("program_id", input.programId)
+    .eq("status", "active")
+
+  return (sessions || []).map((row) => row.id as string)
+}
+
 export async function markEnrollmentPaymentAction(formData: FormData) {
+  const organizationId = await requireOrganizationId()
   const enrollmentId = String(formData.get("enrollment_id") || "")
   const paymentStatus = String(formData.get("payment_status") || "")
   const redirectTo = String(
@@ -76,6 +135,7 @@ export async function markEnrollmentPaymentAction(formData: FormData) {
     const { data: enrollmentData, error: enrollmentError } = await supabase
       .from("program_enrollments")
       .select("total_amount")
+      .eq("organization_id", organizationId)
       .eq("id", enrollmentId)
       .maybeSingle()
 
@@ -90,6 +150,7 @@ export async function markEnrollmentPaymentAction(formData: FormData) {
   const { error } = await supabase
     .from("program_enrollments")
     .update(updatePayload)
+    .eq("organization_id", organizationId)
     .eq("id", enrollmentId)
 
   if (error) {
@@ -100,6 +161,7 @@ export async function markEnrollmentPaymentAction(formData: FormData) {
 }
 
 export async function updateEnrollmentStatusAction(formData: FormData) {
+  const organizationId = await requireOrganizationId()
   const enrollmentId = String(formData.get("enrollment_id") || "")
   const status = String(formData.get("status") || "")
   const redirectTo = String(
@@ -122,7 +184,8 @@ export async function updateEnrollmentStatusAction(formData: FormData) {
 
   const { data: enrollmentData, error: enrollmentError } = await supabase
     .from("program_enrollments")
-    .select("id, program_id, status")
+    .select("id, program_id, organization_id, status")
+    .eq("organization_id", organizationId)
     .eq("id", enrollmentId)
     .maybeSingle()
 
@@ -145,6 +208,7 @@ export async function updateEnrollmentStatusAction(formData: FormData) {
       status,
       updated_at: new Date().toISOString(),
     })
+    .eq("organization_id", organizationId)
     .eq("id", enrollmentId)
 
   if (error) {
@@ -158,6 +222,7 @@ export async function updateEnrollmentStatusAction(formData: FormData) {
     const { data: programData, error: programError } = await supabase
       .from("programs")
       .select("enrolled")
+      .eq("organization_id", organizationId)
       .eq("id", enrollment.program_id)
       .maybeSingle()
 
@@ -176,6 +241,7 @@ export async function updateEnrollmentStatusAction(formData: FormData) {
           : Math.max(currentEnrolled - 1, 0),
         updated_at: new Date().toISOString(),
       })
+      .eq("organization_id", organizationId)
       .eq("id", enrollment.program_id)
 
     if (updateProgramError) {
@@ -187,6 +253,7 @@ export async function updateEnrollmentStatusAction(formData: FormData) {
 }
 
 export async function removeWaitlistEntryAction(formData: FormData) {
+  const organizationId = await requireOrganizationId()
   const waitlistId = String(formData.get("waitlist_id") || "")
 
   if (!waitlistId) {
@@ -197,7 +264,8 @@ export async function removeWaitlistEntryAction(formData: FormData) {
 
   const { data: waitlistData, error: waitlistError } = await supabase
     .from("program_waitlist")
-    .select("id, program_id")
+    .select("id, program_id, organization_id")
+    .eq("organization_id", organizationId)
     .eq("id", waitlistId)
     .maybeSingle()
 
@@ -214,6 +282,7 @@ export async function removeWaitlistEntryAction(formData: FormData) {
   const { error } = await supabase
     .from("program_waitlist")
     .delete()
+    .eq("organization_id", organizationId)
     .eq("id", waitlistId)
 
   if (error) {
@@ -224,6 +293,7 @@ export async function removeWaitlistEntryAction(formData: FormData) {
     const { data: programData, error: programError } = await supabase
       .from("programs")
       .select("waitlist")
+      .eq("organization_id", organizationId)
       .eq("id", waitlistEntry.program_id)
       .maybeSingle()
 
@@ -239,6 +309,7 @@ export async function removeWaitlistEntryAction(formData: FormData) {
         waitlist: Math.max(Number(program?.waitlist || 0) - 1, 0),
         updated_at: new Date().toISOString(),
       })
+      .eq("organization_id", organizationId)
       .eq("id", waitlistEntry.program_id)
 
     if (updateProgramError) {
@@ -251,6 +322,7 @@ export async function removeWaitlistEntryAction(formData: FormData) {
 }
 
 export async function moveWaitlistToEnrollmentAction(formData: FormData) {
+  const organizationId = await requireOrganizationId()
   const waitlistId = String(formData.get("waitlist_id") || "")
   const redirectTo = String(
     formData.get("redirect_to") || "/programs/registrations"
@@ -278,6 +350,7 @@ export async function moveWaitlistToEnrollmentAction(formData: FormData) {
       notes
     `
     )
+    .eq("organization_id", organizationId)
     .eq("id", waitlistId)
     .maybeSingle()
 
@@ -294,6 +367,7 @@ export async function moveWaitlistToEnrollmentAction(formData: FormData) {
   const { data: programData, error: programError } = await supabase
     .from("programs")
     .select("id, department_id, enrolled, waitlist, capacity")
+    .eq("organization_id", organizationId)
     .eq("id", waitlistEntry.program_id)
     .maybeSingle()
 
@@ -314,13 +388,25 @@ export async function moveWaitlistToEnrollmentAction(formData: FormData) {
     refreshAndRedirect(redirectTo)
   }
 
+  const offering = await getDefaultOfferingForProgramByOrg(
+    waitlistEntry.program_id,
+    organizationId
+  )
+
+  const sessionIds = await resolveSessionAccessForWaitlistMove({
+    organizationId,
+    programId: waitlistEntry.program_id,
+    preferredWeeks: waitlistEntry.preferred_weeks,
+  })
+
   const today = new Date().toISOString().slice(0, 10)
 
   const { data: newEnrollmentData, error: insertError } = await supabase
     .from("program_enrollments")
     .insert({
-      organization_id: waitlistEntry.organization_id,
+      organization_id: organizationId,
       program_id: waitlistEntry.program_id,
+      offering_id: offering?.id ?? null,
       department_id: program.department_id,
       child_name: waitlistEntry.child_name,
       child_age: waitlistEntry.child_age,
@@ -328,7 +414,7 @@ export async function moveWaitlistToEnrollmentAction(formData: FormData) {
       parent_email: waitlistEntry.parent_email,
       parent_phone: waitlistEntry.parent_phone,
       session_name: null,
-      weeks: waitlistEntry.preferred_weeks,
+      weeks: sessionIds.length > 0 ? sessionIds : waitlistEntry.preferred_weeks,
       enrollment_date: today,
       status: "enrolled",
       payment_status: "pending",
@@ -338,6 +424,8 @@ export async function moveWaitlistToEnrollmentAction(formData: FormData) {
       after_care: false,
       lunch_type: null,
       notes: waitlistEntry.notes,
+      participant_type: "youth",
+      registrant_type: "guardian",
     })
     .select("id")
     .single()
@@ -348,9 +436,18 @@ export async function moveWaitlistToEnrollmentAction(formData: FormData) {
 
   const newEnrollment = newEnrollmentData as { id: string }
 
+  if (sessionIds.length > 0) {
+    await createSessionAccessRows({
+      organizationId,
+      enrollmentId: newEnrollment.id,
+      sessionIds,
+    })
+  }
+
   const { error: deleteError } = await supabase
     .from("program_waitlist")
     .delete()
+    .eq("organization_id", organizationId)
     .eq("id", waitlistId)
 
   if (deleteError) {
@@ -364,6 +461,7 @@ export async function moveWaitlistToEnrollmentAction(formData: FormData) {
       waitlist: Math.max(Number(program.waitlist || 0) - 1, 0),
       updated_at: new Date().toISOString(),
     })
+    .eq("organization_id", organizationId)
     .eq("id", waitlistEntry.program_id)
 
   if (updateProgramError) {

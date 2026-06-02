@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 
 import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
+import { getDefaultOfferingForProgram } from "@/lib/programs/program-offering-queries"
 
 type CreateProgramSessionInput = {
   program_id: string
@@ -35,11 +36,14 @@ export async function createProgramSession(
     throw new Error("No organization selected")
   }
 
+  const defaultOffering = await getDefaultOfferingForProgram(input.program_id)
+
   const { error } = await supabase
     .from("program_sessions")
     .insert({
       organization_id: organizationId,
       program_id: input.program_id,
+      offering_id: defaultOffering?.id ?? null,
 
       name: input.name,
       description: input.description ?? null,

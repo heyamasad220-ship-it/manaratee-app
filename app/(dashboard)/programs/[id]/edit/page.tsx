@@ -6,6 +6,8 @@ import { getDepartments } from "@/lib/departments/department-queries"
 import { getProgramById } from "@/lib/programs/program-queries"
 import { getProgramCapacityGroups } from "@/lib/programs/program-capacity-group-queries"
 import { getProgramSessions } from "@/lib/programs/program-session-queries"
+import { getDefaultOfferingForProgram } from "@/lib/programs/program-offering-queries"
+import { getAllRegistrationOptionsForOffering } from "@/lib/programs/program-registration-option-queries"
 
 import { EditProgramForm } from "./edit-program-form"
 
@@ -34,6 +36,11 @@ export default async function EditProgramPage({
     notFound()
   }
 
+  const defaultOffering = await getDefaultOfferingForProgram(id)
+  const registrationOptions = defaultOffering
+    ? await getAllRegistrationOptionsForOffering(defaultOffering.id)
+    : []
+
   return (
     <>
       <Header title="Programs" />
@@ -43,6 +50,7 @@ export default async function EditProgramPage({
         feeOptions={feeOptionsResult.data || []}
         capacityGroups={capacityGroups}
         sessions={sessions}
+        registrationOptions={registrationOptions}
       />
     </>
   )

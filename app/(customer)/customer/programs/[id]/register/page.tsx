@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { cookies } from "next/headers"
-import { redirect, notFound } from "next/navigation"
+import { notFound } from "next/navigation"
 import {
   ArrowLeft,
   BookOpen,
@@ -12,7 +12,16 @@ import {
   Users,
 } from "lucide-react"
 
+import { ProgramRegisterSessionFields } from "@/components/customer/program-register-session-fields"
+import { CustomerRegistrationOptionPicker } from "@/components/programs/program-registration-options-editor"
 import { createClient } from "@/lib/supabase/server"
+import { getDefaultOfferingForProgramByOrg } from "@/lib/programs/program-offering-queries"
+import { registerForProgram } from "@/lib/programs/program-registration-actions"
+import {
+  getRegistrationOptionsForOffering,
+  isRegistrationOptionAvailable,
+} from "@/lib/programs/program-registration-option-queries"
+import { lookupContactsByPersonIds } from "@/lib/programs/registration-contact-resolver"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -35,6 +44,7 @@ type Program = {
   name: string
   description: string | null
   department_id: string | null
+  program_type: string | null
   start_date: string | null
   end_date: string | null
   enrollment_open_date: string | null
@@ -50,28 +60,18 @@ type Program = {
 
 type ProgramSession = {
   id: string
-  organization_id: string
-  program_id: string
   name: string
-  description: string | null
   start_date: string | null
   end_date: string | null
   capacity: number | null
   enrolled: number | null
-  waitlist: number | null
   price: number | null
-  status: string | null
-  sort_order: number | null
 }
 
 type LunchOption = {
   id: string
-  organization_id: string
   name: string
-  description: string | null
   price: number | null
-  is_active: boolean
-  sort_order: number | null
 }
 
 type CustomerContact = {
@@ -83,22 +83,9 @@ type CustomerContact = {
   phone: string | null
 }
 
-type FamilyRelationship = {
-  related_person_id: string
-  relationship_type: string
-}
-
-type Person = {
-  id: string
-  first_name: string | null
-  last_name: string | null
-  date_of_birth: string | null
-  gender: string | null
-  person_type: string | null
-}
-
 type FamilyMember = {
-  id: string
+  personId: string
+  contactId: string | null
   first_name: string
   last_name: string
   date_of_birth: string | null
@@ -127,23 +114,13 @@ function formatMoney(value?: number | null) {
   }).format(amount)
 }
 
-function todayDateOnly() {
-  const now = new Date()
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate())
-}
-
-function dateOnly(value?: string | null) {
-  if (!value) return null
-  return new Date(`${value}T00:00:00`)
-}
-
 function isEnrollmentOpen(open?: string | null, close?: string | null) {
-  const today = todayDateOnly()
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
 
-  const openDate = dateOnly(open)
-  const closeDate = dateOnly(close)
+  const openDate = open ? new Date(`${open}T00:00:00`) : null
+  const closeDate = close ? new Date(`${close}T00:00:00`) : null
 
-  if (!openDate && !closeDate) return false
   if (openDate && today < openDate) return false
   if (closeDate && today > closeDate) return false
 
@@ -214,9 +191,7 @@ async function getActiveCustomerOrganization() {
   const cookieStore = await cookies()
   const activeOrganizationId = cookieStore.get("active_organization_id")?.value
 
-  const { data: organizations, error } = await supabase.rpc(
-    "get_my_organizations"
-  )
+  const { data: organizations, error } = await supabase.rpc("get_my_organizations")
 
   if (error) {
     return {
@@ -269,7 +244,10 @@ async function getCurrentCustomerContact(organizationId: string) {
   return data as CustomerContact | null
 }
 
-async function getFamilyMembers(parentPersonId: string, organizationId: string) {
+async function getFamilyMembers(
+  parentPersonId: string,
+  organizationId: string
+): Promise<FamilyMember[]> {
   const supabase = await createClient()
 
   const { data: relationships, error: relationshipError } = await supabase
@@ -283,14 +261,13 @@ async function getFamilyMembers(parentPersonId: string, organizationId: string) 
     return []
   }
 
-  const relationshipRows = (relationships || []) as FamilyRelationship[]
-  const personIds = relationshipRows.map((row) => row.related_person_id)
+  const personIds = (relationships || []).map((row) => row.related_person_id as string)
 
   if (personIds.length === 0) return []
 
   const { data: people, error: peopleError } = await supabase
     .from("people")
-    .select("id, first_name, last_name, date_of_birth, gender, person_type")
+    .select("id, first_name, last_name, date_of_birth, gender")
     .eq("organization_id", organizationId)
     .in("id", personIds)
 
@@ -299,262 +276,30 @@ async function getFamilyMembers(parentPersonId: string, organizationId: string) 
     return []
   }
 
-  const peopleRows = (people || []) as Person[]
+  const contactByPersonId = await lookupContactsByPersonIds(
+    organizationId,
+    personIds
+  )
 
-  return relationshipRows
+  return (relationships || [])
     .map((relationship) => {
-      const person = peopleRows.find(
+      const person = (people || []).find(
         (row) => row.id === relationship.related_person_id
       )
 
       if (!person) return null
 
       return {
-        id: person.id,
+        personId: person.id as string,
+        contactId: contactByPersonId.get(person.id as string) ?? null,
         first_name: person.first_name || "",
         last_name: person.last_name || "",
         date_of_birth: person.date_of_birth,
         gender: person.gender,
-        relationship_type: relationship.relationship_type,
+        relationship_type: relationship.relationship_type as string,
       }
     })
     .filter(Boolean) as FamilyMember[]
-}
-
-async function registerForProgram(formData: FormData) {
-  "use server"
-
-  const supabase = await createClient()
-
-  const programId = String(formData.get("program_id") || "")
-  const organizationId = String(formData.get("organization_id") || "")
-  const departmentId = String(formData.get("department_id") || "") || null
-  const mode = String(formData.get("mode") || "")
-
-  const childPersonId = String(formData.get("child_person_id") || "").trim()
-  const parentName = String(formData.get("parent_name") || "").trim()
-  const parentEmail = String(formData.get("parent_email") || "").trim()
-  const parentPhone = String(formData.get("parent_phone") || "").trim()
-  const notes = String(formData.get("notes") || "").trim()
-
-  const selectedSessionIds = formData
-    .getAll("session_ids")
-    .map((sessionId) => String(sessionId))
-    .filter(Boolean)
-
-  const beforeCare = formData.get("before_care") === "on"
-  const afterCare = formData.get("after_care") === "on"
-  const lunchOptionId =
-    String(formData.get("lunch_option_id") || "").trim() || null
-
-  if (!programId || !organizationId || !childPersonId) {
-    redirect(`/customer/programs/${programId}/register?error=missing-fields`)
-  }
-
-  const { data: childPerson, error: childError } = await supabase
-    .from("people")
-    .select("id, first_name, last_name, date_of_birth")
-    .eq("id", childPersonId)
-    .eq("organization_id", organizationId)
-    .maybeSingle()
-
-  if (childError || !childPerson) {
-    redirect(`/customer/programs/${programId}/register?error=invalid-participant`)
-  }
-
-  const childName = `${childPerson.first_name || ""} ${
-    childPerson.last_name || ""
-  }`.trim()
-  const childAge = calculateAge(childPerson.date_of_birth)
-
-  if (!childName) {
-    redirect(`/customer/programs/${programId}/register?error=invalid-participant`)
-  }
-
-  const { data: program, error: programError } = await supabase
-    .from("programs")
-    .select(
-      `
-      id,
-      organization_id,
-      department_id,
-      capacity,
-      enrolled,
-      waitlist,
-      status,
-      enrollment_open_date,
-      enrollment_close_date
-    `
-    )
-    .eq("id", programId)
-    .eq("organization_id", organizationId)
-    .eq("status", "active")
-    .maybeSingle()
-
-  if (programError || !program) {
-    redirect("/customer/programs")
-  }
-
-  const currentMode = getRegistrationMode(program as Program)
-
-  if (currentMode === "closed" || currentMode === "full") {
-    redirect(`/customer/programs/${programId}?registration=unavailable`)
-  }
-
-  let lunchType: string | null = null
-  let lunchPrice = 0
-
-  if (lunchOptionId) {
-    const { data: lunchOption, error: lunchError } = await supabase
-      .from("program_lunch_options")
-      .select("id, name, price")
-      .eq("id", lunchOptionId)
-      .eq("organization_id", organizationId)
-      .eq("is_active", true)
-      .maybeSingle()
-
-    if (lunchError || !lunchOption) {
-      redirect(`/customer/programs/${programId}/register?error=invalid-lunch`)
-    }
-
-    lunchType = lunchOption.name
-    lunchPrice = Number(lunchOption.price || 0)
-  }
-
-  const selectedSessions: ProgramSession[] = []
-
-  if (selectedSessionIds.length > 0) {
-    const { data: sessions, error: sessionsError } = await supabase
-      .from("program_sessions")
-      .select(
-        "id, organization_id, program_id, name, description, start_date, end_date, capacity, enrolled, waitlist, price, status, sort_order"
-      )
-      .eq("organization_id", organizationId)
-      .eq("program_id", programId)
-      .in("id", selectedSessionIds)
-
-    if (sessionsError) {
-      redirect(`/customer/programs/${programId}/register?error=invalid-session`)
-    }
-
-    selectedSessions.push(...((sessions || []) as ProgramSession[]))
-
-    if (selectedSessions.length !== selectedSessionIds.length) {
-      redirect(`/customer/programs/${programId}/register?error=invalid-session`)
-    }
-  }
-
-  const sessionTotal = selectedSessions.reduce((total, session) => {
-    return total + Number(session.price || 0)
-  }, 0)
-
-  const totalAmount = sessionTotal + lunchPrice
-  const today = new Date().toISOString().slice(0, 10)
-
-  if (currentMode === "waitlist" || mode === "waitlist") {
-    const { data: existingWaitlistRegistration } = await supabase
-      .from("program_waitlist")
-      .select("id")
-      .eq("program_id", programId)
-      .eq("child_person_id", childPersonId)
-      .maybeSingle()
-
-    if (existingWaitlistRegistration) {
-      redirect(`/customer/programs/${programId}/register?error=already-waitlisted`)
-    }
-
-    const { data: existingWaitlist } = await supabase
-      .from("program_waitlist")
-      .select("position")
-      .eq("program_id", programId)
-      .order("position", { ascending: false })
-      .limit(1)
-
-    const nextPosition = (existingWaitlist?.[0]?.position || 0) + 1
-
-    const { error } = await supabase.from("program_waitlist").insert({
-      organization_id: organizationId,
-      program_id: programId,
-      child_person_id: childPersonId,
-      child_name: childName,
-      child_age: childAge,
-      parent_name: parentName || null,
-      parent_email: parentEmail || null,
-      parent_phone: parentPhone || null,
-      preferred_weeks:
-        selectedSessionIds.length > 0 ? selectedSessionIds : null,
-      added_date: today,
-      position: nextPosition,
-      status: "waiting",
-      priority: "normal",
-      notes: notes || null,
-    })
-
-    if (error) {
-      if (error.code === "23505") {
-        redirect(`/customer/programs/${programId}/register?error=already-waitlisted`)
-      }
-
-      throw new Error(error.message)
-    }
-
-    await supabase
-      .from("programs")
-      .update({ waitlist: (program.waitlist || 0) + 1 })
-      .eq("id", programId)
-
-    redirect(`/customer/programs/${programId}?registration=waitlist-success`)
-  }
-
-  const { data: existingEnrollment } = await supabase
-    .from("program_enrollments")
-    .select("id")
-    .eq("program_id", programId)
-    .eq("child_person_id", childPersonId)
-    .maybeSingle()
-
-  if (existingEnrollment) {
-    redirect(`/customer/programs/${programId}/register?error=already-enrolled`)
-  }
-
-  const { error } = await supabase.from("program_enrollments").insert({
-    organization_id: organizationId,
-    program_id: programId,
-    department_id: departmentId,
-    child_person_id: childPersonId,
-    child_name: childName,
-    child_age: childAge,
-    parent_name: parentName || null,
-    parent_email: parentEmail || null,
-    parent_phone: parentPhone || null,
-    session_name:
-      selectedSessions.length === 1 ? selectedSessions[0].name : null,
-    weeks: selectedSessionIds.length > 0 ? selectedSessionIds : null,
-    enrollment_date: today,
-    status: "pending",
-    payment_status: "pending",
-    amount_paid: 0,
-    total_amount: totalAmount,
-    before_care: beforeCare,
-    after_care: afterCare,
-    lunch_type: lunchType,
-    notes: notes || null,
-  })
-
-  if (error) {
-    if (error.code === "23505") {
-      redirect(`/customer/programs/${programId}/register?error=already-enrolled`)
-    }
-
-    throw new Error(error.message)
-  }
-
-  await supabase
-    .from("programs")
-    .update({ enrolled: (program.enrolled || 0) + 1 })
-    .eq("id", programId)
-
-  redirect(`/customer/programs/${programId}?registration=success`)
 }
 
 export default async function CustomerProgramRegisterPage({
@@ -591,16 +336,8 @@ export default async function CustomerProgramRegisterPage({
     )
   }
 
-  const customerContact = await getCurrentCustomerContact(
-    organization.organization_id
-  )
-
-  const familyMembers = customerContact?.person_id
-    ? await getFamilyMembers(
-        customerContact.person_id,
-        organization.organization_id
-      )
-    : []
+  const organizationId = organization.organization_id
+  const customerContact = await getCurrentCustomerContact(organizationId)
 
   const { data, error } = await supabase
     .from("programs")
@@ -611,6 +348,7 @@ export default async function CustomerProgramRegisterPage({
       name,
       description,
       department_id,
+      program_type,
       start_date,
       end_date,
       enrollment_open_date,
@@ -625,7 +363,7 @@ export default async function CustomerProgramRegisterPage({
     `
     )
     .eq("id", id)
-    .eq("organization_id", organization.organization_id)
+    .eq("organization_id", organizationId)
     .eq("status", "active")
     .maybeSingle()
 
@@ -634,32 +372,58 @@ export default async function CustomerProgramRegisterPage({
   }
 
   const program = data as Program
+  const isAdultProgram = program.program_type === "adult"
+
+  const offering = await getDefaultOfferingForProgramByOrg(program.id, organizationId)
+
+  if (!offering) {
+    notFound()
+  }
+
+  const allOptions = offering
+    ? await getRegistrationOptionsForOffering(offering.id, organizationId)
+    : []
+
+  const registrationOptions = allOptions.filter((option) =>
+    isRegistrationOptionAvailable(option)
+  )
+
+  const familyMembers =
+    !isAdultProgram && customerContact?.person_id
+      ? await getFamilyMembers(customerContact.person_id, organizationId)
+      : []
 
   const { data: sessionData } = await supabase
     .from("program_sessions")
     .select(
-      "id, organization_id, program_id, name, description, start_date, end_date, capacity, enrolled, waitlist, price, status, sort_order"
+      "id, name, start_date, end_date, capacity, enrolled, price, status, sort_order"
     )
-    .eq("organization_id", organization.organization_id)
+    .eq("organization_id", organizationId)
     .eq("program_id", program.id)
     .eq("status", "active")
     .order("sort_order", { ascending: true })
     .order("start_date", { ascending: true })
 
-  const sessions = (sessionData || []) as ProgramSession[]
+  const sessions = ((sessionData || []) as ProgramSession[]).map((session) => ({
+    ...session,
+    remaining: sessionSeatsRemaining(session),
+  }))
 
   const { data: lunchData } = await supabase
     .from("program_lunch_options")
-    .select(
-      "id, organization_id, name, description, price, is_active, sort_order"
-    )
-    .eq("organization_id", organization.organization_id)
+    .select("id, name, price")
+    .eq("organization_id", organizationId)
     .eq("is_active", true)
     .order("sort_order", { ascending: true })
 
   const lunchOptions = (lunchData || []) as LunchOption[]
 
-  const mode = getRegistrationMode(program)
+  const enrollmentOpen = isEnrollmentOpen(
+    offering.enrollment_open_date ?? program.enrollment_open_date,
+    offering.enrollment_close_date ?? program.enrollment_close_date
+  )
+
+  const mode = enrollmentOpen ? getRegistrationMode(program) : "closed"
   const remainingSeats = seatsRemaining(program)
 
   if (mode === "closed" || mode === "full") {
@@ -684,9 +448,7 @@ export default async function CustomerProgramRegisterPage({
                 This program is currently {mode === "closed" ? "closed" : "full"}.
               </p>
               <Button className="mt-6" asChild>
-                <Link href={`/customer/programs/${program.id}`}>
-                  View Program
-                </Link>
+                <Link href={`/customer/programs/${program.id}`}>View Program</Link>
               </Button>
             </CardContent>
           </Card>
@@ -696,15 +458,25 @@ export default async function CustomerProgramRegisterPage({
   }
 
   const errorMessages: Record<string, string> = {
-    "missing-fields": "Please select a participant before continuing.",
+    "missing-fields": "Please complete all required fields before continuing.",
     "invalid-participant": "The selected participant could not be found.",
-    "invalid-session": "One of the selected sessions could not be found.",
+    "missing-participant-contact":
+      "This participant does not have a linked contact record yet. Contact your organization administrator to complete contact migration before registering.",
+    "invalid-session": "One or more selected sessions could not be found.",
     "invalid-lunch": "The selected lunch option could not be found.",
+    "invalid-option": "The selected registration option is not available.",
+    "invalid-offering": "This program offering is not available.",
+    "invalid-registrant": "Your registrant contact could not be verified.",
+    "invalid-payer": "The payer contact could not be verified.",
     "already-enrolled": "This participant is already enrolled in this program.",
     "already-waitlisted":
       "This participant is already on the waitlist for this program.",
     "save-failed": "We could not save this registration. Please try again.",
   }
+
+  const canRegister =
+    customerContact &&
+    (isAdultProgram || (customerContact.person_id && familyMembers.length > 0))
 
   const ageGroups = program.age_groups || []
   const gradeLevels = program.grade_levels || []
@@ -726,9 +498,7 @@ export default async function CustomerProgramRegisterPage({
               <CardHeader>
                 <div className="flex flex-wrap items-center gap-3">
                   <CardTitle>
-                    {mode === "waitlist"
-                      ? "Join Waitlist"
-                      : "Register for Program"}
+                    {mode === "waitlist" ? "Join Waitlist" : "Register for Program"}
                   </CardTitle>
                   <Badge
                     className={
@@ -741,7 +511,8 @@ export default async function CustomerProgramRegisterPage({
                   </Badge>
                 </div>
                 <CardDescription>
-                  Complete the form below for {program.name}.
+                  Choose a registration option, then complete the form for{" "}
+                  {program.name}.
                 </CardDescription>
               </CardHeader>
 
@@ -753,152 +524,199 @@ export default async function CustomerProgramRegisterPage({
                   </div>
                 ) : null}
 
-                {!customerContact?.person_id ? (
+                {!customerContact ? (
                   <div className="rounded-lg border border-dashed p-8 text-center">
                     <Users className="mx-auto mb-3 h-10 w-10 text-muted-foreground/50" />
-                    <h3 className="font-medium">Profile connection needed</h3>
+                    <h3 className="font-medium">Customer contact required</h3>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Your customer profile is not linked to a person record yet.
+                      Your account is not linked to a contact record for this
+                      organization.
                     </p>
                     <Button className="mt-4" asChild>
                       <Link href="/customer/profile">Go to Profile</Link>
                     </Button>
                   </div>
-                ) : familyMembers.length === 0 ? (
+                ) : !canRegister ? (
                   <div className="rounded-lg border border-dashed p-8 text-center">
                     <Users className="mx-auto mb-3 h-10 w-10 text-muted-foreground/50" />
                     <h3 className="font-medium">No family members found</h3>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Add a child or grandchild to your profile before registering.
+                      Add a child or grandchild to your profile before registering
+                      for this youth program.
                     </p>
                     <Button className="mt-4" asChild>
                       <Link href="/customer/profile">Add Family Member</Link>
                     </Button>
                   </div>
+                ) : registrationOptions.length === 0 ? (
+                  <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+                    Registration options have not been configured for this program
+                    yet.
+                  </div>
                 ) : (
                   <form action={registerForProgram} className="space-y-6">
                     <input type="hidden" name="program_id" value={program.id} />
-                    <input
-                      type="hidden"
-                      name="organization_id"
-                      value={organization.organization_id}
-                    />
-                    <input
-                      type="hidden"
-                      name="department_id"
-                      value={program.department_id || ""}
-                    />
+                    <input type="hidden" name="organization_id" value={organizationId} />
+                    <input type="hidden" name="department_id" value={program.department_id || ""} />
+                    <input type="hidden" name="offering_id" value={offering.id} />
+                    <input type="hidden" name="program_type" value={program.program_type || "youth"} />
                     <input type="hidden" name="mode" value={mode} />
+                    <input
+                      type="hidden"
+                      name="registrant_contact_id"
+                      value={customerContact.id}
+                    />
+                    <input
+                      type="hidden"
+                      name="payer_contact_id"
+                      value={customerContact.id}
+                    />
+                    <input
+                      type="hidden"
+                      name="is_adult_self"
+                      value={isAdultProgram ? "true" : "false"}
+                    />
 
-                    <div className="space-y-3">
-                      <label className="text-sm font-medium">
-                        Select Participant <span className="text-red-500">*</span>
-                      </label>
+                    <CustomerRegistrationOptionPicker options={registrationOptions} />
 
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        {familyMembers.map((member) => {
-                          const fullName = getFullName(member)
-                          const age = calculateAge(member.date_of_birth)
-
-                          return (
-                            <label
-                              key={member.id}
-                              className="flex cursor-pointer items-start gap-3 rounded-lg border bg-background px-4 py-3 text-sm hover:bg-muted"
-                            >
-                              <input
-                                type="radio"
-                                name="child_person_id"
-                                value={member.id}
-                                required
-                                className="mt-1"
-                              />
-                              <div>
-                                <p className="font-medium">{fullName}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  {formatRelationship(member.relationship_type)}
-                                  {age !== null ? ` · Age ${age}` : ""}
-                                  {member.gender ? ` · ${member.gender}` : ""}
-                                </p>
-                              </div>
-                            </label>
-                          )
-                        })}
+                    {isAdultProgram ? (
+                      <div className="rounded-lg border bg-muted/30 p-4 text-sm">
+                        <p className="font-medium">Participant</p>
+                        <p className="mt-1 text-muted-foreground">
+                          You are registering yourself as{" "}
+                          {customerContact.full_name || "the participant"}.
+                        </p>
+                        <input
+                          type="hidden"
+                          name="participant_contact_id"
+                          value={customerContact.id}
+                        />
                       </div>
-                    </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <label className="text-sm font-medium">
+                          Select Participant <span className="text-red-500">*</span>
+                        </label>
+
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          {familyMembers.map((member) => {
+                            const fullName = getFullName(member)
+                            const age = calculateAge(member.date_of_birth)
+                            const disabled = !member.contactId
+
+                            return (
+                              <label
+                                key={member.personId}
+                                className={`flex items-start gap-3 rounded-lg border bg-background px-4 py-3 text-sm ${
+                                  disabled
+                                    ? "cursor-not-allowed opacity-60"
+                                    : "cursor-pointer hover:bg-muted"
+                                }`}
+                              >
+                                <input
+                                  type="radio"
+                                  name="participant_contact_id"
+                                  value={member.contactId || ""}
+                                  required={!disabled}
+                                  disabled={disabled}
+                                  className="mt-1"
+                                />
+                                <div>
+                                  <p className="font-medium">{fullName}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {formatRelationship(member.relationship_type)}
+                                    {age !== null ? ` · Age ${age}` : ""}
+                                    {member.gender ? ` · ${member.gender}` : ""}
+                                  </p>
+                                  {disabled ? (
+                                    <p className="mt-1 text-xs text-amber-700">
+                                      Contact record missing — administrator must
+                                      link this person to a contact before
+                                      registration.
+                                    </p>
+                                  ) : null}
+                                </div>
+                              </label>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
 
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div className="space-y-2">
                         <label className="text-sm font-medium">
-                          Parent / Guardian Name
+                          {isAdultProgram ? "Your Name" : "Parent / Guardian Name"}
                         </label>
                         <input
                           name="parent_name"
-                          defaultValue={customerContact?.full_name || ""}
+                          defaultValue={customerContact.full_name || ""}
                           className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                         />
                       </div>
 
                       <div className="space-y-2">
                         <label className="text-sm font-medium">
-                          Parent / Guardian Email
+                          {isAdultProgram ? "Your Email" : "Parent / Guardian Email"}
                         </label>
                         <input
                           name="parent_email"
                           type="email"
-                          defaultValue={customerContact?.email || ""}
+                          defaultValue={customerContact.email || ""}
                           className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                         />
                       </div>
 
                       <div className="space-y-2 sm:col-span-2">
                         <label className="text-sm font-medium">
-                          Parent / Guardian Phone
+                          {isAdultProgram ? "Your Phone" : "Parent / Guardian Phone"}
                         </label>
                         <input
                           name="parent_phone"
-                          defaultValue={customerContact?.phone || ""}
+                          defaultValue={customerContact.phone || ""}
                           className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                         />
                       </div>
                     </div>
 
                     {mode !== "waitlist" ? (
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">
-                          Lunch Preference
-                        </label>
-                        <select
-                          name="lunch_option_id"
-                          className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-                          defaultValue=""
-                        >
-                          <option value="">No lunch selected</option>
-                          {lunchOptions.map((option) => (
-                            <option key={option.id} value={option.id}>
-                              {option.name} — {formatMoney(option.price)}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    ) : null}
+                      <>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Lunch Preference</label>
+                          <select
+                            name="lunch_option_id"
+                            className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                            defaultValue=""
+                          >
+                            <option value="">No lunch selected</option>
+                            {lunchOptions.map((option) => (
+                              <option key={option.id} value={option.id}>
+                                {option.name} — {formatMoney(option.price)}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
 
-                    {mode !== "waitlist" ? (
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <label className="flex items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm">
-                          <input type="checkbox" name="before_care" />
-                          Before care
-                        </label>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <label className="flex items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm">
+                            <input type="checkbox" name="before_care" />
+                            Before care
+                          </label>
 
-                        <label className="flex items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm">
-                          <input type="checkbox" name="after_care" />
-                          After care
-                        </label>
-                      </div>
+                          <label className="flex items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm">
+                            <input type="checkbox" name="after_care" />
+                            After care
+                          </label>
+                        </div>
+                      </>
                     ) : null}
 
                     <div className="space-y-2">
                       <label className="text-sm font-medium">
-                        Notes <span className="font-normal text-muted-foreground">(Optional)</span>
+                        Notes{" "}
+                        <span className="font-normal text-muted-foreground">
+                          (Optional)
+                        </span>
                       </label>
                       <textarea
                         name="notes"
@@ -908,69 +726,15 @@ export default async function CustomerProgramRegisterPage({
                       />
                     </div>
 
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <label className="text-sm font-medium">Sessions</label>
-                          <p className="text-xs text-muted-foreground">
-                            Select the sessions you want to register for.
-                          </p>
-                        </div>
-                      </div>
-
-                      {sessions.length === 0 ? (
-                        <div className="rounded-lg border border-dashed p-5 text-sm text-muted-foreground">
-                          No sessions are available for this program yet.
-                        </div>
-                      ) : (
-                        <div className="space-y-2">
-                          {sessions.map((session) => {
-                            const remaining = sessionSeatsRemaining(session)
-
-                            return (
-                              <label
-                                key={session.id}
-                                className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border bg-background px-4 py-3 text-sm hover:bg-muted"
-                              >
-                                <span className="flex items-start gap-3">
-                                  <input
-                                    type="checkbox"
-                                    name="session_ids"
-                                    value={session.id}
-                                    className="mt-1"
-                                  />
-                                  <span>
-                                    <span className="font-medium">
-                                      {session.name}
-                                    </span>
-                                    <span className="block text-xs text-muted-foreground">
-                                      {formatDate(session.start_date)} –{" "}
-                                      {formatDate(session.end_date)}
-                                    </span>
-                                  </span>
-                                </span>
-
-                                <span className="text-right text-xs text-muted-foreground">
-                                  <span className="block">
-                                    {formatMoney(session.price)}
-                                  </span>
-                                  <span className="block text-emerald-700">
-                                    {remaining} seat
-                                    {remaining === 1 ? "" : "s"} available
-                                  </span>
-                                </span>
-                              </label>
-                            )
-                          })}
-                        </div>
-                      )}
-                    </div>
+                    <ProgramRegisterSessionFields
+                      sessions={sessions}
+                      formatDate={formatDate}
+                      formatMoney={formatMoney}
+                    />
 
                     <Button type="submit" className="w-full">
                       <CheckCircle2 className="mr-2 h-4 w-4" />
-                      {mode === "waitlist"
-                        ? "Join Waitlist"
-                        : "Submit Registration"}
+                      {mode === "waitlist" ? "Join Waitlist" : "Submit Registration"}
                     </Button>
                   </form>
                 )}
@@ -983,7 +747,7 @@ export default async function CustomerProgramRegisterPage({
               <CardHeader>
                 <CardTitle>{program.name}</CardTitle>
                 <CardDescription>
-                  {program.description || "No description provided."}
+                  {offering.name} · {program.description || "No description provided."}
                 </CardDescription>
               </CardHeader>
 
@@ -991,8 +755,8 @@ export default async function CustomerProgramRegisterPage({
                 <div className="flex items-start gap-3 text-muted-foreground">
                   <CalendarDays className="mt-0.5 h-4 w-4" />
                   <span>
-                    {formatDate(program.start_date)} –{" "}
-                    {formatDate(program.end_date)}
+                    {formatDate(offering.start_date ?? program.start_date)} –{" "}
+                    {formatDate(offering.end_date ?? program.end_date)}
                   </span>
                 </div>
 
@@ -1002,8 +766,14 @@ export default async function CustomerProgramRegisterPage({
                     <div>
                       <p className="font-medium">Enrollment Window</p>
                       <p className="text-xs">
-                        {formatDate(program.enrollment_open_date)} –{" "}
-                        {formatDate(program.enrollment_close_date)}
+                        {formatDate(
+                          offering.enrollment_open_date ?? program.enrollment_open_date
+                        )}{" "}
+                        –{" "}
+                        {formatDate(
+                          offering.enrollment_close_date ??
+                            program.enrollment_close_date
+                        )}
                       </p>
                     </div>
                   </div>
@@ -1014,8 +784,7 @@ export default async function CustomerProgramRegisterPage({
                   <div>
                     <p className="font-medium text-foreground">Capacity</p>
                     <p>
-                      {remainingSeats} seat{remainingSeats === 1 ? "" : "s"}{" "}
-                      remaining
+                      {remainingSeats} seat{remainingSeats === 1 ? "" : "s"} remaining
                     </p>
                   </div>
                 </div>
@@ -1080,9 +849,7 @@ export default async function CustomerProgramRegisterPage({
                     <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-xs text-amber-900">
                       <div className="flex gap-2">
                         <Info className="h-4 w-4 shrink-0" />
-                        <p>
-                          Eligibility rules are set by the organization.
-                        </p>
+                        <p>Eligibility rules are set by the organization.</p>
                       </div>
                     </div>
                   </div>

@@ -26,6 +26,11 @@ import {
 
 import { createClient } from "@/lib/supabase/server"
 import { getPrograms } from "@/lib/programs/program-queries"
+import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
+import {
+  contactLabel,
+  loadContactsByIds,
+} from "@/lib/programs/registration-display-helpers"
 
 type PageSearchParams = {
   q?: string
@@ -45,6 +50,11 @@ type EnrollmentRow = {
   parent_name: string | null
   parent_email: string | null
   parent_phone: string | null
+  participant_contact_id: string | null
+  registrant_contact_id: string | null
+  payer_contact_id: string | null
+  participant_type: string | null
+  registrant_type: string | null
   enrollment_date: string | null
   status: string | null
   payment_status: string | null
@@ -75,6 +85,8 @@ type RegistrationRow = {
   program_id: string | null
   program_name: string
   participant_name: string
+  registrant_name: string | null
+  payer_name: string | null
   child_age: number | null
   parent_name: string | null
   parent_email: string | null
@@ -164,6 +176,8 @@ function matchesFilters(row: RegistrationRow, filters: PageSearchParams) {
   const matchesSearch =
     !query ||
     row.participant_name.toLowerCase().includes(query) ||
+    (row.registrant_name || "").toLowerCase().includes(query) ||
+    (row.payer_name || "").toLowerCase().includes(query) ||
     (row.parent_name || "").toLowerCase().includes(query) ||
     (row.parent_email || "").toLowerCase().includes(query) ||
     (row.parent_phone || "").toLowerCase().includes(query) ||
@@ -207,6 +221,7 @@ export default async function ProgramsRegistrationsPage({
   }
 
   const supabase = await createClient()
+  const organizationId = await getSelectedOrganizationId()
   const programs = await getPrograms()
   const programIds = programs.map((program) => program.id)
 
@@ -218,7 +233,7 @@ export default async function ProgramsRegistrationsPage({
   let waitlist: WaitlistRow[] = []
   let loadError: string | null = null
 
-  if (programIds.length > 0) {
+  if (programIds.length > 0 && organizationId) {
     const [enrollmentsResult, waitlistResult] = await Promise.all([
       supabase
         .from("program_enrollments")
@@ -233,6 +248,11 @@ export default async function ProgramsRegistrationsPage({
           parent_name,
           parent_email,
           parent_phone,
+          participant_contact_id,
+          registrant_contact_id,
+          payer_contact_id,
+          participant_type,
+          registrant_type,
           enrollment_date,
           status,
           payment_status,
@@ -241,6 +261,7 @@ export default async function ProgramsRegistrationsPage({
           created_at
         `
         )
+        .eq("organization_id", organizationId)
         .in("program_id", programIds)
         .order("created_at", { ascending: false }),
       supabase
@@ -262,6 +283,7 @@ export default async function ProgramsRegistrationsPage({
           created_at
         `
         )
+        .eq("organization_id", organizationId)
         .in("program_id", programIds)
         .order("created_at", { ascending: false }),
     ])
@@ -279,6 +301,16 @@ export default async function ProgramsRegistrationsPage({
     }
   }
 
+  const contactIds = enrollments.flatMap((row) => [
+    row.participant_contact_id,
+    row.registrant_contact_id,
+    row.payer_contact_id,
+  ])
+
+  const contactsById = organizationId
+    ? await loadContactsByIds(organizationId, contactIds as string[])
+    : new Map()
+
   const registrationRows: RegistrationRow[] = [
     ...enrollments.map((row) => ({
       id: row.id,
@@ -287,7 +319,18 @@ export default async function ProgramsRegistrationsPage({
       program_name:
         (row.program_id ? programNameById.get(row.program_id) : null) ||
         "Unknown Program",
-      participant_name: row.child_name,
+      participant_name: contactLabel(
+        row.participant_contact_id
+          ? contactsById.get(row.participant_contact_id)
+          : undefined,
+        row.child_name
+      ),
+      registrant_name: row.registrant_contact_id
+        ? contactLabel(contactsById.get(row.registrant_contact_id), row.parent_name)
+        : row.parent_name,
+      payer_name: row.payer_contact_id
+        ? contactLabel(contactsById.get(row.payer_contact_id), row.parent_name)
+        : row.parent_name,
       child_age: row.child_age,
       parent_name: row.parent_name,
       parent_email: row.parent_email,
@@ -307,6 +350,8 @@ export default async function ProgramsRegistrationsPage({
         (row.program_id ? programNameById.get(row.program_id) : null) ||
         "Unknown Program",
       participant_name: row.child_name,
+      registrant_name: row.parent_name,
+      payer_name: row.parent_name,
       child_age: row.child_age,
       parent_name: row.parent_name,
       parent_email: row.parent_email,

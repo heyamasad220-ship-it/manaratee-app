@@ -30,6 +30,7 @@ import {
   getInitialFullProgramRegistrationEnabled,
   RegistrationTypeSelector,
 } from "@/components/programs/registration-type-selector"
+import { ProgramRegistrationOptionsEditor } from "@/components/programs/program-registration-options-editor"
 import { ProgramSessionsEditor } from "@/components/programs/program-sessions-editor"
 import type { Department } from "@/lib/departments/department-types"
 import { replaceProgramCapacityGroups } from "@/lib/programs/program-capacity-group-actions"
@@ -37,6 +38,7 @@ import type { ProgramCapacityGroupInput } from "@/lib/programs/program-capacity-
 import { updateProgram } from "@/lib/programs/program-actions"
 import { replaceProgramFeeOptions } from "@/lib/programs/program-fee-actions"
 import type { ProgramSession } from "@/lib/programs/program-session-types"
+import type { ProgramRegistrationOption } from "@/lib/programs/program-registration-option-types"
 import type { Program } from "@/lib/programs/program-types"
 
 const AGE_OPTIONS = Array.from({ length: 100 }, (_, index) => index)
@@ -102,12 +104,14 @@ export function EditProgramForm({
   feeOptions,
   capacityGroups: initialCapacityGroups,
   sessions,
+  registrationOptions,
 }: {
   program: Program
   departments: Department[]
   feeOptions: ProgramFeeOption[]
   capacityGroups: ProgramCapacityGroupInput[]
   sessions: ProgramSession[]
+  registrationOptions: ProgramRegistrationOption[]
 }) {
   const router = useRouter()
   const typedProgram = program as ProgramWithExtraFields
@@ -127,6 +131,16 @@ export function EditProgramForm({
     React.useState<BillingType>(initialBillingType)
   const [sessionRegistrationEnabled, setSessionRegistrationEnabled] =
     React.useState(initialSessionRegistrationEnabled)
+  const [singleSessionEnabled, setSingleSessionEnabled] = React.useState(
+    registrationOptions.some(
+      (option) => option.option_type === "single_session" && option.is_active
+    )
+  )
+  const [dropInEnabled, setDropInEnabled] = React.useState(
+    registrationOptions.some(
+      (option) => option.option_type === "drop_in" && option.is_active
+    )
+  )
   const [fullProgramRegistrationEnabled, setFullProgramRegistrationEnabled] =
     React.useState(initialFullProgramRegistrationEnabled)
   const [programGender, setProgramGender] = React.useState<
@@ -286,6 +300,8 @@ export function EditProgramForm({
 
       full_program_registration_enabled: fullProgramRegistrationEnabled,
       session_registration_enabled: sessionRegistrationEnabled,
+      single_session_registration_enabled: singleSessionEnabled,
+      drop_in_registration_enabled: dropInEnabled,
 
       capacity: totalCapacity,
       enable_waitlist: formData.get("enable_waitlist") === "on",
@@ -688,6 +704,14 @@ export function EditProgramForm({
                 sessionRegistrationEnabled={sessionRegistrationEnabled}
                 onFullProgramChange={setFullProgramRegistrationEnabled}
                 onSessionChange={setSessionRegistrationEnabled}
+              />
+
+              <ProgramRegistrationOptionsEditor
+                options={registrationOptions}
+                singleSessionEnabled={singleSessionEnabled}
+                dropInEnabled={dropInEnabled}
+                onSingleSessionChange={setSingleSessionEnabled}
+                onDropInChange={setDropInEnabled}
               />
             </CardContent>
           </Card>

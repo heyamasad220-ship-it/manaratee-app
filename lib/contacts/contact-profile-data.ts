@@ -245,24 +245,18 @@ export async function fetchContactProfileData(
     })
   }
 
-  if (personId) {
-    const { data: enrollments } = await supabase
-      .from("program_enrollments")
-      .select(`
-        id,
-        enrollment_date,
-        status,
-        payment_status,
-        created_at,
-        programs:program_id (name)
-      `)
-      .eq("organization_id", orgId)
-      .eq("child_person_id", personId)
-      .order("enrollment_date", { ascending: false })
-      .limit(50)
-
-    for (const enrollment of enrollments || []) {
-      const programName = (enrollment as any).programs?.name || "Program"
+  async function appendEnrollmentActivity(
+    enrollments: Array<{
+      id: string
+      enrollment_date: string | null
+      status: string | null
+      payment_status: string | null
+      created_at: string | null
+      programs?: { name?: string } | null
+    }>
+  ) {
+    for (const enrollment of enrollments) {
+      const programName = enrollment.programs?.name || "Program"
       activity.programs.push({
         id: enrollment.id,
         module: "programs",
@@ -273,12 +267,44 @@ export async function fetchContactProfileData(
       })
       timeline.push({
         id: `enrollment-${enrollment.id}`,
-        date: enrollment.enrollment_date || enrollment.created_at,
+        date: enrollment.enrollment_date || enrollment.created_at || new Date().toISOString(),
         title: `Registered for ${programName}`,
         module: "Programs",
         status: enrollment.status || enrollment.payment_status,
       })
     }
+  }
+
+  const enrollmentSelect = `
+    id,
+    enrollment_date,
+    status,
+    payment_status,
+    created_at,
+    programs:program_id (name)
+  `
+
+  const { data: enrollmentsByContact } = await supabase
+    .from("program_enrollments")
+    .select(enrollmentSelect)
+    .eq("organization_id", orgId)
+    .eq("participant_contact_id", contactId)
+    .order("enrollment_date", { ascending: false })
+    .limit(50)
+
+  await appendEnrollmentActivity((enrollmentsByContact || []) as any[])
+
+  if (personId) {
+    const { data: enrollmentsByPerson } = await supabase
+      .from("program_enrollments")
+      .select(enrollmentSelect)
+      .eq("organization_id", orgId)
+      .eq("child_person_id", personId)
+      .is("participant_contact_id", null)
+      .order("enrollment_date", { ascending: false })
+      .limit(50)
+
+    await appendEnrollmentActivity((enrollmentsByPerson || []) as any[])
   }
 
   if (email) {
