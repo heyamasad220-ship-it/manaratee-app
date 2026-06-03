@@ -1,8 +1,10 @@
+import { getAppBaseUrl } from "@/lib/app/get-app-base-url"
+
 const DEFAULT_POST_AUTH_PATH = "/dashboard"
 
 export const SET_PASSWORD_PATH = "/auth/set-password"
 
-function resolveBaseUrl(explicitBaseUrl?: string) {
+function resolveBaseUrl(explicitBaseUrl?: string, request?: { headers: Headers }) {
   if (explicitBaseUrl) {
     return explicitBaseUrl.replace(/\/$/, "")
   }
@@ -11,12 +13,7 @@ function resolveBaseUrl(explicitBaseUrl?: string) {
     return window.location.origin
   }
 
-  return (
-    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
-    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "") ||
-    "http://localhost:3000"
-  )
+  return getAppBaseUrl(request)
 }
 
 export function authCallbackUrl(nextPath: string = DEFAULT_POST_AUTH_PATH, baseUrl?: string) {

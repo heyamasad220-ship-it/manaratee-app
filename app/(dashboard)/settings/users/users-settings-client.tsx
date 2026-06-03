@@ -50,6 +50,7 @@ import {
   UserX,
   Loader2,
 } from "lucide-react"
+import { OrganizationJoinLinkCard } from "@/components/settings/organization-join-link-card"
 
 type OrgRole = {
   id: string
@@ -100,8 +101,12 @@ function formatSystemRole(value: string | null | undefined) {
 
 export function UsersSettingsClient({
   organizationId,
+  organizationName,
+  organizationSlug,
 }: {
   organizationId: string
+  organizationName: string
+  organizationSlug: string | null
 }) {
   const supabase = createClient()
 
@@ -370,6 +375,13 @@ export function UsersSettingsClient({
                 <strong>Error:</strong> {error}
               </CardContent>
             </Card>
+          )}
+
+          {organizationSlug && (
+            <OrganizationJoinLinkCard
+              organizationName={organizationName}
+              organizationSlug={organizationSlug}
+            />
           )}
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

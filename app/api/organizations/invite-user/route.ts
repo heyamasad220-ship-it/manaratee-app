@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 import { createClient as createServerClient } from "@/lib/supabase/server"
 import { inviteAcceptRedirectUrl } from "@/lib/auth/auth-redirect"
+import { getAppBaseUrl } from "@/lib/app/get-app-base-url"
 import {
   DEFAULT_INVITED_MEMBER_SYSTEM_ROLE,
   invitedMemberSystemRoleCandidates,
@@ -18,22 +19,7 @@ function json(status: number, body: unknown) {
 }
 
 function resolveAppUrl(req: NextRequest) {
-  const fromEnv =
-    process.env.NEXT_PUBLIC_APP_URL ||
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "")
-
-  if (fromEnv) {
-    return fromEnv.replace(/\/$/, "")
-  }
-
-  const origin = req.headers.get("origin") || req.headers.get("x-forwarded-host")
-  if (origin) {
-    const host = origin.startsWith("http") ? origin : `https://${origin}`
-    return host.replace(/\/$/, "")
-  }
-
-  return "http://localhost:3000"
+  return getAppBaseUrl(req)
 }
 
 function isExistingUserError(message?: string | null) {
