@@ -86,6 +86,25 @@ interface ModuleConfig {
   organizationModuleId?: string
 }
 
+interface OrgRole {
+  id: string
+  name: string
+  description?: string | null
+}
+
+interface OrgMember {
+  membershipId: string
+  userId: string
+  name: string
+  email: string
+  systemRole: string
+  roleId: string | null
+  roleName: string
+  status: "Active" | "Inactive"
+  lastLogin: string | null
+  createdAt: string
+}
+
 const statusStyles: Record<Organization["status"], string> = {
   Active: "bg-emerald-100 text-emerald-700 hover:bg-emerald-100",
   Suspended: "bg-red-100 text-red-700 hover:bg-red-100",
@@ -131,6 +150,16 @@ export default function OrganizationsPage() {
   const [saving, setSaving] = useState(false)
   const [savingPlan, setSavingPlan] = useState(false)
   const [editingOrgId, setEditingOrgId] = useState<string | null>(null)
+
+  const [orgMembers, setOrgMembers] = useState<OrgMember[]>([])
+  const [orgRoles, setOrgRoles] = useState<OrgRole[]>([])
+  const [loadingMembers, setLoadingMembers] = useState(false)
+  const [inviteMemberOpen, setInviteMemberOpen] = useState(false)
+  const [inviteFirstName, setInviteFirstName] = useState("")
+  const [inviteLastName, setInviteLastName] = useState("")
+  const [inviteEmail, setInviteEmail] = useState("")
+  const [inviteRoleId, setInviteRoleId] = useState("")
+  const [sendingInvite, setSendingInvite] = useState(false)
 
   useEffect(() => {
     fetchOrgs()
@@ -265,6 +294,106 @@ export default function OrganizationsPage() {
     }))
 
     setOrgModules(mapped)
+    await loadOrganizationMembers(org.id)
+  }
+
+  const loadOrganizationMembers = async (organizationId: string) => {
+    setLoadingMembers(true)
+
+    try {
+      const response = await fetch(
+        `/api/platform/organizations/${organizationId}/members`
+      )
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to load organization members.")
+      }
+
+      setOrgMembers(result.members || [])
+      setOrgRoles(result.roles || [])
+
+      if (!inviteRoleId && result.roles?.length > 0) {
+        const adminRole = result.roles.find(
+          (role: OrgRole) => role.name.toLowerCase() === "admin"
+        )
+        setInviteRoleId(adminRole?.id ?? result.roles[0].id)
+      }
+    } catch (error) {
+      console.error(error)
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Failed to load organization members."
+      )
+      setOrgMembers([])
+      setOrgRoles([])
+    } finally {
+      setLoadingMembers(false)
+    }
+  }
+
+  const resetInviteMemberForm = () => {
+    setInviteFirstName("")
+    setInviteLastName("")
+    setInviteEmail("")
+
+    const adminRole = orgRoles.find((role) => role.name.toLowerCase() === "admin")
+    setInviteRoleId(adminRole?.id ?? orgRoles[0]?.id ?? "")
+  }
+
+  const handleInviteOrganizationMember = async () => {
+    if (!selectedOrg) return
+
+    const cleanEmail = inviteEmail.trim().toLowerCase()
+    if (!cleanEmail) {
+      alert("Enter an email address.")
+      return
+    }
+
+    setSendingInvite(true)
+
+    try {
+      const selectedRole = orgRoles.find((role) => role.id === inviteRoleId)
+      const response = await fetch(
+        `/api/platform/organizations/${selectedOrg.id}/members`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email: cleanEmail,
+            firstName: inviteFirstName.trim() || null,
+            lastName: inviteLastName.trim() || null,
+            roleId: inviteRoleId || null,
+            roleName: selectedRole?.name || null,
+            organizationName: selectedOrg.name,
+          }),
+        }
+      )
+
+      const result = await response.json()
+
+      if (!response.ok || !result.success) {
+        const message = [result.error, result.details, result.fix]
+          .filter(Boolean)
+          .join(" — ")
+        alert(message || "Failed to send invitation.")
+        return
+      }
+
+      alert(result.message || "Invitation email sent.")
+      resetInviteMemberForm()
+      setInviteMemberOpen(false)
+      await loadOrganizationMembers(selectedOrg.id)
+      fetchOrgs()
+    } catch (error) {
+      console.error(error)
+      alert("Unexpected error sending invitation.")
+    } finally {
+      setSendingInvite(false)
+    }
   }
 
   const saveOrganizationPlan = async () => {
@@ -390,34 +519,6 @@ export default function OrganizationsPage() {
     fetchOrgs()
   }
 
-  const inviteOrganizationAdmin = async (org: Organization) => {
-    if (!org.contactEmail) {
-      alert("This organization does not have an admin/contact email.")
-      return
-    }
-
-    const response = await fetch("/api/platform/invite-admin", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        email: org.contactEmail,
-        organizationId: org.id,
-        organizationName: org.name,
-      }),
-    })
-
-    const result = await response.json()
-
-    if (!response.ok) {
-      alert(result.error || "Failed to invite admin.")
-      return
-    }
-
-    alert(`Admin invite sent to ${org.contactEmail}`)
-  }
-
   const handleAddOrganization = async () => {
     if (!newOrgName.trim()) {
       alert("Organization name is required.")
@@ -484,17 +585,19 @@ export default function OrganizationsPage() {
         throw new Error("No organization returned from API")
       }
 
-      const inviteResponse = await fetch("/api/platform/invite-admin", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: newOrgEmail.trim(),
-          organizationId: createResult.organization.id,
-          organizationName: createResult.organization.name,
-        }),
-      })
+      const inviteResponse = await fetch(
+        `/api/platform/organizations/${createResult.organization.id}/members`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email: newOrgEmail.trim(),
+            organizationName: createResult.organization.name,
+          }),
+        }
+      )
 
       const inviteResult = await inviteResponse.json()
 
@@ -687,12 +790,6 @@ export default function OrganizationsPage() {
                               Edit
                             </DropdownMenuItem>
 
-                            <DropdownMenuItem
-                              onClick={() => inviteOrganizationAdmin(org)}
-                            >
-                              Send Admin Login Invite
-                            </DropdownMenuItem>
-
                             {org.status === "Active" && (
                               <DropdownMenuItem
                                 className="text-destructive"
@@ -869,11 +966,25 @@ export default function OrganizationsPage() {
             </TabsContent>
 
             <TabsContent value="members" className="mt-6 space-y-4">
-              <div>
-                <h3 className="font-medium">Organization Members</h3>
-                <p className="text-sm text-muted-foreground">
-                  Manage admins and members for this organization.
-                </p>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h3 className="font-medium">Organization Members</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Organization admins and staff only. Customer portal users are
+                    managed inside each organization.
+                  </p>
+                </div>
+
+                <Button
+                  className="bg-emerald-600 text-white hover:bg-emerald-700"
+                  onClick={() => {
+                    resetInviteMemberForm()
+                    setInviteMemberOpen(true)
+                  }}
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Invite User
+                </Button>
               </div>
 
               <Card>
@@ -889,42 +1000,61 @@ export default function OrganizationsPage() {
                     </TableHeader>
 
                     <TableBody>
-                      <TableRow>
-                        <TableCell className="font-medium">
-                          {selectedOrg?.name} Admin
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {selectedOrg?.contactEmail || "—"}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary" className="bg-blue-100 text-blue-700">
-                            Admin
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant="secondary"
-                            className={
-                              selectedOrg?.status === "Active"
-                                ? "bg-emerald-100 text-emerald-700"
-                                : "bg-zinc-100 text-zinc-700"
-                            }
+                      {loadingMembers ? (
+                        <TableRow>
+                          <TableCell
+                            colSpan={4}
+                            className="h-20 text-center text-muted-foreground"
                           >
-                            {selectedOrg?.status}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
+                            Loading members...
+                          </TableCell>
+                        </TableRow>
+                      ) : orgMembers.length === 0 ? (
+                        <TableRow>
+                          <TableCell
+                            colSpan={4}
+                            className="h-20 text-center text-muted-foreground"
+                          >
+                            No members yet. Invite the first user for this
+                            organization.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        orgMembers.map((member) => (
+                          <TableRow key={member.membershipId}>
+                            <TableCell className="font-medium">
+                              {member.name}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {member.email}
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant="secondary"
+                                className="bg-blue-100 text-blue-700"
+                              >
+                                {member.roleName}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant="secondary"
+                                className={
+                                  member.status === "Active"
+                                    ? "bg-emerald-100 text-emerald-700"
+                                    : "bg-zinc-100 text-zinc-700"
+                                }
+                              >
+                                {member.status}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
                     </TableBody>
                   </Table>
                 </CardContent>
               </Card>
-
-              <Button
-                className="bg-emerald-600 text-white hover:bg-emerald-700"
-                onClick={() => selectedOrg && inviteOrganizationAdmin(selectedOrg)}
-              >
-                Send Admin Login Invite
-              </Button>
             </TabsContent>
 
             <TabsContent value="modules" className="mt-6 space-y-4">
@@ -1112,6 +1242,90 @@ export default function OrganizationsPage() {
                 : editingOrgId
                 ? "Save Changes"
                 : "Create Organization + Invite Admin"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={inviteMemberOpen} onOpenChange={setInviteMemberOpen}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>Invite Organization User</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="invite-first-name">First Name</Label>
+                <Input
+                  id="invite-first-name"
+                  value={inviteFirstName}
+                  onChange={(event) => setInviteFirstName(event.target.value)}
+                  placeholder="Optional"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="invite-last-name">Last Name</Label>
+                <Input
+                  id="invite-last-name"
+                  value={inviteLastName}
+                  onChange={(event) => setInviteLastName(event.target.value)}
+                  placeholder="Optional"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="invite-email">Email</Label>
+              <Input
+                id="invite-email"
+                type="email"
+                value={inviteEmail}
+                onChange={(event) => setInviteEmail(event.target.value)}
+                placeholder="user@example.com"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="invite-role">Organization Role</Label>
+              {orgRoles.length > 0 ? (
+                <Select value={inviteRoleId} onValueChange={setInviteRoleId}>
+                  <SelectTrigger id="invite-role">
+                    <SelectValue placeholder="Select a role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {orgRoles.map((role) => (
+                      <SelectItem key={role.id} value={role.id}>
+                        {role.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No staff roles configured yet. The user will receive admin
+                  access for this organization.
+                </p>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setInviteMemberOpen(false)}
+              disabled={sendingInvite}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="bg-emerald-600 text-white hover:bg-emerald-700"
+              onClick={handleInviteOrganizationMember}
+              disabled={sendingInvite}
+            >
+              {sendingInvite ? "Sending..." : "Send Invite"}
             </Button>
           </DialogFooter>
         </DialogContent>

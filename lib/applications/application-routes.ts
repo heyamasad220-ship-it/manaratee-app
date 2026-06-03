@@ -2,14 +2,20 @@ import type { ApplicationStatus, ModuleOwner } from "@/lib/applications/applicat
 import type { ApplicationStatusTabId } from "@/lib/applications/application-status-tabs"
 
 export const PEOPLE_MANAGEMENT_APPLICATIONS_PATH = "/people-management/applications"
+export const VENDOR_HUB_APPLICATIONS_PATH = "/vendor-hub/applications"
+export const PROGRAMS_FINANCIAL_ASSISTANCE_PATH = "/programs/financial-assistance"
 
-export type PeopleManagementApplicationsPageTab = "overview" | "submissions" | "templates"
+export type ApplicationsPageTab = "overview" | "submissions" | "templates"
+export type PeopleManagementApplicationsPageTab = ApplicationsPageTab
 
-export function peopleManagementApplicationsUrl(options?: {
-  pageTab?: PeopleManagementApplicationsPageTab
-  status?: ApplicationStatusTabId | ApplicationStatus | ApplicationStatus[]
-  applicationType?: string
-}) {
+export function applicationsPageUrl(
+  basePath: string,
+  options?: {
+    pageTab?: ApplicationsPageTab
+    status?: ApplicationStatusTabId | ApplicationStatus | ApplicationStatus[]
+    applicationType?: string
+  }
+) {
   const params = new URLSearchParams()
 
   const pageTab =
@@ -30,18 +36,76 @@ export function peopleManagementApplicationsUrl(options?: {
   }
 
   const query = params.toString()
-  return query ? `${PEOPLE_MANAGEMENT_APPLICATIONS_PATH}?${query}` : PEOPLE_MANAGEMENT_APPLICATIONS_PATH
+  return query ? `${basePath}?${query}` : basePath
+}
+
+export function vendorApplicationsUrl(options?: {
+  pageTab?: ApplicationsPageTab
+  status?: ApplicationStatusTabId | ApplicationStatus | ApplicationStatus[]
+  applicationType?: string
+}) {
+  return applicationsPageUrl(VENDOR_HUB_APPLICATIONS_PATH, options)
+}
+
+export function programsFinancialAssistanceUrl(options?: {
+  pageTab?: ApplicationsPageTab
+  status?: ApplicationStatusTabId | ApplicationStatus | ApplicationStatus[]
+  applicationType?: string
+}) {
+  return applicationsPageUrl(PROGRAMS_FINANCIAL_ASSISTANCE_PATH, options)
+}
+
+export function peopleManagementApplicationsUrl(options?: {
+  pageTab?: ApplicationsPageTab
+  status?: ApplicationStatusTabId | ApplicationStatus | ApplicationStatus[]
+  applicationType?: string
+}) {
+  return applicationsPageUrl(PEOPLE_MANAGEMENT_APPLICATIONS_PATH, options)
 }
 
 export function moduleApplicationsUrl(options: {
   moduleOwner?: ModuleOwner
   applicationType?: string
+  pageTab?: ApplicationsPageTab
   status?: ApplicationStatusTabId | ApplicationStatus | ApplicationStatus[]
 }) {
   if (options.moduleOwner === "hr" || (!options.moduleOwner && !options.applicationType)) {
     return peopleManagementApplicationsUrl({
+      pageTab: options.pageTab,
       status: options.status,
       applicationType: options.applicationType,
+    })
+  }
+
+  if (options.applicationType === "vendor") {
+    return vendorApplicationsUrl({
+      pageTab: options.pageTab ?? (options.status ? "submissions" : undefined),
+      status: options.status,
+      applicationType: options.applicationType,
+    })
+  }
+
+  if (options.applicationType === "financial_aid") {
+    return programsFinancialAssistanceUrl({
+      pageTab: options.pageTab ?? (options.status ? "submissions" : undefined),
+      status: options.status,
+      applicationType: options.applicationType,
+    })
+  }
+
+  if (options.moduleOwner === "vendor_hub") {
+    return vendorApplicationsUrl({
+      pageTab: options.pageTab ?? (options.status ? "submissions" : undefined),
+      status: options.status,
+      applicationType: "vendor",
+    })
+  }
+
+  if (options.moduleOwner === "programs") {
+    return programsFinancialAssistanceUrl({
+      pageTab: options.pageTab ?? (options.status ? "submissions" : undefined),
+      status: options.status,
+      applicationType: "financial_aid",
     })
   }
 

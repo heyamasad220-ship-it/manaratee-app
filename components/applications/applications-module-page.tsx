@@ -36,7 +36,13 @@ import {
   fetchApplicationsList,
   fetchApplicationTypeDefinitions,
 } from "@/lib/applications/application-actions"
-import { peopleManagementApplicationsUrl, type PeopleManagementApplicationsPageTab } from "@/lib/applications/application-routes"
+import {
+  applicationsPageUrl,
+  peopleManagementApplicationsUrl,
+  PROGRAMS_FINANCIAL_ASSISTANCE_PATH,
+  VENDOR_HUB_APPLICATIONS_PATH,
+  type PeopleManagementApplicationsPageTab,
+} from "@/lib/applications/application-routes"
 import {
   APPLICATION_LIST_STATUS_TABS,
   dashboardCardToTabId,
@@ -105,6 +111,17 @@ function buildPageUrl(
 
   if (basePath === "/people-management/applications") {
     return peopleManagementApplicationsUrl({
+      pageTab: options.pageTab ?? "submissions",
+      status: options.statusTab,
+      applicationType: options.applicationType,
+    })
+  }
+
+  if (
+    basePath === VENDOR_HUB_APPLICATIONS_PATH ||
+    basePath === PROGRAMS_FINANCIAL_ASSISTANCE_PATH
+  ) {
+    return applicationsPageUrl(basePath, {
       pageTab: options.pageTab ?? "submissions",
       status: options.statusTab,
       applicationType: options.applicationType,

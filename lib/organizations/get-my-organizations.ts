@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
+import { normalizeCustomerOrganizations } from "@/lib/customer/customer-portal-role-label"
 
 export async function getMyOrganizations() {
   const supabase = await createClient()
@@ -10,5 +11,5 @@ export async function getMyOrganizations() {
     return []
   }
 
-  return data || []
+  return normalizeCustomerOrganizations(data || [])
 }

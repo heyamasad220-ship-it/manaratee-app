@@ -13,6 +13,8 @@ import {
 } from "lucide-react"
 
 import { ProgramRegisterSessionFields } from "@/components/customer/program-register-session-fields"
+import { ProgramRegisterQuotePreview } from "@/components/customer/program-register-quote-preview"
+import { ProgramRegisterParticipantsFields } from "@/components/customer/program-register-participants-fields"
 import { CustomerRegistrationOptionPicker } from "@/components/programs/program-registration-options-editor"
 import { createClient } from "@/lib/supabase/server"
 import { getDefaultOfferingForProgramByOrg } from "@/lib/programs/program-offering-queries"
@@ -22,6 +24,7 @@ import {
   isRegistrationOptionAvailable,
 } from "@/lib/programs/program-registration-option-queries"
 import { lookupContactsByPersonIds } from "@/lib/programs/registration-contact-resolver"
+import { getMyOrganizations } from "@/lib/organizations/get-my-organizations"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -150,57 +153,11 @@ function getRegistrationMode(program: Program) {
   return "enroll"
 }
 
-function calculateAge(dateOfBirth?: string | null) {
-  if (!dateOfBirth) return null
-
-  const today = new Date()
-  const birthDate = new Date(`${dateOfBirth}T00:00:00`)
-
-  let age = today.getFullYear() - birthDate.getFullYear()
-  const monthDiff = today.getMonth() - birthDate.getMonth()
-
-  if (
-    monthDiff < 0 ||
-    (monthDiff === 0 && today.getDate() < birthDate.getDate())
-  ) {
-    age--
-  }
-
-  return age
-}
-
-function formatRelationship(value: string) {
-  const labels: Record<string, string> = {
-    child: "Child / Grandchild",
-    guardian: "Guardian",
-    spouse: "Spouse",
-    parent: "Parent",
-    sibling: "Sibling",
-    other: "Other",
-  }
-
-  return labels[value] || value
-}
-
-function getFullName(person: Pick<FamilyMember, "first_name" | "last_name">) {
-  return `${person.first_name || ""} ${person.last_name || ""}`.trim()
-}
-
 async function getActiveCustomerOrganization() {
-  const supabase = await createClient()
   const cookieStore = await cookies()
   const activeOrganizationId = cookieStore.get("active_organization_id")?.value
 
-  const { data: organizations, error } = await supabase.rpc("get_my_organizations")
-
-  if (error) {
-    return {
-      organization: null,
-      errorMessage: error.message,
-    }
-  }
-
-  const customerOrganizations = (organizations || []) as CustomerOrganization[]
+  const customerOrganizations = (await getMyOrganizations()) as CustomerOrganization[]
 
   if (customerOrganizations.length === 0) {
     return {
@@ -468,6 +425,12 @@ export default async function CustomerProgramRegisterPage({
       "This participant does not have a linked contact record yet. Contact your organization administrator to complete contact migration before registering.",
     "invalid-session": "One or more selected sessions could not be found.",
     "invalid-lunch": "The selected lunch option could not be found.",
+    "no-fee-plan":
+      "This program does not have a fee plan configured. Contact the organization.",
+    "invalid-fee-plan":
+      "This registration option references an invalid fee plan. Contact the organization.",
+    "pricing-error":
+      "We could not calculate pricing for this registration. Please try again or contact support.",
     "invalid-option": "The selected registration option is not available.",
     "invalid-offering": "This program offering is not available.",
     "invalid-registrant": "Your registrant contact could not be verified.",
@@ -558,7 +521,7 @@ export default async function CustomerProgramRegisterPage({
                     yet.
                   </div>
                 ) : (
-                  <form action={registerForProgram} className="space-y-6">
+                  <form id="program-register-form" action={registerForProgram} className="space-y-6">
                     <input type="hidden" name="program_id" value={program.id} />
                     <input type="hidden" name="mode" value={mode} />
 
@@ -573,98 +536,26 @@ export default async function CustomerProgramRegisterPage({
                         </p>
                       </div>
                     ) : (
-                      <div className="space-y-3">
-                        <label className="text-sm font-medium">
-                          Select Participant <span className="text-red-500">*</span>
-                        </label>
-
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          {familyMembers.map((member) => {
-                            const fullName = getFullName(member)
-                            const age = calculateAge(member.date_of_birth)
-                            const disabled = !member.contactId
-
-                            return (
-                              <label
-                                key={member.personId}
-                                className={`flex items-start gap-3 rounded-lg border bg-background px-4 py-3 text-sm ${
-                                  disabled
-                                    ? "cursor-not-allowed opacity-60"
-                                    : "cursor-pointer hover:bg-muted"
-                                }`}
-                              >
-                                <input
-                                  type="radio"
-                                  name="participant_contact_id"
-                                  value={member.contactId || ""}
-                                  required={!disabled}
-                                  disabled={disabled}
-                                  className="mt-1"
-                                />
-                                <div>
-                                  <p className="font-medium">{fullName}</p>
-                                  <p className="text-xs text-muted-foreground">
-                                    {formatRelationship(member.relationship_type)}
-                                    {age !== null ? ` · Age ${age}` : ""}
-                                    {member.gender ? ` · ${member.gender}` : ""}
-                                  </p>
-                                  {disabled ? (
-                                    <p className="mt-1 text-xs text-amber-700">
-                                      Contact record missing — administrator must
-                                      link this person to a contact before
-                                      registration.
-                                    </p>
-                                  ) : null}
-                                </div>
-                              </label>
-                            )
-                          })}
-                        </div>
-                      </div>
+                      <ProgramRegisterParticipantsFields
+                        familyMembers={familyMembers}
+                        lunchOptions={lunchOptions}
+                        showAddons={mode !== "waitlist"}
+                      />
                     )}
 
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">
-                          {isAdultProgram ? "Your Name" : "Parent / Guardian Name"}
-                        </label>
+                    {isAdultProgram && mode !== "waitlist" ? (
+                      <div className="space-y-3 rounded-lg border bg-muted/20 p-4">
+                        <p className="text-sm font-medium">Registration Options</p>
                         <input
-                          name="parent_name"
-                          defaultValue={customerContact.full_name || ""}
-                          className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                          type="hidden"
+                          name="participant_contact_ids"
+                          value={customerContact.id}
                         />
-                      </div>
 
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">
-                          {isAdultProgram ? "Your Email" : "Parent / Guardian Email"}
-                        </label>
-                        <input
-                          name="parent_email"
-                          type="email"
-                          defaultValue={customerContact.email || ""}
-                          className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-                        />
-                      </div>
-
-                      <div className="space-y-2 sm:col-span-2">
-                        <label className="text-sm font-medium">
-                          {isAdultProgram ? "Your Phone" : "Parent / Guardian Phone"}
-                        </label>
-                        <input
-                          name="parent_phone"
-                          defaultValue={customerContact.phone || ""}
-                          className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-                        />
-                      </div>
-                    </div>
-
-                    {mode !== "waitlist" ? (
-                      <>
                         <div className="space-y-2">
                           <label className="text-sm font-medium">Lunch Preference</label>
                           <select
-                            name="lunch_option_id"
+                            name={`participant_${customerContact.id}_lunch_option_id`}
                             className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                             defaultValue=""
                           >
@@ -679,16 +570,22 @@ export default async function CustomerProgramRegisterPage({
 
                         <div className="grid gap-3 sm:grid-cols-2">
                           <label className="flex items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm">
-                            <input type="checkbox" name="before_care" />
+                            <input
+                              type="checkbox"
+                              name={`participant_${customerContact.id}_before_care`}
+                            />
                             Before care
                           </label>
 
                           <label className="flex items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm">
-                            <input type="checkbox" name="after_care" />
+                            <input
+                              type="checkbox"
+                              name={`participant_${customerContact.id}_after_care`}
+                            />
                             After care
                           </label>
                         </div>
-                      </>
+                      </div>
                     ) : null}
 
                     <div className="space-y-2">
@@ -706,11 +603,16 @@ export default async function CustomerProgramRegisterPage({
                       />
                     </div>
 
-                    <ProgramRegisterSessionFields
-                      sessions={sessions}
-                      formatDate={formatDate}
-                      formatMoney={formatMoney}
-                    />
+                    <ProgramRegisterSessionFields sessions={sessions} />
+
+                    {mode !== "waitlist" ? (
+                      <ProgramRegisterQuotePreview
+                        organizationId={organizationId}
+                        programId={program.id}
+                        offeringId={offering.id}
+                        formId="program-register-form"
+                      />
+                    ) : null}
 
                     <Button type="submit" className="w-full">
                       <CheckCircle2 className="mr-2 h-4 w-4" />

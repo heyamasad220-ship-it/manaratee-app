@@ -14,6 +14,7 @@ import {
 } from "lucide-react"
 
 import { OrganizationSwitcher } from "@/components/organization-switcher"
+import { formatCustomerPortalRoleLabel } from "@/lib/customer/customer-portal-role-label"
 import { cn } from "@/lib/utils"
 
 type CustomerOrganization = {
@@ -41,7 +42,9 @@ export function CustomerNav({
   organizations,
 }: CustomerNavProps) {
   const pathname = usePathname()
-  const portalRoleLabel = activeOrganization?.role_name || "Member"
+  const portalRoleLabel = formatCustomerPortalRoleLabel(
+    activeOrganization?.role_name
+  )
 
   return (
     <aside className="hidden w-[260px] shrink-0 border-r border-border bg-card lg:flex lg:flex-col">

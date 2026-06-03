@@ -20,8 +20,10 @@ If email still does not arrive, verify in Supabase Dashboard:
 * **Authentication → URL Configuration** — add these redirect URLs:
   * `https://manaratee-app.vercel.app/auth/callback`
   * `https://manaratee-app.vercel.app/auth/confirm`
+  * `https://manaratee-app.vercel.app/auth/accept` (legacy invite links)
   * `http://localhost:3000/auth/callback` (local dev)
   * `http://localhost:3000/auth/confirm` (local dev)
+  * `http://localhost:3000/auth/accept` (local dev)
 * **Authentication → Email Templates** — Invite + Reset password enabled
 * **Project Settings → API** — `SUPABASE_SERVICE_ROLE_KEY` in `.env.local`
 * Set `NEXT_PUBLIC_APP_URL=https://manaratee-app.vercel.app` in Vercel env

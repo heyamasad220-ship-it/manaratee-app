@@ -171,7 +171,7 @@ export async function promoteWaitlistAction(formData: FormData) {
   revalidatePath(`/programs/registrations/waitlist/${waitlistId}`)
 
   if (result.enrollment_id) {
-    redirect(`/programs/registrations/enrollment/${result.enrollment_id}`)
+    redirect(`/programs/registrations/${result.enrollment_id}`)
   }
 
   redirect(redirectTo)

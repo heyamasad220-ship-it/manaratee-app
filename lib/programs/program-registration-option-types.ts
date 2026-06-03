@@ -21,6 +21,7 @@ export interface ProgramRegistrationOption {
   priority_rank: number
   available_from: string | null
   available_until: string | null
+  fee_plan_id: string | null
   created_at: string
   updated_at: string
 }

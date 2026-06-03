@@ -31,12 +31,24 @@ import {
   RegistrationTypeSelector,
 } from "@/components/programs/registration-type-selector"
 import { ProgramRegistrationOptionsEditor } from "@/components/programs/program-registration-options-editor"
+import {
+  ProgramFeePlanEditor,
+  type FeePlanEditorState,
+} from "@/components/programs/program-fee-plan-editor"
 import { ProgramSessionsEditor } from "@/components/programs/program-sessions-editor"
 import type { Department } from "@/lib/departments/department-types"
 import { replaceProgramCapacityGroups } from "@/lib/programs/program-capacity-group-actions"
 import type { ProgramCapacityGroupInput } from "@/lib/programs/program-capacity-group-types"
 import { updateProgram } from "@/lib/programs/program-actions"
 import { replaceProgramFeeOptions } from "@/lib/programs/program-fee-actions"
+import { saveOfferingFeePlans } from "@/lib/programs/program-fee-plan-actions"
+import type {
+  ProgramOfferingDiscountRule,
+  ProgramOfferingFeePlan,
+  ProgramOfferingFeePlanComponent,
+} from "@/lib/programs/program-fee-plan-types"
+import type { ProgramOffering } from "@/lib/programs/program-offering-types"
+import type { InvalidFeePlanLink } from "@/lib/programs/program-fee-plan-queries"
 import type { ProgramSession } from "@/lib/programs/program-session-types"
 import type { ProgramRegistrationOption } from "@/lib/programs/program-registration-option-types"
 import type { Program } from "@/lib/programs/program-types"
@@ -105,6 +117,11 @@ export function EditProgramForm({
   capacityGroups: initialCapacityGroups,
   sessions,
   registrationOptions,
+  defaultOffering,
+  feePlans,
+  feePlanComponents,
+  feePlanDiscountRules,
+  invalidFeePlanLinks,
 }: {
   program: Program
   departments: Department[]
@@ -112,6 +129,11 @@ export function EditProgramForm({
   capacityGroups: ProgramCapacityGroupInput[]
   sessions: ProgramSession[]
   registrationOptions: ProgramRegistrationOption[]
+  defaultOffering: ProgramOffering | null
+  feePlans: ProgramOfferingFeePlan[]
+  feePlanComponents: ProgramOfferingFeePlanComponent[]
+  feePlanDiscountRules: ProgramOfferingDiscountRule[]
+  invalidFeePlanLinks: InvalidFeePlanLink[]
 }) {
   const router = useRouter()
   const typedProgram = program as ProgramWithExtraFields
@@ -206,6 +228,10 @@ export function EditProgramForm({
           },
         ]
   )
+  const feePlanStateRef = React.useRef<FeePlanEditorState | null>(null)
+  const handleFeePlanChange = React.useCallback((state: FeePlanEditorState) => {
+    feePlanStateRef.current = state
+  }, [])
 
   const showGradeFields = programType !== "adult"
 
@@ -343,6 +369,16 @@ export function EditProgramForm({
       program_id: program.id,
       fees,
     })
+
+    if (defaultOffering && feePlanStateRef.current) {
+      await saveOfferingFeePlans({
+        programId: program.id,
+        offeringId: defaultOffering.id,
+        plans: feePlanStateRef.current.plans,
+        discountRules: feePlanStateRef.current.discountRules,
+        optionFeePlanLinks: feePlanStateRef.current.optionFeePlanLinks,
+      })
+    }
 
     router.push(`/programs/${program.id}`)
     router.refresh()
@@ -715,6 +751,39 @@ export function EditProgramForm({
               />
             </CardContent>
           </Card>
+
+          {defaultOffering ? (
+            <>
+              {invalidFeePlanLinks.length > 0 ? (
+                <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+                  <p className="font-medium">Invalid fee plan links</p>
+                  <p className="mt-1 text-amber-900">
+                    The following registration options reference fee plans that
+                    are missing or inactive. Customer registration will fail until
+                    fixed.
+                  </p>
+                  <ul className="mt-2 list-disc pl-5">
+                    {invalidFeePlanLinks.map((link) => (
+                      <li key={link.optionId}>
+                        {link.optionName} ({link.optionType}) → {link.feePlanId}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
+              <ProgramFeePlanEditor
+              programId={program.id}
+              offeringId={defaultOffering.id}
+              organizationId={program.organization_id}
+              plans={feePlans}
+              components={feePlanComponents}
+              discountRules={feePlanDiscountRules}
+              registrationOptions={registrationOptions}
+              onChange={handleFeePlanChange}
+            />
+            </>
+          ) : null}
 
           {sessionRegistrationEnabled ? (
             <ProgramSessionsEditor

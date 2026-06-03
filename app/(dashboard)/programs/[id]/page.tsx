@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   Bell,
   Calendar,
+  DollarSign,
   Edit,
   GraduationCap,
   Percent,
@@ -128,12 +129,20 @@ export default async function ProgramDetailsPage({
             </p>
           </div>
           
-          <Button asChild>
-            <Link href={`/programs/${program.id}/edit`}>
-              <Edit className="mr-2 h-4 w-4" />
-              Edit Program
-            </Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" asChild>
+              <Link href={`/programs/${program.id}/billing`}>
+                <DollarSign className="mr-2 h-4 w-4" />
+                Billing Schedule
+              </Link>
+            </Button>
+            <Button asChild>
+              <Link href={`/programs/${program.id}/edit`}>
+                <Edit className="mr-2 h-4 w-4" />
+                Edit Program
+              </Link>
+            </Button>
+          </div>
           
         </div>
 

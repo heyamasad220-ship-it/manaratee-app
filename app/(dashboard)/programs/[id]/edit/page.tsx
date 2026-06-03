@@ -8,6 +8,8 @@ import { getProgramCapacityGroups } from "@/lib/programs/program-capacity-group-
 import { getProgramSessions } from "@/lib/programs/program-session-queries"
 import { getDefaultOfferingForProgram } from "@/lib/programs/program-offering-queries"
 import { getAllRegistrationOptionsForOffering } from "@/lib/programs/program-registration-option-queries"
+import { getFeePlanBundleForOffering, getInvalidFeePlanLinksForOffering } from "@/lib/programs/program-fee-plan-queries"
+import type { ProgramOffering } from "@/lib/programs/program-offering-types"
 
 import { EditProgramForm } from "./edit-program-form"
 
@@ -40,6 +42,26 @@ export default async function EditProgramPage({
   const registrationOptions = defaultOffering
     ? await getAllRegistrationOptionsForOffering(defaultOffering.id)
     : []
+  const feePlanBundle = defaultOffering
+    ? await getFeePlanBundleForOffering(defaultOffering.id, program.organization_id)
+    : { plans: [], components: [], discountRules: [] }
+  const invalidFeePlanLinks = defaultOffering
+    ? await getInvalidFeePlanLinksForOffering(
+        defaultOffering.id,
+        program.organization_id
+      )
+    : []
+
+  if (invalidFeePlanLinks.length > 0) {
+    console.warn(
+      "[program-fee-plans] Invalid fee_plan_id on registration options:",
+      invalidFeePlanLinks.map((link) => ({
+        programId: id,
+        offeringId: defaultOffering?.id,
+        ...link,
+      }))
+    )
+  }
 
   return (
     <>
@@ -51,6 +73,11 @@ export default async function EditProgramPage({
         capacityGroups={capacityGroups}
         sessions={sessions}
         registrationOptions={registrationOptions}
+        defaultOffering={defaultOffering}
+        feePlans={feePlanBundle.plans}
+        feePlanComponents={feePlanBundle.components}
+        feePlanDiscountRules={feePlanBundle.discountRules}
+        invalidFeePlanLinks={invalidFeePlanLinks}
       />
     </>
   )

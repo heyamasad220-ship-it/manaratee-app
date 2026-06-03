@@ -12,6 +12,7 @@ import {
 } from "lucide-react"
 
 import { createClient } from "@/lib/supabase/server"
+import { getMyOrganizations } from "@/lib/organizations/get-my-organizations"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -160,22 +161,10 @@ function getEnrollmentBarColor(program: Program) {
 }
 
 async function getActiveCustomerOrganization() {
-  const supabase = await createClient()
   const cookieStore = await cookies()
   const activeOrganizationId = cookieStore.get("active_organization_id")?.value
 
-  const { data: organizations, error } = await supabase.rpc(
-    "get_my_organizations"
-  )
-
-  if (error) {
-    return {
-      organization: null,
-      errorMessage: error.message,
-    }
-  }
-
-  const customerOrganizations = (organizations || []) as CustomerOrganization[]
+  const customerOrganizations = (await getMyOrganizations()) as CustomerOrganization[]
 
   if (customerOrganizations.length === 0) {
     return {

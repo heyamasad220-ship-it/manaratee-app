@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -8,11 +8,13 @@ import { Badge } from "@/components/ui/badge"
 import { Loader2, Pencil, Plus } from "lucide-react"
 import { fetchApplicationTypeDefinitions } from "@/lib/applications/application-actions"
 import {
+  buildTypeRegistry,
   getTypeIcon,
+  MODULE_OWNER_LABELS,
   type ApplicationTypeDefinition,
+  type ModuleOwner,
 } from "@/lib/applications/application-types"
-import { peopleManagementApplicationsUrl } from "@/lib/applications/application-routes"
-import { PEOPLE_MANAGEMENT_MODULE_LABEL } from "@/lib/hr/hr-module-label"
+import { applicationsPageUrl } from "@/lib/applications/application-routes"
 
 const PM_TEMPLATE_TYPE_IDS = [
   "volunteer",
@@ -22,39 +24,73 @@ const PM_TEMPLATE_TYPE_IDS = [
 ] as const
 
 export function ApplicationTemplatesPanel({
+  moduleOwner,
+  basePath,
   hubApplicationTypes,
 }: {
+  moduleOwner: ModuleOwner
+  basePath: string
   hubApplicationTypes: readonly string[]
 }) {
-  const [typeRegistry, setTypeRegistry] = useState<Record<string, ApplicationTypeDefinition>>({})
-  const [loading, setLoading] = useState(true)
+  const [typeRegistry, setTypeRegistry] = useState<Record<string, ApplicationTypeDefinition>>(() =>
+    buildTypeRegistry(null)
+  )
+  const [refreshing, setRefreshing] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const loadTypes = useCallback(async () => {
-    setLoading(true)
-    setError(null)
+  useEffect(() => {
+    let cancelled = false
 
-    try {
-      const registry = await fetchApplicationTypeDefinitions()
-      setTypeRegistry(registry)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load application templates")
-      setTypeRegistry({})
-    } finally {
-      setLoading(false)
+    async function loadTypes() {
+      setRefreshing(true)
+      setError(null)
+
+      try {
+        const registry = await Promise.race([
+          fetchApplicationTypeDefinitions(),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("Request timed out")), 10_000)
+          ),
+        ])
+
+        if (!cancelled) {
+          setTypeRegistry(registry)
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(
+            err instanceof Error ? err.message : "Failed to refresh application templates"
+          )
+        }
+      } finally {
+        if (!cancelled) {
+          setRefreshing(false)
+        }
+      }
+    }
+
+    void loadTypes()
+
+    return () => {
+      cancelled = true
     }
   }, [])
 
-  useEffect(() => {
-    void loadTypes()
-  }, [loadTypes])
-
   const templateTypes = useMemo(() => {
-    const allowed = new Set([...hubApplicationTypes, ...PM_TEMPLATE_TYPE_IDS])
+    if (moduleOwner === "hr") {
+      const allowed = new Set([...hubApplicationTypes, ...PM_TEMPLATE_TYPE_IDS])
+      return Object.values(typeRegistry)
+        .filter((type) => type.moduleOwner === "hr" && allowed.has(type.id))
+        .sort((a, b) => a.sortOrder - b.sortOrder)
+    }
+
+    const allowed = new Set(hubApplicationTypes)
     return Object.values(typeRegistry)
-      .filter((type) => type.moduleOwner === "hr" && allowed.has(type.id))
+      .filter((type) => type.moduleOwner === moduleOwner && allowed.has(type.id))
       .sort((a, b) => a.sortOrder - b.sortOrder)
-  }, [hubApplicationTypes, typeRegistry])
+  }, [hubApplicationTypes, moduleOwner, typeRegistry])
+
+  const moduleLabel = MODULE_OWNER_LABELS[moduleOwner].toLowerCase()
 
   return (
     <div className="flex flex-col gap-5">
@@ -62,34 +98,28 @@ export function ApplicationTemplatesPanel({
         <div>
           <h3 className="text-base font-semibold">Application Templates</h3>
           <p className="text-sm text-muted-foreground">
-            Define the forms, requirements, and fields for each {PEOPLE_MANAGEMENT_MODULE_LABEL.toLowerCase()}{" "}
-            application type.
+            Define the forms, requirements, and fields for each {moduleLabel} application type.
           </p>
         </div>
         <Button disabled>
           <Plus className="mr-2 h-4 w-4" />
           New Template
         </Button>
+        {refreshing && (
+          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-label="Refreshing templates" />
+        )}
       </div>
 
       {error && (
-        <Card className="border-red-200 bg-red-50">
-          <CardContent className="pt-6 text-sm text-red-700">
-            <strong>Error:</strong> {error}
+        <Card className="border-amber-200 bg-amber-50">
+          <CardContent className="pt-6 text-sm text-amber-800">
+            Showing default templates. {error}
           </CardContent>
         </Card>
       )}
 
-      {loading ? (
-        <Card>
-          <CardContent className="flex items-center justify-center gap-2 py-12 text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Loading templates...
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2">
-          {templateTypes.map((type) => {
+      <div className="grid gap-4 md:grid-cols-2">
+        {templateTypes.map((type) => {
             const TypeIcon = getTypeIcon(type.id)
             const isHubType = hubApplicationTypes.includes(type.id)
 
@@ -123,7 +153,7 @@ export function ApplicationTemplatesPanel({
                     </Button>
                     <Button variant="ghost" size="sm" asChild>
                       <Link
-                        href={peopleManagementApplicationsUrl({
+                        href={applicationsPageUrl(basePath, {
                           pageTab: "submissions",
                           applicationType: type.id,
                         })}
@@ -136,13 +166,12 @@ export function ApplicationTemplatesPanel({
               </Card>
             )
           })}
-        </div>
-      )}
+      </div>
 
-      {!loading && templateTypes.length === 0 && (
+      {templateTypes.length === 0 && (
         <Card>
           <CardContent className="py-12 text-center text-sm text-muted-foreground">
-            No application templates found for {PEOPLE_MANAGEMENT_MODULE_LABEL.toLowerCase()}.
+            No application templates found for {moduleLabel}.
           </CardContent>
         </Card>
       )}

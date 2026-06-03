@@ -13,14 +13,19 @@ type SessionOption = {
   remaining: number
 }
 
+function formatDate(date?: string | null) {
+  if (!date) return "TBD"
+  return new Date(`${date}T00:00:00`).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  })
+}
+
 export function ProgramRegisterSessionFields({
   sessions,
-  formatDate,
-  formatMoney,
 }: {
   sessions: SessionOption[]
-  formatDate: (value?: string | null) => string
-  formatMoney: (value?: number | null) => string
 }) {
   const [optionType, setOptionType] = useState<ProgramRegistrationOptionType | "">(
     ""
@@ -104,7 +109,9 @@ export function ProgramRegisterSessionFields({
               </span>
 
               <span className="text-right text-xs text-muted-foreground">
-                <span className="block">{formatMoney(session.price)}</span>
+                <span className="block text-[11px] italic">
+                  Final price shown at checkout
+                </span>
                 <span className="block text-emerald-700">
                   {session.remaining} seat{session.remaining === 1 ? "" : "s"} available
                 </span>

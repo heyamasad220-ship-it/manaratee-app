@@ -73,6 +73,7 @@ export async function createSessionAccessRows(input: {
   }
 }
 
+/** Client-side preview helper — must stay aligned with resolve_registration_session_ids (019A). */
 export async function getActiveSessionIdsForOffering(
   offeringId: string,
   organizationId: string,

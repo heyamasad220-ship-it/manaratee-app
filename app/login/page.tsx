@@ -5,7 +5,8 @@ import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Eye, EyeOff, Loader2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
-import { selectOrganization } from "@/lib/organizations/organization-actions"
+import { routeUserByRole } from "@/lib/auth/route-user"
+import { authCallbackUrl } from "@/lib/auth/auth-redirect"
 import { AuthLayout } from "@/components/customer/auth-layout"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -77,68 +78,6 @@ function LoginContent() {
     }
   }, [searchParams])
 
-  async function setSelectedOrganization(organizationId: string) {
-    await selectOrganization(organizationId)
-  }
-
-  async function routeUserByRole(userId: string) {
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("is_platform_admin")
-      .eq("id", userId)
-      .maybeSingle()
-
-    if (profileError) throw profileError
-
-    if (profile?.is_platform_admin === true) {
-      router.push("/admin/dashboard")
-      return
-    }
-
-    const { data: memberships, error: membershipError } = await supabase
-      .from("organization_members")
-      .select("organization_id, role, status")
-      .eq("user_id", userId)
-      .eq("status", "active")
-
-    if (membershipError) throw membershipError
-
-    const orgAdminMembership = memberships?.find((membership) =>
-      ["super_admin", "admin", "coordinator", "viewer"].includes(membership.role)
-    )
-
-    if (orgAdminMembership) {
-      await setSelectedOrganization(orgAdminMembership.organization_id)
-      router.refresh()
-      router.push("/dashboard")
-      return
-    }
-
-    const customerMembership = memberships?.find(
-      (membership) => membership.role === "customer"
-    )
-
-    if (customerMembership) {
-      router.push("/customer/dashboard")
-      return
-    }
-
-    const { data: customerProfile, error: customerError } = await supabase
-      .from("customer_profiles")
-      .select("organization_id")
-      .eq("id", userId)
-      .maybeSingle()
-
-    if (customerError) throw customerError
-
-    if (customerProfile?.organization_id) {
-      router.push("/customer/dashboard")
-      return
-    }
-
-    router.push("/customer/dashboard")
-  }
-
   async function handleEmailPasswordLogin() {
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
@@ -153,7 +92,7 @@ function LoginContent() {
       throw new Error("Login failed")
     }
 
-    await routeUserByRole(data.user.id)
+    await routeUserByRole(data.user.id, router)
   }
 
   async function handleSignUp() {
@@ -165,7 +104,7 @@ function LoginContent() {
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/accept?next=/dashboard`,
+        emailRedirectTo: authCallbackUrl("/dashboard"),
       },
     })
 
@@ -192,7 +131,7 @@ function LoginContent() {
       return
     }
 
-    await routeUserByRole(data.user.id)
+    await routeUserByRole(data.user.id, router)
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -221,7 +160,7 @@ function LoginContent() {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: `${window.location.origin}/auth/accept?next=/dashboard`,
+          redirectTo: authCallbackUrl("/dashboard"),
         },
       })
 

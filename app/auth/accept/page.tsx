@@ -9,6 +9,10 @@ import { AuthLayout } from "@/components/customer/auth-layout"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
 import { SET_PASSWORD_PATH } from "@/lib/auth/auth-redirect"
+import {
+  routeUserByRole,
+  shouldRouteByRoleAfterAuth,
+} from "@/lib/auth/route-user"
 
 function AuthAcceptLoading() {
   return (
@@ -35,6 +39,19 @@ function AuthAcceptContent() {
       const next = searchParams.get("next") ?? SET_PASSWORD_PATH
       const safeNext = next.startsWith("/") ? next : SET_PASSWORD_PATH
 
+      async function finishAuth() {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
+
+        if (user && shouldRouteByRoleAfterAuth(safeNext)) {
+          await routeUserByRole(user.id, router)
+          return
+        }
+
+        router.replace(safeNext)
+      }
+
       const authError = searchParams.get("error_description") ?? searchParams.get("error")
       if (authError) {
         setError(decodeURIComponent(authError.replace(/\+/g, " ")))
@@ -43,29 +60,14 @@ function AuthAcceptContent() {
 
       const code = searchParams.get("code")
       if (code) {
-        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
-        if (exchangeError) {
-          setError(exchangeError.message)
-          return
-        }
-
-        router.replace(safeNext)
+        window.location.replace(`/auth/callback?${searchParams.toString()}`)
         return
       }
 
       const tokenHash = searchParams.get("token_hash")
       const type = searchParams.get("type") as EmailOtpType | null
       if (tokenHash && type) {
-        const { error: verifyError } = await supabase.auth.verifyOtp({
-          token_hash: tokenHash,
-          type,
-        })
-        if (verifyError) {
-          setError(verifyError.message)
-          return
-        }
-
-        router.replace(safeNext)
+        window.location.replace(`/auth/confirm?${searchParams.toString()}`)
         return
       }
 
@@ -79,7 +81,7 @@ function AuthAcceptContent() {
           return
         }
 
-        router.replace(safeNext)
+        await finishAuth()
         return
       }
 
@@ -88,7 +90,7 @@ function AuthAcceptContent() {
       } = await supabase.auth.getUser()
 
       if (user) {
-        router.replace(safeNext)
+        await finishAuth()
         return
       }
 

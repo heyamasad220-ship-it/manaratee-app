@@ -1,9 +1,6 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import {
-  moduleApplicationsUrl,
-  peopleManagementApplicationsUrl,
-} from "@/lib/applications/application-routes"
+import { moduleApplicationsUrl } from "@/lib/applications/application-routes"
 import type { ModuleOwner } from "@/lib/applications/application-types"
 import { FileText } from "lucide-react"
 
@@ -16,13 +13,11 @@ export function ModuleApplicationsLink({
   moduleOwner?: ModuleOwner
   label?: string
 }) {
-  const href =
-    moduleOwner === "hr" || applicationType
-      ? peopleManagementApplicationsUrl({
-          pageTab: "submissions",
-          applicationType,
-        })
-      : moduleApplicationsUrl({ moduleOwner })
+  const href = moduleApplicationsUrl({
+    moduleOwner,
+    applicationType,
+    pageTab: "submissions",
+  })
 
   return (
     <Button variant="outline" size="sm" asChild>

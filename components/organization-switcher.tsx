@@ -1,6 +1,7 @@
 "use client"
 
 import { switchOrganizationAction } from "@/app/(customer)/actions/switch-organization"
+import { formatCustomerPortalRoleLabel } from "@/lib/customer/customer-portal-role-label"
 
 type Organization = {
   organization_id: string
@@ -29,7 +30,7 @@ export function OrganizationSwitcher({
       >
         {organizations.map((org) => (
           <option key={org.organization_id} value={org.organization_id}>
-            {org.organization_name} — {org.role_name}
+            {org.organization_name} — {formatCustomerPortalRoleLabel(org.role_name)}
           </option>
         ))}
       </select>

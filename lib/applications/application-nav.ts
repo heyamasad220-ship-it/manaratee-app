@@ -1,7 +1,8 @@
 import type { ModuleOwner } from "@/lib/applications/application-types"
 import {
-  moduleApplicationsUrl,
   PEOPLE_MANAGEMENT_APPLICATIONS_PATH,
+  PROGRAMS_FINANCIAL_ASSISTANCE_PATH,
+  VENDOR_HUB_APPLICATIONS_PATH,
 } from "@/lib/applications/application-routes"
 
 export type ApplicationNavItem = {
@@ -26,8 +27,8 @@ export function hrApplicationNavItems(): ApplicationNavItem[] {
 export function vendorApplicationNavItem(): ApplicationNavItem {
   return {
     label: "Applications",
-    href: moduleApplicationsUrl({ applicationType: "vendor" }),
-    matchPrefix: "/applications/all",
+    href: VENDOR_HUB_APPLICATIONS_PATH,
+    matchPrefix: VENDOR_HUB_APPLICATIONS_PATH,
     permissionKey: "applications.view",
   }
 }
@@ -35,8 +36,8 @@ export function vendorApplicationNavItem(): ApplicationNavItem {
 export function programsFinancialAssistanceNavItem(): ApplicationNavItem {
   return {
     label: "Financial Assistance",
-    href: moduleApplicationsUrl({ applicationType: "financial_aid" }),
-    matchPrefix: "/applications/all",
+    href: PROGRAMS_FINANCIAL_ASSISTANCE_PATH,
+    matchPrefix: PROGRAMS_FINANCIAL_ASSISTANCE_PATH,
     permissionKey: "applications.view",
   }
 }

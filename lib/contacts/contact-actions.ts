@@ -93,6 +93,78 @@ export async function findOrCreateContact(input: FindOrCreateContactInput) {
   return { contactId: newContact.id, created: true }
 }
 
+export async function ensureContactForPerson(input: {
+  organizationId: string
+  personId: string
+  roles?: ContactRoleValue[]
+}) {
+  const supabase = await createClient()
+  const organizationId = input.organizationId.trim()
+  const personId = input.personId.trim()
+  const roles = sanitizeRoleInput(input.roles?.length ? input.roles : ["member"])
+
+  if (!organizationId || !personId) {
+    throw new Error("Organization and person are required.")
+  }
+
+  const { data: person, error: personError } = await supabase
+    .from("people")
+    .select("id, first_name, last_name, email, phone")
+    .eq("id", personId)
+    .eq("organization_id", organizationId)
+    .single()
+
+  if (personError || !person) {
+    throw new Error(personError?.message || "Person not found.")
+  }
+
+  const fullName =
+    `${person.first_name ?? ""} ${person.last_name ?? ""}`.trim() || "Family Member"
+
+  const { data: linkedContact, error: linkedContactError } = await supabase
+    .from("contacts")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("person_id", personId)
+    .maybeSingle()
+
+  if (linkedContactError) {
+    throw new Error(linkedContactError.message || "Could not check existing contact.")
+  }
+
+  let contactId = linkedContact?.id as string | undefined
+  let created = false
+
+  if (!contactId) {
+    const { data: newContact, error: contactError } = await supabase
+      .from("contacts")
+      .insert({
+        organization_id: organizationId,
+        full_name: fullName,
+        person_id: personId,
+        email: person.email || null,
+        phone: person.phone || null,
+        contact_type: "individual",
+        status: "active",
+      })
+      .select("id")
+      .single()
+
+    if (contactError || !newContact) {
+      throw new Error(contactError?.message || "Could not create contact for family member.")
+    }
+
+    contactId = newContact.id as string
+    created = true
+  }
+
+  for (const role of roles) {
+    await ensureRoleRow(organizationId, contactId, role)
+  }
+
+  return { contactId, created }
+}
+
 async function ensureRoleRow(
   organizationId: string,
   contactId: string,

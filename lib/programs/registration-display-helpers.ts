@@ -47,3 +47,22 @@ export function contactLabel(
   if (contact?.email) return contact.email
   return fallback || "Not linked"
 }
+
+const TERMINAL_ENROLLMENT_STATUSES = new Set([
+  "cancelled",
+  "canceled",
+  "withdrawn",
+  "transferred",
+  "expired",
+])
+
+/** Enrollment statuses where payment tracking is no longer meaningful in the UI. */
+export function isTerminalEnrollmentStatus(status: string | null | undefined) {
+  return TERMINAL_ENROLLMENT_STATUSES.has((status || "").toLowerCase())
+}
+
+export function shouldShowEnrollmentPaymentStatus(
+  enrollmentStatus: string | null | undefined
+) {
+  return !isTerminalEnrollmentStatus(enrollmentStatus)
+}

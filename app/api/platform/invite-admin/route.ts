@@ -1,10 +1,29 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+
+import {
+  inviteOrganizationMember,
+  resolveAppUrlFromRequest,
+} from "@/lib/organizations/invite-organization-member"
+import { requirePlatformAdmin } from "@/lib/platform/require-platform-admin"
 
 export async function POST(request: Request) {
   try {
+    const auth = await requirePlatformAdmin()
+    if (!auth.ok) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status })
+    }
+
     const body = await request.json()
-    const { email, organizationId, organizationName } = body
+    const email = String(body.email || "")
+      .trim()
+      .toLowerCase()
+    const organizationId = String(body.organizationId || "").trim()
+    const organizationName = body.organizationName
+      ? String(body.organizationName).trim()
+      : null
+    const roleId = body.roleId ? String(body.roleId).trim() : null
+    const firstName = body.firstName ? String(body.firstName).trim() : ""
+    const lastName = body.lastName ? String(body.lastName).trim() : ""
 
     if (!email) {
       return NextResponse.json(
@@ -13,45 +32,47 @@ export async function POST(request: Request) {
       )
     }
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-    if (!supabaseUrl || !serviceRoleKey) {
+    if (!organizationId) {
       return NextResponse.json(
-        { error: "Missing Supabase server environment variables." },
-        { status: 500 }
+        { error: "Organization ID is required." },
+        { status: 400 }
       )
     }
 
-    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
+    const result = await inviteOrganizationMember(auth.context.admin, {
+      email,
+      organizationId,
+      roleId,
+      firstName,
+      lastName,
+      organizationName,
+      inviterSystemRole: "admin",
+      staffOnly: true,
+      appUrl: resolveAppUrlFromRequest(request),
     })
 
-    const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(
-      email,
-      {
-        data: {
-          role: "org_admin",
-          organization_id: organizationId,
-          organization_name: organizationName,
+    if (!result.success) {
+      return NextResponse.json(
+        {
+          error: result.error,
+          details: result.details,
+          fix: result.fix,
         },
-      }
-    )
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 })
+        { status: result.status }
+      )
     }
 
     return NextResponse.json({
       success: true,
-      user: data.user,
+      message: result.message,
+      user: result.user,
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { error: error?.message || "Failed to invite admin." },
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to invite admin.",
+      },
       { status: 500 }
     )
   }

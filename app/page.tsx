@@ -10,14 +10,20 @@ export default async function Home({
   const tokenHash = typeof params.token_hash === "string" ? params.token_hash : null
   const type = typeof params.type === "string" ? params.type : null
 
-  if (code || tokenHash) {
-    const acceptParams = new URLSearchParams()
-    if (code) acceptParams.set("code", code)
-    if (tokenHash) acceptParams.set("token_hash", tokenHash)
-    if (type) acceptParams.set("type", type)
-    acceptParams.set("next", "/auth/set-password")
-    redirect(`/auth/accept?${acceptParams.toString()}`)
+  if (code) {
+    const callbackParams = new URLSearchParams()
+    callbackParams.set("code", code)
+    callbackParams.set("next", "/auth/set-password")
+    redirect(`/auth/callback?${callbackParams.toString()}`)
   }
 
-  redirect("/dashboard")
+  if (tokenHash && type) {
+    const confirmParams = new URLSearchParams()
+    confirmParams.set("token_hash", tokenHash)
+    confirmParams.set("type", type)
+    confirmParams.set("next", "/auth/set-password")
+    redirect(`/auth/confirm?${confirmParams.toString()}`)
+  }
+
+  redirect("/login")
 }

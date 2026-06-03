@@ -4,13 +4,13 @@ import {
   Clock,
   DollarSign,
   Download,
-  Eye,
   Search,
   Users,
   UserPlus,
 } from "lucide-react"
 
 import { Header } from "@/components/layout/header"
+import { RegistrationRowActions } from "@/components/programs/registration-row-actions"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -29,7 +29,9 @@ import { getPrograms } from "@/lib/programs/program-queries"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import {
   contactLabel,
+  isTerminalEnrollmentStatus,
   loadContactsByIds,
+  shouldShowEnrollmentPaymentStatus,
 } from "@/lib/programs/registration-display-helpers"
 
 type PageSearchParams = {
@@ -373,7 +375,9 @@ export default async function ProgramsRegistrationsPage({
     matchesFilters(row, filters)
   )
 
-  const totalRegistrations = enrollments.length
+  const activeEnrollmentCount = enrollments.filter(
+    (row) => !isTerminalEnrollmentStatus(row.status)
+  ).length
   const totalWaitlist = waitlist.length
   const thisMonthRegistrations = registrationRows.filter((row) =>
     isThisMonth(row.registered_date)
@@ -406,8 +410,8 @@ export default async function ProgramsRegistrationsPage({
 
   const stats = [
     {
-      label: "Enrollments",
-      value: String(totalRegistrations),
+      label: "Active Enrollment",
+      value: String(activeEnrollmentCount),
       icon: Users,
       color: "text-blue-600",
     },
@@ -585,7 +589,7 @@ export default async function ProgramsRegistrationsPage({
                     <TableHead>Payment</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="w-[90px]">Type</TableHead>
-                    <TableHead className="w-[90px]" />
+                    <TableHead className="w-[90px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
 
@@ -625,16 +629,7 @@ export default async function ProgramsRegistrationsPage({
                       </TableCell>
 
                       <TableCell>
-                        {row.program_id ? (
-                          <Link
-                            href={`/programs/${row.program_id}`}
-                            className="text-primary hover:underline"
-                          >
-                            {row.program_name}
-                          </Link>
-                        ) : (
-                          <span>{row.program_name}</span>
-                        )}
+                        <span>{row.program_name}</span>
                       </TableCell>
 
                       <TableCell className="text-muted-foreground">
@@ -648,7 +643,8 @@ export default async function ProgramsRegistrationsPage({
                       </TableCell>
 
                       <TableCell>
-                        {row.type === "waitlist" ? (
+                        {row.type === "waitlist" ||
+                        !shouldShowEnrollmentPaymentStatus(row.status) ? (
                           <Badge variant="secondary">N/A</Badge>
                         ) : (
                           <Badge
@@ -678,13 +674,11 @@ export default async function ProgramsRegistrationsPage({
                       </TableCell>
 
                       <TableCell>
-                        {row.program_id ? (
-                          <Button variant="ghost" size="icon" asChild>
-                            <Link href={`/programs/${row.program_id}`}>
-                              <Eye className="h-4 w-4" />
-                            </Link>
-                          </Button>
-                        ) : null}
+                        <RegistrationRowActions
+                          registrationId={row.id}
+                          recordType={row.type}
+                          programId={row.program_id}
+                        />
                       </TableCell>
                     </TableRow>
                   ))}

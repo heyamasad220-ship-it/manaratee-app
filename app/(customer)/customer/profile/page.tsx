@@ -29,6 +29,10 @@ import {
   Briefcase,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import {
+  addCustomerFamilyMember,
+  removeCustomerFamilyMember,
+} from "@/lib/customer/customer-family-actions"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -435,66 +439,98 @@ export default function CustomerProfilePage() {
   }
 
   async function handleAddFamilyMember() {
-    if (!organizationId || !personId) {
-      alert("Missing customer profile connection. Please refresh and try again.")
+    if (!organizationId) {
+      alert("Missing organization context. Please refresh and try again.")
       return
     }
 
-    const { data: createdPerson, error: personError } = await supabase
-      .from("people")
-      .insert({
-        organization_id: organizationId,
-        first_name: newFamilyMember.firstName,
-        last_name: newFamilyMember.lastName,
+    setSaving(true)
+
+    try {
+      const activeParentPersonId = personId || (await refreshParentPersonId())
+
+      if (!activeParentPersonId) {
+        throw new Error(
+          "Your profile is not fully linked yet. Save your profile and try again."
+        )
+      }
+
+      await addCustomerFamilyMember({
+        organizationId,
+        parentPersonId: activeParentPersonId,
+        firstName: newFamilyMember.firstName,
+        lastName: newFamilyMember.lastName,
         gender: newFamilyMember.gender || null,
-        date_of_birth: newFamilyMember.dateOfBirth || null,
-        person_type: "participant",
-      })
-      .select("id")
-      .single()
-
-    if (personError || !createdPerson) {
-      console.error("Family member create error:", personError)
-      alert(personError?.message || "Could not create family member.")
-      return
-    }
-
-    const { error: relationshipError } = await supabase
-      .from("person_relationships")
-      .insert({
-        organization_id: organizationId,
-        person_id: personId,
-        related_person_id: createdPerson.id,
-        relationship_type: newFamilyMember.relationship,
+        dateOfBirth: newFamilyMember.dateOfBirth || null,
+        relationship: newFamilyMember.relationship,
       })
 
-    if (relationshipError) {
-      console.error("Family relationship create error:", relationshipError)
-      alert(relationshipError.message)
-      return
+      setNewFamilyMember({
+        firstName: "",
+        lastName: "",
+        gender: "",
+        dateOfBirth: "",
+        relationship: "",
+      })
+      setIsAddFamilyDialogOpen(false)
+
+      const refreshedParentPersonId =
+        (await refreshParentPersonId()) || activeParentPersonId
+      await loadFamilyMembers(refreshedParentPersonId)
+    } catch (error) {
+      console.error("Family member create error:", error)
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Could not create family member."
+      )
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function refreshParentPersonId() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user || !organizationId) {
+      return null
     }
 
-    setNewFamilyMember({ firstName: "", lastName: "", gender: "", dateOfBirth: "", relationship: "" })
-    setIsAddFamilyDialogOpen(false)
-    await loadFamilyMembers(personId)
+    const { data } = await supabase
+      .from("contacts")
+      .select("person_id")
+      .eq("auth_user_id", user.id)
+      .eq("organization_id", organizationId)
+      .maybeSingle()
+
+    const nextPersonId = (data?.person_id as string | null) ?? null
+    if (nextPersonId) {
+      setPersonId(nextPersonId)
+    }
+
+    return nextPersonId
   }
 
   async function handleRemoveFamilyMember(id: string) {
-    if (!personId) return
+    if (!personId || !organizationId) return
 
-    const { error } = await supabase
-      .from("person_relationships")
-      .delete()
-      .eq("person_id", personId)
-      .eq("related_person_id", id)
-
-    if (error) {
+    try {
+      await removeCustomerFamilyMember({
+        organizationId,
+        parentPersonId: personId,
+        relatedPersonId: id,
+      })
+      await loadFamilyMembers(personId)
+    } catch (error) {
       console.error("Family member remove error:", error)
-      alert(error.message)
-      return
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Could not remove family member."
+      )
     }
-
-    await loadFamilyMembers(personId)
   }
 
   function detectCardType(cardNumber: string): "visa" | "mastercard" | "amex" | "discover" {

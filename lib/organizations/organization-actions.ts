@@ -64,3 +64,41 @@ export async function selectOrganization(organizationId: string) {
 
   return { success: true }
 }
+
+/** Customer portal org selection — validates via get_my_organizations (includes contact links). */
+export async function setActiveOrganization(organizationId: string) {
+  const trimmedId = organizationId?.trim()
+
+  if (!trimmedId) {
+    throw new Error("Organization ID is required")
+  }
+
+  const supabase = await createClient()
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser()
+
+  if (userError || !user) {
+    throw new Error("Not authenticated")
+  }
+
+  const { data: organizations, error } = await supabase.rpc("get_my_organizations")
+
+  if (error) {
+    throw new Error(error.message || "Could not verify organization access")
+  }
+
+  const allowed = (organizations || []).some(
+    (org: { organization_id: string }) => org.organization_id === trimmedId
+  )
+
+  if (!allowed) {
+    throw new Error("You do not have access to this organization")
+  }
+
+  const cookieStore = await cookies()
+  cookieStore.set("active_organization_id", trimmedId, cookieOptions)
+
+  return { success: true }
+}

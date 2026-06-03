@@ -11,6 +11,7 @@ function resolveApplicationsRedirect(
   if (params.application_type === "vendor" || params.application_type === "financial_aid") {
     return moduleApplicationsUrl({
       applicationType: params.application_type,
+      pageTab: "submissions",
       status,
     })
   }
@@ -18,11 +19,13 @@ function resolveApplicationsRedirect(
   if (params.module_owner && params.module_owner !== "hr") {
     return moduleApplicationsUrl({
       moduleOwner: params.module_owner as "vendor_hub" | "programs",
+      pageTab: "submissions",
       status,
     })
   }
 
   return peopleManagementApplicationsUrl({
+    pageTab: "submissions",
     status,
     applicationType: params.application_type,
   })

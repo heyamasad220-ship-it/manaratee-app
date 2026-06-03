@@ -1,4 +1,5 @@
 export type EnrollmentStatus =
+  | "pending_payment"
   | "pending"
   | "enrolled"
   | "active"
@@ -6,6 +7,7 @@ export type EnrollmentStatus =
   | "cancelled"
   | "withdrawn"
   | "transferred"
+  | "expired"
 
 export type WaitlistStatus =
   | "waiting"
@@ -29,6 +31,7 @@ export const FORWARD_ENROLLMENT_TRANSITIONS: Record<
   EnrollmentStatus,
   EnrollmentStatus[]
 > = {
+  pending_payment: ["enrolled"],
   pending: ["enrolled"],
   enrolled: ["active"],
   active: ["completed"],
@@ -36,6 +39,7 @@ export const FORWARD_ENROLLMENT_TRANSITIONS: Record<
   cancelled: [],
   withdrawn: [],
   transferred: [],
+  expired: [],
 }
 
 function normalizeStatus(value: string | null | undefined) {
@@ -51,7 +55,9 @@ export function nextForwardEnrollmentStatus(
 }
 
 export function canCancelEnrollmentStatus(status: string | null | undefined) {
-  return ["pending", "enrolled", "active"].includes(normalizeStatus(status))
+  return ["pending_payment", "pending", "enrolled", "active"].includes(
+    normalizeStatus(status)
+  )
 }
 
 export function canPromoteWaitlist(

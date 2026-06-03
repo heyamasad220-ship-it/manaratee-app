@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { createClient as createServerClient } from "@/lib/supabase/server"
+import { isOrgStaffSystemRole } from "@/lib/organizations/organization-member-constants"
+import {
+  getPlatformAdminUserIds,
+  isPlatformAdminUserId,
+} from "@/lib/platform/platform-admin-users"
 
 export async function GET() {
   try {
@@ -53,7 +58,7 @@ export async function GET() {
     name,
     monthly_price
   ),
-  organization_members ( id )
+  organization_members ( id, role, user_id )
 `)
       .order("created_at", { ascending: false })
 
@@ -61,9 +66,16 @@ export async function GET() {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
+    const platformAdminUserIds = await getPlatformAdminUserIds(admin)
+
     const formatted = (organizations || []).map((org: any) => ({
   ...org,
-  members: org.organization_members?.length || 0,
+  members:
+    org.organization_members?.filter(
+      (member: { role?: string | null; user_id?: string | null }) =>
+        isOrgStaffSystemRole(member.role) &&
+        !isPlatformAdminUserId(member.user_id as string, platformAdminUserIds)
+    ).length || 0,
   plan_id: org.plan_id || null,
   plan_name: org.plans?.name || null,
   mrr: Number(org.plans?.monthly_price || 0),
