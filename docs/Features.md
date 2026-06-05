@@ -149,14 +149,34 @@ Possible causes:
 
 Status: Active Development
 
+## Staff setup UI (June 2026)
+
+**Doc:** [programs-staff-setup-ui.md](./programs-staff-setup-ui.md)
+
+Completed:
+
+* **Quick Create** (`/programs/create`) — basics only; redirects to edit after save
+* **Edit Program** (`/programs/[id]/edit`) — tabbed full setup (Basics, Enrollment, Registration, Pricing, Sessions, Financial Assistance)
+* Shared section components in `components/programs/edit/`
+* `saveEditProgram` wrapper for edit save (returns errors instead of throwing)
+* Legacy Billing / Program Fees cards removed from edit form; fee plans are SSOT on Pricing tab
+* Capacity group gender/grade rules (Male/Female parallel pools)
+
+Quick Create collects: name, type, department, description, dates, eligibility, capacity, visibility, draft/active.
+
+Edit Program completes: registration options, fee plans, sessions, waitlist, financial assistance.
+
+---
+
 ## Programs
 
 Completed:
 
 * Program CRUD
 * Departments
-* Eligibility fields
-* Registration types
+* Eligibility fields (min/max age, grade levels, gender)
+* Registration types (Edit Program → Registration tab)
+* Visibility on create + edit
 
 ---
 

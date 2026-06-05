@@ -454,7 +454,7 @@ export function ApplicationsModulePage({
             ))}
           </div>
 
-          {section === "overview" && typeOptions.length > 0 && (
+          {(section === "overview" || section === "all") && typeOptions.length > 0 && (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {typeOptions.map((type) => {
                 const TypeIcon = getTypeIcon(type.id)

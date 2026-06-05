@@ -4,6 +4,7 @@ import {
   Clock,
   DollarSign,
   Download,
+  Printer,
   Search,
   Users,
   UserPlus,
@@ -456,10 +457,20 @@ export default async function ProgramsRegistrationsPage({
             </p>
           </div>
 
-          <Button variant="outline" disabled>
-            <Download className="mr-2 h-4 w-4" />
-            Export Coming Soon
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {filters.program && filters.program !== "all" ? (
+              <Button variant="outline" asChild>
+                <Link href={`/programs/${filters.program}/car-tags`}>
+                  <Printer className="mr-2 h-4 w-4" />
+                  Print Car Tags
+                </Link>
+              </Button>
+            ) : null}
+            <Button variant="outline" disabled>
+              <Download className="mr-2 h-4 w-4" />
+              Export Coming Soon
+            </Button>
+          </div>
         </div>
 
         <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">

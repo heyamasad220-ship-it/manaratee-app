@@ -7,6 +7,10 @@ import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-orga
 
 import type { ProgramCapacityGroupInput } from "./program-capacity-group-types"
 import { getTotalCapacityFromGroups } from "./program-capacity-group-types"
+import {
+  getPersistableCapacityGroups,
+  normalizeCapacityGroups,
+} from "./program-capacity-group-utils"
 
 export async function replaceProgramCapacityGroups({
   program_id,
@@ -22,21 +26,15 @@ export async function replaceProgramCapacityGroups({
     throw new Error("No organization selected")
   }
 
-  const cleanGroups = groups
-    .map((group, index) => ({
-      organization_id: organizationId,
-      program_id,
-      name: group.name.trim() || `Group ${index + 1}`,
-      grade_levels: group.grade_levels || [],
-      genders: group.genders || [],
-      capacity: Number(group.capacity || 0),
-      sort_order: index,
-    }))
-    .filter(
-      (group) =>
-        (group.grade_levels.length > 0 || group.genders.length > 0) &&
-        group.capacity >= 0
-    )
+  const cleanGroups = getPersistableCapacityGroups(groups).map((group, index) => ({
+    organization_id: organizationId,
+    program_id,
+    name: group.name.trim(),
+    grade_levels: group.grade_levels,
+    genders: group.genders,
+    capacity: group.capacity,
+    sort_order: index,
+  }))
 
   const { error: deleteError } = await supabase
     .from("program_capacity_groups")
@@ -73,7 +71,24 @@ export async function replaceProgramCapacityGroups({
     throw new Error(programError.message)
   }
 
+  const { data: savedGroups, error: fetchError } = await supabase
+    .from("program_capacity_groups")
+    .select("*")
+    .eq("program_id", program_id)
+    .eq("organization_id", organizationId)
+    .order("sort_order", { ascending: true })
+    .order("name", { ascending: true })
+
+  if (fetchError) {
+    throw new Error(fetchError.message)
+  }
+
   revalidatePath("/programs")
+  revalidatePath("/programs/catalog")
   revalidatePath(`/programs/${program_id}`)
   revalidatePath(`/programs/${program_id}/edit`)
+  revalidatePath(`/customer/programs/${program_id}`)
+  revalidatePath(`/customer/programs/${program_id}/register`)
+
+  return normalizeCapacityGroups(savedGroups || [])
 }

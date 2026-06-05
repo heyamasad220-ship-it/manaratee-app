@@ -5,6 +5,14 @@ import { CheckCircle2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { ProgramRegistrationOption } from "@/lib/programs/program-registration-option-types"
 import { REGISTRATION_OPTION_LABELS } from "@/lib/programs/program-registration-option-types"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 
 const OPTION_DESCRIPTIONS: Record<string, string> = {
   full_program:
@@ -33,40 +41,51 @@ export function ProgramRegistrationOptionsEditor({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-md border bg-muted/30 p-4 text-sm text-muted-foreground">
-        Registration options are saved to the default offering for this program.
-        Full program and selected sessions follow the toggles above. Enable
-        optional single-session or drop-in choices below.
-      </div>
-
       {coreOptions.length > 0 ? (
         <div className="space-y-2">
-          <p className="text-sm font-medium">Active registration options</p>
-          <ul className="space-y-2">
-            {coreOptions.map((option) => (
-              <li
-                key={option.id}
-                className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"
-              >
-                <span>
-                  {option.name || REGISTRATION_OPTION_LABELS[option.option_type]}
-                </span>
-                <span
-                  className={cn(
-                    "text-xs font-medium",
-                    option.is_active ? "text-emerald-700" : "text-muted-foreground"
-                  )}
-                >
-                  {option.is_active ? "Active" : "Inactive"}
-                </span>
-              </li>
-            ))}
-          </ul>
+          <p className="text-sm font-medium">Core options</p>
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Registration Option</TableHead>
+                  <TableHead className="w-[120px]">Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {coreOptions.map((option) => (
+                  <TableRow key={option.id}>
+                    <TableCell>
+                      <p className="font-medium">
+                        {option.name ||
+                          REGISTRATION_OPTION_LABELS[option.option_type]}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {OPTION_DESCRIPTIONS[option.option_type]}
+                      </p>
+                    </TableCell>
+                    <TableCell>
+                      <span
+                        className={cn(
+                          "text-xs font-medium",
+                          option.is_active
+                            ? "text-emerald-700"
+                            : "text-muted-foreground"
+                        )}
+                      >
+                        {option.is_active ? "Active" : "Inactive"}
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </div>
       ) : null}
 
       <div className="grid gap-3 md:grid-cols-2">
-        <label className="flex cursor-pointer items-start gap-3 rounded-lg border p-4">
+        <label className="flex cursor-pointer items-start gap-3 rounded-lg border p-3">
           <input
             type="checkbox"
             checked={singleSessionEnabled}
@@ -74,14 +93,14 @@ export function ProgramRegistrationOptionsEditor({
             className="mt-1"
           />
           <span>
-            <span className="block font-medium">Single Session</span>
-            <span className="text-sm text-muted-foreground">
+            <span className="block text-sm font-medium">Single Session</span>
+            <span className="text-xs text-muted-foreground">
               {OPTION_DESCRIPTIONS.single_session}
             </span>
           </span>
         </label>
 
-        <label className="flex cursor-pointer items-start gap-3 rounded-lg border p-4">
+        <label className="flex cursor-pointer items-start gap-3 rounded-lg border p-3">
           <input
             type="checkbox"
             checked={dropInEnabled}
@@ -89,8 +108,8 @@ export function ProgramRegistrationOptionsEditor({
             className="mt-1"
           />
           <span>
-            <span className="block font-medium">Drop-In</span>
-            <span className="text-sm text-muted-foreground">
+            <span className="block text-sm font-medium">Drop-In</span>
+            <span className="text-xs text-muted-foreground">
               {OPTION_DESCRIPTIONS.drop_in}
             </span>
           </span>

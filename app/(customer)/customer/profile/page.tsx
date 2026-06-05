@@ -37,6 +37,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
+import { BirthDateInput } from "@/components/ui/birth-date-input"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -688,7 +689,7 @@ export default function CustomerProfilePage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-2">
               <Label className="text-sm text-muted-foreground">Date of Birth</Label>
-              {isEditing ? <Input type="date" value={editData.dateOfBirth} onChange={(e) => handleChange("dateOfBirth", e.target.value)} className="h-9" /> : <span className="text-sm font-medium text-foreground">{safeDate(profile.dateOfBirth)}</span>}
+              {isEditing ? <BirthDateInput id="profile-dob" value={editData.dateOfBirth} onChange={(value) => handleChange("dateOfBirth", value)} className="h-9" /> : <span className="text-sm font-medium text-foreground">{safeDate(profile.dateOfBirth)}</span>}
             </div>
             <div className="flex flex-col gap-2">
               <Label className="text-sm text-muted-foreground">Gender</Label>
@@ -823,7 +824,7 @@ export default function CustomerProfilePage() {
               <div className="flex flex-col gap-2"><Label htmlFor="fm-firstName">First Name</Label><Input id="fm-firstName" value={newFamilyMember.firstName} onChange={(e) => setNewFamilyMember((prev) => ({ ...prev, firstName: e.target.value }))} placeholder="First name" /></div>
               <div className="flex flex-col gap-2"><Label htmlFor="fm-lastName">Last Name</Label><Input id="fm-lastName" value={newFamilyMember.lastName} onChange={(e) => setNewFamilyMember((prev) => ({ ...prev, lastName: e.target.value }))} placeholder="Last name" /></div>
             </div>
-            <div className="flex flex-col gap-2"><Label htmlFor="fm-dob">Date of Birth</Label><Input id="fm-dob" type="date" value={newFamilyMember.dateOfBirth} onChange={(e) => setNewFamilyMember((prev) => ({ ...prev, dateOfBirth: e.target.value }))} /></div>
+            <div className="flex flex-col gap-2"><Label htmlFor="fm-dob">Date of Birth</Label><BirthDateInput id="fm-dob" value={newFamilyMember.dateOfBirth} onChange={(dateOfBirth) => setNewFamilyMember((prev) => ({ ...prev, dateOfBirth }))} /></div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-2"><Label htmlFor="fm-gender">Gender</Label><Select value={newFamilyMember.gender} onValueChange={(val) => setNewFamilyMember((prev) => ({ ...prev, gender: val }))}><SelectTrigger id="fm-gender"><SelectValue placeholder="Select gender" /></SelectTrigger><SelectContent><SelectItem value="Male">Male</SelectItem><SelectItem value="Female">Female</SelectItem><SelectItem value="Non-binary">Non-binary</SelectItem><SelectItem value="Prefer not to say">Prefer not to say</SelectItem></SelectContent></Select></div>
               <div className="flex flex-col gap-2"><Label htmlFor="fm-relationship">Relationship</Label><Select value={newFamilyMember.relationship} onValueChange={(val) => setNewFamilyMember((prev) => ({ ...prev, relationship: val }))}><SelectTrigger id="fm-relationship"><SelectValue placeholder="Select relationship" /></SelectTrigger><SelectContent><SelectItem value="child">Child / Grandchild</SelectItem><SelectItem value="guardian">Guardian</SelectItem><SelectItem value="spouse">Spouse</SelectItem><SelectItem value="parent">Parent</SelectItem><SelectItem value="sibling">Sibling</SelectItem><SelectItem value="other">Other</SelectItem></SelectContent></Select></div>

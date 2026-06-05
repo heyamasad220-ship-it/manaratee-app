@@ -1,3 +1,5 @@
+import type { CustomerOrganization } from "@/lib/customer/customer-organization-types"
+
 /** Customer portal display label for organization access (not staff system roles). */
 export function formatCustomerPortalRoleLabel(
   roleName: string | null | undefined
@@ -18,9 +20,9 @@ export function formatCustomerPortalRoleLabel(
   return roleName.trim()
 }
 
-export function normalizeCustomerOrganizations<
-  T extends { role_name?: string | null },
->(organizations: T[]): T[] {
+export function normalizeCustomerOrganizations(
+  organizations: CustomerOrganization[]
+): CustomerOrganization[] {
   return organizations.map((organization) => ({
     ...organization,
     role_name: formatCustomerPortalRoleLabel(organization.role_name),

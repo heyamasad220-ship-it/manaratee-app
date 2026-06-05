@@ -241,7 +241,7 @@ const orgId = profile.organization_id
   if (isLoading || !org) {
     return (
       <>
-        <Header title="Org Admin" />
+        <Header title="Dashboard" />
         <div className="p-6">Loading organization...</div>
       </>
     )
@@ -249,7 +249,7 @@ const orgId = profile.organization_id
 
   return (
     <>
-      <Header title="Org Admin" />
+      <Header title="Dashboard" />
 
       <div className="p-6">
         <div className="flex flex-col gap-6">

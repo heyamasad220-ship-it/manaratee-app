@@ -25,22 +25,22 @@ export function CustomersPageTabs() {
   return (
     <Tabs defaultValue="all-customers" className="flex flex-1 flex-col">
       <div className="border-b border-border px-6">
-        <TabsList className="h-10 bg-transparent p-0 rounded-none gap-0">
+        <TabsList className="h-10 w-fit rounded-none border-0 bg-transparent p-0">
           <TabsTrigger
             value="all-customers"
-            className="rounded-none border-b-2 border-transparent px-4 py-2.5 text-sm font-medium data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-primary text-muted-foreground hover:text-foreground"
+            className="rounded-none border-b-2 border-transparent px-4 py-2.5 data-[state=active]:border-amber-600 data-[state=active]:bg-transparent data-[state=active]:text-amber-700 data-[state=active]:shadow-none"
           >
             All People
           </TabsTrigger>
           <TabsTrigger
             value="reports"
-            className="rounded-none border-b-2 border-transparent px-4 py-2.5 text-sm font-medium data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-primary text-muted-foreground hover:text-foreground"
+            className="rounded-none border-b-2 border-transparent px-4 py-2.5 data-[state=active]:border-amber-600 data-[state=active]:bg-transparent data-[state=active]:text-amber-700 data-[state=active]:shadow-none"
           >
             Reports
           </TabsTrigger>
           <TabsTrigger
             value="settings"
-            className="rounded-none border-b-2 border-transparent px-4 py-2.5 text-sm font-medium data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-primary text-muted-foreground hover:text-foreground"
+            className="rounded-none border-b-2 border-transparent px-4 py-2.5 data-[state=active]:border-amber-600 data-[state=active]:bg-transparent data-[state=active]:text-amber-700 data-[state=active]:shadow-none"
           >
             Settings
           </TabsTrigger>

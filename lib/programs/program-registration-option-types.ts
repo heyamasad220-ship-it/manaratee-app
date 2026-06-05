@@ -42,3 +42,38 @@ export const REGISTRATION_OPTION_LABELS: Record<ProgramRegistrationOptionType, s
   single_session: "Single Session",
   drop_in: "Drop-In",
 }
+
+const SESSION_REGISTRATION_OPTION_TYPES: ProgramRegistrationOptionType[] = [
+  "selected_sessions",
+  "single_session",
+  "drop_in",
+]
+
+export function isRegistrationOptionActive(
+  options: ProgramRegistrationOption[],
+  optionType: ProgramRegistrationOptionType
+) {
+  return (
+    options.find((option) => option.option_type === optionType)?.is_active ??
+    false
+  )
+}
+
+export function isSessionManagementEnabled(
+  options: ProgramRegistrationOption[]
+) {
+  return options.some(
+    (option) =>
+      option.is_active &&
+      SESSION_REGISTRATION_OPTION_TYPES.includes(option.option_type)
+  )
+}
+
+export function getRegistrationOptionsSignature(
+  options: ProgramRegistrationOption[]
+) {
+  return options
+    .map((option) => `${option.option_type}:${option.is_active ? 1 : 0}`)
+    .sort()
+    .join("|")
+}

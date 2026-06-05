@@ -11,55 +11,13 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
+import {
+  GRADE_LEVELS,
+  getGradeRange,
+  getMinMaxGradeFromLevels,
+} from "@/lib/programs/grade-levels"
 
-export const GRADE_LEVELS = [
-  "Pre-K",
-  "Kindergarten",
-  "1st Grade",
-  "2nd Grade",
-  "3rd Grade",
-  "4th Grade",
-  "5th Grade",
-  "6th Grade",
-  "7th Grade",
-  "8th Grade",
-  "9th Grade",
-  "10th Grade",
-  "11th Grade",
-  "12th Grade",
-] as const
-
-export function getGradeRange(minGrade: string | null, maxGrade: string | null) {
-  if (!minGrade || !maxGrade) return []
-
-  const minIndex = GRADE_LEVELS.indexOf(minGrade as (typeof GRADE_LEVELS)[number])
-  const maxIndex = GRADE_LEVELS.indexOf(maxGrade as (typeof GRADE_LEVELS)[number])
-
-  if (minIndex === -1 || maxIndex === -1) return []
-  if (minIndex > maxIndex) return []
-
-  return GRADE_LEVELS.slice(minIndex, maxIndex + 1)
-}
-
-export function getMinMaxGradeFromLevels(gradeLevels: string[]) {
-  if (gradeLevels.length === 0) {
-    return { minGrade: null, maxGrade: null }
-  }
-
-  const indices = gradeLevels
-    .map((grade) => GRADE_LEVELS.indexOf(grade as (typeof GRADE_LEVELS)[number]))
-    .filter((index) => index >= 0)
-    .sort((a, b) => a - b)
-
-  if (indices.length === 0) {
-    return { minGrade: null, maxGrade: null }
-  }
-
-  return {
-    minGrade: GRADE_LEVELS[indices[0]],
-    maxGrade: GRADE_LEVELS[indices[indices.length - 1]],
-  }
-}
+export { GRADE_LEVELS, getGradeRange, getMinMaxGradeFromLevels }
 
 function getGradeLevelsLabel(selectedGrades: string[]) {
   if (selectedGrades.length === 0) {

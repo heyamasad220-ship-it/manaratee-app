@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
+import { formatProgramAgeEligibility } from "@/lib/programs/program-eligibility-display"
 
 type CustomerOrganization = {
   organization_id: string
@@ -38,6 +39,8 @@ type Program = {
   enrollment_open_date: string | null
   enrollment_close_date: string | null
   age_groups: string[]
+  min_age: number | null
+  max_age: number | null
   grade_levels: string[]
   gender: string | null
   capacity: number
@@ -155,6 +158,7 @@ function matchesFilters(
     (program.description || "").toLowerCase().includes(query) ||
     (program.gender || "").toLowerCase().includes(query) ||
     program.age_groups.some((age) => age.toLowerCase().includes(query)) ||
+    formatProgramAgeEligibility(program).toLowerCase().includes(query) ||
     program.grade_levels.some((grade) => grade.toLowerCase().includes(query))
 
   const enrollmentLabel = getEnrollmentLabel(program).toLowerCase()
@@ -229,6 +233,8 @@ export default async function CustomerProgramsPage({
         enrollment_open_date,
         enrollment_close_date,
         age_groups,
+        min_age,
+        max_age,
         grade_levels,
         gender,
         capacity,
@@ -487,9 +493,7 @@ export default async function CustomerProgramsPage({
                       <div className="flex items-center gap-2 text-muted-foreground">
                         <Users className="h-4 w-4" />
                         <span>
-                          {program.age_groups.length > 0
-                            ? program.age_groups.join(", ")
-                            : "All ages"}
+                          {formatProgramAgeEligibility(program)}
                         </span>
                       </div>
 

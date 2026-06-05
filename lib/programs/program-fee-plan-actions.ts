@@ -52,6 +52,106 @@ export type FeePlanInput = {
   components: FeePlanComponentInput[]
 }
 
+function normalizePaymentDueDay(
+  planType: FeePlanType,
+  value: number | null | undefined
+): number | null {
+  if (planType !== "monthly") {
+    return null
+  }
+
+  if (value == null || Number.isNaN(Number(value))) {
+    return null
+  }
+
+  const day = Math.round(Number(value))
+
+  if (day < 1 || day > 28) {
+    throw new Error("Payment Due Day must be between 1 and 28 for monthly fee plans.")
+  }
+
+  return day
+}
+
+function normalizeInstallmentCount(
+  planType: FeePlanType,
+  value: number | null | undefined
+): number | null {
+  if (planType !== "installments") {
+    return null
+  }
+
+  if (value == null || Number.isNaN(Number(value))) {
+    return null
+  }
+
+  const count = Math.round(Number(value))
+
+  if (count < 1) {
+    throw new Error("Installment Count must be at least 1 for installment fee plans.")
+  }
+
+  return count
+}
+
+function normalizePlanForSave(plan: FeePlanInput): FeePlanInput {
+  return {
+    ...plan,
+    payment_due_day: normalizePaymentDueDay(plan.plan_type, plan.payment_due_day),
+    installment_count: normalizeInstallmentCount(
+      plan.plan_type,
+      plan.installment_count
+    ),
+  }
+}
+
+function normalizeDefaultFeePlans(plans: FeePlanInput[]) {
+  if (plans.length === 0) {
+    return plans
+  }
+
+  const defaultIndex = plans.findIndex((plan) => plan.is_default)
+
+  return plans.map((plan, index) => ({
+    ...plan,
+    is_default: defaultIndex >= 0 ? index === defaultIndex : index === 0,
+  }))
+}
+
+function resolveExistingPlanId(
+  plan: FeePlanInput,
+  existingPlans: Array<{ id: string; name: string; is_default: boolean }>
+) {
+  if (plan.id) {
+    return plan.id
+  }
+
+  if (existingPlans.length === 0) {
+    return null
+  }
+
+  const nameMatch = existingPlans.find(
+    (existing) => existing.name.trim() === plan.name.trim()
+  )
+
+  if (nameMatch) {
+    return nameMatch.id
+  }
+
+  if (plan.is_default) {
+    const defaultMatch = existingPlans.find((existing) => existing.is_default)
+    if (defaultMatch) {
+      return defaultMatch.id
+    }
+  }
+
+  if (existingPlans.length === 1) {
+    return existingPlans[0].id
+  }
+
+  return null
+}
+
 export async function saveOfferingFeePlans(input: {
   programId: string
   offeringId: string
@@ -64,8 +164,56 @@ export async function saveOfferingFeePlans(input: {
 
   const supabase = await createClient()
   const keptPlanIds: string[] = []
+  const planIdBySourceKey = new Map<string, string>()
+  const plans = normalizeDefaultFeePlans(
+    input.plans
+      .filter((plan) => plan.name.trim())
+      .map(normalizePlanForSave)
+  )
 
-  for (const plan of input.plans) {
+  for (const plan of plans) {
+    if (plan.plan_type === "monthly" && plan.payment_due_day == null) {
+      throw new Error(
+        "Monthly fee plans require a Payment Due Day between 1 and 28."
+      )
+    }
+  }
+
+  if (plans.length === 0) {
+    return
+  }
+
+  const { data: existingPlans, error: existingPlansError } = await supabase
+    .from("program_offering_fee_plans")
+    .select("id, name, is_default")
+    .eq("organization_id", organizationId)
+    .eq("offering_id", input.offeringId)
+
+  if (existingPlansError) {
+    throw new Error(existingPlansError.message)
+  }
+
+  const existingPlanRows = (existingPlans || []) as Array<{
+    id: string
+    name: string
+    is_default: boolean
+  }>
+
+  const { error: clearDefaultError } = await supabase
+    .from("program_offering_fee_plans")
+    .update({
+      is_default: false,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("organization_id", organizationId)
+    .eq("offering_id", input.offeringId)
+
+  if (clearDefaultError) {
+    throw new Error(clearDefaultError.message)
+  }
+
+  for (let index = 0; index < plans.length; index++) {
+    const plan = plans[index]
     const planPayload = {
       organization_id: organizationId,
       program_id: input.programId,
@@ -81,12 +229,15 @@ export async function saveOfferingFeePlans(input: {
       updated_at: new Date().toISOString(),
     }
 
-    let planId = plan.id
+    let planId = resolveExistingPlanId(plan, existingPlanRows)
 
     if (planId) {
       const { error } = await supabase
         .from("program_offering_fee_plans")
-        .update(planPayload)
+        .update({
+          ...planPayload,
+          is_default: false,
+        })
         .eq("organization_id", organizationId)
         .eq("id", planId)
 
@@ -100,7 +251,10 @@ export async function saveOfferingFeePlans(input: {
     } else {
       const { data, error } = await supabase
         .from("program_offering_fee_plans")
-        .insert(planPayload)
+        .insert({
+          ...planPayload,
+          is_default: false,
+        })
         .select("id")
         .single()
 
@@ -109,6 +263,23 @@ export async function saveOfferingFeePlans(input: {
     }
 
     keptPlanIds.push(planId)
+
+    for (const sourceKey of [plan.id, `draft-${index}`].filter(Boolean) as string[]) {
+      planIdBySourceKey.set(sourceKey, planId)
+    }
+
+    if (plan.is_default) {
+      const { error } = await supabase
+        .from("program_offering_fee_plans")
+        .update({
+          is_default: true,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("organization_id", organizationId)
+        .eq("id", planId)
+
+      if (error) throw new Error(error.message)
+    }
 
     const componentRows = plan.components
       .filter((component) => component.label.trim())
@@ -137,13 +308,13 @@ export async function saveOfferingFeePlans(input: {
     }
   }
 
-  const { data: existingPlans } = await supabase
+  const { data: currentOfferingPlans } = await supabase
     .from("program_offering_fee_plans")
     .select("id")
     .eq("organization_id", organizationId)
     .eq("offering_id", input.offeringId)
 
-  const removeIds = (existingPlans || [])
+  const removeIds = (currentOfferingPlans || [])
     .map((row) => row.id as string)
     .filter((id) => !keptPlanIds.includes(id))
 
@@ -183,18 +354,23 @@ export async function saveOfferingFeePlans(input: {
   }
 
   for (const link of input.optionFeePlanLinks) {
-    if (link.feePlanId) {
-      const planExists = keptPlanIds.includes(link.feePlanId)
-      if (!planExists) {
-        throw new Error(
-          `Registration option ${link.optionId} references an invalid fee plan. Save fee plans first, then link options.`
-        )
-      }
+    const resolvedFeePlanId = link.feePlanId
+      ? planIdBySourceKey.get(link.feePlanId) ??
+        (keptPlanIds.includes(link.feePlanId) ? link.feePlanId : null)
+      : null
+
+    if (link.feePlanId && !resolvedFeePlanId) {
+      throw new Error(
+        `Registration option ${link.optionId} references an invalid fee plan. Save fee plans first, then link options.`
+      )
     }
 
     const { error } = await supabase
       .from("program_registration_options")
-      .update({ fee_plan_id: link.feePlanId, updated_at: new Date().toISOString() })
+      .update({
+        fee_plan_id: resolvedFeePlanId,
+        updated_at: new Date().toISOString(),
+      })
       .eq("organization_id", organizationId)
       .eq("id", link.optionId)
 

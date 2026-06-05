@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 
 import type { ProgramCapacityGroup } from "./program-capacity-group-types"
+import { normalizeCapacityGroupInput } from "./program-capacity-group-utils"
 
 export async function getProgramCapacityGroups(
   programId: string
@@ -30,5 +31,7 @@ export async function getProgramCapacityGroups(
     throw new Error("Failed to load program capacity groups")
   }
 
-  return (data || []) as ProgramCapacityGroup[]
+  return (data || []).map((group) =>
+    normalizeCapacityGroupInput(group as ProgramCapacityGroup)
+  )
 }

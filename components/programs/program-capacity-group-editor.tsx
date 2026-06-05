@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Check, ChevronDown, Pencil, Plus, Trash2 } from "lucide-react"
+import { Check, ChevronDown, GripVertical, Pencil, Plus, Trash2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -27,7 +27,14 @@ import {
   getTotalCapacityFromGroups,
   type ProgramCapacityGroupInput,
 } from "@/lib/programs/program-capacity-group-types"
-import { GRADE_LEVELS } from "@/components/programs/grade-levels-multi-select"
+import {
+  buildCapacityGroupFromDraft,
+  getCapacityGroupGradeCatalog,
+  getEffectiveGroupGrades,
+  getGradeLevelsLabel,
+  sortGrades,
+} from "@/lib/programs/program-capacity-group-utils"
+import { suggestCapacityGroupName } from "@/lib/programs/grade-levels"
 import { cn } from "@/lib/utils"
 
 type DraftGroup = {
@@ -37,72 +44,130 @@ type DraftGroup = {
   capacity: number
 }
 
-function sortGrades(grades: string[]) {
-  return [...grades].sort(
-    (a, b) => GRADE_LEVELS.indexOf(a as (typeof GRADE_LEVELS)[number]) -
-      GRADE_LEVELS.indexOf(b as (typeof GRADE_LEVELS)[number])
-  )
-}
-
-function suggestGradeGroupName(grades: string[]) {
-  if (grades.length === 0) {
-    return ""
-  }
-
-  const abbreviations: Record<string, string> = {
-    "Pre-K": "PK",
-    Kindergarten: "KG",
-  }
-
-  return grades.map((grade) => abbreviations[grade] || grade).join("/")
-}
-
-function suggestGenderGroupName(gender: string) {
-  if (gender === "Male") return "Boys"
-  if (gender === "Female") return "Girls"
-  return gender
-}
-
-function gendersOverlap(a: string[], b: string[]) {
-  if (a.length === 0 || b.length === 0) {
-    return true
-  }
-
-  return a.some((gender) => b.includes(gender))
-}
-
 function getTakenGradesForGenders(
   groups: ProgramCapacityGroupInput[],
   targetGenders: string[],
-  excludeIndex: number | null
+  excludeIndex: number | null,
+  eligibleGrades: string[],
+  programGender: "All" | "Male" | "Female"
 ) {
   const taken = new Set<string>()
+  const relevantGroups = groups.filter((_, index) => index !== excludeIndex)
+  const targetIsAnyGender = targetGenders.length === 0
+  const targetIsMale = targetGenders.includes("Male")
+  const targetIsFemale = targetGenders.includes("Female")
+
+  for (const grade of eligibleGrades) {
+    const anyGenderGroupHas = relevantGroups.some(
+      (group) =>
+        group.genders.length === 0 &&
+        getEffectiveGroupGrades(group, eligibleGrades).includes(grade)
+    )
+
+    if (anyGenderGroupHas) {
+      taken.add(grade)
+      continue
+    }
+
+    const maleGroupHas = relevantGroups.some(
+      (group) =>
+        group.genders.includes("Male") &&
+        getEffectiveGroupGrades(group, eligibleGrades).includes(grade)
+    )
+    const femaleGroupHas = relevantGroups.some(
+      (group) =>
+        group.genders.includes("Female") &&
+        getEffectiveGroupGrades(group, eligibleGrades).includes(grade)
+    )
+
+    if (targetIsAnyGender) {
+      if (programGender === "All") {
+        if (maleGroupHas && femaleGroupHas) {
+          taken.add(grade)
+        }
+      } else if (programGender === "Male") {
+        if (maleGroupHas) {
+          taken.add(grade)
+        }
+      } else if (femaleGroupHas) {
+        taken.add(grade)
+      }
+      continue
+    }
+
+    if (targetIsMale && maleGroupHas) {
+      taken.add(grade)
+      continue
+    }
+
+    if (targetIsFemale && femaleGroupHas) {
+      taken.add(grade)
+    }
+  }
+
+  return taken
+}
+
+function getGradeBlockersForGenders(
+  groups: ProgramCapacityGroupInput[],
+  targetGenders: string[],
+  excludeIndex: number | null,
+  eligibleGrades: string[],
+  programGender: "All" | "Male" | "Female"
+) {
+  const blockers = new Map<string, string[]>()
+  const taken = getTakenGradesForGenders(
+    groups,
+    targetGenders,
+    excludeIndex,
+    eligibleGrades,
+    programGender
+  )
 
   groups.forEach((group, index) => {
     if (index === excludeIndex) {
       return
     }
 
-    if (!gendersOverlap(group.genders, targetGenders)) {
-      return
-    }
+    const label = `${group.name || "Unnamed group"} (${getGroupGenderLabel(group.genders)})`
 
-    group.grade_levels.forEach((grade) => taken.add(grade))
+    getEffectiveGroupGrades(group, eligibleGrades).forEach((grade) => {
+      if (!taken.has(grade)) {
+        return
+      }
+
+      const existing = blockers.get(grade) || []
+      blockers.set(grade, [...existing, label])
+    })
   })
 
-  return taken
+  return blockers
 }
 
-function getGradeLevelsLabel(grades: string[]) {
-  if (grades.length === 0) {
-    return "All grades"
+function isDraftCommittable(draft: DraftGroup) {
+  return draft.name.trim().length > 0 && Number(draft.capacity) > 0
+}
+
+function applyDraftToGroups(
+  groups: ProgramCapacityGroupInput[],
+  draft: DraftGroup,
+  editingIndex: number | null,
+  eligibleGrades: string[]
+) {
+  const nextGroup = buildCapacityGroupFromDraft(draft, eligibleGrades)
+
+  if (editingIndex !== null) {
+    return groups.map((group, index) =>
+      index === editingIndex
+        ? {
+            ...group,
+            ...nextGroup,
+          }
+        : group
+    )
   }
 
-  if (grades.length <= 3) {
-    return grades.join(", ")
-  }
-
-  return `${grades.length} grades selected`
+  return [...groups, nextGroup]
 }
 
 function preventFormSubmitOnEnter(event: React.KeyboardEvent) {
@@ -115,10 +180,14 @@ function GroupGradePicker({
   options,
   selectedGrades,
   onChange,
+  emptyMessage,
+  emptyLabel = "Select grades",
 }: {
   options: string[]
   selectedGrades: string[]
   onChange: (grades: string[]) => void
+  emptyMessage?: string
+  emptyLabel?: string
 }) {
   const [open, setOpen] = React.useState(false)
 
@@ -141,7 +210,9 @@ function GroupGradePicker({
             selectedGrades.length === 0 && "text-muted-foreground"
           )}
         >
-          <span className="truncate">{getGradeLevelsLabel(selectedGrades)}</span>
+          <span className="truncate">
+            {getGradeLevelsLabel(selectedGrades, emptyLabel)}
+          </span>
           <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
@@ -152,7 +223,8 @@ function GroupGradePicker({
       >
         {options.length === 0 ? (
           <p className="px-2 py-3 text-sm text-muted-foreground">
-            No grades available for this group.
+            {emptyMessage ||
+              "No grades available for this group. Try a different gender or edit an existing group."}
           </p>
         ) : (
           <>
@@ -169,19 +241,17 @@ function GroupGradePicker({
               </label>
             ))}
 
-            {selectedGrades.length > 0 && (
-              <div className="border-t px-2 py-2">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 w-full text-xs"
-                  onClick={() => onChange([])}
-                >
-                  Clear grades
-                </Button>
-              </div>
-            )}
+            <div className="border-t px-2 py-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 w-full text-xs"
+                onClick={() => setOpen(false)}
+              >
+                Ok
+              </Button>
+            </div>
           </>
         )}
       </PopoverContent>
@@ -189,21 +259,31 @@ function GroupGradePicker({
   )
 }
 
-export function ProgramCapacityGroupEditor({
-  selectedGrades,
-  programGender,
-  groups,
-  onChange,
-  totalCapacity,
-  onTotalCapacityChange,
-}: {
-  selectedGrades: string[]
-  programGender: "All" | "Male" | "Female"
-  groups: ProgramCapacityGroupInput[]
-  onChange: (groups: ProgramCapacityGroupInput[]) => void
-  totalCapacity: number
-  onTotalCapacityChange: (capacity: number) => void
-}) {
+export type ProgramCapacityGroupEditorHandle = {
+  flushPendingDraft: () => ProgramCapacityGroupInput[]
+}
+
+export const ProgramCapacityGroupEditor = React.forwardRef<
+  ProgramCapacityGroupEditorHandle,
+  {
+    selectedGrades: string[]
+    programGender: "All" | "Male" | "Female"
+    groups: ProgramCapacityGroupInput[]
+    onChange: (groups: ProgramCapacityGroupInput[]) => void
+    totalCapacity: number
+    onTotalCapacityChange: (capacity: number) => void
+  }
+>(function ProgramCapacityGroupEditor(
+  {
+    selectedGrades,
+    programGender,
+    groups,
+    onChange,
+    totalCapacity,
+    onTotalCapacityChange,
+  },
+  ref
+) {
   const [draft, setDraft] = React.useState<DraftGroup>(() => ({
     name: "",
     grade_levels: [],
@@ -211,25 +291,34 @@ export function ProgramCapacityGroupEditor({
     capacity: 0,
   }))
   const [editingIndex, setEditingIndex] = React.useState<number | null>(null)
+  const [draggedGroupIndex, setDraggedGroupIndex] = React.useState<number | null>(
+    null
+  )
+  const [dropTargetIndex, setDropTargetIndex] = React.useState<number | null>(
+    null
+  )
+
+  const gradeCatalog = getCapacityGroupGradeCatalog(
+    sortGrades(selectedGrades),
+    draft.grade_levels
+  )
 
   const usingGroupCapacity = groups.length > 0
   const takenGradesForDraft = getTakenGradesForGenders(
     groups,
     draft.genders,
-    editingIndex
+    editingIndex,
+    gradeCatalog,
+    programGender
   )
   const availableGradesForDraft = sortGrades(
-    selectedGrades.filter((grade) => !takenGradesForDraft.has(grade))
-  )
-  const gradesInAnyGroup = new Set(groups.flatMap((group) => group.grade_levels))
-  const unassignedGrades = sortGrades(
-    selectedGrades.filter((grade) => !gradesInAnyGroup.has(grade))
+    gradeCatalog.filter((grade) => !takenGradesForDraft.has(grade))
   )
 
   const genderOnlyGroups = groups.filter(
     (group, index) =>
       index !== editingIndex &&
-      group.grade_levels.length === 0 &&
+      getEffectiveGroupGrades(group, gradeCatalog).length === 0 &&
       group.genders.length > 0
   )
   const assignedGenderOnly = new Set(
@@ -252,77 +341,32 @@ export function ProgramCapacityGroupEditor({
           ? ["Female"]
           : []
 
-    const grades = sortGrades(
-      selectedGrades.filter(
-        (grade) =>
-          !getTakenGradesForGenders(groups, genders, editingIndex).has(grade)
-      )
-    )
-
-    let name = ""
-    if (grades.length > 0) {
-      name = suggestGradeGroupName(grades)
-    } else if (genders[0]) {
-      name = suggestGenderGroupName(genders[0])
-    }
-
     return {
-      name,
-      grade_levels: grades,
+      name: "",
+      grade_levels: [],
       genders,
       capacity: 0,
     }
   }
 
-  React.useEffect(() => {
-    if (selectedGrades.length === 0) {
-      return
-    }
-
-    const allowed = new Set(selectedGrades)
-    let hasChanges = false
-
-    const nextGroups = groups.map((group) => {
-      const grade_levels = sortGrades(
-        group.grade_levels.filter((grade) => allowed.has(grade))
-      )
-      const previousGrades = sortGrades(group.grade_levels)
-
-      if (
-        grade_levels.length !== previousGrades.length ||
-        grade_levels.some((grade, index) => grade !== previousGrades[index])
-      ) {
-        hasChanges = true
-      }
-
-      return {
-        ...group,
-        grade_levels,
-      }
-    })
-
-    if (hasChanges) {
-      syncGroups(nextGroups)
-    }
-    // Only re-sync when program eligibility grades change.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedGrades])
-
-  React.useEffect(() => {
-    if (editingIndex === null) {
-      setDraft(buildDefaultDraft())
-    }
-    // Pre-fill the add row from eligibility when not editing a saved group.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedGrades, programGender, groups.length, editingIndex])
-
   function syncGroups(nextGroups: ProgramCapacityGroupInput[]) {
     onChange(nextGroups)
+    onTotalCapacityChange(getTotalCapacityFromGroups(nextGroups))
 
-    if (nextGroups.length > 0) {
-      onTotalCapacityChange(getTotalCapacityFromGroups(nextGroups))
+    if (nextGroups.length === 0) {
+      resetDraft()
     }
   }
+
+  React.useImperativeHandle(
+    ref,
+    () => ({
+      flushPendingDraft() {
+        return groups
+      },
+    }),
+    [draft, editingIndex, groups, gradeCatalog]
+  )
 
   function resetDraft() {
     setEditingIndex(null)
@@ -336,7 +380,7 @@ export function ProgramCapacityGroupEditor({
     setEditingIndex(index)
     setDraft({
       name: group.name,
-      grade_levels: [...group.grade_levels],
+      grade_levels: getEffectiveGroupGrades(group, gradeCatalog),
       genders: [...group.genders],
       capacity: group.capacity,
     })
@@ -347,36 +391,13 @@ export function ProgramCapacityGroupEditor({
   }
 
   function commitDraft() {
-    if (draft.grade_levels.length === 0 && draft.genders.length === 0) {
+    if (!isDraftCommittable(draft)) {
       return
     }
 
-    const nextGroup: ProgramCapacityGroupInput = {
-      name:
-        draft.name.trim() ||
-        suggestGradeGroupName(draft.grade_levels) ||
-        suggestGenderGroupName(draft.genders[0] || "") ||
-        `Group ${groups.length + 1}`,
-      grade_levels: sortGrades(draft.grade_levels),
-      genders: draft.genders,
-      capacity: Number(draft.capacity || 0),
-    }
-
-    if (editingIndex !== null) {
-      syncGroups(
-        groups.map((group, index) =>
-          index === editingIndex
-            ? {
-                ...group,
-                ...nextGroup,
-              }
-            : group
-        )
-      )
-    } else {
-      syncGroups([...groups, nextGroup])
-    }
-
+    syncGroups(
+      applyDraftToGroups(groups, draft, editingIndex, gradeCatalog)
+    )
     resetDraft()
   }
 
@@ -390,10 +411,78 @@ export function ProgramCapacityGroupEditor({
     syncGroups(groups.filter((_, groupIndex) => groupIndex !== index))
   }
 
+  function moveGroup(fromIndex: number, toIndex: number) {
+    if (
+      fromIndex === toIndex ||
+      fromIndex < 0 ||
+      toIndex < 0 ||
+      fromIndex >= groups.length ||
+      toIndex >= groups.length
+    ) {
+      return
+    }
+
+    const nextGroups = [...groups]
+    const [moved] = nextGroups.splice(fromIndex, 1)
+    nextGroups.splice(toIndex, 0, moved)
+
+    if (editingIndex !== null) {
+      if (editingIndex === fromIndex) {
+        setEditingIndex(toIndex)
+      } else if (fromIndex < editingIndex && toIndex >= editingIndex) {
+        setEditingIndex(editingIndex - 1)
+      } else if (fromIndex > editingIndex && toIndex <= editingIndex) {
+        setEditingIndex(editingIndex + 1)
+      }
+    }
+
+    onChange(nextGroups)
+  }
+
+  function getGradePickerEmptyMessage() {
+    if (availableGradesForDraft.length > 0) {
+      return undefined
+    }
+
+    const blockers = getGradeBlockersForGenders(
+      groups,
+      draft.genders,
+      editingIndex,
+      gradeCatalog,
+      programGender
+    )
+    const genderLabel = getGroupGenderLabel(draft.genders)
+    const blockedGrades = sortGrades(
+      gradeCatalog.filter((grade) => !availableGradesForDraft.includes(grade))
+    )
+
+    if (blockedGrades.length === 0) {
+      return `No eligible grades are configured for this program. Update grade levels in Eligibility first.`
+    }
+
+    const examples = blockedGrades.slice(0, 3).map((grade) => {
+      const sources = blockers.get(grade) || []
+      return sources.length > 0
+        ? `${grade} → ${sources.join(", ")}`
+        : grade
+    })
+
+    return `No grades left for ${genderLabel}. ${examples.join(" · ")}`
+  }
+
   function getGradeOptionsForDraft() {
+    const editingGroupGrades =
+      editingIndex !== null && groups[editingIndex]
+        ? getEffectiveGroupGrades(groups[editingIndex], gradeCatalog)
+        : []
+
     return sortGrades(
       Array.from(
-        new Set([...availableGradesForDraft, ...draft.grade_levels])
+        new Set([
+          ...availableGradesForDraft,
+          ...draft.grade_levels,
+          ...editingGroupGrades,
+        ])
       )
     )
   }
@@ -421,17 +510,22 @@ export function ProgramCapacityGroupEditor({
       ]
     }
 
-    return GENDER_CAPACITY_VALUES.filter((gender) => {
+    const genderOptions = GENDER_CAPACITY_VALUES.filter((gender) => {
       if (gender === currentValue) return true
       return !draftGenderOnlyTaken.has(gender)
     }).map((gender) => ({
       value: gender,
       label: gender,
     }))
+
+    if (draft.genders.length === 0) {
+      return [{ value: "", label: "Any gender" }, ...genderOptions]
+    }
+
+    return genderOptions
   }
 
-  const canCommitDraft =
-    draft.grade_levels.length > 0 || draft.genders.length > 0
+  const canCommitDraft = isDraftCommittable(draft)
 
   return (
     <div
@@ -449,8 +543,8 @@ export function ProgramCapacityGroupEditor({
           ) : null}
         </div>
         <p className="mt-1 text-sm text-muted-foreground">
-          Use the row below to add a group based on your eligibility settings.
-          Click + when ready. Saved groups appear in the list below.
+          Enter a group name, grades or gender, and capacity in the row below,
+          then click + to add it. Drag saved groups to reorder them.
         </p>
       </div>
 
@@ -459,6 +553,7 @@ export function ProgramCapacityGroupEditor({
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-10" aria-label="Reorder" />
                 <TableHead>Group Name</TableHead>
                 <TableHead>Grades</TableHead>
                 <TableHead>Gender</TableHead>
@@ -469,6 +564,7 @@ export function ProgramCapacityGroupEditor({
 
             <TableBody>
               <TableRow className="bg-muted/20">
+                    <TableCell className="w-10" />
                     <TableCell className="min-w-[140px] align-top">
                       <Input
                         id="capacity-group-draft-name"
@@ -478,7 +574,7 @@ export function ProgramCapacityGroupEditor({
                           updateDraft({ name: event.target.value })
                         }
                         onKeyDown={preventFormSubmitOnEnter}
-                        placeholder="PK/KG or Boys"
+                        placeholder="Enter group name"
                       />
                     </TableCell>
 
@@ -491,9 +587,15 @@ export function ProgramCapacityGroupEditor({
                         <GroupGradePicker
                           options={getGradeOptionsForDraft()}
                           selectedGrades={sortGrades(draft.grade_levels)}
+                          emptyMessage={getGradePickerEmptyMessage()}
+                          emptyLabel="Select grades"
                           onChange={(grade_levels) => {
+                            const sorted = sortGrades(grade_levels)
                             updateDraft({
-                              grade_levels: sortGrades(grade_levels),
+                              grade_levels: sorted,
+                              name:
+                                draft.name.trim() ||
+                                suggestCapacityGroupName(sorted),
                             })
                           }}
                         />
@@ -514,7 +616,9 @@ export function ProgramCapacityGroupEditor({
                                 !getTakenGradesForGenders(
                                   groups,
                                   genders,
-                                  editingIndex
+                                  editingIndex,
+                                  gradeCatalog,
+                                  programGender
                                 ).has(grade)
                             )
                           )
@@ -599,16 +703,61 @@ export function ProgramCapacityGroupEditor({
                   <TableRow
                     key={`${group.id || "new"}-${index}`}
                     className={cn(
-                      editingIndex === index && "bg-muted/40 opacity-60"
+                      editingIndex === index && "bg-muted/40 opacity-60",
+                      draggedGroupIndex === index && "opacity-50",
+                      dropTargetIndex === index &&
+                        draggedGroupIndex !== index &&
+                        "bg-primary/5 ring-1 ring-inset ring-primary/20"
                     )}
+                    onDragOver={(event) => {
+                      event.preventDefault()
+                      event.dataTransfer.dropEffect = "move"
+                      setDropTargetIndex(index)
+                    }}
+                    onDragLeave={() => {
+                      setDropTargetIndex((current) =>
+                        current === index ? null : current
+                      )
+                    }}
+                    onDrop={(event) => {
+                      event.preventDefault()
+                      if (draggedGroupIndex !== null) {
+                        moveGroup(draggedGroupIndex, index)
+                      }
+                      setDraggedGroupIndex(null)
+                      setDropTargetIndex(null)
+                    }}
                   >
+                    <TableCell className="w-10 align-middle">
+                      <button
+                        type="button"
+                        draggable
+                        aria-label={`Reorder ${group.name || "capacity group"}`}
+                        title="Drag to reorder"
+                        className="flex h-8 w-8 cursor-grab items-center justify-center rounded-md text-muted-foreground hover:bg-muted active:cursor-grabbing"
+                        onDragStart={(event) => {
+                          event.dataTransfer.effectAllowed = "move"
+                          event.dataTransfer.setData(
+                            "text/plain",
+                            String(index)
+                          )
+                          setDraggedGroupIndex(index)
+                        }}
+                        onDragEnd={() => {
+                          setDraggedGroupIndex(null)
+                          setDropTargetIndex(null)
+                        }}
+                      >
+                        <GripVertical className="h-4 w-4" />
+                      </button>
+                    </TableCell>
                     <TableCell className="whitespace-normal font-medium">
                       {group.name}
                     </TableCell>
                     <TableCell className="whitespace-normal">
-                      {group.grade_levels.length > 0
-                        ? group.grade_levels.join(", ")
-                        : "All grades"}
+                      {getGradeLevelsLabel(
+                        getEffectiveGroupGrades(group, gradeCatalog)
+                      )}
                     </TableCell>
                     <TableCell>{getGroupGenderLabel(group.genders)}</TableCell>
                     <TableCell className="text-right">{group.capacity}</TableCell>
@@ -644,7 +793,7 @@ export function ProgramCapacityGroupEditor({
               {groups.length > 0 ? (
                 <TableFooter>
                   <TableRow>
-                    <TableCell colSpan={3} className="font-medium">
+                    <TableCell colSpan={4} className="font-medium">
                       Total capacity ({groups.length}{" "}
                       {groups.length === 1 ? "group" : "groups"})
                     </TableCell>
@@ -657,12 +806,6 @@ export function ProgramCapacityGroupEditor({
               ) : null}
             </Table>
           </div>
-
-          {unassignedGrades.length > 0 ? (
-            <p className="text-xs text-amber-600">
-              Grades not in any capacity group: {unassignedGrades.join(", ")}
-            </p>
-          ) : null}
         </div>
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -694,7 +837,7 @@ export function ProgramCapacityGroupEditor({
       </div>
     </div>
   )
-}
+})
 
 /** @deprecated Use ProgramCapacityGroupEditor */
 export const ProgramGradeCapacityEditor = ProgramCapacityGroupEditor

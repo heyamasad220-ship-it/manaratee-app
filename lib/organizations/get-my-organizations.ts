@@ -1,7 +1,8 @@
 import { createClient } from "@/lib/supabase/server"
+import type { CustomerOrganization } from "@/lib/customer/customer-organization-types"
 import { normalizeCustomerOrganizations } from "@/lib/customer/customer-portal-role-label"
 
-export async function getMyOrganizations() {
+export async function getMyOrganizations(): Promise<CustomerOrganization[]> {
   const supabase = await createClient()
 
   const { data, error } = await supabase.rpc("get_my_organizations")
@@ -11,5 +12,5 @@ export async function getMyOrganizations() {
     return []
   }
 
-  return normalizeCustomerOrganizations(data || [])
+  return normalizeCustomerOrganizations((data || []) as CustomerOrganization[])
 }

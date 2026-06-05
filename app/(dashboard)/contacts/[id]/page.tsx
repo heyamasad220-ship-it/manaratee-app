@@ -14,6 +14,7 @@ import { ContactRolesCard } from "@/components/contacts/contact-roles-card"
 import { ContactTimelinePanel } from "@/components/contacts/contact-timeline-panel"
 import { ContactVolunteerDetails } from "@/components/contacts/contact-volunteer-details"
 import { ContactVolunteerPanel } from "@/components/contacts/contact-volunteer-panel"
+import { ContactProgramAssignmentsPanel } from "@/components/contacts/contact-program-assignments-panel"
 import { ContactTeamsPanel } from "@/components/contacts/contact-teams-panel"
 import { ContactApplicationsPanel } from "@/components/contacts/contact-applications-panel"
 import { PersonTagsCard } from "@/components/people/person-tags-card"
@@ -27,6 +28,8 @@ import {
   fetchContactProfileData,
   type ContactProfileData,
 } from "@/lib/contacts/contact-profile-data"
+import { loadContactProgramAssignments } from "@/lib/programs/program-staff-assignment-actions"
+import type { ProgramStaffAssignmentWithDetails } from "@/lib/programs/program-staff-assignment-types"
 import {
   ArrowLeft,
   Briefcase,
@@ -63,6 +66,10 @@ export default function ContactDetailPage() {
 
   const [contact, setContact] = useState<any>(null)
   const [profileData, setProfileData] = useState<ContactProfileData | null>(null)
+  const [programAssignments, setProgramAssignments] = useState<
+    ProgramStaffAssignmentWithDetails[]
+  >([])
+  const [assignmentsLoading, setAssignmentsLoading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [profileLoading, setProfileLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState("")
@@ -136,6 +143,25 @@ export default function ContactDetailPage() {
       ((data.contact_roles || []) as any[]).map((role) => role.role).filter(Boolean)
     )
     await loadProfileData(data, roles)
+
+    const isStaffEligible =
+      roles.includes("employee") || roles.includes("volunteer")
+
+    if (isStaffEligible) {
+      setAssignmentsLoading(true)
+      try {
+        const assignments = await loadContactProgramAssignments(contactId)
+        setProgramAssignments(assignments)
+      } catch (error) {
+        console.error("Error loading program assignments:", error)
+        setProgramAssignments([])
+      } finally {
+        setAssignmentsLoading(false)
+      }
+    } else {
+      setProgramAssignments([])
+    }
+
     setLoading(false)
   }, [contactId, loadProfileData, supabase])
 
@@ -351,22 +377,32 @@ export default function ContactDetailPage() {
         {hasRole("employee") && (
           <Card>
             <CardContent className="p-6">
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <Briefcase className="h-5 w-5 text-sky-600" />
-                  <h2 className="text-lg font-semibold">Employee</h2>
-                </div>
-                <Button variant="outline" size="sm" asChild>
-                  <Link href="/programs/instructors">Employee records &amp; assignments</Link>
-                </Button>
+              <div className="mb-2 flex items-center gap-2">
+                <Briefcase className="h-5 w-5 text-sky-600" />
+                <h2 className="text-lg font-semibold">Employee</h2>
               </div>
               <p className="text-sm text-muted-foreground">
-                Employment details, department, documents, and program assignments are managed in
-                Employee records.
+                Employment details and HR records are managed separately. Program
+                teaching assignments appear below.
               </p>
             </CardContent>
           </Card>
         )}
+
+        {(hasRole("employee") || hasRole("volunteer")) &&
+          (assignmentsLoading ? (
+            <Card>
+              <CardContent className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading program assignments...
+              </CardContent>
+            </Card>
+          ) : (
+            <ContactProgramAssignmentsPanel
+              contactId={contact.id}
+              assignments={programAssignments}
+            />
+          ))}
 
         {hasRole("vendor") && (
           <Card>

@@ -162,7 +162,7 @@ export default async function WaitlistRegistrationDetailPage({
 
             {program ? (
               <Button variant="outline" asChild>
-                <Link href={`/programs/${program.id}`}>View Program</Link>
+                <Link href={`/programs/${program.id}/edit`}>Edit Program</Link>
               </Button>
             ) : null}
           </div>

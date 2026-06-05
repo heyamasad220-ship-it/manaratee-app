@@ -16,6 +16,10 @@ import {
   getCustomerContactForUser,
   verifyParticipantInRegistrantFamily,
 } from "@/lib/programs/registration-contact-resolver"
+import {
+  isEnrollmentWindowOpen,
+  isProgramPublishedForRegistration,
+} from "@/lib/programs/program-enrollment-availability"
 
 type RegisterForProgramRpcResult = {
   ok: boolean
@@ -29,19 +33,6 @@ type RegisterForProgramRpcResult = {
   total_amount?: number
 }
 
-function isEnrollmentOpen(open?: string | null, close?: string | null) {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-
-  const openDate = open ? new Date(`${open}T00:00:00`) : null
-  const closeDate = close ? new Date(`${close}T00:00:00`) : null
-
-  if (openDate && today < openDate) return false
-  if (closeDate && today > closeDate) return false
-
-  return true
-}
-
 function isFull(program: { capacity: number; enrolled: number }) {
   return program.capacity > 0 && program.enrolled >= program.capacity
 }
@@ -53,7 +44,7 @@ function getRegistrationMode(program: {
   enrollment_open_date: string | null
   enrollment_close_date: string | null
 }) {
-  const enrollmentOpen = isEnrollmentOpen(
+  const enrollmentOpen = isEnrollmentWindowOpen(
     program.enrollment_open_date,
     program.enrollment_close_date
   )
@@ -400,10 +391,12 @@ export async function registerForProgram(formData: FormData) {
     redirect(`${redirectBase}?error=invalid-option`)
   }
 
-  const enrollmentOpen = isEnrollmentOpen(
-    offering.enrollment_open_date ?? program.enrollment_open_date,
-    offering.enrollment_close_date ?? program.enrollment_close_date
-  )
+  const enrollmentOpen =
+    isProgramPublishedForRegistration(program.status) &&
+    isEnrollmentWindowOpen(
+      offering.enrollment_open_date ?? program.enrollment_open_date,
+      offering.enrollment_close_date ?? program.enrollment_close_date
+    )
 
   if (!enrollmentOpen) {
     redirect(`/customer/programs/${programId}?registration=unavailable`)

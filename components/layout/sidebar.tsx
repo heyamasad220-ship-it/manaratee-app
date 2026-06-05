@@ -232,7 +232,7 @@ function buildNavItems(rows: SidebarModuleRow[], permissionContext: UserPermissi
     })
 
   const allItems: NavItem[] = [
-    { label: "Org Admin", href: "/dashboard", icon: Home, matchPrefix: "/dashboard" },
+    { label: "Dashboard", href: "/dashboard", icon: Home, matchPrefix: "/dashboard" },
     ...dynamicItems,
     {
       label: "Settings",
@@ -283,7 +283,7 @@ export function MobileMenuTrigger() {
 
 function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname()
-  const [navItems, setNavItems] = useState<NavItem[]>([{ label: "Org Admin", href: "/dashboard", icon: Home, matchPrefix: "/dashboard" }])
+  const [navItems, setNavItems] = useState<NavItem[]>([{ label: "Dashboard", href: "/dashboard", icon: Home, matchPrefix: "/dashboard" }])
   const [loading, setLoading] = useState(true)
   const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({})
 
@@ -294,7 +294,7 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
 
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
-        setNavItems([{ label: "Org Admin", href: "/dashboard", icon: Home, matchPrefix: "/dashboard" }])
+        setNavItems([{ label: "Dashboard", href: "/dashboard", icon: Home, matchPrefix: "/dashboard" }])
         setLoading(false)
         return
       }
@@ -307,7 +307,7 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
 
       if (membershipError || !membership) {
         console.error("Error loading organization membership:", membershipError)
-        setNavItems([{ label: "Org Admin", href: "/dashboard", icon: Home, matchPrefix: "/dashboard" }])
+        setNavItems([{ label: "Dashboard", href: "/dashboard", icon: Home, matchPrefix: "/dashboard" }])
         setLoading(false)
         return
       }
@@ -348,7 +348,7 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
         setNavItems(
           filterNavItemsByPermissions(
             [
-              { label: "Org Admin", href: "/dashboard", icon: Home, matchPrefix: "/dashboard" },
+              { label: "Dashboard", href: "/dashboard", icon: Home, matchPrefix: "/dashboard" },
               {
                 label: "Settings",
                 href: "/settings",

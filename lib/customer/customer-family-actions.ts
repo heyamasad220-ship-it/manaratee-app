@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 
 import { ensureContactForPerson } from "@/lib/contacts/contact-actions"
+import { normalizeDateOfBirth } from "@/lib/dates/date-input-utils"
 import { createClient } from "@/lib/supabase/server"
 
 export type AddCustomerFamilyMemberInput = {
@@ -110,6 +111,8 @@ export async function addCustomerFamilyMember(input: AddCustomerFamilyMemberInpu
     throw new Error("Relationship is required.")
   }
 
+  const dateOfBirth = normalizeDateOfBirth(input.dateOfBirth)
+
   const { supabase, contact } = await getAuthenticatedCustomerContact(organizationId)
   const resolvedParentPersonId = await ensureParentPersonId(
     supabase,
@@ -128,7 +131,7 @@ export async function addCustomerFamilyMember(input: AddCustomerFamilyMemberInpu
       first_name: firstName,
       last_name: lastName,
       gender: input.gender?.trim() || null,
-      date_of_birth: input.dateOfBirth || null,
+      date_of_birth: dateOfBirth,
       person_type: "participant",
     })
     .select("id")

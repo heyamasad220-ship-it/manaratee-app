@@ -7,7 +7,9 @@ import {
   CalendarDays,
   CheckCircle2,
   Clock,
-  Info,
+  GraduationCap,
+  UserCircle2,
+  UserRound,
   Utensils,
   Users,
 } from "lucide-react"
@@ -17,12 +19,17 @@ import { ProgramRegisterQuotePreview } from "@/components/customer/program-regis
 import { ProgramRegisterParticipantsFields } from "@/components/customer/program-register-participants-fields"
 import { CustomerRegistrationOptionPicker } from "@/components/programs/program-registration-options-editor"
 import { createClient } from "@/lib/supabase/server"
-import { getDefaultOfferingForProgramByOrg } from "@/lib/programs/program-offering-queries"
+import { getDefaultOfferingForProgramByOrg, getOfferingByIdForOrg } from "@/lib/programs/program-offering-queries"
 import { registerForProgram } from "@/lib/programs/program-registration-actions"
 import {
   getRegistrationOptionsForOffering,
   isRegistrationOptionAvailable,
 } from "@/lib/programs/program-registration-option-queries"
+import {
+  formatProgramAgeRangeShort,
+  formatProgramGradeRangeShort,
+} from "@/lib/programs/program-eligibility-display"
+import { enrollmentStatusBlocksDuplicate } from "@/lib/programs/enrollment-status-helpers"
 import { lookupContactsByPersonIds } from "@/lib/programs/registration-contact-resolver"
 import { getMyOrganizations } from "@/lib/organizations/get-my-organizations"
 import { Badge } from "@/components/ui/badge"
@@ -53,6 +60,8 @@ type Program = {
   enrollment_open_date: string | null
   enrollment_close_date: string | null
   age_groups: string[] | null
+  min_age: number | null
+  max_age: number | null
   grade_levels: string[] | null
   gender: string | null
   capacity: number
@@ -259,15 +268,64 @@ async function getFamilyMembers(
     .filter(Boolean) as FamilyMember[]
 }
 
+async function getActiveEnrollmentByContactId(
+  organizationId: string,
+  programId: string,
+  participantContactIds: string[]
+) {
+  const uniqueContactIds = [...new Set(participantContactIds.filter(Boolean))]
+
+  if (uniqueContactIds.length === 0) {
+    return new Map<string, string>()
+  }
+
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from("program_enrollments")
+    .select("participant_contact_id, status")
+    .eq("organization_id", organizationId)
+    .eq("program_id", programId)
+    .in("participant_contact_id", uniqueContactIds)
+
+  if (error) {
+    console.error("Enrollment lookup for registration:", error.message)
+    return new Map<string, string>()
+  }
+
+  const activeByContactId = new Map<string, string>()
+
+  for (const row of data || []) {
+    const contactId = row.participant_contact_id as string | null
+    const status = row.status as string | null
+
+    if (contactId && enrollmentStatusBlocksDuplicate(status)) {
+      activeByContactId.set(contactId, status || "active")
+    }
+  }
+
+  return activeByContactId
+}
+
+type RegisterSearchParams = {
+  offering?: string | string[]
+  error?: string | string[]
+}
+
+function getSearchParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value
+}
+
 export default async function CustomerProgramRegisterPage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>
-  searchParams?: Promise<{ error?: string }>
+  searchParams?: Promise<RegisterSearchParams>
 }) {
   const { id } = await params
   const resolvedSearchParams = await searchParams
+  const offeringParam = getSearchParam(resolvedSearchParams?.offering)
   const supabase = await createClient()
 
   const { organization, errorMessage } = await getActiveCustomerOrganization()
@@ -311,6 +369,8 @@ export default async function CustomerProgramRegisterPage({
       enrollment_open_date,
       enrollment_close_date,
       age_groups,
+      min_age,
+      max_age,
       grade_levels,
       gender,
       capacity,
@@ -331,9 +391,15 @@ export default async function CustomerProgramRegisterPage({
   const program = data as Program
   const isAdultProgram = program.program_type === "adult"
 
-  const offering = await getDefaultOfferingForProgramByOrg(program.id, organizationId)
+  const offering = offeringParam
+    ? await getOfferingByIdForOrg(offeringParam, organizationId)
+    : await getDefaultOfferingForProgramByOrg(program.id, organizationId)
 
-  if (!offering) {
+  if (!offering || offering.program_id !== program.id) {
+    notFound()
+  }
+
+  if (offering.status === "draft" || offering.status === "archived") {
     notFound()
   }
 
@@ -350,14 +416,24 @@ export default async function CustomerProgramRegisterPage({
       ? await getFamilyMembers(customerContact.person_id, organizationId)
       : []
 
-  const { data: sessionData } = await supabase
+  const activeEnrollmentByContactId = await getActiveEnrollmentByContactId(
+    organizationId,
+    program.id,
+    familyMembers.map((member) => member.contactId || "")
+  )
+
+  const sessionQuery = supabase
     .from("program_sessions")
     .select(
-      "id, name, start_date, end_date, capacity, enrolled, price, status, sort_order"
+      "id, name, start_date, end_date, capacity, enrolled, price, status, sort_order, offering_id"
     )
     .eq("organization_id", organizationId)
     .eq("program_id", program.id)
     .eq("status", "active")
+
+  const { data: sessionData } = offering.is_default
+    ? await sessionQuery.or(`offering_id.eq.${offering.id},offering_id.is.null`)
+    : await sessionQuery.eq("offering_id", offering.id)
     .order("sort_order", { ascending: true })
     .order("start_date", { ascending: true })
 
@@ -435,7 +511,8 @@ export default async function CustomerProgramRegisterPage({
     "invalid-offering": "This program offering is not available.",
     "invalid-registrant": "Your registrant contact could not be verified.",
     "invalid-payer": "The payer contact could not be verified.",
-    "already-enrolled": "This participant is already enrolled in this program.",
+    "already-enrolled":
+      "This participant already has an active registration for this program. If a prior registration was cancelled, ask staff to confirm it shows Cancelled, then try again.",
     "already-waitlisted":
       "This participant is already on the waitlist for this program.",
     "save-failed": "We could not save this registration. Please try again.",
@@ -445,8 +522,8 @@ export default async function CustomerProgramRegisterPage({
     customerContact &&
     (isAdultProgram || (customerContact.person_id && familyMembers.length > 0))
 
-  const ageGroups = program.age_groups || []
-  const gradeLevels = program.grade_levels || []
+  const ageRangeLabel = formatProgramAgeRangeShort(program)
+  const gradeRangeLabel = formatProgramGradeRangeShort(program.grade_levels)
 
   return (
     <div className="min-h-screen bg-[#f5f5f7] px-6 py-8">
@@ -465,7 +542,9 @@ export default async function CustomerProgramRegisterPage({
               <CardHeader>
                 <div className="flex flex-wrap items-center gap-3">
                   <CardTitle>
-                    {mode === "waitlist" ? "Join Waitlist" : "Register for Program"}
+                    {mode === "waitlist"
+                      ? `Join waitlist — ${offering.name}`
+                      : `Register for ${offering.name}`}
                   </CardTitle>
                   <Badge
                     className={
@@ -478,15 +557,15 @@ export default async function CustomerProgramRegisterPage({
                   </Badge>
                 </div>
                 <CardDescription>
-                  Choose a registration option, then complete the form for{" "}
-                  {program.name}.
+                  Part of {program.name}. Choose a registration option, then
+                  complete the form below.
                 </CardDescription>
               </CardHeader>
 
               <CardContent>
-                {resolvedSearchParams?.error ? (
+                {getSearchParam(resolvedSearchParams?.error) ? (
                   <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                    {errorMessages[resolvedSearchParams.error] ||
+                    {errorMessages[getSearchParam(resolvedSearchParams?.error) || ""] ||
                       "Something went wrong. Please try again."}
                   </div>
                 ) : null}
@@ -540,6 +619,9 @@ export default async function CustomerProgramRegisterPage({
                         familyMembers={familyMembers}
                         lunchOptions={lunchOptions}
                         showAddons={mode !== "waitlist"}
+                        activeEnrollmentByContactId={Object.fromEntries(
+                          activeEnrollmentByContactId
+                        )}
                       />
                     )}
 
@@ -681,59 +763,27 @@ export default async function CustomerProgramRegisterPage({
                   </div>
                 ) : null}
 
-                <div className="border-t pt-5">
-                  <p className="mb-3 text-base font-semibold">Eligibility</p>
+                <div className="flex items-start gap-3 text-muted-foreground">
+                  <UserRound className="mt-0.5 h-4 w-4" />
+                  <div>
+                    <p className="font-medium text-foreground">Ages</p>
+                    <p>{ageRangeLabel}</p>
+                  </div>
+                </div>
 
-                  <div className="space-y-4">
-                    <div>
-                      <p className="mb-2 text-xs font-medium text-muted-foreground">
-                        Age Groups
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {ageGroups.length > 0 ? (
-                          ageGroups.map((age) => (
-                            <Badge key={age} variant="secondary">
-                              {age}
-                            </Badge>
-                          ))
-                        ) : (
-                          <Badge variant="secondary">All ages</Badge>
-                        )}
-                      </div>
-                    </div>
+                <div className="flex items-start gap-3 text-muted-foreground">
+                  <GraduationCap className="mt-0.5 h-4 w-4" />
+                  <div>
+                    <p className="font-medium text-foreground">Grade Levels</p>
+                    <p>{gradeRangeLabel}</p>
+                  </div>
+                </div>
 
-                    <div>
-                      <p className="mb-2 text-xs font-medium text-muted-foreground">
-                        Grade Levels
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {gradeLevels.length > 0 ? (
-                          gradeLevels.map((grade) => (
-                            <Badge key={grade} variant="outline">
-                              {grade}
-                            </Badge>
-                          ))
-                        ) : (
-                          <Badge variant="outline">All grades</Badge>
-                        )}
-                      </div>
-                    </div>
-
-                    <div>
-                      <p className="mb-2 text-xs font-medium text-muted-foreground">
-                        Gender
-                      </p>
-                      <Badge variant="secondary">
-                        {program.gender || "All genders"}
-                      </Badge>
-                    </div>
-
-                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-xs text-amber-900">
-                      <div className="flex gap-2">
-                        <Info className="h-4 w-4 shrink-0" />
-                        <p>Eligibility rules are set by the organization.</p>
-                      </div>
-                    </div>
+                <div className="flex items-start gap-3 text-muted-foreground">
+                  <UserCircle2 className="mt-0.5 h-4 w-4" />
+                  <div>
+                    <p className="font-medium text-foreground">Gender</p>
+                    <p>{program.gender || "All"}</p>
                   </div>
                 </div>
               </CardContent>

@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
+import { BirthDateInput } from "@/components/ui/birth-date-input"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -145,13 +146,17 @@ function FormField({
   return (
     <div className="flex flex-col gap-1.5">
       <Label className="text-sm text-muted-foreground">{label}</Label>
-      <Input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="h-9"
-      />
+      {type === "date" ? (
+        <BirthDateInput value={value} onChange={onChange} className="h-9" />
+      ) : (
+        <Input
+          type={type}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className="h-9"
+        />
+      )}
     </div>
   )
 }

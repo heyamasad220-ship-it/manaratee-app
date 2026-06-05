@@ -22,3 +22,23 @@ export interface ProgramOffering {
   created_at: string
   updated_at: string
 }
+
+export type ProgramOfferingInput = {
+  name: string
+  offering_type?: ProgramOfferingType
+  start_date?: string | null
+  end_date?: string | null
+  enrollment_open_date?: string | null
+  enrollment_close_date?: string | null
+  status?: ProgramOfferingStatus
+}
+
+export const PROGRAM_OFFERING_STATUS_LABELS: Record<
+  ProgramOfferingStatus,
+  string
+> = {
+  draft: "Draft",
+  active: "Active",
+  closed: "Closed",
+  archived: "Archived",
+}

@@ -8,6 +8,7 @@ export interface ProgramSession {
 
   organization_id: string
   program_id: string
+  offering_id: string | null
 
   name: string
   description: string | null

@@ -63,15 +63,17 @@ Status: Working
 Features:
 
 * Program CRUD
+* **Quick Create** + **Edit Program** tabbed setup (see `docs/programs-staff-setup-ui.md`)
 * Organization filtering
 * Program details
-* Eligibility rules
-* Registration types
+* Eligibility rules (ages, grades, gender, capacity groups)
+* Registration types and fee plans (Edit Program)
+* Offering-scoped pricing (Phase 2A/2B)
 
 Pending:
 
-* Eligibility redesign
-* Session management improvements
+* Session enrollment tracking improvements
+* Phase 3 Stripe checkout
 
 ---
 

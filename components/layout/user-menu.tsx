@@ -2,11 +2,16 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { ChevronDown, User, LogOut } from "lucide-react"
+import { ChevronDown, GraduationCap, LayoutDashboard, LogOut, User } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
+import { getCurrentOrganizationId } from "@/lib/current-organization"
+import {
+  fetchUserPortalCapabilities,
+} from "@/lib/auth/portal-capabilities-client"
+import type { UserPortalCapabilities } from "@/lib/auth/portal-capabilities-types"
 
 import {
   DropdownMenu,
@@ -25,6 +30,8 @@ export function UserMenu() {
   const supabase = createClient()
 
   const [profile, setProfile] = useState<UserProfile | null>(null)
+  const [portalCapabilities, setPortalCapabilities] =
+    useState<UserPortalCapabilities | null>(null)
 
   useEffect(() => {
     async function loadUser() {
@@ -44,6 +51,14 @@ export function UserMenu() {
         full_name: profileData?.full_name || null,
         email: user.email || null,
       })
+
+      const orgId = await getCurrentOrganizationId()
+      const capabilities = await fetchUserPortalCapabilities(
+        supabase,
+        user.id,
+        orgId
+      )
+      setPortalCapabilities(capabilities)
     }
 
     loadUser()
@@ -85,13 +100,40 @@ export function UserMenu() {
         </Button>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end" className="w-48">
+      <DropdownMenuContent align="end" className="w-52">
         <DropdownMenuItem asChild>
           <Link href="/profile" className="flex items-center gap-2">
             <User className="h-4 w-4" />
             Profile
           </Link>
         </DropdownMenuItem>
+
+        {portalCapabilities?.hasPersonalPortal ? (
+          <DropdownMenuItem asChild>
+            <Link href="/customer/dashboard" className="flex items-center gap-2">
+              <User className="h-4 w-4" />
+              My Account
+            </Link>
+          </DropdownMenuItem>
+        ) : null}
+
+        {portalCapabilities?.hasTeachingPortal ? (
+          <DropdownMenuItem asChild>
+            <Link href="/my-classes" className="flex items-center gap-2">
+              <GraduationCap className="h-4 w-4" />
+              My Classes
+            </Link>
+          </DropdownMenuItem>
+        ) : null}
+
+        {portalCapabilities?.hasAdminPortal ? (
+          <DropdownMenuItem asChild>
+            <Link href="/dashboard" className="flex items-center gap-2">
+              <LayoutDashboard className="h-4 w-4" />
+              Admin Dashboard
+            </Link>
+          </DropdownMenuItem>
+        ) : null}
 
         <DropdownMenuSeparator />
 

@@ -26,7 +26,7 @@ function TabsList({
     <TabsPrimitive.List
       data-slot="tabs-list"
       className={cn(
-        'bg-muted text-muted-foreground inline-flex h-9 w-fit items-center justify-center rounded-lg p-[3px]',
+        'inline-flex h-auto w-fit flex-wrap items-center gap-1 rounded-lg border border-zinc-200 bg-zinc-50 p-1 text-muted-foreground',
         className,
       )}
       {...props}
@@ -42,7 +42,13 @@ function TabsTrigger({
     <TabsPrimitive.Trigger
       data-slot="tabs-trigger"
       className={cn(
-        "data-[state=active]:bg-background dark:data-[state=active]:text-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:outline-ring dark:data-[state=active]:border-input dark:data-[state=active]:bg-input/30 text-foreground dark:text-muted-foreground inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium whitespace-nowrap transition-[color,box-shadow] focus-visible:ring-[3px] focus-visible:outline-1 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:shadow-sm [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        'inline-flex h-8 flex-none items-center justify-center gap-1.5 rounded-md border border-transparent px-3 py-1.5 text-sm font-medium whitespace-nowrap text-zinc-600 transition-colors',
+        'hover:bg-amber-50/70 hover:text-amber-700',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600/20 focus-visible:ring-offset-1',
+        'disabled:pointer-events-none disabled:opacity-50',
+        'data-[state=active]:bg-amber-50 data-[state=active]:text-amber-700 data-[state=active]:shadow-none',
+        'dark:text-zinc-400 dark:hover:bg-amber-950/30 dark:hover:text-amber-400 dark:data-[state=active]:bg-amber-950/40 dark:data-[state=active]:text-amber-400',
+        "[&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         className,
       )}
       {...props}
@@ -57,7 +63,10 @@ function TabsContent({
   return (
     <TabsPrimitive.Content
       data-slot="tabs-content"
-      className={cn('flex-1 outline-none', className)}
+      className={cn(
+        'flex-1 outline-none data-[state=inactive]:hidden',
+        className,
+      )}
       {...props}
     />
   )

@@ -17,14 +17,16 @@ The Programs module lets organizations create and manage programs (camps, classe
 7. [Registration Lifecycle (Phase 018)](#registration-lifecycle-phase-018)
 8. [Customer Registration Flow](#customer-registration-flow)
 9. [Staff Routes and UI](#staff-routes-and-ui)
-10. [Customer Portal Routes](#customer-portal-routes)
-11. [TypeScript Library (`lib/programs`)](#typescript-library-libprograms)
-12. [Components](#components)
-13. [Permissions](#permissions)
-14. [Contacts Integration](#contacts-integration)
-15. [Legacy vs Current Patterns](#legacy-vs-current-patterns)
-16. [Known Issues and Gaps](#known-issues-and-gaps)
-17. [Not Yet Implemented (Phase 2B+)](#not-yet-implemented-phase-2b)
+10. [Staff Setup UI (Quick Create + Edit)](#staff-setup-ui-quick-create--edit)
+11. [Customer Portal Routes](#customer-portal-routes)
+12. [TypeScript Library (`lib/programs`)](#typescript-library-libprograms)
+13. [Components](#components)
+14. [Permissions](#permissions)
+15. [Contacts Integration](#contacts-integration)
+16. [Legacy vs Current Patterns](#legacy-vs-current-patterns)
+17. [Known Issues and Gaps](#known-issues-and-gaps)
+18. [Phase 2B — Charge Ledger](#phase-2b--charge-ledger-designed-not-wired-to-ui)
+19. [Not Yet Implemented (Phase 3+)](#not-yet-implemented-phase-3)
 
 ---
 
@@ -38,7 +40,8 @@ The Programs module lets organizations create and manage programs (camps, classe
 | Contact-based enrollments | Working (016+) |
 | Customer browse + register UI | Working |
 | Live quote preview | Working (019+) |
-| Fee plan editor (staff) | Working (019+) |
+| Fee plan editor (staff) | Working (019+); tabbed Edit Program UI (June 2026) |
+| Quick Create + Edit Program split | Working — see [programs-staff-setup-ui.md](./programs-staff-setup-ui.md) |
 | Registration RPC (`register_for_program`) | Implemented; end-to-end submission may need data/debugging |
 | Lifecycle RPCs (cancel, advance, waitlist) | Working (018) |
 | Financial assistance (customer + admin UI) | Partial — DB complete, workflows in progress |
@@ -104,6 +107,7 @@ Apply in Supabase SQL Editor in this order:
 | `019_program_fee_plans_quote_engine.sql` | Fee plans, quote engine, updated register RPC |
 | `019a_program_quote_stabilization.sql` | Quote fixes: session resolution, addons, monthly schedule, lock compute RPC |
 | `019b_lock_quote_engine_and_verify.sql` | Idempotent patch + verification if 019A partially applied |
+| `026_program_min_max_age.sql` | `programs.min_age`, `programs.max_age` for staff eligibility UI |
 
 **Verification after 019B:** Run the `SELECT` at the bottom of `019b_lock_quote_engine_and_verify.sql`. Expect:
 
@@ -386,10 +390,12 @@ TypeScript helpers: `lib/programs/program-lifecycle-types.ts`
 |-------|---------|
 | `/programs` | Redirect / landing |
 | `/programs/catalog` | Program list |
-| `/programs/create` | Create program |
+| `/programs/create` | **Quick Create** — basics only; redirects to `/programs/[id]/edit` after save |
 | `/programs/[id]` | Program detail |
-| `/programs/[id]/edit` | Edit program (eligibility, fee plans, registration options) |
-| `/programs/[id]/sessions` | Session management |
+| `/programs/[id]/edit` | **Full setup** — tabbed editor (see [programs-staff-setup-ui.md](./programs-staff-setup-ui.md)) |
+| `/programs/[id]/billing` | Billing schedule (linked from Edit → Pricing tab) |
+| `/programs/[id]/car-tags` | Printable car dismissal name tags (staff operations) |
+| `/programs/[id]/sessions` | Session management (standalone route; also in Edit → Sessions tab) |
 | `/programs/[id]/discounts` | Program discounts |
 | `/programs/instructors` | Instructor assignments |
 | `/programs/registrations` | Enrollment + waitlist queue |
@@ -397,6 +403,15 @@ TypeScript helpers: `lib/programs/program-lifecycle-types.ts`
 | `/programs/schedule` | Cross-program schedule view |
 | `/programs/reports` | Reports |
 | `/programs/settings` | Module settings |
+
+### Staff setup flow
+
+See **[programs-staff-setup-ui.md](./programs-staff-setup-ui.md)** for Quick Create vs Edit Program architecture, shared section components, capacity group rules, and save behavior.
+
+**Summary:**
+
+- **Quick Create** — name, dates, eligibility, capacity, visibility, draft/active only.
+- **Edit Program** — tabs: Basics, Enrollment, Registration, Pricing, Sessions, Financial Assistance. Sticky Save applies to all tabs via `saveEditProgram`.
 
 ---
 
@@ -414,7 +429,8 @@ Organization context comes from `active_organization_id` cookie and `getMyOrgani
 |------|----------------|
 | `program-types.ts` | `Program` interface |
 | `program-status.ts` | Status enum + labels |
-| `program-queries.ts` / `program-actions.ts` | Program CRUD |
+| `program-queries.ts` / `program-actions.ts` | Program CRUD (`createProgram`, `updateProgram`) |
+| `save-edit-program.ts` | Edit form save wrapper (program + capacity groups + fee plans) |
 | `program-session-types.ts` / `-queries.ts` / `-actions.ts` | Sessions |
 | `program-offering-types.ts` / `-queries.ts` / `-actions.ts` | Offerings |
 | `program-registration-option-types.ts` / `-queries.ts` / `-actions.ts` | Registration options |
@@ -436,16 +452,18 @@ Organization context comes from `active_organization_id` cookie and `getMyOrgani
 
 | Component | Location | Purpose |
 |-----------|----------|---------|
-| `program-fee-plan-editor.tsx` | `components/programs/` | Staff fee plan CRUD in edit form |
+| `edit/*` section components | `components/programs/edit/` | Shared Create + Edit sections (basics, dates, eligibility, enrollment, etc.) |
+| `program-fee-plan-editor.tsx` | `components/programs/` | Fee plan CRUD (Edit → Pricing tab) |
 | `program-sessions-editor.tsx` | `components/programs/` | Session list editor |
 | `program-registration-options-editor.tsx` | `components/programs/` | Registration option picker/editor |
-| `program-capacity-group-editor.tsx` | `components/programs/` | Capacity groups |
+| `program-capacity-group-editor.tsx` | `components/programs/` | Capacity groups by grade/gender |
 | `registration-type-selector.tsx` | `components/programs/` | Registration type UI |
 | `grade-levels-multi-select.tsx` | `components/programs/` | Grade picker |
+| `program-eligibility-display.ts` | `lib/programs/` | Compact age/grade display helpers |
 | `program-register-session-fields.tsx` | `components/customer/` | Customer session picker |
 | `program-register-quote-preview.tsx` | `components/customer/` | Live quote preview |
-| `create-program-form.tsx` | `app/(dashboard)/programs/create/` | Create program |
-| `edit-program-form.tsx` | `app/(dashboard)/programs/[id]/edit/` | Edit program |
+| `create-program-form.tsx` | `app/(dashboard)/programs/create/` | Quick Create form |
+| `edit-program-form.tsx` | `app/(dashboard)/programs/[id]/edit/` | Tabbed Edit Program orchestrator |
 
 ---
 
@@ -477,8 +495,9 @@ Do not break Contacts module when changing registration logic.
 | Legacy | Current (preferred) |
 |--------|---------------------|
 | `program_enrollments.child_person_id` | `participant_contact_id` |
+| Legacy program billing fields on edit form | Offering **fee plans** on Edit → Pricing tab |
 | `program_fee_options` on program | `program_offering_fee_plans` on offering |
-| Direct session prices in UI | Quote engine via fee plan components |
+| Monolithic create + edit forms | Quick Create + tabbed Edit Program ([programs-staff-setup-ui.md](./programs-staff-setup-ui.md)) |
 | `program_enrollment_sessions` | `program_registration_session_access` |
 | `schedule_sessions` | **Do not use** — use `program_sessions` |
 
@@ -494,7 +513,7 @@ From `docs/Known_Issues.md` and recent work:
 
 3. **019A partial apply** — If quote engine behaves oddly, run `019b_lock_quote_engine_and_verify.sql` and confirm verification SELECT passes.
 
-4. **Program edit save logic** — Some fields in `program-actions.ts` may need consolidation (see Known Issues).
+4. **Program edit save** — Uses `saveEditProgram` wrapper; ensure migration `026_program_min_max_age.sql` is applied for age persistence.
 
 5. **Session enrollment tracking** — Session-level `enrolled` counts and capacity enforcement still improving.
 
@@ -558,11 +577,10 @@ Legacy cart tables (`registration_carts`, `registration_orders`) remain unused; 
 
 ## Related Documentation
 
-- `docs/Features.md` — high-level feature list (may be partially outdated)
-- `docs/Database_Overview.md` — cross-module table reference
-- `docs/Module_Inventory.md` — module status summary
-- `docs/Known_Issues.md` — open bugs
-- `scripts/016` through `scripts/019b` — authoritative SQL source
+- [programs-staff-setup-ui.md](./programs-staff-setup-ui.md) — Quick Create + Edit Program UI architecture
+- [programs-architecture-reset-plan.md](./programs-architecture-reset-plan.md) — **workflow audit & refactor sequence (review before Phase 3)**
+- [programs-phase-2b-charge-ledger.md](./programs-phase-2b-charge-ledger.md) — charge ledger design
+- `docs/Features.md` — high-level feature list
 
 ---
 

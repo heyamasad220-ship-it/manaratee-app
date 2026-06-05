@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { LayoutGrid, FileText, Layers } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -37,6 +37,7 @@ export function ModuleApplicationsClient({
   description = "Review submissions, track status, and configure application templates.",
   lockedApplicationType,
   hubApplicationTypes,
+  overviewLeadingContent,
 }: {
   moduleOwner: ModuleOwner
   basePath: string
@@ -44,6 +45,7 @@ export function ModuleApplicationsClient({
   description?: string
   lockedApplicationType?: string
   hubApplicationTypes?: readonly string[]
+  overviewLeadingContent?: ReactNode
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -128,8 +130,9 @@ export function ModuleApplicationsClient({
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="mt-0">
-          {activeTab === "overview" && (
+        <TabsContent value="overview" className="mt-0 space-y-6">
+          {overviewLeadingContent}
+          {!overviewLeadingContent && activeTab === "overview" && (
             <ApplicationsModulePage
               moduleOwner={moduleOwner}
               basePath={basePath}
@@ -149,7 +152,7 @@ export function ModuleApplicationsClient({
               basePath={basePath}
               hubApplicationTypes={resolvedHubTypes}
               lockedApplicationType={lockedApplicationType}
-              section="submissions"
+              section={overviewLeadingContent ? "all" : "submissions"}
               hidePageHeader
               pageTab="submissions"
             />

@@ -6,29 +6,28 @@ import { usePathname } from "next/navigation"
 import {
   CalendarDays,
   Gift,
+  GraduationCap,
   Grid3X3,
   HeartHandshake,
   Home,
+  LayoutDashboard,
   LogOut,
   User,
 } from "lucide-react"
 
 import { OrganizationSwitcher } from "@/components/organization-switcher"
+import type { UserPortalCapabilities } from "@/lib/auth/portal-capabilities-types"
+import type { CustomerOrganization } from "@/lib/customer/customer-organization-types"
 import { formatCustomerPortalRoleLabel } from "@/lib/customer/customer-portal-role-label"
 import { cn } from "@/lib/utils"
-
-type CustomerOrganization = {
-  organization_id: string
-  organization_name: string
-  role_name: string
-}
 
 type CustomerNavProps = {
   activeOrganization: CustomerOrganization | null
   organizations: CustomerOrganization[]
+  portalCapabilities?: UserPortalCapabilities
 }
 
-const navLinks = [
+const memberNavLinks = [
   { label: "Dashboard", href: "/customer/dashboard", icon: Home },
   { label: "Bookings", href: "/customer/bookings", icon: CalendarDays },
   { label: "Donations", href: "/customer/donation", icon: Gift },
@@ -37,14 +36,29 @@ const navLinks = [
   { label: "More", href: "/customer/more", icon: Grid3X3 },
 ]
 
+const teachingNavLinks = [
+  { label: "My Classes", href: "/my-classes", icon: GraduationCap },
+]
+
 export function CustomerNav({
   activeOrganization,
   organizations,
+  portalCapabilities,
 }: CustomerNavProps) {
   const pathname = usePathname()
   const portalRoleLabel = formatCustomerPortalRoleLabel(
     activeOrganization?.role_name
   )
+
+  const isTeachingPortal = pathname.startsWith("/my-classes")
+  const navLinks = isTeachingPortal
+    ? teachingNavLinks
+    : [
+        ...memberNavLinks,
+        ...(portalCapabilities?.hasTeachingPortal
+          ? [{ label: "My Classes", href: "/my-classes", icon: GraduationCap }]
+          : []),
+      ]
 
   return (
     <aside className="hidden w-[260px] shrink-0 border-r border-border bg-card lg:flex lg:flex-col">
@@ -101,6 +115,41 @@ export function CustomerNav({
       </div>
 
       <div className="border-t border-border p-4">
+        {portalCapabilities?.hasPersonalPortal &&
+        portalCapabilities?.hasTeachingPortal ? (
+          <div className="mb-4 space-y-1">
+            <p className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Portal
+            </p>
+            {isTeachingPortal ? (
+              <Link
+                href="/customer/dashboard"
+                className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              >
+                <User className="h-4 w-4" />
+                My Account
+              </Link>
+            ) : (
+              <Link
+                href="/my-classes"
+                className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              >
+                <GraduationCap className="h-4 w-4" />
+                My Classes
+              </Link>
+            )}
+            {portalCapabilities.hasAdminPortal ? (
+              <Link
+                href="/dashboard"
+                className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              >
+                <LayoutDashboard className="h-4 w-4" />
+                Admin Dashboard
+              </Link>
+            ) : null}
+          </div>
+        ) : null}
+
         <div className="mb-4 flex items-center gap-3 rounded-lg bg-muted/50 px-3 py-3">
           <div className="flex h-11 w-11 items-center justify-center rounded-full bg-primary/10 text-primary">
             <User className="h-5 w-5" />

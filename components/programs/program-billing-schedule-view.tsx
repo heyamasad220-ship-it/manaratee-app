@@ -81,10 +81,12 @@ export function ProgramBillingScheduleView({
   programId,
   bundle,
   readOnly = false,
+  showParticipants = true,
 }: {
   programId: string
   bundle: OfferingBillingScheduleBundle
   readOnly?: boolean
+  showParticipants?: boolean
 }) {
   const router = useRouter()
   const [pending, setPending] = React.useState(false)
@@ -243,6 +245,8 @@ export function ProgramBillingScheduleView({
         </CardContent>
       </Card>
 
+      {showParticipants ? (
+        <>
       <Card>
         <CardHeader>
           <CardTitle>Participant Balances</CardTitle>
@@ -653,6 +657,8 @@ export function ProgramBillingScheduleView({
             </Table>
           </CardContent>
         </Card>
+      ) : null}
+        </>
       ) : null}
     </div>
   )

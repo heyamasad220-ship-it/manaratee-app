@@ -109,16 +109,35 @@ export async function getOfferingBillingOverrides(
 
 export async function getOfferingBillingScheduleBundle(
   programId: string,
-  organizationId: string
+  organizationId: string,
+  offeringId?: string | null,
+  options?: { includeParticipants?: boolean }
 ): Promise<OfferingBillingScheduleResult> {
-  const offering = await getDefaultOfferingForProgram(programId)
+  const includeParticipants = options?.includeParticipants ?? true
+  const supabase = await createClient()
+  let offering = null
+
+  if (offeringId) {
+    const { data } = await supabase
+      .from("program_offerings")
+      .select("*")
+      .eq("id", offeringId)
+      .eq("program_id", programId)
+      .eq("organization_id", organizationId)
+      .maybeSingle()
+
+    offering = data
+  }
+
+  if (!offering) {
+    offering = await getDefaultOfferingForProgram(programId)
+  }
 
   if (!offering) {
     return { migrationRequired: false, bundle: null }
   }
 
   const billingCalendarReady = await probeBillingCalendarSchema(organizationId)
-  const supabase = await createClient()
 
   const monthlyPlan = await supabase
     .from("program_offering_fee_plans")
@@ -164,10 +183,11 @@ export async function getOfferingBillingScheduleBundle(
     }
   }
 
-  const enrollmentsResult = await supabase
-    .from("program_enrollments")
-    .select(
-      `
+  const enrollmentsResult = includeParticipants
+    ? await supabase
+        .from("program_enrollments")
+        .select(
+          `
       id,
       charge_id,
       child_name,
@@ -180,25 +200,27 @@ export async function getOfferingBillingScheduleBundle(
         due_today
       )
     `
-    )
-    .eq("organization_id", organizationId)
-    .eq("offering_id", offering.id)
-    .in("status", [
-      "pending_payment",
-      "pending",
-      "enrolled",
-      "active",
-      "completed",
-    ])
-    .order("child_name", { ascending: true })
+        )
+        .eq("organization_id", organizationId)
+        .eq("offering_id", offering.id)
+        .in("status", [
+          "pending_payment",
+          "pending",
+          "enrolled",
+          "active",
+          "completed",
+        ])
+        .order("child_name", { ascending: true })
+    : { data: [] }
 
   const billingPeriods = billingCalendarReady
     ? await getOfferingBillingPeriods(organizationId, offering.id)
     : []
 
-  const overrides = billingCalendarReady
-    ? await getOfferingBillingOverrides(organizationId, offering.id)
-    : []
+  const overrides =
+    includeParticipants && billingCalendarReady
+      ? await getOfferingBillingOverrides(organizationId, offering.id)
+      : []
 
   const enrollments = enrollmentsResult.data || []
   const chargeIds = enrollments

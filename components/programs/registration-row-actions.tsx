@@ -47,11 +47,11 @@ export function RegistrationRowActions({
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
               <Link
-                href={`/programs/${programId}`}
+                href={`/programs/${programId}/edit`}
                 className="flex items-center gap-2"
               >
                 <ExternalLink className="h-4 w-4" />
-                View Program
+                Edit Program
               </Link>
             </DropdownMenuItem>
           </>

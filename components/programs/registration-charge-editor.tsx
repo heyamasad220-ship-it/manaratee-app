@@ -109,11 +109,13 @@ export function RegistrationChargeEditor({
   programId,
   chargeBundle,
   quoteSnapshot,
+  readOnly = false,
 }: {
   enrollmentId: string
   programId: string | null
   chargeBundle: EnrollmentChargeBundle
   quoteSnapshot: unknown
+  readOnly?: boolean
 }) {
   const router = useRouter()
   const [pending, setPending] = React.useState(false)
@@ -249,9 +251,11 @@ export function RegistrationChargeEditor({
       <CardHeader>
         <CardTitle>Registration Fees</CardTitle>
         <CardDescription>
-          {hasCharge
-            ? "Adjust, remove, or add fees for this registration. Changes update the charge ledger and enrollment total."
-            : "This registration has no charge ledger yet (created before auto-charge wiring). Click below to create one from the saved quote, or register anew after migration 023."}
+          {readOnly
+            ? "Fees are read-only because this registration is cancelled or closed."
+            : hasCharge
+              ? "Adjust, remove, or add fees for this registration. Changes update the charge ledger and enrollment total."
+              : "This registration has no charge ledger yet (created before auto-charge wiring). Click below to create one from the saved quote, or register anew after migration 023."}
           {chargeBundle.planType
             ? ` (${chargeBundle.planType.replace("_", " ")})`
             : quote?.plan_type
@@ -269,9 +273,11 @@ export function RegistrationChargeEditor({
         {!hasCharge ? (
           <div className="space-y-4">
             {quote?.ok ? <QuoteFallbackTable quote={quote} /> : null}
-            <Button type="button" onClick={handleEnsureCharge} disabled={pending}>
-              Create Charge Ledger from Quote
-            </Button>
+            {!readOnly ? (
+              <Button type="button" onClick={handleEnsureCharge} disabled={pending}>
+                Create Charge Ledger from Quote
+              </Button>
+            ) : null}
           </div>
         ) : (
           <>
@@ -282,7 +288,7 @@ export function RegistrationChargeEditor({
                   <TableHead className="text-right">Qty</TableHead>
                   <TableHead className="text-right">Unit</TableHead>
                   <TableHead className="text-right">Amount</TableHead>
-                  <TableHead className="w-[140px]" />
+                  {!readOnly ? <TableHead className="w-[140px]" /> : null}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -305,30 +311,32 @@ export function RegistrationChargeEditor({
                     <TableCell className="text-right">
                       {formatCurrency(line.amount)}
                     </TableCell>
-                    <TableCell>
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          disabled={pending}
-                          aria-label={`Edit ${line.label}`}
-                          onClick={() => startEdit(line)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          disabled={pending}
-                          aria-label={`Remove ${line.label}`}
-                          onClick={() => handleVoid(line.id)}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </TableCell>
+                    {!readOnly ? (
+                      <TableCell>
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            disabled={pending}
+                            aria-label={`Edit ${line.label}`}
+                            onClick={() => startEdit(line)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            disabled={pending}
+                            aria-label={`Remove ${line.label}`}
+                            onClick={() => handleVoid(line.id)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    ) : null}
                   </TableRow>
                 ))}
               </TableBody>
@@ -376,7 +384,7 @@ export function RegistrationChargeEditor({
               </div>
             </div>
 
-            {editingLineId ? (
+            {!readOnly && editingLineId ? (
               <form
                 onSubmit={handleAdjustSubmit}
                 className="rounded-lg border bg-muted/20 p-4 space-y-3"
@@ -430,10 +438,11 @@ export function RegistrationChargeEditor({
               </form>
             ) : null}
 
-            <form
-              onSubmit={handleAddSubmit}
-              className="rounded-lg border p-4 space-y-3"
-            >
+            {!readOnly ? (
+              <form
+                onSubmit={handleAddSubmit}
+                className="rounded-lg border p-4 space-y-3"
+              >
               <div className="flex items-center gap-2">
                 <Plus className="h-4 w-4" />
                 <p className="text-sm font-medium">Add fee</p>
@@ -496,6 +505,7 @@ export function RegistrationChargeEditor({
                 Add Fee
               </Button>
             </form>
+            ) : null}
           </>
         )}
 

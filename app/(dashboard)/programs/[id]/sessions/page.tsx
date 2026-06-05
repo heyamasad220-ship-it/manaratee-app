@@ -9,6 +9,7 @@ import {
 } from "lucide-react"
 
 import { Header } from "@/components/layout/header"
+import { OfferingSessionsSelector } from "@/components/programs/edit/offering-sessions-selector"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -21,8 +22,12 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  getDefaultOfferingForProgram,
+  getOfferingsForProgram,
+} from "@/lib/programs/program-offering-queries"
 import { getProgramById } from "@/lib/programs/program-queries"
-import { getProgramSessions } from "@/lib/programs/program-session-queries"
+import { getProgramSessionsForOffering } from "@/lib/programs/program-session-queries"
 import { createProgramSession } from "@/lib/programs/program-session-actions"
 
 function formatDate(date?: string | null) {
@@ -42,27 +47,63 @@ function formatCurrency(amount?: number | null) {
   }).format(amount || 0)
 }
 
+function resolveSelectedOffering(
+  offerings: Awaited<ReturnType<typeof getOfferingsForProgram>>,
+  defaultOffering: Awaited<ReturnType<typeof getDefaultOfferingForProgram>>,
+  offeringParam?: string
+) {
+  if (
+    offeringParam &&
+    offerings.some((offering) => offering.id === offeringParam)
+  ) {
+    return offerings.find((offering) => offering.id === offeringParam) ?? null
+  }
+
+  return defaultOffering ?? offerings[0] ?? null
+}
+
 export default async function ProgramSessionsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>
+  searchParams: Promise<{ offering?: string }>
 }) {
   const { id } = await params
+  const { offering: offeringParam } = await searchParams
 
-  const [program, sessions] = await Promise.all([
+  const [program, offerings, defaultOffering] = await Promise.all([
     getProgramById(id),
-    getProgramSessions(id),
+    getOfferingsForProgram(id),
+    getDefaultOfferingForProgram(id),
   ])
 
   if (!program) {
     notFound()
   }
 
+  const selectedOffering = resolveSelectedOffering(
+    offerings,
+    defaultOffering,
+    offeringParam
+  )
+
+  const sessions = selectedOffering
+    ? await getProgramSessionsForOffering(
+        id,
+        selectedOffering.id,
+        selectedOffering.is_default
+      )
+    : []
+
   async function addSession(formData: FormData) {
     "use server"
 
+    const offeringId = String(formData.get("offering_id") || "") || null
+
     await createProgramSession({
       program_id: id,
+      offering_id: offeringId,
       name: String(formData.get("name") || ""),
       description: String(formData.get("description") || "") || null,
       start_date: String(formData.get("start_date") || "") || null,
@@ -81,6 +122,10 @@ export default async function ProgramSessionsPage({
     })
   }
 
+  const editProgramHref = selectedOffering
+    ? `/programs/${program.id}/edit?tab=offerings`
+    : `/programs/${program.id}/edit`
+
   return (
     <>
       <Header title="Programs" />
@@ -90,11 +135,11 @@ export default async function ProgramSessionsPage({
           <div className="flex items-center justify-between gap-4">
             <div>
               <Link
-                href={`/programs/${program.id}`}
+                href={editProgramHref}
                 className="mb-3 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
               >
                 <ArrowLeft className="h-4 w-4" />
-                Back to Program
+                Back to Offerings
               </Link>
 
               <h1 className="text-2xl font-semibold tracking-tight">
@@ -102,29 +147,40 @@ export default async function ProgramSessionsPage({
               </h1>
 
               <p className="mt-1 text-sm text-muted-foreground">
-                Manage sessions for {program.name}.
+                {selectedOffering
+                  ? `Manage sessions for ${selectedOffering.name} under ${program.name}.`
+                  : `Manage sessions for ${program.name}. Add an offering first.`}
               </p>
             </div>
 
             <Button asChild variant="outline">
-              <Link href={`/programs/${program.id}/edit`}>
-                Edit Program
-              </Link>
+              <Link href={editProgramHref}>Edit Program</Link>
             </Button>
           </div>
 
+          {selectedOffering ? (
+            <OfferingSessionsSelector
+              programId={program.id}
+              offerings={offerings}
+              selectedOfferingId={selectedOffering.id}
+            />
+          ) : (
+            <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
+              No offerings are configured for this program. Add an offering on
+              the Edit Program page before creating sessions.
+            </div>
+          )}
+
           <div className="grid gap-6 lg:grid-cols-3">
             <div className="space-y-4 lg:col-span-2">
-              {sessions.length === 0 ? (
+              {!selectedOffering ? null : sessions.length === 0 ? (
                 <Card>
                   <CardContent className="flex min-h-[260px] flex-col items-center justify-center p-8 text-center">
                     <CalendarDays className="mb-4 h-10 w-10 text-muted-foreground" />
-                    <h2 className="text-lg font-semibold">
-                      No sessions yet
-                    </h2>
+                    <h2 className="text-lg font-semibold">No sessions yet</h2>
                     <p className="mt-2 max-w-md text-sm text-muted-foreground">
-                      Add sessions for camps, classes, workshops, months, weeks,
-                      or course sections.
+                      Add sessions for {selectedOffering.name} — camps, classes,
+                      workshops, months, weeks, or course sections.
                     </p>
                   </CardContent>
                 </Card>
@@ -202,134 +258,142 @@ export default async function ProgramSessionsPage({
               )}
             </div>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Add Session</CardTitle>
-                <CardDescription>
-                  Create a week, month, class section, or program session.
-                </CardDescription>
-              </CardHeader>
+            {selectedOffering ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Add Session</CardTitle>
+                  <CardDescription>
+                    Create a session for {selectedOffering.name}.
+                  </CardDescription>
+                </CardHeader>
 
-              <CardContent>
-                <form action={addSession} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Session Name *</Label>
-                    <Input
-                      id="name"
-                      name="name"
-                      required
-                      placeholder="Session A"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="description">Description</Label>
-                    <Textarea
-                      id="description"
-                      name="description"
-                      rows={3}
-                      placeholder="Optional session details"
-                    />
-                  </div>
-
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="start_date">Start Date</Label>
-                      <Input id="start_date" name="start_date" type="date" />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="end_date">End Date</Label>
-                      <Input id="end_date" name="end_date" type="date" />
-                    </div>
-                  </div>
-
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="registration_open_date">
-                        Registration Open
-                      </Label>
-                      <Input
-                        id="registration_open_date"
-                        name="registration_open_date"
-                        type="date"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="registration_close_date">
-                        Registration Close
-                      </Label>
-                      <Input
-                        id="registration_close_date"
-                        name="registration_close_date"
-                        type="date"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="capacity">Capacity</Label>
-                      <Input
-                        id="capacity"
-                        name="capacity"
-                        type="number"
-                        min="0"
-                        defaultValue="0"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="price">Price</Label>
-                      <Input
-                        id="price"
-                        name="price"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        defaultValue="0"
-                      />
-                    </div>
-                  </div>
-
-                  <label className="flex items-start gap-3 rounded-lg border p-3">
+                <CardContent>
+                  <form action={addSession} className="space-y-4">
                     <input
-                      type="checkbox"
-                      name="enable_waitlist"
-                      defaultChecked
-                      className="mt-1"
+                      type="hidden"
+                      name="offering_id"
+                      value={selectedOffering.id}
                     />
 
-                    <div>
-                      <p className="text-sm font-medium">Enable waitlist</p>
-                      <p className="text-xs text-muted-foreground">
-                        Allow customers to join a waitlist when this session is
-                        full.
-                      </p>
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Session Name *</Label>
+                      <Input
+                        id="name"
+                        name="name"
+                        required
+                        placeholder="Session A"
+                      />
                     </div>
-                  </label>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="waitlist_capacity">
-                      Waitlist Capacity
-                    </Label>
-                    <Input
-                      id="waitlist_capacity"
-                      name="waitlist_capacity"
-                      type="number"
-                      min="0"
-                      placeholder="Leave blank for unlimited"
-                    />
-                  </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="description">Description</Label>
+                      <Textarea
+                        id="description"
+                        name="description"
+                        rows={3}
+                        placeholder="Optional session details"
+                      />
+                    </div>
 
-                  <Button type="submit" className="w-full">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Session
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="start_date">Start Date</Label>
+                        <Input id="start_date" name="start_date" type="date" />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="end_date">End Date</Label>
+                        <Input id="end_date" name="end_date" type="date" />
+                      </div>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="registration_open_date">
+                          Registration Open
+                        </Label>
+                        <Input
+                          id="registration_open_date"
+                          name="registration_open_date"
+                          type="date"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="registration_close_date">
+                          Registration Close
+                        </Label>
+                        <Input
+                          id="registration_close_date"
+                          name="registration_close_date"
+                          type="date"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="capacity">Capacity</Label>
+                        <Input
+                          id="capacity"
+                          name="capacity"
+                          type="number"
+                          min="0"
+                          defaultValue="0"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="price">Price</Label>
+                        <Input
+                          id="price"
+                          name="price"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          defaultValue="0"
+                        />
+                      </div>
+                    </div>
+
+                    <label className="flex items-start gap-3 rounded-lg border p-3">
+                      <input
+                        type="checkbox"
+                        name="enable_waitlist"
+                        defaultChecked
+                        className="mt-1"
+                      />
+
+                      <div>
+                        <p className="text-sm font-medium">Enable waitlist</p>
+                        <p className="text-xs text-muted-foreground">
+                          Allow customers to join a waitlist when this session is
+                          full.
+                        </p>
+                      </div>
+                    </label>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="waitlist_capacity">
+                        Waitlist Capacity
+                      </Label>
+                      <Input
+                        id="waitlist_capacity"
+                        name="waitlist_capacity"
+                        type="number"
+                        min="0"
+                        placeholder="Leave blank for unlimited"
+                      />
+                    </div>
+
+                    <Button type="submit" className="w-full">
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Session
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
+            ) : null}
           </div>
         </div>
       </div>

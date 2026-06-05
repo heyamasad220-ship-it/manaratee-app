@@ -8,6 +8,7 @@ import {
   ExternalLink,
   Mail,
   Phone,
+  Printer,
   User,
 } from "lucide-react"
 
@@ -34,6 +35,7 @@ import {
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import {
   contactLabel,
+  canEditEnrollmentCharges,
   loadContactsByIds,
   shouldShowEnrollmentPaymentStatus,
 } from "@/lib/programs/registration-display-helpers"
@@ -41,6 +43,7 @@ import { getEnrollmentChargeSchedule } from "@/lib/programs/program-billing-quer
 import { getEnrollmentChargeBundle } from "@/lib/programs/program-charge-queries"
 import { CHARGE_SCHEDULE_STATUS_LABELS } from "@/lib/programs/program-billing-types"
 import { getEnrollmentRegistrationDetail } from "@/lib/programs/registration-detail-queries"
+import { isCarTagEligibleStatus } from "@/lib/programs/car-tag-types"
 
 type PageParams = {
   registrationId: string
@@ -280,12 +283,24 @@ export default async function RegistrationDetailPage({
             </div>
 
             {program ? (
-              <Button variant="outline" asChild>
-                <Link href={`/programs/${program.id}`}>
-                  <ExternalLink className="mr-2 h-4 w-4" />
-                  View Program
-                </Link>
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                {isCarTagEligibleStatus(enrollment.status) ? (
+                  <Button variant="outline" asChild>
+                    <Link
+                      href={`/programs/${program.id}/car-tags?enrollment=${enrollment.id}`}
+                    >
+                      <Printer className="mr-2 h-4 w-4" />
+                      Print Car Tag
+                    </Link>
+                  </Button>
+                ) : null}
+                <Button variant="outline" asChild>
+                  <Link href={`/programs/${program.id}/edit`}>
+                    <ExternalLink className="mr-2 h-4 w-4" />
+                    Edit Program
+                  </Link>
+                </Button>
+              </div>
             ) : null}
           </div>
         </div>
@@ -447,15 +462,15 @@ export default async function RegistrationDetailPage({
           programId={program?.id ?? null}
           chargeBundle={chargeBundle}
           quoteSnapshot={enrollment.quote_snapshot}
+          readOnly={!canEditEnrollmentCharges(enrollment.status)}
         />
 
         <Card>
           <CardHeader>
             <CardTitle>Charge Schedule</CardTitle>
             <CardDescription>
-              Individual scheduled charges for this registration. Manage
-              overrides from the program billing schedule or registration-level
-              actions in Phase 2B.
+              Individual scheduled charges for this registration. Waive, adjust,
+              or add fees from this page.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -495,15 +510,6 @@ export default async function RegistrationDetailPage({
                 registration is linked to the Phase 2B charge ledger.
               </p>
             )}
-            {program ? (
-              <div className="mt-4">
-                <Button variant="outline" size="sm" asChild>
-                  <Link href={`/programs/${program.id}/billing`}>
-                    Open Program Billing Schedule
-                  </Link>
-                </Button>
-              </div>
-            ) : null}
           </CardContent>
         </Card>
 

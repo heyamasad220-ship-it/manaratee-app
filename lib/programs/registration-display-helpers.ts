@@ -66,3 +66,10 @@ export function shouldShowEnrollmentPaymentStatus(
 ) {
   return !isTerminalEnrollmentStatus(enrollmentStatus)
 }
+
+/** Charge ledger line edits are blocked once enrollment is terminal (e.g. cancelled). */
+export function canEditEnrollmentCharges(
+  enrollmentStatus: string | null | undefined
+) {
+  return !isTerminalEnrollmentStatus(enrollmentStatus)
+}

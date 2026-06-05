@@ -1,15 +1,26 @@
 import { Header } from "@/components/layout/header"
+import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { getDepartments } from "@/lib/departments/department-queries"
-
-import { CreateProgramForm } from "./create-program-form"
+import { ProgramForm } from "@/components/programs/program-form"
 
 export default async function CreateProgramPage() {
-  const departments = await getDepartments()
+  const [departments, organizationId] = await Promise.all([
+    getDepartments(),
+    getSelectedOrganizationId(),
+  ])
+
+  if (!organizationId) {
+    throw new Error("No organization selected")
+  }
 
   return (
     <>
       <Header title="Programs" />
-      <CreateProgramForm departments={departments} />
+      <ProgramForm
+        mode="create"
+        departments={departments}
+        organizationId={organizationId}
+      />
     </>
   )
 }

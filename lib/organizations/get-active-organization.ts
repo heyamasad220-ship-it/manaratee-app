@@ -1,7 +1,11 @@
 import { cookies } from "next/headers"
+import type { CustomerOrganization } from "@/lib/customer/customer-organization-types"
 import { getMyOrganizations } from "@/lib/organizations/get-my-organizations"
 
-export async function getActiveOrganization() {
+export async function getActiveOrganization(): Promise<{
+  activeOrganization: CustomerOrganization | null
+  organizations: CustomerOrganization[]
+}> {
   const organizations = await getMyOrganizations()
 
   if (!organizations || organizations.length === 0) {
@@ -19,7 +23,7 @@ export async function getActiveOrganization() {
 
   const activeOrganization =
     organizations.find(
-      (org: any) => org.organization_id === cookieOrganizationId
+      (org) => org.organization_id === cookieOrganizationId
     ) || organizations[0]
 
   return {

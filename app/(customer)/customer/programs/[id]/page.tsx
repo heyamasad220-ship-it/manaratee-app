@@ -8,6 +8,8 @@ import {
   CalendarDays,
   Clock,
   GraduationCap,
+  UserCircle2,
+  UserRound,
   Users,
 } from "lucide-react"
 
@@ -22,7 +24,16 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { cn } from "@/lib/utils"
+import {
+  formatProgramAgeRangeShort,
+  formatProgramGradeRangeShort,
+} from "@/lib/programs/program-eligibility-display"
+import { getCustomerOfferingsForProgram } from "@/lib/programs/program-offering-queries"
+import {
+  formatOfferingDateRange,
+  isOfferingEnrollmentOpen,
+} from "@/lib/programs/program-offering-display"
+import type { ProgramOffering } from "@/lib/programs/program-offering-types"
 
 type CustomerOrganization = {
   organization_id: string
@@ -41,6 +52,8 @@ type Program = {
   enrollment_open_date: string | null
   enrollment_close_date: string | null
   age_groups: string[]
+  min_age: number | null
+  max_age: number | null
   grade_levels: string[]
   gender: string | null
   capacity: number
@@ -146,20 +159,6 @@ function getEnrollmentBadgeClass(program: Program) {
   return ""
 }
 
-function getEnrollmentPercent(program: Program) {
-  if (!program.capacity || program.capacity <= 0) return 0
-  return Math.min(Math.round((program.enrolled / program.capacity) * 100), 100)
-}
-
-function getEnrollmentBarColor(program: Program) {
-  const percent = getEnrollmentPercent(program)
-
-  if (percent >= 90) return "bg-red-500"
-  if (percent >= 70) return "bg-amber-500"
-
-  return "bg-emerald-500"
-}
-
 async function getActiveCustomerOrganization() {
   const cookieStore = await cookies()
   const activeOrganizationId = cookieStore.get("active_organization_id")?.value
@@ -256,6 +255,8 @@ export default async function CustomerProgramDetailsPage({
       enrollment_open_date,
       enrollment_close_date,
       age_groups,
+      min_age,
+      max_age,
       grade_levels,
       gender,
       capacity,
@@ -274,11 +275,40 @@ export default async function CustomerProgramDetailsPage({
   }
 
   const program = data as Program
+  const offerings = await getCustomerOfferingsForProgram(
+    program.id,
+    organization.organization_id
+  )
   const scheduleItems = await getProgramScheduleItems(program.id)
 
   const enrollmentLabel = getEnrollmentLabel(program)
   const remainingSeats = seatsRemaining(program)
-  const enrollmentPercent = getEnrollmentPercent(program)
+  const ageRangeLabel = formatProgramAgeRangeShort(program)
+  const gradeRangeLabel = formatProgramGradeRangeShort(program.grade_levels)
+  const openOfferings = offerings.filter((offering) =>
+    isOfferingEnrollmentOpen(offering, program)
+  )
+  const singleOffering =
+    offerings.length === 1 ? offerings[0] : null
+
+  function getOfferingRegisterLabel(offering: ProgramOffering) {
+    if (offering.status === "closed") {
+      return "Registration closed"
+    }
+
+    if (!isOfferingEnrollmentOpen(offering, program)) {
+      return "Not open yet"
+    }
+
+    return "Register"
+  }
+
+  function isOfferingRegisterDisabled(offering: ProgramOffering) {
+    return (
+      offering.status === "closed" ||
+      !isOfferingEnrollmentOpen(offering, program)
+    )
+  }
 
   return (
     <div className="min-h-screen bg-[#f5f5f7] px-6 py-8">
@@ -317,30 +347,121 @@ export default async function CustomerProgramDetailsPage({
 
             <Button
               size="lg"
-              disabled={enrollmentLabel === "Closed" || enrollmentLabel === "Full"}
+              disabled={
+                offerings.length > 1 ||
+                (offerings.length === 0 &&
+                  (enrollmentLabel === "Closed" || enrollmentLabel === "Full")) ||
+                (singleOffering
+                  ? isOfferingRegisterDisabled(singleOffering)
+                  : false)
+              }
               asChild={
-                enrollmentLabel !== "Closed" && enrollmentLabel !== "Full"
+                offerings.length <= 1 &&
+                !(
+                  offerings.length === 0 &&
+                  (enrollmentLabel === "Closed" || enrollmentLabel === "Full")
+                ) &&
+                !(singleOffering && isOfferingRegisterDisabled(singleOffering))
               }
             >
-              {enrollmentLabel === "Closed" || enrollmentLabel === "Full" ? (
-                <span>
-                  {enrollmentLabel === "Closed"
-                    ? "Enrollment Closed"
-                    : "Program Full"}
-                </span>
-              ) : (
-                <Link href={`/customer/programs/${program.id}/register`}>
-                  {enrollmentLabel === "Waitlist"
-                    ? "Join Waitlist"
-                    : "Register"}
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              )}
+              {offerings.length > 1 ? (
+                <span>Choose an offering below</span>
+              ) : offerings.length === 0 ? (
+                enrollmentLabel === "Closed" || enrollmentLabel === "Full" ? (
+                  <span>
+                    {enrollmentLabel === "Closed"
+                      ? "Enrollment Closed"
+                      : "Program Full"}
+                  </span>
+                ) : (
+                  <Link href={`/customer/programs/${program.id}/register`}>
+                    Register
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
+                )
+              ) : singleOffering ? (
+                isOfferingRegisterDisabled(singleOffering) ? (
+                  <span>{getOfferingRegisterLabel(singleOffering)}</span>
+                ) : (
+                  <Link
+                    href={`/customer/programs/${program.id}/register?offering=${singleOffering.id}`}
+                  >
+                    Register
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
+                )
+              ) : null}
             </Button>
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {offerings.length > 0 ? (
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle>
+                {offerings.length === 1 ? "Offering" : "Choose an offering"}
+              </CardTitle>
+              <CardDescription>
+                {offerings.length === 1
+                  ? "Register for the available offering under this program."
+                  : "Select the level, camp, or track you want to register for."}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {offerings.map((offering) => {
+                  const disabled = isOfferingRegisterDisabled(offering)
+
+                  return (
+                    <Card key={offering.id} className="shadow-none">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <CardTitle className="text-lg">{offering.name}</CardTitle>
+                          <Badge variant={disabled ? "secondary" : "default"}>
+                            {disabled
+                              ? getOfferingRegisterLabel(offering)
+                              : "Open"}
+                          </Badge>
+                        </div>
+                        <CardDescription>
+                          {formatOfferingDateRange(
+                            offering.start_date,
+                            offering.end_date
+                          )}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <Button
+                          className="w-full"
+                          disabled={disabled}
+                          asChild={!disabled}
+                        >
+                          {disabled ? (
+                            <span>{getOfferingRegisterLabel(offering)}</span>
+                          ) : (
+                            <Link
+                              href={`/customer/programs/${program.id}/register?offering=${offering.id}`}
+                            >
+                              Register
+                              <ArrowRight className="ml-2 h-4 w-4" />
+                            </Link>
+                          )}
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  )
+                })}
+              </div>
+              {openOfferings.length === 0 ? (
+                <p className="mt-4 text-sm text-muted-foreground">
+                  No offerings are open for registration right now.
+                </p>
+              ) : null}
+            </CardContent>
+          </Card>
+        ) : null}
+
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <Card className="shadow-sm">
             <CardContent className="flex items-center gap-4 p-5">
               <div className="rounded-lg bg-blue-100 p-3 text-blue-600">
@@ -385,134 +506,35 @@ export default async function CustomerProgramDetailsPage({
           <Card className="shadow-sm">
             <CardContent className="flex items-center gap-4 p-5">
               <div className="rounded-lg bg-orange-100 p-3 text-orange-600">
-                <GraduationCap className="h-5 w-5" />
+                <UserCircle2 className="h-5 w-5" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Gender</p>
-                <p className="font-semibold">{program.gender || "All genders"}</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="grid gap-6 lg:grid-cols-3">
-          <Card className="shadow-sm lg:col-span-2">
-            <CardHeader>
-              <CardTitle>Program Details</CardTitle>
-              <CardDescription>
-                Review dates, eligibility, and enrollment availability.
-              </CardDescription>
-            </CardHeader>
-
-            <CardContent className="space-y-6">
-              <div>
-                <div className="mb-2 flex justify-between text-sm">
-                  <span className="text-muted-foreground">Enrollment</span>
-                  <span className="font-medium">
-                    {program.enrolled}/{program.capacity}
-                    {program.waitlist > 0
-                      ? ` (+${program.waitlist} waitlist)`
-                      : ""}
-                  </span>
-                </div>
-
-                <div className="h-2 overflow-hidden rounded-full bg-muted">
-                  <div
-                    className={cn(
-                      "h-full rounded-full",
-                      getEnrollmentBarColor(program)
-                    )}
-                    style={{ width: `${enrollmentPercent}%` }}
-                  />
-                </div>
-
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {remainingSeats > 0
-                    ? `${remainingSeats} seat${
-                        remainingSeats === 1 ? "" : "s"
-                      } remaining.`
-                    : program.waitlist > 0
-                      ? "This program is full. Waitlist may be available."
-                      : "This program is full."}
-                </p>
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <p className="text-sm text-muted-foreground">Start Date</p>
-                  <p className="font-medium">{formatDate(program.start_date)}</p>
-                </div>
-
-                <div>
-                  <p className="text-sm text-muted-foreground">End Date</p>
-                  <p className="font-medium">{formatDate(program.end_date)}</p>
-                </div>
-
-                <div>
-                  <p className="text-sm text-muted-foreground">
-                    Enrollment Opens
-                  </p>
-                  <p className="font-medium">
-                    {formatDate(program.enrollment_open_date)}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-sm text-muted-foreground">
-                    Enrollment Closes
-                  </p>
-                  <p className="font-medium">
-                    {formatDate(program.enrollment_close_date)}
-                  </p>
-                </div>
+                <p className="font-semibold">{program.gender || "All"}</p>
               </div>
             </CardContent>
           </Card>
 
           <Card className="shadow-sm">
-            <CardHeader>
-              <CardTitle>Eligibility</CardTitle>
-              <CardDescription>
-                Who this program is intended for.
-              </CardDescription>
-            </CardHeader>
-
-            <CardContent className="space-y-5">
-              <div>
-                <p className="mb-2 text-sm font-medium">Age Groups</p>
-                {program.age_groups.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {program.age_groups.map((ageGroup) => (
-                      <Badge key={ageGroup} variant="secondary">
-                        {ageGroup}
-                      </Badge>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">All ages</p>
-                )}
+            <CardContent className="flex items-center gap-4 p-5">
+              <div className="rounded-lg bg-rose-100 p-3 text-rose-600">
+                <UserRound className="h-5 w-5" />
               </div>
-
               <div>
-                <p className="mb-2 text-sm font-medium">Grade Levels</p>
-                {program.grade_levels.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {program.grade_levels.map((gradeLevel) => (
-                      <Badge key={gradeLevel} variant="secondary">
-                        {gradeLevel}
-                      </Badge>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">All grades</p>
-                )}
+                <p className="text-sm text-muted-foreground">Ages</p>
+                <p className="font-semibold">{ageRangeLabel}</p>
               </div>
+            </CardContent>
+          </Card>
 
+          <Card className="shadow-sm">
+            <CardContent className="flex items-center gap-4 p-5">
+              <div className="rounded-lg bg-indigo-100 p-3 text-indigo-600">
+                <GraduationCap className="h-5 w-5" />
+              </div>
               <div>
-                <p className="mb-2 text-sm font-medium">Gender</p>
-                <Badge variant="secondary">
-                  {program.gender || "All genders"}
-                </Badge>
+                <p className="text-sm text-muted-foreground">Grade Levels</p>
+                <p className="font-semibold">{gradeRangeLabel}</p>
               </div>
             </CardContent>
           </Card>

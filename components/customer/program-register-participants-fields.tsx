@@ -65,23 +65,29 @@ function formatMoney(value?: number | null) {
   }).format(amount)
 }
 
+function formatEnrollmentStatus(status: string) {
+  return status.replace(/_/g, " ")
+}
+
 function ParticipantFeeColumn({
   member,
   lunchOptions,
   showAddons,
   selected,
   onToggle,
+  activeEnrollmentStatus,
 }: {
   member: FamilyMember
   lunchOptions: LunchOption[]
   showAddons: boolean
   selected: boolean
   onToggle: (checked: boolean) => void
+  activeEnrollmentStatus?: string | null
 }) {
   const fullName = getFullName(member)
   const age = calculateAge(member.date_of_birth)
   const contactId = member.contactId
-  const disabled = !contactId
+  const disabled = !contactId || Boolean(activeEnrollmentStatus)
   const feesDisabled = disabled || !selected
 
   return (
@@ -118,7 +124,13 @@ function ParticipantFeeColumn({
             {age !== null ? ` · Age ${age}` : ""}
             {member.gender ? ` · ${member.gender}` : ""}
           </p>
-          {disabled ? (
+          {disabled && activeEnrollmentStatus ? (
+            <p className="mt-1 text-xs text-amber-700">
+              Already registered ({formatEnrollmentStatus(activeEnrollmentStatus)}).
+              Contact the organization if this should be cancelled.
+            </p>
+          ) : null}
+          {disabled && !activeEnrollmentStatus ? (
             <p className="mt-1 text-xs text-amber-700">
               Contact record missing — add this family member again from your
               profile or contact the organization.
@@ -185,10 +197,12 @@ export function ProgramRegisterParticipantsFields({
   familyMembers,
   lunchOptions,
   showAddons,
+  activeEnrollmentByContactId = {},
 }: {
   familyMembers: FamilyMember[]
   lunchOptions: LunchOption[]
   showAddons: boolean
+  activeEnrollmentByContactId?: Record<string, string>
 }) {
   const [selectedContactIds, setSelectedContactIds] = React.useState<string[]>([])
 
@@ -230,6 +244,9 @@ export function ProgramRegisterParticipantsFields({
               lunchOptions={lunchOptions}
               showAddons={showAddons}
               selected={selected}
+              activeEnrollmentStatus={
+                contactId ? activeEnrollmentByContactId[contactId] ?? null : null
+              }
               onToggle={(checked) => {
                 if (!contactId) return
                 toggleParticipant(contactId, checked)

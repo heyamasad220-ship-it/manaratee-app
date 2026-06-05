@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { isBillingSchemaMissingError } from "@/lib/programs/program-billing-schema"
+import { canEditEnrollmentCharges } from "@/lib/programs/registration-display-helpers"
 
 async function requireOrganizationId() {
   const organizationId = await getSelectedOrganizationId()
@@ -32,6 +33,36 @@ function mapRpcError(error: { message: string }) {
   return error.message
 }
 
+async function assertEnrollmentChargesEditable(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  organizationId: string,
+  enrollmentId: string
+) {
+  if (!enrollmentId) {
+    return { ok: false as const, error: "Missing enrollment" }
+  }
+
+  const { data: enrollment, error } = await supabase
+    .from("program_enrollments")
+    .select("status")
+    .eq("organization_id", organizationId)
+    .eq("id", enrollmentId)
+    .maybeSingle()
+
+  if (error || !enrollment) {
+    return { ok: false as const, error: "Enrollment not found" }
+  }
+
+  if (!canEditEnrollmentCharges(enrollment.status as string)) {
+    return {
+      ok: false as const,
+      error: "Fees cannot be changed for a cancelled or closed registration.",
+    }
+  }
+
+  return { ok: true as const }
+}
+
 export async function ensureEnrollmentChargeAction(formData: FormData) {
   const organizationId = await requireOrganizationId()
   const enrollmentId = String(formData.get("enrollment_id") || "")
@@ -42,6 +73,15 @@ export async function ensureEnrollmentChargeAction(formData: FormData) {
   }
 
   const supabase = await createClient()
+  const editable = await assertEnrollmentChargesEditable(
+    supabase,
+    organizationId,
+    enrollmentId
+  )
+  if (!editable.ok) {
+    return editable
+  }
+
   const { data, error } = await supabase.rpc("staff_ensure_enrollment_charge", {
     p_organization_id: organizationId,
     p_enrollment_id: enrollmentId,
@@ -92,6 +132,15 @@ export async function voidChargeLineAction(formData: FormData) {
   }
 
   const supabase = await createClient()
+  const editable = await assertEnrollmentChargesEditable(
+    supabase,
+    organizationId,
+    enrollmentId
+  )
+  if (!editable.ok) {
+    return editable
+  }
+
   const { error } = await supabase.rpc("void_program_charge_line", {
     p_organization_id: organizationId,
     p_line_id: lineId,
@@ -121,6 +170,15 @@ export async function adjustChargeLineAction(formData: FormData) {
   }
 
   const supabase = await createClient()
+  const editable = await assertEnrollmentChargesEditable(
+    supabase,
+    organizationId,
+    enrollmentId
+  )
+  if (!editable.ok) {
+    return editable
+  }
+
   const { error } = await supabase.rpc("adjust_program_charge_line", {
     p_organization_id: organizationId,
     p_line_id: lineId,
@@ -155,6 +213,15 @@ export async function addChargeLineAction(formData: FormData) {
   }
 
   const supabase = await createClient()
+  const editable = await assertEnrollmentChargesEditable(
+    supabase,
+    organizationId,
+    enrollmentId
+  )
+  if (!editable.ok) {
+    return editable
+  }
+
   const { error } = await supabase.rpc("add_program_charge_line", {
     p_organization_id: organizationId,
     p_charge_id: chargeId,

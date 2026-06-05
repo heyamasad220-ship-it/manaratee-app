@@ -18,6 +18,7 @@ async function requireOrganizationId() {
 
 function revalidateBilling(programId: string) {
   revalidatePath(`/programs/${programId}/billing`)
+  revalidatePath(`/programs/${programId}/edit`)
   revalidatePath("/programs/registrations")
 }
 

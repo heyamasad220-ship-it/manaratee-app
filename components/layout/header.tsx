@@ -15,12 +15,13 @@ import { createClient } from "@/lib/supabase/client"
 import { getCurrentOrganizationId } from "@/lib/current-organization"
 
 interface HeaderProps {
-  title: string
+  /** @deprecated Title is no longer shown in the top bar. Kept for call-site compatibility. */
+  title?: string
   showSearch?: boolean
   actions?: ReactNode
 }
 
-export function Header({ title, showSearch = false, actions }: HeaderProps) {
+export function Header({ showSearch = false, actions }: HeaderProps) {
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
 
   useEffect(() => {
@@ -53,16 +54,12 @@ export function Header({ title, showSearch = false, actions }: HeaderProps) {
   }, [])
 
   return (
-    <header className="flex h-14 sm:h-16 shrink-0 items-center justify-between border-b border-border bg-card px-4 sm:px-6 gap-4">
-      <div className="flex items-center gap-3 min-w-0">
+    <header className="sticky top-0 z-50 flex h-14 shrink-0 items-center justify-end gap-4 border-b border-border bg-card/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-card/80 sm:h-16 sm:px-6">
+      <div className="mr-auto lg:hidden">
         <MobileMenuTrigger />
-
-        <h1 className="text-lg sm:text-xl font-semibold tracking-tight text-foreground truncate">
-          {title}
-        </h1>
       </div>
 
-      <div className="flex items-center gap-2 sm:gap-3">
+      <div className="flex shrink-0 items-center gap-2 sm:gap-3">
         {actions}
         {showSearch && (
           <div className="hidden md:flex relative">

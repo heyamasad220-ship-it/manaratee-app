@@ -6,9 +6,14 @@ export interface Program {
   organization_id: string
 
   name: string
+  subtitle: string | null
   description: string | null
 
   department_id: string | null
+  flyer_url: string | null
+  background_color: string | null
+  title_color: string | null
+  subtitle_color: string | null
 
   start_date: string | null
   end_date: string | null

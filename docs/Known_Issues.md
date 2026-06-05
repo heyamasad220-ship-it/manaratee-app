@@ -88,24 +88,19 @@ organization_members.user_id == auth.users.id
 
 ## Program Edit Save Logic
 
-Status: Open
+Status: **Mostly resolved** (June 2026)
 
-File:
+Current path:
 
-lib/programs/program-actions.ts
+* `lib/programs/save-edit-program.ts` — edit form save wrapper
+* `lib/programs/program-actions.ts` — `updateProgram` includes financial assistance, visibility, waitlist, min/max age
 
-Missing:
+Remaining:
 
-* financial_assistance_enabled
-* financial_assistance_open
-* financial_assistance_close_date
-* financial_assistance_instructions
+* Run migration `scripts/026_program_min_max_age.sql` if ages do not persist
+* Verify production deploy includes latest edit form + `saveEditProgram`
 
-Needs update in:
-
-UpdateProgramInput
-
-and Supabase update payload.
+See [programs-staff-setup-ui.md](./programs-staff-setup-ui.md).
 
 ---
 
@@ -114,5 +109,4 @@ and Supabase update payload.
 * program_enrollment_sessions table
 * Session capacity tracking
 * Session-based registration flow
-* Eligibility redesign
-* Consolidated session management inside Edit Program
+* ~~Consolidated session management inside Edit Program~~ — **Done** (Edit → Sessions tab)

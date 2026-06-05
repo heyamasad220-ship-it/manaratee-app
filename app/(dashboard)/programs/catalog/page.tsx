@@ -2,19 +2,15 @@ import Link from "next/link"
 import {
   Archive,
   Calendar,
-  Eye,
-  LayoutGrid,
-  List,
+  ImageIcon,
   Plus,
-  Search,
   Users,
 } from "lucide-react"
 
 import { Header } from "@/components/layout/header"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { getDepartments } from "@/lib/departments/department-queries"
 import {
   Table,
@@ -26,8 +22,17 @@ import {
 } from "@/components/ui/table"
 
 import { getPrograms } from "@/lib/programs/program-queries"
+import { getOfferingCountsByProgramIds } from "@/lib/programs/program-offering-queries"
 import type { Program } from "@/lib/programs/program-types"
+import type { ProgramStatus } from "@/lib/programs/program-status"
 import { getProgramStatusLabel } from "@/lib/programs/program-status"
+import {
+  getProgramRegistrationAvailabilityLabel,
+  isProgramAcceptingRegistration,
+} from "@/lib/programs/program-enrollment-availability"
+import { ProgramCatalogFilters } from "@/components/programs/program-catalog-filters"
+import { ProgramCardActions } from "@/components/programs/program-card-actions"
+import { ProgramStatusSelect } from "@/components/programs/program-status-select"
 import { cn } from "@/lib/utils"
 
 type PageSearchParams = {
@@ -83,75 +88,127 @@ function matchesProgram(program: Program, filters: PageSearchParams) {
   return matchesSearch && matchesStatus && matchesDepartment
 }
 
-function ProgramCard({ program }: { program: Program }) {
+function getStatusBadgeVariant(status: string) {
+  switch (status as ProgramStatus) {
+    case "active":
+      return "default"
+    case "paused":
+      return "outline"
+    default:
+      return "secondary"
+  }
+}
+
+function ProgramCard({
+  program,
+  offeringCount,
+}: {
+  program: Program
+  offeringCount: number
+}) {
   const percent = getEnrollmentPercent(program)
+  const acceptingRegistration = isProgramAcceptingRegistration(program)
+  const availabilityLabel = getProgramRegistrationAvailabilityLabel(program)
+  const ageLabel = program.age_groups?.length
+    ? program.age_groups.join(", ")
+    : "No age group"
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <CardTitle className="text-lg">{program.name}</CardTitle>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {program.description || "No description"}
-            </p>
-          </div>
-
-          <Badge>{getProgramStatusLabel(program.status)}</Badge>
-        </div>
-      </CardHeader>
-
-      <CardContent className="space-y-4">
-        <div className="flex flex-wrap gap-2">
-          {program.age_groups?.length ? (
-            program.age_groups.map((age) => (
-              <Badge key={age} variant="secondary">
-                {age}
-              </Badge>
-            ))
+    <Card className="overflow-hidden">
+      <div className="flex gap-4 p-4">
+        <div className="aspect-[3/4] w-28 shrink-0 overflow-hidden rounded-md border bg-white sm:w-32">
+          {program.flyer_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={program.flyer_url}
+              alt={`${program.name} flyer`}
+              className="h-full w-full object-cover"
+            />
           ) : (
-            <Badge variant="secondary">No age group</Badge>
+            <div className="flex h-full items-center justify-center bg-muted/40">
+              <ImageIcon className="h-8 w-8 text-muted-foreground/40" />
+            </div>
           )}
         </div>
 
-        <div>
-          <div className="mb-2 flex justify-between text-sm">
-            <span className="text-muted-foreground">Enrollment</span>
-            <span>
-              {program.enrolled}/{program.capacity}
-              {program.waitlist > 0 ? ` (+${program.waitlist} waitlist)` : ""}
-            </span>
-          </div>
-
-          <div className="h-2 overflow-hidden rounded-full bg-muted">
-            <div
-              className={cn("h-full rounded-full", getEnrollmentColor(program))}
-              style={{ width: `${percent}%` }}
+        <div className="min-w-0 flex-1 space-y-2">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-base font-semibold leading-tight">{program.name}</p>
+              {program.subtitle ? (
+                <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
+                  {program.subtitle}
+                </p>
+              ) : null}
+            </div>
+            <ProgramStatusSelect
+              programId={program.id}
+              status={program.status}
             />
           </div>
-        </div>
 
-        <div className="grid gap-3 text-sm sm:grid-cols-2">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Calendar className="h-4 w-4" />
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Calendar className="h-4 w-4 shrink-0" />
             <span>
               {formatDate(program.start_date)} - {formatDate(program.end_date)}
             </span>
           </div>
 
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Users className="h-4 w-4" />
-            <span>{program.gender || "All"}</span>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <Users className="h-4 w-4 shrink-0" />
+              <span>{program.gender || "All"}</span>
+            </div>
+            <span className="text-muted-foreground/40">·</span>
+            <span>{ageLabel}</span>
+            <span className="text-muted-foreground/40">·</span>
+            <span>
+              {offeringCount} offering{offeringCount === 1 ? "" : "s"}
+            </span>
+          </div>
+
+          <div>
+            <div className="mb-1 flex justify-between text-sm">
+              <span className="text-muted-foreground">Enrollment</span>
+              <span>
+                {program.enrolled}/{program.capacity}
+                {program.waitlist > 0 ? ` (+${program.waitlist} waitlist)` : ""}
+              </span>
+            </div>
+
+            <p
+              className={cn(
+                "mb-2 text-xs",
+                acceptingRegistration
+                  ? "text-emerald-700"
+                  : "text-muted-foreground"
+              )}
+            >
+              {availabilityLabel}
+            </p>
+
+            <div className="h-2 overflow-hidden rounded-full bg-muted">
+              <div
+                className={cn(
+                  "h-full rounded-full",
+                  acceptingRegistration
+                    ? getEnrollmentColor(program)
+                    : "bg-muted-foreground/30"
+                )}
+                style={{ width: `${percent}%` }}
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end pt-1">
+            <ProgramCardActions
+              programId={program.id}
+              programName={program.name}
+              programStatus={program.status}
+            />
           </div>
         </div>
-
-        <Button variant="outline" size="sm" asChild>
-          <Link href={`/programs/${program.id}`}>
-            <Eye className="mr-2 h-4 w-4" />
-            View Details
-          </Link>
-        </Button>
-      </CardContent>
+      </div>
     </Card>
   )
 }
@@ -167,7 +224,7 @@ function ProgramsTable({ programs }: { programs: Program[] }) {
               <TableHead>Dates</TableHead>
               <TableHead>Enrollment</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead className="w-[120px]" />
+              <TableHead className="w-[280px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
 
@@ -190,13 +247,17 @@ function ProgramsTable({ programs }: { programs: Program[] }) {
                 </TableCell>
 
                 <TableCell>
-                  <Badge>{getProgramStatusLabel(program.status)}</Badge>
+                  <Badge variant={getStatusBadgeVariant(program.status)}>
+                    {getProgramStatusLabel(program.status)}
+                  </Badge>
                 </TableCell>
 
                 <TableCell>
-                  <Button variant="outline" size="sm" asChild>
-                    <Link href={`/programs/${program.id}`}>View</Link>
-                  </Button>
+                  <ProgramCardActions
+                    programId={program.id}
+                    programName={program.name}
+                    programStatus={program.status}
+                  />
                 </TableCell>
               </TableRow>
             ))}
@@ -215,7 +276,7 @@ export default async function ProgramsPage({
   const resolvedSearchParams = await searchParams
 
   const filters: PageSearchParams = {
-    q: getValue(resolvedSearchParams?.q),
+    q: getValue(resolvedSearchParams?.q) || "",
     status: getValue(resolvedSearchParams?.status) || "all",
     department: getValue(resolvedSearchParams?.department) || "all",
     view: getValue(resolvedSearchParams?.view) || "cards",
@@ -227,6 +288,9 @@ export default async function ProgramsPage({
   ])
   const filteredPrograms = programs.filter((program) =>
     matchesProgram(program, filters)
+  )
+  const offeringCounts = await getOfferingCountsByProgramIds(
+    filteredPrograms.map((program) => program.id)
   )
 
   const viewMode = filters.view === "table" ? "table" : "cards"
@@ -254,71 +318,15 @@ export default async function ProgramsPage({
 
         <Card>
           <CardContent className="p-4">
-            <form className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex flex-1 flex-col gap-4 sm:flex-row">
-                <div className="relative flex-1 lg:max-w-sm">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    name="q"
-                    defaultValue={filters.q}
-                    placeholder="Search programs..."
-                    className="pl-9"
-                  />
-                </div>
-
-                <select
-                  name="status"
-                  defaultValue={filters.status}
-                  className="h-10 rounded-md border bg-background px-3 text-sm"
-                >
-                  <option value="all">All Statuses</option>
-                  <option value="draft">Draft</option>
-                  <option value="active">Active</option>
-                  <option value="paused">Paused</option>
-                  <option value="archived">Archived</option>
-                </select>
-
-                <select
-  name="department"
-  defaultValue={filters.department}
-  className="h-10 rounded-md border bg-background px-3 text-sm"
->
-  <option value="all">All Departments</option>
-
-  {departments.map((department) => (
-  <option key={department.id} value={department.id}>
-    {department.name}
-  </option>
-))}
-</select>
-
-                <input type="hidden" name="view" value={viewMode} />
-
-                <Button type="submit">Apply</Button>
-              </div>
-
-              <div className="flex gap-2">
-                <Button
-                  variant={viewMode === "cards" ? "secondary" : "outline"}
-                  asChild
-                >
-                  <Link href="/programs/catalog?view=cards">
-                    <LayoutGrid className="mr-2 h-4 w-4" />
-                    Cards
-                  </Link>
-                </Button>
-
-                <Button
-                  variant={viewMode === "table" ? "secondary" : "outline"}
-                  asChild
-                >
-                  <Link href="/programs/catalog?view=table">
-                    <List className="mr-2 h-4 w-4" />
-                    Table
-                  </Link>
-                </Button>
-              </div>
-            </form>
+            <ProgramCatalogFilters
+              departments={departments}
+              initialFilters={{
+                q: filters.q || "",
+                status: filters.status || "all",
+                department: filters.department || "all",
+                view: viewMode,
+              }}
+            />
           </CardContent>
         </Card>
 
@@ -342,7 +350,11 @@ export default async function ProgramsPage({
         ) : (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {filteredPrograms.map((program) => (
-              <ProgramCard key={program.id} program={program} />
+              <ProgramCard
+                key={program.id}
+                program={program}
+                offeringCount={offeringCounts.get(program.id) || 0}
+              />
             ))}
           </div>
         )}
