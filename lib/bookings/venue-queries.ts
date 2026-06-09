@@ -82,6 +82,91 @@ const venueSelectColumns = `
   updated_at
 `
 
+const legacyVenueSelectColumns = `
+  id,
+  organization_id,
+  name,
+  description,
+  location,
+  capacity,
+  max_capacity,
+  base_price,
+  hourly_rate,
+  amenities,
+  status,
+  created_at,
+  updated_at
+`
+
+function isMissingVenueColumnError(error: { message?: string } | null) {
+  const message = error?.message?.toLowerCase() ?? ""
+  return (
+    message.includes("usage_tag") ||
+    message.includes("peak_flat_price") ||
+    message.includes("peak_hourly_rate") ||
+    message.includes("availability_start") ||
+    message.includes("availability_end") ||
+    message.includes("does not exist")
+  )
+}
+
+async function fetchOrganizationVenueRows(
+  organizationId: string,
+  options?: { venueId?: string }
+) {
+  const supabase = await createClient()
+
+  let query = supabase
+    .from("venues")
+    .select(venueSelectColumns)
+    .eq("organization_id", organizationId)
+
+  if (options?.venueId) {
+    query = query.eq("id", options.venueId).maybeSingle()
+  } else {
+    query = query.order("name", { ascending: true })
+  }
+
+  let result = await query
+
+  if (result.error && isMissingVenueColumnError(result.error)) {
+    let legacyQuery = supabase
+      .from("venues")
+      .select(legacyVenueSelectColumns)
+      .eq("organization_id", organizationId)
+
+    if (options?.venueId) {
+      legacyQuery = legacyQuery.eq("id", options.venueId).maybeSingle()
+    } else {
+      legacyQuery = legacyQuery.order("name", { ascending: true })
+    }
+
+    result = await legacyQuery
+  }
+
+  return result
+}
+
+export async function venueCatalogSupportsUsageTags(): Promise<boolean> {
+  const organizationId = await getSelectedOrganizationId()
+  if (!organizationId) {
+    return false
+  }
+
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from("venues")
+    .select("usage_tag")
+    .eq("organization_id", organizationId)
+    .limit(1)
+
+  if (!error) {
+    return true
+  }
+
+  return !isMissingVenueColumnError(error)
+}
+
 async function getVenueBookingStats(organizationId: string) {
   const supabase = await createClient()
 
@@ -124,27 +209,23 @@ export async function getVenues(): Promise<VenueRecord[]> {
 }
 
 export async function getVenuesWithStats(): Promise<VenueWithStats[]> {
-  const supabase = await createClient()
   const organizationId = await getSelectedOrganizationId()
 
   if (!organizationId) {
     return []
   }
 
-  const { data, error } = await supabase
-    .from("venues")
-    .select(venueSelectColumns)
-    .eq("organization_id", organizationId)
-    .order("name", { ascending: true })
+  const { data, error } = await fetchOrganizationVenueRows(organizationId)
 
   if (error) {
     console.error(error)
     throw new Error("Failed to load venues")
   }
 
+  const rows = (Array.isArray(data) ? data : data ? [data] : []) as VenueRow[]
   const bookingStats = await getVenueBookingStats(organizationId)
 
-  return ((data || []) as VenueRow[]).map((row) => {
+  return rows.map((row) => {
     const venue = mapVenueRow(row)
     const stats = bookingStats.get(venue.id) || { totalBookings: 0, revenue: 0 }
 
@@ -157,26 +238,26 @@ export async function getVenuesWithStats(): Promise<VenueWithStats[]> {
 }
 
 export async function getVenueById(id: string): Promise<VenueRecord | null> {
-  const supabase = await createClient()
   const organizationId = await getSelectedOrganizationId()
 
   if (!organizationId) {
     return null
   }
 
-  const { data, error } = await supabase
-    .from("venues")
-    .select(venueSelectColumns)
-    .eq("id", id)
-    .eq("organization_id", organizationId)
-    .maybeSingle()
+  const { data, error } = await fetchOrganizationVenueRows(organizationId, {
+    venueId: id,
+  })
 
   if (error) {
     console.error(error)
     return null
   }
 
-  return data ? mapVenueRow(data as VenueRow) : null
+  if (!data || Array.isArray(data)) {
+    return null
+  }
+
+  return mapVenueRow(data as VenueRow)
 }
 
 export async function getVenuesByUsageTag(

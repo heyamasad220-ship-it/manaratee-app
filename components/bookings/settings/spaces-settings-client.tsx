@@ -144,9 +144,11 @@ function toFormState(venue: VenueWithStats): VenueFormState {
 export function SpacesSettingsClient({
   venues,
   canManage,
+  supportsUsageTags = true,
 }: {
   venues: VenueWithStats[]
   canManage: boolean
+  supportsUsageTags?: boolean
 }) {
   const router = useRouter()
   const [search, setSearch] = useState("")
@@ -264,6 +266,17 @@ export function SpacesSettingsClient({
         </div>
 
         <FacilitiesSettingsNav />
+
+        {!supportsUsageTags ? (
+          <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            Run migration{" "}
+            <code className="rounded bg-amber-100 px-1.5 py-0.5 text-xs">
+              068_venue_usage_tags_and_pricing.sql
+            </code>{" "}
+            in Supabase to enable internal/external tags, peak pricing, and availability hours.
+            Basic space fields still work until then.
+          </div>
+        ) : null}
 
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Spaces</h1>

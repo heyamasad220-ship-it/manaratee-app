@@ -76,6 +76,31 @@ function validateVenueInput(input: UpsertVenueInput) {
   }
 }
 
+function toLegacyVenuePayload(payload: ReturnType<typeof validateVenueInput>) {
+  const {
+    peak_flat_price: _peakFlat,
+    peak_hourly_rate: _peakHourly,
+    usage_tag: _usageTag,
+    availability_start: _availabilityStart,
+    availability_end: _availabilityEnd,
+    ...legacy
+  } = payload
+
+  return legacy
+}
+
+function isMissingVenueColumnError(error: { message?: string } | null) {
+  const message = error?.message?.toLowerCase() ?? ""
+  return (
+    message.includes("usage_tag") ||
+    message.includes("peak_flat_price") ||
+    message.includes("peak_hourly_rate") ||
+    message.includes("availability_start") ||
+    message.includes("availability_end") ||
+    message.includes("does not exist")
+  )
+}
+
 function revalidateVenuePaths() {
   revalidatePath("/facilities/settings/spaces")
   revalidatePath("/facilities/settings")
@@ -99,27 +124,31 @@ export async function upsertVenue(input: UpsertVenueInput) {
 
   const payload = validateVenueInput(input)
 
-  if (input.id) {
-    const { error } = await supabase
-      .from("venues")
-      .update(payload)
-      .eq("id", input.id)
-      .eq("organization_id", organizationId)
-
-    if (error) {
-      console.error(error)
-      throw new Error(error.message || "Failed to update venue")
+  async function writeVenueRecord(recordPayload: Record<string, unknown>) {
+    if (input.id) {
+      return supabase
+        .from("venues")
+        .update(recordPayload)
+        .eq("id", input.id)
+        .eq("organization_id", organizationId)
     }
-  } else {
-    const { error } = await supabase.from("venues").insert({
+
+    return supabase.from("venues").insert({
       organization_id: organizationId,
-      ...payload,
+      ...recordPayload,
     })
+  }
 
-    if (error) {
-      console.error(error)
-      throw new Error(error.message || "Failed to create venue")
-    }
+  let { error } = await writeVenueRecord(payload)
+
+  if (error && isMissingVenueColumnError(error)) {
+    const legacyResult = await writeVenueRecord(toLegacyVenuePayload(payload))
+    error = legacyResult.error
+  }
+
+  if (error) {
+    console.error(error)
+    throw new Error(error.message || (input.id ? "Failed to update venue" : "Failed to create venue"))
   }
 
   revalidateVenuePaths()
