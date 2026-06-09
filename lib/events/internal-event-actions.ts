@@ -13,6 +13,7 @@ import { createClient } from "@/lib/supabase/server"
 import { resolveOrganizationId } from "@/lib/organizations/resolve-organization-id"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { userCanSubmitInternalEventRequest } from "@/lib/auth/staff-tools-eligibility"
+import { normalizeVenueUsageTag, VENUE_USAGE_TAGS } from "@/lib/bookings/venue-usage"
 import { hasAnyPermission, PERMISSIONS } from "@/lib/permissions/permissions"
 import { getConflictingReservations } from "@/lib/reservations/reservation-queries"
 
@@ -158,13 +159,19 @@ async function assertVenueInOrg(
 
   const { data, error } = await supabase
     .from("venues")
-    .select("id")
+    .select("id, usage_tag")
     .eq("id", venueId)
     .eq("organization_id", organizationId)
     .maybeSingle()
 
   if (error || !data) {
     throw new Error("Selected venue is not valid for this organization.")
+  }
+
+  if (normalizeVenueUsageTag(data.usage_tag as string | null) !== VENUE_USAGE_TAGS.internal) {
+    throw new Error(
+      "Internal events can only use Internal spaces. Choose an internal-tagged space in Facilities settings."
+    )
   }
 }
 async function assertDepartmentInOrg(

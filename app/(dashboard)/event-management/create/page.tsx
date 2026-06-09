@@ -3,7 +3,7 @@ import { InternalEventForm } from "@/components/events/internal-event-form"
 import { getDepartments } from "@/lib/departments/department-queries"
 import { getEventTypes } from "@/lib/events/event-type-queries"
 import { getInternalEventFormDefaults } from "@/lib/events/internal-event-form-defaults"
-import { getCalendarVenues } from "@/lib/reservations/reservation-queries"
+import { getInternalCalendarVenues } from "@/lib/bookings/venue-calendar-venues"
 import {
   PERMISSIONS,
   requireAnyPermission,
@@ -24,7 +24,7 @@ export default async function CreateInternalEventPage({ searchParams }: PageProp
   const [departments, eventTypes, venues, defaults] = await Promise.all([
     getDepartments(),
     getEventTypes({ activeOnly: true }),
-    getCalendarVenues(),
+    getInternalCalendarVenues(),
     getInternalEventFormDefaults(),
   ])
 

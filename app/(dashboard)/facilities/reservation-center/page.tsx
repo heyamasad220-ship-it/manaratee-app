@@ -10,6 +10,10 @@ import {
 import { Header } from "@/components/layout/header"
 import { VenueRentalTransitionReportPanel } from "@/components/bookings/venue-rental-transition-report-panel"
 import { ReservationCenterOpsPanel } from "@/components/facilities/reservation-center-ops-panel"
+import {
+  MasterCalendarLegend,
+  NeedSpaceIntakeCard,
+} from "@/components/facilities/need-space-intake-card"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -56,13 +60,45 @@ export default async function ReservationCenterPage() {
         <div>
           <h2 className="text-xl font-semibold">Reservation Center</h2>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-            Operational hub for shared reservation infrastructure. Business workflows
-            live in Venue Rentals, Event Management, and Programs; this view surfaces
-            cross-module visibility, conflicts, and transition safety.
+            Operational hub for shared reservation infrastructure. Business workflows live in
+            Venue Rentals, Event Management, and Programs. This view surfaces cross-module
+            visibility, conflicts, and facility setup — use module calendars for your slice, and
+            the master calendar for the full picture.
           </p>
+          <div className="mt-3">
+            <MasterCalendarLegend />
+          </div>
         </div>
 
-        <div className="flex flex-wrap gap-4 [&>*]:w-fit">
+        <NeedSpaceIntakeCard />
+
+        <ReservationCenterOpsPanel
+          upcomingBriefs={upcomingBriefs}
+          temporaryHolds={temporaryHolds}
+          conflicts={conflicts}
+        />
+
+        <Card className={briefsNeedingReview > 0 ? "border-amber-200" : undefined}>
+          <CardHeader className="pb-2">
+            <CardDescription>Operational briefs needing review</CardDescription>
+            <CardTitle className="text-2xl">{briefsNeedingReview}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="mb-2 text-sm text-muted-foreground">
+              Setup briefs flagged as needs review or with reported issues. Open a reservation on
+              the master calendar to view facility setup details.
+            </p>
+            <Button variant="link" className="h-auto p-0" asChild>
+              <Link href="/facilities/calendar">Open master calendar</Link>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <div>
+          <h3 className="mb-3 text-sm font-semibold text-muted-foreground">
+            Venue rental queue metrics
+          </h3>
+          <div className="flex flex-wrap gap-4 [&>*]:w-fit">
           <Card>
             <CardHeader className="pb-2">
               <CardDescription>Awaiting approval</CardDescription>
@@ -112,29 +148,8 @@ export default async function ReservationCenterPage() {
               </Button>
             </CardContent>
           </Card>
+          </div>
         </div>
-
-        <ReservationCenterOpsPanel
-          upcomingBriefs={upcomingBriefs}
-          temporaryHolds={temporaryHolds}
-          conflicts={conflicts}
-        />
-
-        <Card className={briefsNeedingReview > 0 ? "border-amber-200" : undefined}>
-          <CardHeader className="pb-2">
-            <CardDescription>Operational briefs needing review</CardDescription>
-            <CardTitle className="text-2xl">{briefsNeedingReview}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="mb-2 text-sm text-muted-foreground">
-              Setup briefs flagged as needs review or with reported issues. Open a
-              reservation on the master calendar to view facility setup details.
-            </p>
-            <Button variant="link" className="h-auto p-0" asChild>
-              <Link href="/facilities/calendar">Open master calendar</Link>
-            </Button>
-          </CardContent>
-        </Card>
 
         <Card>
           <CardHeader>

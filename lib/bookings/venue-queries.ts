@@ -3,9 +3,11 @@ import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-orga
 
 import {
   normalizeVenueStatus,
+  normalizeVenueUsageTag,
   parseAmenities,
   type VenueRecord,
   type VenueStatus,
+  type VenueUsageTag,
   type VenueWithStats,
 } from "./venue-types"
 
@@ -19,6 +21,11 @@ type VenueRow = {
   max_capacity?: number | null
   base_price: number | string | null
   hourly_rate: number | string | null
+  peak_flat_price?: number | string | null
+  peak_hourly_rate?: number | string | null
+  usage_tag?: string | null
+  availability_start?: string | null
+  availability_end?: string | null
   amenities: string[] | null
   status: string | null
   created_at: string
@@ -42,12 +49,38 @@ function mapVenueRow(row: VenueRow): VenueRecord {
     capacity: Number(row.capacity ?? row.max_capacity ?? 0),
     base_price: Number(row.base_price ?? 0),
     hourly_rate: Number(row.hourly_rate ?? 0),
+    peak_flat_price: Number(row.peak_flat_price ?? row.base_price ?? 0),
+    peak_hourly_rate: Number(row.peak_hourly_rate ?? row.hourly_rate ?? 0),
+    usage_tag: normalizeVenueUsageTag(row.usage_tag),
+    availability_start: row.availability_start ?? null,
+    availability_end: row.availability_end ?? null,
     amenities: parseAmenities(row.amenities),
     status: normalizeVenueStatus(row.status),
     created_at: row.created_at,
     updated_at: row.updated_at,
   }
 }
+
+const venueSelectColumns = `
+  id,
+  organization_id,
+  name,
+  description,
+  location,
+  capacity,
+  max_capacity,
+  base_price,
+  hourly_rate,
+  peak_flat_price,
+  peak_hourly_rate,
+  usage_tag,
+  availability_start,
+  availability_end,
+  amenities,
+  status,
+  created_at,
+  updated_at
+`
 
 async function getVenueBookingStats(organizationId: string) {
   const supabase = await createClient()
@@ -100,23 +133,7 @@ export async function getVenuesWithStats(): Promise<VenueWithStats[]> {
 
   const { data, error } = await supabase
     .from("venues")
-    .select(
-      `
-      id,
-      organization_id,
-      name,
-      description,
-      location,
-      capacity,
-      max_capacity,
-      base_price,
-      hourly_rate,
-      amenities,
-      status,
-      created_at,
-      updated_at
-    `
-    )
+    .select(venueSelectColumns)
     .eq("organization_id", organizationId)
     .order("name", { ascending: true })
 
@@ -149,23 +166,7 @@ export async function getVenueById(id: string): Promise<VenueRecord | null> {
 
   const { data, error } = await supabase
     .from("venues")
-    .select(
-      `
-      id,
-      organization_id,
-      name,
-      description,
-      location,
-      capacity,
-      max_capacity,
-      base_price,
-      hourly_rate,
-      amenities,
-      status,
-      created_at,
-      updated_at
-    `
-    )
+    .select(venueSelectColumns)
     .eq("id", id)
     .eq("organization_id", organizationId)
     .maybeSingle()
@@ -176,4 +177,17 @@ export async function getVenueById(id: string): Promise<VenueRecord | null> {
   }
 
   return data ? mapVenueRow(data as VenueRow) : null
+}
+
+export async function getVenuesByUsageTag(
+  usageTag: VenueUsageTag,
+  options?: { activeOnly?: boolean }
+): Promise<VenueRecord[]> {
+  const venues = await getVenuesWithStats()
+  return venues
+    .filter((venue) => venue.usage_tag === usageTag)
+    .filter((venue) =>
+      options?.activeOnly ? venue.status === "active" : true
+    )
+    .map(({ totalBookings: _totalBookings, revenue: _revenue, ...venue }) => venue)
 }

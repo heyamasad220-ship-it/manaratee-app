@@ -306,6 +306,7 @@ export type UpcomingOperationalBriefRow = {
   id: string
   title: string
   sourceType: string
+  sourceId: string | null
   eventDate: string | null
   startTime: string | null
   setupStatus: string
@@ -323,7 +324,7 @@ export async function getUpcomingOperationalBriefs(
 
   const { data, error } = await supabase
     .from("operational_briefs")
-    .select("id, title, source_type, event_date, start_time, setup_status, source_status")
+    .select("id, title, source_type, source_id, event_date, start_time, setup_status, source_status")
     .eq("organization_id", orgId)
     .gte("event_date", today)
     .order("event_date", { ascending: true })
@@ -336,6 +337,7 @@ export async function getUpcomingOperationalBriefs(
     id: row.id as string,
     title: row.title as string,
     sourceType: row.source_type as string,
+    sourceId: (row.source_id as string | null) ?? null,
     eventDate: row.event_date as string | null,
     startTime: row.start_time as string | null,
     setupStatus: row.setup_status as string,

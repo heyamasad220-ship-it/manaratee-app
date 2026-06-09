@@ -5,7 +5,7 @@ import { Header } from "@/components/layout/header"
 import { getDepartments } from "@/lib/departments/department-queries"
 import { getEventTypes } from "@/lib/events/event-type-queries"
 import { getInternalEventFormDefaults } from "@/lib/events/internal-event-form-defaults"
-import { getCalendarVenues } from "@/lib/reservations/reservation-queries"
+import { getInternalCalendarVenues } from "@/lib/bookings/venue-calendar-venues"
 import { hasAnyPermission, PERMISSIONS } from "@/lib/permissions/permissions"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 
@@ -39,7 +39,7 @@ export default async function InternalEventRequestPage({ searchParams }: PagePro
   const [departments, eventTypes, venues, defaults] = await Promise.all([
     getDepartments(),
     getEventTypes({ activeOnly: true }),
-    getCalendarVenues(),
+    getInternalCalendarVenues(),
     getInternalEventFormDefaults(),
   ])
 

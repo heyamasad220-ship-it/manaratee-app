@@ -6,7 +6,7 @@ import { getDepartments } from "@/lib/departments/department-queries"
 import { getEventTypes } from "@/lib/events/event-type-queries"
 import { getInternalEventFormDefaults } from "@/lib/events/internal-event-form-defaults"
 import { getActiveOrganization } from "@/lib/organizations/get-active-organization"
-import { getCalendarVenues } from "@/lib/reservations/reservation-queries"
+import { getInternalCalendarVenues } from "@/lib/bookings/venue-calendar-venues"
 import { createClient } from "@/lib/supabase/server"
 
 type PageProps = {
@@ -49,7 +49,7 @@ export default async function CustomerStaffEventRequestPage({
   const [departments, eventTypes, venues, defaults] = await Promise.all([
     getDepartments(),
     getEventTypes({ activeOnly: true }),
-    getCalendarVenues(),
+    getInternalCalendarVenues(),
     getInternalEventFormDefaults(),
   ])
 

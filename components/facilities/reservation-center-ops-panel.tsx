@@ -14,6 +14,7 @@ import {
 import type { TemporaryHoldRow, UpcomingOperationalBriefRow } from "@/lib/operational-briefs/operational-brief-queries"
 import { OPERATIONAL_BRIEF_SETUP_STATUS_LABELS } from "@/lib/operational-briefs/operational-brief-types"
 import type { MasterCalendarConflictPreview } from "@/lib/operational-briefs/reservation-center-queries"
+import { operationalBriefSourceHref } from "@/lib/operational-briefs/brief-source-path"
 import { formatTimeRange } from "@/lib/reservations/reservation-time"
 
 type ReservationCenterOpsPanelProps = {
@@ -63,12 +64,23 @@ export function ReservationCenterOpsPanel({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {upcomingBriefs.map((brief) => (
+                  {upcomingBriefs.map((brief) => {
+                    const sourceHref = operationalBriefSourceHref(
+                      brief.sourceType,
+                      brief.sourceId
+                    )
+
+                    return (
                     <TableRow key={brief.id}>
                       <TableCell>
                         <div className="space-y-1">
                           <p className="font-medium">{brief.title}</p>
                           <Badge variant="outline">{sourceTypeLabel(brief.sourceType)}</Badge>
+                          {sourceHref ? (
+                            <Button variant="link" className="h-auto p-0 text-xs" asChild>
+                              <Link href={sourceHref}>Open source record</Link>
+                            </Button>
+                          ) : null}
                         </div>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
@@ -83,7 +95,8 @@ export function ReservationCenterOpsPanel({
                         </Badge>
                       </TableCell>
                     </TableRow>
-                  ))}
+                    )
+                  })}
                 </TableBody>
               </Table>
             </div>

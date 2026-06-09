@@ -30,6 +30,7 @@ import {
 } from "./venue-rental-transition"
 import { getDuplicateVenueRentalBlockReport } from "./venue-rental-transition-queries"
 import { syncOperationalBriefForVenueRental } from "@/lib/operational-briefs/operational-brief-queries"
+import { normalizeVenueUsageTag } from "@/lib/bookings/venue-usage"
 import {
   RENTAL_CONTRACT_STATUSES,
   RENTAL_PAYMENT_STATUSES,
@@ -99,7 +100,7 @@ async function assertVenuesInOrg(
 
   const { data, error } = await supabase
     .from("venues")
-    .select("id")
+    .select("id, usage_tag")
     .eq("organization_id", organizationId)
     .in("id", uniqueIds)
 
@@ -109,6 +110,16 @@ async function assertVenuesInOrg(
 
   if ((data || []).length !== uniqueIds.length) {
     throw new Error("One or more selected venues are invalid for this organization.")
+  }
+
+  const invalidTag = (data || []).find(
+    (row) => normalizeVenueUsageTag(row.usage_tag as string | null) !== "external"
+  )
+
+  if (invalidTag) {
+    throw new Error(
+      "Venue Rentals can only use External spaces. Choose an external-tagged space or update the space in Facilities settings."
+    )
   }
 }
 

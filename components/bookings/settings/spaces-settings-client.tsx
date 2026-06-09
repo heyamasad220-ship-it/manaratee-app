@@ -51,7 +51,16 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Card, CardContent } from "@/components/ui/card"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { deleteVenue, upsertVenue } from "@/lib/bookings/venue-actions"
+import {
+  formatVenueAvailabilityWindow,
+  getVenueUsageTagDescription,
+  getVenueUsageTagLabel,
+  toVenueTimeInputValue,
+  VENUE_USAGE_TAGS,
+  type VenueUsageTag,
+} from "@/lib/bookings/venue-usage"
 import {
   getVenueStatusLabel,
   getVenueSummaryStats,
@@ -69,6 +78,11 @@ type VenueFormState = {
   capacity: string
   basePrice: string
   hourlyRate: string
+  peakFlatPrice: string
+  peakHourlyRate: string
+  usageTag: VenueUsageTag
+  availabilityStart: string
+  availabilityEnd: string
   amenities: string
   status: VenueStatus
 }
@@ -80,8 +94,18 @@ const emptyForm: VenueFormState = {
   capacity: "",
   basePrice: "",
   hourlyRate: "",
+  peakFlatPrice: "",
+  peakHourlyRate: "",
+  usageTag: VENUE_USAGE_TAGS.internal,
+  availabilityStart: "08:00",
+  availabilityEnd: "22:00",
   amenities: "",
   status: VENUE_STATUSES.active,
+}
+
+const tagStyles: Record<string, string> = {
+  Internal: "bg-violet-100 text-violet-700",
+  External: "bg-blue-100 text-blue-700",
 }
 
 const statusStyles: Record<string, string> = {
@@ -107,6 +131,11 @@ function toFormState(venue: VenueWithStats): VenueFormState {
     capacity: String(venue.capacity || ""),
     basePrice: String(venue.base_price || ""),
     hourlyRate: String(venue.hourly_rate || ""),
+    peakFlatPrice: String(venue.peak_flat_price || venue.base_price || ""),
+    peakHourlyRate: String(venue.peak_hourly_rate || venue.hourly_rate || ""),
+    usageTag: venue.usage_tag,
+    availabilityStart: toVenueTimeInputValue(venue.availability_start) || "08:00",
+    availabilityEnd: toVenueTimeInputValue(venue.availability_end) || "22:00",
     amenities: venue.amenities.join(", "),
     status: venue.status,
   }
@@ -122,6 +151,7 @@ export function SpacesSettingsClient({
   const router = useRouter()
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [tagFilter, setTagFilter] = useState<string>("all")
   const [formDialogOpen, setFormDialogOpen] = useState(false)
   const [detailDialogOpen, setDetailDialogOpen] = useState(false)
   const [selectedVenue, setSelectedVenue] = useState<VenueWithStats | null>(null)
@@ -135,6 +165,8 @@ export function SpacesSettingsClient({
     const query = search.trim().toLowerCase()
     const statusLabel = getVenueStatusLabel(venue.status)
 
+    const tagLabel = getVenueUsageTagLabel(venue.usage_tag)
+
     const matchesSearch =
       !query ||
       venue.name.toLowerCase().includes(query) ||
@@ -142,8 +174,9 @@ export function SpacesSettingsClient({
       venue.location?.toLowerCase().includes(query)
 
     const matchesStatus = statusFilter === "all" || statusLabel === statusFilter
+    const matchesTag = tagFilter === "all" || tagLabel === tagFilter
 
-    return matchesSearch && matchesStatus
+    return matchesSearch && matchesStatus && matchesTag
   })
 
   function openCreateDialog() {
@@ -177,6 +210,11 @@ export function SpacesSettingsClient({
           capacity: Number(form.capacity || 0),
           base_price: Number(form.basePrice || 0),
           hourly_rate: Number(form.hourlyRate || 0),
+          peak_flat_price: Number(form.peakFlatPrice || form.basePrice || 0),
+          peak_hourly_rate: Number(form.peakHourlyRate || form.hourlyRate || 0),
+          usage_tag: form.usageTag,
+          availability_start: form.availabilityStart || null,
+          availability_end: form.availabilityEnd || null,
           amenities: parseAmenities(form.amenities),
           status: form.status,
         })
@@ -230,7 +268,8 @@ export function SpacesSettingsClient({
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Spaces</h1>
           <p className="text-muted-foreground">
-            Manage venue inventory, capacity, and availability for your organization.
+            Manage bookable spaces with internal/external tags, availability hours, and peak vs
+            non-peak pricing.
           </p>
         </div>
 
@@ -315,6 +354,16 @@ export function SpacesSettingsClient({
                 <SelectItem value="Maintenance">Maintenance</SelectItem>
               </SelectContent>
             </Select>
+            <Select value={tagFilter} onValueChange={setTagFilter}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Tag" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Tags</SelectItem>
+                <SelectItem value="Internal">Internal</SelectItem>
+                <SelectItem value="External">External</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           {canManage ? (
             <Button onClick={openCreateDialog}>
@@ -330,11 +379,12 @@ export function SpacesSettingsClient({
               <TableHeader>
                 <TableRow>
                   <TableHead>Venue</TableHead>
+                  <TableHead>Tag</TableHead>
                   <TableHead>Location</TableHead>
                   <TableHead>Capacity</TableHead>
-                  <TableHead>Base Price</TableHead>
-                  <TableHead>Bookings</TableHead>
-                  <TableHead>Revenue</TableHead>
+                  <TableHead>Non-Peak</TableHead>
+                  <TableHead>Peak</TableHead>
+                  <TableHead>Hours</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="w-[60px]"></TableHead>
                 </TableRow>
@@ -343,7 +393,7 @@ export function SpacesSettingsClient({
                 {filteredVenues.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={8}
+                      colSpan={9}
                       className="h-24 text-center text-muted-foreground"
                     >
                       {venues.length === 0
@@ -354,6 +404,11 @@ export function SpacesSettingsClient({
                 ) : (
                   filteredVenues.map((venue) => {
                     const statusLabel = getVenueStatusLabel(venue.status)
+                    const tagLabel = getVenueUsageTagLabel(venue.usage_tag)
+                    const hoursLabel = formatVenueAvailabilityWindow(
+                      venue.availability_start,
+                      venue.availability_end
+                    )
 
                     return (
                       <TableRow
@@ -371,6 +426,11 @@ export function SpacesSettingsClient({
                             ) : null}
                           </div>
                         </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className={tagStyles[tagLabel]}>
+                            {tagLabel}
+                          </Badge>
+                        </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {venue.location || "—"}
                         </TableCell>
@@ -380,12 +440,20 @@ export function SpacesSettingsClient({
                             <span>{venue.capacity}</span>
                           </div>
                         </TableCell>
-                        <TableCell className="font-medium">
-                          {formatCurrency(venue.base_price)}
+                        <TableCell className="text-sm">
+                          <p>{formatCurrency(venue.base_price)} flat</p>
+                          <p className="text-muted-foreground">
+                            {formatCurrency(venue.hourly_rate)}/hr
+                          </p>
                         </TableCell>
-                        <TableCell>{venue.totalBookings}</TableCell>
-                        <TableCell className="font-medium text-emerald-600">
-                          {formatCurrency(venue.revenue)}
+                        <TableCell className="text-sm">
+                          <p>{formatCurrency(venue.peak_flat_price)} flat</p>
+                          <p className="text-muted-foreground">
+                            {formatCurrency(venue.peak_hourly_rate)}/hr
+                          </p>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {hoursLabel || "—"}
                         </TableCell>
                         <TableCell>
                           <Badge
@@ -528,39 +596,172 @@ export function SpacesSettingsClient({
                     placeholder="100"
                   />
                 </div>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="venue-base-price">Base Price ($)</Label>
-                  <Input
-                    id="venue-base-price"
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    value={form.basePrice}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        basePrice: event.target.value,
-                      }))
-                    }
-                    placeholder="1000"
-                  />
+                <div className="flex flex-col gap-2 sm:col-span-2">
+                  <Label>Hours of availability</Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="venue-availability-start"
+                      type="time"
+                      value={form.availabilityStart}
+                      onChange={(event) =>
+                        setForm((current) => ({
+                          ...current,
+                          availabilityStart: event.target.value,
+                        }))
+                      }
+                    />
+                    <span className="text-sm text-muted-foreground">to</span>
+                    <Input
+                      id="venue-availability-end"
+                      type="time"
+                      value={form.availabilityEnd}
+                      onChange={(event) =>
+                        setForm((current) => ({
+                          ...current,
+                          availabilityEnd: event.target.value,
+                        }))
+                      }
+                    />
+                  </div>
                 </div>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="venue-hourly-rate">Hourly Rate ($)</Label>
-                  <Input
-                    id="venue-hourly-rate"
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    value={form.hourlyRate}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        hourlyRate: event.target.value,
-                      }))
-                    }
-                    placeholder="150"
-                  />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <Label>Space tag</Label>
+                <RadioGroup
+                  value={form.usageTag}
+                  onValueChange={(value) =>
+                    setForm((current) => ({
+                      ...current,
+                      usageTag: value as VenueUsageTag,
+                    }))
+                  }
+                  className="flex flex-col gap-2 sm:flex-row sm:gap-6"
+                >
+                  <div className="flex items-start gap-2 rounded-md border p-3">
+                    <RadioGroupItem
+                      value={VENUE_USAGE_TAGS.internal}
+                      id="venue-tag-internal"
+                      className="mt-0.5"
+                    />
+                    <div>
+                      <Label htmlFor="venue-tag-internal" className="font-medium">
+                        Internal
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        {getVenueUsageTagDescription(VENUE_USAGE_TAGS.internal)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2 rounded-md border p-3">
+                    <RadioGroupItem
+                      value={VENUE_USAGE_TAGS.external}
+                      id="venue-tag-external"
+                      className="mt-0.5"
+                    />
+                    <div>
+                      <Label htmlFor="venue-tag-external" className="font-medium">
+                        External
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        {getVenueUsageTagDescription(VENUE_USAGE_TAGS.external)}
+                      </p>
+                    </div>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-3 rounded-md border border-blue-200 bg-blue-50/40 p-3">
+                  <Label className="text-sm font-semibold text-blue-800">
+                    Non-peak pricing (Mon–Thu)
+                  </Label>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="venue-base-price" className="text-xs font-normal">
+                        Flat fee ($)
+                      </Label>
+                      <Input
+                        id="venue-base-price"
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={form.basePrice}
+                        onChange={(event) =>
+                          setForm((current) => ({
+                            ...current,
+                            basePrice: event.target.value,
+                          }))
+                        }
+                        placeholder="350"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="venue-hourly-rate" className="text-xs font-normal">
+                        Hourly ($)
+                      </Label>
+                      <Input
+                        id="venue-hourly-rate"
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={form.hourlyRate}
+                        onChange={(event) =>
+                          setForm((current) => ({
+                            ...current,
+                            hourlyRate: event.target.value,
+                          }))
+                        }
+                        placeholder="50"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50/40 p-3">
+                  <Label className="text-sm font-semibold text-amber-800">
+                    Peak pricing (Fri–Sun)
+                  </Label>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="venue-peak-flat" className="text-xs font-normal">
+                        Flat fee ($)
+                      </Label>
+                      <Input
+                        id="venue-peak-flat"
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={form.peakFlatPrice}
+                        onChange={(event) =>
+                          setForm((current) => ({
+                            ...current,
+                            peakFlatPrice: event.target.value,
+                          }))
+                        }
+                        placeholder="500"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="venue-peak-hourly" className="text-xs font-normal">
+                        Hourly ($)
+                      </Label>
+                      <Input
+                        id="venue-peak-hourly"
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={form.peakHourlyRate}
+                        onChange={(event) =>
+                          setForm((current) => ({
+                            ...current,
+                            peakHourlyRate: event.target.value,
+                          }))
+                        }
+                        placeholder="75"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -664,6 +865,12 @@ export function SpacesSettingsClient({
                 >
                   {getVenueStatusLabel(selectedVenue.status)}
                 </Badge>
+                <Badge
+                  variant="secondary"
+                  className={`${tagStyles[getVenueUsageTagLabel(selectedVenue.usage_tag)]} w-fit`}
+                >
+                  {getVenueUsageTagLabel(selectedVenue.usage_tag)}
+                </Badge>
 
                 {selectedVenue.description ? (
                   <div>
@@ -674,7 +881,7 @@ export function SpacesSettingsClient({
                   </div>
                 ) : null}
 
-                <div className="grid gap-4 sm:grid-cols-4">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                   <div className="rounded-lg border p-3 text-center">
                     <p className="text-xl font-bold">{selectedVenue.capacity}</p>
                     <p className="text-xs text-muted-foreground">Capacity</p>
@@ -683,19 +890,22 @@ export function SpacesSettingsClient({
                     <p className="text-xl font-bold">
                       {formatCurrency(selectedVenue.base_price)}
                     </p>
-                    <p className="text-xs text-muted-foreground">Base Price</p>
+                    <p className="text-xs text-muted-foreground">Non-peak flat</p>
                   </div>
                   <div className="rounded-lg border p-3 text-center">
                     <p className="text-xl font-bold">
-                      {formatCurrency(selectedVenue.hourly_rate)}
+                      {formatCurrency(selectedVenue.peak_flat_price)}
                     </p>
-                    <p className="text-xs text-muted-foreground">Hourly Rate</p>
+                    <p className="text-xs text-muted-foreground">Peak flat</p>
                   </div>
                   <div className="rounded-lg border p-3 text-center">
-                    <p className="text-xl font-bold">
-                      {selectedVenue.totalBookings}
+                    <p className="text-sm font-semibold">
+                      {formatVenueAvailabilityWindow(
+                        selectedVenue.availability_start,
+                        selectedVenue.availability_end
+                      ) || "Not set"}
                     </p>
-                    <p className="text-xs text-muted-foreground">Total Bookings</p>
+                    <p className="text-xs text-muted-foreground">Availability</p>
                   </div>
                 </div>
 

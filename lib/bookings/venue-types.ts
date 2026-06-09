@@ -6,6 +6,14 @@ export const VENUE_STATUSES = {
 
 export type VenueStatus = (typeof VENUE_STATUSES)[keyof typeof VENUE_STATUSES]
 
+export type { VenueUsageTag } from "./venue-usage"
+export {
+  getVenueUsageTagDescription,
+  getVenueUsageTagLabel,
+  normalizeVenueUsageTag,
+  VENUE_USAGE_TAGS,
+} from "./venue-usage"
+
 export interface VenueRecord {
   id: string
   organization_id: string
@@ -15,6 +23,11 @@ export interface VenueRecord {
   capacity: number
   base_price: number
   hourly_rate: number
+  peak_flat_price: number
+  peak_hourly_rate: number
+  usage_tag: import("./venue-usage").VenueUsageTag
+  availability_start: string | null
+  availability_end: string | null
   amenities: string[]
   status: VenueStatus
   created_at: string

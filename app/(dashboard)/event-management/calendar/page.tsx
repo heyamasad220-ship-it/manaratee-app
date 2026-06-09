@@ -2,7 +2,7 @@ import { Header } from "@/components/layout/header"
 import { EventsCalendarPageClient } from "@/components/events/calendar/events-calendar-page-client"
 import { internalEventsToGridItems } from "@/lib/events/event-calendar-utils"
 import { getInternalEvents } from "@/lib/events/internal-event-queries"
-import { getCalendarVenues } from "@/lib/reservations/reservation-queries"
+import { getInternalCalendarVenues } from "@/lib/bookings/venue-calendar-venues"
 import {
   hasAnyPermission,
   PERMISSIONS,
@@ -13,7 +13,7 @@ export default async function EventManagementCalendarPage() {
   await requireAnyPermission(PERMISSIONS.EVENTS_VIEW, PERMISSIONS.PROGRAMS_VIEW)
 
   const [venues, events, canManage] = await Promise.all([
-    getCalendarVenues(),
+    getInternalCalendarVenues(),
     getInternalEvents(),
     hasAnyPermission(PERMISSIONS.EVENTS_MANAGE, PERMISSIONS.PROGRAMS_MANAGE),
   ])

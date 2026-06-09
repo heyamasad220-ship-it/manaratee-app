@@ -1,5 +1,8 @@
 import { createClient } from "@/lib/supabase/server"
 import { resolveOrganizationId } from "@/lib/organizations/resolve-organization-id"
+import {
+  type VenueUsageTag,
+} from "@/lib/bookings/venue-usage"
 
 import { reservationStatusBlocksBooking } from "./reservation-conflict-rules"
 
@@ -159,7 +162,14 @@ function expandProgramScheduleRows(
   return reservations
 }
 
-export async function getCalendarVenues(): Promise<CalendarVenue[]> {
+export type GetCalendarVenuesOptions = {
+  usageTags?: VenueUsageTag[]
+  activeOnly?: boolean
+}
+
+export async function getCalendarVenues(
+  options?: GetCalendarVenuesOptions
+): Promise<CalendarVenue[]> {
   const supabase = await createClient()
   const organizationId = await resolveOrganizationId()
 
@@ -167,18 +177,45 @@ export async function getCalendarVenues(): Promise<CalendarVenue[]> {
     return []
   }
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("venues")
-    .select("id, name")
+    .select("id, name, usage_tag, status")
     .eq("organization_id", organizationId)
-    .order("name", { ascending: true })
+
+  if (options?.usageTags?.length) {
+    query = query.in("usage_tag", options.usageTags)
+  }
+
+  if (options?.activeOnly) {
+    query = query.eq("status", "active")
+  }
+
+  const { data, error } = await query.order("name", { ascending: true })
 
   if (error) {
+    if (error.message?.includes("usage_tag")) {
+      const fallback = await supabase
+        .from("venues")
+        .select("id, name, status")
+        .eq("organization_id", organizationId)
+        .order("name", { ascending: true })
+
+      if (fallback.error) {
+        console.error(fallback.error)
+        return []
+      }
+
+      return (fallback.data || []) as CalendarVenue[]
+    }
+
     console.error(error)
     return []
   }
 
-  return (data || []) as CalendarVenue[]
+  return (data || []).map((row) => ({
+    id: row.id as string,
+    name: row.name as string,
+  }))
 }
 
 async function getStoredReservations(

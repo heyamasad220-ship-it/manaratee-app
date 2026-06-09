@@ -11,6 +11,7 @@ import {
 } from "@/lib/bookings/venue-rental-queries"
 import { createClient } from "@/lib/supabase/server"
 import { getActiveOrganization } from "@/lib/organizations/get-active-organization"
+import { VENUE_USAGE_TAGS } from "@/lib/bookings/venue-usage"
 
 export default async function CustomerVenueRentalRequestPage({
   searchParams,
@@ -45,8 +46,9 @@ export default async function CustomerVenueRentalRequestPage({
   const [venuesResult, availabilityBlocks, eventTypes, addons] = await Promise.all([
     supabase
       .from("venues")
-      .select("id, name, description, capacity, status")
+      .select("id, name, description, capacity, status, usage_tag")
       .eq("organization_id", organizationId)
+      .eq("usage_tag", VENUE_USAGE_TAGS.external)
       .in("status", ["active", "closed", "inactive"])
       .order("name", { ascending: true }),
     getPublicAvailabilityBlocks(

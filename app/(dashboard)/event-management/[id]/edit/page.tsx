@@ -5,7 +5,7 @@ import { InternalEventForm } from "@/components/events/internal-event-form"
 import { getDepartments } from "@/lib/departments/department-queries"
 import { getEventTypes } from "@/lib/events/event-type-queries"
 import { getInternalEventById } from "@/lib/events/internal-event-queries"
-import { getCalendarVenues } from "@/lib/reservations/reservation-queries"
+import { getInternalCalendarVenues } from "@/lib/bookings/venue-calendar-venues"
 import {
   PERMISSIONS,
   requireAnyPermission,
@@ -23,7 +23,7 @@ export default async function EditInternalEventPage({
     getInternalEventById(id),
     getDepartments(),
     getEventTypes({ activeOnly: true }),
-    getCalendarVenues(),
+    getInternalCalendarVenues(),
   ])
 
   if (!event) {
