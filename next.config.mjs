@@ -9,9 +9,29 @@ const nextConfig = {
   async redirects() {
     return [
       {
-        source: "/programs/registrations/enrollment/:id",
-        destination: "/programs/registrations/:id",
-        permanent: true,
+        source: "/hr",
+        destination: "/workforce",
+        permanent: false,
+      },
+      {
+        source: "/hr/:path*",
+        destination: "/workforce/:path*",
+        permanent: false,
+      },
+      {
+        source: "/programs/instructors",
+        destination: "/workforce/employees?tab=assignments",
+        permanent: false,
+      },
+      {
+        source: "/events/overview",
+        destination: "/event-management/overview",
+        permanent: false,
+      },
+      {
+        source: "/events/calendar",
+        destination: "/facilities/calendar",
+        permanent: false,
       },
     ]
   },

@@ -5,16 +5,21 @@ import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import {
   type ContactRoleValue,
+  type ContactRecordType,
   normalizePhone,
   sanitizeRoleInput,
   splitFullName,
+  CONTACT_MANUAL_AFFILIATION_ROLES,
+  CONTACT_ORGANIZATION_AFFILIATION_ROLES,
 } from "@/lib/contacts/contact-constants"
+import { syncContactAffiliations } from "@/lib/contacts/contact-affiliation-sync"
 
 type FindOrCreateContactInput = {
   organizationId: string
   fullName: string
   email?: string | null
   phone?: string | null
+  primaryContactName?: string | null
   contactType?: "individual" | "organization"
   notes?: string | null
 }
@@ -72,6 +77,11 @@ export async function findOrCreateContact(input: FindOrCreateContactInput) {
     return { contactId: existingContact.id, created: false }
   }
 
+  const isOrganization = input.contactType === "organization"
+  const primaryContactName = isOrganization
+    ? input.primaryContactName?.trim() || null
+    : null
+
   const { data: newContact, error: contactError } = await supabase
     .from("contacts")
     .insert({
@@ -79,6 +89,7 @@ export async function findOrCreateContact(input: FindOrCreateContactInput) {
       full_name: cleanName,
       email: cleanEmail,
       phone: cleanPhone,
+      primary_contact_name: primaryContactName,
       contact_type: input.contactType || "individual",
       notes: input.notes?.trim() || null,
       status: "active",
@@ -101,7 +112,7 @@ export async function ensureContactForPerson(input: {
   const supabase = await createClient()
   const organizationId = input.organizationId.trim()
   const personId = input.personId.trim()
-  const roles = sanitizeRoleInput(input.roles?.length ? input.roles : ["member"])
+  const roles = sanitizeRoleInput(input.roles?.length ? input.roles : [])
 
   if (!organizationId || !personId) {
     throw new Error("Organization and person are required.")
@@ -168,28 +179,68 @@ export async function ensureContactForPerson(input: {
 async function ensureRoleRow(
   organizationId: string,
   contactId: string,
-  role: ContactRoleValue
+  role: ContactRoleValue,
+  isManual = false
 ) {
   const supabase = await createClient()
 
   const { data: existingRole, error: existingRoleError } = await supabase
     .from("contact_roles")
-    .select("id")
+    .select("id, is_manual")
     .eq("contact_id", contactId)
     .eq("role", role)
     .maybeSingle()
 
   if (existingRoleError) {
+    if (existingRoleError.code === "42703") {
+      const { data: legacyRole } = await supabase
+        .from("contact_roles")
+        .select("id")
+        .eq("contact_id", contactId)
+        .eq("role", role)
+        .maybeSingle()
+
+      if (legacyRole) return
+
+      const { error: roleError } = await supabase.from("contact_roles").insert({
+        organization_id: organizationId,
+        contact_id: contactId,
+        role,
+      })
+
+      if (roleError) {
+        throw new Error(roleError.message || "Could not add contact role")
+      }
+      return
+    }
     throw new Error(existingRoleError.message || "Could not check contact role")
   }
 
-  if (existingRole) return
+  if (existingRole) {
+    if (isManual && !existingRole.is_manual) {
+      const { error: updateError } = await supabase
+        .from("contact_roles")
+        .update({ is_manual: true })
+        .eq("id", existingRole.id)
 
-  const { error: roleError } = await supabase.from("contact_roles").insert({
+      if (updateError) {
+        throw new Error(updateError.message || "Could not update contact role")
+      }
+    }
+    return
+  }
+
+  const insertPayload: Record<string, unknown> = {
     organization_id: organizationId,
     contact_id: contactId,
     role,
-  })
+  }
+
+  if (isManual) {
+    insertPayload.is_manual = true
+  }
+
+  const { error: roleError } = await supabase.from("contact_roles").insert(insertPayload)
 
   if (roleError) {
     throw new Error(roleError.message || "Could not add contact role")
@@ -282,7 +333,21 @@ export async function syncContactRoles(
     throw new Error("No organization selected")
   }
 
-  const uniqueRoles = sanitizeRoleInput(Array.from(new Set(roles)))
+  const { data: contactRow, error: contactError } = await supabase
+    .from("contacts")
+    .select("contact_type")
+    .eq("id", contactId)
+    .eq("organization_id", organizationId)
+    .maybeSingle()
+
+  if (contactError) {
+    throw new Error(contactError.message || "Could not load contact record")
+  }
+
+  const recordType = (contactRow?.contact_type as ContactRecordType | undefined) || "individual"
+  const uniqueRoles = sanitizeRoleInput(Array.from(new Set(roles)), recordType).filter(
+    (role) => role !== "member"
+  )
 
   const { data: existingRows, error: loadError } = await supabase
     .from("contact_roles")
@@ -295,8 +360,17 @@ export async function syncContactRoles(
   }
 
   const existingRoles = (existingRows || []).map((row) => row.role as string)
+  const editableAffiliationValues = (
+    recordType === "organization"
+      ? [...CONTACT_ORGANIZATION_AFFILIATION_ROLES]
+      : [...CONTACT_MANUAL_AFFILIATION_ROLES]
+  ) as ContactRoleValue[]
   const rolesToAdd = uniqueRoles.filter((role) => !existingRoles.includes(role))
-  const rolesToRemove = existingRoles.filter((role) => !uniqueRoles.includes(role))
+  const rolesToRemove = existingRoles.filter((role) => {
+    if (role === "member") return false
+    if ((uniqueRoles as string[]).includes(role)) return false
+    return editableAffiliationValues.includes(role as ContactRoleValue)
+  })
 
   if (rolesToRemove.length > 0) {
     const { error: deleteError } = await supabase
@@ -312,12 +386,17 @@ export async function syncContactRoles(
   }
 
   for (const role of rolesToAdd) {
-    await ensureRoleRow(organizationId, contactId, role)
+    const isManualAffiliation = editableAffiliationValues.includes(
+      role as (typeof editableAffiliationValues)[number]
+    )
+    await ensureRoleRow(organizationId, contactId, role, isManualAffiliation)
   }
 
   if (contactInfo) {
     await ensureHrExtensionRecords(organizationId, contactId, uniqueRoles, contactInfo)
   }
+
+  await syncContactAffiliations(contactId, organizationId, supabase)
 
   revalidateContactPaths()
   revalidatePath(`/contacts/${contactId}`)
@@ -334,7 +413,7 @@ export async function addRolesToContact(
     throw new Error("No organization selected")
   }
 
-  const uniqueRoles = sanitizeRoleInput(Array.from(new Set(roles)))
+  const uniqueRoles = sanitizeRoleInput(Array.from(new Set(roles)), "individual")
   if (uniqueRoles.length === 0 && roles.length > 0) {
     throw new Error("No valid roles selected")
   }
@@ -354,6 +433,7 @@ export async function addContactWithRoles(input: {
   fullName: string
   email?: string
   phone?: string
+  primaryContactName?: string
   contactType?: "individual" | "organization"
   notes?: string
   roles: ContactRoleValue[]
@@ -364,9 +444,14 @@ export async function addContactWithRoles(input: {
     throw new Error("No organization selected")
   }
 
-  const uniqueRoles = sanitizeRoleInput(Array.from(new Set(input.roles)))
-  if (uniqueRoles.length === 0) {
-    throw new Error("Select at least one role")
+  const uniqueRoles = sanitizeRoleInput(
+    Array.from(new Set(input.roles)),
+    input.contactType || "individual"
+  )
+  const isOrganization = input.contactType === "organization"
+
+  if (uniqueRoles.length === 0 && !isOrganization) {
+    throw new Error("Select at least one affiliation")
   }
 
   const { contactId, created } = await findOrCreateContact({
@@ -374,6 +459,7 @@ export async function addContactWithRoles(input: {
     fullName: input.fullName,
     email: input.email,
     phone: input.phone,
+    primaryContactName: input.primaryContactName,
     contactType: input.contactType,
     notes: input.notes,
   })
@@ -397,14 +483,16 @@ function revalidateContactPaths() {
   revalidatePath("/contacts")
   revalidatePath("/contacts/people")
   revalidatePath("/contacts/organizations")
-  revalidatePath("/hr/members")
-  revalidatePath("/hr/employees")
-  revalidatePath("/hr/volunteers")
-  revalidatePath("/hr/service-providers")
+  revalidatePath("/contacts/members")
+  revalidatePath("/membership")
+  revalidatePath("/membership/members")
+  revalidatePath("/workforce/employees")
+  revalidatePath("/workforce/volunteers")
+  revalidatePath("/workforce/service-providers")
   revalidatePath("/donations/donors")
   revalidatePath("/vendor-hub/vendors")
   revalidatePath("/resources/volunteers")
-  revalidatePath("/programs/instructors")
+  revalidatePath("/workforce/employees")
 }
 
 export async function linkStaffToContact(input: {
@@ -440,6 +528,64 @@ export async function linkStaffToContact(input: {
     throw new Error(error.message || "Could not link staff to contact")
   }
 
+  await syncContactAffiliations(contactId, organizationId, supabase)
+
   revalidateContactPaths()
   return contactId
+}
+
+export async function updateContactBasics(input: {
+  contactId: string
+  fullName: string
+  email?: string | null
+  phone?: string | null
+  primaryContactName?: string | null
+  status: string
+}) {
+  const supabase = await createClient()
+  const organizationId = await getSelectedOrganizationId()
+
+  if (!organizationId) {
+    throw new Error("No organization selected")
+  }
+
+  const cleanName = input.fullName.trim()
+  if (!cleanName) {
+    throw new Error("Contact name is required")
+  }
+
+  const { data: existing, error: loadError } = await supabase
+    .from("contacts")
+    .select("id, contact_type")
+    .eq("organization_id", organizationId)
+    .eq("id", input.contactId)
+    .maybeSingle()
+
+  if (loadError || !existing) {
+    throw new Error("Contact not found")
+  }
+
+  const isOrganization = existing.contact_type === "organization"
+
+  const { error } = await supabase
+    .from("contacts")
+    .update({
+      full_name: cleanName,
+      email: input.email?.trim().toLowerCase() || null,
+      phone: normalizePhone(input.phone) || null,
+      primary_contact_name: isOrganization
+        ? input.primaryContactName?.trim() || null
+        : null,
+      status: input.status,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("organization_id", organizationId)
+    .eq("id", input.contactId)
+
+  if (error) {
+    throw new Error(error.message || "Could not update contact")
+  }
+
+  revalidateContactPaths()
+  revalidatePath(`/contacts/${input.contactId}`)
 }

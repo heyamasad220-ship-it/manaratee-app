@@ -74,7 +74,7 @@ export default function BazaarReportsPage() {
 
         {activeTab === "Overview" && (
           <div className="flex flex-col gap-6">
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="flex flex-wrap gap-4 [&>*]:w-fit">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground">Total Revenue</CardTitle>

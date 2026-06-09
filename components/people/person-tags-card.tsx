@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { createClient } from "@/lib/supabase/client"
 import { addPersonTag, removePersonTag } from "@/lib/people/person-tag-actions"
-import { PEOPLE_MANAGEMENT_MODULE_LABEL } from "@/lib/hr/hr-module-label"
+import { CONTACTS_MODULE_LABEL } from "@/lib/contacts/contact-module-label"
 import { Loader2, Tags } from "lucide-react"
 
 type DiscountTag = {
@@ -111,7 +111,7 @@ export function PersonTagsCard({ contactId, personId }: PersonTagsCardProps) {
           </div>
         ) : tags.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No active discount tags found. Create tags under {PEOPLE_MANAGEMENT_MODULE_LABEL} → Discount Policies.
+            No active discount tags found. Create tags under {CONTACTS_MODULE_LABEL} → Settings → Discount Tags.
           </p>
         ) : (
           <div className="flex flex-wrap gap-2">

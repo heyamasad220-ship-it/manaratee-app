@@ -491,7 +491,7 @@ export default function CustomerDonationsPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="flex flex-wrap gap-4 [&>*]:w-fit">
         <Card className="border-l-4 border-l-primary">
           <CardContent className="p-5">
             <div className="flex items-center justify-between">

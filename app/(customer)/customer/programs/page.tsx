@@ -15,6 +15,7 @@ import {
 
 import { createClient } from "@/lib/supabase/server"
 import { getMyOrganizations } from "@/lib/organizations/get-my-organizations"
+import { userHasActiveMembership } from "@/lib/memberships/membership-queries"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -47,6 +48,7 @@ type Program = {
   enrolled: number
   waitlist: number
   status: string
+  visibility?: "public" | "private" | "members_only" | null
 }
 
 type SearchParams = {
@@ -219,6 +221,14 @@ export default async function CustomerProgramsPage({
   let errorMessage = organizationError
 
   if (organization) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    const hasMembership = user
+      ? await userHasActiveMembership(organization.organization_id, user.id)
+      : false
+
     const { data, error } = await supabase
       .from("programs")
       .select(
@@ -240,17 +250,24 @@ export default async function CustomerProgramsPage({
         capacity,
         enrolled,
         waitlist,
-        status
+        status,
+        visibility
       `
       )
       .eq("organization_id", organization.organization_id)
       .eq("status", "active")
+      .neq("visibility", "private")
       .order("start_date", { ascending: true })
 
     if (error) {
       errorMessage = error.message
     } else {
-      programs = (data || []) as Program[]
+      programs = ((data || []) as Program[]).filter((program) => {
+        if (program.visibility === "members_only") {
+          return hasMembership
+        }
+        return true
+      })
     }
   }
 

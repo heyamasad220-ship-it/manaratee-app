@@ -473,7 +473,7 @@ export default async function ProgramsRegistrationsPage({
           </div>
         </div>
 
-        <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="mb-6 flex flex-wrap gap-4 [&>*]:w-fit">
           {stats.map((stat) => (
             <Card key={stat.label}>
               <CardContent className="flex items-center gap-4 p-4">

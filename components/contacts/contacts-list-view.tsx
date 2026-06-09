@@ -1,8 +1,9 @@
 "use client"
 
+import Link from "next/link"
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
-import { Card, CardContent } from "@/components/ui/card"
+import { StatCard, StatCardsRow } from "@/components/ui/stat-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -10,10 +11,8 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Checkbox } from "@/components/ui/checkbox"
 import { createClient } from "@/lib/supabase/client"
 import { getCurrentOrganizationId } from "@/lib/current-organization"
-import {
-  addContactWithRoles,
-  syncContactRoles,
-} from "@/lib/contacts/contact-actions"
+import { addContactWithRoles } from "@/lib/contacts/contact-actions"
+import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
 import {
   fetchAllTeamMembershipsForFilter,
   fetchHrTeamPositions,
@@ -34,7 +33,7 @@ import {
   filterContactRoles,
   mapRoleValue,
   mapStatus,
-  statusToDbValue,
+  MEMBERSHIP_DERIVED_ROLE,
 } from "@/lib/contacts/contact-constants"
 import {
   Table,
@@ -81,7 +80,6 @@ import {
   User,
   Loader2,
   MoreHorizontal,
-  Pencil,
   Trash2,
   Filter,
 } from "lucide-react"
@@ -220,7 +218,6 @@ export function ContactsListView({
   const [teamMemberships, setTeamMemberships] = useState<HrTeamMembership[]>([])
 
   const [showAddDialog, setShowAddDialog] = useState(false)
-  const [showEditDialog, setShowEditDialog] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [selectedContact, setSelectedContact] = useState<ContactListItem | null>(null)
 
@@ -233,40 +230,41 @@ export function ContactsListView({
   const [contactRoles, setContactRoles] = useState<ContactRoleValue[]>(defaultAddRoles)
   const [contactNotes, setContactNotes] = useState("")
 
-  const [editName, setEditName] = useState("")
-  const [editEmail, setEditEmail] = useState("")
-  const [editPhone, setEditPhone] = useState("")
-  const [editContactType, setEditContactType] = useState<ContactRecordType>("individual")
-  const [editStatus, setEditStatus] = useState("active")
-  const [editRoles, setEditRoles] = useState<ContactRoleValue[]>([])
+  const hideMembershipRole = Boolean(requiredRole)
 
-  const mapContactRows = useCallback((rows: any[]): ContactListItem[] => {
-    return rows.map((c: any) => {
-      const roleValues = filterContactRoles(
-        Array.from(
-          new Set((c.contact_roles || []).map((r: any) => r.role as string).filter(Boolean))
+  const mapContactRows = useCallback(
+    (rows: any[]): ContactListItem[] => {
+      return rows.map((c: any) => {
+        const roleValues = filterContactRoles(
+          Array.from(
+            new Set((c.contact_roles || []).map((r: any) => r.role as string).filter(Boolean))
+          )
         )
-      )
-      const roles = roleValues
-        .map((value) => mapRoleValue(value))
-        .filter(Boolean) as ContactRoleLabel[]
-      const recordType: ContactRecordType =
-        c.contact_type === "organization" ? "organization" : "individual"
+        const visibleRoleValues = hideMembershipRole
+          ? roleValues.filter((role) => role !== MEMBERSHIP_DERIVED_ROLE)
+          : roleValues
+        const roles = visibleRoleValues
+          .map((value) => mapRoleValue(value))
+          .filter(Boolean) as ContactRoleLabel[]
+        const recordType: ContactRecordType =
+          c.contact_type === "organization" ? "organization" : "individual"
 
-      return {
-        id: c.id,
-        name: c.full_name || c.email || c.phone || "Unnamed Contact",
-        email: c.email || "",
-        phone: c.phone || "",
-        recordType,
-        roleValues,
-        roles,
-        status: mapStatus(c.status),
-        createdAt: c.created_at,
-        lastActivity: c.created_at,
-      }
-    })
-  }, [])
+        return {
+          id: c.id,
+          name: c.full_name || c.email || c.phone || "Unnamed Contact",
+          email: c.email || "",
+          phone: c.phone || "",
+          recordType,
+          roleValues,
+          roles,
+          status: mapStatus(c.status),
+          createdAt: c.created_at,
+          lastActivity: c.created_at,
+        }
+      })
+    },
+    [hideMembershipRole]
+  )
 
   const loadSummaryStats = useCallback(async () => {
     if (!showStats || !searchToLoad) return
@@ -515,17 +513,6 @@ export function ContactsListView({
     setContactNotes("")
   }
 
-  function openEditDialog(contact: ContactListItem) {
-    setSelectedContact(contact)
-    setEditName(contact.name)
-    setEditEmail(contact.email)
-    setEditPhone(contact.phone)
-    setEditContactType(contact.recordType)
-    setEditStatus(statusToDbValue(contact.status))
-    setEditRoles(contact.roleValues.length > 0 ? contact.roleValues : [])
-    setShowEditDialog(true)
-  }
-
   function openDeleteDialog(contact: ContactListItem) {
     setSelectedContact(contact)
     setShowDeleteDialog(true)
@@ -577,64 +564,6 @@ export function ContactsListView({
     } finally {
       setSaving(false)
     }
-  }
-
-  async function handleUpdateContact() {
-    if (!selectedContact) return
-
-    const cleanName = editName.trim()
-    if (!cleanName) {
-      alert("Contact name is required")
-      return
-    }
-    if (editRoles.length === 0) {
-      alert("Select at least one role")
-      return
-    }
-
-    setSaving(true)
-
-    const { error } = await supabase
-      .from("contacts")
-      .update({
-        full_name: cleanName,
-        email: editEmail.trim().toLowerCase() || null,
-        phone: editPhone.replace(/[^\d]/g, "") || null,
-        contact_type: editContactType,
-        status: editStatus,
-      })
-      .eq("id", selectedContact.id)
-
-    if (error) {
-      alert(error.message || "Could not update contact")
-      setSaving(false)
-      return
-    }
-
-    try {
-      await syncContactRoles(selectedContact.id, editRoles, {
-        fullName: cleanName,
-        email: editEmail.trim() || null,
-        phone: editPhone.trim() || null,
-      })
-    } catch (roleError: any) {
-      alert(roleError?.message || "Contact saved but roles could not be updated")
-      setSaving(false)
-      return
-    }
-
-    setShowEditDialog(false)
-    setSelectedContact(null)
-
-    if (searchToLoad) {
-      if (searchQuery.trim()) {
-        await loadContacts(searchQuery.trim())
-      }
-    } else {
-      await loadContacts()
-    }
-
-    setSaving(false)
   }
 
   async function handleDeleteContact() {
@@ -694,7 +623,7 @@ export function ContactsListView({
 
   const roleFilterLabel =
     roleFilters.length === 0
-      ? "All Roles"
+      ? "All affiliations"
       : roleFilters.map((role) => ROLE_VALUE_TO_LABEL[role]).join(", ")
 
   const statCards = [
@@ -706,22 +635,17 @@ export function ContactsListView({
   return (
     <div className={embedded ? "flex flex-col gap-6" : "flex flex-col gap-6 p-6"}>
       {showStats && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          {statCards.map((stat) => {
-            const Icon = stat.icon
-            return (
-              <Card key={stat.label}>
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-2">
-                    <Icon className="h-4 w-4 text-muted-foreground" />
-                    <div className="text-2xl font-bold">{stat.value}</div>
-                  </div>
-                  <div className="text-sm text-muted-foreground">{stat.label}</div>
-                </CardContent>
-              </Card>
-            )
-          })}
-        </div>
+        <StatCardsRow>
+          {statCards.map((stat) => (
+            <StatCard
+              key={stat.label}
+              label={stat.label}
+              value={stat.value}
+              icon={stat.icon}
+              layout="compact"
+            />
+          ))}
+        </StatCardsRow>
       )}
 
       <div className="flex flex-col gap-3">
@@ -750,7 +674,7 @@ export function ContactsListView({
               </PopoverTrigger>
               <PopoverContent className="w-72" align="start">
                 <div className="space-y-3">
-                  <p className="text-sm font-medium">Filter by roles</p>
+                  <p className="text-sm font-medium">Filter by affiliations</p>
                   <RoleCheckboxGroup
                     idPrefix="filter"
                     selected={roleFilters}
@@ -763,7 +687,7 @@ export function ContactsListView({
                     className="w-full"
                     onClick={() => setRoleFilters([])}
                   >
-                    Clear role filters
+                    Clear affiliation filters
                   </Button>
                 </div>
               </PopoverContent>
@@ -984,9 +908,11 @@ export function ContactsListView({
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => openEditDialog(contact)}>
-                            <Pencil className="mr-2 h-4 w-4" />
-                            Edit
+                          <DropdownMenuItem asChild>
+                            <Link href={contactProfileHref(contact.id)}>
+                              <User className="mr-2 h-4 w-4" />
+                              View profile
+                            </Link>
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => openDeleteDialog(contact)}
@@ -1106,109 +1032,6 @@ export function ContactsListView({
             <Button onClick={handleAddContact} disabled={saving}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Add Contact
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Edit Contact</DialogTitle>
-            <DialogDescription>
-              Update contact details and add or remove roles.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="flex flex-col gap-4 py-4">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="edit-name">
-                {editContactType === "organization" ? "Organization Name" : "Full Name"}
-              </Label>
-              <Input
-                id="edit-name"
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-              />
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="edit-email">Email</Label>
-                <Input
-                  id="edit-email"
-                  type="email"
-                  value={editEmail}
-                  onChange={(e) => setEditEmail(e.target.value)}
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="edit-phone">Phone</Label>
-                <Input
-                  id="edit-phone"
-                  type="tel"
-                  value={editPhone}
-                  onChange={(e) => setEditPhone(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              {!lockedRecordType && (
-                <div className="flex flex-col gap-2">
-                  <Label>Record Type</Label>
-                  <Select
-                    value={editContactType}
-                    onValueChange={(value) => setEditContactType(value as ContactRecordType)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="individual">Person</SelectItem>
-                      <SelectItem value="organization">Organization</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              <div className="flex flex-col gap-2">
-                <Label>Status</Label>
-                <Select value={editStatus} onValueChange={setEditStatus}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {STATUS_OPTIONS.map((status) => (
-                      <SelectItem key={status.value} value={status.value}>
-                        {status.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <Label>Roles</Label>
-              <RoleCheckboxGroup idPrefix="edit" selected={editRoles} onChange={setEditRoles} />
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowEditDialog(false)
-                setSelectedContact(null)
-              }}
-              disabled={saving}
-            >
-              Cancel
-            </Button>
-            <Button onClick={handleUpdateContact} disabled={saving}>
-              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Save Changes
             </Button>
           </DialogFooter>
         </DialogContent>

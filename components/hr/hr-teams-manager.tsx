@@ -12,6 +12,7 @@ import {
   type HrTeam,
   type HrTeamStatus,
 } from "@/lib/hr/hr-team-actions"
+import { membershipTeamDetailPath } from "@/lib/memberships/membership-module-label"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import {
@@ -229,7 +230,7 @@ export function HrTeamsManager({
                         <div className="flex items-center gap-1">
                           {showViewLinks && (
                             <Button variant="ghost" size="icon" className="size-8" asChild>
-                              <Link href={`/hr/teams/${item.id}`}>
+                              <Link href={membershipTeamDetailPath(item.id)}>
                                 <ExternalLink className="size-4" />
                               </Link>
                             </Button>

@@ -16,6 +16,7 @@ import {
   getCustomerContactForUser,
   verifyParticipantInRegistrantFamily,
 } from "@/lib/programs/registration-contact-resolver"
+import { userHasActiveMembership } from "@/lib/memberships/membership-queries"
 import {
   isEnrollmentWindowOpen,
   isProgramPublishedForRegistration,
@@ -339,7 +340,8 @@ export async function registerForProgram(formData: FormData) {
       waitlist,
       status,
       enrollment_open_date,
-      enrollment_close_date
+      enrollment_close_date,
+      visibility
     `
     )
     .eq("id", programId)
@@ -348,6 +350,17 @@ export async function registerForProgram(formData: FormData) {
     .maybeSingle()
 
   if (programError || !program) {
+    redirect("/customer/programs")
+  }
+
+  if (program.visibility === "members_only") {
+    const hasMembership = await userHasActiveMembership(organizationId, user.id)
+    if (!hasMembership) {
+      redirect(`${redirectBase}?error=members-only`)
+    }
+  }
+
+  if (program.visibility === "private") {
     redirect("/customer/programs")
   }
 

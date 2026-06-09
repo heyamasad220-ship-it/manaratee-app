@@ -5,13 +5,15 @@ import { PEOPLE_MANAGEMENT_APPLICATIONS_PATH } from "@/lib/applications/applicat
 
 export function PeopleManagementApplicationsClient({
   hubApplicationTypes,
+  basePath = PEOPLE_MANAGEMENT_APPLICATIONS_PATH,
 }: {
   hubApplicationTypes: readonly string[]
+  basePath?: string
 }) {
   return (
     <ModuleApplicationsClient
-      moduleOwner="hr"
-      basePath={PEOPLE_MANAGEMENT_APPLICATIONS_PATH}
+      moduleOwner="workforce"
+      basePath={basePath}
       title="Applications"
       hubApplicationTypes={hubApplicationTypes}
     />

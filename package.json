@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "smoke:phase2b": "node scripts/run-phase2b-smoke-test.mjs"
+    "smoke:phase2b": "node scripts/run-phase2b-smoke-test.mjs",
+    "test:conflicts": "npx tsx --test lib/reservations/reservation-conflict-rules.test.ts lib/bookings/venue-rental-transition.test.ts lib/operational-briefs/operational-brief-payload.test.ts lib/bookings/customer-venue-rental-experience.test.ts lib/events/internal-event-status.test.ts lib/auth/resolve-portal-permissions.test.ts lib/auth/staff-tools-eligibility.test.ts components/ui/time-picker.test.ts",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

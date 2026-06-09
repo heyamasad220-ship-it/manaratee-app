@@ -6,6 +6,8 @@ import {
 } from "@/lib/contacts/contact-activities"
 import type { ContactRoleValue } from "@/lib/contacts/contact-constants"
 import { ROLE_VALUE_TO_LABEL } from "@/lib/contacts/contact-constants"
+import { getVenueRentalStatusLabel } from "@/lib/bookings/venue-rental-status"
+import type { VenueRentalStatus } from "@/lib/bookings/venue-rental-types"
 
 export type ContactRelationshipSummary = {
   affiliationsCount: number
@@ -36,6 +38,28 @@ export type ContactDonorStats = {
   pledgeCount: number
 }
 
+export type ContactDonationRecord = {
+  id: string
+  date: string
+  amount: number
+  memo: string | null
+  status: string | null
+}
+
+export type ContactRentalRecord = {
+  id: string
+  date: string
+  status: string
+  statusLabel: string
+  eventTypeName: string | null
+  spacesSummary: string | null
+}
+
+export type ContactRentalStats = {
+  rentalCount: number
+  lastRentalDate: string | null
+}
+
 export type ContactNoteRecord = {
   id: string
   note: string
@@ -44,11 +68,22 @@ export type ContactNoteRecord = {
   note_type?: string | null
 }
 
+export type ContactEnrollmentRecord = {
+  id: string
+  programName: string
+  status: string | null
+  enrollmentDate: string | null
+}
+
 export type ContactProfileData = {
   summary: ContactRelationshipSummary
   activity: ContactActivitySummary
   timeline: ContactTimelineItem[]
   donorStats: ContactDonorStats
+  donationRecords: ContactDonationRecord[]
+  rentalStats: ContactRentalStats
+  rentalRecords: ContactRentalRecord[]
+  enrollmentRecords: ContactEnrollmentRecord[]
   activeTeamsCount: number
   notes: ContactNoteRecord[]
 }
@@ -91,6 +126,9 @@ export async function fetchContactProfileData(
   const { contactId, personId, email, roles, contactCreatedAt } = input
   const activity = emptyActivitySummary()
   const timeline: ContactTimelineItem[] = []
+  const donationRecords: ContactDonationRecord[] = []
+  const rentalRecords: ContactRentalRecord[] = []
+  const enrollmentRecords: ContactEnrollmentRecord[] = []
   let activeTeamsCount = 0
   const notes: ContactNoteRecord[] = []
 
@@ -207,6 +245,13 @@ export async function fetchContactProfileData(
       status: payment.status,
     }
     activity.donations.push(record)
+    donationRecords.push({
+      id: payment.id,
+      date: payment.payment_date,
+      amount: Number(payment.amount) || 0,
+      memo: payment.memo,
+      status: payment.status,
+    })
     timeline.push({
       id: `payment-${payment.id}`,
       date: payment.payment_date,
@@ -257,6 +302,12 @@ export async function fetchContactProfileData(
   ) {
     for (const enrollment of enrollments) {
       const programName = enrollment.programs?.name || "Program"
+      enrollmentRecords.push({
+        id: enrollment.id,
+        programName,
+        status: enrollment.status || enrollment.payment_status,
+        enrollmentDate: enrollment.enrollment_date || enrollment.created_at,
+      })
       activity.programs.push({
         id: enrollment.id,
         module: "programs",
@@ -337,6 +388,74 @@ export async function fetchContactProfileData(
     }
   }
 
+  const { data: venueRentals, error: venueRentalsError } = await supabase
+    .from("venue_rentals")
+    .select(`
+      id,
+      status,
+      created_at,
+      venue_rental_event_types(name),
+      rental_reservations(start_at, venues(name))
+    `)
+    .eq("organization_id", orgId)
+    .eq("billing_contact_id", contactId)
+    .order("created_at", { ascending: false })
+    .limit(50)
+
+  if (!venueRentalsError && venueRentals?.length) {
+    for (const rental of venueRentals) {
+      const status = rental.status as VenueRentalStatus
+      const eventTypeRel = rental.venue_rental_event_types as
+        | { name: string }
+        | { name: string }[]
+        | null
+      const eventTypeName = Array.isArray(eventTypeRel)
+        ? eventTypeRel[0]?.name
+        : eventTypeRel?.name
+
+      const reservations = (rental.rental_reservations || []) as Array<{
+        start_at: string
+        venues?: { name: string } | { name: string }[] | null
+      }>
+      const spaceNames = reservations
+        .map((row) => {
+          const venueRel = row.venues
+          if (Array.isArray(venueRel)) return venueRel[0]?.name
+          return venueRel?.name
+        })
+        .filter(Boolean) as string[]
+      const primaryDate = reservations[0]?.start_at || rental.created_at
+
+      rentalRecords.push({
+        id: rental.id,
+        date: primaryDate || rental.created_at,
+        status: rental.status,
+        statusLabel: getVenueRentalStatusLabel(status),
+        eventTypeName: eventTypeName ?? null,
+        spacesSummary: spaceNames.length ? spaceNames.join(", ") : null,
+      })
+
+      activity.spaces.push({
+        id: rental.id,
+        module: "spaces",
+        activityType: "venue_rental",
+        title: eventTypeName ? `Venue rental: ${eventTypeName}` : "Venue rental",
+        subtitle: spaceNames.length ? spaceNames.join(", ") : undefined,
+        date: primaryDate || rental.created_at,
+        status: rental.status,
+      })
+
+      timeline.push({
+        id: `venue-rental-${rental.id}`,
+        date: primaryDate || rental.created_at,
+        title: eventTypeName ? `Venue rental: ${eventTypeName}` : "Venue rental",
+        module: "Rentals",
+        subtitle: spaceNames.length ? spaceNames.join(", ") : undefined,
+        status: getVenueRentalStatusLabel(status),
+      })
+    }
+  }
+
   const { data: vendors } = await supabase
     .from("vendors")
     .select("id, business_name, status, created_at")
@@ -405,6 +524,11 @@ export async function fetchContactProfileData(
     pledgeCount: pledges?.length || 0,
   }
 
+  const rentalStats: ContactRentalStats = {
+    rentalCount: rentalRecords.length,
+    lastRentalDate: rentalRecords[0]?.date || null,
+  }
+
   const allDates = timeline.map((item) => item.date)
   const relationshipSummary: ContactRelationshipSummary = {
     affiliationsCount: roles.length,
@@ -420,11 +544,19 @@ export async function fetchContactProfileData(
 
   timeline.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 
+  const uniqueEnrollmentRecords = Array.from(
+    new Map(enrollmentRecords.map((record) => [record.id, record])).values()
+  )
+
   return {
     summary: relationshipSummary,
     activity,
     timeline,
     donorStats,
+    donationRecords,
+    rentalStats,
+    rentalRecords,
+    enrollmentRecords: uniqueEnrollmentRecords,
     activeTeamsCount,
     notes,
   }

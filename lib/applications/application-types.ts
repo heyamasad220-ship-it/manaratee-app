@@ -5,9 +5,23 @@ import {
   Users,
   type LucideIcon,
 } from "lucide-react"
-import { PEOPLE_MANAGEMENT_MODULE_LABEL } from "@/lib/hr/hr-module-label"
+import { WORKFORCE_MODULE_LABEL } from "@/lib/hr/hr-module-label"
+import { moduleApplicationsUrl } from "@/lib/applications/application-routes"
 
-export type ModuleOwner = "hr" | "vendor_hub" | "programs"
+export type ModuleOwner = "workforce" | "vendor_hub" | "programs"
+
+/** Accepts legacy `hr` values from URLs and pre-migration rows. */
+export function normalizeModuleOwner(value?: string | null): ModuleOwner | undefined {
+  if (!value || value === "hr") return "workforce"
+  if (value === "workforce" || value === "vendor_hub" || value === "programs") {
+    return value
+  }
+  return undefined
+}
+
+export function isWorkforceModuleOwner(value?: string | null) {
+  return !value || value === "hr" || value === "workforce"
+}
 
 export type ApplicationStatus =
   | "draft"
@@ -39,21 +53,21 @@ export const DEFAULT_APPLICATION_TYPES: ApplicationTypeDefinition[] = [
   {
     id: "volunteer",
     label: "Volunteer Application",
-    moduleOwner: "hr",
+    moduleOwner: "workforce",
     description: "Apply to volunteer with the organization",
     sortOrder: 10,
   },
   {
     id: "employment",
     label: "Employment Application",
-    moduleOwner: "hr",
+    moduleOwner: "workforce",
     description: "Apply for employment",
     sortOrder: 20,
   },
   {
     id: "committee_member",
     label: "Committee Member Application",
-    moduleOwner: "hr",
+    moduleOwner: "workforce",
     description: "Apply to serve on a committee",
     sortOrder: 30,
   },
@@ -74,17 +88,27 @@ export const DEFAULT_APPLICATION_TYPES: ApplicationTypeDefinition[] = [
   {
     id: "childcare_provider",
     label: "Childcare Provider Application",
-    moduleOwner: "hr",
+    moduleOwner: "workforce",
     description: "Apply to provide childcare services",
     sortOrder: 60,
   },
 ]
 
 export const MODULE_OWNER_LABELS: Record<ModuleOwner, string> = {
-  hr: PEOPLE_MANAGEMENT_MODULE_LABEL,
+  workforce: WORKFORCE_MODULE_LABEL,
   vendor_hub: "Vendor Hub",
   programs: "Programs",
 }
+
+/** Shown on Workforce → Settings → Applications hub. */
+export const WORKFORCE_APPLICATIONS_HUB_TYPES = [
+  "volunteer",
+  "committee_member",
+  "childcare_provider",
+] as const
+
+/** @deprecated Use WORKFORCE_APPLICATIONS_HUB_TYPES */
+export const PEOPLE_MANAGEMENT_APPLICATIONS_HUB_TYPES = WORKFORCE_APPLICATIONS_HUB_TYPES
 
 export const APPLICATION_STATUS_LABELS: Record<ApplicationStatus, string> = {
   draft: "Draft",
@@ -96,13 +120,6 @@ export const APPLICATION_STATUS_LABELS: Record<ApplicationStatus, string> = {
 }
 
 export const PENDING_STATUSES: ApplicationStatus[] = ["submitted", "pending_review"]
-
-/** Shown on People Management > Applications. Employment uses its own filtered entry point. */
-export const PEOPLE_MANAGEMENT_APPLICATIONS_HUB_TYPES = [
-  "volunteer",
-  "committee_member",
-  "childcare_provider",
-] as const
 
 export type ApplicationRecord = {
   id: string
@@ -232,7 +249,7 @@ export function isPendingStatus(status: ApplicationStatus) {
 }
 
 export function hrApplicationTypes(registry: Record<string, ApplicationTypeDefinition>) {
-  return Object.values(registry).filter((type) => type.moduleOwner === "hr")
+  return Object.values(registry).filter((type) => type.moduleOwner === "workforce")
 }
 
 export function programApplicationTypes(registry: Record<string, ApplicationTypeDefinition>) {
@@ -242,9 +259,6 @@ export function programApplicationTypes(registry: Record<string, ApplicationType
 export function vendorApplicationTypes(registry: Record<string, ApplicationTypeDefinition>) {
   return Object.values(registry).filter((type) => type.moduleOwner === "vendor_hub")
 }
-
-import type { ApplicationStatus, ModuleOwner } from "@/lib/applications/application-types"
-import { moduleApplicationsUrl } from "@/lib/applications/application-routes"
 
 export function buildApplicationsListUrl(filters: {
   applicationType?: string

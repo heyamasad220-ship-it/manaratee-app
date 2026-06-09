@@ -8,10 +8,12 @@ import {
   ArrowRight,
   User,
   Building2,
+  Briefcase,
 } from "lucide-react"
 
 import { createClient } from "@/lib/supabase/server"
 import { getActiveOrganization } from "@/lib/organizations/get-active-organization"
+import { getUserPortalCapabilities } from "@/lib/auth/portal-capabilities"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 
@@ -34,6 +36,8 @@ export default async function CustomerDashboardPage() {
 
   const organizationId = activeOrganization.organization_id
 
+  const portalCapabilities = await getUserPortalCapabilities(user.id, organizationId)
+
   const { data: contact } = await supabase
     .from("contacts")
     .select("id, full_name, email, organization_id")
@@ -46,18 +50,18 @@ export default async function CustomerDashboardPage() {
     user.email?.split("@")?.[0] ||
     "there"
 
-  const { count: bookingsCount } = await supabase
-    .from("venue_bookings")
+  const { count: rentalsCount } = await supabase
+    .from("venue_rentals")
     .select("*", { count: "exact", head: true })
     .eq("organization_id", organizationId)
-    .eq("user_id", user.id)
+    .eq("customer_user_id", user.id)
 
-  const { count: pendingBookingsCount } = await supabase
-    .from("venue_bookings")
+  const { count: pendingRentalsCount } = await supabase
+    .from("venue_rentals")
     .select("*", { count: "exact", head: true })
     .eq("organization_id", organizationId)
-    .eq("user_id", user.id)
-    .eq("status", "pending_review")
+    .eq("customer_user_id", user.id)
+    .eq("status", "awaiting_supervisor_approval")
 
   const { count: donationCount } = await supabase
     .from("donation_payments")
@@ -71,10 +75,10 @@ export default async function CustomerDashboardPage() {
 
   const overviewCards = [
     {
-      title: "Bookings",
-      value: bookingsCount || 0,
+      title: "Venue Rentals",
+      value: rentalsCount || 0,
       description: "Venue requests and reservations",
-      href: "/customer/bookings",
+      href: "/customer/rentals",
       icon: CalendarDays,
     },
     {
@@ -126,7 +130,7 @@ export default async function CustomerDashboardPage() {
         </div>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="flex flex-wrap gap-4 [&>*]:w-fit">
         {overviewCards.map((item) => (
           <Link key={item.title} href={item.href}>
             <Card className="h-full transition-colors hover:bg-muted/50">
@@ -161,11 +165,11 @@ export default async function CustomerDashboardPage() {
 
           <CardContent className="grid gap-3 sm:grid-cols-2">
             <DashboardAction
-              href="/customer/bookings"
+              href="/customer/rentals"
               icon={CalendarDays}
-              title="My Bookings"
-              description={`${pendingBookingsCount || 0} pending request${
-                pendingBookingsCount === 1 ? "" : "s"
+              title="Venue Rentals"
+              description={`${pendingRentalsCount || 0} pending request${
+                pendingRentalsCount === 1 ? "" : "s"
               }`}
             />
 
@@ -189,6 +193,15 @@ export default async function CustomerDashboardPage() {
               title="Profile"
               description="Update your personal information"
             />
+
+            {portalCapabilities.hasStaffToolsPortal ? (
+              <DashboardAction
+                href="/customer/staff"
+                icon={Briefcase}
+                title="Staff Tools"
+                description="Submit department event requests"
+              />
+            ) : null}
           </CardContent>
         </Card>
 

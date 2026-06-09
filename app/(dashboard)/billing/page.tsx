@@ -360,7 +360,7 @@ export default function BillingPage() {
       <Header title="Billing" />
       <div className="flex flex-col gap-6 p-6">
         {/* Summary Cards */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="flex flex-wrap gap-4 [&>*]:w-fit">
           <Card className="border border-border">
             <CardContent className="flex items-center gap-4 p-4">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100">

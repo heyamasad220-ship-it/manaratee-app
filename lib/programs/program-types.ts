@@ -42,6 +42,11 @@ monthly_amount: number
 installment_count: number | null
 payment_due_day: number | null
 
+  requires_volunteers?: boolean
+  requires_childcare?: boolean
+  requires_vendors?: boolean
+  service_requirements?: Record<string, unknown> | null
+
   age_groups: string[]
   grade_levels: string[]
 

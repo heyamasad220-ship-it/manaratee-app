@@ -27,6 +27,11 @@ import {
 } from "@/components/ui/dialog"
 import { Pencil, Boxes, Calendar, Ticket, Store, GraduationCap, Heart } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import {
+  isCapabilityModuleSlug,
+  isCoreModuleSlug,
+  isProductModuleSlug,
+} from "@/lib/modules/module-catalog"
 
 type Module = {
   id: string
@@ -36,6 +41,7 @@ type Module = {
   is_core: boolean
   is_active: boolean
   default_enabled: boolean
+  include_in_catalog?: boolean
   price_monthly: number
   price_yearly: number
 }
@@ -79,6 +85,11 @@ export default function ModulesPage() {
         ...m,
         is_active: m.is_active ?? true,
         default_enabled: m.default_enabled ?? false,
+        include_in_catalog:
+          m.include_in_catalog ??
+          (isProductModuleSlug(m.slug) &&
+            !isCoreModuleSlug(m.slug) &&
+            !isCapabilityModuleSlug(m.slug)),
       }))
       setModules(modulesWithDefaults)
     }
@@ -159,13 +170,20 @@ export default function ModulesPage() {
 
   const activeCount = modules.filter((m) => m.is_active).length
   const defaultEnabledCount = modules.filter((m) => m.default_enabled).length
+  const catalogCount = modules.filter((m) => m.include_in_catalog).length
+
+  function catalogLabel(module: Module) {
+    if (module.is_core || isCoreModuleSlug(module.slug)) return "Core"
+    if (module.include_in_catalog) return "Product"
+    return "Capability"
+  }
 
   return (
     <>
       <PlatformHeader title="Modules" />
       <div className="flex flex-col gap-6 p-6">
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-4 gap-4">
           <Card className="border border-border shadow-sm">
             <CardContent className="flex items-start gap-4 p-5">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-700">
@@ -199,6 +217,17 @@ export default function ModulesPage() {
               </div>
             </CardContent>
           </Card>
+          <Card className="border border-border shadow-sm">
+            <CardContent className="flex items-start gap-4 p-5">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-700">
+                <Boxes className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Catalog Modules</p>
+                <p className="mt-0.5 text-2xl font-bold text-foreground">{catalogCount}</p>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Modules Table */}
@@ -212,6 +241,7 @@ export default function ModulesPage() {
                 <TableRow>
                   <TableHead className="font-medium text-muted-foreground">Module Name</TableHead>
                   <TableHead className="font-medium text-muted-foreground">Description</TableHead>
+                  <TableHead className="font-medium text-muted-foreground">Catalog</TableHead>
                   <TableHead className="font-medium text-muted-foreground">Status</TableHead>
                   <TableHead className="font-medium text-muted-foreground">Default Enabled</TableHead>
                   <TableHead className="font-medium text-muted-foreground text-right">Actions</TableHead>
@@ -220,13 +250,13 @@ export default function ModulesPage() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                       Loading modules...
                     </TableCell>
                   </TableRow>
                 ) : modules.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                       No modules found.
                     </TableCell>
                   </TableRow>
@@ -250,6 +280,20 @@ export default function ModulesPage() {
                           <p className="text-sm text-muted-foreground truncate">
                             {module.description || "No description"}
                           </p>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="secondary"
+                            className={
+                              catalogLabel(module) === "Product"
+                                ? "bg-blue-100 text-blue-700 hover:bg-blue-100"
+                                : catalogLabel(module) === "Core"
+                                  ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-100"
+                                  : "bg-zinc-100 text-zinc-600 hover:bg-zinc-100"
+                            }
+                          >
+                            {catalogLabel(module)}
+                          </Badge>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">

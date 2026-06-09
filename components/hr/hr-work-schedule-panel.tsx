@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
+import { TimeInput } from "@/components/ui/time-input"
 import {
   Select,
   SelectContent,
@@ -52,11 +53,11 @@ export function HrWorkSchedulePanel() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-2">
               <Label htmlFor="start-time">Work Day Start</Label>
-              <Input id="start-time" type="time" defaultValue="09:00" />
+              <TimeInput id="start-time" defaultValue="09:00" />
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="end-time">Work Day End</Label>
-              <Input id="end-time" type="time" defaultValue="17:00" />
+              <TimeInput id="end-time" defaultValue="17:00" />
             </div>
           </div>
         </CardContent>

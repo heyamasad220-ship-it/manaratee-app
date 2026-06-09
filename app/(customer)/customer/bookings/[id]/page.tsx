@@ -1,5 +1,8 @@
 import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
+
+/** LEGACY customer booking detail — reads venue_bookings until Phase B cutover. */
+
 import {
   ArrowLeft,
   Calendar,
@@ -13,7 +16,6 @@ import {
 
 import { createClient } from "@/lib/supabase/server"
 import { getActiveOrganization } from "@/lib/organizations/get-active-organization"
-import { CustomerTabs } from "@/components/customer/customer-tabs"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -93,16 +95,14 @@ export default async function CustomerBookingDetailPage({
 
   return (
     <div className="space-y-6">
-      <CustomerTabs />
-
       <div className="flex items-center justify-between">
         <div>
           <Link
-            href="/customer/bookings"
+            href="/customer/rentals"
             className="mb-3 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back to Bookings
+            Back to Venue Rentals
           </Link>
 
           <h1 className="text-2xl font-bold tracking-tight">
@@ -252,9 +252,9 @@ export default async function CustomerBookingDetailPage({
                 className="w-full justify-start"
                 asChild
               >
-                <Link href="/customer/bookings">
+                <Link href="/customer/rentals">
                   <Calendar className="mr-2 h-4 w-4" />
-                  View All Bookings
+                  View All Venue Rentals
                 </Link>
               </Button>
 

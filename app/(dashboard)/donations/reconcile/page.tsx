@@ -399,6 +399,20 @@ export default function ReconcilePage() {
     setDonorMatches(formatted)
   }
 
+  async function syncDonationAffiliation(input: {
+    donorId?: string | null
+    contactId?: string | null
+  }) {
+    try {
+      const { handleDonationAffiliationSync } = await import(
+        "@/lib/contacts/contact-affiliation-sync"
+      )
+      await handleDonationAffiliationSync(input)
+    } catch (syncError) {
+      console.warn("Donation affiliation sync failed:", syncError)
+    }
+  }
+
   async function handleMatchToDonor(donor: DonorMatch) {
     if (!selectedPayment) return
 
@@ -419,6 +433,8 @@ export default function ReconcilePage() {
       alert(error.message || "Could not match payment to donor")
       return
     }
+
+    await syncDonationAffiliation({ donorId: donor.id, contactId: donor.contactId })
 
     await loadPayments()
     moveToNextPayment(paymentId)
@@ -462,6 +478,8 @@ export default function ReconcilePage() {
       return
     }
 
+    await syncDonationAffiliation({ donorId: donor.id, contactId: donor.contactId })
+
     await loadPayments()
     await loadAllPledges()
     setDonorMatches([])
@@ -502,6 +520,11 @@ export default function ReconcilePage() {
       alert(error.message)
       return
     }
+
+    await syncDonationAffiliation({
+      donorId: selectedDonor?.id || pledge?.donorId || selectedPayment.donorId || null,
+      contactId: selectedDonor?.contactId || selectedPayment.contactId || null,
+    })
 
     setShowPledgeDialog(false)
     setSelectedDonor(null)

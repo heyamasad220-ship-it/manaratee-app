@@ -24,6 +24,8 @@ export default async function CustomerLayout({
     : {
         hasPersonalPortal: false,
         hasTeachingPortal: false,
+        hasStaffToolsPortal: false,
+        canManageEventRequests: false,
         hasAdminPortal: false,
       }
 

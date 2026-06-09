@@ -1,6 +1,7 @@
 "use client"
 
 import { cn } from "@/lib/utils"
+import { statCardWidthClassName } from "@/components/ui/stat-card"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { LucideIcon } from "lucide-react"
 import { ReactNode } from "react"
@@ -18,8 +19,8 @@ export const pageSpacing = {
 
 // Consistent grid layouts
 export const gridLayouts = {
-  kpiCards: "grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4 xl:grid-cols-5",
-  summaryCards: "grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4",
+  kpiCards: "flex flex-wrap gap-3 sm:gap-4 [&>*]:w-fit",
+  summaryCards: "flex flex-wrap gap-3 sm:gap-4 [&>*]:w-fit",
   formFields: "grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2",
   threeCol: "grid gap-4 lg:grid-cols-3",
   twoCol: "grid gap-4 lg:grid-cols-2",
@@ -66,10 +67,10 @@ interface KpiCardProps {
 export function KpiCard({ title, value, icon: Icon, subtitle, trend, accentColor }: KpiCardProps) {
   const colors = statusColors[accentColor]
   return (
-    <Card className={cn("border-l-4", colors.accent)}>
+    <Card className={cn("border-l-4", statCardWidthClassName, colors.accent)}>
       <CardContent className="p-4">
-        <div className="flex items-center justify-between">
-          <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-4">
+          <div>
             <p className="text-xs font-medium text-muted-foreground truncate">{title}</p>
             <p className="text-2xl font-bold text-foreground">{value}</p>
           </div>

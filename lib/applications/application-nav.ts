@@ -12,7 +12,7 @@ export type ApplicationNavItem = {
   permissionKey?: string
 }
 
-/** Single Applications entry under People Management (between Teams and Settings). */
+/** Organization workforce application hub (under global Settings). */
 export function hrApplicationNavItems(): ApplicationNavItem[] {
   return [
     {
@@ -50,12 +50,12 @@ export function moduleOwnerFromScope(
   if (applicationType === "vendor") return "vendor_hub"
   if (applicationType === "financial_aid") return "programs"
   if (
-    applicationType === "volunteer" ||
     applicationType === "employment" ||
     applicationType === "committee_member" ||
-    applicationType === "childcare_provider"
+    applicationType === "childcare_provider" ||
+    applicationType === "volunteer"
   ) {
-    return "hr"
+    return "workforce"
   }
   return undefined
 }

@@ -182,7 +182,7 @@ export function OfferingStaffPanel({
       <div>
         <h3 className="text-base font-semibold">Instructors &amp; Staff</h3>
         <p className="text-sm text-muted-foreground">
-          Assign employees and volunteers from People Management to{" "}
+          Assign employees and volunteers from Workforce to{" "}
           {offering.name}. Assignments save immediately.
         </p>
       </div>
@@ -284,8 +284,8 @@ export function OfferingStaffPanel({
 
       <p className="text-xs text-muted-foreground">
         Need someone new? Add them in{" "}
-        <Link href="/contacts" className="underline underline-offset-2">
-          People Management
+        <Link href="/workforce" className="underline underline-offset-2">
+          Workforce
         </Link>{" "}
         with an Employee or Volunteer role first.
       </p>

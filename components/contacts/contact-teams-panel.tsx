@@ -14,6 +14,7 @@ import {
   type HrTeamPosition,
   type TeamMembershipStatus,
 } from "@/lib/hr/hr-team-actions"
+import { membershipTeamDetailPath } from "@/lib/memberships/membership-module-label"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -187,7 +188,7 @@ export function ContactTeamsPanel({ contactId, contactName }: ContactTeamsPanelP
               >
                 <div className="space-y-1">
                   <Link
-                    href={`/hr/teams/${membership.team_id}`}
+                    href={membershipTeamDetailPath(membership.team_id)}
                     className="font-medium hover:underline"
                   >
                     {membership.team_name}

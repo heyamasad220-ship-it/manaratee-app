@@ -297,7 +297,7 @@ export default function DonationsPage() {
             </div>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="flex flex-wrap gap-4 [&>*]:w-fit">
             <Card className="border-l-4 border-l-blue-500">
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
@@ -537,7 +537,7 @@ export default function DonationsPage() {
             </CardContent>
           </Card>
 
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="flex flex-wrap gap-4 [&>*]:w-fit">
             <Link href="/donations/payments">
               <Card className="h-full transition-colors hover:bg-muted/50">
                 <CardContent className="flex items-center gap-4 pt-6">

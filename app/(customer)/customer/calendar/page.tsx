@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation"
 
-export default function CustomerCalendarRedirectPage() {
-  redirect("/customer/venue-availability")
+export default function CustomerCalendarRedirect() {
+  redirect("/customer/rentals/new")
 }

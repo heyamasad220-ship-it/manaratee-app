@@ -83,7 +83,17 @@ interface ModuleConfig {
   description: string | null
   enabled: boolean
   isDefault: boolean
+  isCore?: boolean
+  isProduct?: boolean
+  isCapability?: boolean
   organizationModuleId?: string
+}
+
+interface SubscriptionBundleOption {
+  slug: string
+  name: string
+  description: string
+  moduleSlugs: string[]
 }
 
 interface OrgRole {
@@ -141,6 +151,16 @@ export default function OrganizationsPage() {
   const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null)
   const [selectedPlanId, setSelectedPlanId] = useState("")
   const [orgModules, setOrgModules] = useState<ModuleConfig[]>([])
+  const [coreModules, setCoreModules] = useState<ModuleConfig[]>([])
+  const [capabilityModules, setCapabilityModules] = useState<ModuleConfig[]>([])
+  const [subscriptionBundles, setSubscriptionBundles] = useState<
+    SubscriptionBundleOption[]
+  >([])
+  const [activeBundleSlug, setActiveBundleSlug] = useState<string | null>(null)
+  const [applyingBundleSlug, setApplyingBundleSlug] = useState<string | null>(
+    null
+  )
+  const [loadingModules, setLoadingModules] = useState(false)
 
   const [newOrgName, setNewOrgName] = useState("")
   const [newOrgEmail, setNewOrgEmail] = useState("")
@@ -261,39 +281,47 @@ export default function OrganizationsPage() {
       setSelectedPlanId(orgData.plan_id || "")
     }
 
-    const { data, error } = await supabase
-      .from("organization_modules")
-      .select(`
-        id,
-        enabled,
-        enabled_by_plan,
-        modules (
-          id,
-          name,
-          slug,
-          description
-        )
-      `)
-      .eq("organization_id", org.id)
-      .order("created_at", { ascending: true })
+    setLoadingModules(true)
 
-    if (error) {
+    try {
+      const response = await fetch(
+        `/api/platform/organizations/${org.id}/modules`
+      )
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to load organization modules.")
+      }
+
+      const mapModule = (item: any): ModuleConfig => ({
+        id: item.id,
+        name: item.name,
+        slug: item.slug,
+        description: item.description,
+        enabled: item.enabled,
+        isDefault: item.enabledByPlan,
+        isCore: item.isCore,
+        isProduct: item.isProduct,
+        isCapability: item.isCapability,
+        organizationModuleId: item.organizationModuleId,
+      })
+
+      setOrgModules((result.catalogModules || []).map(mapModule))
+      setCoreModules((result.coreModules || []).map(mapModule))
+      setCapabilityModules((result.capabilityModules || []).map(mapModule))
+      setSubscriptionBundles(result.bundles || [])
+      setActiveBundleSlug(result.bundleSlug || null)
+    } catch (error) {
       console.error(error)
-      alert("Failed to load organization modules.")
-      return
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Failed to load organization modules."
+      )
+    } finally {
+      setLoadingModules(false)
     }
 
-    const mapped: ModuleConfig[] = (data || []).map((item: any) => ({
-      id: item.modules.id,
-      name: item.modules.name,
-      slug: item.modules.slug,
-      description: item.modules.description,
-      enabled: item.enabled,
-      isDefault: item.enabled_by_plan,
-      organizationModuleId: item.id,
-    }))
-
-    setOrgModules(mapped)
     await loadOrganizationMembers(org.id)
   }
 
@@ -445,32 +473,109 @@ export default function OrganizationsPage() {
     setAddOrgOpen(true)
   }
 
-  const toggleModule = async (moduleId: string) => {
+  const applySubscriptionBundle = async (bundleSlug: string) => {
     if (!selectedOrg) return
 
-    const existing = orgModules.find((m) => m.id === moduleId)
+    setApplyingBundleSlug(bundleSlug)
+
+    try {
+      const response = await fetch(
+        `/api/platform/organizations/${selectedOrg.id}/modules`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ bundleSlug }),
+        }
+      )
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to apply bundle.")
+      }
+
+      const mapModule = (item: any): ModuleConfig => ({
+        id: item.id,
+        name: item.name,
+        slug: item.slug,
+        description: item.description,
+        enabled: item.enabled,
+        isDefault: item.enabledByPlan,
+        isCore: item.isCore,
+        isProduct: item.isProduct,
+        isCapability: item.isCapability,
+        organizationModuleId: item.organizationModuleId,
+      })
+
+      setOrgModules((result.catalogModules || []).map(mapModule))
+      setCoreModules((result.coreModules || []).map(mapModule))
+      setCapabilityModules((result.capabilityModules || []).map(mapModule))
+      setActiveBundleSlug(result.bundleSlug || bundleSlug)
+      alert("Subscription bundle applied.")
+    } catch (error) {
+      console.error(error)
+      alert(
+        error instanceof Error ? error.message : "Failed to apply bundle."
+      )
+    } finally {
+      setApplyingBundleSlug(null)
+    }
+  }
+
+  const toggleModule = async (moduleSlug: string) => {
+    if (!selectedOrg) return
+
+    const existing = orgModules.find((m) => m.slug === moduleSlug)
     if (!existing) return
 
     const nextEnabled = !existing.enabled
 
     setOrgModules((prev) =>
       prev.map((m) =>
-        m.id === moduleId ? { ...m, enabled: nextEnabled } : m
+        m.slug === moduleSlug ? { ...m, enabled: nextEnabled } : m
       )
     )
 
-    const { error } = await supabase
-      .from("organization_modules")
-      .update({
-        enabled: nextEnabled,
-        manually_overridden: true,
-      })
-      .eq("organization_id", selectedOrg.id)
-      .eq("module_id", moduleId)
+    try {
+      const response = await fetch(
+        `/api/platform/organizations/${selectedOrg.id}/modules`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ moduleSlug, enabled: nextEnabled }),
+        }
+      )
+      const result = await response.json()
 
-    if (error) {
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to update module.")
+      }
+
+      const mapModule = (item: any): ModuleConfig => ({
+        id: item.id,
+        name: item.name,
+        slug: item.slug,
+        description: item.description,
+        enabled: item.enabled,
+        isDefault: item.enabledByPlan,
+        isCore: item.isCore,
+        isProduct: item.isProduct,
+        isCapability: item.isCapability,
+        organizationModuleId: item.organizationModuleId,
+      })
+
+      setOrgModules((result.catalogModules || []).map(mapModule))
+      setCapabilityModules((result.capabilityModules || []).map(mapModule))
+      setActiveBundleSlug(result.bundleSlug || null)
+    } catch (error) {
       console.error(error)
-      alert("Failed to update module.")
+      setOrgModules((prev) =>
+        prev.map((m) =>
+          m.slug === moduleSlug ? { ...m, enabled: !nextEnabled } : m
+        )
+      )
+      alert(
+        error instanceof Error ? error.message : "Failed to update module."
+      )
     }
   }
 
@@ -1106,7 +1211,180 @@ export default function OrganizationsPage() {
                 </CardContent>
               </Card>
 
-              
+              <Card>
+                <CardContent className="space-y-4 p-4">
+                  <div>
+                    <h3 className="text-sm font-semibold">Persona Bundle</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Apply a preset module mix for common organization types.
+                      {activeBundleSlug
+                        ? ` Active bundle: ${activeBundleSlug.replace(/-/g, " ")}.`
+                        : " Custom module mix (no bundle applied)."}
+                    </p>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {subscriptionBundles.map((bundle) => (
+                      <div
+                        key={bundle.slug}
+                        className={cn(
+                          "rounded-lg border p-3",
+                          activeBundleSlug === bundle.slug &&
+                            "border-emerald-500 bg-emerald-50/40"
+                        )}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <p className="text-sm font-medium">{bundle.name}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {bundle.description}
+                            </p>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant={
+                              activeBundleSlug === bundle.slug
+                                ? "secondary"
+                                : "outline"
+                            }
+                            disabled={applyingBundleSlug !== null}
+                            onClick={() => applySubscriptionBundle(bundle.slug)}
+                          >
+                            {applyingBundleSlug === bundle.slug
+                              ? "Applying..."
+                              : activeBundleSlug === bundle.slug
+                                ? "Reapply"
+                                : "Apply"}
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="space-y-4 p-4">
+                  <div>
+                    <h3 className="text-sm font-semibold">Core Platform</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Included with every tenant — always enabled.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    {coreModules.map((module) => (
+                      <div
+                        key={module.slug}
+                        className="flex items-center justify-between rounded-md border px-3 py-2"
+                      >
+                        <div>
+                          <p className="text-sm font-medium">{module.name}</p>
+                          {module.description ? (
+                            <p className="text-xs text-muted-foreground">
+                              {module.description}
+                            </p>
+                          ) : null}
+                        </div>
+                        <Badge
+                          variant="secondary"
+                          className="bg-emerald-100 text-emerald-700"
+                        >
+                          Always on
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="space-y-4 p-4">
+                  <div>
+                    <h3 className="text-sm font-semibold">Product Modules</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Toggle billable modules for this organization. Capability
+                      modules sync automatically.
+                    </p>
+                  </div>
+
+                  {loadingModules ? (
+                    <p className="text-sm text-muted-foreground">
+                      Loading modules...
+                    </p>
+                  ) : orgModules.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      No product modules found. Run migration 067 in Supabase.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {orgModules.map((module) => (
+                        <div
+                          key={module.slug}
+                          className="flex items-center justify-between rounded-md border px-3 py-2"
+                        >
+                          <div className="pr-4">
+                            <p className="text-sm font-medium">{module.name}</p>
+                            {module.description ? (
+                              <p className="text-xs text-muted-foreground">
+                                {module.description}
+                              </p>
+                            ) : null}
+                          </div>
+                          <Switch
+                            checked={module.enabled}
+                            onCheckedChange={() => toggleModule(module.slug)}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {capabilityModules.length > 0 ? (
+                <Card>
+                  <CardContent className="space-y-4 p-4">
+                    <div>
+                      <h3 className="text-sm font-semibold">
+                        Included Capabilities
+                      </h3>
+                      <p className="text-xs text-muted-foreground">
+                        Managed automatically when parent product modules are
+                        enabled — not sold separately.
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      {capabilityModules.map((module) => (
+                        <div
+                          key={module.slug}
+                          className="flex items-center justify-between rounded-md border border-dashed px-3 py-2"
+                        >
+                          <div>
+                            <p className="text-sm font-medium">{module.name}</p>
+                            {module.description ? (
+                              <p className="text-xs text-muted-foreground">
+                                {module.description}
+                              </p>
+                            ) : null}
+                          </div>
+                          <Badge
+                            variant="secondary"
+                            className={
+                              module.enabled
+                                ? "bg-emerald-100 text-emerald-700"
+                                : "bg-zinc-100 text-zinc-600"
+                            }
+                          >
+                            {module.enabled ? "Active" : "Off"}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : null}
             </TabsContent>
 
             <TabsContent value="billing" className="mt-6 space-y-4">

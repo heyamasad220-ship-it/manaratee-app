@@ -10,7 +10,7 @@ import {
 } from "@/lib/applications/application-routes"
 import { statusTabIdFromQueryParam } from "@/lib/applications/application-status-tabs"
 import { PERMISSIONS, requirePermission } from "@/lib/permissions/permissions"
-import type { ModuleOwner } from "@/lib/applications/application-types"
+import { isWorkforceModuleOwner, type ModuleOwner } from "@/lib/applications/application-types"
 
 export default async function ApplicationsAllPage({
   searchParams,
@@ -50,7 +50,7 @@ export default async function ApplicationsAllPage({
     params.application_type
   )
 
-  if (!params.application_type && (!params.module_owner || params.module_owner === "hr")) {
+  if (!params.application_type && isWorkforceModuleOwner(params.module_owner)) {
     redirect(
       peopleManagementApplicationsUrl({
         status: statusTab,
@@ -69,7 +69,7 @@ export default async function ApplicationsAllPage({
     )
   }
 
-  if (!moduleOwner || moduleOwner === "hr") {
+  if (!moduleOwner || isWorkforceModuleOwner(moduleOwner)) {
     redirect(
       peopleManagementApplicationsUrl({
         status: statusTab,

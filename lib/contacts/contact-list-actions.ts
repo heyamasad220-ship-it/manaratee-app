@@ -8,6 +8,7 @@ import {
   type ContactRoleValue,
   type ContactStatus,
   filterContactRoles,
+  getAllowedRolesForRecordType,
   mapRoleValue,
   mapStatus,
 } from "@/lib/contacts/contact-constants"
@@ -22,6 +23,7 @@ export type ContactListRow = {
   name: string
   email: string
   phone: string
+  primaryContactName: string
   recordType: ContactRecordType
   roles: ContactRoleLabel[]
   roleValues: ContactRoleValue[]
@@ -64,17 +66,17 @@ function escapeIlike(value: string) {
 }
 
 function mapContactRow(row: any): ContactListRow {
+  const recordType: ContactRecordType =
+    row.contact_type === "organization" ? "organization" : "individual"
+
   const roleValues = filterContactRoles(
     Array.from(
       new Set((row.contact_roles || []).map((r: any) => r.role as string).filter(Boolean))
     )
-  )
+  ).filter((role) => getAllowedRolesForRecordType(recordType).includes(role))
   const roles = roleValues
     .map((value) => mapRoleValue(value))
     .filter(Boolean) as ContactRoleLabel[]
-
-  const recordType: ContactRecordType =
-    row.contact_type === "organization" ? "organization" : "individual"
 
   const teamMap = new Map<string, ContactListTeamSummary>()
   for (const membership of row.hr_team_memberships || []) {
@@ -94,6 +96,7 @@ function mapContactRow(row: any): ContactListRow {
     name: row.full_name || row.email || row.phone || "Unnamed Contact",
     email: row.email || "",
     phone: row.phone || "",
+    primaryContactName: row.primary_contact_name || "",
     recordType,
     roleValues,
     roles,
@@ -107,10 +110,11 @@ function mapContactRow(row: any): ContactListRow {
 function buildSelect(
   roleFilter: boolean,
   teamFilter: boolean,
-  options?: { includeTeams?: boolean; includeActivityColumns?: boolean }
+  options?: { includeTeams?: boolean; includeActivityColumns?: boolean; includePrimaryContactName?: boolean }
 ) {
   const includeTeams = options?.includeTeams !== false
   const includeActivityColumns = options?.includeActivityColumns === true
+  const includePrimaryContactName = options?.includePrimaryContactName !== false
 
   const roles = roleFilter ? "contact_roles!inner(role)" : "contact_roles(role)"
   const activityColumns = includeActivityColumns
@@ -129,6 +133,7 @@ function buildSelect(
     full_name,
     email,
     phone,
+    ${includePrimaryContactName ? "primary_contact_name," : ""}
     contact_type,
     status,
     created_at,
@@ -170,6 +175,7 @@ function isMissingColumnError(error: { code?: string; message?: string } | null)
   return (
     message.includes("last_activity_at") ||
     message.includes("updated_at") ||
+    message.includes("primary_contact_name") ||
     message.includes("does not exist")
   )
 }
@@ -183,6 +189,7 @@ function isMissingTeamsRelationError(error: { code?: string; message?: string } 
 type QueryOptions = {
   includeTeams: boolean
   includeActivityColumns: boolean
+  includePrimaryContactName: boolean
 }
 
 async function runContactsQuery(
@@ -202,6 +209,7 @@ async function runContactsQuery(
       buildSelect(Boolean(roleFilter), Boolean(teamFilter), {
         includeTeams: options.includeTeams,
         includeActivityColumns: options.includeActivityColumns,
+        includePrimaryContactName: options.includePrimaryContactName,
       }),
       { count: "exact" }
     )
@@ -238,7 +246,7 @@ async function runContactsQuery(
   if (trimmedSearch) {
     const pattern = `%${escapeIlike(trimmedSearch)}%`
     query = query.or(
-      `full_name.ilike.${pattern},email.ilike.${pattern},phone.ilike.${pattern}`
+      `full_name.ilike.${pattern},email.ilike.${pattern},phone.ilike.${pattern},primary_contact_name.ilike.${pattern}`
     )
   }
 
@@ -320,9 +328,10 @@ export async function fetchContactsList(
   const isRecentView = !hasListFilters(input)
 
   const queryPlans: QueryOptions[] = [
-    { includeTeams: true, includeActivityColumns: true },
-    { includeTeams: true, includeActivityColumns: false },
-    { includeTeams: false, includeActivityColumns: false },
+    { includeTeams: true, includeActivityColumns: true, includePrimaryContactName: true },
+    { includeTeams: true, includeActivityColumns: false, includePrimaryContactName: true },
+    { includeTeams: false, includeActivityColumns: false, includePrimaryContactName: true },
+    { includeTeams: false, includeActivityColumns: false, includePrimaryContactName: false },
   ]
 
   let lastError: { message?: string } | null = null
@@ -357,6 +366,7 @@ export async function fetchContactsList(
 
     const canRetry =
       (plan.includeActivityColumns && isMissingColumnError(error)) ||
+      (plan.includePrimaryContactName && isMissingColumnError(error)) ||
       (plan.includeTeams && isMissingTeamsRelationError(error))
 
     if (!canRetry) {

@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { TimeInput } from "@/components/ui/time-input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Switch } from "@/components/ui/switch"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
@@ -701,7 +702,7 @@ export function AddEventForm({ initialDate, initialHour, onCancel, onSave }: Add
                 <Label>Ticket Unavailability Date</Label>
                 <div className="grid grid-cols-2 gap-3">
                   <Input type="date" className="bg-card" />
-                  <Input type="time" className="bg-card" />
+                  <TimeInput className="bg-card" />
                 </div>
               </div>
             </div>

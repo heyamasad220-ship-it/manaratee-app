@@ -20,7 +20,7 @@ export default function UpcomingEventsPage() {
           </div>
           <div className="flex items-center gap-3">
             <Button asChild className="gap-1.5">
-              <Link href="/events/new">
+              <Link href="/bookings/requests">
                 <Plus className="h-4 w-4" />
                 New Event
               </Link>

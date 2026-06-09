@@ -12,7 +12,7 @@ import type {
 } from "@/lib/hr/hr-report-types"
 
 function revalidateHrReports() {
-  revalidatePath("/hr/reports")
+  revalidatePath("/workforce/reports")
 }
 
 export async function saveAttendanceRecord(input: AttendanceFormState & { id?: string }) {

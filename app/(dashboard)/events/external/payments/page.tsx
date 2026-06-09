@@ -344,7 +344,7 @@ const [recordPaymentForm, setRecordPaymentForm] = useState({
       <Header title="Payments" />
       <div className="flex flex-col gap-4 sm:gap-6 p-4 sm:p-6">
         {/* Summary Cards */}
-        <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
+        <div className="flex flex-wrap gap-3 sm:gap-4 [&>*]:w-fit">
           <Card className="border-l-4 border-l-amber-500">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">

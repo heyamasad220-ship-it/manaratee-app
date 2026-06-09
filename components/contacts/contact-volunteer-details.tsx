@@ -6,6 +6,7 @@ import { Calendar, Clock, Loader2, UsersRound } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { getCurrentOrganizationId } from "@/lib/current-organization"
 import { fetchTeamMemberships, type HrTeamMembership } from "@/lib/hr/hr-team-actions"
+import { membershipTeamDetailPath } from "@/lib/memberships/membership-module-label"
 import { formatContactDate } from "@/lib/contacts/contact-profile-data"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -97,11 +98,11 @@ export function ContactVolunteerDetails({ contactId }: ContactVolunteerDetailsPr
         <div className="mb-4 flex items-center justify-between gap-2">
           <h2 className="text-lg font-semibold">Volunteer Details</h2>
           <Button variant="outline" size="sm" asChild>
-            <Link href="/hr/volunteers">View volunteers</Link>
+            <Link href="/workforce/volunteers">View volunteers</Link>
           </Button>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="flex flex-wrap gap-4 [&>*]:w-fit">
           <div>
             <p className="text-xs text-muted-foreground">Volunteer status</p>
             {status ? (
@@ -139,7 +140,7 @@ export function ContactVolunteerDetails({ contactId }: ContactVolunteerDetailsPr
           <div className="mt-4 space-y-2">
             {teams.map((team) => (
               <div key={team.id} className="rounded-md border px-3 py-2 text-sm">
-                <Link href={`/hr/teams/${team.team_id}`} className="font-medium hover:underline">
+                <Link href={membershipTeamDetailPath(team.team_id)} className="font-medium hover:underline">
                   {team.team_name}
                 </Link>
                 <p className="text-muted-foreground">

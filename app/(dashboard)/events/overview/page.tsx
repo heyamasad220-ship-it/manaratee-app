@@ -296,7 +296,7 @@ export default function OverviewPage() {
         {/* Quick Actions */}
         <div className="flex flex-wrap gap-2 sm:gap-3">
           <Button asChild className="h-9 sm:h-10">
-            <Link href="/events/new">
+              <Link href="/bookings/requests">
               <Eye className="mr-1.5 sm:mr-2 h-4 w-4" />
               <span className="hidden sm:inline">Review Requests</span>
               <span className="sm:hidden">Review</span>
@@ -333,7 +333,7 @@ export default function OverviewPage() {
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base font-semibold">Recent Event Requests</CardTitle>
                 <Button variant="ghost" size="sm" asChild>
-                  <Link href="/events/new" className="text-xs">
+                  <Link href="/bookings/requests" className="text-xs">
                     View All
                     <ChevronRight className="ml-1 h-3 w-3" />
                   </Link>

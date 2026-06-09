@@ -24,9 +24,12 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent } from "@/components/ui/card"
-import { AddEventForm } from "@/components/events/new/add-event-form"
 import { NewBookingRequestDrawer } from "@/components/bookings/new-booking-request-drawer"
 import { BookingStatus } from "@/lib/status-badges"
+import type {
+  CalendarSlotSelection,
+  EventCalendarGridItem,
+} from "@/lib/events/event-calendar-utils"
 
 const viewModes = ["Day", "Week", "Month", "List"] as const
 type ViewMode = (typeof viewModes)[number]
@@ -103,14 +106,32 @@ function getWeekStart(date: Date) {
 }
 
 interface EventsCalendarProps {
-  onSlotClick?: (date: Date, hour?: number) => void
+  variant?: "bookings" | "events"
+  venues?: Array<{ id: string; name: string }>
+  calendarEvents?: EventCalendarGridItem[]
+  onSlotClick?: (slot: CalendarSlotSelection) => void
+  onCreateEventClick?: () => void
 }
 
-export function EventsCalendar({ onSlotClick }: EventsCalendarProps) {
+export function EventsCalendar({
+  variant = "bookings",
+  venues = [],
+  calendarEvents,
+  onSlotClick,
+  onCreateEventClick,
+}: EventsCalendarProps) {
+  const isEventsVariant = variant === "events"
+  const venueIdByName = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const venue of venues) {
+      map.set(venue.name, venue.id)
+    }
+    return map
+  }, [venues])
   const [activeView, setActiveView] = useState<ViewMode>("Day")
   const [currentDate, setCurrentDate] = useState(new Date())
   const [showAddEventDialog, setShowAddEventDialog] = useState(false)
-  const [selectedSlot, setSelectedSlot] = useState<{ date: Date; hour?: number } | null>(null)
+  const [selectedSlot, setSelectedSlot] = useState<CalendarSlotSelection | null>(null)
   const [spaceFilter, setSpaceFilter] = useState("All Spaces")
   const [showBlockDialog, setShowBlockDialog] = useState(false)
   const [showManualBookingDialog, setShowManualBookingDialog] = useState(false)
@@ -183,11 +204,26 @@ export function EventsCalendar({ onSlotClick }: EventsCalendarProps) {
   }
 
   const spaceNames = useMemo(() => {
+    if (venues.length > 0) {
+      return venues.map((venue) => venue.name)
+    }
     if (spaceFilter === "All Spaces") {
       return ["Main Hall", "Room A", "Room B", "Conference Room", "Classrooms", "Library"]
     }
     return [spaceFilter]
-  }, [spaceFilter])
+  }, [spaceFilter, venues])
+
+  const spaceFilterOptions = useMemo(() => {
+    if (venues.length > 0) {
+      return ["All Spaces", ...venues.map((venue) => venue.name)]
+    }
+    return spaces
+  }, [venues])
+
+  const gridEvents: EventCalendarGridItem[] = calendarEvents ?? mockCalendarEvents.map((event) => ({
+    ...event,
+    eventDate: "",
+  }))
 
   const weekStart = useMemo(() => getWeekStart(currentDate), [currentDate])
   const weekDays = useMemo(() => {
@@ -198,10 +234,21 @@ export function EventsCalendar({ onSlotClick }: EventsCalendarProps) {
     })
   }, [weekStart])
 
-  const handleSlotClick = (date: Date, hour?: number) => {
-    setSelectedSlot({ date, hour })
+  const handleSlotClick = (slot: CalendarSlotSelection) => {
+    const enrichedSlot = {
+      ...slot,
+      venueId:
+        slot.venueId ||
+        (slot.spaceName ? venueIdByName.get(slot.spaceName) : undefined),
+    }
+
+    if (onSlotClick) {
+      onSlotClick(enrichedSlot)
+      return
+    }
+
+    setSelectedSlot(enrichedSlot)
     setShowAddEventDialog(true)
-    onSlotClick?.(date, hour)
   }
 
   return (
@@ -254,7 +301,7 @@ export function EventsCalendar({ onSlotClick }: EventsCalendarProps) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {spaces.map((space) => (
+                {spaceFilterOptions.map((space) => (
                   <SelectItem key={space} value={space}>{space}</SelectItem>
                 ))}
               </SelectContent>
@@ -265,10 +312,10 @@ export function EventsCalendar({ onSlotClick }: EventsCalendarProps) {
               <Ban className="mr-1.5 h-4 w-4" />
               Block
             </Button>
-            <Button onClick={() => setShowManualBookingDialog(true)} className="h-9 text-sm">
+            <Button onClick={() => (isEventsVariant && onCreateEventClick ? onCreateEventClick() : setShowManualBookingDialog(true))} className="h-9 text-sm">
               <Plus className="mr-1.5 h-4 w-4" />
-              <span className="hidden sm:inline">Manual Booking</span>
-              <span className="sm:hidden">Book</span>
+              <span className="hidden sm:inline">{isEventsVariant ? "Create Event" : "Manual Booking"}</span>
+              <span className="sm:hidden">{isEventsVariant ? "Create" : "Book"}</span>
             </Button>
           </div>
         </div>
@@ -283,6 +330,8 @@ export function EventsCalendar({ onSlotClick }: EventsCalendarProps) {
           currentDate={currentDate}
           onSlotClick={handleSlotClick}
           spaceFilter={spaceFilter}
+          gridEvents={gridEvents}
+          isEventsVariant={isEventsVariant}
         />
       )}
 
@@ -294,24 +343,33 @@ export function EventsCalendar({ onSlotClick }: EventsCalendarProps) {
           scrollRef={scrollContainerRef} 
           onSlotClick={handleSlotClick}
           spaceFilter={spaceFilter}
+          gridEvents={gridEvents}
         />
       )}
 
       {/* List View */}
-      {activeView === "List" && <ListView onSlotClick={handleSlotClick} currentDate={currentDate} spaceFilter={spaceFilter} />}
+      {activeView === "List" && (
+        <ListView
+          onSlotClick={handleSlotClick}
+          currentDate={currentDate}
+          spaceFilter={spaceFilter}
+          gridEvents={gridEvents}
+        />
+      )}
 
       {/* Month View */}
       {activeView === "Month" && (
         <MonthView currentDate={currentDate} onSlotClick={handleSlotClick} spaceFilter={spaceFilter} />
       )}
 
-      {/* New Booking Request Drawer */}
-      <NewBookingRequestDrawer
-        open={showAddEventDialog}
-        onOpenChange={setShowAddEventDialog}
-        initialDate={selectedSlot?.date}
-        initialHour={selectedSlot?.hour}
-      />
+      {!isEventsVariant ? (
+        <NewBookingRequestDrawer
+          open={showAddEventDialog}
+          onOpenChange={setShowAddEventDialog}
+          initialDate={selectedSlot?.date}
+          initialHour={selectedSlot?.hour}
+        />
+      ) : null}
 
       {/* Block Slot Dialog */}
       <Dialog open={showBlockDialog} onOpenChange={setShowBlockDialog}>
@@ -617,20 +675,66 @@ export function EventsCalendar({ onSlotClick }: EventsCalendarProps) {
 
 /* ──────────── Day View ──────────── */
 
+function calendarDayKey(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
+
 interface DayViewProps {
   hours: number[]
   spaceNames: string[]
   scrollRef: React.RefObject<HTMLDivElement | null>
   currentDate: Date
-  onSlotClick: (date: Date, hour?: number) => void
+  onSlotClick: (slot: CalendarSlotSelection) => void
   spaceFilter: string
+  gridEvents: EventCalendarGridItem[]
+  isEventsVariant?: boolean
 }
 
-function DayView({ hours, spaceNames, scrollRef, currentDate, onSlotClick, spaceFilter }: DayViewProps) {
+function getEventStatusClasses(status: string, isEventsVariant?: boolean) {
+  if (!isEventsVariant && status in statusConfig) {
+    return statusConfig[status as BookingStatus]
+  }
+
+  switch (status) {
+    case "confirmed":
+    case "approved":
+      return { bg: "bg-emerald-100", text: "text-emerald-700", dot: "bg-emerald-500" }
+    case "awaiting_approval":
+    case "submitted":
+      return { bg: "bg-amber-100", text: "text-amber-700", dot: "bg-amber-500" }
+    case "declined":
+    case "cancelled":
+      return { bg: "bg-red-100", text: "text-red-700", dot: "bg-red-500" }
+    default:
+      return { bg: "bg-blue-100", text: "text-blue-700", dot: "bg-blue-500" }
+  }
+}
+
+function DayView({
+  hours,
+  spaceNames,
+  scrollRef,
+  currentDate,
+  onSlotClick,
+  spaceFilter,
+  gridEvents,
+  isEventsVariant,
+}: DayViewProps) {
   const filteredEvents = useMemo(() => {
-    if (spaceFilter === "All Spaces") return mockCalendarEvents
-    return mockCalendarEvents.filter(e => e.space === spaceFilter)
-  }, [spaceFilter])
+    const dayKey = calendarDayKey(currentDate)
+    const forDay = gridEvents.filter((event) => {
+      if ("eventDate" in event && event.eventDate) {
+        return event.eventDate === dayKey
+      }
+      return true
+    })
+
+    if (spaceFilter === "All Spaces") return forDay
+    return forDay.filter((e) => e.space === spaceFilter)
+  }, [spaceFilter, gridEvents, currentDate])
 
   return (
     <Card>
@@ -673,14 +777,16 @@ function DayView({ hours, spaceNames, scrollRef, currentDate, onSlotClick, space
                       key={`${hour}-${space}`}
                       className="relative border-b border-r border-border last:border-r-0 cursor-pointer hover:bg-muted/30 transition-colors"
                       style={{ height: ROW_HEIGHT }}
-                      onClick={() => onSlotClick(currentDate, hour)}
+                      onClick={() =>
+                        onSlotClick({ date: currentDate, hour, spaceName: space })
+                      }
                     >
                       {event && (
                         <button
                           className={cn(
                             "absolute inset-x-1 top-1 z-[5] overflow-hidden rounded-md border px-2 py-1 text-left text-[11px] font-medium leading-tight shadow-sm transition-opacity hover:opacity-80",
-                            statusConfig[event.status].bg,
-                            statusConfig[event.status].text,
+                            getEventStatusClasses(event.status, isEventsVariant).bg,
+                            getEventStatusClasses(event.status, isEventsVariant).text,
                             event.status === "Blocked" && "cursor-not-allowed opacity-60"
                           )}
                           style={{
@@ -711,14 +817,22 @@ interface WeekViewProps {
   spaceNames: string[]
   weekDays: Date[]
   scrollRef: React.RefObject<HTMLDivElement | null>
-  onSlotClick: (date: Date, hour?: number) => void
+  onSlotClick: (slot: CalendarSlotSelection) => void
   spaceFilter: string
+  gridEvents: EventCalendarGridItem[]
 }
 
-function WeekView({ spaceNames, weekDays, scrollRef, onSlotClick, spaceFilter }: WeekViewProps) {
+function WeekView({
+  spaceNames,
+  weekDays,
+  scrollRef,
+  onSlotClick,
+  spaceFilter,
+  gridEvents,
+}: WeekViewProps) {
   const filteredEvents = useMemo(() => {
     if (spaceFilter === "All Spaces") return mockWeekEvents
-    return mockWeekEvents.filter(e => e.space === spaceFilter)
+    return mockWeekEvents.filter((e) => e.space === spaceFilter)
   }, [spaceFilter])
 
   return (
@@ -764,7 +878,7 @@ function WeekView({ spaceNames, weekDays, scrollRef, onSlotClick, spaceFilter }:
                       <div
                         key={`${dayIdx}-${space}`}
                         className="flex flex-col gap-1.5 border-b border-r border-border px-3 py-2.5 last:border-r-0 min-h-[90px] cursor-pointer hover:bg-muted/30 transition-colors"
-                        onClick={() => onSlotClick(day)}
+                        onClick={() => onSlotClick({ date: day, spaceName: space })}
                       >
                         {cellEvents.map((evt) => (
                           <button
@@ -796,7 +910,7 @@ function WeekView({ spaceNames, weekDays, scrollRef, onSlotClick, spaceFilter }:
 
 interface MonthViewProps {
   currentDate: Date
-  onSlotClick: (date: Date) => void
+  onSlotClick: (slot: CalendarSlotSelection) => void
   spaceFilter: string
 }
 
@@ -856,7 +970,7 @@ function MonthView({ currentDate, onSlotClick, spaceFilter }: MonthViewProps) {
                 day ? "cursor-pointer hover:bg-muted/30" : "bg-muted/20",
                 idx % 7 === 6 && "border-r-0"
               )}
-              onClick={() => day && onSlotClick(day)}
+              onClick={() => day && onSlotClick({ date: day })}
             >
               {day && (
                 <>
@@ -901,9 +1015,10 @@ function MonthView({ currentDate, onSlotClick, spaceFilter }: MonthViewProps) {
 /* ──────────── List View ──────────── */
 
 interface ListViewProps {
-  onSlotClick: (date: Date) => void
+  onSlotClick: (slot: CalendarSlotSelection) => void
   currentDate: Date
   spaceFilter: string
+  gridEvents?: EventCalendarGridItem[]
 }
 
 function ListView({ onSlotClick, currentDate, spaceFilter }: ListViewProps) {
@@ -937,7 +1052,7 @@ function ListView({ onSlotClick, currentDate, spaceFilter }: ListViewProps) {
             {/* Date header */}
             <div 
               className="border-b border-border bg-card px-5 py-3 cursor-pointer hover:bg-muted/30 transition-colors flex items-center justify-between"
-              onClick={() => onSlotClick(currentDate)}
+              onClick={() => onSlotClick({ date: currentDate })}
             >
               <h3 className="text-sm font-bold text-primary tracking-wide">{dateLabel}</h3>
               <Button size="sm" variant="ghost" className="h-7 gap-1 text-xs">
@@ -982,7 +1097,7 @@ function ListView({ onSlotClick, currentDate, spaceFilter }: ListViewProps) {
         {/* Add new date section */}
         <div 
           className="flex items-center justify-center gap-2 border-b border-border bg-muted/20 px-5 py-6 cursor-pointer hover:bg-muted/40 transition-colors"
-          onClick={() => onSlotClick(currentDate)}
+          onClick={() => onSlotClick({ date: currentDate })}
         >
           <Plus className="h-4 w-4 text-muted-foreground" />
           <span className="text-sm text-muted-foreground">Click to add a new event</span>

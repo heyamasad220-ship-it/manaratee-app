@@ -1,19 +1,11 @@
 import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
-import {
-  ORG_ADMIN_DASHBOARD_ROLES,
-} from "@/lib/organizations/organization-member-constants"
-import { PERMISSIONS } from "@/lib/permissions/permission-keys"
 import { getStaffAssignmentsForCurrentContact } from "@/lib/programs/program-staff-assignment-queries"
 import type { UserPortalCapabilities } from "@/lib/auth/portal-capabilities-types"
+import { resolvePortalPermissions } from "@/lib/auth/resolve-portal-permissions"
+import { resolveStaffToolsPortalAccess } from "@/lib/auth/staff-tools-eligibility"
 
-export type { UserPortalCapabilities }
-
-function isOrgAdminDashboardRole(role: string | null | undefined) {
-  return ORG_ADMIN_DASHBOARD_ROLES.includes(
-    role as (typeof ORG_ADMIN_DASHBOARD_ROLES)[number]
-  )
-}
+export type { UserPortalCapabilities } from "@/lib/auth/portal-capabilities-types"
 
 export async function getUserPortalCapabilities(
   userId: string,
@@ -26,6 +18,8 @@ export async function getUserPortalCapabilities(
     return {
       hasPersonalPortal: false,
       hasTeachingPortal: false,
+      hasStaffToolsPortal: false,
+      canManageEventRequests: false,
       hasAdminPortal: false,
     }
   }
@@ -37,25 +31,6 @@ export async function getUserPortalCapabilities(
     .eq("user_id", userId)
     .eq("status", "active")
     .maybeSingle()
-
-  let hasAdminPanel = false
-
-  if (membership?.role_id) {
-    const { data: permissionRows } = await supabase
-      .from("role_permissions")
-      .select("permission_key")
-      .eq("role_id", membership.role_id)
-      .in("permission_key", [
-        PERMISSIONS.PROGRAMS_MANAGE,
-        PERMISSIONS.PROGRAMS_VIEW,
-      ])
-
-    hasAdminPanel = Boolean(permissionRows?.length)
-  }
-
-  if (!hasAdminPanel && membership?.role) {
-    hasAdminPanel = isOrgAdminDashboardRole(membership.role)
-  }
 
   const { data: contact } = await supabase
     .from("contacts")
@@ -71,10 +46,26 @@ export async function getUserPortalCapabilities(
   const hasTeachingPortal = teachingAssignments.length > 0
   const hasPersonalPortal = Boolean(contact?.id) || membership?.role === "viewer"
 
+  const portalPermissions = await resolvePortalPermissions(
+    supabase,
+    orgId,
+    membership
+  )
+
+  const hasStaffToolsPortal = await resolveStaffToolsPortalAccess(
+    supabase,
+    orgId,
+    userId,
+    membership,
+    contact?.id
+  )
+
   return {
     hasPersonalPortal,
     hasTeachingPortal,
-    hasAdminPortal: hasAdminPanel,
+    hasStaffToolsPortal,
+    canManageEventRequests: portalPermissions.canManageEventRequests,
+    hasAdminPortal: portalPermissions.hasAdminPortal,
   }
 }
 
@@ -101,4 +92,12 @@ export async function userCanAccessOfferingRoster(input: {
     (assignment) =>
       assignment.offering_id === input.offeringId && assignment.is_active
   )
+}
+
+export async function requireStaffToolsPortal(
+  userId: string,
+  organizationId: string
+) {
+  const capabilities = await getUserPortalCapabilities(userId, organizationId)
+  return capabilities.hasStaffToolsPortal
 }

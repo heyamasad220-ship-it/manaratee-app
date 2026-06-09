@@ -226,7 +226,7 @@ useEffect(() => {
             </CardContent>
           </Card>
 
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+          <div className="flex flex-wrap gap-4 [&>*]:w-fit">
             {stats.map((stat) => (
               <Card key={stat.label}>
                 <CardContent className="p-4">

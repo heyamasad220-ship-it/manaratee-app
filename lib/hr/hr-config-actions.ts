@@ -23,9 +23,9 @@ export type HrJobRole = {
 }
 
 function revalidateHrSettingsPaths() {
-  revalidatePath("/hr/settings")
-  revalidatePath("/programs/instructors")
-  revalidatePath("/hr/employees")
+  revalidatePath("/workforce/settings")
+  revalidatePath("/workforce/employees")
+  revalidatePath("/workforce/employees")
 }
 
 export async function fetchHrPositions(): Promise<HrPosition[]> {

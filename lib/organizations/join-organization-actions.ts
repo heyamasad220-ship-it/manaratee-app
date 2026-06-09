@@ -9,6 +9,7 @@ import {
 } from "@/lib/organizations/organization-member-constants"
 import { setActiveOrganization } from "@/lib/organizations/organization-actions"
 import { syncProfileForOrganizationMember } from "@/lib/organizations/sync-profile-organization"
+import { ensureActiveMembershipForContact } from "@/lib/memberships/membership-actions"
 
 export type JoinOrganizationSummary = {
   id: string
@@ -38,32 +39,6 @@ export async function getJoinOrganizationBySlug(
     id: data.id as string,
     name: data.name as string,
     slug: data.slug as string,
-  }
-}
-
-async function ensureContactMemberRole(
-  admin: ReturnType<typeof getServiceRoleClient>,
-  organizationId: string,
-  contactId: string
-) {
-  const { data: existingRole } = await admin
-    .from("contact_roles")
-    .select("id")
-    .eq("organization_id", organizationId)
-    .eq("contact_id", contactId)
-    .eq("role", "member")
-    .maybeSingle()
-
-  if (existingRole) return
-
-  const { error } = await admin.from("contact_roles").insert({
-    organization_id: organizationId,
-    contact_id: contactId,
-    role: "member",
-  })
-
-  if (error && !error.message.includes("duplicate")) {
-    throw new Error(error.message || "Could not assign contact role")
   }
 }
 
@@ -241,7 +216,11 @@ export async function joinOrganizationAsCustomer(input: {
     contactId = contact.id as string
   }
 
-  await ensureContactMemberRole(admin, organization.id, contactId)
+  await ensureActiveMembershipForContact({
+    organizationId: organization.id,
+    contactId,
+    supabase: admin,
+  })
 
   await syncProfileForOrganizationMember(admin, {
     userId: user.id,

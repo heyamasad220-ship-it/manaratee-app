@@ -4,6 +4,17 @@ import { revalidatePath } from "next/cache"
 
 import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
+import { MEMBERSHIP_BENEFITS_PATH } from "@/lib/memberships/membership-module-label"
+import { CONTACTS_SETTINGS_PATH } from "@/lib/contacts/contact-module-label"
+
+function revalidateDiscountTagPaths() {
+  revalidatePath(MEMBERSHIP_BENEFITS_PATH)
+  revalidatePath(CONTACTS_SETTINGS_PATH)
+  revalidatePath("/workforce/settings/discount-tags")
+  revalidatePath("/workforce/settings")
+  revalidatePath("/membership/benefits")
+  revalidatePath("/discount-tags")
+}
 
 export async function createDiscountTag(formData: FormData) {
   const supabase = await createClient()
@@ -32,9 +43,7 @@ export async function createDiscountTag(formData: FormData) {
     throw new Error(error.message)
   }
 
-  revalidatePath("/discount-tags")
-  revalidatePath("/hr/settings")
-  revalidatePath("/hr/discount-policies")
+  revalidateDiscountTagPaths()
 }
 
 export async function toggleDiscountTagFromForm(formData: FormData) {
@@ -73,9 +82,7 @@ export async function toggleDiscountTagActive(id: string, active: boolean) {
     throw new Error(error.message)
   }
 
-  revalidatePath("/discount-tags")
-  revalidatePath("/hr/settings")
-  revalidatePath("/hr/discount-policies")
+  revalidateDiscountTagPaths()
 }
 
 export async function deleteDiscountTag(id: string) {
@@ -97,7 +104,5 @@ export async function deleteDiscountTag(id: string) {
     throw new Error(error.message)
   }
 
-  revalidatePath("/discount-tags")
-  revalidatePath("/hr/settings")
-  revalidatePath("/hr/discount-policies")
+  revalidateDiscountTagPaths()
 }

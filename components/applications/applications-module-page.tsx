@@ -74,7 +74,7 @@ type ApplicationsModulePageProps = {
   lockedApplicationType?: string
   /** Embed inside another page (reduced chrome, custom URL sync). */
   embedded?: boolean
-  /** Base path for URL sync when embedded, e.g. /hr/employees with tab=applications. */
+  /** Base path for URL sync when embedded, e.g. /workforce/employees with tab=applications. */
   embeddedSyncPath?: string
   /** When set, only filter to these types on the hub view (excludes employment on PM Applications). */
   hubApplicationTypes?: readonly string[]
@@ -406,7 +406,7 @@ export function ApplicationsModulePage({
 
       {showOverview && (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="flex flex-wrap gap-4 [&>*]:w-fit">
             {statCards.map((card) => (
               <button
                 key={card.id}

@@ -1,5 +1,11 @@
 import { redirect } from "next/navigation"
+import { peopleManagementApplicationsUrl } from "@/lib/applications/application-routes"
 
 export default function SignUpsApplicationsRedirectPage() {
-  redirect("/applications/all?application_type=volunteer")
+  redirect(
+    peopleManagementApplicationsUrl({
+      pageTab: "submissions",
+      applicationType: "volunteer",
+    })
+  )
 }

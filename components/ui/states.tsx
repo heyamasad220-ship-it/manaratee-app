@@ -4,6 +4,7 @@ import * as React from "react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { statCardWidthClassName } from "@/components/ui/stat-card"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Calendar,
@@ -324,9 +325,9 @@ export function TableSkeleton({ rows = 5, columns = 5, className }: { rows?: num
 
 export function CardsSkeleton({ count = 4, className }: { count?: number; className?: string }) {
   return (
-    <div className={cn("grid gap-4 sm:grid-cols-2 lg:grid-cols-4", className)}>
+    <div className={cn("flex flex-wrap gap-4", className)}>
       {Array.from({ length: count }).map((_, i) => (
-        <Card key={i}>
+        <Card key={i} className={statCardWidthClassName}>
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-4">
               <Skeleton className="h-4 w-24" />

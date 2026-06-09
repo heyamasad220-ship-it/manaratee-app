@@ -38,7 +38,7 @@ async function assertStaffEligibleContact(
 
   if (!data?.length) {
     throw new Error(
-      "Selected contact must have an Employee or Volunteer role in People Management."
+      "Selected contact must have an Employee or Volunteer role in Workforce."
     )
   }
 }

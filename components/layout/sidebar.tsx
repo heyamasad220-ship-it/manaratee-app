@@ -10,7 +10,8 @@ import {
   CreditCard,
   Settings,
   LayoutGrid,
-  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Store,
   Heart,
   Users,
@@ -21,15 +22,17 @@ import {
   Ticket,
   Boxes,
   FileText,
+  ClipboardList,
+  Baby,
+  UserCheck,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 import { createClient } from "@/lib/supabase/client"
-import { PEOPLE_MANAGEMENT_MODULE_LABEL } from "@/lib/hr/hr-module-label"
+import { WORKFORCE_MODULE_LABEL } from "@/lib/hr/hr-module-label"
 import {
-  hrApplicationNavItems,
   programsFinancialAssistanceNavItem,
   vendorApplicationNavItem,
 } from "@/lib/applications/application-nav"
@@ -49,6 +52,7 @@ interface NavItem {
   children?: SubItem[]
   group?: string | null
   permissionKey?: string
+  moduleSlug?: string
 }
 
 interface SidebarModuleRow {
@@ -58,6 +62,93 @@ interface SidebarModuleRow {
   icon_name: string | null
   group_name: string | null
   sort_order: number | null
+}
+
+/** Shown when DB module rows are missing (before migrations 032/033 are applied). */
+const HIDDEN_SIDEBAR_MODULE_SLUGS = new Set([
+  "sign-ups",
+  "child-care",
+  "ticketing",
+  "bazaar",
+  "hr",
+  "reports",
+  "applications",
+])
+
+/** Ensures Event Management appears before SQL migration 038 is applied. */
+const STATIC_SIDEBAR_MODULES: SidebarModuleRow[] = [
+  {
+    name: "Event Management",
+    slug: "event-management",
+    route: "/event-management/overview",
+    icon_name: "LayoutGrid",
+    group_name: "Operations",
+    sort_order: 40,
+  },
+  {
+    name: "Membership",
+    slug: "membership",
+    route: "/membership",
+    icon_name: "UserCheck",
+    group_name: "People",
+    sort_order: 36,
+  },
+  {
+    name: "Workforce",
+    slug: "workforce",
+    route: "/workforce",
+    icon_name: "Users",
+    group_name: "People",
+    sort_order: 35,
+  },
+]
+
+const moduleSortOrderOverride: Record<string, number> = {
+  workforce: 35,
+  "event-management": 40,
+  membership: 36,
+  bookings: 41,
+  programs: 42,
+  spaces: 50,
+}
+
+function mergeSidebarModules(rows: SidebarModuleRow[]): SidebarModuleRow[] {
+  const bySlug = new Map<string, SidebarModuleRow>()
+
+  for (const row of rows) {
+    if (!HIDDEN_SIDEBAR_MODULE_SLUGS.has(row.slug)) {
+      bySlug.set(row.slug, row)
+    }
+  }
+
+  for (const row of STATIC_SIDEBAR_MODULES) {
+    if (!bySlug.has(row.slug)) {
+      bySlug.set(row.slug, row)
+    }
+  }
+
+  if (!bySlug.has("spaces")) {
+    bySlug.set("spaces", {
+      name: "Facilities",
+      slug: "spaces",
+      route: "/facilities/reservation-center",
+      icon_name: "Building2",
+      group_name: "Facilities",
+      sort_order: 50,
+    })
+  }
+
+  return Array.from(bySlug.values())
+    .map((row) => ({
+      ...row,
+      sort_order: moduleSortOrderOverride[row.slug] ?? row.sort_order,
+    }))
+    .sort((a, b) => {
+      const aOrder = a.sort_order ?? 999
+      const bOrder = b.sort_order ?? 999
+      if (aOrder !== bOrder) return aOrder - bOrder
+      return a.name.localeCompare(b.name)
+    })
 }
 
 interface UserPermissionContext {
@@ -79,39 +170,91 @@ const iconMap: Record<string, LucideIcon> = {
   Ticket,
   Boxes,
   FileText,
+  ClipboardList,
+  Baby,
+  UserCheck,
 }
 
 const modulePermissionMap: Record<string, string> = {
   programs: "programs.view",
   donations: "donations.view",
+  workforce: "staff.view",
   hr: "staff.view",
   staff: "staff.view",
   applications: "applications.view",
   contacts: "contacts.view",
+  membership: "contacts.view",
   reports: "reports.view",
   ticketing: "ticketing.view",
   bookings: "bookings.view",
   spaces: "spaces.view",
   "vendor-hub": "vendor_hub.view",
+  "event-management": "events.view",
 }
 
+/** Until roles are updated, show Event Management to users with Programs access. */
+const modulePermissionFallbacks: Record<string, string[]> = {
+  "event-management": ["programs.view", "ticketing.view", "ticketing.manage"],
+}
+
+const subItemPermissionFallbacks: Record<string, string[]> = {
+  "events.view": ["programs.view"],
+  "events.manage": ["programs.manage"],
+  "reports.view": ["events.view", "programs.view"],
+  "ticketing.view": ["events.view", "programs.view", "ticketing.manage"],
+  "ticketing.manage": ["events.manage", "programs.manage"],
+}
+
+const SIDEBAR_GROUP_ORDER = [
+  "People",
+  "Operations",
+  "Facilities",
+  "Services",
+  "Financial",
+  "System",
+] as const
+
 const moduleDisplayNameMap: Record<string, string> = {
-  hr: PEOPLE_MANAGEMENT_MODULE_LABEL,
+  workforce: WORKFORCE_MODULE_LABEL,
+  hr: WORKFORCE_MODULE_LABEL,
+  bookings: "Venue Rentals",
+  spaces: "Facilities",
+}
+
+function resolveModuleNavSlug(slug: string) {
+  return slug === "hr" ? "workforce" : slug
+}
+
+const moduleGroupOverride: Record<string, string> = {
+  spaces: "Facilities",
+}
+
+const moduleDefaultRouteOverride: Record<string, string> = {
+  spaces: "/facilities/reservation-center",
+  workforce: "/workforce",
+  hr: "/workforce",
 }
 
 const moduleChildren: Record<string, SubItem[]> = {
-  ticketing: [
-    { label: "Overview", href: "/events/tickets", matchPrefix: "/events/tickets", permissionKey: "ticketing.view" },
-    { label: "Settings", href: "/tickets/settings", matchPrefix: "/tickets/settings", permissionKey: "ticketing.manage" },
-  ],
   bookings: [
     { label: "Dashboard", href: "/bookings/overview", matchPrefix: "/bookings/overview", permissionKey: "bookings.view" },
-    { label: "Calendar", href: "/events/new", matchPrefix: "/events/new", permissionKey: "bookings.manage" },
-    { label: "Requests", href: "/events/external/emails", matchPrefix: "/events/external/emails", permissionKey: "bookings.manage" },
+    { label: "Calendar", href: "/bookings/calendar", matchPrefix: "/bookings/calendar", permissionKey: "bookings.view" },
+    { label: "Requests", href: "/bookings/requests", matchPrefix: "/bookings/requests", permissionKey: "bookings.manage" },
+    { label: "Settings", href: "/bookings/settings", matchPrefix: "/bookings/settings", permissionKey: "bookings.manage" },
+  ],
+  "event-management": [
+    { label: "Dashboard", href: "/event-management/overview", matchPrefix: "/event-management/overview", permissionKey: "events.view" },
+    { label: "Calendar", href: "/event-management/calendar", matchPrefix: "/event-management/calendar", permissionKey: "events.view" },
+    { label: "Events", href: "/event-management", matchPrefix: "/event-management", permissionKey: "events.view" },
+    { label: "Ticketing", href: "/event-management/ticketing", matchPrefix: "/event-management/ticketing", permissionKey: "ticketing.view" },
+    { label: "Reports", href: "/event-management/reports", matchPrefix: "/event-management/reports", permissionKey: "reports.view" },
+    { label: "Settings", href: "/event-management/settings", matchPrefix: "/event-management/settings", permissionKey: "events.manage" },
   ],
   spaces: [
-    { label: "Overview", href: "/events/external/venues", matchPrefix: "/events/external/venues", permissionKey: "spaces.view" },
-    { label: "Settings", href: "/bookings/settings", matchPrefix: "/bookings/settings", permissionKey: "spaces.manage" },
+    { label: "Spaces", href: "/facilities/settings/spaces", matchPrefix: "/facilities/settings/spaces", permissionKey: "spaces.view" },
+    { label: "Resources", href: "/facilities/resources", matchPrefix: "/facilities/resources", permissionKey: "spaces.view" },
+    { label: "Reservation Center", href: "/facilities/reservation-center", matchPrefix: "/facilities/reservation-center", permissionKey: "spaces.view" },
+    { label: "Master Calendar", href: "/facilities/calendar", matchPrefix: "/facilities/calendar", permissionKey: "spaces.view" },
   ],
   programs: [
     { label: "Catalog", href: "/programs/catalog", matchPrefix: "/programs/catalog", permissionKey: "programs.view" },
@@ -136,7 +279,15 @@ const moduleChildren: Record<string, SubItem[]> = {
   contacts: [
     { label: "All Contacts", href: "/contacts", matchPrefix: "/contacts", permissionKey: "contacts.view" },
     { label: "People", href: "/contacts/people", matchPrefix: "/contacts/people", permissionKey: "contacts.view" },
+    { label: "Families", href: "/contacts/families", matchPrefix: "/contacts/families", permissionKey: "contacts.view" },
     { label: "Organizations", href: "/contacts/organizations", matchPrefix: "/contacts/organizations", permissionKey: "contacts.view" },
+    { label: "Settings", href: "/contacts/settings", matchPrefix: "/contacts/settings", permissionKey: "contacts.view" },
+  ],
+  membership: [
+    { label: "Overview", href: "/membership", matchPrefix: "/membership", permissionKey: "contacts.view" },
+    { label: "Members", href: "/membership/members", matchPrefix: "/membership/members", permissionKey: "contacts.view" },
+    { label: "Teams", href: "/membership/teams", matchPrefix: "/membership/teams", permissionKey: "contacts.view" },
+    { label: "Settings", href: "/membership/settings", matchPrefix: "/membership/settings", permissionKey: "contacts.view" },
   ],
   donations: [
     { label: "Overview", href: "/donations", matchPrefix: "/donations", permissionKey: "donations.view" },
@@ -148,62 +299,143 @@ const moduleChildren: Record<string, SubItem[]> = {
     { label: "Reports", href: "/donations/reports", matchPrefix: "/donations/reports", permissionKey: "reports.view" },
     { label: "Settings", href: "/donations/settings", matchPrefix: "/donations/settings", permissionKey: "donations.manage" },
   ],
-hr: [
-  {
-    label: "Members",
-    href: "/hr/members",
-    matchPrefix: "/hr/members",
-    permissionKey: "staff.view",
-  },
-  {
-    label: "Employees",
-    href: "/hr/employees",
-    matchPrefix: "/hr/employees",
-    permissionKey: "staff.view",
-  },
-  {
-    label: "Volunteers",
-    href: "/hr/volunteers",
-    matchPrefix: "/hr/volunteers",
-    permissionKey: "staff.view",
-  },
-  {
-    label: "Child Care",
-    href: "/hr/childcare",
-    matchPrefix: "/hr/childcare",
-    permissionKey: "staff.view",
-  },
-  {
-    label: "Teams",
-    href: "/hr/teams",
-    matchPrefix: "/hr/teams",
-    permissionKey: "staff.view",
-  },
-  ...hrApplicationNavItems(),
-  {
-    label: "Reports",
-    href: "/hr/reports",
-    matchPrefix: "/hr/reports",
-    permissionKey: "reports.view",
-  },
-  {
-    label: "Settings",
-    href: "/hr/settings",
-    matchPrefix: "/hr/settings",
-    permissionKey: "staff.view",
-  },
-],
+  workforce: [
+    {
+      label: "Employees",
+      href: "/workforce/employees",
+      matchPrefix: "/workforce/employees",
+      permissionKey: "staff.view",
+    },
+    {
+      label: "Volunteers",
+      href: "/workforce/volunteers",
+      matchPrefix: "/workforce/volunteers",
+      permissionKey: "staff.view",
+    },
+    {
+      label: "Childcare Providers",
+      href: "/workforce/childcare",
+      matchPrefix: "/workforce/childcare",
+      permissionKey: "staff.view",
+    },
+    {
+      label: "Childcare Registrations",
+      href: "/workforce/childcare/registrations",
+      matchPrefix: "/workforce/childcare/registrations",
+      permissionKey: "staff.view",
+    },
+    {
+      label: "Reports",
+      href: "/workforce/reports",
+      matchPrefix: "/workforce/reports",
+      permissionKey: "reports.view",
+    },
+    {
+      label: "Settings",
+      href: "/workforce/settings",
+      matchPrefix: "/workforce/settings",
+      permissionKey: "staff.view",
+    },
+  ],
+  hr: [
+    {
+      label: "Employees",
+      href: "/workforce/employees",
+      matchPrefix: "/workforce/employees",
+      permissionKey: "staff.view",
+    },
+    {
+      label: "Volunteers",
+      href: "/workforce/volunteers",
+      matchPrefix: "/workforce/volunteers",
+      permissionKey: "staff.view",
+    },
+    {
+      label: "Childcare Providers",
+      href: "/workforce/childcare",
+      matchPrefix: "/workforce/childcare",
+      permissionKey: "staff.view",
+    },
+    {
+      label: "Childcare Registrations",
+      href: "/workforce/childcare/registrations",
+      matchPrefix: "/workforce/childcare/registrations",
+      permissionKey: "staff.view",
+    },
+    {
+      label: "Reports",
+      href: "/workforce/reports",
+      matchPrefix: "/workforce/reports",
+      permissionKey: "reports.view",
+    },
+    {
+      label: "Settings",
+      href: "/workforce/settings",
+      matchPrefix: "/workforce/settings",
+      permissionKey: "staff.view",
+    },
+  ],
 }
 
 function userCanAccess(permissionContext: UserPermissionContext, permissionKey?: string) {
   if (!permissionKey) return true
   if (permissionContext.isOwner) return true
-  return permissionContext.enabledPermissions.has(permissionKey)
+  if (permissionContext.enabledPermissions.has(permissionKey)) return true
+
+  const fallbacks = subItemPermissionFallbacks[permissionKey] || []
+  return fallbacks.some((key) => permissionContext.enabledPermissions.has(key))
+}
+
+function userCanAccessModule(
+  permissionContext: UserPermissionContext,
+  permissionKey: string | undefined,
+  moduleSlug: string | undefined,
+) {
+  if (userCanAccess(permissionContext, permissionKey)) return true
+  if (!moduleSlug) return false
+
+  const fallbacks = modulePermissionFallbacks[moduleSlug] || []
+  return fallbacks.some((key) => userCanAccess(permissionContext, key))
+}
+
+function groupNavItemsForDisplay(navItems: NavItem[]) {
+  const dashboardItems = navItems.filter((item) => item.label === "Dashboard")
+  const otherItems = navItems.filter((item) => item.label !== "Dashboard")
+  const byGroup = new Map<string | null, NavItem[]>()
+
+  for (const item of otherItems) {
+    const group = item.group ?? null
+    const existing = byGroup.get(group) ?? []
+    existing.push(item)
+    byGroup.set(group, existing)
+  }
+
+  const grouped: { group: string | null; items: NavItem[] }[] = []
+
+  if (dashboardItems.length > 0) {
+    grouped.push({ group: null, items: dashboardItems })
+  }
+
+  for (const groupName of SIDEBAR_GROUP_ORDER) {
+    const items = byGroup.get(groupName)
+    if (items?.length) {
+      grouped.push({ group: groupName, items })
+      byGroup.delete(groupName)
+    }
+  }
+
+  for (const [group, items] of byGroup) {
+    if (items.length > 0) {
+      grouped.push({ group, items })
+    }
+  }
+
+  return grouped
 }
 
 function filterNavItemsByPermissions(items: NavItem[], permissionContext: UserPermissionContext): NavItem[] {
   return items
-    .filter((item) => userCanAccess(permissionContext, item.permissionKey))
+    .filter((item) => userCanAccessModule(permissionContext, item.permissionKey, item.moduleSlug))
     .map((item) => ({
       ...item,
       children: item.children?.filter((child) => userCanAccess(permissionContext, child.permissionKey)),
@@ -215,18 +447,20 @@ function buildNavItems(rows: SidebarModuleRow[], permissionContext: UserPermissi
   const dynamicItems: NavItem[] = rows
     .filter((row) => row.route && row.slug !== "applications")
     .map((row) => {
-      const href = row.route || "/dashboard"
+      const navSlug = resolveModuleNavSlug(row.slug)
+      const href = (moduleDefaultRouteOverride[navSlug] ?? row.route) || "/dashboard"
       const iconName = row.icon_name || "Boxes"
       const Icon = iconMap[iconName] || Boxes
       return {
-        label: moduleDisplayNameMap[row.slug] ?? row.name,
+        label: moduleDisplayNameMap[navSlug] ?? moduleDisplayNameMap[row.slug] ?? row.name,
         href,
         icon: Icon,
         matchPrefix: href,
-        group: row.group_name,
-        permissionKey: modulePermissionMap[row.slug],
-        children: moduleChildren[row.slug] || [
-          { label: "Overview", href, matchPrefix: href, permissionKey: modulePermissionMap[row.slug] },
+        group: moduleGroupOverride[navSlug] ?? row.group_name,
+        permissionKey: modulePermissionMap[navSlug] ?? modulePermissionMap[row.slug],
+        moduleSlug: row.slug,
+        children: moduleChildren[navSlug] || moduleChildren[row.slug] || [
+          { label: "Overview", href, matchPrefix: href, permissionKey: modulePermissionMap[navSlug] ?? modulePermissionMap[row.slug] },
         ],
       }
     })
@@ -242,8 +476,6 @@ function buildNavItems(rows: SidebarModuleRow[], permissionContext: UserPermissi
       group: "System",
       children: [
         { label: "Users", href: "/settings/users", matchPrefix: "/settings/users", permissionKey: "settings.users.view" },
-        { label: "Templates", href: "/settings/templates", matchPrefix: "/settings/templates", permissionKey: "settings.templates.view" },
-        { label: "Email Settings", href: "/settings/email", matchPrefix: "/settings/email", permissionKey: "settings.email.view" },
         { label: "Roles & Permissions", href: "/settings/roles-permissions", matchPrefix: "/settings/roles-permissions", permissionKey: "settings.roles.view" },
       ],
     },
@@ -252,9 +484,44 @@ function buildNavItems(rows: SidebarModuleRow[], permissionContext: UserPermissi
   return filterNavItemsByPermissions(allItems, permissionContext)
 }
 
+function isItemActive(item: NavItem, pathname: string, navItems: NavItem[]) {
+  const matchesSelf = pathname.startsWith(item.matchPrefix)
+  const matchesChild = item.children?.some((child) => pathname.startsWith(child.matchPrefix)) ?? false
+  const isOverridden = navItems.some(
+    (other) =>
+      other.label !== item.label &&
+      other.matchPrefix.startsWith(item.matchPrefix) &&
+      other.matchPrefix.length > item.matchPrefix.length &&
+      pathname.startsWith(other.matchPrefix),
+  )
+  return (matchesSelf && !isOverridden) || matchesChild
+}
+
+function findActiveModuleWithChildren(navItems: NavItem[], pathname: string): NavItem | null {
+  for (const item of navItems) {
+    if (item.children && item.children.length > 0 && isItemActive(item, pathname, navItems)) {
+      return item
+    }
+  }
+  return null
+}
+
+function isChildActive(child: SubItem, siblings: SubItem[], pathname: string) {
+  const isChildOverridden = siblings.some(
+    (other) =>
+      other.label !== child.label &&
+      other.matchPrefix.startsWith(child.matchPrefix) &&
+      other.matchPrefix.length > child.matchPrefix.length &&
+      pathname.startsWith(other.matchPrefix),
+  )
+  return pathname.startsWith(child.matchPrefix) && !isChildOverridden
+}
+
 interface SidebarContextType {
   mobileOpen: boolean
   setMobileOpen: (open: boolean) => void
+  navItems: NavItem[]
+  loading: boolean
 }
 
 const SidebarContext = createContext<SidebarContextType | null>(null)
@@ -269,30 +536,19 @@ export function useSidebarContext() {
 
 export function SidebarProvider({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false)
-  return <SidebarContext.Provider value={{ mobileOpen, setMobileOpen }}>{children}</SidebarContext.Provider>
-}
-
-export function MobileMenuTrigger() {
-  const { setMobileOpen } = useSidebarContext()
-  return (
-    <Button variant="ghost" size="icon" className="h-10 w-10 lg:hidden" onClick={() => setMobileOpen(true)} aria-label="Open menu">
-      <Menu className="h-5 w-5" />
-    </Button>
-  )
-}
-
-function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
-  const pathname = usePathname()
-  const [navItems, setNavItems] = useState<NavItem[]>([{ label: "Dashboard", href: "/dashboard", icon: Home, matchPrefix: "/dashboard" }])
+  const [navItems, setNavItems] = useState<NavItem[]>([
+    { label: "Dashboard", href: "/dashboard", icon: Home, matchPrefix: "/dashboard" },
+  ])
   const [loading, setLoading] = useState(true)
-  const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     async function loadSidebarModules() {
       setLoading(true)
       const supabase = createClient()
 
-      const { data: { user } } = await supabase.auth.getUser()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
       if (!user) {
         setNavItems([{ label: "Dashboard", href: "/dashboard", icon: Home, matchPrefix: "/dashboard" }])
         setLoading(false)
@@ -335,8 +591,6 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
         }
       }
 
-      // my_sidebar_modules remains the subscription/module source.
-      // Unsubscribed modules are hidden by that view first.
       const { data, error } = await supabase
         .from("my_sidebar_modules")
         .select("name, slug, route, icon_name, group_name, sort_order")
@@ -357,7 +611,12 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
                 group: "System",
                 children: [
                   { label: "Users", href: "/settings/users", matchPrefix: "/settings/users", permissionKey: "settings.users.view" },
-                  { label: "Roles & Permissions", href: "/settings/roles-permissions", matchPrefix: "/settings/roles-permissions", permissionKey: "settings.roles.view" },
+                  {
+                    label: "Roles & Permissions",
+                    href: "/settings/roles-permissions",
+                    matchPrefix: "/settings/roles-permissions",
+                    permissionKey: "settings.roles.view",
+                  },
                 ],
               },
             ],
@@ -365,7 +624,7 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
           ),
         )
       } else {
-        setNavItems(buildNavItems(data || [], permissionContext))
+        setNavItems(buildNavItems(mergeSidebarModules(data || []), permissionContext))
       }
 
       setLoading(false)
@@ -374,44 +633,61 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
     loadSidebarModules()
   }, [])
 
-  useEffect(() => {
-    const initial: Record<string, boolean> = {}
-    navItems.forEach((item) => {
-      if (item.children && isItemActive(item)) initial[item.label] = true
-    })
-    setOpenMenus((prev) => ({ ...initial, ...prev }))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname, navItems.length])
+  return (
+    <SidebarContext.Provider value={{ mobileOpen, setMobileOpen, navItems, loading }}>
+      {children}
+    </SidebarContext.Provider>
+  )
+}
 
-  const isItemActive = (item: NavItem) => {
-    const matchesSelf = pathname.startsWith(item.matchPrefix)
-    const matchesChild = item.children?.some((child) => pathname.startsWith(child.matchPrefix)) ?? false
-    const isOverridden = navItems.some(
-      (other) =>
-        other.label !== item.label &&
-        other.matchPrefix.startsWith(item.matchPrefix) &&
-        other.matchPrefix.length > item.matchPrefix.length &&
-        pathname.startsWith(other.matchPrefix),
-    )
-    return (matchesSelf && !isOverridden) || matchesChild
-  }
+export function MobileMenuTrigger() {
+  const { setMobileOpen } = useSidebarContext()
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      className="h-10 w-10 lg:hidden"
+      onClick={() => setMobileOpen(true)}
+      aria-label="Open menu"
+    >
+      <Menu className="h-5 w-5" />
+    </Button>
+  )
+}
 
-  function toggleMenu(label: string) {
-    setOpenMenus((prev) => ({ ...prev, [label]: !prev[label] }))
-  }
+function PrimaryNavLink({
+  item,
+  isActive,
+  onNavigate,
+  showChevron,
+}: {
+  item: NavItem
+  isActive: boolean
+  onNavigate?: () => void
+  showChevron?: boolean
+}) {
+  return (
+    <Link
+      href={item.href}
+      onClick={onNavigate}
+      className={cn(
+        "relative flex min-h-[44px] items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+        isActive ? "bg-amber-50 text-amber-700" : "text-zinc-700 hover:bg-amber-50 hover:text-amber-700",
+      )}
+    >
+      {isActive && <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-r-full bg-amber-600" />}
+      <item.icon className="h-[18px] w-[18px] shrink-0" />
+      <span className="flex-1">{item.label}</span>
+      {showChevron ? <ChevronRight className="h-4 w-4 shrink-0 text-zinc-400" /> : null}
+    </Link>
+  )
+}
 
-  const groupedItems: { group: string | null; items: NavItem[] }[] = []
-  let currentGroup: string | null | undefined = undefined
+function SidebarPrimaryNav({ onNavigate }: { onNavigate?: () => void }) {
+  const pathname = usePathname()
+  const { navItems, loading } = useSidebarContext()
 
-  navItems.forEach((item) => {
-    const itemGroup = item.group ?? null
-    if (groupedItems.length === 0 || itemGroup !== currentGroup) {
-      groupedItems.push({ group: itemGroup, items: [item] })
-      currentGroup = itemGroup
-    } else {
-      groupedItems[groupedItems.length - 1].items.push(item)
-    }
-  })
+  const groupedItems = groupNavItemsForDisplay(navItems)
 
   if (loading) {
     return (
@@ -424,83 +700,79 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   }
 
   return (
-    <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 pt-3 pb-4">
+    <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-3 pt-3 pb-4">
       {groupedItems.map((group, groupIndex) => (
         <div key={`${group.group ?? "main"}-${groupIndex}`} className={groupIndex > 0 ? "mt-5" : ""}>
-          {group.group && <div className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">{group.group}</div>}
+          {group.group ? (
+            <div className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+              {group.group}
+            </div>
+          ) : null}
 
-          {group.items.map((item) => {
-            const isActive = isItemActive(item)
-            const isOpen = openMenus[item.label] ?? false
-
-            if (item.children && item.children.length > 0) {
-              return (
-                <div key={item.label}>
-                  <button
-                    type="button"
-                    onClick={() => toggleMenu(item.label)}
-                    className={cn(
-                      "relative flex min-h-[44px] w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                      isActive ? "bg-amber-50 text-amber-700" : "text-zinc-700 hover:bg-amber-50 hover:text-amber-700",
-                    )}
-                  >
-                    {isActive && <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-r-full bg-amber-600" />}
-                    <item.icon className="h-[18px] w-[18px] shrink-0" />
-                    <span className="flex-1 text-left">{item.label}</span>
-                    <ChevronDown className={cn("h-4 w-4 shrink-0 transition-transform duration-200", isOpen && "rotate-180")} />
-                  </button>
-
-                  {isOpen && (
-                    <div className="ml-[30px] flex flex-col gap-0.5 border-l border-amber-100 pl-3 pt-1 pb-1">
-                      {item.children.map((child) => {
-                        const isChildOverridden = item.children!.some(
-                          (other) =>
-                            other.label !== child.label &&
-                            other.matchPrefix.startsWith(child.matchPrefix) &&
-                            other.matchPrefix.length > child.matchPrefix.length &&
-                            pathname.startsWith(other.matchPrefix),
-                        )
-                        const isChildActive = pathname.startsWith(child.matchPrefix) && !isChildOverridden
-
-                        return (
-                          <Link
-                            key={child.label}
-                            href={child.href}
-                            onClick={onNavigate}
-                            className={cn(
-                              "flex min-h-[40px] items-center rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                              isChildActive ? "bg-amber-50 text-amber-700" : "text-zinc-600 hover:bg-amber-50 hover:text-amber-700",
-                            )}
-                          >
-                            {child.label}
-                          </Link>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
-              )
-            }
-
-            return (
-              <Link
-                key={item.label}
-                href={item.href}
-                onClick={onNavigate}
-                className={cn(
-                  "relative flex min-h-[44px] items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                  isActive ? "bg-amber-50 text-amber-700" : "text-zinc-700 hover:bg-amber-50 hover:text-amber-700",
-                )}
-              >
-                {isActive && <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-r-full bg-amber-600" />}
-                <item.icon className="h-[18px] w-[18px] shrink-0" />
-                {item.label}
-              </Link>
-            )
-          })}
+          {group.items.map((item) => (
+            <PrimaryNavLink
+              key={item.label}
+              item={item}
+              isActive={isItemActive(item, pathname, navItems)}
+              onNavigate={onNavigate}
+              showChevron={Boolean(item.children && item.children.length > 0)}
+            />
+          ))}
         </div>
       ))}
     </nav>
+  )
+}
+
+function SidebarSubNavLinks({
+  module,
+  onNavigate,
+}: {
+  module: NavItem
+  onNavigate?: () => void
+}) {
+  const pathname = usePathname()
+  const children = module.children ?? []
+
+  return (
+    <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 pt-3 pb-4">
+      {children.map((child) => {
+        const active = isChildActive(child, children, pathname)
+        return (
+          <Link
+            key={child.label}
+            href={child.href}
+            onClick={onNavigate}
+            className={cn(
+              "relative flex min-h-[40px] items-center rounded-md px-3 py-2 text-sm font-medium transition-colors",
+              active ? "bg-amber-50 text-amber-700" : "text-zinc-600 hover:bg-amber-50 hover:text-amber-700",
+            )}
+          >
+            {active ? <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-r-full bg-amber-600" /> : null}
+            {child.label}
+          </Link>
+        )
+      })}
+    </nav>
+  )
+}
+
+export function ModuleSubNav() {
+  const pathname = usePathname()
+  const { navItems, loading } = useSidebarContext()
+  const activeModule = findActiveModuleWithChildren(navItems, pathname)
+
+  if (loading || !activeModule?.children?.length) {
+    return null
+  }
+
+  return (
+    <aside className="hidden h-screen w-[200px] shrink-0 flex-col border-r border-zinc-200 bg-zinc-50/80 text-zinc-900 lg:flex">
+      <div className="flex h-[88px] items-end border-b border-zinc-200 px-4 pb-3">
+        <p className="text-sm font-semibold text-zinc-900">{activeModule.label}</p>
+      </div>
+      <SidebarSubNavLinks module={activeModule} />
+    </aside>
   )
 }
 
@@ -521,15 +793,45 @@ function SidebarHeader() {
 
 export function Sidebar() {
   return (
-    <aside className="hidden h-screen w-[240px] shrink-0 flex-col border-r border-zinc-200 bg-white text-zinc-900 lg:flex">
+    <aside className="hidden h-screen w-[220px] shrink-0 flex-col border-r border-zinc-200 bg-white text-zinc-900 lg:flex">
       <SidebarHeader />
-      <SidebarNav />
+      <SidebarPrimaryNav />
     </aside>
   )
 }
 
 export function MobileSidebar() {
-  const { mobileOpen, setMobileOpen } = useSidebarContext()
+  const { mobileOpen, setMobileOpen, navItems, loading } = useSidebarContext()
+  const pathname = usePathname()
+  const [mobileModule, setMobileModule] = useState<NavItem | null>(null)
+
+  useEffect(() => {
+    if (!mobileOpen) {
+      setMobileModule(null)
+    }
+  }, [mobileOpen])
+
+  useEffect(() => {
+    if (mobileOpen) {
+      const active = findActiveModuleWithChildren(navItems, pathname)
+      setMobileModule(active)
+    }
+  }, [mobileOpen, navItems, pathname])
+
+  function closeMobile() {
+    setMobileOpen(false)
+    setMobileModule(null)
+  }
+
+  function handlePrimaryClick(item: NavItem) {
+    if (item.children && item.children.length > 0) {
+      setMobileModule(item)
+      return
+    }
+    closeMobile()
+  }
+
+  const groupedItems = groupNavItemsForDisplay(navItems)
 
   return (
     <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
@@ -538,22 +840,110 @@ export function MobileSidebar() {
 
         <div className="flex items-center justify-between border-b border-zinc-200 px-3 py-3">
           <div className="flex h-[72px] min-w-0 flex-1 items-center overflow-hidden pr-2">
-            <Image
-              src="/logo.png"
-              alt="Manaratee"
-              width={220}
-              height={100}
-              className="h-auto w-full origin-center scale-[1.35] object-contain"
-              priority
-            />
+            {mobileModule ? (
+              <button
+                type="button"
+                onClick={() => setMobileModule(null)}
+                className="flex items-center gap-2 text-sm font-medium text-zinc-700 hover:text-amber-700"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Back
+              </button>
+            ) : (
+              <Image
+                src="/logo.png"
+                alt="Manaratee"
+                width={220}
+                height={100}
+                className="h-auto w-full origin-center scale-[1.35] object-contain"
+                priority
+              />
+            )}
           </div>
 
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-700 hover:bg-amber-50 hover:text-amber-700" onClick={() => setMobileOpen(false)}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-zinc-700 hover:bg-amber-50 hover:text-amber-700"
+            onClick={closeMobile}
+          >
             <X className="h-4 w-4" />
           </Button>
         </div>
 
-        <SidebarNav onNavigate={() => setMobileOpen(false)} />
+        {loading ? (
+          <nav className="flex flex-col gap-2 px-3 pt-3">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <div key={index} className="h-11 animate-pulse rounded-lg bg-amber-50" />
+            ))}
+          </nav>
+        ) : mobileModule ? (
+          <div className="flex h-[calc(100vh-88px)] flex-col">
+            <div className="border-b border-zinc-200 px-4 py-3">
+              <p className="text-sm font-semibold text-zinc-900">{mobileModule.label}</p>
+            </div>
+            <SidebarSubNavLinks module={mobileModule} onNavigate={closeMobile} />
+          </div>
+        ) : (
+          <nav className="flex max-h-[calc(100vh-88px)] flex-col gap-0.5 overflow-y-auto px-3 pt-3 pb-4">
+            {groupedItems.map((group, groupIndex) => (
+              <div key={`${group.group ?? "main"}-${groupIndex}`} className={groupIndex > 0 ? "mt-5" : ""}>
+                {group.group ? (
+                  <div className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+                    {group.group}
+                  </div>
+                ) : null}
+
+                {group.items.map((item) => {
+                  const hasChildren = Boolean(item.children && item.children.length > 0)
+
+                  if (hasChildren) {
+                    return (
+                      <button
+                        key={item.label}
+                        type="button"
+                        onClick={() => handlePrimaryClick(item)}
+                        className={cn(
+                          "relative flex min-h-[44px] w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                          isItemActive(item, pathname, navItems)
+                            ? "bg-amber-50 text-amber-700"
+                            : "text-zinc-700 hover:bg-amber-50 hover:text-amber-700",
+                        )}
+                      >
+                        {isItemActive(item, pathname, navItems) ? (
+                          <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-r-full bg-amber-600" />
+                        ) : null}
+                        <item.icon className="h-[18px] w-[18px] shrink-0" />
+                        <span className="flex-1 text-left">{item.label}</span>
+                        <ChevronRight className="h-4 w-4 shrink-0 text-zinc-400" />
+                      </button>
+                    )
+                  }
+
+                  return (
+                    <Link
+                      key={item.label}
+                      href={item.href}
+                      onClick={closeMobile}
+                      className={cn(
+                        "relative flex min-h-[44px] items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                        isItemActive(item, pathname, navItems)
+                          ? "bg-amber-50 text-amber-700"
+                          : "text-zinc-700 hover:bg-amber-50 hover:text-amber-700",
+                      )}
+                    >
+                      {isItemActive(item, pathname, navItems) ? (
+                        <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-r-full bg-amber-600" />
+                      ) : null}
+                      <item.icon className="h-[18px] w-[18px] shrink-0" />
+                      {item.label}
+                    </Link>
+                  )
+                })}
+              </div>
+            ))}
+          </nav>
+        )}
       </SheetContent>
     </Sheet>
   )

@@ -16,12 +16,7 @@ import {
 } from "@/lib/applications/application-types"
 import { applicationsPageUrl } from "@/lib/applications/application-routes"
 
-const PM_TEMPLATE_TYPE_IDS = [
-  "volunteer",
-  "employment",
-  "committee_member",
-  "childcare_provider",
-] as const
+const PM_HR_TEMPLATE_TYPE_IDS = ["committee_member", "childcare_provider"] as const
 
 export function ApplicationTemplatesPanel({
   moduleOwner,
@@ -77,14 +72,15 @@ export function ApplicationTemplatesPanel({
   }, [])
 
   const templateTypes = useMemo(() => {
-    if (moduleOwner === "hr") {
-      const allowed = new Set([...hubApplicationTypes, ...PM_TEMPLATE_TYPE_IDS])
-      return Object.values(typeRegistry)
-        .filter((type) => type.moduleOwner === "hr" && allowed.has(type.id))
-        .sort((a, b) => a.sortOrder - b.sortOrder)
+    const allowed = new Set(hubApplicationTypes)
+
+    if (moduleOwner === "workforce" || moduleOwner === "hr") {
+      const isPeopleManagementHub = PM_HR_TEMPLATE_TYPE_IDS.some((typeId) => allowed.has(typeId))
+      if (isPeopleManagementHub) {
+        allowed.add("employment")
+      }
     }
 
-    const allowed = new Set(hubApplicationTypes)
     return Object.values(typeRegistry)
       .filter((type) => type.moduleOwner === moduleOwner && allowed.has(type.id))
       .sort((a, b) => a.sortOrder - b.sortOrder)

@@ -1,6 +1,8 @@
 import type { LucideIcon } from "lucide-react"
 import {
+  Baby,
   Briefcase,
+  Building2,
   Calendar,
   Heart,
   Store,
@@ -8,28 +10,54 @@ import {
   Wrench,
 } from "lucide-react"
 
-/** Stable affiliations — customer is NOT a role (inferred from transactions). */
-export const CONTACT_ROLE_VALUES = [
+/** Affiliations staff can add or remove manually on a contact profile. */
+export const CONTACT_MANUAL_AFFILIATION_ROLES = [
   "donor",
-  "volunteer",
-  "employee",
-  "member",
-  "vendor",
   "service_provider",
+] as const
+
+/** All stored affiliation roles for individual contacts (manual + activity-derived). */
+export const CONTACT_PERSON_AFFILIATION_ROLES = [
+  ...CONTACT_MANUAL_AFFILIATION_ROLES,
+  "vendor",
+  "childcare_provider",
+] as const
+
+/** @deprecated Use CONTACT_MANUAL_AFFILIATION_ROLES for editable forms. */
+export const CONTACT_AFFILIATION_ROLES = CONTACT_MANUAL_AFFILIATION_ROLES
+
+/** Derived from active membership records — not manually assigned. */
+export const MEMBERSHIP_DERIVED_ROLE = "member" as const
+
+/** Affiliations for organization contacts only. */
+export const CONTACT_ORGANIZATION_AFFILIATION_ROLES = [
+  "donor",
+  "customer",
+  "service_provider",
+] as const
+
+/** Workforce roles managed under Workforce module — not assigned via Contacts CRM. */
+export const CONTACT_WORKFORCE_ROLES = ["employee", "volunteer"] as const
+
+/** All contact role values (including membership-derived member tag). */
+export const CONTACT_ROLE_VALUES = [
+  ...CONTACT_PERSON_AFFILIATION_ROLES,
+  MEMBERSHIP_DERIVED_ROLE,
+  "customer",
+  ...CONTACT_WORKFORCE_ROLES,
 ] as const
 
 export type ContactRoleValue = (typeof CONTACT_ROLE_VALUES)[number]
 
 export type ContactRoleLabel =
   | "Donor"
+  | "Customer (Venue Renter)"
   | "Volunteer"
   | "Employee"
   | "Member"
   | "Vendor"
+  | "Child Care Provider"
   | "Service Provider"
-
-/** Legacy role values kept out of UI and new assignments. */
-export const EXCLUDED_CONTACT_ROLES = ["customer"] as const
 
 export type ContactRecordType = "individual" | "organization"
 
@@ -42,43 +70,116 @@ export type ContactStatus =
 
 export const ROLE_VALUE_TO_LABEL: Record<ContactRoleValue, ContactRoleLabel> = {
   donor: "Donor",
+  customer: "Customer (Venue Renter)",
   volunteer: "Volunteer",
   employee: "Employee",
   member: "Member",
   vendor: "Vendor",
+  childcare_provider: "Child Care Provider",
   service_provider: "Service Provider",
 }
 
 export const ROLE_LABEL_TO_VALUE: Record<ContactRoleLabel, ContactRoleValue> = {
   Donor: "donor",
+  "Customer (Venue Renter)": "customer",
   Volunteer: "volunteer",
   Employee: "employee",
   Member: "member",
   Vendor: "vendor",
+  "Child Care Provider": "childcare_provider",
   "Service Provider": "service_provider",
 }
 
-export const ROLE_OPTIONS: { label: ContactRoleLabel; value: ContactRoleValue }[] =
-  CONTACT_ROLE_VALUES.map((value) => ({
+const INDIVIDUAL_AFFILIATION_OPTIONS: { label: ContactRoleLabel; value: ContactRoleValue }[] =
+  CONTACT_MANUAL_AFFILIATION_ROLES.map((value) => ({
     label: ROLE_VALUE_TO_LABEL[value],
     value,
   }))
 
+const INDIVIDUAL_ROLE_OPTIONS: { label: ContactRoleLabel; value: ContactRoleValue }[] = [
+  ...INDIVIDUAL_AFFILIATION_OPTIONS,
+  ...CONTACT_WORKFORCE_ROLES.map((value) => ({
+    label: ROLE_VALUE_TO_LABEL[value],
+    value,
+  })),
+]
+
+const ORGANIZATION_ROLE_OPTIONS: { label: ContactRoleLabel; value: ContactRoleValue }[] =
+  CONTACT_ORGANIZATION_AFFILIATION_ROLES.map((value) => ({
+    label: ROLE_VALUE_TO_LABEL[value],
+    value,
+  }))
+
+/** Affiliations staff can assign from Contacts add/edit forms (excludes workforce + membership). */
+export function getContactsCrmRoleOptions(
+  recordType: ContactRecordType | "all" = "all"
+): { label: ContactRoleLabel; value: ContactRoleValue }[] {
+  if (recordType === "organization") {
+    return ORGANIZATION_ROLE_OPTIONS
+  }
+  return INDIVIDUAL_AFFILIATION_OPTIONS
+}
+
+/** Affiliations staff can assign manually on the contact profile (membership is managed separately). */
+export function getEditableRoleOptionsForRecordType(
+  recordType: ContactRecordType | "all" = "all"
+): { label: ContactRoleLabel; value: ContactRoleValue }[] {
+  return getContactsCrmRoleOptions(recordType)
+}
+
+export function isWorkforceRole(role: ContactRoleValue): role is (typeof CONTACT_WORKFORCE_ROLES)[number] {
+  return (CONTACT_WORKFORCE_ROLES as readonly string[]).includes(role)
+}
+
+/** Default role picker options (people + mixed contact lists). */
+export const ROLE_OPTIONS = INDIVIDUAL_ROLE_OPTIONS
+
+export function getRoleOptionsForRecordType(
+  recordType: ContactRecordType | "all" = "all"
+): { label: ContactRoleLabel; value: ContactRoleValue }[] {
+  if (recordType === "organization") {
+    return ORGANIZATION_ROLE_OPTIONS
+  }
+  return INDIVIDUAL_ROLE_OPTIONS
+}
+
+export function getAllowedRolesForRecordType(
+  recordType: ContactRecordType
+): ContactRoleValue[] {
+  if (recordType === "organization") {
+    return [...CONTACT_ORGANIZATION_AFFILIATION_ROLES]
+  }
+  return CONTACT_ROLE_VALUES.filter((role) => role !== "customer") as ContactRoleValue[]
+}
+
+/** Roles staff may assign manually (membership manages the member tag). */
+export function getEditableAllowedRolesForRecordType(
+  recordType: ContactRecordType
+): ContactRoleValue[] {
+  return getAllowedRolesForRecordType(recordType).filter(
+    (role) => role !== MEMBERSHIP_DERIVED_ROLE
+  )
+}
+
 export const ROLE_COLORS: Record<ContactRoleLabel, string> = {
   Donor: "bg-rose-100 text-rose-700",
+  "Customer (Venue Renter)": "bg-orange-100 text-orange-700",
   Volunteer: "bg-emerald-100 text-emerald-700",
   Employee: "bg-sky-100 text-sky-700",
   Member: "bg-indigo-100 text-indigo-700",
   Vendor: "bg-amber-100 text-amber-700",
+  "Child Care Provider": "bg-teal-100 text-teal-700",
   "Service Provider": "bg-purple-100 text-purple-700",
 }
 
 export const ROLE_ICONS: Record<ContactRoleLabel, LucideIcon> = {
   Donor: Heart,
+  "Customer (Venue Renter)": Building2,
   Volunteer: Calendar,
   Employee: Briefcase,
   Member: UserCheck,
   Vendor: Store,
+  "Child Care Provider": Baby,
   "Service Provider": Wrench,
 }
 
@@ -147,6 +248,10 @@ export function normalizePhone(phone?: string | null) {
   return (phone || "").replace(/[^\d]/g, "")
 }
 
-export function sanitizeRoleInput(roles: ContactRoleValue[]): ContactRoleValue[] {
-  return filterContactRoles(roles)
+export function sanitizeRoleInput(
+  roles: ContactRoleValue[],
+  recordType: ContactRecordType = "individual"
+): ContactRoleValue[] {
+  const allowed = new Set(getAllowedRolesForRecordType(recordType))
+  return filterContactRoles(roles).filter((role) => allowed.has(role))
 }

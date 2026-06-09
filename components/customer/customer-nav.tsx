@@ -4,18 +4,21 @@ import Link from "next/link"
 import Image from "next/image"
 import { usePathname } from "next/navigation"
 import {
+  Briefcase,
   CalendarDays,
+  CalendarPlus,
+  ClipboardList,
   Gift,
   GraduationCap,
   Grid3X3,
   HeartHandshake,
   Home,
-  LayoutDashboard,
   LogOut,
   User,
 } from "lucide-react"
 
 import { OrganizationSwitcher } from "@/components/organization-switcher"
+import { PortalSwitcher } from "@/components/portal/portal-switcher"
 import type { UserPortalCapabilities } from "@/lib/auth/portal-capabilities-types"
 import type { CustomerOrganization } from "@/lib/customer/customer-organization-types"
 import { formatCustomerPortalRoleLabel } from "@/lib/customer/customer-portal-role-label"
@@ -29,15 +32,26 @@ type CustomerNavProps = {
 
 const memberNavLinks = [
   { label: "Dashboard", href: "/customer/dashboard", icon: Home },
-  { label: "Bookings", href: "/customer/bookings", icon: CalendarDays },
+  { label: "Venue Rentals", href: "/customer/rentals", icon: CalendarDays },
   { label: "Donations", href: "/customer/donation", icon: Gift },
   { label: "Programs", href: "/customer/programs", icon: HeartHandshake },
+  { label: "Opportunities", href: "/customer/opportunities", icon: ClipboardList },
   { label: "Profile", href: "/customer/profile", icon: User },
   { label: "More", href: "/customer/more", icon: Grid3X3 },
 ]
 
 const teachingNavLinks = [
   { label: "My Classes", href: "/my-classes", icon: GraduationCap },
+]
+
+const staffNavLinks = [
+  { label: "Staff Tools", href: "/customer/staff", icon: Briefcase },
+  { label: "My event requests", href: "/customer/staff/events", icon: ClipboardList },
+  {
+    label: "Request event",
+    href: "/customer/staff/events/request",
+    icon: CalendarPlus,
+  },
 ]
 
 export function CustomerNav({
@@ -51,19 +65,27 @@ export function CustomerNav({
   )
 
   const isTeachingPortal = pathname.startsWith("/my-classes")
+  const isStaffPortal = pathname.startsWith("/customer/staff")
+
   const navLinks = isTeachingPortal
     ? teachingNavLinks
-    : [
-        ...memberNavLinks,
-        ...(portalCapabilities?.hasTeachingPortal
-          ? [{ label: "My Classes", href: "/my-classes", icon: GraduationCap }]
-          : []),
-      ]
+    : isStaffPortal
+      ? staffNavLinks
+      : [
+          ...memberNavLinks.slice(0, 4),
+          ...(portalCapabilities?.hasStaffToolsPortal
+            ? [{ label: "Staff Tools", href: "/customer/staff", icon: Briefcase }]
+            : []),
+          ...memberNavLinks.slice(4),
+          ...(portalCapabilities?.hasTeachingPortal
+            ? [{ label: "My Classes", href: "/my-classes", icon: GraduationCap }]
+            : []),
+        ]
 
   return (
     <aside className="hidden w-[260px] shrink-0 border-r border-border bg-card lg:flex lg:flex-col">
       <div className="border-b border-border px-6 py-6">
-        <Link href="/customer/dashboard">
+        <Link href={isStaffPortal ? "/customer/staff" : "/customer/dashboard"}>
           <Image
             src="/logo.png"
             alt="Manaratee"
@@ -115,38 +137,12 @@ export function CustomerNav({
       </div>
 
       <div className="border-t border-border p-4">
-        {portalCapabilities?.hasPersonalPortal &&
-        portalCapabilities?.hasTeachingPortal ? (
-          <div className="mb-4 space-y-1">
-            <p className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Portal
-            </p>
-            {isTeachingPortal ? (
-              <Link
-                href="/customer/dashboard"
-                className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
-              >
-                <User className="h-4 w-4" />
-                My Account
-              </Link>
-            ) : (
-              <Link
-                href="/my-classes"
-                className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
-              >
-                <GraduationCap className="h-4 w-4" />
-                My Classes
-              </Link>
-            )}
-            {portalCapabilities.hasAdminPortal ? (
-              <Link
-                href="/dashboard"
-                className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
-              >
-                <LayoutDashboard className="h-4 w-4" />
-                Admin Dashboard
-              </Link>
-            ) : null}
+        {portalCapabilities ? (
+          <div className="mb-4">
+            <PortalSwitcher
+              capabilities={portalCapabilities}
+              pathname={pathname}
+            />
           </div>
         ) : null}
 

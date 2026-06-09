@@ -1,5 +1,11 @@
 "use client"
 
+/**
+ * Phase B target form for new Venue Rental requests.
+ * Must call submitVenueRentalRequest (venue_rentals → rental_reservations) when wired.
+ * Do NOT insert into legacy venue_bookings from this form.
+ */
+
 import { useState } from "react"
 import { format } from "date-fns"
 import { CalendarIcon, Loader2, Building2, Users } from "lucide-react"
@@ -114,8 +120,9 @@ export function VenueRentalRequestForm() {
   const [isSubmitted, setIsSubmitted] = useState(false)
   
   // Get available venues based on user type
-  const availableVenues = getAvailableVenues(mockCurrentUser.type)
-  const isEmployee = mockCurrentUser.type === "employee"
+  const userType = mockCurrentUser.type as string
+  const availableVenues = getAvailableVenues(userType)
+  const isEmployee = userType === "employee"
   
   const [formData, setFormData] = useState<FormData>({
     venueName: "",

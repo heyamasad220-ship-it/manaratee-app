@@ -65,8 +65,26 @@ export async function hasPermission(permissionKey: PermissionKey) {
   return data?.enabled === true
 }
 
+export async function hasAnyPermission(...permissionKeys: PermissionKey[]) {
+  for (const permissionKey of permissionKeys) {
+    if (await hasPermission(permissionKey)) {
+      return true
+    }
+  }
+
+  return false
+}
+
 export async function requirePermission(permissionKey: PermissionKey) {
   const allowed = await hasPermission(permissionKey)
+
+  if (!allowed) {
+    redirect("/unauthorized")
+  }
+}
+
+export async function requireAnyPermission(...permissionKeys: PermissionKey[]) {
+  const allowed = await hasAnyPermission(...permissionKeys)
 
   if (!allowed) {
     redirect("/unauthorized")

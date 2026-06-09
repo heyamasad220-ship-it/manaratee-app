@@ -357,7 +357,7 @@ export function EmployeesList() {
                   <TableRow key={emp.id}>
                     <TableCell>
                       <Link
-                        href={`/hr/employees/${emp.id}`}
+                        href={`/workforce/employees/${emp.id}`}
                         className="font-medium text-primary underline-offset-4 hover:underline"
                       >
                         {emp.name}

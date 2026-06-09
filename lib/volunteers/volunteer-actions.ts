@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
-import { findOrCreateContact, addRolesToContact, ensureHrExtensionRecords } from "@/lib/contacts/contact-actions"
+import { findOrCreateContact, ensureHrExtensionRecords } from "@/lib/contacts/contact-actions"
+import { syncContactAffiliations } from "@/lib/contacts/contact-affiliation-sync"
 import type {
   VolunteerPerformance,
   VolunteerSignUpStatus,
@@ -46,12 +47,6 @@ export async function createVolunteer(input: SaveVolunteerInput) {
     notes: input.notes,
   })
 
-  await addRolesToContact(contactId, ["volunteer"], {
-    fullName,
-    email: input.email,
-    phone: input.phone,
-  })
-
   const { data: existingVolunteer } = await supabase
     .from("volunteers")
     .select("id")
@@ -60,8 +55,12 @@ export async function createVolunteer(input: SaveVolunteerInput) {
     .maybeSingle()
 
   if (existingVolunteer) {
+    await syncContactAffiliations(contactId, organizationId, supabase)
     revalidateVolunteerPaths()
-    return existingVolunteer.id as string
+    return {
+      volunteerId: existingVolunteer.id as string,
+      contactId,
+    }
   }
 
   const { data, error } = await supabase
@@ -87,8 +86,16 @@ export async function createVolunteer(input: SaveVolunteerInput) {
     throw new Error(error.message || "Failed to create volunteer")
   }
 
+  await ensureHrExtensionRecords(organizationId, contactId, ["volunteer"], {
+    fullName,
+    email: input.email,
+    phone: input.phone,
+  })
+
+  await syncContactAffiliations(contactId, organizationId, supabase)
+
   revalidateVolunteerPaths()
-  return data.id as string
+  return { volunteerId: data.id as string, contactId }
 }
 
 export async function updateVolunteer(input: SaveVolunteerInput & { id: string }) {
@@ -430,9 +437,8 @@ export async function updateVolunteerFromContact(
 }
 
 function revalidateVolunteerPaths() {
-  revalidatePath("/hr/volunteers")
+  revalidatePath("/workforce/volunteers")
   revalidatePath("/resources/volunteers")
-  revalidatePath("/sign-ups/volunteers")
   revalidatePath("/events/volunteers")
   revalidatePath("/contacts")
 }

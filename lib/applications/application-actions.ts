@@ -4,9 +4,12 @@ import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { findOrCreateContact } from "@/lib/contacts/contact-actions"
+import { syncContactAffiliations } from "@/lib/contacts/contact-affiliation-sync"
+import { AFFILIATION_APPLICATION_TYPES } from "@/lib/contacts/contact-affiliation-rules"
 import { hasPermission, PERMISSIONS } from "@/lib/permissions/permissions"
 import {
   buildTypeRegistry,
+  normalizeModuleOwner,
   type ApplicationAction,
   type ApplicationDashboardStats,
   type ApplicationDocumentRecord,
@@ -39,7 +42,8 @@ function mapApplicationRow(row: Record<string, unknown>): ApplicationRecord {
     id: row.id as string,
     organization_id: row.organization_id as string,
     application_type: row.application_type as string,
-    module_owner: row.module_owner as ApplicationRecord["module_owner"],
+    module_owner:
+      normalizeModuleOwner(row.module_owner as string) ?? ("workforce" as const),
     contact_id: (row.contact_id as string | null) ?? null,
     applicant_name: row.applicant_name as string,
     applicant_email: (row.applicant_email ?? row.email) as string,
@@ -386,6 +390,12 @@ export async function submitApplication(input: SubmitApplicationInput) {
   revalidateApplicationPaths()
   revalidatePath(`/contacts/${contactId}`)
 
+  if (
+    (AFFILIATION_APPLICATION_TYPES as readonly string[]).includes(input.applicationType)
+  ) {
+    await syncContactAffiliations(contactId, organizationId, supabase)
+  }
+
   return mapApplicationRow(data)
 }
 
@@ -473,6 +483,11 @@ export async function updateApplicationStatus(input: UpdateApplicationStatusInpu
   revalidatePath(`/applications/${input.applicationId}`)
   if (existing.contact_id) {
     revalidatePath(`/contacts/${existing.contact_id}`)
+    if (
+      (AFFILIATION_APPLICATION_TYPES as readonly string[]).includes(existing.application_type)
+    ) {
+      await syncContactAffiliations(existing.contact_id, organizationId, supabase)
+    }
   }
 
   return mapApplicationRow(data)

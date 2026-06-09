@@ -1,16 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 
-import {
-  ORG_ADMIN_DASHBOARD_ROLES,
-} from "@/lib/organizations/organization-member-constants"
-import { PERMISSIONS } from "@/lib/permissions/permission-keys"
 import type { UserPortalCapabilities } from "@/lib/auth/portal-capabilities-types"
-
-function isOrgAdminDashboardRole(role: string | null | undefined) {
-  return ORG_ADMIN_DASHBOARD_ROLES.includes(
-    role as (typeof ORG_ADMIN_DASHBOARD_ROLES)[number]
-  )
-}
+import { resolvePortalPermissions } from "@/lib/auth/resolve-portal-permissions"
+import { resolveStaffToolsPortalAccess } from "@/lib/auth/staff-tools-eligibility"
 
 export async function fetchUserPortalCapabilities(
   supabase: SupabaseClient,
@@ -21,6 +13,8 @@ export async function fetchUserPortalCapabilities(
     return {
       hasPersonalPortal: false,
       hasTeachingPortal: false,
+      hasStaffToolsPortal: false,
+      canManageEventRequests: false,
       hasAdminPortal: false,
     }
   }
@@ -32,25 +26,6 @@ export async function fetchUserPortalCapabilities(
     .eq("user_id", userId)
     .eq("status", "active")
     .maybeSingle()
-
-  let hasAdminPanel = false
-
-  if (membership?.role_id) {
-    const { data: permissionRows } = await supabase
-      .from("role_permissions")
-      .select("permission_key")
-      .eq("role_id", membership.role_id)
-      .in("permission_key", [
-        PERMISSIONS.PROGRAMS_MANAGE,
-        PERMISSIONS.PROGRAMS_VIEW,
-      ])
-
-    hasAdminPanel = Boolean(permissionRows?.length)
-  }
-
-  if (!hasAdminPanel && membership?.role) {
-    hasAdminPanel = isOrgAdminDashboardRole(membership.role)
-  }
 
   const { data: contact } = await supabase
     .from("contacts")
@@ -74,9 +49,25 @@ export async function fetchUserPortalCapabilities(
 
   const hasPersonalPortal = Boolean(contact?.id) || membership?.role === "viewer"
 
+  const portalPermissions = await resolvePortalPermissions(
+    supabase,
+    organizationId,
+    membership
+  )
+
+  const hasStaffToolsPortal = await resolveStaffToolsPortalAccess(
+    supabase,
+    organizationId,
+    userId,
+    membership,
+    contact?.id
+  )
+
   return {
     hasPersonalPortal,
     hasTeachingPortal,
-    hasAdminPortal: hasAdminPanel,
+    hasStaffToolsPortal,
+    canManageEventRequests: portalPermissions.canManageEventRequests,
+    hasAdminPortal: portalPermissions.hasAdminPortal,
   }
 }

@@ -15,6 +15,7 @@ import {
   type HrTeamPosition,
   type TeamMembershipStatus,
 } from "@/lib/hr/hr-team-actions"
+import { MEMBERSHIP_TEAMS_PATH } from "@/lib/memberships/membership-module-label"
 import { createClient } from "@/lib/supabase/client"
 import { getCurrentOrganizationId } from "@/lib/current-organization"
 import {
@@ -226,7 +227,7 @@ export function HrTeamDetailClient({ teamId }: { teamId: string }) {
         <Card>
           <CardContent className="p-6 text-sm text-muted-foreground">
             Team not found.
-            <Button variant="outline" className="mt-4" onClick={() => router.push("/hr/teams")}>
+            <Button variant="outline" className="mt-4" onClick={() => router.push(MEMBERSHIP_TEAMS_PATH)}>
               <ArrowLeft className="mr-2 size-4" />
               Back to Teams
             </Button>
@@ -240,7 +241,7 @@ export function HrTeamDetailClient({ teamId }: { teamId: string }) {
     <div className="flex flex-col gap-6 p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <Button variant="ghost" size="sm" className="mb-2 -ml-2" onClick={() => router.push("/hr/teams")}>
+          <Button variant="ghost" size="sm" className="mb-2 -ml-2" onClick={() => router.push(MEMBERSHIP_TEAMS_PATH)}>
             <ArrowLeft className="mr-2 size-4" />
             Back to Teams
           </Button>
@@ -262,7 +263,7 @@ export function HrTeamDetailClient({ teamId }: { teamId: string }) {
         </Button>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="flex flex-wrap gap-4 [&>*]:w-fit">
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Total Members</p>

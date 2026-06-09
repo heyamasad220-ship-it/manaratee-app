@@ -10,7 +10,7 @@ export default function DonationsDonorsPage() {
         defaultAddRoles={["donor"]}
         hideRoleFilter
         showStats={false}
-        emptyMessage="No donors yet. Add a contact with the Donor role."
+        emptyMessage="No donors yet. Donor affiliations are added automatically when a contact or organization makes a gift."
       />
     </>
   )

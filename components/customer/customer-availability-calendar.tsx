@@ -100,11 +100,13 @@ export function CustomerAvailabilityCalendar({
   organizationName,
   venues,
   bookings,
+  eventTypes,
   createBookingAction,
 }: {
   organizationName: string
   venues: Venue[]
   bookings: Booking[]
+  eventTypes: Array<{ id: string; name: string }>
   createBookingAction: (formData: FormData) => void
 }) {
   const [activeView, setActiveView] = useState<ViewMode>("Day")
@@ -345,13 +347,26 @@ export function CustomerAvailabilityCalendar({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="event_type">Event Name / Type</Label>
-                <Input
-                  id="event_type"
-                  name="event_type"
-                  placeholder="Birthday Party, Meeting, Wedding..."
-                  required
-                />
+                <Label htmlFor="event_type">Event Type</Label>
+                {eventTypes.length > 0 ? (
+                  <select
+                    id="event_type"
+                    name="event_type"
+                    required
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  >
+                    <option value="">Select event type</option>
+                    {eventTypes.map((eventType) => (
+                      <option key={eventType.id} value={eventType.name}>
+                        {eventType.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Event types are not available yet. Please contact the organization.
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -385,7 +400,9 @@ export function CustomerAvailabilityCalendar({
                   Cancel
                 </Button>
 
-                <Button type="submit">Submit Request</Button>
+                <Button type="submit" disabled={eventTypes.length === 0}>
+                  Submit Request
+                </Button>
               </DialogFooter>
             </form>
           )}

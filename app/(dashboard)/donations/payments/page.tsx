@@ -292,6 +292,29 @@ export default function PaymentsPage() {
       return;
     }
 
+    const selectedDonorContactId =
+      donorId === "none"
+        ? null
+        : (
+            await supabase
+              .from("donors")
+              .select("contact_id")
+              .eq("id", donorId)
+              .maybeSingle()
+          ).data?.contact_id ?? null;
+
+    try {
+      const { handleDonationAffiliationSync } = await import(
+        "@/lib/contacts/contact-affiliation-sync"
+      );
+      await handleDonationAffiliationSync({
+        donorId: donorId === "none" ? null : donorId,
+        contactId: selectedDonorContactId,
+      });
+    } catch (syncError) {
+      console.warn("Donation affiliation sync failed:", syncError);
+    }
+
     resetForm();
     setShowAddDialog(false);
     await loadPayments();

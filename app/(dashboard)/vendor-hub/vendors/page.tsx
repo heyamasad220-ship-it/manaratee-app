@@ -7,10 +7,9 @@ export default function VendorHubVendorsPage() {
       <Header title="Vendors" />
       <ContactsListView
         requiredRole="vendor"
-        defaultAddRoles={["vendor"]}
         hideRoleFilter
         showStats={false}
-        emptyMessage="No vendors yet. Add a contact with the Vendor role."
+        emptyMessage="No vendors yet. Vendor affiliations are added automatically when a vendor application is approved."
       />
     </>
   )

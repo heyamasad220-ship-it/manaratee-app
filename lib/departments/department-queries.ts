@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
-import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
+import { resolveOrganizationId } from "@/lib/organizations/resolve-organization-id"
 
 async function repairLegacyDepartments(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -23,7 +23,7 @@ async function repairLegacyDepartments(
 
 export async function getDepartments() {
   const supabase = await createClient()
-  const organizationId = await getSelectedOrganizationId()
+  const organizationId = await resolveOrganizationId()
 
   if (!organizationId) {
     return []

@@ -2,9 +2,10 @@
 
 import { useState } from "react"
 import { Header } from "@/components/layout/header"
-import { Search, ChevronLeft, ChevronRight, Edit, MoreHorizontal, Plus, CalendarDays, Clock, MapPin } from "lucide-react"
+import { Search, ChevronLeft, ChevronRight, Edit, MoreHorizontal, Plus, CalendarDays, MapPin } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import { TimeInput } from "@/components/ui/time-input"
 import {
   Table,
   TableBody,
@@ -217,10 +218,7 @@ export default function SignUpsEventsPage() {
               </div>
               <div className="flex flex-col gap-2">
                 <Label htmlFor="event-time">Time</Label>
-                <div className="relative">
-                  <Clock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input id="event-time" type="time" className="pl-9" />
-                </div>
+                <TimeInput id="event-time" />
               </div>
             </div>
 

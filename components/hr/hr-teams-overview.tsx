@@ -8,8 +8,10 @@ import {
   type HrTeam,
   type HrTeamDashboardStats,
 } from "@/lib/hr/hr-team-actions"
+import { membershipTeamDetailPath } from "@/lib/memberships/membership-module-label"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { StatCard, StatCardsRow } from "@/components/ui/stat-card"
 import { Badge } from "@/components/ui/badge"
 import {
   Table,
@@ -67,24 +69,11 @@ export function HrTeamsOverview({ onManageTeams }: HrTeamsOverviewProps) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {statCards.map((stat) => {
-          const Icon = stat.icon
-          return (
-            <Card key={stat.label}>
-              <CardContent className="flex items-center justify-between p-6">
-                <div>
-                  <p className="text-sm text-muted-foreground">{stat.label}</p>
-                  <p className="text-2xl font-bold">{stat.value}</p>
-                </div>
-                <div className="flex size-10 items-center justify-center rounded-full bg-primary/10">
-                  <Icon className="size-5 text-primary" />
-                </div>
-              </CardContent>
-            </Card>
-          )
-        })}
-      </div>
+      <StatCardsRow>
+        {statCards.map((stat) => (
+          <StatCard key={stat.label} label={stat.label} value={stat.value} icon={stat.icon} />
+        ))}
+      </StatCardsRow>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
@@ -143,7 +132,7 @@ export function HrTeamsOverview({ onManageTeams }: HrTeamsOverviewProps) {
                     </TableCell>
                     <TableCell>
                       <Button variant="ghost" size="sm" asChild>
-                        <Link href={`/hr/teams/${team.id}`}>View</Link>
+                        <Link href={membershipTeamDetailPath(team.id)}>View</Link>
                       </Button>
                     </TableCell>
                   </TableRow>

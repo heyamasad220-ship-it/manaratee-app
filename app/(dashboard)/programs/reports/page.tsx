@@ -899,7 +899,7 @@ export default function ProgramsReportsPage() {
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="flex flex-wrap gap-4 [&>*]:w-fit">
               <SummaryCard
                 title="Active Programs"
                 value={overviewStats.activePrograms}

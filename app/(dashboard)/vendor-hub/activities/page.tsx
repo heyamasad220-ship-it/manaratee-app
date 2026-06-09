@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { TimeInput } from "@/components/ui/time-input"
 import {
   Dialog,
   DialogContent,
@@ -240,12 +241,12 @@ export default function ActivitiesPage() {
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-2">
                 <Label htmlFor="activity-start">Start Time</Label>
-                <Input id="activity-start" type="time" />
+                <TimeInput id="activity-start" />
               </div>
 
               <div className="flex flex-col gap-2">
                 <Label htmlFor="activity-end">End Time</Label>
-                <Input id="activity-end" type="time" />
+                <TimeInput id="activity-end" />
               </div>
             </div>
 

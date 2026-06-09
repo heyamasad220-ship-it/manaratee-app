@@ -6,6 +6,7 @@ import { HrTeamPositionsManager } from "@/components/hr/hr-team-positions-manage
 import { HrTeamsManager } from "@/components/hr/hr-teams-manager"
 import { HrTeamsOverview } from "@/components/hr/hr-teams-overview"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { MEMBERSHIP_TEAMS_PATH } from "@/lib/memberships/membership-module-label"
 import { LayoutGrid, UserCog, UsersRound } from "lucide-react"
 
 const teamsTabValues = ["overview", "teams", "positions"] as const
@@ -19,14 +20,20 @@ function normalizeTab(value?: string | null): TeamsTabValue {
   return "overview"
 }
 
-export function HrTeamsPageClient({ initialTab }: { initialTab?: string | null }) {
+export function HrTeamsPageClient({
+  initialTab,
+  basePath = MEMBERSHIP_TEAMS_PATH,
+}: {
+  initialTab?: string | null
+  basePath?: string
+}) {
   const router = useRouter()
   const [activeTab, setActiveTab] = React.useState<TeamsTabValue>(normalizeTab(initialTab))
 
   function handleTabChange(value: string) {
     const tab = normalizeTab(value)
     setActiveTab(tab)
-    router.replace(`/hr/teams?tab=${tab}`, { scroll: false })
+    router.replace(`${basePath}?tab=${tab}`, { scroll: false })
   }
 
   function goToTeamsTab() {
@@ -38,7 +45,7 @@ export function HrTeamsPageClient({ initialTab }: { initialTab?: string | null }
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Teams</h1>
         <p className="text-sm text-muted-foreground">
-          Manage groups, team positions, and contact memberships.
+          Member teams and optional assignments. Team positions define roles within each group.
         </p>
       </div>
 

@@ -23,19 +23,20 @@ import {
 } from "@/lib/applications/application-routes"
 import {
   getTypeLabel,
+  isWorkforceModuleOwner,
   MODULE_OWNER_LABELS,
   type ApplicationDashboardStats,
   type ApplicationTypeDefinition,
   type ModuleOwner,
 } from "@/lib/applications/application-types"
-import { PEOPLE_MANAGEMENT_MODULE_LABEL } from "@/lib/hr/hr-module-label"
+import { WORKFORCE_MODULE_LABEL } from "@/lib/hr/hr-module-label"
 
 function listUrlForScope(scope: {
   moduleOwner?: ModuleOwner
   applicationType?: string
   status?: "pending_review" | "approved" | "rejected"
 }) {
-  if (scope.moduleOwner === "hr" || (!scope.moduleOwner && !scope.applicationType)) {
+  if (isWorkforceModuleOwner(scope.moduleOwner) || (!scope.moduleOwner && !scope.applicationType)) {
     return peopleManagementApplicationsUrl({
       status: scope.status,
       applicationType: scope.applicationType,
@@ -146,12 +147,12 @@ export function ApplicationsOverviewClient() {
     <div className="flex flex-1 flex-col gap-6 p-6">
       {!moduleOwner && !applicationType && (
         <p className="text-sm text-muted-foreground">
-          Application management is organized under {PEOPLE_MANAGEMENT_MODULE_LABEL}, Vendor Hub,
+          Application management is organized under {WORKFORCE_MODULE_LABEL}, Vendor Hub,
           and Programs in the sidebar.
         </p>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="flex flex-wrap gap-4 [&>*]:w-fit">
         {statCards.map((card) => (
           <Card key={card.label}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -206,7 +207,7 @@ export function ApplicationsOverviewClient() {
             <CardContent className="flex flex-col gap-3">
               <div className="flex items-center justify-between rounded-lg border p-3">
                 <span className="text-sm font-medium">
-                  {PEOPLE_MANAGEMENT_MODULE_LABEL} Applications
+                  {WORKFORCE_MODULE_LABEL} Applications
                 </span>
                 <Button variant="outline" size="sm" asChild>
                   <Link href={peopleManagementApplicationsUrl()}>View</Link>

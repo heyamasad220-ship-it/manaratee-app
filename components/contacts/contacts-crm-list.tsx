@@ -1,6 +1,7 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
   fetchContactListStats,
@@ -10,8 +11,8 @@ import {
 } from "@/lib/contacts/contact-list-actions"
 import {
   addContactWithRoles,
-  syncContactRoles,
 } from "@/lib/contacts/contact-actions"
+import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
 import { fetchHrTeams } from "@/lib/hr/hr-team-actions"
 import {
   type ContactRecordType,
@@ -20,9 +21,12 @@ import {
   ROLE_COLORS,
   ROLE_ICONS,
   ROLE_OPTIONS,
+  getContactsCrmRoleOptions,
+  getRoleOptionsForRecordType,
   STATUS_COLORS,
   STATUS_OPTIONS,
-  statusToDbValue,
+  getAllowedRolesForRecordType,
+  MEMBERSHIP_DERIVED_ROLE,
 } from "@/lib/contacts/contact-constants"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
@@ -30,6 +34,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { StatCard, StatCardsRow } from "@/components/ui/stat-card"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
@@ -69,7 +74,6 @@ import {
   ChevronRight,
   Loader2,
   MoreHorizontal,
-  Pencil,
   Phone,
   Plus,
   Search,
@@ -86,17 +90,9 @@ export type ContactsCrmListProps = {
   showStats?: boolean
   /** Pre-selected affiliations when adding a contact. */
   defaultAddRoles?: ContactRoleValue[]
+  /** Optional intro copy above filters. */
+  intro?: ReactNode
 }
-
-const QUICK_FILTER_CHIPS: { label: string; value: ContactRoleValue | "all" }[] = [
-  { label: "All", value: "all" },
-  { label: "Members", value: "member" },
-  { label: "Volunteers", value: "volunteer" },
-  { label: "Donors", value: "donor" },
-  { label: "Vendors", value: "vendor" },
-  { label: "Employees", value: "employee" },
-  { label: "Service Providers", value: "service_provider" },
-]
 
 function getInitials(name: string) {
   const fallback = name?.trim() || "?"
@@ -126,10 +122,12 @@ function RoleCheckboxGroup({
   selected,
   onChange,
   idPrefix,
+  roleOptions = ROLE_OPTIONS,
 }: {
   selected: ContactRoleValue[]
   onChange: (roles: ContactRoleValue[]) => void
   idPrefix: string
+  roleOptions?: { label: string; value: ContactRoleValue }[]
 }) {
   function toggleRole(role: ContactRoleValue, checked: boolean) {
     if (checked) {
@@ -141,7 +139,7 @@ function RoleCheckboxGroup({
 
   return (
     <div className="grid gap-2 sm:grid-cols-2">
-      {ROLE_OPTIONS.map((role) => (
+      {roleOptions.map((role) => (
         <label
           key={role.value}
           htmlFor={`${idPrefix}-${role.value}`}
@@ -163,6 +161,7 @@ export function ContactsCrmList({
   lockedRecordType,
   showStats = true,
   defaultAddRoles = [],
+  intro,
 }: ContactsCrmListProps = {}) {
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
@@ -210,25 +209,18 @@ export function ContactsCrmList({
   const [teamOptions, setTeamOptions] = useState<{ id: string; name: string }[]>([])
 
   const [showAddDialog, setShowAddDialog] = useState(false)
-  const [showEditDialog, setShowEditDialog] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [selectedContact, setSelectedContact] = useState<ContactListRow | null>(null)
 
   const [contactName, setContactName] = useState("")
   const [contactEmail, setContactEmail] = useState("")
   const [contactPhone, setContactPhone] = useState("")
+  const [contactPrimaryContactName, setContactPrimaryContactName] = useState("")
   const [contactType, setContactType] = useState<ContactRecordType>(
     lockedRecordType || "individual"
   )
   const [contactRoles, setContactRoles] = useState<ContactRoleValue[]>(defaultAddRoles)
   const [contactNotes, setContactNotes] = useState("")
-
-  const [editName, setEditName] = useState("")
-  const [editEmail, setEditEmail] = useState("")
-  const [editPhone, setEditPhone] = useState("")
-  const [editContactType, setEditContactType] = useState<ContactRecordType>("individual")
-  const [editStatus, setEditStatus] = useState("active")
-  const [editRoles, setEditRoles] = useState<ContactRoleValue[]>([])
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(searchQuery.trim()), 350)
@@ -236,10 +228,11 @@ export function ContactsCrmList({
   }, [searchQuery])
 
   useEffect(() => {
+    if (lockedRecordType === "organization") return
     void fetchHrTeams({ includeInactive: false }).then((teams) => {
       setTeamOptions(teams.map((team) => ({ id: team.id, name: team.name })))
     })
-  }, [])
+  }, [lockedRecordType])
 
   useEffect(() => {
     setPage(1)
@@ -266,7 +259,7 @@ export function ContactsCrmList({
         recordType: lockedRecordType ? "all" : recordTypeFilter,
         lockedRecordType,
         status: statusFilter,
-        teamId: teamFilter,
+        teamId: lockedRecordType === "organization" ? "all" : teamFilter,
         page,
         pageSize: PAGE_SIZE,
       })
@@ -300,7 +293,7 @@ export function ContactsCrmList({
         roleFilter !== "all" ||
         recordTypeFiltered ||
         statusFilter !== "all" ||
-        teamFilter !== "all"
+        (lockedRecordType !== "organization" && teamFilter !== "all")
     )
   }, [debouncedSearch, lockedRecordType, recordTypeFilter, roleFilter, statusFilter, teamFilter])
 
@@ -332,20 +325,14 @@ export function ContactsCrmList({
     setContactName("")
     setContactEmail("")
     setContactPhone("")
+    setContactPrimaryContactName("")
     setContactType(lockedRecordType || "individual")
     setContactRoles(defaultAddRoles)
     setContactNotes("")
   }
 
-  function openEditDialog(contact: ContactListRow) {
-    setSelectedContact(contact)
-    setEditName(contact.name)
-    setEditEmail(contact.email)
-    setEditPhone(contact.phone)
-    setEditContactType(contact.recordType)
-    setEditStatus(statusToDbValue(contact.status))
-    setEditRoles(contact.roleValues)
-    setShowEditDialog(true)
+  function isOrganizationType(type: ContactRecordType) {
+    return type === "organization"
   }
 
   function openDeleteDialog(contact: ContactListRow) {
@@ -367,7 +354,7 @@ export function ContactsCrmList({
       alert("Contact name is required")
       return
     }
-    if (contactRoles.length === 0) {
+    if (contactRoles.length === 0 && !isOrganizationType(contactType)) {
       alert("Select at least one affiliation")
       return
     }
@@ -378,6 +365,9 @@ export function ContactsCrmList({
         fullName: cleanName,
         email: contactEmail.trim() || undefined,
         phone: contactPhone.trim() || undefined,
+        primaryContactName: isOrganizationType(contactType)
+          ? contactPrimaryContactName.trim() || undefined
+          : undefined,
         contactType,
         notes: contactNotes.trim() || undefined,
         roles: contactRoles,
@@ -390,56 +380,6 @@ export function ContactsCrmList({
     } finally {
       setSaving(false)
     }
-  }
-
-  async function handleUpdateContact() {
-    if (!selectedContact) return
-
-    const cleanName = editName.trim()
-    if (!cleanName) {
-      alert("Contact name is required")
-      return
-    }
-    if (editRoles.length === 0) {
-      alert("Select at least one affiliation")
-      return
-    }
-
-    setSaving(true)
-
-    const { error } = await supabase
-      .from("contacts")
-      .update({
-        full_name: cleanName,
-        email: editEmail.trim().toLowerCase() || null,
-        phone: editPhone.replace(/[^\d]/g, "") || null,
-        contact_type: lockedRecordType || editContactType,
-        status: editStatus,
-      })
-      .eq("id", selectedContact.id)
-
-    if (error) {
-      alert(error.message || "Could not update contact")
-      setSaving(false)
-      return
-    }
-
-    try {
-      await syncContactRoles(selectedContact.id, editRoles, {
-        fullName: cleanName,
-        email: editEmail.trim() || null,
-        phone: editPhone.trim() || null,
-      })
-    } catch (roleError: any) {
-      alert(roleError?.message || "Contact saved but affiliations could not be updated")
-      setSaving(false)
-      return
-    }
-
-    setShowEditDialog(false)
-    setSelectedContact(null)
-    await refreshAfterMutation()
-    setSaving(false)
   }
 
   async function handleDeleteContact() {
@@ -486,6 +426,10 @@ export function ContactsCrmList({
     setSaving(false)
   }
 
+  const affiliationRoleOptions = getRoleOptionsForRecordType(
+    lockedRecordType || "all"
+  )
+
   const statCards = lockedRecordType === "individual"
     ? [
         { label: "Total People", value: stats.people, icon: User },
@@ -504,27 +448,25 @@ export function ContactsCrmList({
           { label: "Organizations", value: stats.organizations, icon: Building2 },
         ]
 
-  const tableColumnCount = lockedRecordType ? 7 : 8
+  const tableColumnCount =
+    lockedRecordType === "organization" ? 7 : lockedRecordType ? 7 : 8
+  const showTeamsColumn = lockedRecordType !== "organization"
 
   return (
     <div className="flex flex-col gap-6 p-6">
+      {intro}
       {showStats && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          {statCards.map((stat) => {
-            const Icon = stat.icon
-            return (
-              <Card key={stat.label}>
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-2">
-                    <Icon className="h-4 w-4 text-muted-foreground" />
-                    <div className="text-2xl font-bold">{stat.value.toLocaleString()}</div>
-                  </div>
-                  <div className="text-sm text-muted-foreground">{stat.label}</div>
-                </CardContent>
-              </Card>
-            )
-          })}
-        </div>
+        <StatCardsRow>
+          {statCards.map((stat) => (
+            <StatCard
+              key={stat.label}
+              label={stat.label}
+              value={stat.value.toLocaleString()}
+              icon={stat.icon}
+              layout="compact"
+            />
+          ))}
+        </StatCardsRow>
       )}
 
       <div className="relative">
@@ -537,31 +479,18 @@ export function ContactsCrmList({
         />
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        {QUICK_FILTER_CHIPS.map((chip) => (
-          <Button
-            key={chip.value}
-            type="button"
-            size="sm"
-            variant={roleFilter === chip.value ? "default" : "outline"}
-            onClick={() => setRoleFilter(chip.value)}
-          >
-            {chip.label}
-          </Button>
-        ))}
-      </div>
-
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-wrap items-center gap-3">
         <Select
           value={roleFilter}
           onValueChange={(value) => setRoleFilter(value as ContactRoleValue | "all")}
         >
-          <SelectTrigger className="h-9 w-full sm:w-[190px]">
+          <SelectTrigger className="h-9 w-full sm:w-[210px]">
             <SelectValue placeholder="Affiliation" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Affiliations</SelectItem>
-            {ROLE_OPTIONS.map((role) => (
+            <SelectItem value="all">All affiliations</SelectItem>
+            {affiliationRoleOptions.map((role) => (
               <SelectItem key={role.value} value={role.value}>
                 {role.label}
               </SelectItem>
@@ -602,19 +531,21 @@ export function ContactsCrmList({
           </SelectContent>
         </Select>
 
-        <Select value={teamFilter} onValueChange={setTeamFilter}>
-          <SelectTrigger className="h-9 w-full sm:w-[180px]">
-            <SelectValue placeholder="Team" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Teams</SelectItem>
-            {teamOptions.map((team) => (
-              <SelectItem key={team.id} value={team.id}>
-                {team.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {lockedRecordType !== "organization" && (
+          <Select value={teamFilter} onValueChange={setTeamFilter}>
+            <SelectTrigger className="h-9 w-full sm:w-[180px]">
+              <SelectValue placeholder="Team" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Teams</SelectItem>
+              {teamOptions.map((team) => (
+                <SelectItem key={team.id} value={team.id}>
+                  {team.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
 
         {hasActiveFilters && (
           <Button type="button" variant="ghost" size="sm" onClick={clearFilters}>
@@ -633,6 +564,12 @@ export function ContactsCrmList({
           <Plus className="mr-1.5 h-4 w-4" />
           {addButtonLabel}
         </Button>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          {lockedRecordType === "organization"
+            ? "Organization affiliations: Donor, Customer (Venue Renter), or Service Provider. Rental history also appears when a rental is linked to the org contact."
+            : "Affiliation filters use stored contact relationships (member, donor, volunteer, etc.). A contact may have several. Program participants, rental customers, and parents appear on contact profiles from Programs, Rentals, and Families — not as separate contact types."}
+        </p>
       </div>
 
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
@@ -661,7 +598,12 @@ export function ContactsCrmList({
               <TableRow>
                 <TableHead>Contact</TableHead>
                 <TableHead>Affiliations</TableHead>
-                <TableHead className="hidden lg:table-cell">Teams</TableHead>
+                {showTeamsColumn ? (
+                  <TableHead className="hidden lg:table-cell">Teams</TableHead>
+                ) : null}
+                {lockedRecordType === "organization" ? (
+                  <TableHead className="hidden md:table-cell">Primary Contact</TableHead>
+                ) : null}
                 <TableHead className="hidden md:table-cell">Phone</TableHead>
                 {!lockedRecordType && (
                   <TableHead className="hidden xl:table-cell">Record Type</TableHead>
@@ -741,11 +683,22 @@ export function ContactsCrmList({
                       </div>
                     </TableCell>
 
-                    <TableCell className="hidden max-w-[220px] truncate lg:table-cell">
-                      <span className="text-sm text-muted-foreground" title={formatTeamSummary(contact.teams)}>
-                        {formatTeamSummary(contact.teams)}
-                      </span>
-                    </TableCell>
+                    {showTeamsColumn ? (
+                      <TableCell className="hidden max-w-[220px] truncate lg:table-cell">
+                        <span
+                          className="text-sm text-muted-foreground"
+                          title={formatTeamSummary(contact.teams)}
+                        >
+                          {formatTeamSummary(contact.teams)}
+                        </span>
+                      </TableCell>
+                    ) : null}
+
+                    {lockedRecordType === "organization" ? (
+                      <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
+                        {contact.primaryContactName || "—"}
+                      </TableCell>
+                    ) : null}
 
                     <TableCell className="hidden md:table-cell">
                       <div className="flex items-center gap-1 text-sm text-muted-foreground">
@@ -780,9 +733,11 @@ export function ContactsCrmList({
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => openEditDialog(contact)}>
-                            <Pencil className="mr-2 h-4 w-4" />
-                            Edit
+                          <DropdownMenuItem asChild>
+                            <Link href={contactProfileHref(contact.id)}>
+                              <User className="mr-2 h-4 w-4" />
+                              View profile
+                            </Link>
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => openDeleteDialog(contact)}
@@ -875,6 +830,17 @@ export function ContactsCrmList({
                 />
               </div>
             </div>
+            {isOrganizationType(contactType) ? (
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="crm-primary-contact">Primary Contact Name</Label>
+                <Input
+                  id="crm-primary-contact"
+                  placeholder="Person we reach at this organization"
+                  value={contactPrimaryContactName}
+                  onChange={(e) => setContactPrimaryContactName(e.target.value)}
+                />
+              </div>
+            ) : null}
             {!lockedRecordType && (
               <div className="flex flex-col gap-2">
                 <Label>Record Type</Label>
@@ -898,6 +864,7 @@ export function ContactsCrmList({
                 idPrefix="crm-add"
                 selected={contactRoles}
                 onChange={setContactRoles}
+                roleOptions={getContactsCrmRoleOptions(contactType)}
               />
             </div>
             <div className="flex flex-col gap-2">
@@ -916,111 +883,6 @@ export function ContactsCrmList({
             </Button>
             <Button onClick={handleAddContact} disabled={saving}>
               {saving ? "Saving..." : addButtonLabel}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Edit Contact</DialogTitle>
-          </DialogHeader>
-          <div className="flex flex-col gap-4 py-4">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="crm-edit-name">Name</Label>
-              <Input
-                id="crm-edit-name"
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-              />
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="crm-edit-email">Email</Label>
-                <Input
-                  id="crm-edit-email"
-                  type="email"
-                  value={editEmail}
-                  onChange={(e) => setEditEmail(e.target.value)}
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="crm-edit-phone">Phone</Label>
-                <Input
-                  id="crm-edit-phone"
-                  type="tel"
-                  value={editPhone}
-                  onChange={(e) => setEditPhone(e.target.value)}
-                />
-              </div>
-            </div>
-            {!lockedRecordType && (
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="flex flex-col gap-2">
-                  <Label>Record Type</Label>
-                  <Select
-                    value={editContactType}
-                    onValueChange={(value) => setEditContactType(value as ContactRecordType)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="individual">Person</SelectItem>
-                      <SelectItem value="organization">Organization</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Label>Status</Label>
-                  <Select value={editStatus} onValueChange={setEditStatus}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {STATUS_OPTIONS.map((status) => (
-                        <SelectItem key={status.value} value={status.value}>
-                          {status.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            )}
-            {lockedRecordType && (
-              <div className="flex flex-col gap-2">
-                <Label>Status</Label>
-                <Select value={editStatus} onValueChange={setEditStatus}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {STATUS_OPTIONS.map((status) => (
-                      <SelectItem key={status.value} value={status.value}>
-                        {status.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            <div className="flex flex-col gap-2">
-              <Label>Affiliations</Label>
-              <RoleCheckboxGroup
-                idPrefix="crm-edit"
-                selected={editRoles}
-                onChange={setEditRoles}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowEditDialog(false)} disabled={saving}>
-              Cancel
-            </Button>
-            <Button onClick={handleUpdateContact} disabled={saving}>
-              {saving ? "Saving..." : "Save Changes"}
             </Button>
           </DialogFooter>
         </DialogContent>

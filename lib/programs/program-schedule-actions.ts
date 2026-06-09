@@ -3,6 +3,7 @@
 import { randomUUID } from "crypto"
 import { revalidatePath } from "next/cache"
 
+import { syncOperationalBriefForProgram } from "@/lib/operational-briefs/operational-brief-queries"
 import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { getInstructorScheduleConflicts } from "@/lib/programs/program-schedule-queries"
@@ -85,7 +86,11 @@ export async function createScheduleItem(input: ScheduleItemInput) {
     throw new Error("Failed to create schedule item")
   }
 
+  await syncOperationalBriefForProgram(input.program_id, organizationId)
+
   revalidatePath(`/programs/${input.program_id}`)
+  revalidatePath("/facilities/calendar")
+  revalidatePath("/facilities/reservation-center")
 }
 
 export async function createRecurringScheduleItems(
@@ -142,7 +147,11 @@ export async function createRecurringScheduleItems(
     throw new Error("Failed to create recurring schedule items")
   }
 
+  await syncOperationalBriefForProgram(input.program_id, organizationId)
+
   revalidatePath(`/programs/${input.program_id}`)
+  revalidatePath("/facilities/calendar")
+  revalidatePath("/facilities/reservation-center")
 }
 
 export async function updateScheduleItem(
@@ -192,7 +201,11 @@ export async function updateScheduleItem(
     throw new Error("Failed to update schedule item")
   }
 
+  await syncOperationalBriefForProgram(input.program_id, organizationId)
+
   revalidatePath(`/programs/${input.program_id}`)
+  revalidatePath("/facilities/calendar")
+  revalidatePath("/facilities/reservation-center")
 }
 
 export async function deleteScheduleItem(itemId: string, programId: string) {
@@ -215,5 +228,9 @@ export async function deleteScheduleItem(itemId: string, programId: string) {
     throw new Error("Failed to delete schedule item")
   }
 
+  await syncOperationalBriefForProgram(programId, organizationId)
+
   revalidatePath(`/programs/${programId}`)
+  revalidatePath("/facilities/calendar")
+  revalidatePath("/facilities/reservation-center")
 }

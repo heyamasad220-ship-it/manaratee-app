@@ -157,7 +157,6 @@ export async function addCustomerFamilyMember(input: AddCustomerFamilyMemberInpu
   const { contactId } = await ensureContactForPerson({
     organizationId,
     personId: createdPerson.id as string,
-    roles: ["member"],
   })
 
   revalidatePath("/customer/profile")

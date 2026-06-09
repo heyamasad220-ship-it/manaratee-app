@@ -3,6 +3,11 @@
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
+import {
+  MEMBERSHIP_MEMBERS_PATH,
+  MEMBERSHIP_TEAMS_PATH,
+  membershipTeamDetailPath,
+} from "@/lib/memberships/membership-module-label"
 
 export type HrTeamStatus = "active" | "inactive"
 export type TeamMembershipStatus = "active" | "inactive"
@@ -61,12 +66,19 @@ export type HrTeamDashboardStats = {
   teamLeaders: number
 }
 
-function revalidateTeamPaths() {
-  revalidatePath("/hr/teams")
-  revalidatePath("/hr/settings")
-  revalidatePath("/hr/members")
-  revalidatePath("/hr")
+function revalidateTeamPaths(teamId?: string) {
+  revalidatePath(MEMBERSHIP_TEAMS_PATH)
+  revalidatePath(MEMBERSHIP_MEMBERS_PATH)
+  revalidatePath("/membership")
+  revalidatePath("/workforce/settings")
   revalidatePath("/contacts")
+  if (teamId) {
+    revalidatePath(membershipTeamDetailPath(teamId))
+  }
+  // Legacy redirect routes
+  revalidatePath("/workforce/teams")
+  revalidatePath("/settings/teams")
+  revalidatePath("/contacts/members")
 }
 
 function isMissingTableError(error: { code?: string } | null) {
@@ -219,8 +231,7 @@ export async function updateHrTeam(input: {
     .is("deleted_at", null)
 
   if (error) throw new Error(error.message || "Failed to update team")
-  revalidateTeamPaths()
-  revalidatePath(`/hr/teams/${input.id}`)
+  revalidateTeamPaths(input.id)
 }
 
 export async function archiveHrTeam(id: string) {
@@ -244,8 +255,7 @@ async function updateHrTeamStatus(id: string, status: HrTeamStatus) {
     .is("deleted_at", null)
 
   if (error) throw new Error(error.message || "Failed to update team status")
-  revalidateTeamPaths()
-  revalidatePath(`/hr/teams/${id}`)
+  revalidateTeamPaths(id)
 }
 
 export async function deleteHrTeam(id: string) {
@@ -496,8 +506,7 @@ export async function addTeamMembership(input: {
   })
 
   if (error) throw new Error(error.message || "Failed to add team member")
-  revalidateTeamPaths()
-  revalidatePath(`/hr/teams/${input.team_id}`)
+  revalidateTeamPaths(input.team_id)
   revalidatePath(`/contacts/${input.contact_id}`)
 }
 
@@ -552,8 +561,7 @@ export async function updateTeamMembership(input: {
     .eq("organization_id", organizationId)
 
   if (error) throw new Error(error.message || "Failed to update team membership")
-  revalidateTeamPaths()
-  revalidatePath(`/hr/teams/${membership.team_id}`)
+  revalidateTeamPaths(membership.team_id)
   revalidatePath(`/contacts/${membership.contact_id}`)
 }
 
@@ -583,8 +591,7 @@ export async function endTeamMembership(id: string, endDate?: string) {
     .eq("organization_id", organizationId)
 
   if (error) throw new Error(error.message || "Failed to end team membership")
-  revalidateTeamPaths()
-  revalidatePath(`/hr/teams/${membership.team_id}`)
+  revalidateTeamPaths(membership.team_id)
   revalidatePath(`/contacts/${membership.contact_id}`)
 }
 
@@ -611,8 +618,7 @@ export async function removeTeamMembership(id: string) {
     .eq("organization_id", organizationId)
 
   if (error) throw new Error(error.message || "Failed to remove team membership")
-  revalidateTeamPaths()
-  revalidatePath(`/hr/teams/${membership.team_id}`)
+  revalidateTeamPaths(membership.team_id)
   revalidatePath(`/contacts/${membership.contact_id}`)
 }
 

@@ -143,6 +143,18 @@ const permissionDefinitions: PermissionDefinition[] = [
     description: "Can open reports.",
     group: "Reports",
   },
+  {
+    key: "events.view",
+    label: "View Events",
+    description: "Can open Event Management pages.",
+    group: "Events",
+  },
+  {
+    key: "events.manage",
+    label: "Manage Events",
+    description: "Can create and edit internal events and event types.",
+    group: "Events",
+  },
 ]
 
 const permissionGroups = Array.from(

@@ -1,8 +1,17 @@
-import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
-import { InstructorsClient } from "./instructors-client"
+import { redirect } from "next/navigation"
 
-export default async function InstructorsPage() {
-  const organizationId = await getSelectedOrganizationId()
+export default async function InstructorsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>
+}) {
+  const { tab } = await searchParams
+  const pageTab =
+    tab === "assignments" || tab === "documents"
+      ? tab
+      : tab === "overview" || !tab
+        ? "employees"
+        : "employees"
 
-  return <InstructorsClient organizationId={organizationId} />
+  redirect(`/workforce/employees?tab=${pageTab}`)
 }

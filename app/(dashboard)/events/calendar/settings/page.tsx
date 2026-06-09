@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
+import { TimeInput } from "@/components/ui/time-input"
 import { cn } from "@/lib/utils"
 
 const settingsTabs = ["Availability", "General"] as const
@@ -158,9 +159,9 @@ export default function CalendarSettingsPage() {
                   Highlight business hours on the calendar.
                 </p>
                 <div className="mt-3 flex items-center gap-2">
-                  <Input type="time" defaultValue="09:00" className="w-[120px]" />
+                  <TimeInput defaultValue="09:00" className="w-[140px]" />
                   <span className="text-sm text-muted-foreground">to</span>
-                  <Input type="time" defaultValue="21:00" className="w-[120px]" />
+                  <TimeInput defaultValue="21:00" className="w-[140px]" />
                 </div>
               </div>
 

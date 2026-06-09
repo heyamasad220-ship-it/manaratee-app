@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { ChevronDown, GraduationCap, LayoutDashboard, LogOut, User } from "lucide-react"
+import { usePathname } from "next/navigation"
+import { ChevronDown, LogOut, User } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -12,6 +13,7 @@ import {
   fetchUserPortalCapabilities,
 } from "@/lib/auth/portal-capabilities-client"
 import type { UserPortalCapabilities } from "@/lib/auth/portal-capabilities-types"
+import { PortalSwitcher } from "@/components/portal/portal-switcher"
 
 import {
   DropdownMenu,
@@ -28,6 +30,7 @@ interface UserProfile {
 
 export function UserMenu() {
   const supabase = createClient()
+  const pathname = usePathname()
 
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [portalCapabilities, setPortalCapabilities] =
@@ -108,31 +111,14 @@ export function UserMenu() {
           </Link>
         </DropdownMenuItem>
 
-        {portalCapabilities?.hasPersonalPortal ? (
-          <DropdownMenuItem asChild>
-            <Link href="/customer/dashboard" className="flex items-center gap-2">
-              <User className="h-4 w-4" />
-              My Account
-            </Link>
-          </DropdownMenuItem>
-        ) : null}
-
-        {portalCapabilities?.hasTeachingPortal ? (
-          <DropdownMenuItem asChild>
-            <Link href="/my-classes" className="flex items-center gap-2">
-              <GraduationCap className="h-4 w-4" />
-              My Classes
-            </Link>
-          </DropdownMenuItem>
-        ) : null}
-
-        {portalCapabilities?.hasAdminPortal ? (
-          <DropdownMenuItem asChild>
-            <Link href="/dashboard" className="flex items-center gap-2">
-              <LayoutDashboard className="h-4 w-4" />
-              Admin Dashboard
-            </Link>
-          </DropdownMenuItem>
+        {portalCapabilities ? (
+          <div className="px-2 py-2">
+            <PortalSwitcher
+              capabilities={portalCapabilities}
+              pathname={pathname}
+              variant="compact"
+            />
+          </div>
         ) : null}
 
         <DropdownMenuSeparator />

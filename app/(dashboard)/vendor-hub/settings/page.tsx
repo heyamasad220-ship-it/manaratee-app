@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
+import { TimeInput } from "@/components/ui/time-input"
 import { Badge } from "@/components/ui/badge"
 import { createClient } from "@/lib/supabase/client"
 import {
@@ -298,12 +299,12 @@ location: type.location ?? "",
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="flex flex-col gap-2">
                       <Label htmlFor="default-start">Default Start Time</Label>
-                      <Input id="default-start" type="time" />
+                      <TimeInput id="default-start" />
                     </div>
 
                     <div className="flex flex-col gap-2">
                       <Label htmlFor="default-end">Default End Time</Label>
-                      <Input id="default-end" type="time" />
+                      <TimeInput id="default-end" />
                     </div>
                   </div>
 
