@@ -5,7 +5,6 @@ import {
   getEventManagementDashboard,
   parseDashboardTimePeriod,
 } from "@/lib/events/internal-event-dashboard-queries"
-import { getPendingInternalEventRequests } from "@/lib/events/internal-event-queries"
 import {
   hasAnyPermission,
   PERMISSIONS,
@@ -30,10 +29,9 @@ async function OverviewContent({
   const resolvedSearchParams = await searchParams
   const period = parseDashboardTimePeriod(getSearchParam(resolvedSearchParams, "period"))
 
-  const [data, canManage, requests] = await Promise.all([
+  const [data, canManage] = await Promise.all([
     getEventManagementDashboard(period),
     hasAnyPermission(PERMISSIONS.EVENTS_MANAGE, PERMISSIONS.PROGRAMS_MANAGE),
-    getPendingInternalEventRequests(),
   ])
 
   return (
@@ -41,7 +39,6 @@ async function OverviewContent({
       data={data}
       period={period}
       canManage={canManage}
-      pendingRequests={requests}
     />
   )
 }

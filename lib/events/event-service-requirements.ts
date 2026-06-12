@@ -8,6 +8,13 @@ export type EventChildcareAgeGroup = {
   capacity: number
 }
 
+export type EventVendorSlot = {
+  vendorTypeId: string
+  vendorTypeName: string
+  quantity: number
+  fee: number | null
+}
+
 export const CHILDCARE_AGE_RANGE_OPTIONS = [
   { value: "0-2", label: "0–2 years" },
   { value: "3-5", label: "3–5 years" },
@@ -29,8 +36,11 @@ export type EventServiceRequirements = {
     registrationDeadline?: string | null
   }
   vendors?: {
+    slots?: EventVendorSlot[]
+    /** @deprecated Use slots */
     maxVendors?: number | null
     applicationDeadline?: string | null
+    /** @deprecated Use slots */
     fee?: number | null
     approvalRequired?: boolean
   }
@@ -42,6 +52,14 @@ export type ChildcareAgeGroupFormRow = {
   capacity: string
 }
 
+export type VendorSlotFormRow = {
+  id: string
+  vendorTypeId: string
+  vendorTypeName: string
+  quantity: string
+  fee: string
+}
+
 export type EventServiceRequirementsFormState = {
   requiresVolunteers: boolean
   requiresChildcare: boolean
@@ -50,9 +68,8 @@ export type EventServiceRequirementsFormState = {
   volunteerRoles: Array<{ id: string; name: string; slots: string }>
   childcareAgeGroups: ChildcareAgeGroupFormRow[]
   childcareDeadline: string
-  maxVendors: string
+  vendorSlots: VendorSlotFormRow[]
   vendorDeadline: string
-  vendorFee: string
   vendorApprovalRequired: boolean
 }
 
@@ -64,9 +81,8 @@ export const DEFAULT_EVENT_SERVICE_REQUIREMENTS_FORM: EventServiceRequirementsFo
   volunteerRoles: [],
   childcareAgeGroups: [],
   childcareDeadline: "",
-  maxVendors: "",
+  vendorSlots: [],
   vendorDeadline: "",
-  vendorFee: "",
   vendorApprovalRequired: true,
 }
 
@@ -95,7 +111,74 @@ function childcareAgeGroupsFromConfig(
 }
 
 export function formatChildcareAgeGroupLabel(ageRange: string): string {
-  return CHILDCARE_AGE_RANGE_OPTIONS.find((option) => option.value === ageRange)?.label ?? ageRange
+  const trimmed = ageRange.trim()
+  if (!trimmed) return ""
+
+  const preset = CHILDCARE_AGE_RANGE_OPTIONS.find((option) => option.value === trimmed)
+  if (preset) return preset.label
+
+  if (/year/i.test(trimmed)) return trimmed
+
+  if (/^\d+\s*[-–]\s*\d+$/.test(trimmed)) {
+    return `${trimmed.replace(/\s*-\s*/, "–")} years`
+  }
+
+  return trimmed
+}
+
+function vendorSlotsFromConfig(
+  config: EventServiceRequirements["vendors"]
+): VendorSlotFormRow[] {
+  if (config?.slots?.length) {
+    return config.slots.map((slot, index) => ({
+      id: `vendor-slot-${index}`,
+      vendorTypeId: slot.vendorTypeId,
+      vendorTypeName: slot.vendorTypeName,
+      quantity: String(slot.quantity),
+      fee: slot.fee != null ? String(slot.fee) : "",
+    }))
+  }
+
+  if (config?.maxVendors || config?.fee != null) {
+    return [
+      {
+        id: "vendor-slot-0",
+        vendorTypeId: "",
+        vendorTypeName: "",
+        quantity: config.maxVendors ? String(config.maxVendors) : "1",
+        fee: config.fee != null ? String(config.fee) : "",
+      },
+    ]
+  }
+
+  return []
+}
+
+export function formatVendorSlotLabel(slot: EventVendorSlot): string {
+  const fee =
+    slot.fee != null && slot.fee > 0
+      ? ` — $${slot.fee.toFixed(2)} each`
+      : ""
+  return `${slot.quantity}× ${slot.vendorTypeName}${fee}`
+}
+
+export function summarizeVendorRequirements(
+  vendors: EventServiceRequirements["vendors"]
+): string[] {
+  if (!vendors) return []
+
+  if (vendors.slots?.length) {
+    return vendors.slots.map(formatVendorSlotLabel)
+  }
+
+  const legacy: string[] = []
+  if (vendors.maxVendors) {
+    legacy.push(`Up to ${vendors.maxVendors} vendors`)
+  }
+  if (vendors.fee != null) {
+    legacy.push(`Fee $${vendors.fee}`)
+  }
+  return legacy
 }
 
 export function parseServiceRequirements(value: unknown): EventServiceRequirements {
@@ -126,9 +209,8 @@ export function serviceRequirementsFormFromEvent(input: {
     })),
     childcareAgeGroups: childcareAgeGroupsFromConfig(config.childcare),
     childcareDeadline: config.childcare?.registrationDeadline || "",
-    maxVendors: config.vendors?.maxVendors != null ? String(config.vendors.maxVendors) : "",
+    vendorSlots: vendorSlotsFromConfig(config.vendors),
     vendorDeadline: config.vendors?.applicationDeadline || "",
-    vendorFee: config.vendors?.fee != null ? String(config.vendors.fee) : "",
     vendorApprovalRequired: config.vendors?.approvalRequired !== false,
   }
 }
@@ -171,10 +253,22 @@ export function buildServiceRequirementsPayload(
   }
 
   if (form.requiresVendors) {
+    const slots = form.vendorSlots
+      .filter((slot) => slot.vendorTypeId.trim().length > 0)
+      .map((slot) => ({
+        vendorTypeId: slot.vendorTypeId,
+        vendorTypeName: slot.vendorTypeName.trim() || "Vendor",
+        quantity: Number.parseInt(slot.quantity, 10) || 0,
+        fee: slot.fee ? Number.parseFloat(slot.fee) : null,
+      }))
+      .filter((slot) => slot.quantity > 0)
+
+    const totalQuantity = slots.reduce((sum, slot) => sum + slot.quantity, 0)
+
     service_requirements.vendors = {
-      maxVendors: form.maxVendors ? Number.parseInt(form.maxVendors, 10) : null,
+      slots,
+      maxVendors: totalQuantity > 0 ? totalQuantity : null,
       applicationDeadline: form.vendorDeadline || null,
-      fee: form.vendorFee ? Number.parseFloat(form.vendorFee) : null,
       approvalRequired: form.vendorApprovalRequired,
     }
   }

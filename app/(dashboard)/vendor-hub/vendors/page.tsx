@@ -1,16 +1,7 @@
-import { Header } from "@/components/layout/header"
-import { ContactsListView } from "@/components/contacts/contacts-list-view"
+import { redirect } from "next/navigation"
 
-export default function VendorHubVendorsPage() {
-  return (
-    <>
-      <Header title="Vendors" />
-      <ContactsListView
-        requiredRole="vendor"
-        hideRoleFilter
-        showStats={false}
-        emptyMessage="No vendors yet. Vendor affiliations are added automatically when a vendor application is approved."
-      />
-    </>
-  )
+import { VENDOR_HUB_ROUTES } from "@/lib/vendor-hub/vendor-hub-routes"
+
+export default function LegacyVendorsRedirect() {
+  redirect(VENDOR_HUB_ROUTES.network.vendors)
 }

@@ -86,6 +86,8 @@ type ApplicationsModulePageProps = {
     statusTab?: ApplicationStatusTabId
     applicationType?: string
   }) => void
+  /** When set, application detail links pass bazaar event context for participation sync. */
+  vendorHubEventId?: string
 }
 
 function buildPageUrl(
@@ -153,9 +155,22 @@ export function ApplicationsModulePage({
   hidePageHeader = false,
   pageTab = "submissions",
   onNavigateToSubmissions,
+  vendorHubEventId,
 }: ApplicationsModulePageProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
+
+  const applicationDetailHref = useCallback(
+    (applicationId: string) => {
+      const params = new URLSearchParams()
+      if (vendorHubEventId) {
+        params.set("vendor_hub_event_id", vendorHubEventId)
+      }
+      const query = params.toString()
+      return query ? `/applications/${applicationId}?${query}` : `/applications/${applicationId}`
+    },
+    [vendorHubEventId]
+  )
 
   const applicationTypeFromUrl = lockedApplicationType
     ?? searchParams.get("application_type")
@@ -624,7 +639,7 @@ export function ApplicationsModulePage({
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => router.push(`/applications/${app.id}`)}
+                          onClick={() => router.push(applicationDetailHref(app.id))}
                         >
                           <Eye className="mr-2 h-4 w-4" />
                           View

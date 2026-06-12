@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/vendor-hub-reminders",
+      "schedule": "0 14 * * *"
+    }
+  ]
+}

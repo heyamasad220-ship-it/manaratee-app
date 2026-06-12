@@ -32,9 +32,9 @@ import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 import { createClient } from "@/lib/supabase/client"
 import { WORKFORCE_MODULE_LABEL } from "@/lib/hr/hr-module-label"
+import { isFacilitiesOnlyAccess } from "@/lib/permissions/facilities-access"
 import {
   programsFinancialAssistanceNavItem,
-  vendorApplicationNavItem,
 } from "@/lib/applications/application-nav"
 
 interface SubItem {
@@ -109,6 +109,7 @@ const moduleSortOrderOverride: Record<string, number> = {
   membership: 36,
   bookings: 41,
   programs: 42,
+  "vendor-hub": 43,
   spaces: 50,
 }
 
@@ -209,7 +210,6 @@ const SIDEBAR_GROUP_ORDER = [
   "People",
   "Operations",
   "Facilities",
-  "Services",
   "Financial",
   "System",
 ] as const
@@ -227,6 +227,7 @@ function resolveModuleNavSlug(slug: string) {
 
 const moduleGroupOverride: Record<string, string> = {
   spaces: "Facilities",
+  "vendor-hub": "Operations",
 }
 
 const moduleDefaultRouteOverride: Record<string, string> = {
@@ -238,23 +239,23 @@ const moduleDefaultRouteOverride: Record<string, string> = {
 const moduleChildren: Record<string, SubItem[]> = {
   bookings: [
     { label: "Dashboard", href: "/bookings/overview", matchPrefix: "/bookings/overview", permissionKey: "bookings.view" },
-    { label: "Calendar", href: "/bookings/calendar", matchPrefix: "/bookings/calendar", permissionKey: "bookings.view" },
     { label: "Requests", href: "/bookings/requests", matchPrefix: "/bookings/requests", permissionKey: "bookings.manage" },
     { label: "Settings", href: "/bookings/settings", matchPrefix: "/bookings/settings", permissionKey: "bookings.manage" },
   ],
   "event-management": [
     { label: "Dashboard", href: "/event-management/overview", matchPrefix: "/event-management/overview", permissionKey: "events.view" },
-    { label: "Calendar", href: "/event-management/calendar", matchPrefix: "/event-management/calendar", permissionKey: "events.view" },
+    { label: "Space Availability", href: "/facilities/availability", matchPrefix: "/facilities/availability", permissionKey: "events.view" },
     { label: "Events", href: "/event-management", matchPrefix: "/event-management", permissionKey: "events.view" },
     { label: "Ticketing", href: "/event-management/ticketing", matchPrefix: "/event-management/ticketing", permissionKey: "ticketing.view" },
     { label: "Reports", href: "/event-management/reports", matchPrefix: "/event-management/reports", permissionKey: "reports.view" },
-    { label: "Settings", href: "/event-management/settings", matchPrefix: "/event-management/settings", permissionKey: "events.manage" },
+    { label: "Settings", href: "/event-management/settings/event-types", matchPrefix: "/event-management/settings", permissionKey: "events.manage" },
   ],
   spaces: [
     { label: "Spaces", href: "/facilities/settings/spaces", matchPrefix: "/facilities/settings/spaces", permissionKey: "spaces.view" },
     { label: "Resources", href: "/facilities/resources", matchPrefix: "/facilities/resources", permissionKey: "spaces.view" },
     { label: "Reservation Center", href: "/facilities/reservation-center", matchPrefix: "/facilities/reservation-center", permissionKey: "spaces.view" },
-    { label: "Master Calendar", href: "/facilities/calendar", matchPrefix: "/facilities/calendar", permissionKey: "spaces.view" },
+    { label: "Space Availability", href: "/facilities/availability", matchPrefix: "/facilities/availability", permissionKey: "spaces.view" },
+    { label: "Schedule", href: "/facilities/calendar", matchPrefix: "/facilities/calendar", permissionKey: "spaces.view" },
   ],
   programs: [
     { label: "Catalog", href: "/programs/catalog", matchPrefix: "/programs/catalog", permissionKey: "programs.view" },
@@ -265,13 +266,9 @@ const moduleChildren: Record<string, SubItem[]> = {
     { label: "Settings", href: "/programs/settings", matchPrefix: "/programs/settings", permissionKey: "programs.manage" },
   ],
   "vendor-hub": [
-    { label: "Overview", href: "/vendor-hub", matchPrefix: "/vendor-hub", permissionKey: "vendor_hub.view" },
-    { label: "Vendors", href: "/vendor-hub/vendors", matchPrefix: "/vendor-hub/vendors", permissionKey: "vendor_hub.manage" },
-    vendorApplicationNavItem(),
-    { label: "Booths", href: "/vendor-hub/booths", matchPrefix: "/vendor-hub/booths", permissionKey: "vendor_hub.manage" },
-    { label: "Activities", href: "/vendor-hub/activities", matchPrefix: "/vendor-hub/activities", permissionKey: "vendor_hub.manage" },
-    { label: "Entertainment", href: "/vendor-hub/entertainment", matchPrefix: "/vendor-hub/entertainment", permissionKey: "vendor_hub.manage" },
-    { label: "Payments", href: "/vendor-hub/payments", matchPrefix: "/vendor-hub/payments", permissionKey: "vendor_hub.manage" },
+    { label: "Dashboard", href: "/vendor-hub", matchPrefix: "/vendor-hub", permissionKey: "vendor_hub.view" },
+    { label: "Vendor Network", href: "/vendor-hub/network/vendors", matchPrefix: "/vendor-hub/network", permissionKey: "vendor_hub.view" },
+    { label: "Bazaar Events", href: "/vendor-hub/events", matchPrefix: "/vendor-hub/events", permissionKey: "vendor_hub.manage" },
     { label: "Community Calendar", href: "/vendor-hub/community-calendar", matchPrefix: "/vendor-hub/community-calendar", permissionKey: "vendor_hub.view" },
     { label: "Reports", href: "/vendor-hub/reports", matchPrefix: "/vendor-hub/reports", permissionKey: "reports.view" },
     { label: "Settings", href: "/vendor-hub/settings", matchPrefix: "/vendor-hub/settings", permissionKey: "vendor_hub.manage" },
@@ -434,13 +431,35 @@ function groupNavItemsForDisplay(navItems: NavItem[]) {
 }
 
 function filterNavItemsByPermissions(items: NavItem[], permissionContext: UserPermissionContext): NavItem[] {
-  return items
+  const filtered = items
     .filter((item) => userCanAccessModule(permissionContext, item.permissionKey, item.moduleSlug))
     .map((item) => ({
       ...item,
       children: item.children?.filter((child) => userCanAccess(permissionContext, child.permissionKey)),
     }))
     .filter((item) => !(item.children && item.children.length === 0 && item.href === "#"))
+
+  if (
+    isFacilitiesOnlyAccess({
+      isOwner: permissionContext.isOwner,
+      enabledPermissions: permissionContext.enabledPermissions,
+    })
+  ) {
+    return filtered
+      .filter(
+        (item) =>
+          item.moduleSlug === "spaces" ||
+          item.matchPrefix.startsWith("/facilities")
+      )
+      .map((item) => ({
+        ...item,
+        children: item.children?.filter(
+          (child) => child.href !== "/facilities/availability"
+        ),
+      }))
+  }
+
+  return filtered
 }
 
 function buildNavItems(rows: SidebarModuleRow[], permissionContext: UserPermissionContext): NavItem[] {

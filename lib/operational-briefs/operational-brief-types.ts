@@ -132,6 +132,7 @@ export type OperationalBriefView = {
   sourceRecordHref: string | null
   canOpenSourceRecord: boolean
   canEditSetupFields: boolean
+  isFacilitiesOnly: boolean
 }
 
 export type OperationalBriefPermissionContext = {
@@ -139,4 +140,5 @@ export type OperationalBriefPermissionContext = {
   canOpenInternalEventRecord: boolean
   canOpenProgramRecord: boolean
   canEditSetupFields: boolean
+  isFacilitiesOnly: boolean
 }

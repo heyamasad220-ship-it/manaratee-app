@@ -5,8 +5,19 @@ import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { findOrCreateContact } from "@/lib/contacts/contact-actions"
 import { syncContactAffiliations } from "@/lib/contacts/contact-affiliation-sync"
+import { attachAuthUserToContactIfLoggedIn } from "@/lib/vendor-hub/link-vendor-contact-auth"
 import { AFFILIATION_APPLICATION_TYPES } from "@/lib/contacts/contact-affiliation-rules"
 import { hasPermission, PERMISSIONS } from "@/lib/permissions/permissions"
+import { syncVendorHubParticipantFromApplication } from "@/lib/vendor-hub/vendor-participant-actions"
+import {
+  hasPendingOrgVendorApplication,
+  isApprovedOrgVendor,
+} from "@/lib/vendor-hub/vendor-eligibility-queries"
+import {
+  VENDOR_ORG_APPLICATION_MODULE,
+  VENDOR_ORG_APPLICATION_TYPE,
+} from "@/lib/vendor-hub/vendor-participation-model"
+import { VENDOR_HUB_ROUTES } from "@/lib/vendor-hub/vendor-hub-routes"
 import {
   buildTypeRegistry,
   normalizeModuleOwner,
@@ -354,6 +365,39 @@ export async function submitApplication(input: SubmitApplicationInput) {
     contactType: "individual",
   })
 
+  if (
+    input.moduleOwner === VENDOR_ORG_APPLICATION_MODULE &&
+    input.applicationType === VENDOR_ORG_APPLICATION_TYPE
+  ) {
+    const approved = await isApprovedOrgVendor({
+      supabase,
+      organizationId,
+      contactId,
+    })
+    if (approved) {
+      throw new Error(
+        "You are already an approved vendor for this organization. Reserve a booth on an open bazaar from My Bazaars."
+      )
+    }
+
+    const pending = await hasPendingOrgVendorApplication({
+      supabase,
+      organizationId,
+      contactId,
+    })
+    if (pending) {
+      throw new Error(
+        "You already have a vendor application under review for this organization."
+      )
+    }
+  }
+
+  await attachAuthUserToContactIfLoggedIn({
+    supabase,
+    contactId,
+    authUserId: user?.id,
+  })
+
   const { data, error } = await supabase
     .from("applications")
     .insert({
@@ -404,6 +448,8 @@ export type UpdateApplicationStatusInput = {
   status: ApplicationStatus
   reviewNotes?: string | null
   notes?: string | null
+  /** @deprecated Org vendor applications are not tied to events. Use booth reservation flow instead. */
+  vendorHubEventId?: string | null
 }
 
 export async function updateApplicationStatus(input: UpdateApplicationStatusInput) {
@@ -490,7 +536,21 @@ export async function updateApplicationStatus(input: UpdateApplicationStatusInpu
     }
   }
 
-  return mapApplicationRow(data)
+  const updatedApplication = mapApplicationRow(data)
+
+  await syncVendorHubParticipantFromApplication({
+    application: updatedApplication,
+    newStatus: input.status,
+    organizationId,
+    vendorHubEventId: null,
+    supabase,
+  })
+
+  revalidatePath(VENDOR_HUB_ROUTES.network.history)
+  revalidatePath(VENDOR_HUB_ROUTES.network.onboarding)
+  revalidatePath(VENDOR_HUB_ROUTES.events.list)
+
+  return updatedApplication
 }
 
 export async function addApplicationNote(applicationId: string, note: string) {

@@ -3,7 +3,7 @@ import { isWorkforceModuleOwner } from "@/lib/applications/application-types"
 import type { ApplicationStatusTabId } from "@/lib/applications/application-status-tabs"
 
 export const PEOPLE_MANAGEMENT_APPLICATIONS_PATH = "/settings/applications"
-export const VENDOR_HUB_APPLICATIONS_PATH = "/vendor-hub/applications"
+export const VENDOR_HUB_APPLICATIONS_PATH = "/vendor-hub/events"
 export const PROGRAMS_FINANCIAL_ASSISTANCE_PATH = "/programs/financial-assistance"
 
 /** @deprecated Sign-Ups applications moved back under People Management */

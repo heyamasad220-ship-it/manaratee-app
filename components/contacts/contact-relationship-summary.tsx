@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 
 type ContactRelationshipSummaryCardProps = {
+  contactId: string
   summary: ContactRelationshipSummary | null
   activity: ContactActivitySummary | null
   loading?: boolean
@@ -116,6 +117,7 @@ function hasVendorActivity(summary: ContactRelationshipSummary, activity: Contac
 }
 
 export function ContactRelationshipSummaryCard({
+  contactId,
   summary,
   activity,
   loading = false,
@@ -193,7 +195,7 @@ export function ContactRelationshipSummaryCard({
       value: summary.vendorActivityCount,
       icon: Store,
       records: activity.vendorHub,
-      href: "/vendor-hub/vendors",
+      href: `/vendor-hub/network/history?contact=${contactId}`,
       viewLabel: "View vendor activity",
     })
   }

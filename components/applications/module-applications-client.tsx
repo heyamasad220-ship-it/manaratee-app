@@ -38,6 +38,7 @@ export function ModuleApplicationsClient({
   lockedApplicationType,
   hubApplicationTypes,
   overviewLeadingContent,
+  vendorHubEventId,
 }: {
   moduleOwner: ModuleOwner
   basePath: string
@@ -46,6 +47,8 @@ export function ModuleApplicationsClient({
   lockedApplicationType?: string
   hubApplicationTypes?: readonly string[]
   overviewLeadingContent?: ReactNode
+  /** When set, application review links include bazaar event context for participation sync. */
+  vendorHubEventId?: string
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -141,6 +144,7 @@ export function ModuleApplicationsClient({
               section="overview"
               hidePageHeader
               onNavigateToSubmissions={navigateToSubmissions}
+              vendorHubEventId={vendorHubEventId}
             />
           )}
         </TabsContent>
@@ -155,6 +159,7 @@ export function ModuleApplicationsClient({
               section={overviewLeadingContent ? "all" : "submissions"}
               hidePageHeader
               pageTab="submissions"
+              vendorHubEventId={vendorHubEventId}
             />
           )}
         </TabsContent>

@@ -86,7 +86,6 @@ export async function upsertEventType(input: UpsertEventTypeInput) {
     }
   }
 
-  revalidatePath("/event-management/settings")
   revalidatePath("/event-management/settings/event-types")
   revalidatePath("/event-management/overview")
 }
@@ -121,7 +120,6 @@ export async function deleteEventType(id: string) {
     throw new Error("Failed to delete event type")
   }
 
-  revalidatePath("/event-management/settings")
   revalidatePath("/event-management/settings/event-types")
   revalidatePath("/event-management/overview")
 }

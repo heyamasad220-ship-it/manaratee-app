@@ -30,7 +30,103 @@ const nextConfig = {
       },
       {
         source: "/events/calendar",
-        destination: "/facilities/calendar",
+        destination: "/facilities/availability",
+        permanent: false,
+      },
+      {
+        source: "/bookings/calendar",
+        destination: "/facilities/availability",
+        permanent: false,
+      },
+      {
+        source: "/event-management/calendar",
+        destination: "/facilities/availability",
+        permanent: false,
+      },
+      // Vendor Hub IA migration
+      {
+        source: "/vendor-hub/applications",
+        destination: "/vendor-hub/events",
+        permanent: false,
+      },
+      {
+        source: "/vendor-hub/vendors/applications",
+        destination: "/vendor-hub/events",
+        permanent: false,
+      },
+      {
+        source: "/vendor-hub/vendors/approved",
+        destination: "/vendor-hub/network/vendors",
+        permanent: false,
+      },
+      {
+        source: "/vendor-hub/vendors/waitlist",
+        destination: "/vendor-hub/network/vendors",
+        permanent: false,
+      },
+      {
+        source: "/vendor-hub/vendors/documents",
+        destination: "/vendor-hub/network/documents",
+        permanent: false,
+      },
+      {
+        source: "/vendor-hub/vendors/communications",
+        destination: "/vendor-hub/network/invitations",
+        permanent: false,
+      },
+      {
+        source: "/vendor-hub/vendors",
+        destination: "/vendor-hub/network/vendors",
+        permanent: false,
+      },
+      {
+        source: "/vendor-hub/vendors/:path*",
+        destination: "/vendor-hub/network/vendors",
+        permanent: false,
+      },
+      {
+        source: "/vendor-hub/booths",
+        destination: "/vendor-hub/events",
+        permanent: false,
+      },
+      {
+        source: "/vendor-hub/booths/:path*",
+        destination: "/vendor-hub/events",
+        permanent: false,
+      },
+      {
+        source: "/vendor-hub/payments",
+        destination: "/vendor-hub/events",
+        permanent: false,
+      },
+      {
+        source: "/vendor-hub/finance/:path*",
+        destination: "/vendor-hub/events",
+        permanent: false,
+      },
+      {
+        source: "/vendor-hub/programming/:path*",
+        destination: "/vendor-hub",
+        permanent: false,
+      },
+      {
+        source: "/vendor-hub/operations/:path*",
+        destination: "/vendor-hub",
+        permanent: false,
+      },
+      {
+        source: "/vendor-hub/publishing/:path*",
+        destination: "/vendor-hub/community-calendar",
+        permanent: false,
+      },
+      {
+        source: "/vendor-hub/activities",
+        destination: "/vendor-hub",
+        permanent: false,
+      },
+      {
+        source: "/vendor-hub/entertainment",
+        destination: "/vendor-hub",
         permanent: false,
       },
     ]

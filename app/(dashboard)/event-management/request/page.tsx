@@ -5,7 +5,9 @@ import { Header } from "@/components/layout/header"
 import { getDepartments } from "@/lib/departments/department-queries"
 import { getEventTypes } from "@/lib/events/event-type-queries"
 import { getInternalEventFormDefaults } from "@/lib/events/internal-event-form-defaults"
-import { getInternalCalendarVenues } from "@/lib/bookings/venue-calendar-venues"
+import { getActiveCalendarVenues } from "@/lib/bookings/venue-calendar-venues"
+import { getRoomSetupStyles } from "@/lib/setup-styles/setup-style-queries"
+import { getVendorHubVendorTypes } from "@/lib/vendor-hub/vendor-type-queries"
 import { hasAnyPermission, PERMISSIONS } from "@/lib/permissions/permissions"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 
@@ -36,11 +38,24 @@ export default async function InternalEventRequestPage({ searchParams }: PagePro
   }
 
   const params = await searchParams
-  const [departments, eventTypes, venues, defaults] = await Promise.all([
+  const [
+    departments,
+    eventTypes,
+    venues,
+    defaults,
+    setupStyles,
+    vendorTypes,
+    canManageSetupStyles,
+    canManageVendorTypes,
+  ] = await Promise.all([
     getDepartments(),
     getEventTypes({ activeOnly: true }),
-    getInternalCalendarVenues(),
+    getActiveCalendarVenues(),
     getInternalEventFormDefaults(),
+    getRoomSetupStyles({ activeOnly: true }),
+    getVendorHubVendorTypes({ activeOnly: true }),
+    hasAnyPermission(PERMISSIONS.EVENTS_MANAGE, PERMISSIONS.PROGRAMS_MANAGE),
+    hasAnyPermission(PERMISSIONS.EVENTS_MANAGE, PERMISSIONS.PROGRAMS_MANAGE),
   ])
 
   return (
@@ -51,6 +66,10 @@ export default async function InternalEventRequestPage({ searchParams }: PagePro
       departments={departments}
       eventTypes={eventTypes}
       venues={venues}
+      setupStyles={setupStyles}
+      canManageSetupStyles={canManageSetupStyles}
+      vendorTypes={vendorTypes}
+      canManageVendorTypes={canManageVendorTypes}
       initialSlot={{
         venueId: params?.venueId || "",
         startAt: params?.start || "",

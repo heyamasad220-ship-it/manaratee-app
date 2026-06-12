@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { EventServiceRequirementsFields } from "@/components/events/event-service-requirements-fields"
 import { EventTicketingFields } from "@/components/events/event-ticketing-fields"
+import { SetupStyleField } from "@/components/setup-styles/setup-style-field"
 import type { Department } from "@/lib/departments/department-types"
 import type { EventType } from "@/lib/events/event-type-types"
 import type { CalendarVenue } from "@/lib/reservations/reservation-types"
@@ -41,8 +42,10 @@ import {
 import { getEventTicketTypes } from "@/lib/tickets/ticket-type-actions"
 import type { InternalEventWithRelations } from "@/lib/events/internal-event-types"
 import type { InternalEventFormDefaults } from "@/lib/events/internal-event-form-defaults"
+import type { RoomSetupStyle } from "@/lib/setup-styles/setup-style-types"
+import type { VendorHubVendorType } from "@/lib/vendor-hub/vendor-type-types"
 
-type InternalEventFormProps =
+type InternalEventFormProps = (
   | {
       mode: "create"
       departments: Department[]
@@ -75,6 +78,12 @@ type InternalEventFormProps =
       eventTypes: EventType[]
       venues: CalendarVenue[]
     }
+) & {
+  setupStyles: RoomSetupStyle[]
+  canManageSetupStyles?: boolean
+  vendorTypes?: VendorHubVendorType[]
+  canManageVendorTypes?: boolean
+}
 
 export function InternalEventForm(props: InternalEventFormProps) {
   const router = useRouter()
@@ -316,13 +325,322 @@ export function InternalEventForm(props: InternalEventFormProps) {
       : props.mode === "request"
         ? isMemberStaffRequest
           ? "/customer/staff"
-          : "/event-management/calendar"
+          : "/facilities/availability"
         : "/event-management"
 
   const isRequestMode = props.mode === "request"
 
+  const prefilledDepartment =
+    formDefaults?.departmentId &&
+    props.departments.find((department) => department.id === formDefaults.departmentId)
+
+  const selectClassName =
+    "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+
+  function renderRequestSidebar() {
+    return (
+      <aside className="space-y-3 lg:sticky lg:top-6 lg:self-start lg:border-r lg:pr-6">
+        {formDefaults?.user ? (
+          <div className="space-y-1.5">
+            <Label htmlFor="requesting_user">User</Label>
+            <Input
+              id="requesting_user"
+              value={formDefaults.user.name}
+              readOnly
+              disabled
+              className="bg-muted"
+            />
+          </div>
+        ) : null}
+
+        <div className="space-y-1.5">
+          <Label htmlFor="department">Department</Label>
+          {prefilledDepartment ? (
+            <Input
+              id="department"
+              value={prefilledDepartment.name}
+              readOnly
+              disabled
+              className="bg-muted"
+            />
+          ) : (
+            <select
+              id="department"
+              value={form.department_id}
+              onChange={(event) => updateField("department_id", event.target.value)}
+              className={selectClassName}
+              required
+            >
+              <option value="">Select department</option>
+              {props.departments.map((department) => (
+                <option key={department.id} value={department.id}>
+                  {department.name}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="event_type">Event type</Label>
+          <select
+            id="event_type"
+            value={form.event_type_id}
+            onChange={(event) => updateField("event_type_id", event.target.value)}
+            className={selectClassName}
+            required
+          >
+            <option value="">Select type</option>
+            {props.eventTypes.map((eventType) => (
+              <option key={eventType.id} value={eventType.id}>
+                {eventType.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="start_at">Start</Label>
+          <DateTimeInput
+            id="start_at"
+            value={form.start_at}
+            onChange={(value) => updateField("start_at", value)}
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="end_at">End</Label>
+          <DateTimeInput
+            id="end_at"
+            value={form.end_at}
+            min={form.start_at || undefined}
+            onChange={(value) => updateField("end_at", value)}
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="venue_id">Venue</Label>
+          <select
+            id="venue_id"
+            value={form.venue_id}
+            onChange={(event) => updateField("venue_id", event.target.value)}
+            className={selectClassName}
+            required
+          >
+            <option value="">Select venue</option>
+            {props.venues.map((venue) => (
+              <option key={venue.id} value={venue.id}>
+                {venue.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <SetupStyleField
+          value={operationalSetup.setupStyle}
+          setupStyles={props.setupStyles}
+          canManage={props.canManageSetupStyles}
+          onChange={(value) =>
+            setOperationalSetup((current) => ({
+              ...current,
+              setupStyle: value,
+            }))
+          }
+        />
+
+        <div className="space-y-1.5">
+          <Label htmlFor="expected_attendance">Expected attendance</Label>
+          <Input
+            id="expected_attendance"
+            type="number"
+            min={1}
+            value={operationalSetup.expectedAttendance}
+            onChange={(event) =>
+              setOperationalSetup((current) => ({
+                ...current,
+                expectedAttendance: event.target.value,
+              }))
+            }
+          />
+        </div>
+      </aside>
+    )
+  }
+
+  function renderScheduleAndLocation() {
+    return (
+      <>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="start_at">Start</Label>
+            <DateTimeInput
+              id="start_at"
+              value={form.start_at}
+              onChange={(value) => updateField("start_at", value)}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="end_at">End</Label>
+            <DateTimeInput
+              id="end_at"
+              value={form.end_at}
+              min={form.start_at || undefined}
+              onChange={(value) => updateField("end_at", value)}
+            />
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="venue_id">Venue</Label>
+          <select
+            id="venue_id"
+            value={form.venue_id}
+            onChange={(event) => updateField("venue_id", event.target.value)}
+            className={selectClassName}
+            required={isRequestMode}
+          >
+            <option value="">
+              {isRequestMode ? "Select venue" : "Select venue (optional)"}
+            </option>
+            {props.venues.map((venue) => (
+              <option key={venue.id} value={venue.id}>
+                {venue.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      </>
+    )
+  }
+
+  function renderOperationalSetup(
+    compact = false,
+    includeSetupStyle = true,
+    includeExpectedAttendance = true
+  ) {
+    return (
+      <div className={compact ? "space-y-3 rounded-lg border p-3" : "space-y-4 rounded-lg border p-4"}>
+        <div>
+          <h3 className="text-sm font-semibold">Facility setup</h3>
+          <p className="text-xs text-muted-foreground">
+            Shared with facility coordinators on the master calendar.
+          </p>
+        </div>
+        {includeExpectedAttendance || includeSetupStyle ? (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {includeExpectedAttendance ? (
+              <div className="space-y-1.5">
+                <Label htmlFor="expected_attendance">Expected attendance</Label>
+                <Input
+                  id="expected_attendance"
+                  type="number"
+                  min={1}
+                  value={operationalSetup.expectedAttendance}
+                  onChange={(event) =>
+                    setOperationalSetup((current) => ({
+                      ...current,
+                      expectedAttendance: event.target.value,
+                    }))
+                  }
+                />
+              </div>
+            ) : null}
+            {includeSetupStyle ? (
+              <SetupStyleField
+                value={operationalSetup.setupStyle}
+                setupStyles={props.setupStyles}
+                canManage={props.canManageSetupStyles}
+                onChange={(value) =>
+                  setOperationalSetup((current) => ({
+                    ...current,
+                    setupStyle: value,
+                  }))
+                }
+              />
+            ) : null}
+          </div>
+        ) : null}
+        <div className="grid gap-3 lg:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="room_setup_notes">Room setup notes</Label>
+            <Textarea
+              id="room_setup_notes"
+              value={operationalSetup.roomSetupNotes}
+              onChange={(event) =>
+                setOperationalSetup((current) => ({
+                  ...current,
+                  roomSetupNotes: event.target.value,
+                }))
+              }
+              rows={2}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="equipment_notes">Equipment / AV needs</Label>
+            <Textarea
+              id="equipment_notes"
+              value={operationalSetup.equipmentNotes}
+              onChange={(event) =>
+                setOperationalSetup((current) => ({
+                  ...current,
+                  equipmentNotes: event.target.value,
+                }))
+              }
+              rows={2}
+            />
+          </div>
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="accessibility_notes">Special accommodations</Label>
+          <Textarea
+            id="accessibility_notes"
+            value={operationalSetup.accessibilityNotes}
+            onChange={(event) =>
+              setOperationalSetup((current) => ({
+                ...current,
+                accessibilityNotes: event.target.value,
+              }))
+            }
+            rows={2}
+          />
+        </div>
+      </div>
+    )
+  }
+
+  function renderFormActions() {
+    return (
+      <div className="flex justify-end gap-2">
+        <Button type="button" variant="outline" asChild disabled={isPending}>
+          <Link href={backHref}>Cancel</Link>
+        </Button>
+        <Button type="submit" disabled={isPending}>
+          {isPending ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Saving...
+            </>
+          ) : props.mode === "create" ? (
+            "Create Event"
+          ) : isRequestMode ? (
+            "Submit Request"
+          ) : (
+            "Save Changes"
+          )}
+        </Button>
+      </div>
+    )
+  }
+
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-6">
+    <div
+      className={
+        isRequestMode
+          ? "mx-auto flex w-full max-w-6xl flex-col gap-4 p-4 sm:p-6"
+          : "mx-auto flex w-full max-w-3xl flex-col gap-6 p-6"
+      }
+    >
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" asChild>
           <Link href={backHref}>
@@ -345,13 +663,68 @@ export function InternalEventForm(props: InternalEventFormProps) {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6 rounded-lg border bg-card p-6">
+      <form
+        onSubmit={handleSubmit}
+        className={
+          isRequestMode
+            ? "space-y-4 rounded-lg border bg-card p-4 sm:p-5"
+            : "space-y-6 rounded-lg border bg-card p-6"
+        }
+      >
         {error ? (
           <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {error}
           </div>
         ) : null}
 
+        {isRequestMode ? (
+          <div className="grid gap-5 lg:grid-cols-[minmax(0,260px)_minmax(0,1fr)] lg:gap-6">
+            {renderRequestSidebar()}
+
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="name">Event name</Label>
+                <Input
+                  id="name"
+                  value={form.name}
+                  onChange={(event) => updateField("name", event.target.value)}
+                  placeholder="Community Iftar"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  value={form.description}
+                  onChange={(event) => updateField("description", event.target.value)}
+                  rows={3}
+                  placeholder="Optional details for staff planning"
+                />
+              </div>
+
+              <EventServiceRequirementsFields
+                value={serviceRequirements}
+                onChange={setServiceRequirements}
+                vendorTypes={props.vendorTypes}
+                canManageVendorTypes={props.canManageVendorTypes}
+              />
+
+              {ticketingLoaded ? (
+                <EventTicketingFields value={ticketing} onChange={setTicketing} />
+              ) : (
+                <div className="rounded-lg border p-4 text-sm text-muted-foreground">
+                  Loading ticketing settings...
+                </div>
+              )}
+
+              {renderOperationalSetup(true, false, false)}
+              {renderFormActions()}
+            </div>
+          </div>
+        ) : (
+          <>
         <div className="space-y-2">
           <Label htmlFor="name">Event name</Label>
           <Input
@@ -370,7 +743,7 @@ export function InternalEventForm(props: InternalEventFormProps) {
               id="department"
               value={form.department_id}
               onChange={(event) => updateField("department_id", event.target.value)}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              className={selectClassName}
               required
             >
               <option value="">Select department</option>
@@ -382,59 +755,24 @@ export function InternalEventForm(props: InternalEventFormProps) {
             </select>
           </div>
 
-          {props.mode !== "edit" && formDefaults?.user ? (
-            <div className="space-y-2">
-              <Label htmlFor="requesting_user">User</Label>
-              <Input
-                id="requesting_user"
-                value={formDefaults.user.name}
-                readOnly
-                disabled
-                className="bg-muted"
-              />
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <Label htmlFor="event_type">Event type</Label>
-              <select
-                id="event_type"
-                value={form.event_type_id}
-                onChange={(event) => updateField("event_type_id", event.target.value)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                required
-              >
-                <option value="">Select type</option>
-                {props.eventTypes.map((eventType) => (
-                  <option key={eventType.id} value={eventType.id}>
-                    {eventType.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-        </div>
-
-        {props.mode !== "edit" && formDefaults?.user ? (
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="event_type">Event type</Label>
-              <select
-                id="event_type"
-                value={form.event_type_id}
-                onChange={(event) => updateField("event_type_id", event.target.value)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                required
-              >
-                <option value="">Select type</option>
-                {props.eventTypes.map((eventType) => (
-                  <option key={eventType.id} value={eventType.id}>
-                    {eventType.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="event_type">Event type</Label>
+            <select
+              id="event_type"
+              value={form.event_type_id}
+              onChange={(event) => updateField("event_type_id", event.target.value)}
+              className={selectClassName}
+              required
+            >
+              <option value="">Select type</option>
+              {props.eventTypes.map((eventType) => (
+                <option key={eventType.id} value={eventType.id}>
+                  {eventType.name}
+                </option>
+              ))}
+            </select>
           </div>
-        ) : null}
+        </div>
 
         {!isRequestMode ? (
           <div className="space-y-2">
@@ -456,58 +794,7 @@ export function InternalEventForm(props: InternalEventFormProps) {
           </div>
         ) : null}
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="start_at">Start</Label>
-            <DateTimeInput
-              id="start_at"
-              value={form.start_at}
-              onChange={(value) => updateField("start_at", value)}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="end_at">End</Label>
-            <DateTimeInput
-              id="end_at"
-              value={form.end_at}
-              min={form.start_at || undefined}
-              onChange={(value) => updateField("end_at", value)}
-            />
-          </div>
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="venue_id">Venue</Label>
-            <select
-              id="venue_id"
-              value={form.venue_id}
-              onChange={(event) => updateField("venue_id", event.target.value)}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              required={isRequestMode}
-            >
-              <option value="">
-                {isRequestMode ? "Select venue" : "Select venue (optional)"}
-              </option>
-              {props.venues.map((venue) => (
-                <option key={venue.id} value={venue.id}>
-                  {venue.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="location_label">Additional location details</Label>
-            <Input
-              id="location_label"
-              value={form.location_label}
-              onChange={(event) => updateField("location_label", event.target.value)}
-              placeholder="Room setup, outdoor area, etc."
-            />
-          </div>
-        </div>
+        {renderScheduleAndLocation()}
 
         <div className="space-y-2">
           <Label htmlFor="description">Description</Label>
@@ -523,6 +810,8 @@ export function InternalEventForm(props: InternalEventFormProps) {
         <EventServiceRequirementsFields
           value={serviceRequirements}
           onChange={setServiceRequirements}
+          vendorTypes={props.vendorTypes}
+          canManageVendorTypes={props.canManageVendorTypes}
         />
 
         {ticketingLoaded ? (
@@ -533,107 +822,10 @@ export function InternalEventForm(props: InternalEventFormProps) {
           </div>
         )}
 
-        <div className="space-y-4 rounded-lg border p-4">
-          <div>
-            <h3 className="text-sm font-semibold">Facility setup (operational brief)</h3>
-            <p className="text-xs text-muted-foreground">
-              Shared with facility coordinators on the master calendar. No payment information.
-            </p>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="expected_attendance">Expected attendance</Label>
-              <Input
-                id="expected_attendance"
-                type="number"
-                min={1}
-                value={operationalSetup.expectedAttendance}
-                onChange={(event) =>
-                  setOperationalSetup((current) => ({
-                    ...current,
-                    expectedAttendance: event.target.value,
-                  }))
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="setup_style">Setup style</Label>
-              <Input
-                id="setup_style"
-                value={operationalSetup.setupStyle}
-                onChange={(event) =>
-                  setOperationalSetup((current) => ({
-                    ...current,
-                    setupStyle: event.target.value,
-                  }))
-                }
-                placeholder="Banquet, classroom, reception..."
-              />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="room_setup_notes">Room setup notes</Label>
-            <Textarea
-              id="room_setup_notes"
-              value={operationalSetup.roomSetupNotes}
-              onChange={(event) =>
-                setOperationalSetup((current) => ({
-                  ...current,
-                  roomSetupNotes: event.target.value,
-                }))
-              }
-              rows={2}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="equipment_notes">Equipment / AV needs</Label>
-            <Textarea
-              id="equipment_notes"
-              value={operationalSetup.equipmentNotes}
-              onChange={(event) =>
-                setOperationalSetup((current) => ({
-                  ...current,
-                  equipmentNotes: event.target.value,
-                }))
-              }
-              rows={2}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="accessibility_notes">Special accommodations</Label>
-            <Textarea
-              id="accessibility_notes"
-              value={operationalSetup.accessibilityNotes}
-              onChange={(event) =>
-                setOperationalSetup((current) => ({
-                  ...current,
-                  accessibilityNotes: event.target.value,
-                }))
-              }
-              rows={2}
-            />
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" asChild disabled={isPending}>
-            <Link href={backHref}>Cancel</Link>
-          </Button>
-          <Button type="submit" disabled={isPending}>
-            {isPending ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Saving...
-              </>
-            ) : props.mode === "create" ? (
-              "Create Event"
-            ) : isRequestMode ? (
-              "Submit Request"
-            ) : (
-              "Save Changes"
-            )}
-          </Button>
-        </div>
+        {renderOperationalSetup()}
+        {renderFormActions()}
+          </>
+        )}
       </form>
     </div>
   )

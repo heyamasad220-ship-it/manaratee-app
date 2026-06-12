@@ -11,7 +11,6 @@ import {
 } from "@/lib/bookings/venue-rental-queries"
 import { createClient } from "@/lib/supabase/server"
 import { getActiveOrganization } from "@/lib/organizations/get-active-organization"
-import { VENUE_USAGE_TAGS } from "@/lib/bookings/venue-usage"
 
 export default async function CustomerVenueRentalRequestPage({
   searchParams,
@@ -46,9 +45,9 @@ export default async function CustomerVenueRentalRequestPage({
   const [venuesResult, availabilityBlocks, eventTypes, addons] = await Promise.all([
     supabase
       .from("venues")
-      .select("id, name, description, capacity, status, usage_tag")
+      .select("id, name, description, capacity, status, available_for_bookings, usage_tag")
       .eq("organization_id", organizationId)
-      .eq("usage_tag", VENUE_USAGE_TAGS.external)
+      .eq("available_for_bookings", true)
       .in("status", ["active", "closed", "inactive"])
       .order("name", { ascending: true }),
     getPublicAvailabilityBlocks(
@@ -73,9 +72,9 @@ export default async function CustomerVenueRentalRequestPage({
               Back to Venue Rentals
             </Link>
           </Button>
-          <h1 className="text-2xl font-bold tracking-tight">Request Venue Rental</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Book a Space</h1>
           <p className="text-sm text-muted-foreground">
-            Check availability, choose your space and time, then submit your request.
+            Check availability for bookable spaces, choose your time, then submit your rental request.
           </p>
         </div>
       </div>

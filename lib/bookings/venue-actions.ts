@@ -8,11 +8,9 @@ import { hasAnyPermission, PERMISSIONS } from "@/lib/permissions/permissions"
 
 import {
   normalizeVenueStatus,
-  normalizeVenueUsageTag,
   parseAmenities,
   VENUE_STATUSES,
   type VenueStatus,
-  type VenueUsageTag,
 } from "./venue-types"
 
 type UpsertVenueInput = {
@@ -25,7 +23,7 @@ type UpsertVenueInput = {
   hourly_rate?: number
   peak_flat_price?: number
   peak_hourly_rate?: number
-  usage_tag?: VenueUsageTag
+  available_for_bookings?: boolean
   availability_start?: string | null
   availability_end?: string | null
   amenities?: string[] | string | null
@@ -68,7 +66,7 @@ function validateVenueInput(input: UpsertVenueInput) {
     hourly_rate: Math.max(0, Number(input.hourly_rate || 0)),
     peak_flat_price: Math.max(0, Number(input.peak_flat_price || 0)),
     peak_hourly_rate: Math.max(0, Number(input.peak_hourly_rate || 0)),
-    usage_tag: normalizeVenueUsageTag(input.usage_tag),
+    available_for_bookings: Boolean(input.available_for_bookings),
     availability_start: input.availability_start?.trim() || null,
     availability_end: input.availability_end?.trim() || null,
     amenities: parseAmenities(input.amenities),
@@ -80,7 +78,7 @@ function toLegacyVenuePayload(payload: ReturnType<typeof validateVenueInput>) {
   const {
     peak_flat_price: _peakFlat,
     peak_hourly_rate: _peakHourly,
-    usage_tag: _usageTag,
+    available_for_bookings: _availableForBookings,
     availability_start: _availabilityStart,
     availability_end: _availabilityEnd,
     ...legacy
@@ -92,6 +90,7 @@ function toLegacyVenuePayload(payload: ReturnType<typeof validateVenueInput>) {
 function isMissingVenueColumnError(error: { message?: string } | null) {
   const message = error?.message?.toLowerCase() ?? ""
   return (
+    message.includes("available_for_bookings") ||
     message.includes("usage_tag") ||
     message.includes("peak_flat_price") ||
     message.includes("peak_hourly_rate") ||
@@ -105,6 +104,7 @@ function revalidateVenuePaths() {
   revalidatePath("/facilities/settings/spaces")
   revalidatePath("/facilities/settings")
   revalidatePath("/facilities/calendar")
+  revalidatePath("/facilities/availability")
   revalidatePath("/bookings/overview")
   revalidatePath("/bookings/calendar")
   revalidatePath("/event-management")

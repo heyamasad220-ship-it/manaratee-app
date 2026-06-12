@@ -1,8 +1,5 @@
-import { createCalendarPage } from "@/lib/reservations/calendar-page"
-import { PERMISSIONS } from "@/lib/permissions/permissions"
+import { redirect } from "next/navigation"
 
-export default createCalendarPage(
-  "venue_rentals",
-  [PERMISSIONS.BOOKINGS_VIEW],
-  "Venue Rentals"
-)
+export default function BookingsCalendarRedirectPage() {
+  redirect("/facilities/availability")
+}

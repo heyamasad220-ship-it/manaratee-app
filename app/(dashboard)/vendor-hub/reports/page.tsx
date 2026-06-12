@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { Header } from "@/components/layout/header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import {
@@ -31,8 +30,7 @@ export default function BazaarReportsPage() {
 
   return (
     <>
-      <Header title="Bazaar Reports" />
-      <div className="p-6">
+      <div>
         <div className="mb-6 flex items-center justify-between">
           <div className="flex gap-0 border-b border-border">
             {reportsTabs.map((tab) => (

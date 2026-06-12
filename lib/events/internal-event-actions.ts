@@ -13,9 +13,9 @@ import { createClient } from "@/lib/supabase/server"
 import { resolveOrganizationId } from "@/lib/organizations/resolve-organization-id"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { userCanSubmitInternalEventRequest } from "@/lib/auth/staff-tools-eligibility"
-import { normalizeVenueUsageTag, VENUE_USAGE_TAGS } from "@/lib/bookings/venue-usage"
 import { hasAnyPermission, PERMISSIONS } from "@/lib/permissions/permissions"
 import { getConflictingReservations } from "@/lib/reservations/reservation-queries"
+import { fireModuleNotifications } from "@/lib/notifications/dispatch-module-notification"
 
 import { buildCopyName } from "@/lib/programs/program-fee-plan-copy-utils"
 
@@ -159,19 +159,13 @@ async function assertVenueInOrg(
 
   const { data, error } = await supabase
     .from("venues")
-    .select("id, usage_tag")
+    .select("id")
     .eq("id", venueId)
     .eq("organization_id", organizationId)
     .maybeSingle()
 
   if (error || !data) {
     throw new Error("Selected venue is not valid for this organization.")
-  }
-
-  if (normalizeVenueUsageTag(data.usage_tag as string | null) !== VENUE_USAGE_TAGS.internal) {
-    throw new Error(
-      "Internal events can only use Internal spaces. Choose an internal-tagged space in Facilities settings."
-    )
   }
 }
 async function assertDepartmentInOrg(
@@ -250,6 +244,7 @@ async function assertInternalEventSpaceAvailable(input: {
 function revalidateInternalEventPaths(eventId?: string) {
   revalidatePath("/event-management")
   revalidatePath("/event-management/calendar")
+  revalidatePath("/facilities/availability")
   revalidatePath("/event-management/overview")
   revalidatePath("/event-management/overview")
   revalidatePath("/facilities/calendar")
@@ -388,6 +383,27 @@ export async function submitInternalEventRequest(input: CreateInternalEventInput
 
   await syncTicketingForEvent(data.id as string, input)
 
+  fireModuleNotifications([
+    {
+      organizationId,
+      moduleKey: "event_management",
+      audience: "staff",
+      eventKey: "request_submitted",
+      subject: "New internal event request",
+      summary: "A staff member submitted a new internal event request.",
+      metadata: { eventId: data.id, submittedBy: user.id },
+    },
+    {
+      organizationId,
+      moduleKey: "event_management",
+      audience: "customer",
+      eventKey: "request_received",
+      subject: "Event request received",
+      summary: "Your internal event request was received and is awaiting review.",
+      metadata: { eventId: data.id, submittedBy: user.id },
+    },
+  ])
+
   revalidateInternalEventPaths(data.id as string)
 
   return data.id as string
@@ -450,6 +466,27 @@ export async function approveInternalEventRequest(eventId: string) {
 
   await syncOperationalBriefForInternalEvent(eventId, organizationId)
 
+  fireModuleNotifications([
+    {
+      organizationId,
+      moduleKey: "event_management",
+      audience: "staff",
+      eventKey: "request_approved",
+      subject: "Internal event approved",
+      summary: "An internal event request was approved.",
+      metadata: { eventId },
+    },
+    {
+      organizationId,
+      moduleKey: "event_management",
+      audience: "customer",
+      eventKey: "request_approved",
+      subject: "Event request approved",
+      summary: "Your internal event request was approved.",
+      metadata: { eventId },
+    },
+  ])
+
   revalidateInternalEventPaths(eventId)
 }
 
@@ -504,6 +541,27 @@ export async function declineInternalEventRequest(input: {
 
   await syncOperationalBriefForInternalEvent(input.eventId, organizationId)
 
+  fireModuleNotifications([
+    {
+      organizationId,
+      moduleKey: "event_management",
+      audience: "staff",
+      eventKey: "request_declined",
+      subject: "Internal event declined",
+      summary: "An internal event request was declined.",
+      metadata: { eventId: input.eventId, reason: input.declineReason },
+    },
+    {
+      organizationId,
+      moduleKey: "event_management",
+      audience: "customer",
+      eventKey: "request_declined",
+      subject: "Event request declined",
+      summary: "Your internal event request was declined.",
+      metadata: { eventId: input.eventId, reason: input.declineReason },
+    },
+  ])
+
   revalidateInternalEventPaths(input.eventId)
 }
 
@@ -555,6 +613,27 @@ export async function updateInternalEvent(input: UpdateInternalEventInput) {
 
   await syncTicketingForEvent(input.id, input)
 
+  fireModuleNotifications([
+    {
+      organizationId,
+      moduleKey: "event_management",
+      audience: "staff",
+      eventKey: "event_updated",
+      subject: "Internal event updated",
+      summary: "An internal event was updated.",
+      metadata: { eventId: input.id },
+    },
+    {
+      organizationId,
+      moduleKey: "event_management",
+      audience: "customer",
+      eventKey: "event_updated",
+      subject: "Event updated",
+      summary: "Your internal event details were updated.",
+      metadata: { eventId: input.id },
+    },
+  ])
+
   revalidateInternalEventPaths(input.id)
   revalidatePath(`/event-management/${input.id}`)
 }
@@ -594,6 +673,29 @@ export async function updateInternalEventStatus(
   }
 
   await syncOperationalBriefForInternalEvent(id, organizationId)
+
+  if (status === INTERNAL_EVENT_STATUSES.cancelled) {
+    fireModuleNotifications([
+      {
+        organizationId,
+        moduleKey: "event_management",
+        audience: "staff",
+        eventKey: "event_cancelled",
+        subject: "Internal event cancelled",
+        summary: "An internal event was cancelled.",
+        metadata: { eventId: id },
+      },
+      {
+        organizationId,
+        moduleKey: "event_management",
+        audience: "customer",
+        eventKey: "event_cancelled",
+        subject: "Event cancelled",
+        summary: "Your internal event was cancelled.",
+        metadata: { eventId: id },
+      },
+    ])
+  }
 
   revalidateInternalEventPaths(id)
   revalidatePath(`/event-management/${id}`)

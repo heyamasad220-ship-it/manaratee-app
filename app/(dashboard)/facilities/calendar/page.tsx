@@ -1,8 +1,8 @@
-import { createCalendarPage } from "@/lib/reservations/calendar-page"
+import { createAudienceCalendarPage } from "@/lib/reservations/calendar-page"
 import { PERMISSIONS } from "@/lib/permissions/permissions"
 
-export default createCalendarPage(
-  "facilities",
+export default createAudienceCalendarPage(
+  "ops",
   [PERMISSIONS.SPACES_VIEW, PERMISSIONS.BOOKINGS_VIEW],
-  "Master Calendar"
+  "Schedule"
 )

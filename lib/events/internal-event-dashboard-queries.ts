@@ -9,10 +9,12 @@ import {
 } from "./internal-event-format"
 import type {
   DashboardTimePeriod,
+  DashboardAttentionItem,
   EventManagementDashboardData,
 } from "./internal-event-dashboard-types"
 import type { InternalEventWithRelations } from "./internal-event-types"
 import { INTERNAL_EVENT_STATUSES } from "./internal-event-status"
+import { getPendingInternalEventRequests } from "./internal-event-queries"
 
 const EVENT_SELECT = `
   *,
@@ -82,15 +84,155 @@ function getActionPriority(days: number): "high" | "medium" | "low" {
   return "low"
 }
 
+function isOperationalEvent(status: string) {
+  return (
+    status !== INTERNAL_EVENT_STATUSES.cancelled &&
+    status !== INTERNAL_EVENT_STATUSES.declined &&
+    status !== INTERNAL_EVENT_STATUSES.draft
+  )
+}
+
+function buildAttentionItems(
+  events: InternalEventWithRelations[],
+  pendingRequests: InternalEventWithRelations[],
+  period: DashboardTimePeriod
+): DashboardAttentionItem[] {
+  const { start, end } = getPeriodRange(period)
+  const inPeriod = events.filter((event) => eventOverlapsPeriod(event, start, end))
+  const items: DashboardAttentionItem[] = []
+  const seen = new Set<string>()
+
+  function add(item: DashboardAttentionItem) {
+    if (seen.has(item.id)) return
+    seen.add(item.id)
+    items.push(item)
+  }
+
+  for (const request of pendingRequests) {
+    add({
+      id: `${request.id}-approval`,
+      title: request.name,
+      description: "Event request awaiting supervisor approval",
+      meta: formatEventDate(request.start_at || request.submitted_at || request.created_at),
+      href: `/event-management/${request.id}`,
+      priority: "high",
+      kind: "approval",
+    })
+  }
+
+  for (const event of inPeriod) {
+    const href = `/event-management/${event.id}`
+    const eventDateLabel = formatEventDate(event.start_at)
+    const until = event.start_at ? daysUntil(new Date(event.start_at)) : 999
+    const priority = event.start_at
+      ? getActionPriority(until)
+      : ("low" as const)
+
+    if (event.status === INTERNAL_EVENT_STATUSES.draft) {
+      if (!event.start_at) {
+        add({
+          id: `${event.id}-schedule`,
+          title: event.name,
+          description: "Add schedule and publish event",
+          meta: eventDateLabel,
+          href: `/event-management/${event.id}/edit`,
+          priority: "medium",
+          kind: "schedule",
+        })
+      } else if (until >= 0 && until <= 14) {
+        add({
+          id: `${event.id}-draft-upcoming`,
+          title: event.name,
+          description: `Still in draft — starts in ${until} day${until === 1 ? "" : "s"}`,
+          meta: eventDateLabel,
+          href,
+          priority: until <= 7 ? "high" : "medium",
+          kind: "draft",
+        })
+      } else {
+        add({
+          id: `${event.id}-draft`,
+          title: event.name,
+          description: "Confirm details and schedule event",
+          meta: eventDateLabel,
+          href,
+          priority,
+          kind: "draft",
+        })
+      }
+    }
+
+    if (
+      event.status === INTERNAL_EVENT_STATUSES.scheduled &&
+      !event.location_label &&
+      !event.venue_id
+    ) {
+      add({
+        id: `${event.id}-location`,
+        title: event.name,
+        description: "Assign location",
+        meta: eventDateLabel,
+        href: `/event-management/${event.id}/edit`,
+        priority,
+        kind: "location",
+      })
+    }
+
+    if (!isOperationalEvent(event.status) || until < 0) {
+      continue
+    }
+
+    if (event.requires_childcare) {
+      add({
+        id: `${event.id}-childcare`,
+        title: event.name,
+        description: "Assign childcare providers and registrations",
+        meta: eventDateLabel,
+        href: `${href}?tab=childcare`,
+        priority,
+        kind: "childcare",
+      })
+    }
+
+    if (event.requires_volunteers) {
+      add({
+        id: `${event.id}-volunteers`,
+        title: event.name,
+        description: "Review volunteer sign-ups and roles",
+        meta: eventDateLabel,
+        href: `${href}?tab=volunteers`,
+        priority,
+        kind: "volunteers",
+      })
+    }
+
+    if (event.requires_vendors) {
+      add({
+        id: `${event.id}-vendors`,
+        title: event.name,
+        description: "Confirm vendors for this event",
+        meta: eventDateLabel,
+        href: `${href}?tab=vendors`,
+        priority,
+        kind: "vendors",
+      })
+    }
+  }
+
+  const priorityOrder = { high: 0, medium: 1, low: 2 }
+  return items
+    .sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority])
+    .slice(0, 12)
+}
+
 function buildDashboardFromEvents(
   events: InternalEventWithRelations[],
+  pendingRequests: InternalEventWithRelations[],
   period: DashboardTimePeriod
 ): EventManagementDashboardData {
-  const { start, end } = getPeriodRange(period)
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
-  const inPeriod = events.filter((event) => eventOverlapsPeriod(event, start, end))
   const activeEvents = events.filter(
     (event) => event.status !== INTERNAL_EVENT_STATUSES.cancelled
   )
@@ -102,10 +244,21 @@ function buildDashboardFromEvents(
     scheduledCount: activeEvents.filter(
       (event) => event.status === INTERNAL_EVENT_STATUSES.scheduled
     ).length,
-    childcareRequired: 0,
-    volunteersRequired: 0,
-    vendorsRequired: 0,
-    ticketedEvents: 0,
+    childcareRequired: activeEvents.filter(
+      (event) =>
+        event.requires_childcare === true && isOperationalEvent(event.status)
+    ).length,
+    volunteersRequired: activeEvents.filter(
+      (event) =>
+        event.requires_volunteers === true && isOperationalEvent(event.status)
+    ).length,
+    vendorsRequired: activeEvents.filter(
+      (event) =>
+        event.requires_vendors === true && isOperationalEvent(event.status)
+    ).length,
+    ticketedEvents: activeEvents.filter(
+      (event) => event.requires_ticketing === true && isOperationalEvent(event.status)
+    ).length,
   }
 
   const recentEvents = [...activeEvents]
@@ -144,106 +297,13 @@ function buildDashboardFromEvents(
       href: `/event-management/${event.id}`,
     }))
 
-  const operationalAlerts = inPeriod
-    .flatMap((event) => {
-      const alerts: EventManagementDashboardData["operationalAlerts"] = []
-      const href = `/event-management/${event.id}`
-
-      if (event.status !== INTERNAL_EVENT_STATUSES.draft) {
-        return alerts
-      }
-
-      if (!event.start_at) {
-        alerts.push({
-          id: `${event.id}-schedule`,
-          type: "warning",
-          message: `${event.name} is missing a start date`,
-          eventDate: formatEventDate(event.created_at),
-          action: "Edit Event",
-          href,
-        })
-        return alerts
-      }
-
-      const until = daysUntil(new Date(event.start_at))
-      if (until >= 0 && until <= 14) {
-        alerts.push({
-          id: `${event.id}-draft-upcoming`,
-          type: until <= 7 ? "warning" : "info",
-          message: `${event.name} is still in draft and starts in ${until} day${until === 1 ? "" : "s"}`,
-          eventDate: formatEventDate(event.start_at),
-          action: "Review Event",
-          href,
-        })
-      }
-
-      if (!event.location_label && !event.venue_id) {
-        alerts.push({
-          id: `${event.id}-location`,
-          type: "info",
-          message: `${event.name} has no location assigned`,
-          eventDate: formatEventDate(event.start_at),
-          action: "Add Location",
-          href: `/event-management/${event.id}/edit`,
-        })
-      }
-
-      return alerts
-    })
-    .slice(0, 6)
-
-  const eventsNeedingAction = inPeriod
-    .filter((event) => event.status !== INTERNAL_EVENT_STATUSES.cancelled)
-    .flatMap((event) => {
-      const href = `/event-management/${event.id}`
-      const items: EventManagementDashboardData["eventsNeedingAction"] = []
-
-      if (event.status === INTERNAL_EVENT_STATUSES.draft) {
-        items.push({
-          id: `${event.id}-draft`,
-          eventName: event.name,
-          eventDate: formatEventDate(event.start_at),
-          actionRequired: event.start_at
-            ? "Confirm details and schedule event"
-            : "Add schedule and publish event",
-          daysUntil: event.start_at ? daysUntil(new Date(event.start_at)) : 999,
-          priority: event.start_at
-            ? getActionPriority(daysUntil(new Date(event.start_at)))
-            : "low",
-          href,
-        })
-      }
-
-      if (
-        event.status === INTERNAL_EVENT_STATUSES.scheduled &&
-        !event.location_label &&
-        !event.venue_id
-      ) {
-        items.push({
-          id: `${event.id}-location`,
-          eventName: event.name,
-          eventDate: formatEventDate(event.start_at),
-          actionRequired: "Assign location",
-          daysUntil: event.start_at ? daysUntil(new Date(event.start_at)) : 999,
-          priority: event.start_at
-            ? getActionPriority(daysUntil(new Date(event.start_at)))
-            : "medium",
-          href: `/event-management/${event.id}/edit`,
-        })
-      }
-
-      return items
-    })
-    .filter((item) => item.daysUntil >= 0 && item.daysUntil <= 90)
-    .sort((a, b) => a.daysUntil - b.daysUntil)
-    .slice(0, 8)
+  const attentionItems = buildAttentionItems(events, pendingRequests, period)
 
   return {
     kpis,
     recentEvents,
     todaysSchedule,
-    operationalAlerts,
-    eventsNeedingAction,
+    attentionItems,
   }
 }
 
@@ -254,15 +314,20 @@ export async function getEventManagementDashboard(
   const organizationId = await getSelectedOrganizationId()
 
   if (!organizationId) {
-    return buildDashboardFromEvents([], period)
+    return buildDashboardFromEvents([], [], period)
   }
 
-  const { data, error } = await supabase
-    .from("internal_events")
-    .select(EVENT_SELECT)
-    .eq("organization_id", organizationId)
-    .order("start_at", { ascending: true, nullsFirst: false })
-    .order("created_at", { ascending: false })
+  const [eventsResult, pendingRequests] = await Promise.all([
+    supabase
+      .from("internal_events")
+      .select(EVENT_SELECT)
+      .eq("organization_id", organizationId)
+      .order("start_at", { ascending: true, nullsFirst: false })
+      .order("created_at", { ascending: false }),
+    getPendingInternalEventRequests(),
+  ])
+
+  const { data, error } = eventsResult
 
   if (error) {
     console.error(error)
@@ -271,6 +336,7 @@ export async function getEventManagementDashboard(
 
   return buildDashboardFromEvents(
     (data || []) as InternalEventWithRelations[],
+    pendingRequests,
     period
   )
 }

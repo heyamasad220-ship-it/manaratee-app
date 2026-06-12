@@ -1,4 +1,5 @@
 import { Sidebar, ModuleSubNav, MobileSidebar, SidebarProvider } from "@/components/layout/sidebar"
+import { DashboardAccessGuard } from "@/components/layout/dashboard-access-guard"
 
 export default function DashboardLayout({
   children,
@@ -7,6 +8,7 @@ export default function DashboardLayout({
 }) {
   return (
     <SidebarProvider>
+      <DashboardAccessGuard />
       <div className="flex h-screen overflow-hidden">
         <Sidebar />
         <ModuleSubNav />

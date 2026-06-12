@@ -90,6 +90,7 @@ export async function createScheduleItem(input: ScheduleItemInput) {
 
   revalidatePath(`/programs/${input.program_id}`)
   revalidatePath("/facilities/calendar")
+  revalidatePath("/facilities/availability")
   revalidatePath("/facilities/reservation-center")
 }
 
@@ -151,6 +152,7 @@ export async function createRecurringScheduleItems(
 
   revalidatePath(`/programs/${input.program_id}`)
   revalidatePath("/facilities/calendar")
+  revalidatePath("/facilities/availability")
   revalidatePath("/facilities/reservation-center")
 }
 
@@ -205,6 +207,7 @@ export async function updateScheduleItem(
 
   revalidatePath(`/programs/${input.program_id}`)
   revalidatePath("/facilities/calendar")
+  revalidatePath("/facilities/availability")
   revalidatePath("/facilities/reservation-center")
 }
 
@@ -232,5 +235,6 @@ export async function deleteScheduleItem(itemId: string, programId: string) {
 
   revalidatePath(`/programs/${programId}`)
   revalidatePath("/facilities/calendar")
+  revalidatePath("/facilities/availability")
   revalidatePath("/facilities/reservation-center")
 }

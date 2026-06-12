@@ -5,7 +5,9 @@ import { InternalEventForm } from "@/components/events/internal-event-form"
 import { getDepartments } from "@/lib/departments/department-queries"
 import { getEventTypes } from "@/lib/events/event-type-queries"
 import { getInternalEventById } from "@/lib/events/internal-event-queries"
-import { getInternalCalendarVenues } from "@/lib/bookings/venue-calendar-venues"
+import { getActiveCalendarVenues } from "@/lib/bookings/venue-calendar-venues"
+import { getRoomSetupStyles } from "@/lib/setup-styles/setup-style-queries"
+import { getVendorHubVendorTypes } from "@/lib/vendor-hub/vendor-type-queries"
 import {
   PERMISSIONS,
   requireAnyPermission,
@@ -19,12 +21,15 @@ export default async function EditInternalEventPage({
   await requireAnyPermission(PERMISSIONS.EVENTS_MANAGE, PERMISSIONS.PROGRAMS_MANAGE)
 
   const { id } = await params
-  const [event, departments, eventTypes, venues] = await Promise.all([
-    getInternalEventById(id),
-    getDepartments(),
-    getEventTypes({ activeOnly: true }),
-    getInternalCalendarVenues(),
-  ])
+  const [event, departments, eventTypes, venues, setupStyles, vendorTypes] =
+    await Promise.all([
+      getInternalEventById(id),
+      getDepartments(),
+      getEventTypes({ activeOnly: true }),
+      getActiveCalendarVenues(),
+      getRoomSetupStyles({ activeOnly: true }),
+      getVendorHubVendorTypes({ activeOnly: true }),
+    ])
 
   if (!event) {
     notFound()
@@ -39,6 +44,10 @@ export default async function EditInternalEventPage({
         departments={departments}
         eventTypes={eventTypes}
         venues={venues}
+        setupStyles={setupStyles}
+        canManageSetupStyles
+        vendorTypes={vendorTypes}
+        canManageVendorTypes
       />
     </>
   )

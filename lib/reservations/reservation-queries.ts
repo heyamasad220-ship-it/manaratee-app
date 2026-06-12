@@ -1,8 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
 import { resolveOrganizationId } from "@/lib/organizations/resolve-organization-id"
-import {
-  type VenueUsageTag,
-} from "@/lib/bookings/venue-usage"
 
 import { reservationStatusBlocksBooking } from "./reservation-conflict-rules"
 
@@ -22,6 +19,13 @@ import type {
   CalendarViewMode,
   ReservationSourceType,
 } from "./reservation-types"
+import {
+  audienceIncludesProgramSchedules,
+  audienceShowsAllSourceTypes,
+  getVenueOptionsForAudience,
+  maskCalendarData,
+  type CalendarAudience,
+} from "./calendar-audience"
 import {
   getSourceTypesForContext,
   RESERVATION_SOURCE_TYPES,
@@ -163,7 +167,7 @@ function expandProgramScheduleRows(
 }
 
 export type GetCalendarVenuesOptions = {
-  usageTags?: VenueUsageTag[]
+  bookableOnly?: boolean
   activeOnly?: boolean
 }
 
@@ -179,11 +183,11 @@ export async function getCalendarVenues(
 
   let query = supabase
     .from("venues")
-    .select("id, name, usage_tag, status")
+    .select("id, name, available_for_bookings, usage_tag, status")
     .eq("organization_id", organizationId)
 
-  if (options?.usageTags?.length) {
-    query = query.in("usage_tag", options.usageTags)
+  if (options?.bookableOnly) {
+    query = query.eq("available_for_bookings", true)
   }
 
   if (options?.activeOnly) {
@@ -193,26 +197,49 @@ export async function getCalendarVenues(
   const { data, error } = await query.order("name", { ascending: true })
 
   if (error) {
-    if (error.message?.includes("usage_tag")) {
-      const fallback = await supabase
+    if (
+      error.message?.includes("available_for_bookings") ||
+      error.message?.includes("usage_tag")
+    ) {
+      let fallbackQuery = supabase
         .from("venues")
         .select("id, name, status")
         .eq("organization_id", organizationId)
-        .order("name", { ascending: true })
+
+      if (options?.activeOnly) {
+        fallbackQuery = fallbackQuery.eq("status", "active")
+      }
+
+      const fallback = await fallbackQuery.order("name", { ascending: true })
 
       if (fallback.error) {
         console.error(fallback.error)
         return []
       }
 
-      return (fallback.data || []) as CalendarVenue[]
+      const rows = fallback.data || []
+
+      if (options?.bookableOnly) {
+        return []
+      }
+
+      return rows.map((row) => ({
+        id: row.id as string,
+        name: row.name as string,
+      }))
     }
 
     console.error(error)
     return []
   }
 
-  return (data || []).map((row) => ({
+  let rows = data || []
+
+  if (options?.bookableOnly) {
+    rows = rows.filter((row) => row.available_for_bookings === true)
+  }
+
+  return rows.map((row) => ({
     id: row.id as string,
     name: row.name as string,
   }))
@@ -307,13 +334,15 @@ async function getProgramFacilityReservations(
 }
 
 export async function getCalendarData(
-  context: CalendarContext,
+  audience: CalendarAudience,
   anchorDate: Date,
-  view: CalendarViewMode = "week"
+  view: CalendarViewMode = "grid"
 ): Promise<CalendarData> {
   const organizationId = await resolveOrganizationId()
   const { start, end } = getRangeForView(view, anchorDate)
-  const sourceTypes = getSourceTypesForContext(context)
+  const sourceTypes = audienceShowsAllSourceTypes(audience)
+    ? null
+    : getSourceTypesForContext("venue_rentals")
 
   if (!organizationId) {
     return {
@@ -324,10 +353,12 @@ export async function getCalendarData(
     }
   }
 
+  const venueOptions = getVenueOptionsForAudience(audience)
+
   const [venues, storedReservations, programReservations] = await Promise.all([
-    getCalendarVenues(),
+    getCalendarVenues(venueOptions),
     getStoredReservations(organizationId, start, end, sourceTypes),
-    context === "facilities"
+    audienceIncludesProgramSchedules(audience)
       ? getProgramFacilityReservations(organizationId, start, end)
       : Promise.resolve([]),
   ])
@@ -336,12 +367,31 @@ export async function getCalendarData(
     (a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime()
   )
 
-  return {
-    venues,
-    reservations,
-    rangeStart: start.toISOString(),
-    rangeEnd: end.toISOString(),
-  }
+  return maskCalendarData(
+    {
+      venues,
+      reservations,
+      rangeStart: start.toISOString(),
+      rangeEnd: end.toISOString(),
+    },
+    audience
+  )
+}
+
+/** @deprecated Use getCalendarData with CalendarAudience instead */
+export async function getCalendarDataByContext(
+  context: CalendarContext,
+  anchorDate: Date,
+  view: CalendarViewMode = "grid"
+): Promise<CalendarData> {
+  const audience =
+    context === "facilities"
+      ? "ops"
+      : context === "venue_rentals"
+        ? "staff"
+        : "staff"
+
+  return getCalendarData(audience, anchorDate, view)
 }
 
 export async function getConflictingReservations(

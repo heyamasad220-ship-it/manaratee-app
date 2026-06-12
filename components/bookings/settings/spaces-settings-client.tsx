@@ -51,15 +51,10 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Card, CardContent } from "@/components/ui/card"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { deleteVenue, upsertVenue } from "@/lib/bookings/venue-actions"
 import {
   formatVenueAvailabilityWindow,
-  getVenueUsageTagDescription,
-  getVenueUsageTagLabel,
   toVenueTimeInputValue,
-  VENUE_USAGE_TAGS,
-  type VenueUsageTag,
 } from "@/lib/bookings/venue-usage"
 import {
   getVenueStatusLabel,
@@ -80,7 +75,7 @@ type VenueFormState = {
   hourlyRate: string
   peakFlatPrice: string
   peakHourlyRate: string
-  usageTag: VenueUsageTag
+  availableForBookings: boolean
   availabilityStart: string
   availabilityEnd: string
   amenities: string
@@ -96,16 +91,11 @@ const emptyForm: VenueFormState = {
   hourlyRate: "",
   peakFlatPrice: "",
   peakHourlyRate: "",
-  usageTag: VENUE_USAGE_TAGS.internal,
+  availableForBookings: false,
   availabilityStart: "08:00",
   availabilityEnd: "22:00",
   amenities: "",
   status: VENUE_STATUSES.active,
-}
-
-const tagStyles: Record<string, string> = {
-  Internal: "bg-violet-100 text-violet-700",
-  External: "bg-blue-100 text-blue-700",
 }
 
 const statusStyles: Record<string, string> = {
@@ -122,6 +112,10 @@ function formatCurrency(amount: number) {
   }).format(amount)
 }
 
+function formatRentalPrice(amount: number, openForRentals: boolean) {
+  return openForRentals ? formatCurrency(amount) : "---"
+}
+
 function toFormState(venue: VenueWithStats): VenueFormState {
   return {
     id: venue.id,
@@ -133,7 +127,7 @@ function toFormState(venue: VenueWithStats): VenueFormState {
     hourlyRate: String(venue.hourly_rate || ""),
     peakFlatPrice: String(venue.peak_flat_price || venue.base_price || ""),
     peakHourlyRate: String(venue.peak_hourly_rate || venue.hourly_rate || ""),
-    usageTag: venue.usage_tag,
+    availableForBookings: venue.available_for_bookings,
     availabilityStart: toVenueTimeInputValue(venue.availability_start) || "08:00",
     availabilityEnd: toVenueTimeInputValue(venue.availability_end) || "22:00",
     amenities: venue.amenities.join(", "),
@@ -141,21 +135,24 @@ function toFormState(venue: VenueWithStats): VenueFormState {
   }
 }
 
+type DialogView = "none" | "detail" | "edit"
+
 export function SpacesSettingsClient({
   venues,
   canManage,
-  supportsUsageTags = true,
+  supportsExtendedFields = true,
+  facilitiesOnly = false,
 }: {
   venues: VenueWithStats[]
   canManage: boolean
-  supportsUsageTags?: boolean
+  supportsExtendedFields?: boolean
+  facilitiesOnly?: boolean
 }) {
   const router = useRouter()
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
-  const [tagFilter, setTagFilter] = useState<string>("all")
-  const [formDialogOpen, setFormDialogOpen] = useState(false)
-  const [detailDialogOpen, setDetailDialogOpen] = useState(false)
+  const [bookingsFilter, setBookingsFilter] = useState<string>("all")
+  const [dialogView, setDialogView] = useState<DialogView>("none")
   const [selectedVenue, setSelectedVenue] = useState<VenueWithStats | null>(null)
   const [form, setForm] = useState<VenueFormState>(emptyForm)
   const [error, setError] = useState<string | null>(null)
@@ -167,8 +164,6 @@ export function SpacesSettingsClient({
     const query = search.trim().toLowerCase()
     const statusLabel = getVenueStatusLabel(venue.status)
 
-    const tagLabel = getVenueUsageTagLabel(venue.usage_tag)
-
     const matchesSearch =
       !query ||
       venue.name.toLowerCase().includes(query) ||
@@ -176,27 +171,37 @@ export function SpacesSettingsClient({
       venue.location?.toLowerCase().includes(query)
 
     const matchesStatus = statusFilter === "all" || statusLabel === statusFilter
-    const matchesTag = tagFilter === "all" || tagLabel === tagFilter
+    const matchesBookings =
+      bookingsFilter === "all" ||
+      (bookingsFilter === "yes" && venue.available_for_bookings) ||
+      (bookingsFilter === "no" && !venue.available_for_bookings)
 
-    return matchesSearch && matchesStatus && matchesTag
+    return matchesSearch && matchesStatus && matchesBookings
   })
+
+  function closeDialog() {
+    setDialogView("none")
+    setSelectedVenue(null)
+    setError(null)
+  }
 
   function openCreateDialog() {
     setForm(emptyForm)
     setError(null)
-    setFormDialogOpen(true)
+    setSelectedVenue(null)
+    setDialogView("edit")
   }
 
   function openEditDialog(venue: VenueWithStats) {
     setForm(toFormState(venue))
     setError(null)
-    setFormDialogOpen(true)
-    setDetailDialogOpen(false)
+    setSelectedVenue(venue)
+    setDialogView("edit")
   }
 
   function openDetailDialog(venue: VenueWithStats) {
     setSelectedVenue(venue)
-    setDetailDialogOpen(true)
+    setDialogView("detail")
   }
 
   function handleSave() {
@@ -214,15 +219,15 @@ export function SpacesSettingsClient({
           hourly_rate: Number(form.hourlyRate || 0),
           peak_flat_price: Number(form.peakFlatPrice || form.basePrice || 0),
           peak_hourly_rate: Number(form.peakHourlyRate || form.hourlyRate || 0),
-          usage_tag: form.usageTag,
+          available_for_bookings: form.availableForBookings,
           availability_start: form.availabilityStart || null,
           availability_end: form.availabilityEnd || null,
           amenities: parseAmenities(form.amenities),
           status: form.status,
         })
 
-        setFormDialogOpen(false)
         setForm(emptyForm)
+        closeDialog()
         router.refresh()
       } catch (saveError) {
         setError(
@@ -240,8 +245,7 @@ export function SpacesSettingsClient({
     startTransition(async () => {
       try {
         await deleteVenue(venue.id)
-        setDetailDialogOpen(false)
-        setSelectedVenue(null)
+        closeDialog()
         router.refresh()
       } catch (deleteError) {
         window.alert(
@@ -267,22 +271,25 @@ export function SpacesSettingsClient({
 
         <FacilitiesSettingsNav />
 
-        {!supportsUsageTags ? (
+        {!supportsExtendedFields ? (
           <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            Run migration{" "}
+            Run migrations{" "}
             <code className="rounded bg-amber-100 px-1.5 py-0.5 text-xs">
               068_venue_usage_tags_and_pricing.sql
             </code>{" "}
-            in Supabase to enable internal/external tags, peak pricing, and availability hours.
-            Basic space fields still work until then.
+            and{" "}
+            <code className="rounded bg-amber-100 px-1.5 py-0.5 text-xs">
+              069_venue_available_for_bookings.sql
+            </code>{" "}
+            in Supabase to enable peak pricing, availability hours, and the bookings toggle.
           </div>
         ) : null}
 
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Spaces</h1>
           <p className="text-muted-foreground">
-            Manage bookable spaces with internal/external tags, availability hours, and peak vs
-            non-peak pricing.
+            All active spaces are available for Event Management and Programs. Use the bookings
+            toggle to expose a space in Venue Rentals.
           </p>
         </div>
 
@@ -328,21 +335,23 @@ export function SpacesSettingsClient({
               </div>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100">
-                  <DollarSign className="h-5 w-5 text-amber-600" />
+          {!facilitiesOnly ? (
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100">
+                    <DollarSign className="h-5 w-5 text-amber-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Total Revenue</p>
+                    <p className="text-xl font-bold">
+                      {formatCurrency(summary.totalRevenue)}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Revenue</p>
-                  <p className="text-xl font-bold">
-                    {formatCurrency(summary.totalRevenue)}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          ) : null}
         </div>
 
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -367,21 +376,21 @@ export function SpacesSettingsClient({
                 <SelectItem value="Maintenance">Maintenance</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={tagFilter} onValueChange={setTagFilter}>
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="Tag" />
+            <Select value={bookingsFilter} onValueChange={setBookingsFilter}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Bookings" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Tags</SelectItem>
-                <SelectItem value="Internal">Internal</SelectItem>
-                <SelectItem value="External">External</SelectItem>
+                <SelectItem value="all">All Spaces</SelectItem>
+                <SelectItem value="yes">Open for rentals</SelectItem>
+                <SelectItem value="no">Events/programs only</SelectItem>
               </SelectContent>
             </Select>
           </div>
           {canManage ? (
             <Button onClick={openCreateDialog}>
               <Plus className="mr-2 h-4 w-4" />
-              Add Venue
+              Add Space
             </Button>
           ) : null}
         </div>
@@ -392,7 +401,7 @@ export function SpacesSettingsClient({
               <TableHeader>
                 <TableRow>
                   <TableHead>Venue</TableHead>
-                  <TableHead>Tag</TableHead>
+                  <TableHead>Bookings</TableHead>
                   <TableHead>Location</TableHead>
                   <TableHead>Capacity</TableHead>
                   <TableHead>Non-Peak</TableHead>
@@ -417,7 +426,6 @@ export function SpacesSettingsClient({
                 ) : (
                   filteredVenues.map((venue) => {
                     const statusLabel = getVenueStatusLabel(venue.status)
-                    const tagLabel = getVenueUsageTagLabel(venue.usage_tag)
                     const hoursLabel = formatVenueAvailabilityWindow(
                       venue.availability_start,
                       venue.availability_end
@@ -440,8 +448,17 @@ export function SpacesSettingsClient({
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="secondary" className={tagStyles[tagLabel]}>
-                            {tagLabel}
+                          <Badge
+                            variant="secondary"
+                            className={
+                              venue.available_for_bookings
+                                ? "bg-blue-100 text-blue-700"
+                                : "bg-zinc-100 text-zinc-600"
+                            }
+                          >
+                            {venue.available_for_bookings
+                              ? "Open for rentals"
+                              : "Events/programs only"}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
@@ -454,16 +471,28 @@ export function SpacesSettingsClient({
                           </div>
                         </TableCell>
                         <TableCell className="text-sm">
-                          <p>{formatCurrency(venue.base_price)} flat</p>
-                          <p className="text-muted-foreground">
-                            {formatCurrency(venue.hourly_rate)}/hr
-                          </p>
+                          {venue.available_for_bookings ? (
+                            <>
+                              <p>{formatCurrency(venue.base_price)} flat</p>
+                              <p className="text-muted-foreground">
+                                {formatCurrency(venue.hourly_rate)}/hr
+                              </p>
+                            </>
+                          ) : (
+                            <p className="text-muted-foreground">---</p>
+                          )}
                         </TableCell>
                         <TableCell className="text-sm">
-                          <p>{formatCurrency(venue.peak_flat_price)} flat</p>
-                          <p className="text-muted-foreground">
-                            {formatCurrency(venue.peak_hourly_rate)}/hr
-                          </p>
+                          {venue.available_for_bookings ? (
+                            <>
+                              <p>{formatCurrency(venue.peak_flat_price)} flat</p>
+                              <p className="text-muted-foreground">
+                                {formatCurrency(venue.peak_hourly_rate)}/hr
+                              </p>
+                            </>
+                          ) : (
+                            <p className="text-muted-foreground">---</p>
+                          )}
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {hoursLabel || "—"}
@@ -501,11 +530,13 @@ export function SpacesSettingsClient({
                                   >
                                     Edit Venue
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem asChild>
-                                    <Link href="/bookings/overview">
-                                      View Bookings
-                                    </Link>
-                                  </DropdownMenuItem>
+                                  {!facilitiesOnly ? (
+                                    <DropdownMenuItem asChild>
+                                      <Link href="/bookings/overview">
+                                        View Bookings
+                                      </Link>
+                                    </DropdownMenuItem>
+                                  ) : null}
                                   <DropdownMenuItem
                                     className="text-red-600"
                                     onClick={() => handleDelete(venue)}
@@ -526,18 +557,150 @@ export function SpacesSettingsClient({
           </CardContent>
         </Card>
 
-        <Dialog open={formDialogOpen} onOpenChange={setFormDialogOpen}>
+        <Dialog
+          open={dialogView !== "none"}
+          onOpenChange={(open) => {
+            if (!open) {
+              closeDialog()
+            }
+          }}
+        >
           <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>
-                {form.id ? "Edit Venue" : "Add New Venue"}
-              </DialogTitle>
-              <DialogDescription>
-                {form.id
-                  ? "Update venue details used across bookings and calendars."
-                  : "Create a new venue for rentals and internal scheduling."}
-              </DialogDescription>
-            </DialogHeader>
+            {dialogView === "detail" && selectedVenue ? (
+              <>
+                <DialogHeader>
+                  <DialogTitle>{selectedVenue.name}</DialogTitle>
+                  <DialogDescription>
+                    {selectedVenue.location || "No location specified"}
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="flex flex-col gap-6 py-4">
+                  <div className="flex flex-wrap gap-2">
+                    <Badge
+                      variant="secondary"
+                      className={`${statusStyles[getVenueStatusLabel(selectedVenue.status)]}`}
+                    >
+                      {getVenueStatusLabel(selectedVenue.status)}
+                    </Badge>
+                    <Badge
+                      variant="secondary"
+                      className={
+                        selectedVenue.available_for_bookings
+                          ? "bg-blue-100 text-blue-700"
+                          : "bg-zinc-100 text-zinc-600"
+                      }
+                    >
+                      {selectedVenue.available_for_bookings
+                        ? "Open for rentals"
+                        : "Events/programs only"}
+                    </Badge>
+                  </div>
+
+                  {selectedVenue.description ? (
+                    <div>
+                      <h4 className="mb-1 text-sm font-medium text-muted-foreground">
+                        Description
+                      </h4>
+                      <p className="text-sm">{selectedVenue.description}</p>
+                    </div>
+                  ) : null}
+
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="rounded-lg border p-3 text-center">
+                      <p className="text-xl font-bold">{selectedVenue.capacity}</p>
+                      <p className="text-xs text-muted-foreground">Capacity</p>
+                    </div>
+                    <div className="rounded-lg border p-3 text-center">
+                      <p className="text-xl font-bold">
+                        {formatRentalPrice(
+                          selectedVenue.base_price,
+                          selectedVenue.available_for_bookings
+                        )}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Non-peak flat</p>
+                    </div>
+                    <div className="rounded-lg border p-3 text-center">
+                      <p className="text-xl font-bold">
+                        {formatRentalPrice(
+                          selectedVenue.peak_flat_price,
+                          selectedVenue.available_for_bookings
+                        )}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Peak flat</p>
+                    </div>
+                    <div className="rounded-lg border p-3 text-center">
+                      <p className="text-sm font-semibold">
+                        {formatVenueAvailabilityWindow(
+                          selectedVenue.availability_start,
+                          selectedVenue.availability_end
+                        ) || "Not set"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Availability</p>
+                    </div>
+                  </div>
+
+                  {selectedVenue.amenities.length > 0 ? (
+                    <div>
+                      <h4 className="mb-2 text-sm font-medium text-muted-foreground">
+                        Amenities
+                      </h4>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedVenue.amenities.map((amenity) => (
+                          <Badge key={amenity} variant="outline">
+                            {amenity}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {!facilitiesOnly ? (
+                    <div className="rounded-lg bg-emerald-50 p-4">
+                      <p className="text-sm text-emerald-700">Total Revenue</p>
+                      <p className="text-2xl font-bold text-emerald-700">
+                        {formatCurrency(selectedVenue.revenue)}
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={closeDialog}>
+                    Close
+                  </Button>
+                  {!facilitiesOnly ? (
+                    <Button variant="outline" asChild>
+                      <Link href="/bookings/overview">View Bookings</Link>
+                    </Button>
+                  ) : null}
+                  {canManage ? (
+                    <>
+                      <Button
+                        variant="outline"
+                        className="text-destructive"
+                        onClick={() => handleDelete(selectedVenue)}
+                        disabled={isPending}
+                      >
+                        Delete
+                      </Button>
+                      <Button onClick={() => openEditDialog(selectedVenue)}>
+                        Edit Venue
+                      </Button>
+                    </>
+                  ) : null}
+                </DialogFooter>
+              </>
+            ) : dialogView === "edit" ? (
+              <>
+                <DialogHeader>
+                  <DialogTitle>
+                    {form.id ? "Edit Venue" : "Add New Venue"}
+                  </DialogTitle>
+                  <DialogDescription>
+                    {form.id
+                      ? "Update venue details used across bookings and calendars."
+                      : "Create a space for events, programs, and optional venue rentals."}
+                  </DialogDescription>
+                </DialogHeader>
             <div className="grid gap-4 py-4">
               {error ? (
                 <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -637,51 +800,6 @@ export function SpacesSettingsClient({
                     />
                   </div>
                 </div>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <Label>Space tag</Label>
-                <RadioGroup
-                  value={form.usageTag}
-                  onValueChange={(value) =>
-                    setForm((current) => ({
-                      ...current,
-                      usageTag: value as VenueUsageTag,
-                    }))
-                  }
-                  className="flex flex-col gap-2 sm:flex-row sm:gap-6"
-                >
-                  <div className="flex items-start gap-2 rounded-md border p-3">
-                    <RadioGroupItem
-                      value={VENUE_USAGE_TAGS.internal}
-                      id="venue-tag-internal"
-                      className="mt-0.5"
-                    />
-                    <div>
-                      <Label htmlFor="venue-tag-internal" className="font-medium">
-                        Internal
-                      </Label>
-                      <p className="text-xs text-muted-foreground">
-                        {getVenueUsageTagDescription(VENUE_USAGE_TAGS.internal)}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-2 rounded-md border p-3">
-                    <RadioGroupItem
-                      value={VENUE_USAGE_TAGS.external}
-                      id="venue-tag-external"
-                      className="mt-0.5"
-                    />
-                    <div>
-                      <Label htmlFor="venue-tag-external" className="font-medium">
-                        External
-                      </Label>
-                      <p className="text-xs text-muted-foreground">
-                        {getVenueUsageTagDescription(VENUE_USAGE_TAGS.external)}
-                      </p>
-                    </div>
-                  </div>
-                </RadioGroup>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
@@ -822,26 +940,24 @@ export function SpacesSettingsClient({
 
               <div className="flex items-center gap-2">
                 <Switch
-                  id="venue-active"
-                  checked={form.status === VENUE_STATUSES.active}
+                  id="venue-available-for-bookings"
+                  checked={form.availableForBookings}
                   onCheckedChange={(checked) =>
                     setForm((current) => ({
                       ...current,
-                      status: checked
-                        ? VENUE_STATUSES.active
-                        : VENUE_STATUSES.inactive,
+                      availableForBookings: checked,
                     }))
                   }
                 />
-                <Label htmlFor="venue-active">
-                  Venue is active and available for bookings
+                <Label htmlFor="venue-available-for-bookings">
+                  Venue is available for bookings (venue rentals)
                 </Label>
               </div>
             </div>
             <DialogFooter>
               <Button
                 variant="outline"
-                onClick={() => setFormDialogOpen(false)}
+                onClick={closeDialog}
                 disabled={isPending}
               >
                 Cancel
@@ -855,119 +971,12 @@ export function SpacesSettingsClient({
                 ) : form.id ? (
                   "Save Changes"
                 ) : (
-                  "Add Venue"
+                  "Add Space"
                 )}
               </Button>
             </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>{selectedVenue?.name}</DialogTitle>
-              <DialogDescription>
-                {selectedVenue?.location || "No location specified"}
-              </DialogDescription>
-            </DialogHeader>
-            {selectedVenue ? (
-              <div className="flex flex-col gap-6 py-4">
-                <Badge
-                  variant="secondary"
-                  className={`${statusStyles[getVenueStatusLabel(selectedVenue.status)]} w-fit`}
-                >
-                  {getVenueStatusLabel(selectedVenue.status)}
-                </Badge>
-                <Badge
-                  variant="secondary"
-                  className={`${tagStyles[getVenueUsageTagLabel(selectedVenue.usage_tag)]} w-fit`}
-                >
-                  {getVenueUsageTagLabel(selectedVenue.usage_tag)}
-                </Badge>
-
-                {selectedVenue.description ? (
-                  <div>
-                    <h4 className="mb-1 text-sm font-medium text-muted-foreground">
-                      Description
-                    </h4>
-                    <p className="text-sm">{selectedVenue.description}</p>
-                  </div>
-                ) : null}
-
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                  <div className="rounded-lg border p-3 text-center">
-                    <p className="text-xl font-bold">{selectedVenue.capacity}</p>
-                    <p className="text-xs text-muted-foreground">Capacity</p>
-                  </div>
-                  <div className="rounded-lg border p-3 text-center">
-                    <p className="text-xl font-bold">
-                      {formatCurrency(selectedVenue.base_price)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">Non-peak flat</p>
-                  </div>
-                  <div className="rounded-lg border p-3 text-center">
-                    <p className="text-xl font-bold">
-                      {formatCurrency(selectedVenue.peak_flat_price)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">Peak flat</p>
-                  </div>
-                  <div className="rounded-lg border p-3 text-center">
-                    <p className="text-sm font-semibold">
-                      {formatVenueAvailabilityWindow(
-                        selectedVenue.availability_start,
-                        selectedVenue.availability_end
-                      ) || "Not set"}
-                    </p>
-                    <p className="text-xs text-muted-foreground">Availability</p>
-                  </div>
-                </div>
-
-                {selectedVenue.amenities.length > 0 ? (
-                  <div>
-                    <h4 className="mb-2 text-sm font-medium text-muted-foreground">
-                      Amenities
-                    </h4>
-                    <div className="flex flex-wrap gap-2">
-                      {selectedVenue.amenities.map((amenity) => (
-                        <Badge key={amenity} variant="outline">
-                          {amenity}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-
-                <div className="rounded-lg bg-emerald-50 p-4">
-                  <p className="text-sm text-emerald-700">Total Revenue</p>
-                  <p className="text-2xl font-bold text-emerald-700">
-                    {formatCurrency(selectedVenue.revenue)}
-                  </p>
-                </div>
-              </div>
+              </>
             ) : null}
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setDetailDialogOpen(false)}>
-                Close
-              </Button>
-              <Button variant="outline" asChild>
-                <Link href="/bookings/overview">View Bookings</Link>
-              </Button>
-              {canManage && selectedVenue ? (
-                <>
-                  <Button
-                    variant="outline"
-                    className="text-destructive"
-                    onClick={() => handleDelete(selectedVenue)}
-                    disabled={isPending}
-                  >
-                    Delete
-                  </Button>
-                  <Button onClick={() => openEditDialog(selectedVenue)}>
-                    Edit Venue
-                  </Button>
-                </>
-              ) : null}
-            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>

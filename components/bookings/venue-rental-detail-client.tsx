@@ -161,7 +161,12 @@ export function VenueRentalDetailClient({
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
             <p className="font-medium">{rental.customerName}</p>
-            <p className="text-muted-foreground">{rental.customerEmail || "No email"}</p>
+            <p className="text-muted-foreground">
+              {rental.customerEmail || "No email on file"}
+            </p>
+            <p className="text-muted-foreground">
+              {rental.customerPhone || "No phone on file"}
+            </p>
             {rental.eventTypeName ? (
               <p>Event type: {rental.eventTypeName}</p>
             ) : null}

@@ -31,18 +31,29 @@ const intakeOptions = [
   },
 ]
 
-export function NeedSpaceIntakeCard() {
+export function NeedSpaceIntakeCard({
+  facilitiesOnly = false,
+}: {
+  facilitiesOnly?: boolean
+}) {
+  const options = facilitiesOnly
+    ? intakeOptions.filter((option) => option.href.startsWith("/facilities"))
+    : intakeOptions
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Need a space?</CardTitle>
+        <CardTitle className="text-base">
+          {facilitiesOnly ? "Facility setup" : "Need a space?"}
+        </CardTitle>
         <CardDescription>
-          Departments request space in their module. Facilities operates the building from the
-          master calendar and reservation center.
+          {facilitiesOnly
+            ? "Review reservations and setup details on the facilities schedule."
+            : "Departments request space in their module. Facilities operates the building from the facilities schedule and reservation center."}
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-3 md:grid-cols-2">
-        {intakeOptions.map((option) => {
+        {options.map((option) => {
           const Icon = option.icon
 
           return (

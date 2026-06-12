@@ -155,6 +155,30 @@ const permissionDefinitions: PermissionDefinition[] = [
     description: "Can create and edit internal events and event types.",
     group: "Events",
   },
+  {
+    key: "bookings.view",
+    label: "View Venue Rentals",
+    description: "Can open Venue Rentals pages.",
+    group: "Venue Rentals",
+  },
+  {
+    key: "bookings.manage",
+    label: "Manage Venue Rentals",
+    description: "Can approve, edit, and manage venue rental workflows.",
+    group: "Venue Rentals",
+  },
+  {
+    key: "spaces.view",
+    label: "View Facilities",
+    description: "Can open Facilities pages, master calendar, and setup briefs.",
+    group: "Facilities",
+  },
+  {
+    key: "spaces.manage",
+    label: "Manage Facilities",
+    description: "Can manage spaces and update facility setup notes.",
+    group: "Facilities",
+  },
 ]
 
 const permissionGroups = Array.from(

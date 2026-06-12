@@ -11,14 +11,20 @@ import {
 } from "@/lib/events/event-service-requirements"
 import { updateProgramServiceRequirements } from "@/lib/service-participations/service-participation-actions"
 
+import type { VendorHubVendorType } from "@/lib/vendor-hub/vendor-type-types"
+
 type ProgramServiceRequirementsPanelProps = {
   programId: string
   initialForm: EventServiceRequirementsFormState
+  vendorTypes?: VendorHubVendorType[]
+  canManageVendorTypes?: boolean
 }
 
 export function ProgramServiceRequirementsPanel({
   programId,
   initialForm,
+  vendorTypes = [],
+  canManageVendorTypes = false,
 }: ProgramServiceRequirementsPanelProps) {
   const [form, setForm] = useState(initialForm)
   const [error, setError] = useState<string | null>(null)
@@ -68,6 +74,8 @@ export function ProgramServiceRequirementsPanel({
             setSaved(false)
             setForm(next)
           }}
+          vendorTypes={vendorTypes}
+          canManageVendorTypes={canManageVendorTypes}
         />
         <div className="flex justify-end">
           <Button onClick={handleSave} disabled={isPending}>

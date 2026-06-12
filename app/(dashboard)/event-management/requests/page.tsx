@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation"
 
 export default function InternalEventRequestsRedirectPage() {
-  redirect("/event-management/overview#event-requests")
+  redirect("/event-management/overview#attention-required")
 }

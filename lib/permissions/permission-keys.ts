@@ -29,6 +29,9 @@ export const PERMISSIONS = {
 
   FINANCE_VIEW: "finance.view",
   FINANCE_MANAGE: "finance.manage",
+
+  VENDOR_HUB_VIEW: "vendor_hub.view",
+  VENDOR_HUB_MANAGE: "vendor_hub.manage",
 } as const
 
 export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS]

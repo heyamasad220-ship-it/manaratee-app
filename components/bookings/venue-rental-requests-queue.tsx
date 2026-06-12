@@ -74,6 +74,7 @@ export function VenueRentalRequestsQueue({
       const matchesSearch =
         row.customerName.toLowerCase().includes(query) ||
         (row.customerEmail || "").toLowerCase().includes(query) ||
+        (row.customerPhone || "").toLowerCase().includes(query) ||
         row.shortId.toLowerCase().includes(query) ||
         row.spaces.some((space) => space.venueName.toLowerCase().includes(query))
 
@@ -166,7 +167,16 @@ export function VenueRentalRequestsQueue({
                         </TableCell>
                         <TableCell>
                           <div className="font-medium">{row.customerName}</div>
-                          <div className="text-xs text-muted-foreground">{row.customerEmail}</div>
+                          {row.customerEmail ? (
+                            <div className="text-xs text-muted-foreground">
+                              {row.customerEmail}
+                            </div>
+                          ) : null}
+                          {row.customerPhone ? (
+                            <div className="text-xs text-muted-foreground">
+                              {row.customerPhone}
+                            </div>
+                          ) : null}
                         </TableCell>
                         <TableCell className="max-w-[240px]">
                           {row.spaces.map((space) => (

@@ -1,7 +1,7 @@
 "use client"
 
+import Link from "next/link"
 import { useEffect, useState } from "react"
-import { Header } from "@/components/layout/header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { TimeInput } from "@/components/ui/time-input"
 import { Badge } from "@/components/ui/badge"
+import { Checkbox } from "@/components/ui/checkbox"
 import { createClient } from "@/lib/supabase/client"
 import {
   Dialog,
@@ -44,6 +45,15 @@ import {
   Pencil,
   Trash2,
 } from "lucide-react"
+import { VendorTypesSettings } from "@/components/vendor-hub/vendor-types-settings"
+import { BoothAttributesSettings } from "@/components/vendor-hub/booth-attributes-settings"
+import { BoothTemplateLibrarySettings } from "@/components/vendor-hub/booth-template-library-settings"
+import {
+  fetchBoothTypeAttributeIds,
+  fetchVendorHubBoothAttributes,
+  setBoothTypeAttributes,
+} from "@/lib/vendor-hub/booth-attribute-actions"
+import type { VendorHubBoothAttribute } from "@/lib/vendor-hub/booth-catalog-types"
 
 type BoothType = {
   id: string
@@ -104,9 +114,14 @@ const [selectedEventId, setSelectedEventId] = useState("")
   const [boothTypeForm, setBoothTypeForm] = useState<BoothTypeForm>(emptyBoothTypeForm)
   const [savingBoothType, setSavingBoothType] = useState(false)
   const [loadingBoothTypes, setLoadingBoothTypes] = useState(false)
+  const [boothAttributes, setBoothAttributes] = useState<VendorHubBoothAttribute[]>([])
+  const [selectedBoothAttributeIds, setSelectedBoothAttributeIds] = useState<string[]>([])
 
   useEffect(() => {
   loadEvents()
+  void fetchVendorHubBoothAttributes()
+    .then(setBoothAttributes)
+    .catch(() => setBoothAttributes([]))
   // eslint-disable-next-line react-hooks/exhaustive-deps
 }, [])
 
@@ -158,10 +173,11 @@ async function loadEvents() {
   function startAddBoothType() {
     setEditingBoothType(null)
     setBoothTypeForm(emptyBoothTypeForm)
+    setSelectedBoothAttributeIds([])
     setBoothTypeDialogOpen(true)
   }
 
-  function startEditBoothType(type: BoothType) {
+  async function startEditBoothType(type: BoothType) {
     setEditingBoothType(type)
     setBoothTypeForm({
       name: type.name ?? "",
@@ -174,7 +190,22 @@ location: type.location ?? "",
       is_active: type.is_active === false ? "false" : "true",
       sort_order: String(type.sort_order ?? 0),
     })
+    try {
+      const attributeIds = await fetchBoothTypeAttributeIds(type.id)
+      setSelectedBoothAttributeIds(attributeIds)
+    } catch {
+      setSelectedBoothAttributeIds([])
+    }
     setBoothTypeDialogOpen(true)
+  }
+
+  function toggleBoothTypeAttribute(attributeId: string, checked: boolean) {
+    setSelectedBoothAttributeIds((current) => {
+      if (checked) {
+        return current.includes(attributeId) ? current : [...current, attributeId]
+      }
+      return current.filter((id) => id !== attributeId)
+    })
   }
 
   async function saveBoothType() {
@@ -203,6 +234,8 @@ location: type.location ?? "",
   updated_at: new Date().toISOString(),
 }
 
+    let boothTypeId = editingBoothType?.id
+
     if (editingBoothType) {
       const { error } = await supabase
         .from("vendor_hub_booth_types")
@@ -216,15 +249,28 @@ location: type.location ?? "",
         return
       }
     } else {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("vendor_hub_booth_types")
         .insert(payload)
+        .select("id")
+        .single()
 
-      if (error) {
+      if (error || !data) {
         console.error("Error adding booth type:", error)
         alert("Booth type could not be added.")
         setSavingBoothType(false)
         return
+      }
+
+      boothTypeId = data.id
+    }
+
+    if (boothTypeId) {
+      try {
+        await setBoothTypeAttributes(boothTypeId, selectedBoothAttributeIds)
+      } catch (attributeError) {
+        console.error(attributeError)
+        alert("Booth type saved, but attributes could not be updated.")
       }
     }
 
@@ -233,6 +279,7 @@ location: type.location ?? "",
     setBoothTypeDialogOpen(false)
     setEditingBoothType(null)
     setBoothTypeForm(emptyBoothTypeForm)
+    setSelectedBoothAttributeIds([])
   }
 
   async function deleteBoothType(id: string) {
@@ -257,17 +304,8 @@ location: type.location ?? "",
 
   return (
     <>
-      <Header title="Vendor Hub Settings" />
-
-      <div className="p-6">
+      <div>
         <div className="mx-auto flex max-w-6xl flex-col gap-6">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Settings</h1>
-            <p className="text-sm text-muted-foreground">
-              Manage Vendor Hub preferences, applications, payments, notifications, booth settings, and vendor types.
-            </p>
-          </div>
-
           <Tabs defaultValue="general" className="w-full">
             <TabsList className="flex h-auto flex-wrap justify-start gap-2">
               <TabsTrigger value="general">General</TabsTrigger>
@@ -470,6 +508,9 @@ location: type.location ?? "",
                     )}
                   </CardContent>
                 </Card>
+
+                <BoothAttributesSettings />
+                <BoothTemplateLibrarySettings />
               </div>
             </TabsContent>
 
@@ -583,34 +624,18 @@ location: type.location ?? "",
                     <Bell className="h-5 w-5" />
                     Notifications
                   </CardTitle>
-                  <CardDescription>Configure email notifications.</CardDescription>
+                  <CardDescription>
+                    Configure when vendors receive email about bazaar publishing, updates,
+                    reminders, and cancellations.
+                  </CardDescription>
                 </CardHeader>
 
-                <CardContent className="flex flex-col gap-4">
-                  <div className="flex items-center justify-between rounded-lg border p-4">
-                    <div>
-                      <p className="font-medium">Email Notifications</p>
-                      <p className="text-sm text-muted-foreground">
-                        Send email updates to vendors.
-                      </p>
-                    </div>
-                    <Switch checked={emailNotifications} onCheckedChange={setEmailNotifications} />
-                  </div>
-
-                  <div className="flex flex-col gap-2">
-                    <Label htmlFor="reminder-days">Reminder Email Schedule</Label>
-                    <Select>
-                      <SelectTrigger id="reminder-days">
-                        <SelectValue placeholder="Select reminder schedule" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="7-3-1">7 days, 3 days, 1 day before</SelectItem>
-                        <SelectItem value="7-1">7 days, 1 day before</SelectItem>
-                        <SelectItem value="3-1">3 days, 1 day before</SelectItem>
-                        <SelectItem value="1">1 day before only</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                <CardContent>
+                  <Button asChild variant="outline">
+                    <Link href="/vendor-hub/settings/notifications">
+                      Open vendor notification settings
+                    </Link>
+                  </Button>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -673,23 +698,7 @@ location: type.location ?? "",
             </TabsContent>
 
             <TabsContent value="vendor-types" className="mt-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Tags className="h-5 w-5" />
-                    Vendor Types
-                  </CardTitle>
-                  <CardDescription>
-                    Vendor type database connection can be restored here later if needed.
-                  </CardDescription>
-                </CardHeader>
-
-                <CardContent>
-                  <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-                    No vendor types configured here yet.
-                  </div>
-                </CardContent>
-              </Card>
+              <VendorTypesSettings />
             </TabsContent>
           </Tabs>
         </div>
@@ -805,6 +814,27 @@ location: type.location ?? "",
                 />
               </div>
             </div>
+
+            {boothAttributes.length > 0 ? (
+              <div className="flex flex-col gap-2">
+                <Label>Default Attributes</Label>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {boothAttributes
+                    .filter((attribute) => attribute.is_active)
+                    .map((attribute) => (
+                      <label key={attribute.id} className="flex items-center gap-2 text-sm">
+                        <Checkbox
+                          checked={selectedBoothAttributeIds.includes(attribute.id)}
+                          onCheckedChange={(checked) =>
+                            toggleBoothTypeAttribute(attribute.id, checked === true)
+                          }
+                        />
+                        {attribute.name}
+                      </label>
+                    ))}
+                </div>
+              </div>
+            ) : null}
 
             <div className="mt-4 flex gap-2">
               <Button onClick={saveBoothType} disabled={savingBoothType}>

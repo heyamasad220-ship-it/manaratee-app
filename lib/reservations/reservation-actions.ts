@@ -6,14 +6,14 @@ import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { hasAnyPermission, PERMISSIONS } from "@/lib/permissions/permissions"
 
-import { getConflictingReservations } from "./reservation-queries"
+import type { CalendarAudience } from "./calendar-audience"
+import { getCalendarData, getConflictingReservations } from "./reservation-queries"
 import {
   combineDateAndTime,
   parseCalendarDate,
 } from "./reservation-time"
-import type { CalendarContext, CalendarViewMode } from "./reservation-types"
 import { RESERVATION_SOURCE_TYPES } from "./reservation-types"
-import { getCalendarData } from "./reservation-queries"
+import type { CalendarViewMode } from "./reservation-types"
 import { syncOperationalBriefForMaintenanceReservation } from "@/lib/operational-briefs/operational-brief-queries"
 
 type CreateBlockInput = {
@@ -30,9 +30,10 @@ type CreateBlockInput = {
 }
 
 const CALENDAR_REVALIDATE_PATHS = [
+  "/facilities/availability",
+  "/facilities/calendar",
   "/bookings/calendar",
   "/event-management/calendar",
-  "/facilities/calendar",
   "/event-management/overview",
 ]
 
@@ -43,13 +44,13 @@ function revalidateCalendars() {
 }
 
 export async function loadCalendarData(input: {
-  context: CalendarContext
+  audience: CalendarAudience
   date?: string
   view?: CalendarViewMode
 }) {
   const anchorDate = parseCalendarDate(input.date)
-  const view = input.view === "day" ? "day" : "week"
-  return getCalendarData(input.context, anchorDate, view)
+  const view = input.view === "day" ? "day" : "grid"
+  return getCalendarData(input.audience, anchorDate, view)
 }
 
 export async function createReservationBlock(input: CreateBlockInput) {

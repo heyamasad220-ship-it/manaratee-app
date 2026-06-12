@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache"
 
 import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
-import { hasAnyPermission, PERMISSIONS } from "@/lib/permissions/permissions"
+import { hasAnyPermission, hasFacilitiesOnlyAccess, PERMISSIONS } from "@/lib/permissions/permissions"
 import type { CalendarReservation } from "@/lib/reservations/reservation-types"
 
 import {
@@ -33,26 +33,34 @@ import {
 
 async function buildPermissionContext(): Promise<OperationalBriefPermissionContext> {
   const [
+    isFacilitiesOnly,
     canOpenVenueRentalRecord,
     canOpenInternalEventRecord,
     canOpenProgramRecord,
-    canEditSetupFields,
+    canManageSpaces,
+    canManageBusinessModules,
   ] = await Promise.all([
+    hasFacilitiesOnlyAccess(),
     hasAnyPermission(PERMISSIONS.BOOKINGS_MANAGE, PERMISSIONS.PROGRAMS_MANAGE),
     hasAnyPermission(PERMISSIONS.EVENTS_MANAGE, PERMISSIONS.PROGRAMS_MANAGE),
     hasAnyPermission(PERMISSIONS.PROGRAMS_MANAGE),
+    hasAnyPermission(PERMISSIONS.SPACES_MANAGE),
     hasAnyPermission(
-      PERMISSIONS.SPACES_MANAGE,
       PERMISSIONS.BOOKINGS_MANAGE,
       PERMISSIONS.EVENTS_MANAGE,
       PERMISSIONS.PROGRAMS_MANAGE
     ),
   ])
 
+  const canEditSetupFields = isFacilitiesOnly
+    ? canManageSpaces
+    : canManageSpaces || canManageBusinessModules
+
   return {
-    canOpenVenueRentalRecord,
-    canOpenInternalEventRecord,
-    canOpenProgramRecord,
+    isFacilitiesOnly,
+    canOpenVenueRentalRecord: !isFacilitiesOnly && canOpenVenueRentalRecord,
+    canOpenInternalEventRecord: !isFacilitiesOnly && canOpenInternalEventRecord,
+    canOpenProgramRecord: !isFacilitiesOnly && canOpenProgramRecord,
     canEditSetupFields,
   }
 }
@@ -248,6 +256,7 @@ export async function updateOperationalBriefSetupAction(input: {
   }
 
   revalidatePath("/facilities/calendar")
+  revalidatePath("/facilities/availability")
   revalidatePath("/facilities/reservation-center")
 }
 

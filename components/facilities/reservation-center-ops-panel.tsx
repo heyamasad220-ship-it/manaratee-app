@@ -21,6 +21,7 @@ type ReservationCenterOpsPanelProps = {
   upcomingBriefs: UpcomingOperationalBriefRow[]
   temporaryHolds: TemporaryHoldRow[]
   conflicts: MasterCalendarConflictPreview
+  facilitiesOnly?: boolean
 }
 
 function sourceTypeLabel(sourceType: string) {
@@ -42,6 +43,7 @@ export function ReservationCenterOpsPanel({
   upcomingBriefs,
   temporaryHolds,
   conflicts,
+  facilitiesOnly = false,
 }: ReservationCenterOpsPanelProps) {
   return (
     <div className="grid gap-4 xl:grid-cols-2">
@@ -76,7 +78,7 @@ export function ReservationCenterOpsPanel({
                         <div className="space-y-1">
                           <p className="font-medium">{brief.title}</p>
                           <Badge variant="outline">{sourceTypeLabel(brief.sourceType)}</Badge>
-                          {sourceHref ? (
+                          {sourceHref && !facilitiesOnly ? (
                             <Button variant="link" className="h-auto p-0 text-xs" asChild>
                               <Link href={sourceHref}>Open source record</Link>
                             </Button>
@@ -107,7 +109,7 @@ export function ReservationCenterOpsPanel({
             </p>
           )}
           <Button variant="link" className="mt-3 h-auto p-0" asChild>
-            <Link href="/facilities/calendar">Open master calendar</Link>
+            <Link href="/facilities/calendar">Open facilities schedule</Link>
           </Button>
         </CardContent>
       </Card>
@@ -134,9 +136,13 @@ export function ReservationCenterOpsPanel({
                       Expires {new Date(hold.holdExpiresAt).toLocaleString()}
                     </p>
                   ) : null}
-                  <Button variant="link" className="mt-1 h-auto p-0" asChild>
-                    <Link href={`/bookings/rentals/${hold.venueRentalId}`}>View rental workflow</Link>
-                  </Button>
+                  {!facilitiesOnly ? (
+                    <Button variant="link" className="mt-1 h-auto p-0" asChild>
+                      <Link href={`/bookings/rentals/${hold.venueRentalId}`}>
+                        View rental workflow
+                      </Link>
+                    </Button>
+                  ) : null}
                 </div>
               ))
             ) : (
@@ -147,7 +153,7 @@ export function ReservationCenterOpsPanel({
 
         <Card className={conflicts.conflictCount > 0 ? "border-amber-200" : undefined}>
           <CardHeader>
-            <CardTitle className="text-base">Master calendar conflicts</CardTitle>
+            <CardTitle className="text-base">Schedule conflicts</CardTitle>
             <CardDescription>
               Cross-module space overlaps detected this week ({conflicts.conflictCount} reservation
               {conflicts.conflictCount === 1 ? "" : "s"}).
@@ -172,7 +178,7 @@ export function ReservationCenterOpsPanel({
               </p>
             )}
             <Button variant="link" className="h-auto p-0" asChild>
-              <Link href="/facilities/calendar">Review on master calendar</Link>
+              <Link href="/facilities/calendar">Review on facilities schedule</Link>
             </Button>
           </CardContent>
         </Card>

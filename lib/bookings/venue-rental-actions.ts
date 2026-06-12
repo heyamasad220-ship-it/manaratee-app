@@ -30,6 +30,7 @@ import {
 } from "./venue-rental-transition"
 import { getDuplicateVenueRentalBlockReport } from "./venue-rental-transition-queries"
 import { syncOperationalBriefForVenueRental } from "@/lib/operational-briefs/operational-brief-queries"
+import { fireModuleNotifications } from "@/lib/notifications/dispatch-module-notification"
 import { normalizeVenueUsageTag } from "@/lib/bookings/venue-usage"
 import {
   RENTAL_CONTRACT_STATUSES,
@@ -44,8 +45,9 @@ import {
 } from "./venue-rental-types"
 
 const CALENDAR_PATHS = [
-  "/bookings/calendar",
+  "/facilities/availability",
   "/facilities/calendar",
+  "/bookings/calendar",
   "/bookings/overview",
   "/customer/rentals",
   "/customer/rentals/new",
@@ -100,11 +102,35 @@ async function assertVenuesInOrg(
 
   const { data, error } = await supabase
     .from("venues")
-    .select("id, usage_tag")
+    .select("id, available_for_bookings, usage_tag")
     .eq("organization_id", organizationId)
     .in("id", uniqueIds)
 
   if (error) {
+    if (error.message?.includes("available_for_bookings")) {
+      const fallback = await supabase
+        .from("venues")
+        .select("id, usage_tag")
+        .eq("organization_id", organizationId)
+        .in("id", uniqueIds)
+
+      if (fallback.error || (fallback.data || []).length !== uniqueIds.length) {
+        throw new Error("One or more selected venues are invalid for this organization.")
+      }
+
+      const invalidLegacy = (fallback.data || []).find(
+        (row) => normalizeVenueUsageTag(row.usage_tag as string | null) !== "external"
+      )
+
+      if (invalidLegacy) {
+        throw new Error(
+          "This space is not enabled for venue rentals. Turn on “Available for bookings” in Facilities settings."
+        )
+      }
+
+      return
+    }
+
     throw new Error("Failed to validate venues.")
   }
 
@@ -112,13 +138,17 @@ async function assertVenuesInOrg(
     throw new Error("One or more selected venues are invalid for this organization.")
   }
 
-  const invalidTag = (data || []).find(
-    (row) => normalizeVenueUsageTag(row.usage_tag as string | null) !== "external"
-  )
+  const unavailable = (data || []).find((row) => {
+    if (typeof row.available_for_bookings === "boolean") {
+      return !row.available_for_bookings
+    }
 
-  if (invalidTag) {
+    return normalizeVenueUsageTag(row.usage_tag as string | null) !== "external"
+  })
+
+  if (unavailable) {
     throw new Error(
-      "Venue Rentals can only use External spaces. Choose an external-tagged space or update the space in Facilities settings."
+      "This space is not enabled for venue rentals. Turn on “Available for bookings” in Facilities settings."
     )
   }
 }
@@ -397,6 +427,27 @@ export async function submitVenueRentalRequest(input: SubmitVenueRentalInput) {
     operationalSetup: input.operationalSetup,
   })
 
+  fireModuleNotifications([
+    {
+      organizationId,
+      moduleKey: "venue_rentals",
+      audience: "staff",
+      eventKey: "request_submitted",
+      subject: "New venue rental request",
+      summary: "A customer submitted a new venue rental request.",
+      metadata: { venueRentalId: rental.id, customerUserId: user.id },
+    },
+    {
+      organizationId,
+      moduleKey: "venue_rentals",
+      audience: "customer",
+      eventKey: "request_received",
+      subject: "Venue rental request received",
+      summary: "Your venue rental request was received and is awaiting review.",
+      metadata: { venueRentalId: rental.id, customerUserId: user.id },
+    },
+  ])
+
   revalidateVenueRentalPaths()
   return rental.id as string
 }
@@ -509,6 +560,18 @@ export async function approveVenueRentalRequest(input: {
 
   await syncOperationalBriefForVenueRental(input.venueRentalId, organizationId, user?.id)
 
+  fireModuleNotifications([
+    {
+      organizationId,
+      moduleKey: "venue_rentals",
+      audience: "customer",
+      eventKey: "request_approved",
+      subject: "Venue rental approved",
+      summary: "Your venue rental request was approved. Payment is now due.",
+      metadata: { venueRentalId: input.venueRentalId },
+    },
+  ])
+
   revalidateVenueRentalPaths()
 }
 
@@ -552,6 +615,27 @@ export async function declineVenueRentalRequest(input: {
     .update({ status: RENTAL_RESERVATION_STATUSES.cancelled, hold_expires_at: null })
     .eq("venue_rental_id", input.venueRentalId)
     .eq("organization_id", organizationId)
+
+  fireModuleNotifications([
+    {
+      organizationId,
+      moduleKey: "venue_rentals",
+      audience: "staff",
+      eventKey: "rental_cancelled",
+      subject: "Venue rental declined",
+      summary: "A venue rental request was declined.",
+      metadata: { venueRentalId: input.venueRentalId, reason },
+    },
+    {
+      organizationId,
+      moduleKey: "venue_rentals",
+      audience: "customer",
+      eventKey: "request_declined",
+      subject: "Venue rental request update",
+      summary: "Your venue rental request was declined.",
+      metadata: { venueRentalId: input.venueRentalId, reason },
+    },
+  ])
 
   revalidateVenueRentalPaths()
 }
@@ -619,6 +703,18 @@ export async function extendVenueRentalHold(input: {
     metadata: { additional_hours: hours },
   })
 
+  fireModuleNotifications([
+    {
+      organizationId,
+      moduleKey: "venue_rentals",
+      audience: "customer",
+      eventKey: "hold_extended",
+      subject: "Venue rental hold extended",
+      summary: "Your venue rental hold was extended.",
+      metadata: { venueRentalId: input.venueRentalId, reason, additionalHours: hours },
+    },
+  ])
+
   revalidateVenueRentalPaths()
 }
 
@@ -671,6 +767,36 @@ export async function markRentalPaymentPaid(input: {
   }
 
   await syncVenueRentalStatusAfterPayment(payment.venue_rental_id as string, organizationId)
+
+  fireModuleNotifications([
+    {
+      organizationId,
+      moduleKey: "venue_rentals",
+      audience: "staff",
+      eventKey: "payment_received",
+      subject: "Venue rental payment received",
+      summary: "A venue rental payment was recorded.",
+      metadata: {
+        venueRentalId: payment.venue_rental_id,
+        paymentId: input.paymentId,
+        paymentType: payment.payment_type,
+      },
+    },
+    {
+      organizationId,
+      moduleKey: "venue_rentals",
+      audience: "customer",
+      eventKey: "payment_received",
+      subject: "Venue rental payment received",
+      summary: "Your venue rental payment was received.",
+      metadata: {
+        venueRentalId: payment.venue_rental_id,
+        paymentId: input.paymentId,
+        paymentType: payment.payment_type,
+      },
+    },
+  ])
+
   revalidateVenueRentalPaths()
 }
 
@@ -679,6 +805,15 @@ async function syncVenueRentalStatusAfterPayment(
   organizationId: string
 ) {
   const supabase = await createClient()
+
+  const { data: rental } = await supabase
+    .from("venue_rentals")
+    .select("status")
+    .eq("id", venueRentalId)
+    .eq("organization_id", organizationId)
+    .maybeSingle()
+
+  const previousStatus = rental?.status as VenueRentalStatus | undefined
 
   const { data: payments } = await supabase
     .from("rental_payments")
@@ -725,6 +860,20 @@ async function syncVenueRentalStatusAfterPayment(
       })
       .eq("venue_rental_id", venueRentalId)
       .eq("organization_id", organizationId)
+
+    if (previousStatus !== VENUE_RENTAL_STATUSES.confirmed) {
+      fireModuleNotifications([
+        {
+          organizationId,
+          moduleKey: "venue_rentals",
+          audience: "customer",
+          eventKey: "rental_confirmed",
+          subject: "Venue rental confirmed",
+          summary: "Your venue rental is fully confirmed.",
+          metadata: { venueRentalId },
+        },
+      ])
+    }
   }
 }
 
@@ -1041,6 +1190,27 @@ export async function cancelVenueRental(input: {
     staffUserId: user.id,
     metadata: { after_payment: Boolean(input.afterPayment) },
   })
+
+  fireModuleNotifications([
+    {
+      organizationId,
+      moduleKey: "venue_rentals",
+      audience: "staff",
+      eventKey: "rental_cancelled",
+      subject: "Venue rental cancelled",
+      summary: "A venue rental was cancelled.",
+      metadata: { venueRentalId: input.venueRentalId, reason },
+    },
+    {
+      organizationId,
+      moduleKey: "venue_rentals",
+      audience: "customer",
+      eventKey: "rental_cancelled",
+      subject: "Venue rental cancelled",
+      summary: "Your venue rental was cancelled.",
+      metadata: { venueRentalId: input.venueRentalId, reason },
+    },
+  ])
 
   revalidateVenueRentalPaths()
 }

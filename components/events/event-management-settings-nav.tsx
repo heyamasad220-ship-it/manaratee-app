@@ -7,15 +7,19 @@ import { cn } from "@/lib/utils"
 
 const settingsTabs = [
   {
-    label: "Overview",
-    href: "/event-management/settings",
-    matchPrefix: "/event-management/settings",
-    exact: true,
-  },
-  {
     label: "Event Types",
     href: "/event-management/settings/event-types",
     matchPrefix: "/event-management/settings/event-types",
+  },
+  {
+    label: "Setup Styles",
+    href: "/event-management/settings/setup-styles",
+    matchPrefix: "/event-management/settings/setup-styles",
+  },
+  {
+    label: "Notifications",
+    href: "/event-management/settings/notifications",
+    matchPrefix: "/event-management/settings/notifications",
   },
 ] as const
 
@@ -25,9 +29,7 @@ export function EventManagementSettingsNav() {
   return (
     <nav className="flex gap-1 border-b border-border">
       {settingsTabs.map((tab) => {
-        const isActive = tab.exact
-          ? pathname === tab.href
-          : pathname.startsWith(tab.matchPrefix)
+        const isActive = pathname.startsWith(tab.matchPrefix)
 
         return (
           <Link

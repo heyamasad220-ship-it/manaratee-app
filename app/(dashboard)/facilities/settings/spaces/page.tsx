@@ -1,10 +1,11 @@
 import { SpacesSettingsClient } from "@/components/bookings/settings/spaces-settings-client"
 import {
   getVenuesWithStats,
-  venueCatalogSupportsUsageTags,
+  venueCatalogSupportsExtendedFields,
 } from "@/lib/bookings/venue-queries"
 import {
   hasAnyPermission,
+  hasFacilitiesOnlyAccess,
   PERMISSIONS,
   requireAnyPermission,
 } from "@/lib/permissions/permissions"
@@ -17,21 +18,23 @@ export default async function BookingsSpacesSettingsPage() {
     PERMISSIONS.PROGRAMS_VIEW
   )
 
-  const [venues, canManage, supportsUsageTags] = await Promise.all([
+  const [venues, canManage, supportsExtendedFields, facilitiesOnly] = await Promise.all([
     getVenuesWithStats(),
     hasAnyPermission(
       PERMISSIONS.SPACES_MANAGE,
       PERMISSIONS.BOOKINGS_MANAGE,
       PERMISSIONS.PROGRAMS_MANAGE
     ),
-    venueCatalogSupportsUsageTags(),
+    venueCatalogSupportsExtendedFields(),
+    hasFacilitiesOnlyAccess(),
   ])
 
   return (
     <SpacesSettingsClient
       venues={venues}
       canManage={canManage}
-      supportsUsageTags={supportsUsageTags}
+      supportsExtendedFields={supportsExtendedFields}
+      facilitiesOnly={facilitiesOnly}
     />
   )
 }

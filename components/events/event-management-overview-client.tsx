@@ -5,24 +5,22 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { useTransition } from "react"
 import {
   ClipboardList,
-  Calendar,
   CalendarCheck,
   Baby,
   Users,
   Truck,
   Ticket,
   Clock,
-  AlertTriangle,
   ChevronRight,
-  Download,
-  Eye,
   Plus,
+  ClipboardCheck,
+  MapPin,
+  AlertTriangle,
 } from "lucide-react"
+import type { LucideIcon } from "lucide-react"
 
 import { Header } from "@/components/layout/header"
-import { InternalEventRequestsQueue } from "@/components/events/internal-event-requests-queue"
 import { InternalEventDbStatusBadge } from "@/components/events/internal-event-db-status-badge"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -42,22 +40,114 @@ import {
 } from "@/components/ui/table"
 import { formatEventDate } from "@/lib/events/internal-event-format"
 import type {
+  DashboardAttentionItem,
   DashboardTimePeriod,
   EventManagementDashboardData,
 } from "@/lib/events/internal-event-dashboard-types"
-import type { InternalEventWithRelations } from "@/lib/events/internal-event-types"
 import { cn } from "@/lib/utils"
+
+const ATTENTION_ICONS: Record<DashboardAttentionItem["kind"], LucideIcon> = {
+  approval: ClipboardCheck,
+  childcare: Baby,
+  volunteers: Users,
+  vendors: Truck,
+  draft: AlertTriangle,
+  schedule: CalendarCheck,
+  location: MapPin,
+}
+
+const ATTENTION_COLORS: Record<DashboardAttentionItem["kind"], string> = {
+  approval: "bg-amber-100 text-amber-700",
+  childcare: "bg-pink-100 text-pink-700",
+  volunteers: "bg-blue-100 text-blue-700",
+  vendors: "bg-orange-100 text-orange-700",
+  draft: "bg-yellow-100 text-yellow-700",
+  schedule: "bg-slate-100 text-slate-700",
+  location: "bg-violet-100 text-violet-700",
+}
+
+function AttentionCard({ item }: { item: DashboardAttentionItem }) {
+  const Icon = ATTENTION_ICONS[item.kind]
+
+  return (
+    <Link
+      href={item.href}
+      className={cn(
+        "group flex items-start gap-3 rounded-lg border p-4 transition-colors hover:border-primary/40 hover:bg-muted/40",
+        item.priority === "high" && "border-amber-200 bg-amber-50/50"
+      )}
+    >
+      <div
+        className={cn(
+          "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
+          ATTENTION_COLORS[item.kind]
+        )}
+      >
+        <Icon className="h-5 w-5" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="font-medium group-hover:text-primary">{item.title}</p>
+        <p className="mt-0.5 text-sm text-muted-foreground">{item.description}</p>
+        {item.meta ? (
+          <p className="mt-1 text-xs text-muted-foreground">{item.meta}</p>
+        ) : null}
+      </div>
+      <ChevronRight className="mt-2 h-4 w-4 shrink-0 text-muted-foreground group-hover:text-primary" />
+    </Link>
+  )
+}
+
+function KpiCard({
+  href,
+  icon: Icon,
+  iconClassName,
+  count,
+  label,
+}: {
+  href?: string
+  icon: LucideIcon
+  iconClassName: string
+  count: number
+  label: string
+}) {
+  const content = (
+    <CardContent className="p-4">
+      <div className="flex items-center gap-3">
+        <div
+          className={cn(
+            "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
+            iconClassName
+          )}
+        >
+          <Icon className="h-5 w-5" />
+        </div>
+        <div className="min-w-0">
+          <p className="text-2xl font-bold text-foreground">{count}</p>
+          <p className="truncate text-xs text-muted-foreground">{label}</p>
+        </div>
+      </div>
+    </CardContent>
+  )
+
+  if (href && count > 0) {
+    return (
+      <Card className="transition-colors hover:border-primary/40">
+        <Link href={href}>{content}</Link>
+      </Card>
+    )
+  }
+
+  return <Card>{content}</Card>
+}
 
 export function EventManagementOverviewClient({
   data,
   period,
   canManage,
-  pendingRequests = [],
 }: {
   data: EventManagementDashboardData
   period: DashboardTimePeriod
   canManage: boolean
-  pendingRequests?: InternalEventWithRelations[]
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -81,7 +171,7 @@ export function EventManagementOverviewClient({
     })
   }
 
-  const { kpis } = data
+  const { kpis, attentionItems } = data
 
   return (
     <>
@@ -125,167 +215,70 @@ export function EventManagementOverviewClient({
         </div>
 
         <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-6">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-100">
-                  <ClipboardList className="h-5 w-5 text-amber-700" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-2xl font-bold text-foreground">
-                    {kpis.draftCount}
-                  </p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    Draft Events
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-100">
-                  <CalendarCheck className="h-5 w-5 text-emerald-700" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-2xl font-bold text-foreground">
-                    {kpis.scheduledCount}
-                  </p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    Scheduled Events
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-pink-100">
-                  <Baby className="h-5 w-5 text-pink-700" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-2xl font-bold text-foreground">
-                    {kpis.childcareRequired}
-                  </p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    Need Childcare
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-100">
-                  <Users className="h-5 w-5 text-blue-700" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-2xl font-bold text-foreground">
-                    {kpis.volunteersRequired}
-                  </p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    Need Volunteers
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-orange-100">
-                  <Truck className="h-5 w-5 text-orange-700" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-2xl font-bold text-foreground">
-                    {kpis.vendorsRequired}
-                  </p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    Need Vendors
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-100">
-                  <Ticket className="h-5 w-5 text-violet-700" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-2xl font-bold text-foreground">
-                    {kpis.ticketedEvents}
-                  </p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    Ticketed Events
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <KpiCard
+            href="/event-management?status=draft"
+            icon={ClipboardList}
+            iconClassName="bg-amber-100 text-amber-700"
+            count={kpis.draftCount}
+            label="Draft Events"
+          />
+          <KpiCard
+            href="/event-management?status=scheduled"
+            icon={CalendarCheck}
+            iconClassName="bg-emerald-100 text-emerald-700"
+            count={kpis.scheduledCount}
+            label="Scheduled Events"
+          />
+          <KpiCard
+            href="#attention-required"
+            icon={Baby}
+            iconClassName="bg-pink-100 text-pink-700"
+            count={kpis.childcareRequired}
+            label="Need Childcare"
+          />
+          <KpiCard
+            href="#attention-required"
+            icon={Users}
+            iconClassName="bg-blue-100 text-blue-700"
+            count={kpis.volunteersRequired}
+            label="Need Volunteers"
+          />
+          <KpiCard
+            href="#attention-required"
+            icon={Truck}
+            iconClassName="bg-orange-100 text-orange-700"
+            count={kpis.vendorsRequired}
+            label="Need Vendors"
+          />
+          <KpiCard
+            href="/event-management"
+            icon={Ticket}
+            iconClassName="bg-violet-100 text-violet-700"
+            count={kpis.ticketedEvents}
+            label="Ticketed Events"
+          />
         </div>
 
-        <div className="flex flex-wrap gap-2 sm:gap-3">
-          <Button asChild className="h-9 sm:h-10">
-            <Link href="/event-management?status=draft">
-              <Eye className="mr-1.5 h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Review Drafts</span>
-              <span className="sm:hidden">Drafts</span>
-              {kpis.draftCount > 0 ? (
-                <Badge variant="secondary" className="ml-1.5 bg-white/20 sm:ml-2">
-                  {kpis.draftCount}
-                </Badge>
-              ) : null}
-            </Link>
-          </Button>
-          <Button variant="outline" className="h-9 sm:h-10" asChild>
-            <Link href="/event-management/calendar">
-              <Calendar className="mr-1.5 h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">View Calendar</span>
-              <span className="sm:hidden">Calendar</span>
-            </Link>
-          </Button>
-          <Button variant="outline" className="h-9 sm:h-10" asChild>
-            <Link href="/workforce/childcare/registrations">
-              <Baby className="mr-1.5 h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Assign Childcare</span>
-              <span className="sm:hidden">Childcare</span>
-            </Link>
-          </Button>
-          <Button variant="outline" className="h-9 sm:h-10" asChild>
-            <Link href="/workforce/volunteers">
-              <Users className="mr-1.5 h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Open Volunteer Needs</span>
-              <span className="sm:hidden">Volunteers</span>
-            </Link>
-          </Button>
-          <Button variant="outline" className="h-9 sm:h-10" disabled>
-            <Download className="mr-1.5 h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Export Report</span>
-            <span className="sm:hidden">Export</span>
-          </Button>
-        </div>
-
-        <section id="event-requests" className="space-y-3">
+        <section id="attention-required" className="space-y-3">
           <div>
-            <h3 className="text-base font-semibold">Event requests</h3>
+            <h3 className="text-base font-semibold">Attention required</h3>
             <p className="text-sm text-muted-foreground">
-              Review department event requests awaiting supervisor approval.
+              Open an event to approve requests, assign childcare, volunteers, and more.
             </p>
           </div>
-          <InternalEventRequestsQueue
-            requests={pendingRequests}
-            canManage={canManage}
-          />
+          {attentionItems.length === 0 ? (
+            <Card>
+              <CardContent className="p-6 text-sm text-muted-foreground">
+                Nothing needs your attention right now.
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {attentionItems.map((item) => (
+                <AttentionCard key={item.id} item={item} />
+              ))}
+            </div>
+          )}
         </section>
 
         <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
@@ -357,7 +350,7 @@ export function EventManagementOverviewClient({
                   Today&apos;s Schedule
                 </CardTitle>
                 <Button variant="ghost" size="sm" asChild>
-                  <Link href="/event-management/calendar" className="text-xs">
+                  <Link href="/facilities/availability" className="text-xs">
                     View Calendar
                     <ChevronRight className="ml-1 h-3 w-3" />
                   </Link>
@@ -408,98 +401,6 @@ export function EventManagementOverviewClient({
                     </TableBody>
                   </Table>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                <AlertTriangle className="h-4 w-4 text-amber-600" />
-                Operational Alerts
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {data.operationalAlerts.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No operational alerts right now.
-                </p>
-              ) : (
-                data.operationalAlerts.map((alert) => (
-                  <div
-                    key={alert.id}
-                    className={cn(
-                      "flex items-start justify-between gap-3 rounded-lg border p-3",
-                      alert.type === "warning"
-                        ? "border-amber-200 bg-amber-50"
-                        : "border-blue-200 bg-blue-50"
-                    )}
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium">{alert.message}</p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        Event: {alert.eventDate}
-                      </p>
-                    </div>
-                    <Button size="sm" variant="outline" className="h-8 shrink-0 text-xs" asChild>
-                      <Link href={alert.href}>{alert.action}</Link>
-                    </Button>
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold">
-                Events Needing Action
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {data.eventsNeedingAction.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  All upcoming events look good.
-                </p>
-              ) : (
-                data.eventsNeedingAction.map((event) => (
-                  <div
-                    key={event.id}
-                    className="flex items-center justify-between gap-3 rounded-lg border p-3"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="truncate text-sm font-medium">
-                          {event.eventName}
-                        </p>
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            "shrink-0 text-[10px]",
-                            event.priority === "high" &&
-                              "border-red-200 bg-red-50 text-red-700",
-                            event.priority === "medium" &&
-                              "border-amber-200 bg-amber-50 text-amber-700",
-                            event.priority === "low" &&
-                              "border-gray-200 bg-gray-50 text-gray-600"
-                          )}
-                        >
-                          {event.daysUntil}d
-                        </Badge>
-                      </div>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {event.actionRequired}
-                      </p>
-                    </div>
-                    <Button size="sm" variant="ghost" className="h-8 shrink-0" asChild>
-                      <Link href={event.href}>
-                        <ChevronRight className="h-4 w-4" />
-                      </Link>
-                    </Button>
-                  </div>
-                ))
               )}
             </CardContent>
           </Card>

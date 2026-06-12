@@ -11,7 +11,7 @@ export type ReservationSourceType =
 
 export type CalendarContext = "venue_rentals" | "internal_events" | "facilities"
 
-export type CalendarViewMode = "day" | "week"
+export type CalendarViewMode = "day" | "grid"
 
 export interface CalendarVenue {
   id: string
@@ -45,7 +45,7 @@ export interface CalendarData {
 export const CALENDAR_CONTEXT_LABELS: Record<CalendarContext, string> = {
   venue_rentals: "Venue Rentals",
   internal_events: "Event Management",
-  facilities: "Master Calendar",
+  facilities: "Schedule",
 }
 
 export const CALENDAR_CONTEXT_DESCRIPTIONS: Record<CalendarContext, string> = {

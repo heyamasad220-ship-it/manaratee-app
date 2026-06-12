@@ -14,6 +14,8 @@ import {
 } from "@/lib/programs/program-offering-queries"
 import { getProgramById } from "@/lib/programs/program-queries"
 import { getAllRegistrationOptionsForOffering } from "@/lib/programs/program-registration-option-queries"
+import { getVendorHubVendorTypes } from "@/lib/vendor-hub/vendor-type-queries"
+import { hasAnyPermission, PERMISSIONS } from "@/lib/permissions/permissions"
 
 export default async function EditProgramPage({
   params,
@@ -22,13 +24,22 @@ export default async function EditProgramPage({
 }) {
   const { id } = await params
 
-  const [program, departments, capacityGroups, offerings, serviceRequirementsForm] =
-    await Promise.all([
+  const [
+    program,
+    departments,
+    capacityGroups,
+    offerings,
+    serviceRequirementsForm,
+    vendorTypes,
+    canManageVendorTypes,
+  ] = await Promise.all([
     getProgramById(id),
     getDepartments(),
     getProgramCapacityGroups(id),
     getOfferingsForProgram(id),
     loadProgramServiceRequirementsForm(id),
+    getVendorHubVendorTypes({ activeOnly: true }),
+    hasAnyPermission(PERMISSIONS.EVENTS_MANAGE, PERMISSIONS.PROGRAMS_MANAGE),
   ])
 
   if (!program) {
@@ -62,6 +73,8 @@ export default async function EditProgramPage({
         <ProgramServiceRequirementsPanel
           programId={program.id}
           initialForm={serviceRequirementsForm ?? DEFAULT_EVENT_SERVICE_REQUIREMENTS_FORM}
+          vendorTypes={vendorTypes}
+          canManageVendorTypes={canManageVendorTypes}
         />
       </div>
     </>

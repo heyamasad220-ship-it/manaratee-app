@@ -20,7 +20,7 @@ import {
   InternalEventModuleDisabledState,
   InternalEventParticipationsPanel,
 } from "@/components/events/internal-event-participations-panel"
-import { InternalEventTicketingPanel } from "@/components/events/internal-event-ticketing-panel"
+import { InternalEventTicketingWorkspace } from "@/components/tickets/internal-event-ticketing-workspace"
 import { InternalEventStatusSelect } from "@/components/events/internal-event-status-select"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -30,6 +30,7 @@ import { getInternalEventStatusLabel } from "@/lib/events/internal-event-status"
 import {
   formatChildcareAgeGroupLabel,
   parseServiceRequirements,
+  summarizeVendorRequirements,
 } from "@/lib/events/event-service-requirements"
 import type { InternalEventWithRelations } from "@/lib/events/internal-event-types"
 import type {
@@ -340,14 +341,9 @@ export function InternalEventWorkspace({
                       <p className="font-medium">Vendors</p>
                       <p className="text-muted-foreground">
                         {[
-                          serviceConfig.vendors?.maxVendors
-                            ? `Up to ${serviceConfig.vendors.maxVendors} vendors`
-                            : null,
+                          ...summarizeVendorRequirements(serviceConfig.vendors),
                           serviceConfig.vendors?.applicationDeadline
                             ? `Apply by ${serviceConfig.vendors.applicationDeadline}`
-                            : null,
-                          serviceConfig.vendors?.fee != null
-                            ? `Fee $${serviceConfig.vendors.fee}`
                             : null,
                           serviceConfig.vendors?.approvalRequired === false
                             ? "Auto-approve vendors"
@@ -365,10 +361,12 @@ export function InternalEventWorkspace({
 
           <TabsContent value="ticketing" className="mt-0">
             {event.requires_ticketing ? (
-              <InternalEventTicketingPanel
+              <InternalEventTicketingWorkspace
                 eventId={event.id}
+                eventName={event.name}
                 ticketTypes={ticketTypes}
                 ticketingConfig={event.ticketing_config}
+                canManage={canManage}
               />
             ) : (
               <InternalEventModuleDisabledState

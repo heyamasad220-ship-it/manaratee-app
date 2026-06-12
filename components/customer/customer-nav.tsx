@@ -14,6 +14,7 @@ import {
   HeartHandshake,
   Home,
   LogOut,
+  Store,
   User,
 } from "lucide-react"
 
@@ -33,8 +34,10 @@ type CustomerNavProps = {
 const memberNavLinks = [
   { label: "Dashboard", href: "/customer/dashboard", icon: Home },
   { label: "Venue Rentals", href: "/customer/rentals", icon: CalendarDays },
+  { label: "Book a Space", href: "/customer/rentals/new", icon: CalendarPlus },
   { label: "Donations", href: "/customer/donation", icon: Gift },
   { label: "Programs", href: "/customer/programs", icon: HeartHandshake },
+  { label: "My Bazaars", href: "/customer/bazaars", icon: Store },
   { label: "Opportunities", href: "/customer/opportunities", icon: ClipboardList },
   { label: "Profile", href: "/customer/profile", icon: User },
   { label: "More", href: "/customer/more", icon: Grid3X3 },
@@ -72,11 +75,11 @@ export function CustomerNav({
     : isStaffPortal
       ? staffNavLinks
       : [
-          ...memberNavLinks.slice(0, 4),
+          ...memberNavLinks.slice(0, 5),
           ...(portalCapabilities?.hasStaffToolsPortal
             ? [{ label: "Staff Tools", href: "/customer/staff", icon: Briefcase }]
             : []),
-          ...memberNavLinks.slice(4),
+          ...memberNavLinks.slice(5),
           ...(portalCapabilities?.hasTeachingPortal
             ? [{ label: "My Classes", href: "/my-classes", icon: GraduationCap }]
             : []),

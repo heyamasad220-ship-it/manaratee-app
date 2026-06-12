@@ -1,24 +1,7 @@
-import { Suspense } from "react"
-import { Header } from "@/components/layout/header"
-import { ModuleApplicationsClient } from "@/components/applications/module-applications-client"
-import { VENDOR_HUB_APPLICATIONS_PATH } from "@/lib/applications/application-routes"
-import { PERMISSIONS, requirePermission } from "@/lib/permissions/permissions"
+import { redirect } from "next/navigation"
 
-export default async function VendorHubApplicationsPage() {
-  await requirePermission(PERMISSIONS.APPLICATIONS_VIEW)
+import { VENDOR_HUB_ROUTES } from "@/lib/vendor-hub/vendor-hub-routes"
 
-  return (
-    <>
-      <Header title="Vendor Applications" />
-      <Suspense>
-        <ModuleApplicationsClient
-          moduleOwner="vendor_hub"
-          basePath={VENDOR_HUB_APPLICATIONS_PATH}
-          title="Vendor Applications"
-          lockedApplicationType="vendor"
-          hubApplicationTypes={["vendor"]}
-        />
-      </Suspense>
-    </>
-  )
+export default function LegacyApplicationsRedirect() {
+  redirect(VENDOR_HUB_ROUTES.events.list)
 }

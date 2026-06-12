@@ -3,13 +3,11 @@ import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-orga
 
 import {
   normalizeVenueStatus,
-  normalizeVenueUsageTag,
   parseAmenities,
   type VenueRecord,
-  type VenueStatus,
-  type VenueUsageTag,
   type VenueWithStats,
 } from "./venue-types"
+import { normalizeVenueUsageTag } from "./venue-usage"
 
 type VenueRow = {
   id: string
@@ -23,6 +21,7 @@ type VenueRow = {
   hourly_rate: number | string | null
   peak_flat_price?: number | string | null
   peak_hourly_rate?: number | string | null
+  available_for_bookings?: boolean | null
   usage_tag?: string | null
   availability_start?: string | null
   availability_end?: string | null
@@ -39,6 +38,18 @@ type VenueBookingStatsRow = {
 
 const EXCLUDED_BOOKING_STATUSES = ["cancelled", "rejected"]
 
+function resolveAvailableForBookings(row: VenueRow): boolean {
+  if (typeof row.available_for_bookings === "boolean") {
+    return row.available_for_bookings
+  }
+
+  if (row.usage_tag) {
+    return normalizeVenueUsageTag(row.usage_tag) === "external"
+  }
+
+  return false
+}
+
 function mapVenueRow(row: VenueRow): VenueRecord {
   return {
     id: row.id,
@@ -51,7 +62,7 @@ function mapVenueRow(row: VenueRow): VenueRecord {
     hourly_rate: Number(row.hourly_rate ?? 0),
     peak_flat_price: Number(row.peak_flat_price ?? row.base_price ?? 0),
     peak_hourly_rate: Number(row.peak_hourly_rate ?? row.hourly_rate ?? 0),
-    usage_tag: normalizeVenueUsageTag(row.usage_tag),
+    available_for_bookings: resolveAvailableForBookings(row),
     availability_start: row.availability_start ?? null,
     availability_end: row.availability_end ?? null,
     amenities: parseAmenities(row.amenities),
@@ -73,6 +84,7 @@ const venueSelectColumns = `
   hourly_rate,
   peak_flat_price,
   peak_hourly_rate,
+  available_for_bookings,
   usage_tag,
   availability_start,
   availability_end,
@@ -101,6 +113,7 @@ const legacyVenueSelectColumns = `
 function isMissingVenueColumnError(error: { message?: string } | null) {
   const message = error?.message?.toLowerCase() ?? ""
   return (
+    message.includes("available_for_bookings") ||
     message.includes("usage_tag") ||
     message.includes("peak_flat_price") ||
     message.includes("peak_hourly_rate") ||
@@ -147,7 +160,7 @@ async function fetchOrganizationVenueRows(
   return result
 }
 
-export async function venueCatalogSupportsUsageTags(): Promise<boolean> {
+export async function venueCatalogSupportsExtendedFields(): Promise<boolean> {
   const organizationId = await getSelectedOrganizationId()
   if (!organizationId) {
     return false
@@ -156,7 +169,7 @@ export async function venueCatalogSupportsUsageTags(): Promise<boolean> {
   const supabase = await createClient()
   const { error } = await supabase
     .from("venues")
-    .select("usage_tag")
+    .select("available_for_bookings, peak_flat_price")
     .eq("organization_id", organizationId)
     .limit(1)
 
@@ -260,15 +273,9 @@ export async function getVenueById(id: string): Promise<VenueRecord | null> {
   return mapVenueRow(data as VenueRow)
 }
 
-export async function getVenuesByUsageTag(
-  usageTag: VenueUsageTag,
-  options?: { activeOnly?: boolean }
-): Promise<VenueRecord[]> {
+export async function getBookableVenues(): Promise<VenueRecord[]> {
   const venues = await getVenuesWithStats()
   return venues
-    .filter((venue) => venue.usage_tag === usageTag)
-    .filter((venue) =>
-      options?.activeOnly ? venue.status === "active" : true
-    )
+    .filter((venue) => venue.available_for_bookings && venue.status === "active")
     .map(({ totalBookings: _totalBookings, revenue: _revenue, ...venue }) => venue)
 }

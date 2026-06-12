@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useCallback, useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
@@ -37,6 +37,8 @@ import { ApplicationStatusBadge } from "@/components/applications/application-st
 
 export function ApplicationDetailClient({ applicationId }: { applicationId: string }) {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const vendorHubEventId = searchParams.get("vendor_hub_event_id")
   const [application, setApplication] = useState<ApplicationRecord | null>(null)
   const [history, setHistory] = useState<ApplicationHistoryRecord[]>([])
   const [documents, setDocuments] = useState<ApplicationDocumentRecord[]>([])
@@ -89,6 +91,7 @@ export function ApplicationDetailClient({ applicationId }: { applicationId: stri
         applicationId: application.id,
         status,
         reviewNotes,
+        vendorHubEventId,
       })
       await loadApplication()
     } catch (err) {

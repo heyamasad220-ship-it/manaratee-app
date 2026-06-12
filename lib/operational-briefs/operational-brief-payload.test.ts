@@ -54,6 +54,7 @@ test("toOperationalBriefView hides source record link for facility-only viewers"
     canOpenInternalEventRecord: false,
     canOpenProgramRecord: false,
     canEditSetupFields: true,
+    isFacilitiesOnly: true,
   })
 
   assert.equal(view.sourceRecordHref, null)
@@ -73,6 +74,7 @@ test("toOperationalBriefView exposes source record link only for module managers
     canOpenInternalEventRecord: false,
     canOpenProgramRecord: false,
     canEditSetupFields: false,
+    isFacilitiesOnly: false,
   })
 
   assert.equal(view.canOpenSourceRecord, true)
@@ -88,6 +90,7 @@ test("canOpenSourceRecordForBrief blocks maintenance deep links without manage a
         canOpenInternalEventRecord: true,
         canOpenProgramRecord: true,
         canEditSetupFields: false,
+        isFacilitiesOnly: false,
       }
     ),
     false

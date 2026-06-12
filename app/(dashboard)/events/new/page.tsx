@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation"
 
-export default function LegacyVenueRentalsCalendarRedirect() {
-  redirect("/bookings/calendar")
+export default function EventsNewRedirectPage() {
+  redirect("/facilities/availability")
 }

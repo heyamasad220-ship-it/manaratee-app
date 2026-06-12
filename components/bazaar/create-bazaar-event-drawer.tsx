@@ -1,7 +1,21 @@
 "use client"
 
-import { createClient } from "@/lib/supabase/client"
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import {
+  fetchInternalEventsForLinking,
+  upsertBazaarEvent,
+  type InternalEventLinkOption,
+} from "@/lib/vendor-hub/vendor-hub-event-actions"
+import {
+  applyBoothSetupTemplate,
+  fetchActiveBoothSetupTemplatesForPicker,
+} from "@/lib/vendor-hub/booth-template-actions"
+import type { VendorHubBoothSetupTemplate } from "@/lib/vendor-hub/booth-catalog-types"
+import {
+  BAZAAR_CALENDAR_VISIBILITY_OPTIONS,
+  visibilityFromCalendarStatus,
+  type BazaarCalendarVisibility,
+} from "@/lib/vendor-hub/calendar-visibility"
 import {
   Sheet,
   SheetContent,
@@ -48,7 +62,41 @@ import { cn } from "@/lib/utils"
 interface CreateBazaarEventDrawerProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  eventData?: any
+  eventData?: {
+    id: string
+    name?: string | null
+    event_type?: string | null
+    event_date?: string | null
+    start_time?: string | null
+    end_time?: string | null
+    location?: string | null
+    description?: string | null
+    calendar_status?: string | null
+    internal_event_id?: string | null
+  }
+}
+
+function parseSupabaseTime(time: string | null | undefined) {
+  if (!time) {
+    return { hour: "", minute: "", period: "AM" as const }
+  }
+
+  const [hourPart, minutePart] = time.split(":")
+  let hourNumber = Number(hourPart)
+  const minute = minutePart?.slice(0, 2) ?? "00"
+  const period = hourNumber >= 12 ? "PM" : "AM"
+
+  if (hourNumber === 0) {
+    hourNumber = 12
+  } else if (hourNumber > 12) {
+    hourNumber -= 12
+  }
+
+  return {
+    hour: String(hourNumber).padStart(2, "0"),
+    minute,
+    period: period as "AM" | "PM",
+  }
 }
 
 // Mock data for dropdowns
@@ -79,9 +127,14 @@ export function CreateBazaarEventDrawer({
   onOpenChange,
   eventData,
 }: CreateBazaarEventDrawerProps) {
-  const supabase = createClient()
   const isEditing = !!eventData
-const [saving, setSaving] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [internalEvents, setInternalEvents] = useState<InternalEventLinkOption[]>([])
+  const [loadingInternalEvents, setLoadingInternalEvents] = useState(false)
+  const [boothTemplates, setBoothTemplates] = useState<VendorHubBoothSetupTemplate[]>([])
+  const [selectedBoothTemplateId, setSelectedBoothTemplateId] = useState("none")
+  const [loadingBoothTemplates, setLoadingBoothTemplates] = useState(false)
   // Section collapse states
   const [vendorAppSection, setVendorAppSection] = useState(false)
   const [boothSetupSection, setBoothSetupSection] = useState(false)
@@ -95,7 +148,7 @@ const [saving, setSaving] = useState(false)
   const [enableVendorApps, setEnableVendorApps] = useState(false)
   const [configureBooths, setConfigureBooths] = useState(false)
   const [collectVendorFees, setCollectVendorFees] = useState(false)
-  const [publishToCalendar, setPublishToCalendar] = useState(false)
+  const [calendarVisibility, setCalendarVisibility] = useState<BazaarCalendarVisibility>("private")
   const [autoApprove, setAutoApprove] = useState(false)
   const [customPricing, setCustomPricing] = useState(false)
   const [requirePaymentBeforeApproval, setRequirePaymentBeforeApproval] = useState(false)
@@ -103,20 +156,22 @@ const [saving, setSaving] = useState(false)
   const [enableTicketing, setEnableTicketing] = useState(false)
 
   // Form data
-  const [eventName, setEventName] = useState(eventData?.name || "")
-const [eventType, setEventType] = useState(eventData?.event_type || "")
-const [startDate, setStartDate] = useState(eventData?.event_date || "")
-const [location, setLocation] = useState(eventData?.location || "")
+  const [eventName, setEventName] = useState("")
+  const [eventType, setEventType] = useState("")
+  const [startDate, setStartDate] = useState("")
+  const [location, setLocation] = useState("")
+  const [description, setDescription] = useState("")
+  const [internalEventId, setInternalEventId] = useState<string>("none")
   const [endDate, setEndDate] = useState("")
   const [startTime, setStartTime] = useState("")
   const [endTime, setEndTime] = useState("")
   const [startHour, setStartHour] = useState("")
-const [startMinute, setStartMinute] = useState("")
-const [startPeriod, setStartPeriod] = useState("AM")
+  const [startMinute, setStartMinute] = useState("")
+  const [startPeriod, setStartPeriod] = useState("AM")
 
-const [endHour, setEndHour] = useState("")
-const [endMinute, setEndMinute] = useState("")
-const [endPeriod, setEndPeriod] = useState("PM")
+  const [endHour, setEndHour] = useState("")
+  const [endMinute, setEndMinute] = useState("")
+  const [endPeriod, setEndPeriod] = useState("PM")
   const [linkedSpace, setLinkedSpace] = useState("")
   const [organizerName, setOrganizerName] = useState("")
   const [primaryContact, setPrimaryContact] = useState("")
@@ -127,6 +182,65 @@ const [endPeriod, setEndPeriod] = useState("PM")
   const [boothTypes, setBoothTypes] = useState<BoothType[]>([
     { id: "bt-1", name: "10x10 Tent", price: "100", quantity: "20" },
   ])
+
+  useEffect(() => {
+    if (!open) {
+      return
+    }
+
+    setSaveError(null)
+    setLoadingInternalEvents(true)
+    setLoadingBoothTemplates(true)
+    void fetchInternalEventsForLinking()
+      .then(setInternalEvents)
+      .finally(() => setLoadingInternalEvents(false))
+    void fetchActiveBoothSetupTemplatesForPicker()
+      .then(setBoothTemplates)
+      .catch(() => setBoothTemplates([]))
+      .finally(() => setLoadingBoothTemplates(false))
+  }, [open])
+
+  useEffect(() => {
+    if (!open) {
+      return
+    }
+
+    if (eventData) {
+      setEventName(eventData.name ?? "")
+      setEventType(eventData.event_type ?? "")
+      setStartDate(eventData.event_date ?? "")
+      setLocation(eventData.location ?? "")
+      setDescription(eventData.description ?? "")
+      setCalendarVisibility(visibilityFromCalendarStatus(eventData.calendar_status))
+      setInternalEventId(eventData.internal_event_id ?? "none")
+
+      const start = parseSupabaseTime(eventData.start_time)
+      setStartHour(start.hour)
+      setStartMinute(start.minute)
+      setStartPeriod(start.period)
+
+      const end = parseSupabaseTime(eventData.end_time)
+      setEndHour(end.hour)
+      setEndMinute(end.minute)
+      setEndPeriod(end.period)
+      return
+    }
+
+    setEventName("")
+    setEventType("")
+    setStartDate("")
+    setLocation("")
+    setDescription("")
+    setCalendarVisibility("private")
+    setInternalEventId("none")
+    setStartHour("")
+    setStartMinute("")
+    setStartPeriod("AM")
+    setEndHour("")
+    setEndMinute("")
+    setEndPeriod("PM")
+    setSelectedBoothTemplateId("none")
+  }, [open, eventData])
 
   const handleContactSelect = (contactId: string) => {
     const contact = mockContacts.find((c) => c.id === contactId)
@@ -176,61 +290,64 @@ function formatTimeForSupabase(hour: string, minute: string, period: string) {
   return `${String(hourNumber).padStart(2, "0")}:${minute}:00`
 }
   const handleSave = async () => {
-  if (!eventName.trim()) {
-    alert("Please enter an event name.")
-    return
+    if (!eventName.trim()) {
+      setSaveError("Please enter an event name.")
+      return
+    }
+
+    setSaving(true)
+    setSaveError(null)
+
+    try {
+      const useTemplate =
+        !isEditing && selectedBoothTemplateId && selectedBoothTemplateId !== "none"
+
+      const result = await upsertBazaarEvent({
+        id: eventData?.id,
+        name: eventName.trim(),
+        event_type: eventType || null,
+        event_date: startDate || null,
+        start_time: formatTimeForSupabase(startHour, startMinute, startPeriod),
+        end_time: formatTimeForSupabase(endHour, endMinute, endPeriod),
+        location: location || null,
+        description: description || null,
+        expected_attendees: 0,
+        total_booths: useTemplate
+          ? 0
+          : boothTypes.reduce((total, booth) => total + Number(booth.quantity || 0), 0),
+        calendar_visibility: calendarVisibility,
+        internal_event_id: internalEventId,
+      })
+
+      if (useTemplate) {
+        await applyBoothSetupTemplate({
+          eventId: result.id,
+          templateId: selectedBoothTemplateId,
+          generateBoothInventory: true,
+        })
+      }
+
+      onOpenChange(false)
+      window.location.reload()
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "Failed to save bazaar event")
+    } finally {
+      setSaving(false)
+    }
   }
-
-  setSaving(true)
-
-  const payload = {
-  name: eventName.trim(),
-  event_type: eventType || null,
-  event_date: startDate || null,
-  start_time: formatTimeForSupabase(startHour, startMinute, startPeriod),
-  end_time: formatTimeForSupabase(endHour, endMinute, endPeriod),
-  location: location || null,
-  description: null,
-  expected_attendees: 0,
-  total_booths: boothTypes.reduce(
-    (total, booth) => total + Number(booth.quantity || 0),
-    0
-  ),
-  status: "draft",
-  calendar_status: publishToCalendar
-    ? "ready_to_publish"
-    : "not_published",
-}
-
-let error = null
-
-if (isEditing) {
-  const response = await supabase
-    .from("vendor_hub_events")
-    .update(payload)
-    .eq("id", eventData.id)
-
-  error = response.error
-} else {
-  const response = await supabase
-    .from("vendor_hub_events")
-    .insert(payload)
-
-  error = response.error
-}
-  
-
-  alert("Event created successfully.")
-  onOpenChange(false)
-  window.location.reload()
-}
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="flex w-full flex-col overflow-hidden p-0 sm:max-w-xl">
         <SheetHeader className="border-b px-6 py-4">
-          <SheetTitle className="text-lg">Create Bazaar Event</SheetTitle>
-          <SheetDescription>Set up a new bazaar, festival, or community event</SheetDescription>
+          <SheetTitle className="text-lg">
+            {isEditing ? "Edit Bazaar Event" : "Create Bazaar Event"}
+          </SheetTitle>
+          <SheetDescription>
+            {isEditing
+              ? "Update bazaar event details, visibility, and Event Management link"
+              : "Set up a new bazaar, festival, or community event"}
+          </SheetDescription>
         </SheetHeader>
 
         <div className="flex-1 overflow-y-auto">
@@ -391,6 +508,17 @@ if (isEditing) {
                     value={location}
                     onChange={(e) => setLocation(e.target.value)}
                     className="mt-1.5"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea
+                    id="description"
+                    placeholder="Brief description for staff and calendar listings..."
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    className="mt-1.5"
+                    rows={3}
                   />
                 </div>
                 <div>
@@ -638,6 +766,42 @@ if (isEditing) {
               </CollapsibleTrigger>
               <CollapsibleContent className="pt-2">
                 <div className="flex flex-col gap-4 pl-6">
+                  {!isEditing ? (
+                    <div>
+                      <Label htmlFor="boothTemplate">Apply Booth Template (optional)</Label>
+                      <Select
+                        value={selectedBoothTemplateId}
+                        onValueChange={(value) => {
+                          setSelectedBoothTemplateId(value)
+                          if (value !== "none") {
+                            setConfigureBooths(true)
+                          }
+                        }}
+                        disabled={loadingBoothTemplates}
+                      >
+                        <SelectTrigger id="boothTemplate" className="mt-1.5">
+                          <SelectValue
+                            placeholder={
+                              loadingBoothTemplates ? "Loading templates..." : "Select a template"
+                            }
+                          />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">None — configure booths later</SelectItem>
+                          {boothTemplates.map((template) => (
+                            <SelectItem key={template.id} value={template.id}>
+                              {template.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="mt-1.5 text-xs text-muted-foreground">
+                        Copies booth types and numbered inventory from your organization template
+                        library. Manage templates in Vendor Hub Settings → Booths.
+                      </p>
+                    </div>
+                  ) : null}
+
                   <div className="flex items-center justify-between">
                     <Label htmlFor="configureBooths" className="cursor-pointer">
                       Configure Booth Layout
@@ -851,11 +1015,11 @@ if (isEditing) {
                   <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
                     <Globe className="h-4 w-4 text-muted-foreground" />
                     Community Calendar
-                    {publishToCalendar && (
+                    {calendarVisibility !== "private" ? (
                       <Badge variant="outline" className="ml-2 border-emerald-200 bg-emerald-50 text-emerald-700">
-                        Will Publish
+                        {calendarVisibility === "published" ? "Public" : "Community Visible"}
                       </Badge>
-                    )}
+                    ) : null}
                   </h3>
                   {calendarSection ? (
                     <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -866,52 +1030,33 @@ if (isEditing) {
               </CollapsibleTrigger>
               <CollapsibleContent className="pt-2">
                 <div className="flex flex-col gap-4 pl-6">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="publishCalendar" className="cursor-pointer">
-                      Publish to Community Calendar
-                    </Label>
-                    <Switch
-                      id="publishCalendar"
-                      checked={publishToCalendar}
-                      onCheckedChange={setPublishToCalendar}
-                    />
+                  <div>
+                    <Label htmlFor="calendarVisibility">Calendar Visibility</Label>
+                    <Select
+                      value={calendarVisibility}
+                      onValueChange={(value) =>
+                        setCalendarVisibility(value as BazaarCalendarVisibility)
+                      }
+                    >
+                      <SelectTrigger id="calendarVisibility" className="mt-1.5">
+                        <SelectValue placeholder="Select visibility" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {BAZAAR_CALENDAR_VISIBILITY_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="mt-1.5 text-xs text-muted-foreground">
+                      {
+                        BAZAAR_CALENDAR_VISIBILITY_OPTIONS.find(
+                          (option) => option.value === calendarVisibility
+                        )?.description
+                      }
+                    </p>
                   </div>
-
-                  {publishToCalendar && (
-                    <div className="flex flex-col gap-4">
-                      <div>
-                        <Label htmlFor="displayName">Display Name</Label>
-                        <Input
-                          id="displayName"
-                          placeholder="Leave blank to use event name"
-                          className="mt-1.5"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="eventCategory">Event Category</Label>
-                        <Select>
-                          <SelectTrigger className="mt-1.5">
-                            <SelectValue placeholder="Select category" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="bazaar">Bazaar</SelectItem>
-                            <SelectItem value="festival">Festival</SelectItem>
-                            <SelectItem value="community">Community Event</SelectItem>
-                            <SelectItem value="fundraiser">Fundraiser</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label htmlFor="shortDescription">Short Description</Label>
-                        <Textarea
-                          id="shortDescription"
-                          placeholder="Brief description for calendar listing..."
-                          className="mt-1.5"
-                          rows={2}
-                        />
-                      </div>
-                    </div>
-                  )}
                 </div>
               </CollapsibleContent>
             </Collapsible>
@@ -973,6 +1118,37 @@ if (isEditing) {
               <CollapsibleContent className="pt-2">
                 <div className="flex flex-col gap-4 pl-6">
                   <div>
+                    <Label htmlFor="linkInternalEvent">Link to Event Management (optional)</Label>
+                    <Select
+                      value={internalEventId}
+                      onValueChange={setInternalEventId}
+                      disabled={loadingInternalEvents}
+                    >
+                      <SelectTrigger id="linkInternalEvent" className="mt-1.5">
+                        <SelectValue
+                          placeholder={
+                            loadingInternalEvents ? "Loading events..." : "Select internal event"
+                          }
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        {internalEvents.map((event) => (
+                          <SelectItem key={event.id} value={event.id}>
+                            {event.name}
+                            {event.start_at
+                              ? ` — ${new Date(event.start_at).toLocaleDateString()}`
+                              : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="mt-1.5 text-xs text-muted-foreground">
+                      Connect this bazaar to an Event Management record without duplicating event
+                      data.
+                    </p>
+                  </div>
+                  <div>
                     <Label htmlFor="linkBooking">Link to Booking</Label>
                     <Select>
                       <SelectTrigger className="mt-1.5">
@@ -1018,11 +1194,17 @@ if (isEditing) {
         </div>
 
         {/* Sticky Footer */}
-        <SheetFooter className="flex-row justify-between border-t px-6 py-4">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+        <SheetFooter className="flex-col gap-3 border-t px-6 py-4 sm:flex-row sm:justify-between">
+          {saveError ? (
+            <p className="w-full text-sm text-destructive sm:order-first sm:w-auto">{saveError}</p>
+          ) : (
+            <span className="hidden sm:block" />
+          )}
+          <div className="flex w-full gap-2 sm:w-auto">
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="flex-1 sm:flex-none">
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={saving}>
+          <Button onClick={handleSave} disabled={saving} className="flex-1 sm:flex-none">
   {saving
     ? isEditing
       ? "Saving..."
@@ -1031,6 +1213,7 @@ if (isEditing) {
       ? "Save Changes"
       : "Create Event"}
 </Button>
+          </div>
         </SheetFooter>
       </SheetContent>
     </Sheet>

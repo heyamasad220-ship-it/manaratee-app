@@ -5,8 +5,10 @@ import { useMemo, useRef, useState, useTransition } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
   Ban,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Info,
   Plus,
   TriangleAlert,
 } from "lucide-react"
@@ -14,6 +16,7 @@ import {
 import { Header } from "@/components/layout/header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Calendar } from "@/components/ui/calendar"
 import { Card, CardContent } from "@/components/ui/card"
 import {
   Dialog,
@@ -24,26 +27,30 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import { Textarea } from "@/components/ui/textarea"
 import { TimeInput } from "@/components/ui/time-input"
+import type { CalendarAudience } from "@/lib/reservations/calendar-audience"
+import { CALENDAR_AUDIENCE_PATHS } from "@/lib/reservations/calendar-audience"
 import { createReservationBlock } from "@/lib/reservations/reservation-actions"
 import { computeReservationConflicts } from "@/lib/reservations/reservation-conflicts"
 import {
-  formatCalendarHeading,
+  formatCalendarToolbarDate,
   formatHourLabel,
   formatTimeRange,
   getWeekStart,
   toDateParam,
 } from "@/lib/reservations/reservation-time"
 import type {
-  CalendarContext,
   CalendarData,
   CalendarReservation,
   CalendarViewMode,
 } from "@/lib/reservations/reservation-types"
 import {
-  CALENDAR_CONTEXT_DESCRIPTIONS,
-  CALENDAR_CONTEXT_LABELS,
   RESERVATION_SOURCE_TYPES,
   SOURCE_TYPE_COLORS,
   SOURCE_TYPE_LABELS,
@@ -53,18 +60,21 @@ import { OperationalBriefPanel } from "@/components/operational-briefs/operation
 import { cn } from "@/lib/utils"
 
 const HOURS_START = 7
-const HOURS_END = 20
-const ROW_HEIGHT = 56
+const HOURS_END = 18
+const DAY_ROW_HEIGHT = 72
+const GRID_ROW_MIN_HEIGHT = 90
 const DAY_LABELS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"]
+const VIEW_MODES: CalendarViewMode[] = ["day", "grid"]
 
 type ReservationCalendarProps = {
-  context: CalendarContext
+  audience: CalendarAudience
   initialData: CalendarData
   initialDate: string
   initialView: CalendarViewMode
   canManageBlocks: boolean
+  canPlanEvents?: boolean
   headerTitle?: string
-  enableOperationalBrief?: boolean
+  description?: string
 }
 
 type CalendarColumn = {
@@ -76,17 +86,8 @@ type CalendarColumn = {
 
 function reservationMatchesColumn(
   reservation: CalendarReservation,
-  column: CalendarColumn,
-  context: CalendarContext
+  column: CalendarColumn
 ) {
-  if (context === "internal_events" && column.id === "unassigned") {
-    return !reservation.venueId && !reservation.spaceLabel
-  }
-
-  if (context === "internal_events" && column.id === "internal-events") {
-    return true
-  }
-
   if (column.venueId) {
     return reservation.venueId === column.venueId
   }
@@ -97,10 +98,6 @@ function reservationMatchesColumn(
       (reservation.spaceLabel || "").toLowerCase() ===
         column.spaceLabel.toLowerCase()
     )
-  }
-
-  if (context === "venue_rentals") {
-    return reservation.venueId === column.venueId
   }
 
   return !reservation.venueId
@@ -127,10 +124,7 @@ function reservationOnDate(reservation: CalendarReservation, date: Date) {
   return start <= dayEnd && end >= dayStart
 }
 
-function buildColumns(
-  data: CalendarData,
-  context: CalendarContext
-): CalendarColumn[] {
+function buildColumns(data: CalendarData): CalendarColumn[] {
   const columns: CalendarColumn[] = data.venues.map((venue) => ({
     id: venue.id,
     label: venue.name,
@@ -155,27 +149,6 @@ function buildColumns(
     })
   }
 
-  if (context === "internal_events" && columns.length === 0) {
-    columns.push({
-      id: "internal-events",
-      label: "Internal Events",
-      venueId: null,
-      spaceLabel: null,
-    })
-  }
-
-  if (context === "internal_events") {
-    const hasUnassigned = data.reservations.some((reservation) => !reservation.venueId)
-    if (hasUnassigned && !columns.some((column) => column.id === "unassigned")) {
-      columns.unshift({
-        id: "unassigned",
-        label: "All Events",
-        venueId: null,
-        spaceLabel: null,
-      })
-    }
-  }
-
   if (columns.length === 0) {
     columns.push({
       id: "schedule",
@@ -188,19 +161,416 @@ function buildColumns(
   return columns
 }
 
-export function ReservationCalendar({
+function buildEventRequestHref(day: Date, hour: number, column: CalendarColumn) {
+  const start = new Date(day)
+  start.setHours(hour, 0, 0, 0)
+  const end = new Date(start)
+  end.setHours(hour + 1, 0, 0, 0)
+
+  const params = new URLSearchParams()
+  if (column.venueId) {
+    params.set("venueId", column.venueId)
+  }
+  params.set("start", start.toISOString())
+  params.set("end", end.toISOString())
+
+  return `/event-management/request?${params.toString()}`
+}
+
+function formatReservationStartTime(iso: string) {
+  return new Date(iso).toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  })
+}
+
+function getReservationColors(
+  reservation: CalendarReservation,
+  isOps: boolean
+) {
+  if (isOps && reservation.sourceType === RESERVATION_SOURCE_TYPES.venueRental) {
+    return getReservationStatusCalendarClasses(reservation.status)
+  }
+
+  return SOURCE_TYPE_COLORS[reservation.sourceType]
+}
+
+type ReservationRenderContext = {
+  isOps: boolean
+  conflicts: ReturnType<typeof computeReservationConflicts>
+  onSelectReservation: (reservation: CalendarReservation) => void
+}
+
+function DayReservationBlock({
+  reservation,
   context,
+}: {
+  reservation: CalendarReservation
+  context: ReservationRenderContext
+}) {
+  const colors = getReservationColors(reservation, context.isOps)
+  const hasConflict = context.conflicts.conflictIds.has(reservation.id)
+
+  const content = (
+    <div
+      className={cn(
+        "absolute inset-x-1 top-1 z-[5] overflow-hidden rounded-md border px-2 py-1 text-left text-[11px] font-medium leading-tight shadow-sm",
+        colors.bg,
+        colors.text,
+        colors.border,
+        hasConflict && "ring-2 ring-red-500 ring-offset-1 border-red-400",
+        context.isOps && "cursor-pointer"
+      )}
+      style={{
+        height: `${reservationDurationHours(reservation.startAt, reservation.endAt) * DAY_ROW_HEIGHT - 8}px`,
+      }}
+      onClick={
+        context.isOps
+          ? (event) => {
+              event.stopPropagation()
+              context.onSelectReservation(reservation)
+            }
+          : undefined
+      }
+      onKeyDown={
+        context.isOps
+          ? (event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault()
+                event.stopPropagation()
+                context.onSelectReservation(reservation)
+              }
+            }
+          : undefined
+      }
+      role={context.isOps ? "button" : undefined}
+      tabIndex={context.isOps ? 0 : undefined}
+    >
+      <div className="truncate font-semibold">{reservation.title}</div>
+      {hasConflict ? (
+        <div className="truncate font-medium text-red-700">Conflict</div>
+      ) : null}
+      <div className="truncate opacity-75">
+        {formatTimeRange(reservation.startAt, reservation.endAt)}
+      </div>
+    </div>
+  )
+
+  if (context.isOps) {
+    return content
+  }
+
+  if (reservation.href) {
+    return (
+      <Link href={reservation.href} className="block">
+        {content}
+      </Link>
+    )
+  }
+
+  return content
+}
+
+function GridReservationItem({
+  reservation,
+  context,
+}: {
+  reservation: CalendarReservation
+  context: ReservationRenderContext
+}) {
+  const colors = getReservationColors(reservation, context.isOps)
+  const hasConflict = context.conflicts.conflictIds.has(reservation.id)
+
+  const inner = (
+    <>
+      <span
+        className={cn(
+          "mt-0.5 h-2 w-2 shrink-0 rounded-full",
+          colors.text.replace("text-", "bg-")
+        )}
+      />
+      <span className="truncate text-foreground">
+        <span className="font-medium">
+          {formatReservationStartTime(reservation.startAt)}
+        </span>{" "}
+        {reservation.title}
+      </span>
+    </>
+  )
+
+  if (context.isOps) {
+    return (
+      <button
+        type="button"
+        className={cn(
+          "flex w-full items-center gap-1.5 text-left text-xs transition-opacity hover:opacity-70",
+          hasConflict && "text-red-700"
+        )}
+        onClick={(event) => {
+          event.stopPropagation()
+          context.onSelectReservation(reservation)
+        }}
+      >
+        {inner}
+      </button>
+    )
+  }
+
+  if (reservation.href) {
+    return (
+      <Link
+        href={reservation.href}
+        className={cn(
+          "flex items-center gap-1.5 text-xs transition-opacity hover:opacity-70",
+          hasConflict && "text-red-700"
+        )}
+        onClick={(event) => event.stopPropagation()}
+      >
+        {inner}
+      </Link>
+    )
+  }
+
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-1.5 text-xs",
+        hasConflict && "text-red-700"
+      )}
+    >
+      {inner}
+    </div>
+  )
+}
+
+function SpaceColumnHeaders({ columns }: { columns: CalendarColumn[] }) {
+  return (
+    <>
+      <div className="sticky top-0 z-10 border-b border-r border-border bg-muted/50 p-2" />
+      {columns.map((column) => (
+        <div
+          key={column.id}
+          className="sticky top-0 z-10 flex items-center justify-center gap-1 border-b border-r border-border bg-muted/50 px-2 py-3 text-center text-xs font-semibold text-foreground last:border-r-0"
+        >
+          <span className="leading-tight">{column.label}</span>
+          <Info className="h-3 w-3 shrink-0 text-muted-foreground" />
+        </div>
+      ))}
+    </>
+  )
+}
+
+function DayView({
+  columns,
+  hours,
+  currentDate,
+  data,
+  scrollRef,
+  canPlanEvents,
+  renderContext,
+  onEmptySlotClick,
+}: {
+  columns: CalendarColumn[]
+  hours: number[]
+  currentDate: Date
+  data: CalendarData
+  scrollRef: React.RefObject<HTMLDivElement | null>
+  canPlanEvents: boolean
+  renderContext: ReservationRenderContext
+  onEmptySlotClick: (day: Date, hour: number, column: CalendarColumn) => void
+}) {
+  return (
+    <div ref={scrollRef} className="overflow-x-auto rounded-b-lg border border-t-0 border-border bg-card">
+      <div
+        className="grid min-w-[900px]"
+        style={{
+          gridTemplateColumns: `80px repeat(${columns.length}, minmax(120px, 1fr))`,
+        }}
+      >
+        <SpaceColumnHeaders columns={columns} />
+
+        {hours.map((hour) => (
+          <div key={hour} className="contents">
+            <div
+              className="flex items-start justify-end border-b border-r border-border px-2 pt-2 text-xs font-medium text-muted-foreground"
+              style={{ height: DAY_ROW_HEIGHT }}
+            >
+              {formatHourLabel(hour)}
+            </div>
+
+            {columns.map((column) => {
+              const items = data.reservations.filter(
+                (reservation) =>
+                  reservationOnDate(reservation, currentDate) &&
+                  reservationMatchesColumn(reservation, column) &&
+                  reservationStartHour(reservation.startAt) === hour
+              )
+              const isEmptySlot = items.length === 0
+              const canClickSlot = canPlanEvents && isEmptySlot && column.venueId
+
+              return (
+                <div
+                  key={`${hour}-${column.id}`}
+                  className={cn(
+                    "relative border-b border-r border-border last:border-r-0",
+                    canClickSlot && "cursor-pointer hover:bg-primary/5"
+                  )}
+                  style={{ height: DAY_ROW_HEIGHT }}
+                  onClick={
+                    canClickSlot
+                      ? () => onEmptySlotClick(currentDate, hour, column)
+                      : undefined
+                  }
+                  onKeyDown={
+                    canClickSlot
+                      ? (event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault()
+                            onEmptySlotClick(currentDate, hour, column)
+                          }
+                        }
+                      : undefined
+                  }
+                  role={canClickSlot ? "button" : undefined}
+                  tabIndex={canClickSlot ? 0 : undefined}
+                  title={
+                    canClickSlot ? "Click to request an event in this slot" : undefined
+                  }
+                >
+                  {items.map((reservation) => (
+                    <DayReservationBlock
+                      key={reservation.id}
+                      reservation={reservation}
+                      context={renderContext}
+                    />
+                  ))}
+                </div>
+              )
+            })}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function GridView({
+  columns,
+  weekDays,
+  data,
+  scrollRef,
+  canPlanEvents,
+  renderContext,
+  onEmptyCellClick,
+}: {
+  columns: CalendarColumn[]
+  weekDays: Date[]
+  data: CalendarData
+  scrollRef: React.RefObject<HTMLDivElement | null>
+  canPlanEvents: boolean
+  renderContext: ReservationRenderContext
+  onEmptyCellClick: (day: Date, column: CalendarColumn) => void
+}) {
+  return (
+    <div ref={scrollRef} className="overflow-x-auto rounded-b-lg border border-t-0 border-border bg-card">
+      <div
+        className="grid min-w-[700px]"
+        style={{
+          gridTemplateColumns: `80px repeat(${columns.length}, minmax(160px, 1fr))`,
+        }}
+      >
+        <SpaceColumnHeaders columns={columns} />
+
+        {weekDays.map((day) => {
+          const dayOfWeek = day.getDay()
+          const dayDate = day.getDate()
+
+          return (
+            <div key={day.toISOString()} className="contents">
+              <div
+                className="flex flex-col items-center justify-start gap-0.5 border-b border-r border-border px-2 py-3"
+                style={{ minHeight: GRID_ROW_MIN_HEIGHT }}
+              >
+                <span className="text-sm font-bold text-primary">{dayDate}</span>
+                <span className="text-xs font-semibold text-primary">
+                  {DAY_LABELS[dayOfWeek]}
+                </span>
+              </div>
+
+              {columns.map((column) => {
+                const cellReservations = data.reservations
+                  .filter(
+                    (reservation) =>
+                      reservationOnDate(reservation, day) &&
+                      reservationMatchesColumn(reservation, column)
+                  )
+                  .sort(
+                    (a, b) =>
+                      new Date(a.startAt).getTime() - new Date(b.startAt).getTime()
+                  )
+                const canClickCell =
+                  canPlanEvents && cellReservations.length === 0 && column.venueId
+
+                return (
+                  <div
+                    key={`${day.toISOString()}-${column.id}`}
+                    className={cn(
+                      "flex flex-col gap-1.5 border-b border-r border-border px-3 py-2.5 last:border-r-0",
+                      canClickCell && "cursor-pointer hover:bg-primary/5"
+                    )}
+                    style={{ minHeight: GRID_ROW_MIN_HEIGHT }}
+                    onClick={
+                      canClickCell ? () => onEmptyCellClick(day, column) : undefined
+                    }
+                    onKeyDown={
+                      canClickCell
+                        ? (event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault()
+                              onEmptyCellClick(day, column)
+                            }
+                          }
+                        : undefined
+                    }
+                    role={canClickCell ? "button" : undefined}
+                    tabIndex={canClickCell ? 0 : undefined}
+                    title={
+                      canClickCell ? "Click to request an event on this day" : undefined
+                    }
+                  >
+                    {cellReservations.map((reservation) => (
+                      <GridReservationItem
+                        key={reservation.id}
+                        reservation={reservation}
+                        context={renderContext}
+                      />
+                    ))}
+                  </div>
+                )
+              })}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+export function ReservationCalendar({
+  audience,
   initialData,
   initialDate,
   initialView,
   canManageBlocks,
+  canPlanEvents = false,
   headerTitle,
-  enableOperationalBrief = false,
+  description,
 }: ReservationCalendarProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [isPending, startTransition] = useTransition()
   const [blockOpen, setBlockOpen] = useState(false)
+  const [datePickerOpen, setDatePickerOpen] = useState(false)
   const [briefOpen, setBriefOpen] = useState(false)
   const [selectedReservation, setSelectedReservation] =
     useState<CalendarReservation | null>(null)
@@ -213,6 +583,8 @@ export function ReservationCalendar({
   )
   const view = initialView
   const data = initialData
+  const isOps = audience === "ops"
+  const isStaff = audience === "staff"
 
   const hours = useMemo(() => {
     const values: number[] = []
@@ -231,10 +603,7 @@ export function ReservationCalendar({
     })
   }, [currentDate])
 
-  const columns = useMemo(
-    () => buildColumns(data, context),
-    [data, context]
-  )
+  const columns = useMemo(() => buildColumns(data), [data])
 
   const sourceTypesInView = useMemo(
     () => Array.from(new Set(data.reservations.map((item) => item.sourceType))),
@@ -243,10 +612,22 @@ export function ReservationCalendar({
 
   const conflicts = useMemo(
     () =>
-      context === "facilities"
+      isOps
         ? computeReservationConflicts(data.reservations, data.venues)
         : { conflictIds: new Set<string>(), conflictPairs: [], conflictCount: 0 },
-    [context, data.reservations, data.venues]
+    [isOps, data.reservations, data.venues]
+  )
+
+  const renderContext: ReservationRenderContext = useMemo(
+    () => ({
+      isOps,
+      conflicts,
+      onSelectReservation: (reservation) => {
+        setSelectedReservation(reservation)
+        setBriefOpen(true)
+      },
+    }),
+    [isOps, conflicts]
   )
 
   function pushParams(next: { date?: string; view?: CalendarViewMode }) {
@@ -254,12 +635,7 @@ export function ReservationCalendar({
     if (next.date) params.set("date", next.date)
     if (next.view) params.set("view", next.view)
 
-    const pathname =
-      context === "venue_rentals"
-        ? "/bookings/calendar"
-        : context === "internal_events"
-          ? "/event-management/calendar"
-          : "/facilities/calendar"
+    const pathname = CALENDAR_AUDIENCE_PATHS[audience]
 
     startTransition(() => {
       router.push(`${pathname}?${params.toString()}`)
@@ -268,12 +644,36 @@ export function ReservationCalendar({
 
   function navigate(direction: -1 | 1) {
     const next = new Date(currentDate)
-    if (view === "week") {
+    if (view === "grid") {
       next.setDate(next.getDate() + direction * 7)
     } else {
       next.setDate(next.getDate() + direction)
     }
     pushParams({ date: toDateParam(next), view })
+  }
+
+  function scrollSpaces(direction: -1 | 1) {
+    scrollRef.current?.scrollBy({
+      left: direction * 240,
+      behavior: "smooth",
+    })
+  }
+
+  function handleEmptySlotClick(day: Date, hour: number, column: CalendarColumn) {
+    router.push(buildEventRequestHref(day, hour, column))
+  }
+
+  function handleEmptyCellClick(day: Date, column: CalendarColumn) {
+    router.push(buildEventRequestHref(day, 9, column))
+  }
+
+  function goToDate(date: Date) {
+    pushParams({ date: toDateParam(date), view })
+    setDatePickerOpen(false)
+  }
+
+  function goToToday() {
+    goToDate(new Date())
   }
 
   async function handleCreateBlock(formData: FormData) {
@@ -306,23 +706,26 @@ export function ReservationCalendar({
     })
   }
 
-  const displayDays = view === "day" ? [currentDate] : weekDays
+  const toolbarDateLabel =
+    view === "grid"
+      ? `${formatCalendarToolbarDate(weekDays[0])} – ${formatCalendarToolbarDate(weekDays[6])}`
+      : formatCalendarToolbarDate(currentDate)
 
   return (
     <>
-      <Header title={headerTitle || CALENDAR_CONTEXT_LABELS[context]} />
+      <Header title={headerTitle || "Calendar"} />
 
       <div className="flex flex-col gap-4 p-4 sm:p-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h2 className="text-xl font-semibold">Calendar</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {CALENDAR_CONTEXT_DESCRIPTIONS[context]}
-            </p>
+            <h2 className="text-xl font-semibold">{headerTitle || "Calendar"}</h2>
+            {description ? (
+              <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+            ) : null}
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {context === "internal_events" ? (
+            {canPlanEvents ? (
               <Button asChild size="sm">
                 <Link href="/event-management/request">
                   <Plus className="mr-2 h-4 w-4" />
@@ -339,234 +742,180 @@ export function ReservationCalendar({
           </div>
         </div>
 
-        <Card>
-          <CardContent className="flex flex-col gap-4 p-4">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="overflow-hidden rounded-lg border border-border bg-card">
+          <div className="flex flex-col gap-3 border-b border-border px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center rounded-md border border-border">
+                {VIEW_MODES.map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => pushParams({ date: initialDate, view: mode })}
+                    disabled={isPending}
+                    className={cn(
+                      "px-3 py-1.5 text-sm font-medium capitalize transition-colors first:rounded-l-md last:rounded-r-md",
+                      view === mode
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                    )}
+                  >
+                    {mode}
+                  </button>
+                ))}
+              </div>
+
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="icon" onClick={() => navigate(-1)} disabled={isPending}>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => navigate(-1)}
+                  disabled={isPending}
+                >
                   <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <Button variant="outline" size="icon" onClick={() => navigate(1)} disabled={isPending}>
-                  <ChevronRight className="h-4 w-4" />
                 </Button>
                 <Button
                   variant="outline"
-                  onClick={() => pushParams({ date: toDateParam(new Date()), view })}
+                  size="icon"
+                  onClick={() => navigate(1)}
                   disabled={isPending}
                 >
-                  Today
+                  <ChevronRight className="h-4 w-4" />
                 </Button>
-              </div>
 
-              <p className="text-sm font-medium sm:text-base">
-                {view === "week"
-                  ? `${formatCalendarHeading(weekDays[0])} – ${formatCalendarHeading(weekDays[6])}`
-                  : formatCalendarHeading(currentDate)}
-              </p>
-
-              <div className="flex rounded-lg border p-0.5">
-                {(["day", "week"] as CalendarViewMode[]).map((mode) => (
-                  <Button
-                    key={mode}
-                    size="sm"
-                    variant={view === mode ? "default" : "ghost"}
-                    onClick={() => pushParams({ date: initialDate, view: mode })}
-                    disabled={isPending}
-                    className="capitalize"
-                  >
-                    {mode}
-                  </Button>
-                ))}
+                <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      disabled={isPending}
+                      className="flex items-center gap-1.5 text-sm font-semibold tracking-wide text-foreground transition-colors hover:text-primary disabled:opacity-50"
+                    >
+                      {toolbarDateLabel}
+                      <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={currentDate}
+                      onSelect={(date) => {
+                        if (date) {
+                          goToDate(date)
+                        }
+                      }}
+                      defaultMonth={currentDate}
+                      initialFocus
+                    />
+                    <div className="border-t border-border p-2">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="w-full"
+                        onClick={goToToday}
+                      >
+                        Today
+                      </Button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
 
-            {context === "facilities" && sourceTypesInView.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {sourceTypesInView.map((sourceType) => (
-                  <Badge
-                    key={sourceType}
-                    variant="outline"
-                    className={cn(
-                      SOURCE_TYPE_COLORS[sourceType].bg,
-                      SOURCE_TYPE_COLORS[sourceType].text,
-                      SOURCE_TYPE_COLORS[sourceType].border
-                    )}
-                  >
-                    {SOURCE_TYPE_LABELS[sourceType]}
-                  </Badge>
-                ))}
-              </div>
-            ) : null}
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => scrollSpaces(-1)}
+                aria-label="Scroll spaces left"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => scrollSpaces(1)}
+                aria-label="Scroll spaces right"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
 
-            {context === "facilities" && conflicts.conflictCount > 0 ? (
-              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-                <div className="flex items-start gap-2">
-                  <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
-                  <div>
-                    <p className="font-medium">
-                      {conflicts.conflictCount} overlapping reservation
-                      {conflicts.conflictCount === 1 ? "" : "s"} detected
-                    </p>
-                    <ul className="mt-2 space-y-1 text-xs">
-                      {conflicts.conflictPairs.slice(0, 5).map((pair) => (
-                        <li key={`${pair.a.id}-${pair.b.id}`}>
-                          {pair.a.title} overlaps {pair.b.title} (
-                          {formatTimeRange(pair.a.startAt, pair.a.endAt)})
-                        </li>
-                      ))}
-                      {conflicts.conflictPairs.length > 5 ? (
-                        <li>+ {conflicts.conflictPairs.length - 5} more conflicts</li>
-                      ) : null}
-                    </ul>
-                  </div>
+          {(isOps || isStaff) && sourceTypesInView.length > 0 ? (
+            <div className="flex flex-wrap gap-2 border-b border-border px-4 py-3">
+              {sourceTypesInView.map((sourceType) => (
+                <Badge
+                  key={sourceType}
+                  variant="outline"
+                  className={cn(
+                    SOURCE_TYPE_COLORS[sourceType].bg,
+                    SOURCE_TYPE_COLORS[sourceType].text,
+                    SOURCE_TYPE_COLORS[sourceType].border
+                  )}
+                >
+                  {SOURCE_TYPE_LABELS[sourceType]}
+                </Badge>
+              ))}
+            </div>
+          ) : null}
+
+          {isOps && conflicts.conflictCount > 0 ? (
+            <div className="border-b border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+              <div className="flex items-start gap-2">
+                <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+                <div>
+                  <p className="font-medium">
+                    {conflicts.conflictCount} overlapping reservation
+                    {conflicts.conflictCount === 1 ? "" : "s"} detected
+                  </p>
+                  <ul className="mt-2 space-y-1 text-xs">
+                    {conflicts.conflictPairs.slice(0, 5).map((pair) => (
+                      <li key={`${pair.a.id}-${pair.b.id}`}>
+                        {pair.a.title} overlaps {pair.b.title} (
+                        {formatTimeRange(pair.a.startAt, pair.a.endAt)})
+                      </li>
+                    ))}
+                    {conflicts.conflictPairs.length > 5 ? (
+                      <li>+ {conflicts.conflictPairs.length - 5} more conflicts</li>
+                    ) : null}
+                  </ul>
                 </div>
               </div>
-            ) : null}
-          </CardContent>
-        </Card>
+            </div>
+          ) : null}
 
-        {data.reservations.length === 0 ? (
+          {view === "day" ? (
+            <DayView
+              columns={columns}
+              hours={hours}
+              currentDate={currentDate}
+              data={data}
+              scrollRef={scrollRef}
+              canPlanEvents={canPlanEvents}
+              renderContext={renderContext}
+              onEmptySlotClick={handleEmptySlotClick}
+            />
+          ) : (
+            <GridView
+              columns={columns}
+              weekDays={weekDays}
+              data={data}
+              scrollRef={scrollRef}
+              canPlanEvents={canPlanEvents}
+              renderContext={renderContext}
+              onEmptyCellClick={handleEmptyCellClick}
+            />
+          )}
+        </div>
+
+        {columns.length === 1 && columns[0].id === "schedule" ? (
           <Card>
-            <CardContent className="py-12 text-center text-sm text-muted-foreground">
-              No reservations in this range yet.
+            <CardContent className="py-8 text-center text-sm text-muted-foreground">
+              No spaces configured yet. Add spaces under Facilities settings to populate
+              this calendar.
             </CardContent>
           </Card>
         ) : null}
-
-        <div className="overflow-hidden rounded-lg border bg-card">
-          <div ref={scrollRef} className="overflow-x-auto">
-            <div
-              className="min-w-[960px]"
-              style={{
-                display: "grid",
-                gridTemplateColumns: `72px repeat(${displayDays.length * columns.length}, minmax(140px, 1fr))`,
-              }}
-            >
-              <div className="border-b border-r bg-muted/40 p-2 text-xs font-semibold uppercase text-muted-foreground">
-                Time
-              </div>
-              {displayDays.map((day) =>
-                columns.map((column) => (
-                  <div
-                    key={`${day.toISOString()}-${column.id}`}
-                    className="border-b border-r bg-muted/40 p-2"
-                  >
-                    <p className="text-[11px] font-semibold uppercase text-muted-foreground">
-                      {DAY_LABELS[day.getDay()]}
-                    </p>
-                    <p className="text-xs font-medium">
-                      {day.toLocaleDateString(undefined, {
-                        month: "short",
-                        day: "numeric",
-                      })}
-                    </p>
-                    <p className="truncate text-xs text-muted-foreground">{column.label}</p>
-                  </div>
-                ))
-              )}
-
-              {hours.map((hour) => (
-                <div key={hour} className="contents">
-                  <div className="border-b border-r px-2 py-3 text-xs text-muted-foreground">
-                    {formatHourLabel(hour)}
-                  </div>
-                  {displayDays.map((day) =>
-                    columns.map((column) => {
-                      const items = data.reservations.filter(
-                        (reservation) =>
-                          reservationOnDate(reservation, day) &&
-                          reservationMatchesColumn(reservation, column, context) &&
-                          reservationStartHour(reservation.startAt) === hour
-                      )
-
-                      return (
-                        <div
-                          key={`${hour}-${day.toISOString()}-${column.id}`}
-                          className="relative border-b border-r bg-background"
-                          style={{ minHeight: ROW_HEIGHT }}
-                        >
-                          {items.map((reservation) => {
-                            const colors =
-                              context === "venue_rentals" &&
-                              reservation.sourceType === RESERVATION_SOURCE_TYPES.venueRental
-                                ? getReservationStatusCalendarClasses(reservation.status)
-                                : SOURCE_TYPE_COLORS[reservation.sourceType]
-                            const hasConflict = conflicts.conflictIds.has(reservation.id)
-                            const content = (
-                              <div
-                                className={cn(
-                                  "absolute inset-x-1 top-1 z-10 rounded-md border px-2 py-1 text-xs shadow-sm",
-                                  colors.bg,
-                                  colors.text,
-                                  colors.border,
-                                  hasConflict &&
-                                    "ring-2 ring-red-500 ring-offset-1 border-red-400",
-                                  enableOperationalBrief && "cursor-pointer"
-                                )}
-                                style={{
-                                  minHeight:
-                                    reservationDurationHours(
-                                      reservation.startAt,
-                                      reservation.endAt
-                                    ) * ROW_HEIGHT -
-                                    8,
-                                }}
-                                onClick={
-                                  enableOperationalBrief
-                                    ? () => {
-                                        setSelectedReservation(reservation)
-                                        setBriefOpen(true)
-                                      }
-                                    : undefined
-                                }
-                                onKeyDown={
-                                  enableOperationalBrief
-                                    ? (event) => {
-                                        if (event.key === "Enter" || event.key === " ") {
-                                          event.preventDefault()
-                                          setSelectedReservation(reservation)
-                                          setBriefOpen(true)
-                                        }
-                                      }
-                                    : undefined
-                                }
-                                role={enableOperationalBrief ? "button" : undefined}
-                                tabIndex={enableOperationalBrief ? 0 : undefined}
-                              >
-                                <p className="line-clamp-2 font-medium">{reservation.title}</p>
-                                {hasConflict ? (
-                                  <p className="line-clamp-1 font-medium text-red-700">
-                                    Conflict
-                                  </p>
-                                ) : null}
-                                <p className="line-clamp-1 opacity-80">
-                                  {formatTimeRange(
-                                    reservation.startAt,
-                                    reservation.endAt
-                                  )}
-                                </p>
-                              </div>
-                            )
-
-                            return enableOperationalBrief ? (
-                              <div key={reservation.id}>{content}</div>
-                            ) : reservation.href ? (
-                              <Link key={reservation.id} href={reservation.href}>
-                                {content}
-                              </Link>
-                            ) : (
-                              <div key={reservation.id}>{content}</div>
-                            )
-                          })}
-                        </div>
-                      )
-                    })
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
       </div>
 
       <OperationalBriefPanel

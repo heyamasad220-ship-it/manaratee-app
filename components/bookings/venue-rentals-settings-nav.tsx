@@ -17,6 +17,11 @@ const settingsTabs = [
     href: "/bookings/settings/event-types",
     matchPrefix: "/bookings/settings/event-types",
   },
+  {
+    label: "Notifications",
+    href: "/bookings/settings/notifications",
+    matchPrefix: "/bookings/settings/notifications",
+  },
 ] as const
 
 export function VenueRentalsSettingsNav() {

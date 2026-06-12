@@ -490,7 +490,7 @@ function revalidateContactPaths() {
   revalidatePath("/workforce/volunteers")
   revalidatePath("/workforce/service-providers")
   revalidatePath("/donations/donors")
-  revalidatePath("/vendor-hub/vendors")
+  revalidatePath("/vendor-hub/network/vendors")
   revalidatePath("/resources/volunteers")
   revalidatePath("/workforce/employees")
 }

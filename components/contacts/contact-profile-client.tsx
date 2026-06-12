@@ -16,6 +16,7 @@ import { ContactNotesPanel } from "@/components/contacts/contact-notes-panel"
 import { ContactRelationshipSummaryCard } from "@/components/contacts/contact-relationship-summary"
 import { ContactRolesCard } from "@/components/contacts/contact-roles-card"
 import { ContactTimelinePanel } from "@/components/contacts/contact-timeline-panel"
+import { ContactVendorEvaluationsPanel } from "@/components/contacts/contact-vendor-evaluations-panel"
 import { ContactVolunteerDetails } from "@/components/contacts/contact-volunteer-details"
 import { ContactVolunteerPanel } from "@/components/contacts/contact-volunteer-panel"
 import { WorkforceCredentialsPanel } from "@/components/workforce/workforce-credentials-panel"
@@ -324,22 +325,25 @@ export function ContactProfileClient({
             staffRecordId) && <WorkforceCredentialsPanel contactId={contact.id} />}
 
           {hasRole("vendor") ? (
-            <Card>
-              <CardContent className="p-6">
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <Store className="h-5 w-5 text-amber-600" />
-                    <h2 className="text-lg font-semibold">Vendor</h2>
+            <>
+              <ContactVendorEvaluationsPanel contactId={contact.id} />
+              <Card>
+                <CardContent className="p-6">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Store className="h-5 w-5 text-amber-600" />
+                      <h2 className="text-lg font-semibold">Vendor</h2>
+                    </div>
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href="/vendor-hub/network/vendors">Vendor Network</Link>
+                    </Button>
                   </div>
-                  <Button variant="outline" size="sm" asChild>
-                    <Link href="/vendor-hub/vendors">Vendor Hub</Link>
-                  </Button>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Booth assignments and vendor participation are managed in Vendor Hub.
-                </p>
-              </CardContent>
-            </Card>
+                  <p className="text-sm text-muted-foreground">
+                    Booth assignments and vendor participation are managed in Vendor Hub.
+                  </p>
+                </CardContent>
+              </Card>
+            </>
           ) : null}
 
           {hasRole("service_provider") ? (
@@ -413,6 +417,7 @@ export function ContactProfileClient({
 
         <TabsContent value="activity" className="mt-0 space-y-6">
           <ContactRelationshipSummaryCard
+            contactId={contact.id}
             summary={profileData?.summary ?? null}
             activity={profileData?.activity ?? null}
             loading={profileLoading}

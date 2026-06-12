@@ -130,6 +130,7 @@ export function toOperationalBriefView(
     sourceRecordHref: href,
     canOpenSourceRecord,
     canEditSetupFields: permissions.canEditSetupFields,
+    isFacilitiesOnly: permissions.isFacilitiesOnly,
   }
 }
 

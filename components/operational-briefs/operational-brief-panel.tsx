@@ -120,7 +120,7 @@ export function OperationalBriefPanel({
               <div className="flex flex-wrap gap-2">
                 <Badge variant="secondary">{brief.sourceTypeLabel}</Badge>
                 <Badge variant="outline">{brief.setupStatusLabel}</Badge>
-                {brief.sourceStatus ? (
+                {brief.sourceStatus && !brief.isFacilitiesOnly ? (
                   <Badge variant="outline">Status: {brief.sourceStatus}</Badge>
                 ) : null}
               </div>
@@ -147,10 +147,12 @@ export function OperationalBriefPanel({
                   label="Coordinator phone"
                   value={brief.internalCoordinatorPhone}
                 />
-                <BriefField
-                  label="Coordinator email"
-                  value={brief.internalCoordinatorEmail}
-                />
+                {!brief.isFacilitiesOnly ? (
+                  <BriefField
+                    label="Coordinator email"
+                    value={brief.internalCoordinatorEmail}
+                  />
+                ) : null}
               </div>
 
               {brief.canEditSetupFields ? (

@@ -100,6 +100,34 @@ export function formatHourLabel(hour: number) {
   return `${display}:00 ${ampm}`
 }
 
+export function formatCalendarToolbarDate(date: Date) {
+  const days = [
+    "SUNDAY",
+    "MONDAY",
+    "TUESDAY",
+    "WEDNESDAY",
+    "THURSDAY",
+    "FRIDAY",
+    "SATURDAY",
+  ]
+  const months = [
+    "JANUARY",
+    "FEBRUARY",
+    "MARCH",
+    "APRIL",
+    "MAY",
+    "JUNE",
+    "JULY",
+    "AUGUST",
+    "SEPTEMBER",
+    "OCTOBER",
+    "NOVEMBER",
+    "DECEMBER",
+  ]
+
+  return `${days[date.getDay()]}, ${months[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`
+}
+
 export function formatCalendarHeading(date: Date) {
   return date.toLocaleDateString(undefined, {
     weekday: "long",

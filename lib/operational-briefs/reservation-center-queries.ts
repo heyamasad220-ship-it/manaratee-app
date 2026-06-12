@@ -16,7 +16,7 @@ export type MasterCalendarConflictPreview = {
 }
 
 export async function getMasterCalendarConflictSummary(): Promise<MasterCalendarConflictPreview> {
-  const data = await getCalendarData("facilities", new Date(), "week")
+  const data = await getCalendarData("ops", new Date(), "grid")
   const conflicts = computeReservationConflicts(data.reservations, data.venues)
 
   const previews = conflicts.conflictPairs.slice(0, 5).map(({ a, b }) => ({

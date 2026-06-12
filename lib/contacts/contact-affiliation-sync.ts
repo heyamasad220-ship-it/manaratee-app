@@ -165,7 +165,7 @@ function revalidateAffiliationPaths() {
   revalidatePath("/contacts/people")
   revalidatePath("/contacts/organizations")
   revalidatePath("/donations/donors")
-  revalidatePath("/vendor-hub/vendors")
+  revalidatePath("/vendor-hub/network/vendors")
   revalidatePath("/workforce/childcare")
   revalidatePath("/workforce/employees")
   revalidatePath("/workforce/volunteers")

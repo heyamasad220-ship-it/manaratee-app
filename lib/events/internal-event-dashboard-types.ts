@@ -30,29 +30,19 @@ export interface DashboardScheduleRow {
   href: string
 }
 
-export interface DashboardAlert {
+export interface DashboardAttentionItem {
   id: string
-  type: "warning" | "info"
-  message: string
-  eventDate: string
-  action: string
+  title: string
+  description: string
+  meta: string
   href: string
-}
-
-export interface DashboardActionItem {
-  id: string
-  eventName: string
-  eventDate: string
-  actionRequired: string
-  daysUntil: number
   priority: "high" | "medium" | "low"
-  href: string
+  kind: "approval" | "childcare" | "volunteers" | "vendors" | "draft" | "schedule" | "location"
 }
 
 export interface EventManagementDashboardData {
   kpis: EventManagementDashboardKpis
   recentEvents: DashboardEventRow[]
   todaysSchedule: DashboardScheduleRow[]
-  operationalAlerts: DashboardAlert[]
-  eventsNeedingAction: DashboardActionItem[]
+  attentionItems: DashboardAttentionItem[]
 }

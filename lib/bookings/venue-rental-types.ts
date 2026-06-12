@@ -202,6 +202,7 @@ export interface VenueRentalQueueRow {
   calendarColor: VenueRentalCalendarColor
   customerName: string
   customerEmail: string | null
+  customerPhone: string | null
   billingContactId: string | null
   billingContactName: string | null
   billingContactType: "individual" | "organization" | null

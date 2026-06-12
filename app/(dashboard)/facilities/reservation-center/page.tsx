@@ -28,6 +28,7 @@ import {
 import { getMasterCalendarConflictSummary } from "@/lib/operational-briefs/reservation-center-queries"
 import {
   hasAnyPermission,
+  hasFacilitiesOnlyAccess,
   PERMISSIONS,
   requireAnyPermission,
 } from "@/lib/permissions/permissions"
@@ -41,17 +42,25 @@ export default async function ReservationCenterPage() {
     PERMISSIONS.PROGRAMS_VIEW
   )
 
-  const [rows, canManageTransition, briefsNeedingReview, upcomingBriefs, temporaryHolds, conflicts] =
-    await Promise.all([
-      getVenueRentalQueueRows(),
-      hasAnyPermission(PERMISSIONS.BOOKINGS_MANAGE, PERMISSIONS.PROGRAMS_MANAGE),
-      countOperationalBriefsNeedingReview(),
-      getUpcomingOperationalBriefs(),
-      getActiveTemporaryHolds(),
-      getMasterCalendarConflictSummary(),
-    ])
+  const facilitiesOnly = await hasFacilitiesOnlyAccess()
 
-  const stats = getVenueRentalDashboardStats(rows)
+  const [
+    canManageTransition,
+    briefsNeedingReview,
+    upcomingBriefs,
+    temporaryHolds,
+    conflicts,
+    rows,
+  ] = await Promise.all([
+    hasAnyPermission(PERMISSIONS.BOOKINGS_MANAGE, PERMISSIONS.PROGRAMS_MANAGE),
+    countOperationalBriefsNeedingReview(),
+    getUpcomingOperationalBriefs(),
+    getActiveTemporaryHolds(),
+    getMasterCalendarConflictSummary(),
+    facilitiesOnly ? Promise.resolve([]) : getVenueRentalQueueRows(),
+  ])
+
+  const stats = facilitiesOnly ? null : getVenueRentalDashboardStats(rows)
 
   return (
     <>
@@ -60,22 +69,22 @@ export default async function ReservationCenterPage() {
         <div>
           <h2 className="text-xl font-semibold">Reservation Center</h2>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-            Operational hub for shared reservation infrastructure. Business workflows live in
-            Venue Rentals, Event Management, and Programs. This view surfaces cross-module
-            visibility, conflicts, and facility setup — use module calendars for your slice, and
-            the master calendar for the full picture.
+            {facilitiesOnly
+              ? "Operational hub for facility setup. Review upcoming reservations, conflicts, and setup briefs on the facilities schedule."
+              : "Operational hub for shared reservation infrastructure. Business workflows live in Venue Rentals, Event Management, and Programs. This view surfaces cross-module visibility, conflicts, and facility setup — use Space Availability for planning, and the facilities schedule for the full picture."}
           </p>
           <div className="mt-3">
             <MasterCalendarLegend />
           </div>
         </div>
 
-        <NeedSpaceIntakeCard />
+        <NeedSpaceIntakeCard facilitiesOnly={facilitiesOnly} />
 
         <ReservationCenterOpsPanel
           upcomingBriefs={upcomingBriefs}
           temporaryHolds={temporaryHolds}
           conflicts={conflicts}
+          facilitiesOnly={facilitiesOnly}
         />
 
         <Card className={briefsNeedingReview > 0 ? "border-amber-200" : undefined}>
@@ -86,107 +95,111 @@ export default async function ReservationCenterPage() {
           <CardContent>
             <p className="mb-2 text-sm text-muted-foreground">
               Setup briefs flagged as needs review or with reported issues. Open a reservation on
-              the master calendar to view facility setup details.
+              the facilities schedule to view facility setup details.
             </p>
             <Button variant="link" className="h-auto p-0" asChild>
-              <Link href="/facilities/calendar">Open master calendar</Link>
+              <Link href="/facilities/calendar">Open facilities schedule</Link>
             </Button>
           </CardContent>
         </Card>
 
-        <div>
-          <h3 className="mb-3 text-sm font-semibold text-muted-foreground">
-            Venue rental queue metrics
-          </h3>
-          <div className="flex flex-wrap gap-4 [&>*]:w-fit">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Awaiting approval</CardDescription>
-              <CardTitle className="text-2xl">{stats.awaitingApprovalCount}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Button variant="link" className="h-auto p-0" asChild>
-                <Link href="/bookings/requests">Venue rental queue</Link>
-              </Button>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Awaiting payment</CardDescription>
-              <CardTitle className="text-2xl">{stats.awaitingPaymentCount}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Button variant="link" className="h-auto p-0" asChild>
-                <Link href="/bookings/overview">Venue rentals dashboard</Link>
-              </Button>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Confirmed rentals</CardDescription>
-              <CardTitle className="text-2xl">{stats.confirmedCount}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Button variant="link" className="h-auto p-0" asChild>
-                <Link href="/bookings/calendar">Venue rentals calendar</Link>
-              </Button>
-            </CardContent>
-          </Card>
-          <Card className={stats.conflictCount > 0 ? "border-amber-200" : undefined}>
-            <CardHeader className="pb-2">
-              <CardDescription className="flex items-center gap-1.5">
-                {stats.conflictCount > 0 ? (
-                  <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
-                ) : null}
-                Rental queue conflicts
-              </CardDescription>
-              <CardTitle className="text-2xl">{stats.conflictCount}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Button variant="link" className="h-auto p-0" asChild>
-                <Link href="/bookings/requests">Venue rental queue</Link>
-              </Button>
-            </CardContent>
-          </Card>
-          </div>
-        </div>
+        {!facilitiesOnly && stats ? (
+          <>
+            <div>
+              <h3 className="mb-3 text-sm font-semibold text-muted-foreground">
+                Venue rental queue metrics
+              </h3>
+              <div className="flex flex-wrap gap-4 [&>*]:w-fit">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardDescription>Awaiting approval</CardDescription>
+                    <CardTitle className="text-2xl">{stats.awaitingApprovalCount}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Button variant="link" className="h-auto p-0" asChild>
+                      <Link href="/bookings/requests">Venue rental queue</Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardDescription>Awaiting payment</CardDescription>
+                    <CardTitle className="text-2xl">{stats.awaitingPaymentCount}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Button variant="link" className="h-auto p-0" asChild>
+                      <Link href="/bookings/overview">Venue rentals dashboard</Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardDescription>Confirmed rentals</CardDescription>
+                    <CardTitle className="text-2xl">{stats.confirmedCount}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Button variant="link" className="h-auto p-0" asChild>
+                      <Link href="/facilities/availability">Space availability</Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+                <Card className={stats.conflictCount > 0 ? "border-amber-200" : undefined}>
+                  <CardHeader className="pb-2">
+                    <CardDescription className="flex items-center gap-1.5">
+                      {stats.conflictCount > 0 ? (
+                        <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                      ) : null}
+                      Rental queue conflicts
+                    </CardDescription>
+                    <CardTitle className="text-2xl">{stats.conflictCount}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Button variant="link" className="h-auto p-0" asChild>
+                      <Link href="/bookings/requests">Venue rental queue</Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Module workflows</CardTitle>
-            <CardDescription>
-              Jump to business modules that write reservations into the shared engine.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Button variant="outline" className="h-auto justify-start py-3" asChild>
-              <Link href="/bookings/requests">
-                <ClipboardList className="mr-2 h-4 w-4 shrink-0" />
-                Venue Rentals
-              </Link>
-            </Button>
-            <Button variant="outline" className="h-auto justify-start py-3" asChild>
-              <Link href="/event-management/calendar">
-                <CalendarDays className="mr-2 h-4 w-4 shrink-0" />
-                Event Management
-              </Link>
-            </Button>
-            <Button variant="outline" className="h-auto justify-start py-3" asChild>
-              <Link href="/facilities/settings/spaces">
-                <LayoutGrid className="mr-2 h-4 w-4 shrink-0" />
-                Spaces
-              </Link>
-            </Button>
-            <Button variant="outline" className="h-auto justify-start py-3" asChild>
-              <Link href="/facilities/calendar">
-                <Sparkles className="mr-2 h-4 w-4 shrink-0" />
-                Master Calendar
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Module workflows</CardTitle>
+                <CardDescription>
+                  Jump to business modules that write reservations into the shared engine.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <Button variant="outline" className="h-auto justify-start py-3" asChild>
+                  <Link href="/bookings/requests">
+                    <ClipboardList className="mr-2 h-4 w-4 shrink-0" />
+                    Venue Rentals
+                  </Link>
+                </Button>
+                <Button variant="outline" className="h-auto justify-start py-3" asChild>
+                  <Link href="/facilities/availability">
+                    <CalendarDays className="mr-2 h-4 w-4 shrink-0" />
+                    Space Availability
+                  </Link>
+                </Button>
+                <Button variant="outline" className="h-auto justify-start py-3" asChild>
+                  <Link href="/facilities/settings/spaces">
+                    <LayoutGrid className="mr-2 h-4 w-4 shrink-0" />
+                    Spaces
+                  </Link>
+                </Button>
+                <Button variant="outline" className="h-auto justify-start py-3" asChild>
+                  <Link href="/facilities/calendar">
+                    <Sparkles className="mr-2 h-4 w-4 shrink-0" />
+                    Facilities Schedule
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+          </>
+        ) : null}
 
-        {canManageTransition ? <VenueRentalTransitionReportPanel /> : null}
+        {canManageTransition && !facilitiesOnly ? <VenueRentalTransitionReportPanel /> : null}
       </div>
     </>
   )

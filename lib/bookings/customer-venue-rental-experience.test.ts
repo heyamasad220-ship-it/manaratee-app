@@ -22,6 +22,7 @@ function baseRental(overrides: Partial<VenueRentalQueueRow> = {}): VenueRentalQu
     calendarColor: "yellow",
     customerName: "Test Customer",
     customerEmail: "test@example.com",
+    customerPhone: null,
     billingContactId: null,
     billingContactName: null,
     billingContactType: null,

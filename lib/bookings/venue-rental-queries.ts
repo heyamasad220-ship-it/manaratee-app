@@ -25,6 +25,66 @@ import type {
 } from "./venue-rental-types"
 import { VENUE_RENTAL_STATUSES } from "./venue-rental-types"
 
+type CustomerContactSummary = {
+  name: string
+  email: string | null
+  phone: string | null
+}
+
+function formatProfileDisplayName(input: {
+  firstName?: string | null
+  lastName?: string | null
+  email?: string | null
+}) {
+  const name = [input.firstName, input.lastName]
+    .map((part) => part?.trim())
+    .filter(Boolean)
+    .join(" ")
+
+  if (name) {
+    return name
+  }
+
+  const email = input.email?.trim()
+  if (email) {
+    return email.split("@")[0] || "Customer"
+  }
+
+  return "Customer"
+}
+
+function formatContactDisplayName(contact: {
+  full_name: string | null
+  contact_type?: string | null
+  primary_contact_name?: string | null
+}) {
+  const baseName = (contact.full_name || "").trim()
+  if (baseName) {
+    return baseName
+  }
+
+  const primaryName = contact.primary_contact_name?.trim()
+  if (primaryName) {
+    return primaryName
+  }
+
+  return "Contact"
+}
+
+function resolveCustomerSummary(input: {
+  billingContact: CustomerContactSummary | null
+  linkedContact: CustomerContactSummary | null
+  profile: CustomerContactSummary | null
+}): CustomerContactSummary {
+  const source = input.billingContact || input.linkedContact || input.profile
+
+  return {
+    name: source?.name || "Customer",
+    email: source?.email ?? null,
+    phone: source?.phone ?? null,
+  }
+}
+
 export async function getBlockingReservationsForVenue(
   organizationId: string,
   venueId: string,
@@ -331,9 +391,7 @@ async function loadBillingContactsById(
   if (!billingContactIds.length) {
     return new Map<
       string,
-      {
-        name: string
-        email: string | null
+      CustomerContactSummary & {
         contactType: "individual" | "organization" | null
         primaryContactName: string | null
       }
@@ -341,8 +399,8 @@ async function loadBillingContactsById(
   }
 
   const withPrimarySelect =
-    "id, full_name, email, contact_type, primary_contact_name"
-  const baseSelect = "id, full_name, email, contact_type"
+    "id, full_name, email, phone, contact_type, primary_contact_name"
+  const baseSelect = "id, full_name, email, phone, contact_type"
 
   let { data, error } = await supabase
     .from("contacts")
@@ -360,6 +418,16 @@ async function loadBillingContactsById(
     error = fallback.error
   }
 
+  if (error && isMissingDbColumnError(error, "phone")) {
+    const fallback = await supabase
+      .from("contacts")
+      .select("id, full_name, email, contact_type, primary_contact_name")
+      .eq("organization_id", organizationId)
+      .in("id", billingContactIds)
+    data = fallback.data
+    error = fallback.error
+  }
+
   if (error) {
     console.error(error)
     return new Map()
@@ -369,13 +437,86 @@ async function loadBillingContactsById(
     (data || []).map((contact) => [
       contact.id as string,
       {
-        name: (contact.full_name as string | null)?.trim() || "Contact",
+        name: formatContactDisplayName({
+          full_name: contact.full_name as string | null,
+          contact_type: contact.contact_type as string | null,
+          primary_contact_name:
+            "primary_contact_name" in contact
+              ? ((contact.primary_contact_name as string | null) ?? null)
+              : null,
+        }),
         email: (contact.email as string | null) ?? null,
+        phone: (contact.phone as string | null) ?? null,
         contactType: contact.contact_type as "individual" | "organization" | null,
         primaryContactName:
           "primary_contact_name" in contact
             ? ((contact.primary_contact_name as string | null) ?? null)
             : null,
+      },
+    ])
+  )
+}
+
+async function loadLinkedCustomerContactsByAuthUserId(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  organizationId: string,
+  customerUserIds: string[]
+) {
+  if (!customerUserIds.length) {
+    return new Map<string, CustomerContactSummary>()
+  }
+
+  const withPrimarySelect =
+    "auth_user_id, full_name, email, phone, contact_type, primary_contact_name"
+  const baseSelect = "auth_user_id, full_name, email, phone, contact_type"
+
+  let { data, error } = await supabase
+    .from("contacts")
+    .select(withPrimarySelect)
+    .eq("organization_id", organizationId)
+    .in("auth_user_id", customerUserIds)
+
+  if (error && isMissingDbColumnError(error, "primary_contact_name")) {
+    const fallback = await supabase
+      .from("contacts")
+      .select(baseSelect)
+      .eq("organization_id", organizationId)
+      .in("auth_user_id", customerUserIds)
+    data = fallback.data
+    error = fallback.error
+  }
+
+  if (error) {
+    if (isMissingDbColumnError(error, "phone")) {
+      const fallback = await supabase
+        .from("contacts")
+        .select("auth_user_id, full_name, email, contact_type, primary_contact_name")
+        .eq("organization_id", organizationId)
+        .in("auth_user_id", customerUserIds)
+      data = fallback.data
+      error = fallback.error
+    }
+  }
+
+  if (error) {
+    console.error(error)
+    return new Map<string, CustomerContactSummary>()
+  }
+
+  return new Map(
+    (data || []).map((contact) => [
+      contact.auth_user_id as string,
+      {
+        name: formatContactDisplayName({
+          full_name: contact.full_name as string | null,
+          contact_type: contact.contact_type as string | null,
+          primary_contact_name:
+            "primary_contact_name" in contact
+              ? ((contact.primary_contact_name as string | null) ?? null)
+              : null,
+        }),
+        email: (contact.email as string | null) ?? null,
+        phone: (contact.phone as string | null) ?? null,
       },
     ])
   )
@@ -413,7 +554,7 @@ export async function getVenueRentalQueueRows(options?: {
     new Set(rentalRows.map((row) => row.billing_contact_id).filter(Boolean))
   ) as string[]
 
-  const [reservationsResult, addonsResult, profilesResult, eventTypesResult, billingContactMap] =
+  const [reservationsResult, addonsResult, profilesResult, eventTypesResult, billingContactMap, linkedContactMap] =
     await Promise.all([
       supabase
         .from("rental_reservations")
@@ -429,7 +570,10 @@ export async function getVenueRentalQueueRows(options?: {
         .eq("organization_id", organizationId)
         .in("venue_rental_id", rentalIds),
       customerIds.length
-        ? supabase.from("profiles").select("id, full_name, email").in("id", customerIds)
+        ? supabase
+            .from("profiles")
+            .select("id, first_name, last_name, email")
+            .in("id", customerIds)
         : Promise.resolve({ data: [] }),
       eventTypeIds.length
         ? supabase
@@ -438,6 +582,7 @@ export async function getVenueRentalQueueRows(options?: {
             .in("id", eventTypeIds)
         : Promise.resolve({ data: [] }),
       loadBillingContactsById(supabase, organizationId, billingContactIds),
+      loadLinkedCustomerContactsByAuthUserId(supabase, organizationId, customerIds),
     ])
 
   const venueIds = Array.from(
@@ -453,8 +598,13 @@ export async function getVenueRentalQueueRows(options?: {
     (profilesResult.data || []).map((profile) => [
       profile.id as string,
       {
-        name: (profile.full_name as string | null)?.trim() || "Customer",
+        name: formatProfileDisplayName({
+          firstName: profile.first_name as string | null,
+          lastName: profile.last_name as string | null,
+          email: profile.email as string | null,
+        }),
         email: (profile.email as string | null) ?? null,
+        phone: null,
       },
     ])
   )
@@ -499,9 +649,23 @@ export async function getVenueRentalQueueRows(options?: {
     const customer = rental.customer_user_id
       ? profileMap.get(rental.customer_user_id)
       : null
+    const linkedContact = rental.customer_user_id
+      ? linkedContactMap.get(rental.customer_user_id) ?? null
+      : null
     const billingContact = rental.billing_contact_id
       ? billingContactMap.get(rental.billing_contact_id)
       : null
+    const customerSummary = resolveCustomerSummary({
+      billingContact: billingContact
+        ? {
+            name: billingContact.name,
+            email: billingContact.email,
+            phone: billingContact.phone,
+          }
+        : null,
+      linkedContact,
+      profile: customer,
+    })
 
     rows.push({
       id: rental.id,
@@ -509,8 +673,9 @@ export async function getVenueRentalQueueRows(options?: {
       status,
       statusLabel: getVenueRentalStatusLabel(status),
       calendarColor: getVenueRentalCalendarColor(status),
-      customerName: billingContact?.name || customer?.name || "Customer",
-      customerEmail: billingContact?.email ?? customer?.email ?? null,
+      customerName: customerSummary.name,
+      customerEmail: customerSummary.email,
+      customerPhone: customerSummary.phone,
       billingContactId: rental.billing_contact_id,
       billingContactName: billingContact?.name ?? null,
       billingContactType: billingContact?.contactType ?? null,

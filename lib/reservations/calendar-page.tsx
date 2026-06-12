@@ -1,12 +1,17 @@
 import { Suspense } from "react"
 
 import { ReservationCalendar } from "@/components/reservations/reservation-calendar"
+import type { CalendarAudience } from "@/lib/reservations/calendar-audience"
+import {
+  CALENDAR_AUDIENCE_DESCRIPTIONS,
+  CALENDAR_AUDIENCE_LABELS,
+} from "@/lib/reservations/calendar-audience"
 import { getCalendarData } from "@/lib/reservations/reservation-queries"
 import {
   parseCalendarDate,
   toDateParam,
 } from "@/lib/reservations/reservation-time"
-import type { CalendarContext, CalendarViewMode } from "@/lib/reservations/reservation-types"
+import type { CalendarViewMode } from "@/lib/reservations/reservation-types"
 import {
   hasAnyPermission,
   PERMISSIONS,
@@ -22,13 +27,13 @@ function getSearchParam(
   return Array.isArray(value) ? value[0] : value
 }
 
-async function CalendarPageContent({
-  context,
+async function AudienceCalendarPageContent({
+  audience,
   searchParams,
   permissions,
   headerTitle,
 }: {
-  context: CalendarContext
+  audience: CalendarAudience
   searchParams?: Promise<Record<string, string | string[] | undefined>>
   permissions: PermissionKey[]
   headerTitle?: string
@@ -37,46 +42,54 @@ async function CalendarPageContent({
 
   const resolved = await searchParams
   const dateParam = getSearchParam(resolved, "date")
-  const viewParam = getSearchParam(resolved, "view")
   const anchorDate = parseCalendarDate(dateParam)
-  const view: CalendarViewMode = viewParam === "day" ? "day" : "week"
+  const viewParam = getSearchParam(resolved, "view")
+  const view: CalendarViewMode =
+    viewParam === "grid" || viewParam === "week" ? "grid" : "day"
 
-  const [data, canManageBlocks] = await Promise.all([
-    getCalendarData(context, anchorDate, view),
+  const [data, canManageBlocks, canPlanEvents] = await Promise.all([
+    getCalendarData(audience, anchorDate, view),
     hasAnyPermission(
       PERMISSIONS.BOOKINGS_MANAGE,
       PERMISSIONS.SPACES_MANAGE,
       PERMISSIONS.EVENTS_MANAGE
     ),
+    hasAnyPermission(
+      PERMISSIONS.EVENTS_VIEW,
+      PERMISSIONS.EVENTS_MANAGE,
+      PERMISSIONS.PROGRAMS_VIEW,
+      PERMISSIONS.PROGRAMS_MANAGE
+    ),
   ])
 
   return (
     <ReservationCalendar
-      context={context}
+      audience={audience}
       initialData={data}
       initialDate={dateParam || toDateParam(anchorDate)}
       initialView={view}
-      canManageBlocks={canManageBlocks}
-      headerTitle={headerTitle}
-      enableOperationalBrief={context === "facilities"}
+      canManageBlocks={canManageBlocks && audience === "ops"}
+      canPlanEvents={canPlanEvents && audience === "staff"}
+      headerTitle={headerTitle || CALENDAR_AUDIENCE_LABELS[audience]}
+      description={CALENDAR_AUDIENCE_DESCRIPTIONS[audience]}
     />
   )
 }
 
-export function createCalendarPage(
-  context: CalendarContext,
+export function createAudienceCalendarPage(
+  audience: CalendarAudience,
   permissions: PermissionKey[],
   headerTitle?: string
 ) {
-  return function CalendarPage({
+  return function AudienceCalendarPage({
     searchParams,
   }: {
     searchParams?: Promise<Record<string, string | string[] | undefined>>
   }) {
     return (
       <Suspense fallback={null}>
-        <CalendarPageContent
-          context={context}
+        <AudienceCalendarPageContent
+          audience={audience}
           searchParams={searchParams}
           permissions={permissions}
           headerTitle={headerTitle}

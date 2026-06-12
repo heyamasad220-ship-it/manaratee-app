@@ -1,6 +1,7 @@
 import { CustomerNav } from "@/components/customer/customer-nav"
 import { getUserPortalCapabilities } from "@/lib/auth/portal-capabilities"
 import { getActiveOrganization } from "@/lib/organizations/get-active-organization"
+import { linkVendorContactsForCurrentUser } from "@/lib/vendor-hub/link-vendor-contact-auth"
 import { createClient } from "@/lib/supabase/server"
 
 export default async function CustomerLayout({
@@ -28,6 +29,10 @@ export default async function CustomerLayout({
         canManageEventRequests: false,
         hasAdminPortal: false,
       }
+
+  if (user) {
+    await linkVendorContactsForCurrentUser(supabase)
+  }
 
   return (
     <div className="flex min-h-screen bg-muted/30">
