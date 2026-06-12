@@ -11,6 +11,7 @@ import {
   Clock,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { loadCustomerDonationPortalData } from "@/lib/customer/customer-portal-data-actions"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -124,11 +125,9 @@ export default function CustomerDonationsPage() {
     async function loadDonationsPage() {
       setLoading(true)
 
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+      const result = await loadCustomerDonationPortalData()
 
-      if (!user) {
+      if (!result.ok || !result.contact) {
         setContact(null)
         setDonationCategories([])
         setPledges([])
@@ -138,103 +137,51 @@ export default function CustomerDonationsPage() {
         return
       }
 
-      const { data: contactData } = await supabase
-        .from("contacts")
-        .select("id, full_name, email, organization_id")
-        .eq("auth_user_id", user.id)
-        .maybeSingle()
-
-      if (!contactData) {
-        setContact(null)
-        setDonationCategories([])
-        setPledges([])
-        setPayments([])
-        setSavedPaymentMethods([])
-        setLoading(false)
-        return
-      }
-
+      const contactData = result.contact
       setContact(contactData)
 
-      const { data: categoriesData } = await supabase
-        .from("donation_categories")
-        .select("id, name")
-        .eq("organization_id", contactData.organization_id)
-        .order("name", { ascending: true })
-
-      const { data: subcategoriesData } = await supabase
-        .from("donation_subcategories")
-        .select("id, name, category_id")
-        .eq("organization_id", contactData.organization_id)
-        .order("name", { ascending: true })
-
-      const formattedCategories: DonationCategory[] = (categoriesData || []).map((category) => ({
+      const formattedCategories: DonationCategory[] = result.categories.map((category) => ({
         id: category.id,
         name: category.name,
-        funds: (subcategoriesData || [])
-          .filter((fund) => fund.category_id === category.id)
-          .map((fund) => ({
-            id: fund.id,
-            name: fund.name,
-            category_id: fund.category_id,
-          })),
+        funds: category.funds,
       }))
 
       setDonationCategories(formattedCategories)
 
-      const { data: paymentMethodsData } = await supabase
-        .from("payment_methods")
-        .select("id, name, fee")
-        .eq("organization_id", contactData.organization_id)
-        .eq("enabled", true)
-        .order("name", { ascending: true })
-
-      const formattedPaymentMethods: SavedPaymentMethod[] = (paymentMethodsData || []).map((method) => ({
-        id: method.id,
-        name: method.name || "Payment Method",
-        fee: method.fee || null,
-      }))
+      const formattedPaymentMethods: SavedPaymentMethod[] = result.paymentMethods.map(
+        (method) => ({
+          id: method.id as string,
+          name: (method.name as string) || "Payment Method",
+          fee: (method.fee as number | null) || null,
+        })
+      )
 
       setSavedPaymentMethods(formattedPaymentMethods)
       setSelectedPaymentMethod(formattedPaymentMethods[0]?.id || "")
 
-      const { data: pledgesData } = await supabase
-        .from("donation_pledges")
-        .select("*")
-        .eq("contact_id", contactData.id)
-        .eq("organization_id", contactData.organization_id)
-        .order("created_at", { ascending: false })
-
-      const { data: paymentsData } = await supabase
-        .from("donation_payments")
-        .select("*")
-        .eq("contact_id", contactData.id)
-        .eq("organization_id", contactData.organization_id)
-        .order("payment_date", { ascending: false })
-
-      const formattedPledges: DonationPledge[] = (pledgesData || []).map((p) => ({
-        id: p.id,
-        campaign: p.fund_name || "General Fund",
+      const formattedPledges: DonationPledge[] = (result.pledges || []).map((p) => ({
+        id: p.id as string,
+        campaign: (p.fund_name as string) || "General Fund",
         totalAmount: Number(p.pledged_amount || p.amount || 0),
         paidAmount: Number(p.collected_amount || 0),
         balance:
           Number(p.pledged_amount || p.amount || 0) -
           Number(p.collected_amount || 0),
-        frequency: p.frequency || "one-time",
+        frequency: (p.frequency as string) || "one-time",
         nextPaymentDate: null,
         nextPaymentAmount: 0,
-        startDate: p.start_date || null,
-        endDate: p.end_date || null,
-        status: p.status || "Active",
+        startDate: (p.start_date as string | null) || null,
+        endDate: (p.end_date as string | null) || null,
+        status: (p.status as string) || "Active",
       }))
 
-      const formattedPayments: DonationPayment[] = (paymentsData || []).map((p) => ({
-        id: p.id,
-        date: p.payment_date || "",
+      const formattedPayments: DonationPayment[] = (result.payments || []).map((p) => ({
+        id: p.id as string,
+        date: (p.payment_date as string) || "",
         amount: Number(p.amount || 0),
-        campaign: p.fund_name || "General Fund",
-        method: p.payment_method || p.source || "Unknown",
-        status: p.status || "Unallocated",
+        campaign: (p.fund_name as string) || "General Fund",
+        method: (p.payment_method as string) || (p.source as string) || "Unknown",
+        status: (p.status as string) || "Unallocated",
       }))
 
       setPledges(formattedPledges)
@@ -243,7 +190,7 @@ export default function CustomerDonationsPage() {
     }
 
     loadDonationsPage()
-  }, [supabase])
+  }, [])
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {

@@ -2,6 +2,15 @@
 
 import { cookies } from "next/headers"
 import { createClient } from "@/lib/supabase/server"
+import { isCurrentUserPlatformAdmin } from "@/lib/platform/is-platform-admin-user"
+import {
+  getPlatformAdminOrgAccessOrganizationId,
+  isPlatformAdminOrgSupportSession,
+} from "@/lib/platform/platform-org-access"
+import {
+  getOrgUserSupportOrganizationId,
+  isOrgUserSupportSession,
+} from "@/lib/organizations/org-user-access"
 
 const cookieOptions = {
   httpOnly: true,
@@ -55,7 +64,12 @@ export async function selectOrganization(organizationId: string) {
     }
 
     if (!membership) {
-      throw new Error("You are not a member of this organization")
+      const isPlatformAdmin = await isCurrentUserPlatformAdmin()
+      const supportOrgId = await getPlatformAdminOrgAccessOrganizationId()
+
+      if (!(isPlatformAdmin && supportOrgId === trimmedId)) {
+        throw new Error("You are not a member of this organization")
+      }
     }
   }
 
@@ -81,6 +95,17 @@ export async function setActiveOrganization(organizationId: string) {
 
   if (userError || !user) {
     throw new Error("Not authenticated")
+  }
+
+  const supportOrgId = await getOrgUserSupportOrganizationId()
+  if (supportOrgId && (await isOrgUserSupportSession(trimmedId))) {
+    if (supportOrgId !== trimmedId) {
+      throw new Error("You do not have access to this organization")
+    }
+
+    const cookieStore = await cookies()
+    cookieStore.set("active_organization_id", trimmedId, cookieOptions)
+    return { success: true }
   }
 
   const { data: organizations, error } = await supabase.rpc("get_my_organizations")

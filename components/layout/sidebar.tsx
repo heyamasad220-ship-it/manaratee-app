@@ -31,6 +31,9 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 import { createClient } from "@/lib/supabase/client"
+import { getCurrentOrganizationContext, clearSelectedOrganizationIdCache } from "@/lib/current-organization"
+import { loadOrganizationSidebarModules } from "@/lib/organizations/load-organization-sidebar-modules"
+import { isOrganizationSystemAdmin } from "@/lib/organizations/organization-system-admin"
 import { WORKFORCE_MODULE_LABEL } from "@/lib/hr/hr-module-label"
 import { isFacilitiesOnlyAccess } from "@/lib/permissions/facilities-access"
 import {
@@ -554,6 +557,7 @@ export function useSidebarContext() {
 }
 
 export function SidebarProvider({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [navItems, setNavItems] = useState<NavItem[]>([
     { label: "Dashboard", href: "/dashboard", icon: Home, matchPrefix: "/dashboard" },
@@ -563,6 +567,7 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     async function loadSidebarModules() {
       setLoading(true)
+      clearSelectedOrganizationIdCache()
       const supabase = createClient()
 
       const {
@@ -574,10 +579,19 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
         return
       }
 
+      const { organizationId, platformSupportMode } = await getCurrentOrganizationContext()
+      if (!organizationId) {
+        console.error("Error loading organization membership: no selected organization")
+        setNavItems([{ label: "Dashboard", href: "/dashboard", icon: Home, matchPrefix: "/dashboard" }])
+        setLoading(false)
+        return
+      }
+
       const { data: membership, error: membershipError } = await supabase
         .from("organization_members")
         .select("organization_id, role, role_id")
         .eq("user_id", user.id)
+        .eq("organization_id", organizationId)
         .maybeSingle()
 
       if (membershipError || !membership) {
@@ -588,7 +602,7 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
       }
 
       let permissionContext: UserPermissionContext = {
-        isOwner: membership.role === "owner",
+        isOwner: platformSupportMode || isOrganizationSystemAdmin(membership.role),
         enabledPermissions: new Set<string>(),
       }
 
@@ -610,47 +624,54 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      const { data, error } = await supabase
-        .from("my_sidebar_modules")
-        .select("name, slug, route, icon_name, group_name, sort_order")
-        .order("sort_order", { ascending: true })
-        .order("name", { ascending: true })
+      let moduleRows = await loadOrganizationSidebarModules(supabase, organizationId)
 
-      if (error) {
-        console.error("Error loading sidebar modules:", error)
-        setNavItems(
-          filterNavItemsByPermissions(
-            [
-              { label: "Dashboard", href: "/dashboard", icon: Home, matchPrefix: "/dashboard" },
-              {
-                label: "Settings",
-                href: "/settings",
-                icon: Settings,
-                matchPrefix: "/settings",
-                group: "System",
-                children: [
-                  { label: "Users", href: "/settings/users", matchPrefix: "/settings/users", permissionKey: "settings.users.view" },
-                  {
-                    label: "Roles & Permissions",
-                    href: "/settings/roles-permissions",
-                    matchPrefix: "/settings/roles-permissions",
-                    permissionKey: "settings.roles.view",
-                  },
-                ],
-              },
-            ],
-            permissionContext,
-          ),
-        )
-      } else {
-        setNavItems(buildNavItems(mergeSidebarModules(data || []), permissionContext))
+      if (moduleRows.length === 0) {
+        const { data, error } = await supabase
+          .from("my_sidebar_modules")
+          .select("name, slug, route, icon_name, group_name, sort_order")
+          .order("sort_order", { ascending: true })
+          .order("name", { ascending: true })
+
+        if (error) {
+          console.error("Error loading sidebar modules:", error)
+          setNavItems(
+            filterNavItemsByPermissions(
+              [
+                { label: "Dashboard", href: "/dashboard", icon: Home, matchPrefix: "/dashboard" },
+                {
+                  label: "Settings",
+                  href: "/settings",
+                  icon: Settings,
+                  matchPrefix: "/settings",
+                  group: "System",
+                  children: [
+                    { label: "Users", href: "/settings/users", matchPrefix: "/settings/users", permissionKey: "settings.users.view" },
+                    {
+                      label: "Roles & Permissions",
+                      href: "/settings/roles-permissions",
+                      matchPrefix: "/settings/roles-permissions",
+                      permissionKey: "settings.roles.view",
+                    },
+                  ],
+                },
+              ],
+              permissionContext,
+            ),
+          )
+          setLoading(false)
+          return
+        }
+
+        moduleRows = data || []
       }
 
+      setNavItems(buildNavItems(mergeSidebarModules(moduleRows), permissionContext))
       setLoading(false)
     }
 
     loadSidebarModules()
-  }, [])
+  }, [pathname])
 
   return (
     <SidebarContext.Provider value={{ mobileOpen, setMobileOpen, navItems, loading }}>

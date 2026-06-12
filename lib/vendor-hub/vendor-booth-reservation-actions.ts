@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 
 import { createClient } from "@/lib/supabase/server"
+import { resolveCustomerPortalActor } from "@/lib/auth/customer-portal-session"
 import {
   getApprovedVendorOrganizationsForAuthUser,
   getContactIdsForAuthUser,
@@ -17,16 +18,15 @@ import { VENDOR_HUB_ROUTES } from "@/lib/vendor-hub/vendor-hub-routes"
 export async function getReservableBazaarEventsForCurrentUser(): Promise<
   ReservableBazaarEvent[]
 > {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const actor = await resolveCustomerPortalActor()
 
-  if (!user) {
+  if (!actor) {
     return []
   }
 
-  const approvedOrgs = await getApprovedVendorOrganizationsForAuthUser(user.id)
+  const { userId, supabase } = actor
+
+  const approvedOrgs = await getApprovedVendorOrganizationsForAuthUser(userId)
   if (approvedOrgs.length === 0) {
     return []
   }

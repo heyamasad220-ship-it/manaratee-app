@@ -49,8 +49,11 @@ import {
   UserCheck,
   UserX,
   Loader2,
+  ExternalLink,
 } from "lucide-react"
 import { OrganizationJoinLinkCard } from "@/components/settings/organization-join-link-card"
+import { enterCustomerPortalAsUser } from "@/lib/organizations/org-user-access-actions"
+import { isOrganizationSystemAdmin } from "@/lib/organizations/organization-system-admin"
 
 type OrgRole = {
   id: string
@@ -596,6 +599,27 @@ export function UsersSettingsClient({
                                   <Shield className="mr-2 h-4 w-4" />
                                   Change Role
                                 </DropdownMenuItem>
+
+                                {organizationId &&
+                                !isOrganizationSystemAdmin(user.systemRole) ? (
+                                  <DropdownMenuItem asChild>
+                                    <form
+                                      action={enterCustomerPortalAsUser.bind(
+                                        null,
+                                        organizationId,
+                                        user.userId
+                                      )}
+                                    >
+                                      <button
+                                        type="submit"
+                                        className="flex w-full cursor-default items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground"
+                                      >
+                                        <ExternalLink className="mr-2 h-4 w-4" />
+                                        Open portal as user
+                                      </button>
+                                    </form>
+                                  </DropdownMenuItem>
+                                ) : null}
 
                                 <DropdownMenuItem disabled>
                                   <Pencil className="mr-2 h-4 w-4" />

@@ -54,6 +54,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
+import { PlatformEnterOrganizationButton } from "@/components/platform/platform-enter-organization-button"
 import { cn } from "@/lib/utils"
 
 const filterTabs = ["All", "Active", "Suspended", "Pending"] as const
@@ -965,12 +966,18 @@ export default function OrganizationsPage() {
               </div>
 
               {selectedOrg && (
-                <Badge
-                  variant="secondary"
-                  className={statusStyles[selectedOrg.status]}
-                >
-                  {selectedOrg.status}
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <PlatformEnterOrganizationButton
+                    organizationId={selectedOrg.id}
+                    organizationName={selectedOrg.name}
+                  />
+                  <Badge
+                    variant="secondary"
+                    className={statusStyles[selectedOrg.status]}
+                  >
+                    {selectedOrg.status}
+                  </Badge>
+                </div>
               )}
             </div>
           </SheetHeader>

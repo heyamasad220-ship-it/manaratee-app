@@ -1,5 +1,6 @@
 import { parseServiceRequirements } from "@/lib/events/event-service-requirements"
 import { createClient } from "@/lib/supabase/server"
+import { resolveCustomerPortalActor } from "@/lib/auth/customer-portal-session"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { getActiveOrganization } from "@/lib/organizations/get-active-organization"
 
@@ -28,19 +29,17 @@ export async function getServiceOpportunitiesForCurrentUser(): Promise<{
   opportunities: ServiceOpportunity[]
   eligibility: Awaited<ReturnType<typeof getContactServiceEligibility>> | null
 }> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
+  const actor = await resolveCustomerPortalActor()
   const { activeOrganization } = await getActiveOrganization()
   const organizationId = activeOrganization?.organization_id
 
-  if (!user || !organizationId) {
+  if (!actor || !organizationId) {
     return { opportunities: [], eligibility: null }
   }
 
-  const contactId = await resolveContactIdForAuthUser(supabase, organizationId, user.id)
+  const { userId, supabase } = actor
+
+  const contactId = await resolveContactIdForAuthUser(supabase, organizationId, userId)
   if (!contactId) {
     return { opportunities: [], eligibility: null }
   }

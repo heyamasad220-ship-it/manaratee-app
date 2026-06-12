@@ -1,53 +1,62 @@
-import { createClient } from "@/lib/supabase/client"
+let cachedOrganizationId: string | null | undefined
+let cachedPlatformSupportMode: boolean | undefined
+let inFlightOrganizationContext: Promise<{
+  organizationId: string | null
+  platformSupportMode: boolean
+}> | null = null
 
-function getOrganizationIdFromCookie() {
-  if (typeof document === "undefined") {
-    return null
+async function fetchOrganizationContextFromApi() {
+  try {
+    const response = await fetch("/api/organizations/selected", {
+      method: "GET",
+      cache: "no-store",
+    })
+
+    if (!response.ok) {
+      return { organizationId: null, platformSupportMode: false }
+    }
+
+    const payload = (await response.json()) as {
+      organizationId?: string | null
+      platformSupportMode?: boolean
+    }
+
+    return {
+      organizationId: payload.organizationId?.trim() || null,
+      platformSupportMode: payload.platformSupportMode === true,
+    }
+  } catch (error) {
+    console.error("Error resolving selected organization:", error)
+    return { organizationId: null, platformSupportMode: false }
   }
-
-  const match = document.cookie.match(/(?:^|;\s*)selected_organization_id=([^;]*)/)
-  return match ? decodeURIComponent(match[1]) : null
 }
 
-let inFlightOrgId: Promise<string | null> | null = null
-
-async function fetchOrganizationIdFromAuth(): Promise<string | null> {
-  const supabase = createClient()
-
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser()
-
-  if (userError || !user) {
-    return null
+export async function getCurrentOrganizationContext() {
+  if (cachedOrganizationId !== undefined && cachedPlatformSupportMode !== undefined) {
+    return {
+      organizationId: cachedOrganizationId,
+      platformSupportMode: cachedPlatformSupportMode,
+    }
   }
 
-  const { data, error } = await supabase
-    .from("organization_members")
-    .select("organization_id")
-    .eq("user_id", user.id)
-    .maybeSingle()
-
-  if (error) {
-    console.error("Error fetching org:", error)
-    return null
-  }
-
-  return data?.organization_id || null
-}
-
-export async function getCurrentOrganizationId(): Promise<string | null> {
-  const cookieOrganizationId = getOrganizationIdFromCookie()
-  if (cookieOrganizationId) {
-    return cookieOrganizationId
-  }
-
-  if (!inFlightOrgId) {
-    inFlightOrgId = fetchOrganizationIdFromAuth().finally(() => {
-      inFlightOrgId = null
+  if (!inFlightOrganizationContext) {
+    inFlightOrganizationContext = fetchOrganizationContextFromApi().finally(() => {
+      inFlightOrganizationContext = null
     })
   }
 
-  return inFlightOrgId
+  const context = await inFlightOrganizationContext
+  cachedOrganizationId = context.organizationId
+  cachedPlatformSupportMode = context.platformSupportMode
+  return context
+}
+
+export async function getCurrentOrganizationId(): Promise<string | null> {
+  const context = await getCurrentOrganizationContext()
+  return context.organizationId
+}
+
+export function clearSelectedOrganizationIdCache() {
+  cachedOrganizationId = undefined
+  cachedPlatformSupportMode = undefined
 }

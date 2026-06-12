@@ -14,8 +14,8 @@ import {
   MessageSquare,
 } from "lucide-react"
 
-import { createClient } from "@/lib/supabase/server"
-import { getActiveOrganization } from "@/lib/organizations/get-active-organization"
+import { getCustomerPortalSupabase } from "@/lib/auth/customer-portal-session"
+import { requireCustomerPortalPageContext } from "@/lib/auth/require-customer-portal-page"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -36,24 +36,8 @@ export default async function CustomerBookingDetailPage({
   params,
 }: PageProps) {
   const { id } = await params
-
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect("/login")
-  }
-
-  const { activeOrganization } = await getActiveOrganization()
-
-  if (!activeOrganization) {
-    redirect("/login")
-  }
-
-  const organizationId = activeOrganization.organization_id
+  const { userId, organizationId } = await requireCustomerPortalPageContext()
+  const { supabase } = await getCustomerPortalSupabase()
 
   const { data: booking, error } = await supabase
     .from("venue_bookings")
@@ -68,7 +52,7 @@ export default async function CustomerBookingDetailPage({
     `)
     .eq("id", id)
     .eq("organization_id", organizationId)
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .maybeSingle()
 
   if (error || !booking) {

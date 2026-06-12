@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { PERMISSIONS, type PermissionKey } from "@/lib/permissions/permission-keys"
 import { isFacilitiesOnlyAccess } from "@/lib/permissions/facilities-access"
+import { isPlatformAdminOrgSupportSession } from "@/lib/platform/platform-org-access"
 
 export { PERMISSIONS, type PermissionKey }
 
@@ -40,6 +41,10 @@ export async function getCurrentUserPermissionContext() {
 export async function hasPermission(permissionKey: PermissionKey) {
   const { supabase, membership, organizationId } =
     await getCurrentUserPermissionContext()
+
+  if (await isPlatformAdminOrgSupportSession(organizationId)) {
+    return true
+  }
 
   // Platform/system owner always has access.
   if (membership.role === "owner") {
@@ -79,6 +84,13 @@ export async function hasAnyPermission(...permissionKeys: PermissionKey[]) {
 export async function getEnabledPermissionKeys() {
   const { supabase, membership, organizationId } =
     await getCurrentUserPermissionContext()
+
+  if (await isPlatformAdminOrgSupportSession(organizationId)) {
+    return {
+      isOwner: true,
+      enabledPermissions: new Set(Object.values(PERMISSIONS)),
+    }
+  }
 
   if (membership.role === "owner") {
     return {

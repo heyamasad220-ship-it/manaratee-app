@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 
 import { createClient } from "@/lib/supabase/server"
+import { resolveCustomerPortalActor } from "@/lib/auth/customer-portal-session"
 import { deliverVendorEventAnnouncement } from "@/lib/vendor-hub/vendor-announcement-delivery"
 import type {
   VendorAnnouncementAudience,
@@ -126,19 +127,18 @@ export async function getEventVendorAnnouncements(
 }
 
 export async function getVendorInboxMessages(): Promise<VendorInboxMessage[]> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const actor = await resolveCustomerPortalActor()
 
-  if (!user) {
+  if (!actor) {
     return []
   }
+
+  const { userId, supabase } = actor
 
   const { data: contacts } = await supabase
     .from("contacts")
     .select("id")
-    .eq("auth_user_id", user.id)
+    .eq("auth_user_id", userId)
 
   const contactIds = (contacts ?? []).map((row) => row.id as string)
   if (contactIds.length === 0) {

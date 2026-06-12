@@ -1,5 +1,4 @@
 import Link from "next/link"
-import { redirect } from "next/navigation"
 import { ArrowRight, GraduationCap } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -11,32 +10,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { createClient } from "@/lib/supabase/server"
-import { getActiveOrganization } from "@/lib/organizations/get-active-organization"
+import { requireCustomerPortalPageContext } from "@/lib/auth/require-customer-portal-page"
 import { getMyClassAssignments } from "@/lib/programs/program-staff-assignment-queries"
 import { PROGRAM_STAFF_ASSIGNMENT_ROLE_LABELS } from "@/lib/programs/program-staff-assignment-types"
 
 export default async function MyClassesPage() {
-  const supabase = await createClient()
+  const { userId, organizationId } = await requireCustomerPortalPageContext()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect("/login")
-  }
-
-  const { activeOrganization } = await getActiveOrganization()
-
-  if (!activeOrganization) {
-    redirect("/login")
-  }
-
-  const assignments = await getMyClassAssignments(
-    activeOrganization.organization_id,
-    user.id
-  )
+  const assignments = await getMyClassAssignments(organizationId, userId)
 
   return (
     <div className="space-y-6">

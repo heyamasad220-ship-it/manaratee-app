@@ -4,47 +4,25 @@ import { CalendarPlus } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { requireCustomerPortalPageContext } from "@/lib/auth/require-customer-portal-page"
 import { requireStaffToolsPortal } from "@/lib/auth/portal-capabilities"
 import {
   formatInternalEventRequestSummary,
   getMyInternalEventRequests,
 } from "@/lib/events/customer-staff-event-queries"
-import { getActiveOrganization } from "@/lib/organizations/get-active-organization"
-import { createClient } from "@/lib/supabase/server"
 import { formatVenueRentalTimeRange } from "@/lib/bookings/venue-rental-format"
 import { isInternalEventPendingApproval } from "@/lib/events/internal-event-status"
 import { cn } from "@/lib/utils"
 
 export default async function CustomerStaffEventsPage() {
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect("/login")
-  }
-
-  const { activeOrganization } = await getActiveOrganization()
-
-  if (!activeOrganization) {
-    redirect("/login")
-  }
-
-  const hasStaffTools = await requireStaffToolsPortal(
-    user.id,
-    activeOrganization.organization_id
-  )
+  const { userId, organizationId } = await requireCustomerPortalPageContext()
+  const hasStaffTools = await requireStaffToolsPortal(userId, organizationId)
 
   if (!hasStaffTools) {
     redirect("/customer/dashboard")
   }
 
-  const requests = await getMyInternalEventRequests(
-    user.id,
-    activeOrganization.organization_id
-  )
+  const requests = await getMyInternalEventRequests(userId, organizationId)
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">

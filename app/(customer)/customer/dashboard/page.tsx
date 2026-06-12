@@ -11,22 +11,16 @@ import {
   Briefcase,
 } from "lucide-react"
 
-import { createClient } from "@/lib/supabase/server"
+import { getCustomerPortalSupabase } from "@/lib/auth/customer-portal-session"
 import { getActiveOrganization } from "@/lib/organizations/get-active-organization"
 import { getUserPortalCapabilities } from "@/lib/auth/portal-capabilities"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 
 export default async function CustomerDashboardPage() {
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect("/login")
-  }
+  const { supabase, session } = await getCustomerPortalSupabase()
+  const userId = session.effectiveUserId
+  const user = session.authenticatedUser
 
   const { activeOrganization } = await getActiveOrganization()
 
@@ -36,17 +30,18 @@ export default async function CustomerDashboardPage() {
 
   const organizationId = activeOrganization.organization_id
 
-  const portalCapabilities = await getUserPortalCapabilities(user.id, organizationId)
+  const portalCapabilities = await getUserPortalCapabilities(userId, organizationId)
 
   const { data: contact } = await supabase
     .from("contacts")
     .select("id, full_name, email, organization_id")
-    .eq("auth_user_id", user.id)
+    .eq("auth_user_id", userId)
     .eq("organization_id", organizationId)
     .maybeSingle()
 
   const firstName =
     contact?.full_name?.split(" ")?.[0] ||
+    contact?.email?.split("@")?.[0] ||
     user.email?.split("@")?.[0] ||
     "there"
 
@@ -54,24 +49,30 @@ export default async function CustomerDashboardPage() {
     .from("venue_rentals")
     .select("*", { count: "exact", head: true })
     .eq("organization_id", organizationId)
-    .eq("customer_user_id", user.id)
+    .eq("customer_user_id", userId)
 
   const { count: pendingRentalsCount } = await supabase
     .from("venue_rentals")
     .select("*", { count: "exact", head: true })
     .eq("organization_id", organizationId)
-    .eq("customer_user_id", user.id)
+    .eq("customer_user_id", userId)
     .eq("status", "awaiting_supervisor_approval")
 
-  const { count: donationCount } = await supabase
-    .from("donation_payments")
-    .select("*", { count: "exact", head: true })
-    .eq("organization_id", organizationId)
+  const { count: donationCount } = contact?.id
+    ? await supabase
+        .from("donation_payments")
+        .select("*", { count: "exact", head: true })
+        .eq("organization_id", organizationId)
+        .eq("contact_id", contact.id)
+    : { count: 0 }
 
-  const { count: programEnrollmentCount } = await supabase
-    .from("program_enrollments")
-    .select("*", { count: "exact", head: true })
-    .eq("organization_id", organizationId)
+  const { count: programEnrollmentCount } = contact?.id
+    ? await supabase
+        .from("program_enrollments")
+        .select("*", { count: "exact", head: true })
+        .eq("organization_id", organizationId)
+        .eq("registrant_contact_id", contact.id)
+    : { count: 0 }
 
   const overviewCards = [
     {

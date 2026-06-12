@@ -14,6 +14,7 @@
 import { revalidatePath } from "next/cache"
 
 import { createClient } from "@/lib/supabase/server"
+import { resolveCustomerPortalSession } from "@/lib/auth/customer-portal-session"
 import { resolveOrganizationId } from "@/lib/organizations/resolve-organization-id"
 import { hasAnyPermission, PERMISSIONS } from "@/lib/permissions/permissions"
 import { assertNoReservationConflicts } from "@/lib/reservations/reservation-conflict-rules"
@@ -352,6 +353,9 @@ export async function submitVenueRentalRequest(input: SubmitVenueRentalInput) {
     throw new Error("You must be signed in to submit a rental request.")
   }
 
+  const portalSession = await resolveCustomerPortalSession()
+  const customerUserId = portalSession?.effectiveUserId ?? user.id
+
   validateSpaces(input.spaces)
   await assertVenuesInOrg(
     organizationId,
@@ -361,18 +365,18 @@ export async function submitVenueRentalRequest(input: SubmitVenueRentalInput) {
 
   const billingContactId = await resolveBillingContactId(
     organizationId,
-    user.id,
+    customerUserId,
     input.billingContactId
   )
 
   const rentalInsertBase = {
     organization_id: organizationId,
-    customer_user_id: user.id,
+    customer_user_id: customerUserId,
     venue_rental_event_type_id: input.venueRentalEventTypeId || null,
     status: VENUE_RENTAL_STATUSES.awaitingSupervisorApproval,
     notes: input.notes?.trim() || null,
     expected_attendance: input.operationalSetup?.expectedAttendance ?? null,
-    created_by: user.id,
+    created_by: customerUserId,
   }
 
   let rentalResult = await supabase
@@ -409,7 +413,7 @@ export async function submitVenueRentalRequest(input: SubmitVenueRentalInput) {
     start_at: space.startAt,
     end_at: space.endAt,
     status: RENTAL_RESERVATION_STATUSES.temporaryHold,
-    created_by: user.id,
+    created_by: customerUserId,
   }))
 
   const { error: reservationError } = await supabase
@@ -423,7 +427,7 @@ export async function submitVenueRentalRequest(input: SubmitVenueRentalInput) {
 
   await insertSelectedAddons(organizationId, rental.id as string, input.addons)
 
-  await syncOperationalBriefForVenueRental(rental.id as string, organizationId, user.id, {
+  await syncOperationalBriefForVenueRental(rental.id as string, organizationId, customerUserId, {
     operationalSetup: input.operationalSetup,
   })
 
@@ -435,7 +439,7 @@ export async function submitVenueRentalRequest(input: SubmitVenueRentalInput) {
       eventKey: "request_submitted",
       subject: "New venue rental request",
       summary: "A customer submitted a new venue rental request.",
-      metadata: { venueRentalId: rental.id, customerUserId: user.id },
+      metadata: { venueRentalId: rental.id, customerUserId },
     },
     {
       organizationId,
@@ -444,7 +448,7 @@ export async function submitVenueRentalRequest(input: SubmitVenueRentalInput) {
       eventKey: "request_received",
       subject: "Venue rental request received",
       summary: "Your venue rental request was received and is awaiting review.",
-      metadata: { venueRentalId: rental.id, customerUserId: user.id },
+      metadata: { venueRentalId: rental.id, customerUserId },
     },
   ])
 

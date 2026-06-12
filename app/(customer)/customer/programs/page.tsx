@@ -13,7 +13,7 @@ import {
   Users,
 } from "lucide-react"
 
-import { createClient } from "@/lib/supabase/server"
+import { getCustomerPortalSupabase } from "@/lib/auth/customer-portal-session"
 import { getMyOrganizations } from "@/lib/organizations/get-my-organizations"
 import { userHasActiveMembership } from "@/lib/memberships/membership-queries"
 import { Badge } from "@/components/ui/badge"
@@ -212,7 +212,7 @@ export default async function CustomerProgramsPage({
     enrollment: getValue(resolvedSearchParams?.enrollment) || "all",
   }
 
-  const supabase = await createClient()
+  const supabase = (await getCustomerPortalSupabase()).supabase
 
   const { organization, errorMessage: organizationError } =
     await getActiveCustomerOrganization()
@@ -221,12 +221,11 @@ export default async function CustomerProgramsPage({
   let errorMessage = organizationError
 
   if (organization) {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const { session } = await getCustomerPortalSupabase()
+    const userId = session.effectiveUserId
 
-    const hasMembership = user
-      ? await userHasActiveMembership(organization.organization_id, user.id)
+    const hasMembership = userId
+      ? await userHasActiveMembership(organization.organization_id, userId)
       : false
 
     const { data, error } = await supabase

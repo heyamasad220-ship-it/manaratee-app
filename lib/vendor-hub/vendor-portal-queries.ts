@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
+import { resolveCustomerPortalActor } from "@/lib/auth/customer-portal-session"
 import { linkVendorContactsForCurrentUser } from "@/lib/vendor-hub/link-vendor-contact-auth"
 import type {
   MyVendorBazaarSummary,
@@ -11,10 +12,7 @@ function isMissingRelationError(error: { code?: string; message?: string } | nul
 }
 
 export async function getMyVendorBazaarActivity(): Promise<MyVendorBazaarSummary> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const actor = await resolveCustomerPortalActor()
 
   const empty: MyVendorBazaarSummary = {
     linkedContactCount: 0,
@@ -25,16 +23,20 @@ export async function getMyVendorBazaarActivity(): Promise<MyVendorBazaarSummary
     tablesAvailable: true,
   }
 
-  if (!user) {
+  if (!actor) {
     return empty
   }
 
-  await linkVendorContactsForCurrentUser(supabase)
+  const { userId, supabase, session } = actor
+
+  if (!session.isSupportSession) {
+    await linkVendorContactsForCurrentUser(supabase)
+  }
 
   const { data: contacts, error: contactsError } = await supabase
     .from("contacts")
     .select("id, organization_id, full_name, organization_name, company_name")
-    .eq("auth_user_id", user.id)
+    .eq("auth_user_id", userId)
 
   if (contactsError) {
     console.error("getMyVendorBazaarActivity contacts:", contactsError)

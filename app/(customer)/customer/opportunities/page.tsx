@@ -1,18 +1,9 @@
-import { redirect } from "next/navigation"
-
 import { OpportunitiesClient } from "@/components/customer/opportunities-client"
 import { getServiceOpportunitiesForCurrentUser } from "@/lib/service-participations/service-participation-queries"
-import { createClient } from "@/lib/supabase/server"
+import { requireCustomerPortalPageContext } from "@/lib/auth/require-customer-portal-page"
 
 export default async function CustomerOpportunitiesPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect("/login")
-  }
+  await requireCustomerPortalPageContext()
 
   const { opportunities, eligibility } = await getServiceOpportunitiesForCurrentUser()
 

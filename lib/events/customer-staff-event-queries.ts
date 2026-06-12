@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
+import { getCustomerPortalSupabase } from "@/lib/auth/customer-portal-session"
 
 import { getInternalEventStatusLabel } from "./internal-event-status"
 import type { InternalEventWithRelations } from "./internal-event-types"
@@ -7,7 +8,7 @@ export async function getMyInternalEventRequests(
   userId: string,
   organizationId: string
 ): Promise<InternalEventWithRelations[]> {
-  const supabase = await createClient()
+  const { supabase } = await getCustomerPortalSupabase()
 
   const { data, error } = await supabase
     .from("internal_events")

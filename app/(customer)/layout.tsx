@@ -1,5 +1,7 @@
 import { CustomerNav } from "@/components/customer/customer-nav"
+import { OrgUserSupportBanner } from "@/components/organizations/org-user-support-banner"
 import { getUserPortalCapabilities } from "@/lib/auth/portal-capabilities"
+import { resolveCustomerPortalSession } from "@/lib/auth/customer-portal-session"
 import { getActiveOrganization } from "@/lib/organizations/get-active-organization"
 import { linkVendorContactsForCurrentUser } from "@/lib/vendor-hub/link-vendor-contact-auth"
 import { createClient } from "@/lib/supabase/server"
@@ -17,9 +19,12 @@ export default async function CustomerLayout({
     data: { user },
   } = await supabase.auth.getUser()
 
-  const portalCapabilities = user
+  const portalSession = user ? await resolveCustomerPortalSession() : null
+  const effectiveUserId = portalSession?.effectiveUserId ?? user?.id
+
+  const portalCapabilities = effectiveUserId
     ? await getUserPortalCapabilities(
-        user.id,
+        effectiveUserId,
         activeOrganization?.organization_id
       )
     : {
@@ -30,7 +35,7 @@ export default async function CustomerLayout({
         hasAdminPortal: false,
       }
 
-  if (user) {
+  if (user && !portalSession?.isSupportSession) {
     await linkVendorContactsForCurrentUser(supabase)
   }
 
@@ -43,6 +48,7 @@ export default async function CustomerLayout({
       />
 
       <main className="flex-1 overflow-x-hidden">
+        <OrgUserSupportBanner />
         <div className="mx-auto max-w-7xl p-6">
           {children}
         </div>

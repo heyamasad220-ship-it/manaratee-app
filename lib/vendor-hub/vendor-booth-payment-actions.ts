@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 
 import { createClient } from "@/lib/supabase/server"
+import { resolveCustomerPortalActor } from "@/lib/auth/customer-portal-session"
 import { linkVendorContactsForCurrentUser } from "@/lib/vendor-hub/link-vendor-contact-auth"
 import type { VendorBoothPaymentDue } from "@/lib/vendor-hub/vendor-portal-types"
 import { VENDOR_HUB_ROUTES } from "@/lib/vendor-hub/vendor-hub-routes"
@@ -24,21 +25,22 @@ function computeAssignmentBalance(
 }
 
 export async function getVendorPaymentDueForCurrentUser(): Promise<VendorBoothPaymentDue[]> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const actor = await resolveCustomerPortalActor()
 
-  if (!user) {
+  if (!actor) {
     return []
   }
 
-  await linkVendorContactsForCurrentUser(supabase)
+  const { userId, supabase, session } = actor
+
+  if (!session.isSupportSession) {
+    await linkVendorContactsForCurrentUser(supabase)
+  }
 
   const { data: contacts } = await supabase
     .from("contacts")
     .select("id, organization_id, organization_name, company_name")
-    .eq("auth_user_id", user.id)
+    .eq("auth_user_id", userId)
 
   if (!contacts?.length) {
     return []

@@ -4,13 +4,13 @@ import { ArrowLeft } from "lucide-react"
 
 import { CustomerVenueRentalCalendar } from "@/components/customer/customer-venue-rental-calendar"
 import { Button } from "@/components/ui/button"
+import { requireCustomerPortalPageContext } from "@/lib/auth/require-customer-portal-page"
 import { getVenueRentalEventTypes } from "@/lib/bookings/venue-rental-event-type-queries"
 import {
   getActiveRentalAddons,
   getPublicAvailabilityBlocks,
 } from "@/lib/bookings/venue-rental-queries"
-import { createClient } from "@/lib/supabase/server"
-import { getActiveOrganization } from "@/lib/organizations/get-active-organization"
+import { getCustomerPortalSupabase } from "@/lib/auth/customer-portal-session"
 
 export default async function CustomerVenueRentalRequestPage({
   searchParams,
@@ -20,23 +20,8 @@ export default async function CustomerVenueRentalRequestPage({
   const params = await searchParams
   const initialVenueId = params?.venueId
 
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect("/login")
-  }
-
-  const { activeOrganization } = await getActiveOrganization()
-
-  if (!activeOrganization) {
-    redirect("/login")
-  }
-
-  const organizationId = activeOrganization.organization_id
+  const { organizationId } = await requireCustomerPortalPageContext()
+  const { supabase } = await getCustomerPortalSupabase()
   const rangeStart = new Date()
   rangeStart.setDate(rangeStart.getDate() - 7)
   const rangeEnd = new Date()

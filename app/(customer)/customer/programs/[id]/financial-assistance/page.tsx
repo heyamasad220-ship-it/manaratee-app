@@ -1,5 +1,6 @@
 import { redirect, notFound } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
+import { getCustomerPortalSupabase, resolveCustomerPortalSession } from "@/lib/auth/customer-portal-session"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -19,15 +20,14 @@ async function submitFinancialAssistanceApplication(formData: FormData) {
   "use server"
 
   const supabase = await createClient()
+  const portalSession = await resolveCustomerPortalSession()
 
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser()
-
-  if (userError || !user) {
+  if (!portalSession) {
     redirect("/login")
   }
+
+  const effectiveUserId = portalSession.effectiveUserId
+  const actorUserId = portalSession.authenticatedUser.id
 
   const programId = String(formData.get("program_id") || "")
   const organizationId = String(formData.get("organization_id") || "")
@@ -100,7 +100,7 @@ async function submitFinancialAssistanceApplication(formData: FormData) {
     .insert({
       organization_id: organizationId,
       program_id: programId,
-      submitted_by: user.id,
+      submitted_by: effectiveUserId,
 
       applicant_type: applicantType,
       applicant_first_name: applicantFirstName,
@@ -137,7 +137,7 @@ async function submitFinancialAssistanceApplication(formData: FormData) {
     application_id: application.id,
     old_status: null,
     new_status: "submitted",
-    changed_by: user.id,
+    changed_by: actorUserId,
     note: "Application submitted by customer.",
   })
 
@@ -160,7 +160,7 @@ async function submitFinancialAssistanceApplication(formData: FormData) {
       application_id: application.id,
       organization_id: organizationId,
       program_id: programId,
-      uploaded_by: user.id,
+      uploaded_by: effectiveUserId,
       file_name: proofFile.name,
       file_path: filePath,
       file_type: proofFile.type || null,
@@ -175,15 +175,7 @@ export default async function FinancialAssistancePage({
   params,
   searchParams,
 }: PageProps) {
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect("/login")
-  }
+  const { supabase } = await getCustomerPortalSupabase()
 
   const { data: program, error } = await supabase
     .from("programs")

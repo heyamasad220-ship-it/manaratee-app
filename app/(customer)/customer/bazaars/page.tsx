@@ -5,17 +5,10 @@ import { getReservableBazaarEventsForCurrentUser } from "@/lib/vendor-hub/vendor
 import { getVendorPaymentDueForCurrentUser } from "@/lib/vendor-hub/vendor-booth-payment-actions"
 import { getVendorInboxMessages } from "@/lib/vendor-hub/vendor-announcement-actions"
 import { getMyVendorBazaarActivity } from "@/lib/vendor-hub/vendor-portal-queries"
-import { createClient } from "@/lib/supabase/server"
+import { requireCustomerPortalPageContext } from "@/lib/auth/require-customer-portal-page"
 
 export default async function CustomerMyBazaarsPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect("/login")
-  }
+  await requireCustomerPortalPageContext()
 
   const [summary, reservableEvents, paymentDue, inboxMessages] = await Promise.all([
     getMyVendorBazaarActivity(),

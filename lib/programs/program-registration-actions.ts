@@ -4,6 +4,7 @@ import { redirect } from "next/navigation"
 
 import { readParticipantSelections } from "@/lib/programs/registration-form-parsing"
 import { getActiveOrganization } from "@/lib/organizations/get-active-organization"
+import { resolveCustomerPortalSession } from "@/lib/auth/customer-portal-session"
 import { createClient } from "@/lib/supabase/server"
 import { getDefaultOfferingForProgramByOrg } from "@/lib/programs/program-offering-queries"
 import {
@@ -285,16 +286,14 @@ async function registerSingleParticipant(input: {
 }
 
 export async function registerForProgram(formData: FormData) {
-  const supabase = await createClient()
+  const session = await resolveCustomerPortalSession()
 
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser()
-
-  if (userError || !user) {
+  if (!session) {
     redirect("/login")
   }
+
+  const supabase = await createClient()
+  const userId = session.effectiveUserId
 
   const { activeOrganization } = await getActiveOrganization()
 
@@ -321,7 +320,7 @@ export async function registerForProgram(formData: FormData) {
     redirect(`${redirectBase}?error=missing-fields`)
   }
 
-  const customerContact = await getCustomerContactForUser(organizationId, user.id)
+  const customerContact = await getCustomerContactForUser(organizationId, userId)
 
   if (!customerContact) {
     redirect(`${redirectBase}?error=unauthorized`)
@@ -354,7 +353,7 @@ export async function registerForProgram(formData: FormData) {
   }
 
   if (program.visibility === "members_only") {
-    const hasMembership = await userHasActiveMembership(organizationId, user.id)
+    const hasMembership = await userHasActiveMembership(organizationId, userId)
     if (!hasMembership) {
       redirect(`${redirectBase}?error=members-only`)
     }

@@ -4,7 +4,95 @@ import { revalidatePath } from "next/cache"
 
 import { ensureContactForPerson } from "@/lib/contacts/contact-actions"
 import { normalizeDateOfBirth } from "@/lib/dates/date-input-utils"
+import { getCustomerPortalClients } from "@/lib/auth/customer-portal-session"
 import { createClient } from "@/lib/supabase/server"
+
+export type CustomerFamilyMemberRow = {
+  id: string
+  firstName: string
+  lastName: string
+  gender: string
+  dateOfBirth: string
+  relationship: string
+}
+
+async function getAuthenticatedCustomerContact(organizationId: string) {
+  const clients = await getCustomerPortalClients()
+
+  if (!clients) {
+    throw new Error("You must be signed in to manage family members.")
+  }
+
+  const { data: contact, error: contactError } = await clients.dataClient
+    .from("contacts")
+    .select("id, person_id, organization_id, full_name, email, phone")
+    .eq("auth_user_id", clients.effectiveUserId)
+    .eq("organization_id", organizationId)
+    .maybeSingle()
+
+  if (contactError || !contact) {
+    throw new Error("Customer contact record not found for this organization.")
+  }
+
+  return {
+    supabase: clients.actionClient,
+    dataClient: clients.dataClient,
+    userId: clients.effectiveUserId,
+    contact,
+  }
+}
+
+export async function loadCustomerFamilyMembers(input: {
+  organizationId: string
+  parentPersonId: string
+}): Promise<CustomerFamilyMemberRow[]> {
+  const clients = await getCustomerPortalClients()
+  if (!clients) {
+    return []
+  }
+
+  const { data, error } = await clients.dataClient
+    .from("person_relationships")
+    .select(`
+      id,
+      relationship_type,
+      related_person_id,
+      people:related_person_id (
+        id,
+        first_name,
+        last_name,
+        gender,
+        date_of_birth
+      )
+    `)
+    .eq("person_id", input.parentPersonId)
+
+  if (error) {
+    console.error("loadCustomerFamilyMembers:", error)
+    return []
+  }
+
+  return (
+    data?.map((row) => {
+      const person = row.people as {
+        id: string
+        first_name: string | null
+        last_name: string | null
+        gender: string | null
+        date_of_birth: string | null
+      } | null
+
+      return {
+        id: person?.id ?? "",
+        firstName: person?.first_name || "",
+        lastName: person?.last_name || "",
+        gender: person?.gender || "",
+        dateOfBirth: person?.date_of_birth || "",
+        relationship: (row.relationship_type as string) || "",
+      }
+    }) ?? []
+  ).filter((member) => member.id)
+}
 
 export type AddCustomerFamilyMemberInput = {
   organizationId: string
@@ -14,32 +102,6 @@ export type AddCustomerFamilyMemberInput = {
   gender?: string | null
   dateOfBirth?: string | null
   relationship: string
-}
-
-async function getAuthenticatedCustomerContact(organizationId: string) {
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser()
-
-  if (userError || !user) {
-    throw new Error("You must be signed in to manage family members.")
-  }
-
-  const { data: contact, error: contactError } = await supabase
-    .from("contacts")
-    .select("id, person_id, organization_id, full_name, email, phone")
-    .eq("auth_user_id", user.id)
-    .eq("organization_id", organizationId)
-    .maybeSingle()
-
-  if (contactError || !contact) {
-    throw new Error("Customer contact record not found for this organization.")
-  }
-
-  return { supabase, user, contact }
 }
 
 async function ensureParentPersonId(

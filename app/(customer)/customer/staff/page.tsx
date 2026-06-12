@@ -10,42 +10,25 @@ import {
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { requireCustomerPortalPageContext } from "@/lib/auth/require-customer-portal-page"
+import { getUserPortalCapabilities, requireStaffToolsPortal } from "@/lib/auth/portal-capabilities"
 import { getMyInternalEventRequests } from "@/lib/events/customer-staff-event-queries"
 import {
   getInternalEventStatusLabel,
   isInternalEventPendingApproval,
 } from "@/lib/events/internal-event-status"
-import { getUserPortalCapabilities, requireStaffToolsPortal } from "@/lib/auth/portal-capabilities"
-import { getActiveOrganization } from "@/lib/organizations/get-active-organization"
-import { createClient } from "@/lib/supabase/server"
 import { formatVenueRentalTimeRange } from "@/lib/bookings/venue-rental-format"
 
 export default async function CustomerStaffToolsPage() {
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect("/login")
-  }
-
-  const { activeOrganization } = await getActiveOrganization()
-
-  if (!activeOrganization) {
-    redirect("/login")
-  }
-
-  const organizationId = activeOrganization.organization_id
-  const hasStaffTools = await requireStaffToolsPortal(user.id, organizationId)
+  const { userId, organizationId } = await requireCustomerPortalPageContext()
+  const hasStaffTools = await requireStaffToolsPortal(userId, organizationId)
 
   if (!hasStaffTools) {
     redirect("/customer/dashboard")
   }
 
-  const portalCapabilities = await getUserPortalCapabilities(user.id, organizationId)
-  const myRequests = await getMyInternalEventRequests(user.id, organizationId)
+  const portalCapabilities = await getUserPortalCapabilities(userId, organizationId)
+  const myRequests = await getMyInternalEventRequests(userId, organizationId)
   const pendingCount = myRequests.filter((event) =>
     isInternalEventPendingApproval(event.status)
   ).length

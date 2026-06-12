@@ -31,8 +31,10 @@ import {
 import { createClient } from "@/lib/supabase/client"
 import {
   addCustomerFamilyMember,
+  loadCustomerFamilyMembers,
   removeCustomerFamilyMember,
 } from "@/lib/customer/customer-family-actions"
+import { loadCustomerProfilePortalData } from "@/lib/customer/customer-portal-data-actions"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -283,32 +285,20 @@ export default function CustomerProfilePage() {
     async function loadProfile() {
       setLoading(true)
 
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+      const result = await loadCustomerProfilePortalData()
 
-      if (!user) {
+      if (!result.ok || !result.contact) {
+        console.error("Customer profile load error:", result.ok ? "Contact not found" : result.error)
         setLoading(false)
         return
       }
 
-      const { data, error } = await supabase
-        .from("contacts")
-        .select("id, organization_id, person_id, full_name, email, phone, address, city, state, zip, country, notes, created_at")
-        .eq("auth_user_id", user.id)
-        .maybeSingle()
-
-      if (error || !data) {
-        console.error("Customer profile load error:", error)
-        setLoading(false)
-        return
-      }
-
+      const data = result.contact
       const name = splitFullName(data.full_name)
       const loadedProfile: ProfileData = {
         firstName: name.firstName,
         lastName: name.lastName,
-        email: data.email || user.email || "",
+        email: data.email || result.accountEmail || "",
         phone: data.phone || "",
         dateOfBirth: "",
         gender: "",
@@ -331,14 +321,7 @@ export default function CustomerProfilePage() {
       setOrganizationId(data.organization_id)
       setProfile(loadedProfile)
       setEditData(loadedProfile)
-
-      if (data.person_id) {
-        await loadFamilyMembers(data.person_id)
-      } else {
-        setFamilyMembers([])
-      }
-
-      // These remain empty until real tables exist for payment methods, applications, and notification preferences.
+      setFamilyMembers(result.familyMembers)
       setPaymentMethods([])
       setUserApplications([])
       setNotifications(defaultNotifications)
@@ -346,7 +329,7 @@ export default function CustomerProfilePage() {
     }
 
     loadProfile()
-  }, [supabase])
+  }, [])
 
   const availableApplicationTypes = applicationTypes.filter(
     (appType) => appType.isActive && !userApplications.some((ua) => ua.applicationTypeId === appType.id)
@@ -405,38 +388,32 @@ export default function CustomerProfilePage() {
   }
 
   async function loadFamilyMembers(parentPersonId: string) {
-    const { data, error } = await supabase
-      .from("person_relationships")
-      .select(`
-        id,
-        relationship_type,
-        related_person_id,
-        people:related_person_id (
-          id,
-          first_name,
-          last_name,
-          gender,
-          date_of_birth
-        )
-      `)
-      .eq("person_id", parentPersonId)
+    if (!organizationId) return
 
-    if (error) {
-      console.error("Family members load error:", error)
-      return
-    }
-
-    const members =
-      data?.map((row: any) => ({
-        id: row.people.id,
-        firstName: row.people.first_name || "",
-        lastName: row.people.last_name || "",
-        gender: row.people.gender || "",
-        dateOfBirth: row.people.date_of_birth || "",
-        relationship: row.relationship_type || "",
-      })) || []
+    const members = await loadCustomerFamilyMembers({
+      organizationId,
+      parentPersonId,
+    })
 
     setFamilyMembers(members)
+  }
+
+  async function refreshParentPersonId() {
+    if (!organizationId) {
+      return null
+    }
+
+    const result = await loadCustomerProfilePortalData()
+    if (!result.ok || !result.contact) {
+      return null
+    }
+
+    const nextPersonId = (result.contact.person_id as string | null) ?? null
+    if (nextPersonId) {
+      setPersonId(nextPersonId)
+    }
+
+    return nextPersonId
   }
 
   async function handleAddFamilyMember() {
@@ -488,30 +465,6 @@ export default function CustomerProfilePage() {
     } finally {
       setSaving(false)
     }
-  }
-
-  async function refreshParentPersonId() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user || !organizationId) {
-      return null
-    }
-
-    const { data } = await supabase
-      .from("contacts")
-      .select("person_id")
-      .eq("auth_user_id", user.id)
-      .eq("organization_id", organizationId)
-      .maybeSingle()
-
-    const nextPersonId = (data?.person_id as string | null) ?? null
-    if (nextPersonId) {
-      setPersonId(nextPersonId)
-    }
-
-    return nextPersonId
   }
 
   async function handleRemoveFamilyMember(id: string) {

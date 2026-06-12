@@ -357,7 +357,9 @@ export async function listOrganizationMembers(
 
   const { data: members, error: membersError } = await admin
     .from("organization_members")
-    .select("id, user_id, organization_id, role, role_id, status, created_at")
+    .select(
+      "id, user_id, organization_id, role, role_id, status, created_at, platform_support_access"
+    )
     .eq("organization_id", organizationId)
     .order("created_at", { ascending: false })
 
@@ -398,6 +400,7 @@ export async function listOrganizationMembers(
     : roles || []
 
   const formattedMembers = (members || [])
+    .filter((member) => member.platform_support_access !== true)
     .map((member) => {
     const profile = profileById.get(member.user_id as string)
     const customRole = member.role_id

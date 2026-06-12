@@ -1,5 +1,4 @@
-import Link from "next/link"
-import { notFound, redirect } from "next/navigation"
+import { redirect } from "next/navigation"
 import { ArrowLeft } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -20,8 +19,8 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { userCanAccessOfferingRoster } from "@/lib/auth/portal-capabilities"
-import { createClient } from "@/lib/supabase/server"
-import { getActiveOrganization } from "@/lib/organizations/get-active-organization"
+import { requireCustomerPortalPageContext } from "@/lib/auth/require-customer-portal-page"
+import { getCustomerPortalSupabase } from "@/lib/auth/customer-portal-session"
 import {
   getOfferingRosterEnrollments,
   getStaffAssignmentsForOffering,
@@ -48,26 +47,11 @@ export default async function MyClassRosterPage({
   params: Promise<{ offeringId: string }>
 }) {
   const { offeringId } = await params
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect("/login")
-  }
-
-  const { activeOrganization } = await getActiveOrganization()
-
-  if (!activeOrganization) {
-    redirect("/login")
-  }
-
-  const organizationId = activeOrganization.organization_id
+  const { userId, organizationId } = await requireCustomerPortalPageContext()
+  const { supabase } = await getCustomerPortalSupabase()
 
   const canAccess = await userCanAccessOfferingRoster({
-    userId: user.id,
+    userId,
     organizationId,
     offeringId,
   })
@@ -94,7 +78,7 @@ export default async function MyClassRosterPage({
       .from("contacts")
       .select("id")
       .eq("organization_id", organizationId)
-      .eq("auth_user_id", user.id)
+      .eq("auth_user_id", userId)
       .maybeSingle(),
   ])
 

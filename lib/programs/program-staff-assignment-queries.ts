@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
+import { getCustomerPortalSupabase } from "@/lib/auth/customer-portal-session"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import type {
   ProgramStaffAssignment,
@@ -116,7 +117,7 @@ export async function getStaffAssignmentsForCurrentContact(
   organizationId: string,
   authUserId: string
 ): Promise<ProgramStaffAssignmentWithDetails[]> {
-  const supabase = await createClient()
+  const { supabase } = await getCustomerPortalSupabase()
 
   const { data: contact, error: contactError } = await supabase
     .from("contacts")

@@ -8,19 +8,11 @@ import { Card, CardContent } from "@/components/ui/card"
 import { getCustomerRentalFinancialContexts } from "@/lib/bookings/customer-venue-rental-queries"
 import { partitionCustomerVenueRentalsForDashboard } from "@/lib/bookings/customer-venue-rental-experience"
 import { getCustomerVenueRentals } from "@/lib/bookings/venue-rental-queries"
-import { createClient } from "@/lib/supabase/server"
+import { getCustomerPortalSupabase } from "@/lib/auth/customer-portal-session"
 import { getActiveOrganization } from "@/lib/organizations/get-active-organization"
 
 export default async function CustomerVenueRentalsPage() {
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect("/login")
-  }
+  const { session } = await getCustomerPortalSupabase()
 
   const { activeOrganization } = await getActiveOrganization()
 
@@ -29,8 +21,9 @@ export default async function CustomerVenueRentalsPage() {
   }
 
   const organizationId = activeOrganization.organization_id
+  const userId = session.effectiveUserId
 
-  const rentals = await getCustomerVenueRentals(user.id, organizationId)
+  const rentals = await getCustomerVenueRentals(userId, organizationId)
 
   const statusByRentalId = Object.fromEntries(
     rentals.map((rental) => [rental.id, rental.status])

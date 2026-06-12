@@ -19,6 +19,7 @@ import { ProgramRegisterQuotePreview } from "@/components/customer/program-regis
 import { ProgramRegisterParticipantsFields } from "@/components/customer/program-register-participants-fields"
 import { CustomerRegistrationOptionPicker } from "@/components/programs/program-registration-options-editor"
 import { createClient } from "@/lib/supabase/server"
+import { resolveCustomerPortalSession } from "@/lib/auth/customer-portal-session"
 import { getDefaultOfferingForProgramByOrg, getOfferingByIdForOrg } from "@/lib/programs/program-offering-queries"
 import { registerForProgram } from "@/lib/programs/program-registration-actions"
 import {
@@ -187,18 +188,17 @@ async function getActiveCustomerOrganization() {
 }
 
 async function getCurrentCustomerContact(organizationId: string) {
-  const supabase = await createClient()
+  const session = await resolveCustomerPortalSession()
+  if (!session) return null
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) return null
+  const supabase = session.isSupportSession
+    ? (await import("@/lib/platform/require-platform-admin")).getServiceRoleClient()
+    : await createClient()
 
   const { data, error } = await supabase
     .from("contacts")
     .select("id, organization_id, person_id, full_name, email, phone")
-    .eq("auth_user_id", user.id)
+    .eq("auth_user_id", session.effectiveUserId)
     .eq("organization_id", organizationId)
     .maybeSingle()
 

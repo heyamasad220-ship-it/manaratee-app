@@ -4,6 +4,8 @@ import { useEffect, useState } from "react"
 import { usePathname, useRouter } from "next/navigation"
 
 import { createClient } from "@/lib/supabase/client"
+import { getCurrentOrganizationContext, clearSelectedOrganizationIdCache } from "@/lib/current-organization"
+import { isOrganizationSystemAdmin } from "@/lib/organizations/organization-system-admin"
 import {
   isFacilitiesOnlyAccess,
   isFacilitiesRoute,
@@ -20,6 +22,7 @@ export function DashboardAccessGuard() {
     let cancelled = false
 
     async function enforceFacilitiesScope() {
+      clearSelectedOrganizationIdCache()
       const supabase = createClient()
       const {
         data: { user },
@@ -30,10 +33,22 @@ export function DashboardAccessGuard() {
         return
       }
 
+      const { organizationId, platformSupportMode } = await getCurrentOrganizationContext()
+      if (!organizationId) {
+        if (!cancelled) setChecked(true)
+        return
+      }
+
+      if (platformSupportMode) {
+        if (!cancelled) setChecked(true)
+        return
+      }
+
       const { data: membership } = await supabase
         .from("organization_members")
         .select("organization_id, role, role_id")
         .eq("user_id", user.id)
+        .eq("organization_id", organizationId)
         .maybeSingle()
 
       if (!membership) {
@@ -57,7 +72,7 @@ export function DashboardAccessGuard() {
       }
 
       const facilitiesOnly = isFacilitiesOnlyAccess({
-        isOwner: membership.role === "owner",
+        isOwner: isOrganizationSystemAdmin(membership.role),
         enabledPermissions,
       })
 
