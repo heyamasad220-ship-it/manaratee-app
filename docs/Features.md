@@ -788,7 +788,7 @@ Full 10k scale not run in CI (requires explicit approval); extrapolated ~2–3s 
 
 1. ~~Add RLS policies on `payments`, `pledges`, `donors`~~ — **Fixed (Priority 14, migration `095`)**
 2. ~~Enforce `donations.view` / `donations.manage` on server actions and `/donations/*` routes~~ — **Fixed (Priority 14)**
-3. ~~Add pagination to staff payments/donors lists~~ — **Partially fixed (Priority 15)** — payments, pledges, donors paginated; reports/campaigns still full-load
+3. ~~Add pagination to staff payments/donors lists~~ — **Fixed (Priority 15–15.5)** — payments, pledges, donors, and reports use server pagination or SQL RPCs
 4. Isolate validation test data (cleanup Stripe test payments or use dedicated test org)
 
 ## Security & multi-tenant hardening (Priority 14)
@@ -876,10 +876,19 @@ npm run validate:donations-production
 
 ### Remaining scale work
 
-* `/donations/reports` and `/donations/campaigns` still load full org payment/pledge sets for analytics
 * Recurring plans list not paginated (typically smaller dataset)
 * Customer portal payment history unbounded per contact
 * Dedicated test org for validation scripts still recommended
+
+### Donations navigation (sidebar consolidation)
+
+Status: Implemented (June 2026)
+
+* Sidebar reduced to **Overview**, **Donors**, **Payments**, **Reports**, **Settings** (`components/layout/sidebar.tsx`)
+* Operational routes grouped under **Payments** via horizontal tab bar (`components/donations/donation-payments-nav.tsx`)
+* Tab bar layout: `app/(dashboard)/donations/(operations)/layout.tsx` — wraps payments, pledges, recurring, collect, campaigns, import, reconcile
+* URLs unchanged; Import/Reconcile tabs hidden unless user has `donations.manage`
+* Sidebar **Payments** item stays active on all operational routes via `alsoMatchPrefixes`
 
 ## Campaign goals & fundraising analytics (Priority 3)
 

@@ -43,7 +43,17 @@ interface SubItem {
   label: string
   href: string
   matchPrefix: string
+  alsoMatchPrefixes?: string[]
   permissionKey?: string
+}
+
+function subItemMatchesPath(child: SubItem, pathname: string) {
+  if (pathname === child.href || pathname.startsWith(`${child.matchPrefix}/`)) {
+    return true
+  }
+  return child.alsoMatchPrefixes?.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  )
 }
 
 interface NavItem {
@@ -280,13 +290,20 @@ const moduleChildren: Record<string, SubItem[]> = {
   donations: [
     { label: "Overview", href: "/donations", matchPrefix: "/donations", permissionKey: "donations.view" },
     { label: "Donors", href: "/donations/donors", matchPrefix: "/donations/donors", permissionKey: "donations.view" },
-    { label: "Payments", href: "/donations/payments", matchPrefix: "/donations/payments", permissionKey: "donations.view" },
-    { label: "Pledges", href: "/donations/pledges", matchPrefix: "/donations/pledges", permissionKey: "donations.view" },
-    { label: "Recurring", href: "/donations/recurring", matchPrefix: "/donations/recurring", permissionKey: "donations.view" },
-    { label: "Collect", href: "/donations/collect", matchPrefix: "/donations/collect", permissionKey: "donations.view" },
-    { label: "Campaigns", href: "/donations/campaigns", matchPrefix: "/donations/campaigns", permissionKey: "donations.view" },
-    { label: "Import", href: "/donations/import", matchPrefix: "/donations/import", permissionKey: "donations.manage" },
-    { label: "Reconcile", href: "/donations/reconcile", matchPrefix: "/donations/reconcile", permissionKey: "donations.manage" },
+    {
+      label: "Payments",
+      href: "/donations/payments",
+      matchPrefix: "/donations/payments",
+      alsoMatchPrefixes: [
+        "/donations/pledges",
+        "/donations/recurring",
+        "/donations/collect",
+        "/donations/campaigns",
+        "/donations/import",
+        "/donations/reconcile",
+      ],
+      permissionKey: "donations.view",
+    },
     { label: "Reports", href: "/donations/reports", matchPrefix: "/donations/reports", permissionKey: "reports.view" },
     { label: "Settings", href: "/donations/settings", matchPrefix: "/donations/settings", permissionKey: "donations.manage" },
   ],
@@ -499,7 +516,8 @@ function buildNavItems(rows: SidebarModuleRow[], permissionContext: UserPermissi
 
 function isItemActive(item: NavItem, pathname: string, navItems: NavItem[]) {
   const matchesSelf = pathname.startsWith(item.matchPrefix)
-  const matchesChild = item.children?.some((child) => pathname.startsWith(child.matchPrefix)) ?? false
+  const matchesChild =
+    item.children?.some((child) => subItemMatchesPath(child, pathname)) ?? false
   const isOverridden = navItems.some(
     (other) =>
       other.label !== item.label &&
@@ -520,14 +538,17 @@ function findActiveModuleWithChildren(navItems: NavItem[], pathname: string): Na
 }
 
 function isChildActive(child: SubItem, siblings: SubItem[], pathname: string) {
+  const selfMatches = subItemMatchesPath(child, pathname)
+  if (!selfMatches) return false
+
   const isChildOverridden = siblings.some(
     (other) =>
       other.label !== child.label &&
-      other.matchPrefix.startsWith(child.matchPrefix) &&
-      other.matchPrefix.length > child.matchPrefix.length &&
-      pathname.startsWith(other.matchPrefix),
+      subItemMatchesPath(other, pathname) &&
+      (other.matchPrefix.length > child.matchPrefix.length ||
+        Boolean(other.alsoMatchPrefixes?.length))
   )
-  return pathname.startsWith(child.matchPrefix) && !isChildOverridden
+  return !isChildOverridden
 }
 
 interface SidebarContextType {
