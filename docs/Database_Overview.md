@@ -227,6 +227,15 @@ program_financial_assistance_status_history.financial_assistance_id → program_
 
 **Transactional email (migration `094`):** `transactional_email_log` tracks receipt, year-end statement, and pledge reminder sends. `donation_receipts.status` includes `failed`. `donation_settings.year_end_statement_email_template` for statement email body.
 
+**RLS hardening (migration `095_donations_rls_hardening.sql`):** Row-level security on canonical ledger tables (`payments`, `pledges`, `donors`) plus donation operational tables (`recurring_donation_plans`, `donation_receipts`, `pledge_reminders`, `donation_checkout_sessions`, `payment_processor_events`, `donation_settings`). Staff policies require `donations.view` / `donations.manage` via `auth_user_can_view_donations` / `auth_user_can_manage_donations` (owner bypass included). Customers may SELECT/INSERT own rows through `auth_user_contact_ids` / `auth_user_donor_ids`. Service role bypass unchanged for webhooks and checkout creation.
+
+Run after `094_transactional_email.sql`:
+
+```bash
+npx supabase db query --linked -f scripts/095_donations_rls_hardening.sql
+npm run validate:donations-security
+```
+
 Key relationships:
 
 ```text

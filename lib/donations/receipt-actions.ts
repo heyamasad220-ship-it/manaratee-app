@@ -1,7 +1,7 @@
 "use server"
 
-import { createClient } from "@/lib/supabase/server"
 import { deliverPaymentReceiptById } from "@/lib/donations/donation-email-delivery"
+import { requireDonationStaffAccess } from "@/lib/donations/donation-action-auth"
 import {
   allocateReceiptNumber,
   buildAnnualGivingStatementPayload,
@@ -15,25 +15,10 @@ import type {
   ReceiptStatus,
 } from "@/lib/donations/receipt-types"
 
-async function getOrgIdForUser() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return { supabase, orgId: null as string | null, userId: null as string | null }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("organization_id")
-    .eq("id", user.id)
-    .maybeSingle()
-
-  return { supabase, orgId: profile?.organization_id ?? null, userId: user.id }
-}
-
 export async function getDonationReceiptSettingsAction() {
-  const { supabase, orgId } = await getOrgIdForUser()
-  if (!orgId) return { success: false as const, error: "No organization" }
+  const access = await requireDonationStaffAccess("manage")
+  if (!access.ok) return { success: false as const, error: access.error }
+  const { supabase, orgId } = access
   try {
     const settings = await loadDonationReceiptSettings(supabase, orgId)
     return { success: true as const, settings }
@@ -45,8 +30,9 @@ export async function getDonationReceiptSettingsAction() {
 export async function saveDonationReceiptSettingsAction(
   settings: Omit<import("@/lib/donations/receipt-types").DonationReceiptSettings, "organization_id">
 ) {
-  const { supabase, orgId } = await getOrgIdForUser()
-  if (!orgId) return { success: false as const, error: "No organization" }
+  const access = await requireDonationStaffAccess("manage")
+  if (!access.ok) return { success: false as const, error: access.error }
+  const { supabase, orgId } = access
 
   const { saveDonationReceiptSettings } = await import("@/lib/donations/receipt-settings")
   try {
@@ -58,8 +44,9 @@ export async function saveDonationReceiptSettingsAction(
 }
 
 export async function generatePaymentReceiptAction(paymentId: string) {
-  const { supabase, orgId, userId } = await getOrgIdForUser()
-  if (!orgId) return { success: false as const, error: "No organization" }
+  const access = await requireDonationStaffAccess("manage")
+  if (!access.ok) return { success: false as const, error: access.error }
+  const { supabase, orgId } = access
 
   const { data: existing } = await supabase
     .from("donation_receipts")
@@ -108,8 +95,9 @@ export async function generatePaymentReceiptAction(paymentId: string) {
 }
 
 export async function sendPaymentReceiptEmailAction(receiptId: string, resend = false) {
-  const { supabase, orgId, userId } = await getOrgIdForUser()
-  if (!orgId) return { success: false as const, error: "No organization" }
+  const access = await requireDonationStaffAccess("manage")
+  if (!access.ok) return { success: false as const, error: access.error }
+  const { supabase, orgId, userId } = access
 
   const delivery = await deliverPaymentReceiptById(supabase, {
     organizationId: orgId,
@@ -145,8 +133,9 @@ export async function markReceiptSentAction(receiptId: string, resend = false) {
 }
 
 export async function getPaymentReceiptAction(paymentId: string) {
-  const { supabase, orgId } = await getOrgIdForUser()
-  if (!orgId) return { success: false as const, error: "No organization" }
+  const access = await requireDonationStaffAccess("view")
+  if (!access.ok) return { success: false as const, error: access.error }
+  const { supabase, orgId } = access
 
   const { data, error } = await supabase
     .from("donation_receipts")
@@ -166,8 +155,9 @@ export async function getPaymentReceiptAction(paymentId: string) {
 }
 
 export async function generateAnnualStatementAction(donorId: string, taxYear: number) {
-  const { supabase, orgId } = await getOrgIdForUser()
-  if (!orgId) return { success: false as const, error: "No organization" }
+  const access = await requireDonationStaffAccess("manage")
+  if (!access.ok) return { success: false as const, error: access.error }
+  const { supabase, orgId } = access
 
   const { data: existing } = await supabase
     .from("donation_receipts")
@@ -221,11 +211,13 @@ export async function generateAnnualStatementAction(donorId: string, taxYear: nu
 }
 
 export async function sendAnnualStatementEmailAction(donorId: string, taxYear: number, resend = false) {
+  const access = await requireDonationStaffAccess("manage")
+  if (!access.ok) return { success: false as const, error: access.error }
+
   const generated = await generateAnnualStatementAction(donorId, taxYear)
   if (!generated.success) return generated
 
-  const { supabase, orgId, userId } = await getOrgIdForUser()
-  if (!orgId) return { success: false as const, error: "No organization" }
+  const { supabase, orgId, userId } = access
 
   const delivery = await deliverPaymentReceiptById(supabase, {
     organizationId: orgId,
@@ -251,8 +243,8 @@ export async function sendAnnualStatementEmailAction(donorId: string, taxYear: n
 }
 
 export async function sendBulkAnnualStatementsAction(donorIds: string[], taxYear: number) {
-  const { orgId } = await getOrgIdForUser()
-  if (!orgId) return { success: false as const, error: "No organization" }
+  const access = await requireDonationStaffAccess("manage")
+  if (!access.ok) return { success: false as const, error: access.error }
   if (!donorIds.length) return { success: false as const, error: "No donors selected" }
 
   const results: Array<{
@@ -279,8 +271,9 @@ export async function sendBulkAnnualStatementsAction(donorIds: string[], taxYear
 }
 
 export async function getDonorGivingTotalsAction(donorId: string) {
-  const { supabase, orgId } = await getOrgIdForUser()
-  if (!orgId) return { success: false as const, error: "No organization" }
+  const access = await requireDonationStaffAccess("view")
+  if (!access.ok) return { success: false as const, error: access.error }
+  const { supabase, orgId } = access
   try {
     const totals = await computeDonorGivingTotals(supabase, orgId, donorId)
     return { success: true as const, totals }
@@ -290,8 +283,9 @@ export async function getDonorGivingTotalsAction(donorId: string) {
 }
 
 export async function getReceiptReportingSummaryAction() {
-  const { supabase, orgId } = await getOrgIdForUser()
-  if (!orgId) return { success: false as const, error: "No organization" }
+  const access = await requireDonationStaffAccess("view")
+  if (!access.ok) return { success: false as const, error: access.error }
+  const { supabase, orgId } = access
 
   const [{ data: receipts }, { data: payments }] = await Promise.all([
     supabase

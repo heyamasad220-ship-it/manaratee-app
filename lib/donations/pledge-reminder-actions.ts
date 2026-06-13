@@ -1,10 +1,10 @@
 "use server"
 
-import { createClient } from "@/lib/supabase/server"
 import {
   resolveDonorEmail,
   sendPledgeReminderEmail,
 } from "@/lib/donations/donation-email-delivery"
+import { requireDonationStaffAccess } from "@/lib/donations/donation-action-auth"
 import { loadDonationReceiptSettings } from "@/lib/donations/receipt-settings"
 import {
   buildPledgeReminderMessage,
@@ -15,27 +15,11 @@ import {
 import type { PledgeReminderType } from "@/lib/donations/pledge-reminder-types"
 import { isPledgeEligibleForReminder } from "@/lib/donations/pledge-reminder-types"
 
-async function getOrgIdForUser() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return { supabase, orgId: null as string | null, userId: null as string | null }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("organization_id")
-    .eq("id", user.id)
-    .maybeSingle()
-
-  return { supabase, orgId: profile?.organization_id ?? null, userId: user.id }
-}
-
 export async function getOutstandingPledgesAction() {
-  const { supabase, orgId } = await getOrgIdForUser()
-  if (!orgId) return { success: false as const, error: "No organization" }
+  const access = await requireDonationStaffAccess("view")
+  if (!access.ok) return { success: false as const, error: access.error }
   try {
-    const pledges = await fetchOutstandingPledges(supabase, orgId)
+    const pledges = await fetchOutstandingPledges(access.supabase, access.orgId)
     return { success: true as const, pledges }
   } catch (error) {
     return { success: false as const, error: (error as Error).message }
@@ -43,10 +27,10 @@ export async function getOutstandingPledgesAction() {
 }
 
 export async function getPledgeCollectionReportAction() {
-  const { supabase, orgId } = await getOrgIdForUser()
-  if (!orgId) return { success: false as const, error: "No organization" }
+  const access = await requireDonationStaffAccess("view")
+  if (!access.ok) return { success: false as const, error: access.error }
   try {
-    const report = await buildPledgeCollectionReport(supabase, orgId)
+    const report = await buildPledgeCollectionReport(access.supabase, access.orgId)
     return { success: true as const, report }
   } catch (error) {
     return { success: false as const, error: (error as Error).message }
@@ -54,8 +38,9 @@ export async function getPledgeCollectionReportAction() {
 }
 
 export async function previewPledgeReminderAction(pledgeId: string) {
-  const { supabase, orgId } = await getOrgIdForUser()
-  if (!orgId) return { success: false as const, error: "No organization" }
+  const access = await requireDonationStaffAccess("view")
+  if (!access.ok) return { success: false as const, error: access.error }
+  const { supabase, orgId } = access
 
   try {
     const settings = await loadDonationReceiptSettings(supabase, orgId)
@@ -115,8 +100,9 @@ export async function sendPledgeReminderAction(
   pledgeId: string,
   reminderType: PledgeReminderType = "manual"
 ) {
-  const { supabase, orgId, userId } = await getOrgIdForUser()
-  if (!orgId) return { success: false as const, error: "No organization" }
+  const access = await requireDonationStaffAccess("manage")
+  if (!access.ok) return { success: false as const, error: access.error }
+  const { supabase, orgId, userId } = access
 
   const preview = await previewPledgeReminderAction(pledgeId)
   if (!preview.success) return preview
@@ -197,8 +183,9 @@ export async function sendPledgeReminderAction(
 }
 
 export async function markPledgeContactedAction(pledgeId: string, contactNotes?: string) {
-  const { supabase, orgId, userId } = await getOrgIdForUser()
-  if (!orgId) return { success: false as const, error: "No organization" }
+  const access = await requireDonationStaffAccess("manage")
+  if (!access.ok) return { success: false as const, error: access.error }
+  const { supabase, orgId, userId } = access
 
   const { data: pledge, error: pledgeError } = await supabase
     .from("pledge_status_view")
@@ -250,10 +237,10 @@ export async function getPledgeReminderHistoryAction(filters?: {
   donorId?: string
   limit?: number
 }) {
-  const { supabase, orgId } = await getOrgIdForUser()
-  if (!orgId) return { success: false as const, error: "No organization" }
+  const access = await requireDonationStaffAccess("view")
+  if (!access.ok) return { success: false as const, error: access.error }
   try {
-    const history = await fetchPledgeReminderHistory(supabase, orgId, filters)
+    const history = await fetchPledgeReminderHistory(access.supabase, access.orgId, filters)
     return { success: true as const, history }
   } catch (error) {
     return { success: false as const, error: (error as Error).message }
@@ -261,8 +248,9 @@ export async function getPledgeReminderHistoryAction(filters?: {
 }
 
 export async function getDonorPledgeCollectionSummaryAction(donorId: string) {
-  const { supabase, orgId } = await getOrgIdForUser()
-  if (!orgId) return { success: false as const, error: "No organization" }
+  const access = await requireDonationStaffAccess("view")
+  if (!access.ok) return { success: false as const, error: access.error }
+  const { supabase, orgId } = access
 
   try {
     const { data: pledgeRows, error } = await supabase

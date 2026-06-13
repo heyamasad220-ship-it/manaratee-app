@@ -786,10 +786,57 @@ Full 10k scale not run in CI (requires explicit approval); extrapolated ~2–3s 
 
 ### Launch blockers to fix before paid customers
 
-1. Add RLS policies on `payments`, `pledges`, `donors` (currently app-layer `organization_id` filtering only)
-2. Enforce `donations.view` / `donations.manage` on server actions and `/donations/*` routes
+1. ~~Add RLS policies on `payments`, `pledges`, `donors`~~ — **Fixed (Priority 14, migration `095`)**
+2. ~~Enforce `donations.view` / `donations.manage` on server actions and `/donations/*` routes~~ — **Fixed (Priority 14)**
 3. Add pagination to staff payments/donors lists
 4. Isolate validation test data (cleanup Stripe test payments or use dedicated test org)
+
+## Security & multi-tenant hardening (Priority 14)
+
+Status: Implemented (June 2026)
+
+### RLS (migration `scripts/095_donations_rls_hardening.sql`)
+
+Permission-aware `SECURITY DEFINER` helpers: `auth_user_can_view_donations`, `auth_user_can_manage_donations`, `auth_user_contact_ids`, `auth_user_donor_ids`.
+
+| Table | Staff SELECT | Staff INSERT/UPDATE/DELETE | Customer self-access |
+|-------|--------------|----------------------------|----------------------|
+| `payments` | `donations.view` or `donations.manage` | `donations.manage` | SELECT/INSERT own (`contact_id`, `source_type = portal`) |
+| `pledges` | same | same | SELECT/INSERT own (`donor_id`) |
+| `donors` | same | same | SELECT/INSERT own (`contact_id`) |
+| `recurring_donation_plans` | same | same | — |
+| `donation_receipts` | same | same | — |
+| `pledge_reminders` | same | same | — |
+| `donation_checkout_sessions` | staff view; staff update manage | — | SELECT own sessions |
+| `payment_processor_events` | staff view (org or null org) | service role only | — |
+
+Service role (Stripe webhooks, checkout session creation) bypasses RLS unchanged.
+
+### Server-side permission enforcement
+
+* `app/(dashboard)/donations/layout.tsx` — `donations.view` **or** `donations.manage`
+* `app/(dashboard)/donations/import/layout.tsx` — `donations.manage`
+* `app/(dashboard)/donations/reconcile/layout.tsx` — `donations.manage`
+* `app/(dashboard)/donations/settings/layout.tsx` — `donations.manage`
+* `lib/donations/donation-action-auth.ts` — `requireDonationStaffAccess("view" | "manage")` for receipt, pledge-reminder, and recurring server actions
+
+Customer portal (`/customer/donation/*`, `stripe-donation-actions.ts`) uses contact-scoped JWT + RLS; no staff permissions required.
+
+### Validation
+
+```bash
+npx supabase db query --linked -f scripts/095_donations_rls_hardening.sql
+npm run validate:donations-security
+```
+
+**Validated (June 2026):** 38/38 security checks — anon blocked, customer cross-donor isolation, staff cross-org isolation, layout/action guards, Stripe webhook integration 14/14.
+
+### Remaining security notes (post-P14)
+
+* `pledge_status_view` / `donor_summary_view` — view RLS not committed in repo; staff/customer queries rely on underlying table policies + app filters
+* Staff list pages still fetch via client Supabase (protected by layout + RLS, not server-action wrappers)
+* `transactional_email_log` still uses org-membership SELECT (not permission-key aware)
+* Pagination still recommended before large-org production load
 
 ## Campaign goals & fundraising analytics (Priority 3)
 

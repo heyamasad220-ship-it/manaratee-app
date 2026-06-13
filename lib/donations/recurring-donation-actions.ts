@@ -1,6 +1,6 @@
 "use server"
 
-import { createClient } from "@/lib/supabase/server"
+import { requireDonationStaffAccess } from "@/lib/donations/donation-action-auth"
 import {
   buildRecurringDashboardMetrics,
   buildRecurringDonorSummary,
@@ -16,29 +16,13 @@ import type {
   RecurringStatus,
 } from "@/lib/donations/recurring-donation-types"
 
-async function getOrgIdForUser() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return { supabase, orgId: null as string | null, userId: null as string | null }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("organization_id")
-    .eq("id", user.id)
-    .maybeSingle()
-
-  return { supabase, orgId: profile?.organization_id ?? null, userId: user.id }
-}
-
 export async function getRecurringDashboardAction() {
-  const { supabase, orgId } = await getOrgIdForUser()
-  if (!orgId) return { success: false as const, error: "No organization" }
+  const access = await requireDonationStaffAccess("view")
+  if (!access.ok) return { success: false as const, error: access.error }
   try {
     const [metrics, plans] = await Promise.all([
-      buildRecurringDashboardMetrics(supabase, orgId),
-      fetchRecurringPlans(supabase, orgId),
+      buildRecurringDashboardMetrics(access.supabase, access.orgId),
+      fetchRecurringPlans(access.supabase, access.orgId),
     ])
     return { success: true as const, metrics, plans }
   } catch (error) {
@@ -58,8 +42,9 @@ export async function createRecurringDonationPlanAction(input: {
   startDate: string
   notes?: string | null
 }) {
-  const { supabase, orgId } = await getOrgIdForUser()
-  if (!orgId) return { success: false as const, error: "No organization" }
+  const access = await requireDonationStaffAccess("manage")
+  if (!access.ok) return { success: false as const, error: access.error }
+  const { supabase, orgId } = access
   if (!input.amount || input.amount <= 0) {
     return { success: false as const, error: "Amount must be greater than zero" }
   }
@@ -94,8 +79,9 @@ export async function updateRecurringPlanStatusAction(
   planId: string,
   status: RecurringStatus
 ) {
-  const { supabase, orgId } = await getOrgIdForUser()
-  if (!orgId) return { success: false as const, error: "No organization" }
+  const access = await requireDonationStaffAccess("manage")
+  if (!access.ok) return { success: false as const, error: access.error }
+  const { supabase, orgId } = access
 
   const patch: Record<string, unknown> = { status }
   if (status === "cancelled") {
@@ -122,8 +108,9 @@ export async function recordRecurringDonationPaymentAction(input: {
   source?: string
   memo?: string
 }) {
-  const { supabase, orgId } = await getOrgIdForUser()
-  if (!orgId) return { success: false as const, error: "No organization" }
+  const access = await requireDonationStaffAccess("manage")
+  if (!access.ok) return { success: false as const, error: access.error }
+  const { supabase, orgId } = access
 
   const { data: plan, error: planError } = await supabase
     .from("recurring_donation_plans")
@@ -200,10 +187,10 @@ export async function recordRecurringDonationPaymentAction(input: {
 }
 
 export async function getDonorRecurringSummaryAction(donorId: string) {
-  const { supabase, orgId } = await getOrgIdForUser()
-  if (!orgId) return { success: false as const, error: "No organization" }
+  const access = await requireDonationStaffAccess("view")
+  if (!access.ok) return { success: false as const, error: access.error }
   try {
-    const summary = await buildRecurringDonorSummary(supabase, orgId, donorId)
+    const summary = await buildRecurringDonorSummary(access.supabase, access.orgId, donorId)
     return { success: true as const, summary }
   } catch (error) {
     return { success: false as const, error: (error as Error).message }
@@ -211,10 +198,10 @@ export async function getDonorRecurringSummaryAction(donorId: string) {
 }
 
 export async function getRecurringReportingSummaryAction() {
-  const { supabase, orgId } = await getOrgIdForUser()
-  if (!orgId) return { success: false as const, error: "No organization" }
+  const access = await requireDonationStaffAccess("view")
+  if (!access.ok) return { success: false as const, error: access.error }
   try {
-    const summary = await buildRecurringReportingSummary(supabase, orgId)
+    const summary = await buildRecurringReportingSummary(access.supabase, access.orgId)
     return { success: true as const, summary }
   } catch (error) {
     return { success: false as const, error: (error as Error).message }

@@ -17,6 +17,7 @@
     "validate:payment-attribution": "node scripts/validate-payment-attribution.mjs",
     "validate:stripe-one-time": "node scripts/validate-stripe-one-time-donations.mjs",
     "validate:transactional-email": "node scripts/validate-transactional-email.mjs",
+    "validate:donations-security": "node scripts/validate-donations-security.mjs",
     "beta:donations-stress": "node scripts/beta-donations-stress-test.mjs --scale=quick",
     "test:conflicts": "npx tsx --test lib/reservations/reservation-conflict-rules.test.ts lib/bookings/venue-rental-transition.test.ts lib/operational-briefs/operational-brief-payload.test.ts lib/bookings/customer-venue-rental-experience.test.ts lib/events/internal-event-status.test.ts lib/auth/resolve-portal-permissions.test.ts lib/auth/staff-tools-eligibility.test.ts components/ui/time-picker.test.ts",
     "typecheck": "tsc --noEmit"
