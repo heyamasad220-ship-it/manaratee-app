@@ -2,6 +2,10 @@
 
 import { createClient } from "@/lib/supabase/client"
 import { getCurrentOrganizationId } from "@/lib/current-organization"
+import {
+  fetchPledgeAttribution,
+  toPaymentAttributionColumns,
+} from "@/lib/donations/payment-attribution"
 import { useEffect, useState } from "react"
 import { Header } from "@/components/layout/header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -459,6 +463,8 @@ export default function ReconcilePage() {
       return
     }
 
+    const pledgeAttribution = await fetchPledgeAttribution(supabase, bestPledge.id)
+
     const { error } = await supabase
       .from("payments")
       .update({
@@ -467,6 +473,7 @@ export default function ReconcilePage() {
         pledge_id: bestPledge.id,
         status: "allocated",
         reconciled_at: new Date().toISOString(),
+        ...toPaymentAttributionColumns(pledgeAttribution),
       })
       .eq("id", selectedPayment.id)
 
@@ -503,6 +510,8 @@ export default function ReconcilePage() {
 
     setAllocating(true)
 
+    const pledgeAttribution = await fetchPledgeAttribution(supabase, selectedPledgeId)
+
     const { error } = await supabase
       .from("payments")
       .update({
@@ -511,6 +520,7 @@ export default function ReconcilePage() {
         pledge_id: selectedPledgeId,
         status: "allocated",
         reconciled_at: new Date().toISOString(),
+        ...toPaymentAttributionColumns(pledgeAttribution),
       })
       .eq("id", selectedPayment.id)
 

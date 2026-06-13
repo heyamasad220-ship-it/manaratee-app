@@ -37,6 +37,17 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Check, ChevronsUpDown, Plus } from "lucide-react";
+import { PaymentReceiptActions } from "@/components/donations/payment-receipt-actions";
+import {
+  DonationAttributionFields,
+  EMPTY_DONATION_ATTRIBUTION_VALUE,
+  toAttributionIds,
+  type DonationAttributionValue,
+} from "@/components/donations/donation-attribution-fields";
+import {
+  fetchPledgeAttribution,
+  toPaymentAttributionColumns,
+} from "@/lib/donations/payment-attribution";
 
 type Payment = {
   id: string;
@@ -104,6 +115,9 @@ export default function PaymentsPage() {
 
   const [organizationId, setOrganizationId] = useState<string | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [receiptByPaymentId, setReceiptByPaymentId] = useState<
+    Record<string, { receipt_number: string; status: string }>
+  >({});
   const [loading, setLoading] = useState(true);
 
   const [donors, setDonors] = useState<DonorOption[]>([]);
@@ -120,6 +134,9 @@ export default function PaymentsPage() {
   const [paymentDate, setPaymentDate] = useState("");
   const [source, setSource] = useState("cash");
   const [memo, setMemo] = useState("");
+  const [attribution, setAttribution] = useState<DonationAttributionValue>(
+    EMPTY_DONATION_ATTRIBUTION_VALUE
+  );
 
   const [showAllocateDialog, setShowAllocateDialog] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
@@ -226,12 +243,29 @@ export default function PaymentsPage() {
       .eq("organization_id", orgId)
       .order("payment_date", { ascending: false });
 
+    const { data: receiptData } = await supabase
+      .from("donation_receipts")
+      .select("payment_id, receipt_number, status")
+      .eq("organization_id", orgId)
+      .eq("receipt_type", "payment");
+
     if (error) {
       console.error("Error loading payments:", error);
       setPayments([]);
     } else {
       setPayments((data || []) as Payment[]);
     }
+
+    const receiptMap: Record<string, { receipt_number: string; status: string }> = {};
+    for (const row of receiptData || []) {
+      if (row.payment_id) {
+        receiptMap[row.payment_id] = {
+          receipt_number: row.receipt_number,
+          status: row.status,
+        };
+      }
+    }
+    setReceiptByPaymentId(receiptMap);
 
     setLoading(false);
   }
@@ -249,6 +283,7 @@ export default function PaymentsPage() {
     setPaymentDate("");
     setSource("cash");
     setMemo("");
+    setAttribution(EMPTY_DONATION_ATTRIBUTION_VALUE);
   }
 
   async function handleAddPayment() {
@@ -283,6 +318,7 @@ export default function PaymentsPage() {
       memo: memo || null,
       status: donorId === "none" ? "pending_review" : "unallocated",
       is_verified: false,
+      ...toAttributionIds(attribution),
     });
 
     setSaving(false);
@@ -340,6 +376,8 @@ export default function PaymentsPage() {
 
     setAllocating(true);
 
+    const pledgeAttribution = await fetchPledgeAttribution(supabase, selectedPledge.id);
+
     const { error } = await supabase
       .from("payments")
       .update({
@@ -347,6 +385,7 @@ export default function PaymentsPage() {
         donor_id: selectedPayment.donor_id || selectedPledge.donor_id || null,
         status: "allocated",
         reconciled_at: new Date().toISOString(),
+        ...toPaymentAttributionColumns(pledgeAttribution),
       })
       .eq("id", selectedPayment.id);
 
@@ -407,6 +446,7 @@ export default function PaymentsPage() {
                     <th className="text-left p-3">Pledge</th>
                     <th className="text-left p-3">Status</th>
                     <th className="text-left p-3">Memo</th>
+                    <th className="text-left p-3">Receipt</th>
                     <th className="text-left p-3">Action</th>
                   </tr>
                 </thead>
@@ -431,6 +471,19 @@ export default function PaymentsPage() {
                       <td className="p-3 capitalize">{formatStatus(payment.status)}</td>
 
                       <td className="p-3">{payment.memo || "—"}</td>
+
+                      <td className="p-3">
+                        {String(payment.status || "").toLowerCase() === "voided" ? (
+                          <span className="text-muted-foreground">—</span>
+                        ) : (
+                          <PaymentReceiptActions
+                            paymentId={payment.id}
+                            receiptNumber={receiptByPaymentId[payment.id]?.receipt_number}
+                            receiptStatus={receiptByPaymentId[payment.id]?.status}
+                            onUpdated={loadPayments}
+                          />
+                        )}
+                      </td>
 
                       <td className="p-3">
                         {!payment.pledge_id ? (
@@ -578,6 +631,12 @@ export default function PaymentsPage() {
                 </SelectContent>
               </Select>
             </div>
+
+            <DonationAttributionFields
+              organizationId={organizationId}
+              value={attribution}
+              onChange={setAttribution}
+            />
 
             <div className="flex flex-col gap-2">
               <Label>Memo</Label>

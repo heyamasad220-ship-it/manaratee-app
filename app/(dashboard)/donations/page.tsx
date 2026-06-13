@@ -46,25 +46,40 @@ import {
   AlertCircle,
   Wallet,
   ArrowUpRight,
+  Target,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
+import { formatPaymentStatusLabel, normalizePaymentStatus } from "@/lib/donations/donation-status"
+import { CampaignProgressBar } from "@/components/donations/campaign-progress-bar"
+import {
+  buildCampaignAnalytics,
+  formatDonationCurrency,
+  type CampaignAnalyticsEntry,
+  type CampaignPledgeRow,
+  type CampaignRow,
+} from "@/lib/donations/campaign-analytics"
 
 type Payment = {
   id: string
-  donor_name: string | null
+  sender_name: string | null
   amount: number
   payment_date: string
   source: string
-  status: "Allocated" | "Unallocated" | string
+  status: string
+  pledge_id?: string | null
+  campaign_id?: string | null
+  donor_id?: string | null
+  contact_id?: string | null
 }
 
-type Pledge = {
+type PledgeSummary = {
   id: string
-  donor_name: string | null
-  amount: number
-  collected_amount: number | null
-  status: string | null
+  amount_pledged: number
+  amount_paid: number
+  balance_remaining: number
+  calculated_status: string | null
+  campaign_id?: string | null
 }
 
 const sourceColors: Record<string, string> = {
@@ -113,7 +128,8 @@ function formatMonth(dateValue: string) {
 export default function DonationsPage() {
   const [timeRange, setTimeRange] = useState("this-year")
   const [payments, setPayments] = useState<Payment[]>([])
-  const [pledges, setPledges] = useState<Pledge[]>([])
+  const [pledges, setPledges] = useState<PledgeSummary[]>([])
+  const [campaignEntries, setCampaignEntries] = useState<CampaignAnalyticsEntry[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
@@ -163,7 +179,7 @@ export default function DonationsPage() {
 
       let paymentsQuery = supabase
         .from("payments")
-        .select("id, donor_name, amount, payment_date, source, status")
+        .select("id, sender_name, amount, payment_date, source, status, pledge_id, campaign_id, donor_id, contact_id")
         .eq("organization_id", organizationId)
         .order("payment_date", { ascending: false })
 
@@ -171,26 +187,37 @@ export default function DonationsPage() {
         paymentsQuery = paymentsQuery.gte("payment_date", rangeStart.toISOString())
       }
 
-      const [paymentsResult, pledgesResult] = await Promise.all([
+      const [paymentsResult, pledgesResult, campaignsResult] = await Promise.all([
         paymentsQuery,
         supabase
-          .from("donation_pledges")
-          .select("id, donor_name, amount, collected_amount, status")
+          .from("pledge_status_view")
+          .select("id, campaign_id, amount_pledged, amount_paid, balance_remaining, calculated_status")
+          .eq("organization_id", organizationId),
+        supabase
+          .from("campaigns")
+          .select("id, organization_id, name, code, description, goal_amount, start_date, end_date, status, created_at")
           .eq("organization_id", organizationId)
-          .neq("status", "Cancelled"),
+          .order("created_at", { ascending: false }),
       ])
 
-      if (paymentsResult.error || pledgesResult.error) {
+      if (paymentsResult.error || pledgesResult.error || campaignsResult.error) {
         setErrorMessage(
           paymentsResult.error?.message ||
             pledgesResult.error?.message ||
+            campaignsResult.error?.message ||
             "Unable to load donation data."
         )
         setPayments([])
         setPledges([])
+        setCampaignEntries([])
       } else {
-        setPayments(paymentsResult.data || [])
+        const paymentRows = paymentsResult.data || []
+        const pledgeRows = (pledgesResult.data || []) as CampaignPledgeRow[]
+        const campaignRows = (campaignsResult.data || []) as CampaignRow[]
+
+        setPayments(paymentRows)
         setPledges(pledgesResult.data || [])
+        setCampaignEntries(buildCampaignAnalytics(campaignRows, pledgeRows, paymentRows))
       }
 
       setIsLoading(false)
@@ -199,9 +226,17 @@ export default function DonationsPage() {
     loadDonationData()
   }, [timeRange])
 
-  const totalPledged = useMemo(
-    () => pledges.reduce((sum, pledge) => sum + Number(pledge.amount || 0), 0),
+  const activePledges = useMemo(
+    () =>
+      pledges.filter(
+        (pledge) => String(pledge.calculated_status || "").toLowerCase() !== "cancelled"
+      ),
     [pledges]
+  )
+
+  const totalPledged = useMemo(
+    () => activePledges.reduce((sum, pledge) => sum + Number(pledge.amount_pledged || 0), 0),
+    [activePledges]
   )
 
   const totalCollected = useMemo(
@@ -209,7 +244,14 @@ export default function DonationsPage() {
     [payments]
   )
 
-  const outstandingBalance = Math.max(totalPledged - totalCollected, 0)
+  const outstandingBalance = useMemo(
+    () =>
+      activePledges.reduce(
+        (sum, pledge) => sum + Math.max(Number(pledge.balance_remaining || 0), 0),
+        0
+      ),
+    [activePledges]
+  )
 
   const paymentsThisMonth = useMemo(() => {
     const now = new Date()
@@ -254,14 +296,25 @@ export default function DonationsPage() {
 
   const recentPayments = payments.slice(0, 5)
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value)
-  }
+  const topCampaigns = useMemo(
+    () => [...campaignEntries].sort((a, b) => b.metrics.raised - a.metrics.raised).slice(0, 5),
+    [campaignEntries]
+  )
+
+  const campaignsWithGoals = useMemo(
+    () => campaignEntries.filter((entry) => Number(entry.campaign.goal_amount || 0) > 0),
+    [campaignEntries]
+  )
+
+  const campaignsGoalAchieved = useMemo(
+    () =>
+      campaignsWithGoals.filter(
+        (entry) => (entry.metrics.progressPercent ?? 0) >= 100
+      ).length,
+    [campaignsWithGoals]
+  )
+
+  const formatCurrency = (value: number) => formatDonationCurrency(value)
 
   return (
     <>
@@ -305,7 +358,7 @@ export default function DonationsPage() {
                     <p className="text-sm font-medium text-muted-foreground">Total Pledged</p>
                     <p className="text-2xl font-bold text-foreground">{formatCurrency(totalPledged)}</p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      From {pledges.length} active pledges
+                      From {activePledges.length} active pledges
                     </p>
                   </div>
                   <div className="rounded-full bg-blue-100 p-3">
@@ -371,6 +424,111 @@ export default function DonationsPage() {
                 </div>
               </CardContent>
             </Card>
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-3">
+            <Card className="lg:col-span-2">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Target className="h-5 w-5" />
+                    Top Campaigns
+                  </CardTitle>
+                  <CardDescription>Ranked by amount raised</CardDescription>
+                </div>
+                <Button variant="outline" size="sm" asChild>
+                  <Link href="/donations/campaigns">View All</Link>
+                </Button>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Campaign</TableHead>
+                      <TableHead>Raised</TableHead>
+                      <TableHead>Goal</TableHead>
+                      <TableHead>Progress</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {topCampaigns.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
+                          {isLoading ? "Loading campaigns..." : "No campaigns yet"}
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      topCampaigns.map(({ campaign, metrics }) => (
+                        <TableRow key={campaign.id}>
+                          <TableCell>
+                            <Link
+                              href={`/donations/campaigns/${campaign.id}`}
+                              className="font-medium text-primary hover:underline"
+                            >
+                              {campaign.name}
+                            </Link>
+                          </TableCell>
+                          <TableCell className="font-medium text-emerald-600">
+                            {formatCurrency(metrics.raised)}
+                          </TableCell>
+                          <TableCell>{formatCurrency(Number(campaign.goal_amount || 0))}</TableCell>
+                          <TableCell className="min-w-[120px]">
+                            <CampaignProgressBar progressPercent={metrics.progressPercent} />
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+
+            <div className="flex flex-col gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Campaign Progress</CardTitle>
+                  <CardDescription>Active fundraising goals</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {campaignsWithGoals.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No campaign goals configured yet.</p>
+                  ) : (
+                    campaignsWithGoals.slice(0, 4).map(({ campaign, metrics }) => (
+                      <div key={campaign.id}>
+                        <div className="mb-1 flex justify-between text-sm">
+                          <Link
+                            href={`/donations/campaigns/${campaign.id}`}
+                            className="font-medium hover:underline"
+                          >
+                            {campaign.name}
+                          </Link>
+                          <span>{formatCurrency(metrics.raised)}</span>
+                        </div>
+                        <CampaignProgressBar progressPercent={metrics.progressPercent} />
+                      </div>
+                    ))
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Goal Achievement</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-3xl font-bold">
+                    {campaignsGoalAchieved}
+                    <span className="text-base font-normal text-muted-foreground">
+                      {" "}
+                      / {campaignsWithGoals.length}
+                    </span>
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Campaigns that reached 100% of goal
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
           </div>
 
           <div className="grid gap-6 lg:grid-cols-3">
@@ -496,7 +654,11 @@ export default function DonationsPage() {
                     recentPayments.map((payment) => (
                       <TableRow key={payment.id} className="cursor-pointer hover:bg-muted/50">
                         <TableCell className="font-medium">
-                          {!payment.donor_name ? <span className="text-amber-600">Unknown</span> : payment.donor_name}
+                          {!payment.sender_name ? (
+                            <span className="text-amber-600">Unknown</span>
+                          ) : (
+                            payment.sender_name
+                          )}
                         </TableCell>
                         <TableCell className="font-semibold text-emerald-600">{formatCurrency(payment.amount)}</TableCell>
                         <TableCell>
@@ -518,12 +680,18 @@ export default function DonationsPage() {
                         <TableCell>
                           <span
                             className={cn(
-                              "inline-flex items-center rounded-full px-2 py-1 text-xs font-medium",
-                              payment.status === "Allocated" && "bg-emerald-100 text-emerald-700",
-                              payment.status === "Unallocated" && "bg-amber-100 text-amber-700"
+                              "inline-flex items-center rounded-full px-2 py-1 text-xs font-medium capitalize",
+                              normalizePaymentStatus(payment.status) === "allocated" &&
+                                "bg-emerald-100 text-emerald-700",
+                              normalizePaymentStatus(payment.status) === "unallocated" &&
+                                "bg-amber-100 text-amber-700",
+                              normalizePaymentStatus(payment.status) === "pending_review" &&
+                                "bg-amber-100 text-amber-700",
+                              normalizePaymentStatus(payment.status) === "unresolved" &&
+                                "bg-red-100 text-red-700"
                             )}
                           >
-                            {payment.status || "Unallocated"}
+                            {formatPaymentStatusLabel(payment.status)}
                           </span>
                         </TableCell>
                         <TableCell className="text-muted-foreground">

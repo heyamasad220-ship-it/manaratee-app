@@ -68,12 +68,21 @@ export async function loadCustomerDonationPortalData() {
 
   const contactId = contact.id as string
 
+  const { data: donorRows } = await supabase
+    .from("donors")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("contact_id", contactId)
+
+  const donorIds = (donorRows || []).map((row) => row.id as string)
+
   const [
     categoriesResult,
     subcategoriesResult,
     paymentMethodsResult,
     pledgesResult,
     paymentsResult,
+    campaignsResult,
   ] = await Promise.all([
     supabase
       .from("donation_categories")
@@ -91,18 +100,29 @@ export async function loadCustomerDonationPortalData() {
       .eq("organization_id", organizationId)
       .eq("enabled", true)
       .order("name", { ascending: true }),
+    donorIds.length > 0
+      ? supabase
+          .from("pledge_status_view")
+          .select(
+            "id, donor_id, donor_name, campaign_id, campaign_name, amount_pledged, amount_paid, balance_remaining, calculated_status, frequency, pledge_date"
+          )
+          .eq("organization_id", organizationId)
+          .in("donor_id", donorIds)
+          .order("pledge_date", { ascending: false })
+      : Promise.resolve({ data: [], error: null }),
     supabase
-      .from("donation_pledges")
-      .select("*")
-      .eq("contact_id", contactId)
+      .from("payments")
+      .select(
+        "id, amount, payment_date, source, status, memo, pledge_id, campaign_id, category_id, subcategory_id"
+      )
       .eq("organization_id", organizationId)
-      .order("created_at", { ascending: false }),
-    supabase
-      .from("donation_payments")
-      .select("*")
       .eq("contact_id", contactId)
-      .eq("organization_id", organizationId)
       .order("payment_date", { ascending: false }),
+    supabase
+      .from("campaigns")
+      .select("id, name")
+      .eq("organization_id", organizationId)
+      .order("name", { ascending: true }),
   ])
 
   const categories = (categoriesResult.data || []).map((category) => ({
@@ -125,5 +145,6 @@ export async function loadCustomerDonationPortalData() {
     paymentMethods: paymentMethodsResult.data || [],
     pledges: pledgesResult.data || [],
     payments: paymentsResult.data || [],
+    campaigns: campaignsResult.data || [],
   }
 }

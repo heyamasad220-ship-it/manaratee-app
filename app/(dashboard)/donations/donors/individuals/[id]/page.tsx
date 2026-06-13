@@ -44,6 +44,10 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
+import { DonorGivingSummary } from "@/components/donations/donor-giving-summary"
+import { DonorPledgeCollectionPanel } from "@/components/donations/donor-pledge-collection-panel"
+import { DonorRecurringPanel } from "@/components/donations/donor-recurring-panel"
+import { PaymentReceiptActions } from "@/components/donations/payment-receipt-actions"
 import {
   Dialog,
   DialogContent,
@@ -251,6 +255,19 @@ if (!donor) return <div className="p-6">Loading...</div>
           </Card>
         </div>
 
+        {/* Giving Summary */}
+        <div className="mb-6">
+          <DonorGivingSummary donorId={donor.id} donorName={donor.name} />
+        </div>
+
+        <div className="mb-6">
+          <DonorPledgeCollectionPanel donorId={donor.id} donorName={donor.name} />
+        </div>
+
+        <div className="mb-6">
+          <DonorRecurringPanel donorId={donor.id} />
+        </div>
+
         <Tabs defaultValue="overview" className="space-y-6">
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -389,8 +406,8 @@ if (!donor) return <div className="p-6">Loading...</div>
                           <Badge variant="secondary">{donation.category}</Badge>
                         </TableCell>
                         <TableCell>{donation.method}</TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {donation.receipt}
+                        <TableCell>
+                          <PaymentReceiptActions paymentId={donation.id} compact />
                         </TableCell>
                       </TableRow>
                     ))}

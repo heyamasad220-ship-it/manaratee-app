@@ -262,31 +262,54 @@ export async function fetchContactProfileData(
     })
   }
 
-  const { data: pledges } = await supabase
-    .from("donation_pledges")
-    .select("id, amount, start_date, status, fund_name, created_at")
+  const { data: donorRows } = await supabase
+    .from("donors")
+    .select("id")
     .eq("organization_id", orgId)
     .eq("contact_id", contactId)
-    .order("start_date", { ascending: false })
-    .limit(20)
 
-  for (const pledge of pledges || []) {
+  const donorIds = (donorRows || []).map((row) => row.id as string)
+
+  let pledges: Array<{
+    id: string
+    amount_pledged?: number | string | null
+    pledge_date?: string | null
+    calculated_status?: string | null
+    campaign_name?: string | null
+    amount_paid?: number | string | null
+  }> = []
+
+  if (donorIds.length > 0) {
+    const { data: pledgeRows } = await supabase
+      .from("pledge_status_view")
+      .select("id, amount_pledged, pledge_date, calculated_status, campaign_name, amount_paid")
+      .eq("organization_id", orgId)
+      .in("donor_id", donorIds)
+      .order("pledge_date", { ascending: false })
+      .limit(20)
+
+    pledges = pledgeRows || []
+  }
+
+  for (const pledge of pledges) {
+    const pledgeTitle = pledge.campaign_name || "Pledge"
+    const pledgeDate = pledge.pledge_date || null
     activity.donations.push({
       id: pledge.id,
       module: "donations",
       activityType: "pledge_created",
-      title: pledge.fund_name || "Pledge",
-      date: pledge.start_date || pledge.created_at,
-      amount: Number(pledge.amount) || 0,
-      status: pledge.status,
+      title: pledgeTitle,
+      date: pledgeDate,
+      amount: Number(pledge.amount_pledged) || 0,
+      status: pledge.calculated_status,
     })
     timeline.push({
       id: `pledge-${pledge.id}`,
-      date: pledge.start_date || pledge.created_at,
-      title: pledge.fund_name ? `Pledge: ${pledge.fund_name}` : "Pledge created",
+      date: pledgeDate,
+      title: `Pledge: ${pledgeTitle}`,
       module: "Donations",
-      amount: Number(pledge.amount) || 0,
-      status: pledge.status,
+      amount: Number(pledge.amount_pledged) || 0,
+      status: pledge.calculated_status,
     })
   }
 

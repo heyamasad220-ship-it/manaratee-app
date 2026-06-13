@@ -12,6 +12,21 @@ import {
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { loadCustomerDonationPortalData } from "@/lib/customer/customer-portal-data-actions"
+import { ensureDonorExtensionForContact } from "@/lib/donations/donor-contact-bridge"
+import {
+  formatPaymentStatusLabel,
+  formatPledgeStatusLabel,
+  normalizePaymentStatus,
+} from "@/lib/donations/donation-status"
+import { normalizePaymentSourceChannel, isStripeCheckoutPaymentMethod } from "@/lib/donations/payment-source-channel"
+import {
+  createOneTimeDonationCheckoutAction,
+  getDonationCheckoutStatusAction,
+} from "@/lib/donations/stripe-donation-actions"
+import {
+  fetchPledgeAttribution,
+  toPaymentAttributionColumns,
+} from "@/lib/donations/payment-attribution"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -57,6 +72,7 @@ type DonationCategory = {
 
 type DonationPledge = {
   id: string
+  campaignId: string | null
   campaign: string
   totalAmount: number
   paidAmount: number
@@ -67,6 +83,11 @@ type DonationPledge = {
   startDate: string | null
   endDate: string | null
   status: string
+}
+
+type DonationCampaign = {
+  id: string
+  name: string
 }
 
 type DonationPayment = {
@@ -84,12 +105,43 @@ type SavedPaymentMethod = {
   fee: string | null
 }
 
+function resolvePaymentCampaignLabel(
+  payment: {
+    campaign_id?: string | null
+    category_id?: string | null
+    subcategory_id?: string | null
+    memo?: string | null
+  },
+  categories: DonationCategory[],
+  campaignRows: Array<{ id: string; name: string }>
+) {
+  if (payment.campaign_id) {
+    const campaign = campaignRows.find((row) => row.id === payment.campaign_id)
+    if (campaign?.name) return campaign.name
+  }
+
+  if (payment.subcategory_id) {
+    for (const category of categories) {
+      const fund = category.funds.find((item) => item.id === payment.subcategory_id)
+      if (fund?.name) return fund.name
+    }
+  }
+
+  if (payment.category_id) {
+    const category = categories.find((item) => item.id === payment.category_id)
+    if (category?.name) return category.name
+  }
+
+  return payment.memo || "General Fund"
+}
+
 export default function CustomerDonationsPage() {
   const supabase = createClient()
 
   const [loading, setLoading] = useState(true)
   const [contact, setContact] = useState<Contact | null>(null)
   const [donationCategories, setDonationCategories] = useState<DonationCategory[]>([])
+  const [campaigns, setCampaigns] = useState<DonationCampaign[]>([])
   const [pledges, setPledges] = useState<DonationPledge[]>([])
   const [payments, setPayments] = useState<DonationPayment[]>([])
   const [savedPaymentMethods, setSavedPaymentMethods] = useState<SavedPaymentMethod[]>([])
@@ -104,18 +156,21 @@ export default function CustomerDonationsPage() {
   const [isProcessing, setIsProcessing] = useState(false)
   const [paymentSuccess, setPaymentSuccess] = useState(false)
   const [oneTimeDonationSuccess, setOneTimeDonationSuccess] = useState(false)
+  const [checkoutSuccessAmount, setCheckoutSuccessAmount] = useState<number | null>(null)
   const [formError, setFormError] = useState("")
 
   const [newPledgeForm, setNewPledgeForm] = useState({
     amount: "",
     frequency: "one-time",
     payments: "1",
+    campaign: "",
     category: "",
     fund: "",
   })
 
   const [oneTimeDonationForm, setOneTimeDonationForm] = useState({
     amount: "",
+    campaign: "",
     category: "",
     fund: "",
     paymentMethod: "",
@@ -147,12 +202,18 @@ export default function CustomerDonationsPage() {
       }))
 
       setDonationCategories(formattedCategories)
+      setCampaigns(
+        (result.campaigns || []).map((campaign) => ({
+          id: campaign.id as string,
+          name: campaign.name as string,
+        }))
+      )
 
       const formattedPaymentMethods: SavedPaymentMethod[] = result.paymentMethods.map(
         (method) => ({
           id: method.id as string,
           name: (method.name as string) || "Payment Method",
-          fee: (method.fee as number | null) || null,
+          fee: method.fee != null ? String(method.fee) : null,
         })
       )
 
@@ -161,27 +222,26 @@ export default function CustomerDonationsPage() {
 
       const formattedPledges: DonationPledge[] = (result.pledges || []).map((p) => ({
         id: p.id as string,
-        campaign: (p.fund_name as string) || "General Fund",
-        totalAmount: Number(p.pledged_amount || p.amount || 0),
-        paidAmount: Number(p.collected_amount || 0),
-        balance:
-          Number(p.pledged_amount || p.amount || 0) -
-          Number(p.collected_amount || 0),
+        campaignId: (p.campaign_id as string | null) ?? null,
+        campaign: (p.campaign_name as string) || "General Fund",
+        totalAmount: Number(p.amount_pledged || 0),
+        paidAmount: Number(p.amount_paid || 0),
+        balance: Number(p.balance_remaining ?? 0),
         frequency: (p.frequency as string) || "one-time",
         nextPaymentDate: null,
         nextPaymentAmount: 0,
-        startDate: (p.start_date as string | null) || null,
-        endDate: (p.end_date as string | null) || null,
-        status: (p.status as string) || "Active",
+        startDate: (p.pledge_date as string | null) || null,
+        endDate: null,
+        status: formatPledgeStatusLabel(p.calculated_status as string | null),
       }))
 
       const formattedPayments: DonationPayment[] = (result.payments || []).map((p) => ({
         id: p.id as string,
         date: (p.payment_date as string) || "",
         amount: Number(p.amount || 0),
-        campaign: (p.fund_name as string) || "General Fund",
-        method: (p.payment_method as string) || (p.source as string) || "Unknown",
-        status: (p.status as string) || "Unallocated",
+        campaign: resolvePaymentCampaignLabel(p, formattedCategories, result.campaigns || []),
+        method: (p.source as string) || "Unknown",
+        status: formatPaymentStatusLabel(p.status as string | null),
       }))
 
       setPledges(formattedPledges)
@@ -190,6 +250,66 @@ export default function CustomerDonationsPage() {
     }
 
     loadDonationsPage()
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+
+    const params = new URLSearchParams(window.location.search)
+    const checkoutState = params.get("checkout")
+    const stripeSessionId = params.get("session_id")
+
+    if (checkoutState === "cancelled") {
+      setFormError("Online payment was cancelled. You can try again or choose an offline method.")
+      setShowOneTimeDonationDialog(true)
+      window.history.replaceState({}, "", "/customer/donation")
+      return
+    }
+
+    if (checkoutState !== "success" || !stripeSessionId) return
+
+    async function confirmCheckoutSuccess() {
+      const result = await getDonationCheckoutStatusAction(stripeSessionId!)
+      if (!result.success) {
+        setFormError(result.error || "Could not confirm your payment yet. Please check back shortly.")
+        return
+      }
+
+      if (result.status === "complete" && result.payment) {
+        setCheckoutSuccessAmount(result.amount)
+        setOneTimeDonationSuccess(true)
+        setShowOneTimeDonationDialog(true)
+        await loadCustomerDonationPortalData().then((portalResult) => {
+          if (!portalResult.ok || !portalResult.contact) return
+          const formattedPayments: DonationPayment[] = (portalResult.payments || []).map((p) => ({
+            id: p.id as string,
+            date: (p.payment_date as string) || "",
+            amount: Number(p.amount || 0),
+            campaign: resolvePaymentCampaignLabel(
+              p,
+              portalResult.categories.map((category) => ({
+                id: category.id,
+                name: category.name,
+                funds: category.funds,
+              })),
+              portalResult.campaigns || []
+            ),
+            method: (p.source as string) || "Unknown",
+            status: formatPaymentStatusLabel(p.status as string | null),
+          }))
+          setPayments(formattedPayments)
+        })
+      } else {
+        setFormError(
+          "Your payment is still processing. Refresh this page in a moment if it does not appear."
+        )
+      }
+
+      window.history.replaceState({}, "", "/customer/donation")
+    }
+
+    confirmCheckoutSuccess()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const formatCurrency = (amount: number) => {
@@ -214,10 +334,12 @@ export default function CustomerDonationsPage() {
 
   const totalPledged = pledges.reduce((sum, pledge) => sum + Number(pledge.totalAmount || 0), 0)
   const totalPaid = payments
-    .filter((payment) => payment.status !== "Voided")
+    .filter((payment) => normalizePaymentStatus(payment.status) !== "voided")
     .reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
   const outstandingBalance = pledges.reduce((sum, pledge) => sum + Number(pledge.balance || 0), 0)
-  const activePledges = pledges.filter((p) => p.status === "Active")
+  const activePledges = pledges.filter(
+    (p) => formatPledgeStatusLabel(p.status) !== "Fulfilled" && p.status !== "Cancelled"
+  )
   const upcomingPaymentTotal = activePledges.reduce(
     (sum, p) => sum + Number(p.nextPaymentAmount || 0),
     0
@@ -237,6 +359,7 @@ export default function CustomerDonationsPage() {
   const handleOpenOneTimeDonation = () => {
     setOneTimeDonationForm({
       amount: "",
+      campaign: "",
       category: "",
       fund: "",
       paymentMethod: savedPaymentMethods[0]?.id || "",
@@ -251,6 +374,7 @@ export default function CustomerDonationsPage() {
       amount: "",
       frequency: "one-time",
       payments: "1",
+      campaign: "",
       category: "",
       fund: "",
     })
@@ -266,21 +390,37 @@ export default function CustomerDonationsPage() {
 
     const paymentMethodName = getSelectedPaymentMethodName(selectedPaymentMethod)
 
+    const donorId = await ensureDonorExtensionForContact(
+      contact.organization_id,
+      contact.id
+    )
+
+    if (!donorId) {
+      setFormError("Could not resolve your donor profile. Please try again.")
+      setIsProcessing(false)
+      return
+    }
+
+    const paymentDate = new Date().toISOString().split("T")[0]
+    const pledgeAttribution = await fetchPledgeAttribution(supabase, selectedPledge.id)
+
     const { data, error } = await supabase
-      .from("donation_payments")
+      .from("payments")
       .insert({
         organization_id: contact.organization_id,
         contact_id: contact.id,
+        donor_id: donorId,
         pledge_id: selectedPledge.id,
-        donor_name: contact.full_name || contact.email || null,
+        sender_name: contact.full_name || contact.email || null,
         amount: Number(paymentAmount || 0),
-        payment_date: new Date().toISOString().split("T")[0],
-        fund_name: selectedPledge.campaign,
-        payment_method: paymentMethodName,
-        source: "Customer Portal",
-        status: "Unallocated",
+        payment_date: `${paymentDate}T12:00:00`,
+        source: normalizePaymentSourceChannel(paymentMethodName),
+        source_type: "portal",
+        status: "unallocated",
+        is_verified: false,
+        ...toPaymentAttributionColumns(pledgeAttribution),
       })
-      .select("*")
+      .select("id, amount, payment_date, source, status, memo")
       .single()
 
     if (error) {
@@ -294,9 +434,9 @@ export default function CustomerDonationsPage() {
         id: data.id,
         date: data.payment_date || "",
         amount: Number(data.amount || 0),
-        campaign: data.fund_name || "General Fund",
-        method: data.payment_method || data.source || "Unknown",
-        status: data.status || "Unallocated",
+        campaign: selectedPledge.campaign,
+        method: paymentMethodName,
+        status: formatPaymentStatusLabel(data.status),
       },
       ...currentPayments,
     ])
@@ -311,27 +451,64 @@ export default function CustomerDonationsPage() {
     setIsProcessing(true)
     setFormError("")
 
+    const paymentMethodName = getSelectedPaymentMethodName(oneTimeDonationForm.paymentMethod)
+
+    const donorId = await ensureDonorExtensionForContact(
+      contact.organization_id,
+      contact.id
+    )
+
+    if (!donorId) {
+      setFormError("Could not resolve your donor profile. Please try again.")
+      setIsProcessing(false)
+      return
+    }
+
+    if (isStripeCheckoutPaymentMethod(paymentMethodName)) {
+      const result = await createOneTimeDonationCheckoutAction({
+        amount: Number(oneTimeDonationForm.amount || 0),
+        campaignId: oneTimeDonationForm.campaign || null,
+        categoryId: oneTimeDonationForm.category || null,
+        subcategoryId: oneTimeDonationForm.fund || null,
+      })
+
+      if (!result.success || !result.checkoutUrl) {
+        setFormError(result.error || "Could not start online checkout. Please try again.")
+        setIsProcessing(false)
+        return
+      }
+
+      window.location.href = result.checkoutUrl
+      return
+    }
+
     const selectedFundName = getSelectedFundName(
       oneTimeDonationForm.category,
       oneTimeDonationForm.fund
     )
-    const paymentMethodName = getSelectedPaymentMethodName(oneTimeDonationForm.paymentMethod)
+
+    const paymentDate = new Date().toISOString().split("T")[0]
 
     const { data, error } = await supabase
-      .from("donation_payments")
+      .from("payments")
       .insert({
         organization_id: contact.organization_id,
         contact_id: contact.id,
+        donor_id: donorId,
         pledge_id: null,
-        donor_name: contact.full_name || contact.email || null,
+        sender_name: contact.full_name || contact.email || null,
         amount: Number(oneTimeDonationForm.amount || 0),
-        payment_date: new Date().toISOString().split("T")[0],
-        fund_name: selectedFundName,
-        payment_method: paymentMethodName,
-        source: "Customer Portal",
-        status: "Unallocated",
+        payment_date: `${paymentDate}T12:00:00`,
+        source: normalizePaymentSourceChannel(paymentMethodName),
+        source_type: "portal",
+        status: "unallocated",
+        is_verified: false,
+        campaign_id: oneTimeDonationForm.campaign || null,
+        category_id: oneTimeDonationForm.category || null,
+        subcategory_id: oneTimeDonationForm.fund || null,
+        memo: `Offline donation recorded (${paymentMethodName})`,
       })
-      .select("*")
+      .select("id, amount, payment_date, source, status, memo")
       .single()
 
     if (error) {
@@ -345,14 +522,18 @@ export default function CustomerDonationsPage() {
         id: data.id,
         date: data.payment_date || "",
         amount: Number(data.amount || 0),
-        campaign: data.fund_name || "General Fund",
-        method: data.payment_method || data.source || "Unknown",
-        status: data.status || "Unallocated",
+        campaign:
+          getSelectedFundName(oneTimeDonationForm.category, oneTimeDonationForm.fund) ||
+          campaigns.find((c) => c.id === oneTimeDonationForm.campaign)?.name ||
+          "General Fund",
+        method: paymentMethodName,
+        status: formatPaymentStatusLabel(data.status),
       },
       ...currentPayments,
     ])
 
     setIsProcessing(false)
+    setCheckoutSuccessAmount(null)
     setOneTimeDonationSuccess(true)
   }
 
@@ -366,44 +547,78 @@ export default function CustomerDonationsPage() {
     const numberOfPayments =
       newPledgeForm.frequency === "one-time" ? 1 : Number(newPledgeForm.payments || 1)
     const totalAmount = Number(newPledgeForm.amount || 0) * numberOfPayments
+    const pledgeDate = new Date().toISOString().split("T")[0]
 
-    const { data, error } = await supabase
-      .from("donation_pledges")
-      .insert({
-        organization_id: contact.organization_id,
-        contact_id: contact.id,
-        fund_name: selectedFundName,
-        amount: totalAmount,
-        pledged_amount: totalAmount,
-        collected_amount: 0,
-        frequency: newPledgeForm.frequency,
-        status: "Active",
-        start_date: new Date().toISOString().split("T")[0],
-      })
-      .select("*")
-      .single()
+    const donorId = await ensureDonorExtensionForContact(
+      contact.organization_id,
+      contact.id
+    )
 
-    if (error) {
-      setFormError("Pledge could not be saved. Please try again.")
+    if (!donorId) {
+      setFormError("Could not resolve your donor profile. Please try again.")
       setIsProcessing(false)
       return
     }
 
+    const pledgePayload = {
+      organization_id: contact.organization_id,
+      donor_id: donorId,
+      campaign_id: newPledgeForm.campaign || null,
+      category_id: newPledgeForm.category || null,
+      subcategory_id: newPledgeForm.fund || null,
+      amount_pledged: totalAmount,
+      pledge_date: pledgeDate,
+      pledge_type: newPledgeForm.frequency.toLowerCase().replace("-", "_"),
+      frequency: newPledgeForm.frequency.toLowerCase().replace("-", "_"),
+      status: "open",
+      notes: null,
+    }
+
+    const { data, error } = await supabase
+      .from("pledges")
+      .insert(pledgePayload)
+      .select("id")
+      .single()
+
+    if (error) {
+      setFormError(error.message || "Pledge could not be saved. Please try again.")
+      setIsProcessing(false)
+      return
+    }
+
+    const { data: pledgeView } = await supabase
+      .from("pledge_status_view")
+      .select(
+        "id, campaign_name, amount_pledged, amount_paid, balance_remaining, calculated_status, frequency, pledge_date"
+      )
+      .eq("id", data.id)
+      .maybeSingle()
+
+    const viewRow = pledgeView || {
+      id: data.id,
+      campaign_name: selectedFundName,
+      amount_pledged: totalAmount,
+      amount_paid: 0,
+      balance_remaining: totalAmount,
+      calculated_status: "open",
+      frequency: newPledgeForm.frequency,
+      pledge_date: pledgeDate,
+    }
+
     setPledges((currentPledges) => [
       {
-        id: data.id,
-        campaign: data.fund_name || "General Fund",
-        totalAmount: Number(data.pledged_amount || data.amount || 0),
-        paidAmount: Number(data.collected_amount || 0),
-        balance:
-          Number(data.pledged_amount || data.amount || 0) -
-          Number(data.collected_amount || 0),
-        frequency: data.frequency || "one-time",
+        id: viewRow.id as string,
+        campaignId: newPledgeForm.campaign || null,
+        campaign: (viewRow.campaign_name as string) || selectedFundName || "General Fund",
+        totalAmount: Number(viewRow.amount_pledged || totalAmount),
+        paidAmount: Number(viewRow.amount_paid || 0),
+        balance: Number(viewRow.balance_remaining ?? totalAmount),
+        frequency: (viewRow.frequency as string) || newPledgeForm.frequency,
         nextPaymentDate: null,
         nextPaymentAmount: 0,
-        startDate: data.start_date || null,
-        endDate: data.end_date || null,
-        status: data.status || "Active",
+        startDate: (viewRow.pledge_date as string | null) || pledgeDate,
+        endDate: null,
+        status: formatPledgeStatusLabel(viewRow.calculated_status as string | null),
       },
       ...currentPledges,
     ])
@@ -712,10 +927,14 @@ export default function CustomerDonationsPage() {
               </div>
               <div className="text-center">
                 <p className="text-2xl font-bold text-foreground">
-                  {formatCurrency(Number(oneTimeDonationForm.amount))}
+                  {formatCurrency(
+                    checkoutSuccessAmount ?? Number(oneTimeDonationForm.amount || 0)
+                  )}
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Donation saved as unallocated
+                  {checkoutSuccessAmount != null
+                    ? "Online payment received — thank you!"
+                    : "Offline donation recorded — staff will reconcile if needed"}
                 </p>
               </div>
               <Button className="mt-4 w-full" onClick={() => setShowOneTimeDonationDialog(false)}>
@@ -745,6 +964,33 @@ export default function CustomerDonationsPage() {
                     />
                   </div>
                 </div>
+
+                {campaigns.length > 0 ? (
+                  <div className="flex flex-col gap-2">
+                    <Label>Campaign (optional)</Label>
+                    <Select
+                      value={oneTimeDonationForm.campaign || "none"}
+                      onValueChange={(v) =>
+                        setOneTimeDonationForm({
+                          ...oneTimeDonationForm,
+                          campaign: v === "none" ? "" : v,
+                        })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select campaign" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No campaign</SelectItem>
+                        {campaigns.map((campaign) => (
+                          <SelectItem key={campaign.id} value={campaign.id}>
+                            {campaign.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : null}
 
                 <div className="flex flex-col gap-2">
                   <Label>Donation Category</Label>
@@ -816,21 +1062,29 @@ export default function CustomerDonationsPage() {
                       }
                       className="flex flex-col gap-2"
                     >
-                      {savedPaymentMethods.map((method) => (
-                        <div key={method.id} className="flex items-center gap-3 rounded-lg border p-3">
-                          <RadioGroupItem value={method.id} id={`one-time-${method.id}`} />
-                          <Label htmlFor={`one-time-${method.id}`} className="flex-1 cursor-pointer">
-                            <div className="flex items-center justify-between">
-                              <span>{method.name}</span>
-                              {method.fee && (
-                                <Badge variant="secondary" className="text-xs">
-                                  {method.fee}
-                                </Badge>
-                              )}
-                            </div>
-                          </Label>
-                        </div>
-                      ))}
+                      {savedPaymentMethods.map((method) => {
+                        const isOnline = isStripeCheckoutPaymentMethod(method.name)
+                        return (
+                          <div key={method.id} className="flex items-center gap-3 rounded-lg border p-3">
+                            <RadioGroupItem value={method.id} id={`one-time-${method.id}`} />
+                            <Label htmlFor={`one-time-${method.id}`} className="flex-1 cursor-pointer">
+                              <div className="flex items-center justify-between gap-2">
+                                <span>{method.name}</span>
+                                <div className="flex items-center gap-2">
+                                  <Badge variant={isOnline ? "default" : "outline"} className="text-xs">
+                                    {isOnline ? "Pay online" : "Record offline"}
+                                  </Badge>
+                                  {method.fee && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      {method.fee}
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                            </Label>
+                          </div>
+                        )
+                      })}
                     </RadioGroup>
                   )}
 
@@ -890,10 +1144,17 @@ export default function CustomerDonationsPage() {
                       <Clock className="h-4 w-4 animate-spin" />
                       Processing...
                     </>
-                  ) : (
+                  ) : isStripeCheckoutPaymentMethod(
+                      getSelectedPaymentMethodName(oneTimeDonationForm.paymentMethod)
+                    ) ? (
                     <>
                       <CreditCard className="h-4 w-4" />
-                      Donate {formatCurrency(Number(oneTimeDonationForm.amount) || 0)}
+                      Pay {formatCurrency(Number(oneTimeDonationForm.amount) || 0)} online
+                    </>
+                  ) : (
+                    <>
+                      <DollarSign className="h-4 w-4" />
+                      Record {formatCurrency(Number(oneTimeDonationForm.amount) || 0)} offline
                     </>
                   )}
                 </Button>
@@ -1106,6 +1367,33 @@ export default function CustomerDonationsPage() {
                 </Select>
               </div>
             )}
+
+            {campaigns.length > 0 ? (
+              <div className="flex flex-col gap-2">
+                <Label>Campaign (optional)</Label>
+                <Select
+                  value={newPledgeForm.campaign || "none"}
+                  onValueChange={(v) =>
+                    setNewPledgeForm({
+                      ...newPledgeForm,
+                      campaign: v === "none" ? "" : v,
+                    })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select campaign" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No campaign</SelectItem>
+                    {campaigns.map((campaign) => (
+                      <SelectItem key={campaign.id} value={campaign.id}>
+                        {campaign.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
 
             <div className="flex flex-col gap-2">
               <Label>Donation Category</Label>

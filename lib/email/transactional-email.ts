@@ -1,9 +1,17 @@
+import { getEmailProvider, isTransactionalEmailConfigured } from "@/lib/email/get-email-provider"
+import type {
+  EmailAttachment,
+  SendEmailInput,
+  SendEmailResult,
+} from "@/lib/email/email-provider-types"
+
 export type SendTransactionalEmailInput = {
   to: string[]
   subject: string
   html: string
   text?: string
   replyTo?: string | null
+  attachments?: EmailAttachment[]
 }
 
 export type TransactionalEmailRecipientResult = {
@@ -19,109 +27,43 @@ export type SendTransactionalEmailResult = {
   results: TransactionalEmailRecipientResult[]
 }
 
+export { isTransactionalEmailConfigured }
+
 function uniqueEmails(emails: string[]) {
   return [...new Set(emails.map((email) => email.trim().toLowerCase()).filter(Boolean))]
-}
-
-export function isTransactionalEmailConfigured() {
-  return Boolean(
-    process.env.RESEND_API_KEY?.trim() && process.env.TRANSACTIONAL_EMAIL_FROM?.trim()
-  )
-}
-
-function buildPlainText(subject: string, html: string, text?: string) {
-  if (text?.trim()) {
-    return text.trim()
-  }
-
-  return `${subject}\n\n${html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()}`
-}
-
-async function sendViaResend(input: SendTransactionalEmailInput): Promise<SendTransactionalEmailResult> {
-  const apiKey = process.env.RESEND_API_KEY!.trim()
-  const from = process.env.TRANSACTIONAL_EMAIL_FROM!.trim()
-  const recipients = uniqueEmails(input.to)
-
-  if (recipients.length === 0) {
-    return { configured: true, provider: "resend", results: [] }
-  }
-
-  const results: TransactionalEmailRecipientResult[] = []
-
-  for (const email of recipients) {
-    try {
-      const response = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          from,
-          to: [email],
-          subject: input.subject,
-          html: input.html,
-          text: buildPlainText(input.subject, input.html, input.text),
-          ...(input.replyTo?.trim() ? { reply_to: input.replyTo.trim() } : {}),
-        }),
-      })
-
-      const payload = (await response.json().catch(() => ({}))) as {
-        id?: string
-        message?: string
-      }
-
-      if (!response.ok) {
-        results.push({
-          email,
-          sent: false,
-          error: payload.message || `Resend HTTP ${response.status}`,
-        })
-        continue
-      }
-
-      results.push({
-        email,
-        sent: true,
-        messageId: payload.id,
-      })
-    } catch (error) {
-      results.push({
-        email,
-        sent: false,
-        error: error instanceof Error ? error.message : "Email send failed",
-      })
-    }
-  }
-
-  return { configured: true, provider: "resend", results }
-}
-
-function sendViaConsole(input: SendTransactionalEmailInput): SendTransactionalEmailResult {
-  const recipients = uniqueEmails(input.to)
-
-  console.info("[transactional-email]", {
-    to: recipients,
-    subject: input.subject,
-    replyTo: input.replyTo ?? null,
-    preview: buildPlainText(input.subject, input.html, input.text).slice(0, 500),
-  })
-
-  return {
-    configured: false,
-    provider: "console",
-    results: recipients.map((email) => ({ email, sent: true })),
-  }
 }
 
 export async function sendTransactionalEmail(
   input: SendTransactionalEmailInput
 ): Promise<SendTransactionalEmailResult> {
-  if (isTransactionalEmailConfigured()) {
-    return sendViaResend(input)
+  const provider = getEmailProvider()
+  const recipients = uniqueEmails(input.to)
+  const results: TransactionalEmailRecipientResult[] = []
+
+  for (const email of recipients) {
+    const payload: SendEmailInput = {
+      to: email,
+      subject: input.subject,
+      html: input.html,
+      text: input.text,
+      replyTo: input.replyTo,
+      attachments: input.attachments,
+    }
+
+    const result: SendEmailResult = await provider.send(payload)
+    results.push({
+      email,
+      sent: result.sent,
+      messageId: result.messageId,
+      error: result.error,
+    })
   }
 
-  return sendViaConsole(input)
+  return {
+    configured: provider.isConfigured(),
+    provider: provider.name,
+    results,
+  }
 }
 
 function escapeHtml(text: string) {

@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { createClient } from "@/lib/supabase/client"
 import { PlatformHeader } from "@/components/platform/platform-header"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -63,8 +62,6 @@ function formatPrice(value: number) {
 }
 
 export default function PlansPage() {
-  const supabase = createClient()
-
   const [plans, setPlans] = useState<Plan[]>([])
   const [availableModules, setAvailableModules] = useState<Module[]>([])
   const [loading, setLoading] = useState(true)
@@ -91,75 +88,23 @@ export default function PlansPage() {
 
   async function loadPageData() {
     setLoading(true)
-    await Promise.all([loadModules(), loadPlans()])
-    setLoading(false)
-  }
 
-  async function loadModules() {
-    const { data, error } = await supabase
-      .from("modules")
-      .select("id, name, slug")
-      .eq("is_active", true)
-      .order("sort_order", { ascending: true })
-      .order("name", { ascending: true })
+    try {
+      const response = await fetch("/api/platform/plans", { cache: "no-store" })
+      const payload = await response.json()
 
-    if (error) {
-      console.error("Error loading modules:", error)
-      alert("Failed to load modules.")
-      return
-    }
+      if (!response.ok) {
+        throw new Error(payload.error || "Failed to load plans.")
+      }
 
-    setAvailableModules(data || [])
-  }
-
-  async function loadPlans() {
-    const { data, error } = await supabase
-      .from("plans")
-      .select(`
-        id,
-        name,
-        slug,
-        description,
-        monthly_price,
-        yearly_price,
-        member_limit,
-        event_limit,
-        is_popular,
-        is_active,
-        plan_modules (
-          module_id,
-          modules (
-            slug
-          )
-        )
-      `)
-      .eq("is_active", true)
-      .order("monthly_price", { ascending: true })
-
-    if (error) {
+      setPlans(payload.plans || [])
+      setAvailableModules(payload.modules || [])
+    } catch (error) {
       console.error("Error loading plans:", error)
-      alert("Failed to load plans.")
-      return
+      alert(error instanceof Error ? error.message : "Failed to load plans.")
+    } finally {
+      setLoading(false)
     }
-
-    const mapped: Plan[] = (data || []).map((plan: any) => ({
-      id: plan.id,
-      name: plan.name,
-      slug: plan.slug,
-      description: plan.description,
-      monthly_price: Number(plan.monthly_price || 0),
-      yearly_price: Number(plan.yearly_price || 0),
-      member_limit: plan.member_limit,
-      event_limit: plan.event_limit,
-      is_popular: Boolean(plan.is_popular),
-      is_active: Boolean(plan.is_active),
-      modules:
-        plan.plan_modules
-          ?.map((pm: any) => pm.modules?.slug)
-          .filter(Boolean) || [],
-    }))
-
-    setPlans(mapped)
   }
 
   function handleEditPlan(plan: Plan) {
@@ -193,64 +138,37 @@ export default function PlansPage() {
 
   setSaving(true)
 
-  const { error: planError } = await supabase
-    .from("plans")
-    .update({
-      name: editName.trim(),
-      description: editDescription.trim() || null,
-      monthly_price: Number(editMonthlyPrice || 0),
-      yearly_price: Number(editYearlyPrice || 0),
-      member_limit: editMemberLimit ? Number(editMemberLimit) : null,
-      event_limit: editEventLimit ? Number(editEventLimit) : null,
-      is_popular: editIsPopular,
+  try {
+    const response = await fetch(`/api/platform/plans/${editPlan.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: editName.trim(),
+        description: editDescription.trim() || null,
+        monthlyPrice: Number(editMonthlyPrice || 0),
+        yearlyPrice: Number(editYearlyPrice || 0),
+        memberLimit: editMemberLimit ? Number(editMemberLimit) : null,
+        eventLimit: editEventLimit ? Number(editEventLimit) : null,
+        isPopular: editIsPopular,
+        moduleSlugs: editModules,
+      }),
     })
-    .eq("id", editPlan.id)
 
-  if (planError) {
-    console.error(planError)
-    alert(planError.message)
-    setSaving(false)
-    return
-  }
+    const payload = await response.json()
 
-  const { error: deleteError } = await supabase
-    .from("plan_modules")
-    .delete()
-    .eq("plan_id", editPlan.id)
-
-  if (deleteError) {
-    console.error(deleteError)
-    alert("Plan details saved, but failed to update included tools.")
-    setSaving(false)
-    return
-  }
-
-  const selectedModules = availableModules.filter((module) =>
-    editModules.includes(module.slug)
-  )
-
-  if (selectedModules.length > 0) {
-    const rows = selectedModules.map((module) => ({
-      plan_id: editPlan.id,
-      module_id: module.id,
-    }))
-
-    const { error: insertError } = await supabase
-      .from("plan_modules")
-      .insert(rows)
-
-    if (insertError) {
-      console.error(insertError)
-      alert("Plan details saved, but failed to save selected tools.")
-      setSaving(false)
-      return
+    if (!response.ok) {
+      throw new Error(payload.error || "Failed to save plan.")
     }
-  }
 
-  setEditPlan(null)
-  setEditModules([])
-  await loadPlans()
-  setSaving(false)
+    setPlans(payload.plans || [])
+    setEditPlan(null)
+    setEditModules([])
+  } catch (error) {
+    console.error(error)
+    alert(error instanceof Error ? error.message : "Failed to save plan.")
+  } finally {
+    setSaving(false)
+  }
 }
 
   async function createPlan() {
@@ -261,42 +179,34 @@ export default function PlansPage() {
 
     setSaving(true)
 
-    const slug = newPlanName
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)/g, "")
+    try {
+      const response = await fetch("/api/platform/plans", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newPlanName.trim(),
+          monthlyPrice: Number(newPlanPrice || 0),
+          memberLimit: newMemberLimit ? Number(newMemberLimit) : null,
+        }),
+      })
 
-    const price = Number(newPlanPrice || 0)
-    const memberLimit = newMemberLimit ? Number(newMemberLimit) : null
+      const payload = await response.json()
 
-    const { error } = await supabase.from("plans").insert({
-      code: slug,
-      name: newPlanName.trim(),
-      slug,
-      description: `${newPlanName.trim()} plan`,
-      monthly_price: price,
-      yearly_price: price * 10,
-      member_limit: memberLimit,
-      event_limit: null,
-      is_active: true,
-      is_public: true,
-      is_popular: false,
-    })
+      if (!response.ok) {
+        throw new Error(payload.error || "Failed to create plan.")
+      }
 
-    if (error) {
+      setPlans(payload.plans || [])
+      setNewPlanName("")
+      setNewPlanPrice("")
+      setNewMemberLimit("")
+      setAddPlanOpen(false)
+    } catch (error) {
       console.error(error)
-      alert(error.message)
+      alert(error instanceof Error ? error.message : "Failed to create plan.")
+    } finally {
       setSaving(false)
-      return
     }
-
-    setNewPlanName("")
-    setNewPlanPrice("")
-    setNewMemberLimit("")
-    setAddPlanOpen(false)
-    await loadPlans()
-    setSaving(false)
   }
 
   return (
@@ -357,40 +267,6 @@ export default function PlansPage() {
                         {plan.description}
                       </p>
                     )}
-                  </div>
-
-                  <div className="flex flex-col gap-2.5">
-                    <div className="flex items-start gap-2">
-                      <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />
-                      <span className="text-sm text-foreground">
-                        {plan.member_limit
-                          ? `Up to ${plan.member_limit.toLocaleString()} members`
-                          : "Unlimited members"}
-                      </span>
-                    </div>
-
-                    <div className="flex items-start gap-2">
-                      <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />
-                      <span className="text-sm text-foreground">
-                        {plan.event_limit
-                          ? `${plan.event_limit} events per month`
-                          : "Unlimited events"}
-                      </span>
-                    </div>
-
-                    <div className="flex items-start gap-2">
-                      <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />
-                      <span className="text-sm text-foreground">
-                        Module-based access
-                      </span>
-                    </div>
-
-                    <div className="flex items-start gap-2">
-                      <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />
-                      <span className="text-sm text-foreground">
-                        Organization management
-                      </span>
-                    </div>
                   </div>
 
                   <Separator className="my-2" />

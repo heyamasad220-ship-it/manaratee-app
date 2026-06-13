@@ -17,12 +17,28 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  DonationAttributionFields,
+  EMPTY_DONATION_ATTRIBUTION_VALUE,
+  toAttributionIds,
+  type DonationAttributionValue,
+} from "@/components/donations/donation-attribution-fields";
+import {
+  buildAttributionLookupMaps,
+  mergePaymentAttribution,
+  parseImportAttributionFromRawRow,
+  resolveAttributionFromNames,
+  toPaymentAttributionColumns,
+} from "@/lib/donations/payment-attribution";
 
 type ParsedPaymentRow = {
   sender_name: string;
   amount: string;
   payment_date: string;
   reference: string;
+  campaign?: string;
+  category?: string;
+  fund?: string;
 };
 
 type StagedPaymentRow = {
@@ -34,6 +50,7 @@ type StagedPaymentRow = {
   reference: string | null;
   import_status: string;
   created_at: string;
+  raw_row?: Record<string, unknown> | null;
 };
 
 type ImportBatch = {
@@ -115,6 +132,10 @@ export default function DonationsImportPage() {
   >([]);
   const [importBatches, setImportBatches] = useState<ImportBatch[]>([]);
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
+  const [organizationId, setOrganizationId] = useState<string | null>(null);
+  const [defaultAttribution, setDefaultAttribution] = useState<DonationAttributionValue>(
+    EMPTY_DONATION_ATTRIBUTION_VALUE
+  );
 
   const validPaymentRows = useMemo(() => {
     return paymentRows.filter((row) => {
@@ -210,6 +231,26 @@ export default function DonationsImportPage() {
             row.Memo ||
             row.description ||
             row.Description ||
+            "",
+          campaign:
+            row.campaign ||
+            row.Campaign ||
+            row.campaign_name ||
+            row["Campaign Name"] ||
+            "",
+          category:
+            row.category ||
+            row.Category ||
+            row.category_name ||
+            row["Category Name"] ||
+            "",
+          fund:
+            row.fund ||
+            row.Fund ||
+            row.subcategory ||
+            row.Subcategory ||
+            row.fund_name ||
+            row["Fund Name"] ||
             "",
         }));
 
@@ -332,8 +373,11 @@ export default function DonationsImportPage() {
     if (!orgId) {
       setStagedPaymentRows([]);
       setSelectedRowIds([]);
+      setOrganizationId(null);
       return;
     }
+
+    setOrganizationId(orgId);
 
     setLoadingStagedPaymentRows(true);
 
@@ -348,7 +392,8 @@ export default function DonationsImportPage() {
         payment_date,
         reference,
         import_status,
-        created_at
+        created_at,
+        raw_row
       `,
       )
       .eq("organization_id", orgId)
@@ -471,22 +516,34 @@ alert(error.message || JSON.stringify(error));
     }
 
     if (rowsToInsert.length > 0) {
-      const paymentPayload = rowsToInsert.map((row) => ({
-        organization_id: orgId,
-        donor_id: null,
-        contact_id: null,
-        pledge_id: null,
-        sender_name: row.sender_name || null,
-        amount: row.amount || 0,
-        payment_date: row.payment_date
-          ? `${String(row.payment_date).slice(0, 10)}T12:00:00`
-          : new Date().toISOString(),
-        memo: row.reference || null,
-        source: "import",
-        source_type: "import",
-        status: "pending_review",
-        is_verified: false,
-      }));
+      const lookupMaps = await buildAttributionLookupMaps(supabase, orgId);
+      const fallbackAttribution = toAttributionIds(defaultAttribution);
+
+      const paymentPayload = rowsToInsert.map((row) => {
+        const fromRow = resolveAttributionFromNames(
+          parseImportAttributionFromRawRow(row.raw_row),
+          lookupMaps
+        );
+        const attribution = mergePaymentAttribution(fromRow, fallbackAttribution);
+
+        return {
+          organization_id: orgId,
+          donor_id: null,
+          contact_id: null,
+          pledge_id: null,
+          sender_name: row.sender_name || null,
+          amount: row.amount || 0,
+          payment_date: row.payment_date
+            ? `${String(row.payment_date).slice(0, 10)}T12:00:00`
+            : new Date().toISOString(),
+          memo: row.reference || null,
+          source: "import",
+          source_type: "import",
+          status: "pending_review",
+          is_verified: false,
+          ...toPaymentAttributionColumns(attribution),
+        };
+      });
 
       const { error: paymentInsertError } = await supabase
         .from("payments")
@@ -792,6 +849,21 @@ alert(error.message || JSON.stringify(error));
                       {importedRows.length}
                     </div>
                   </div>
+                </div>
+
+                <div className="rounded-md border p-4 space-y-3">
+                  <div>
+                    <p className="text-sm font-medium">Default attribution</p>
+                    <p className="text-xs text-muted-foreground">
+                      Applied when CSV rows omit campaign, category, or fund columns.
+                      Optional columns: campaign, category, fund (or Campaign Name, Category Name, Fund Name).
+                    </p>
+                  </div>
+                  <DonationAttributionFields
+                    organizationId={organizationId}
+                    value={defaultAttribution}
+                    onChange={setDefaultAttribution}
+                  />
                 </div>
 
                 <div className="flex flex-wrap gap-3">

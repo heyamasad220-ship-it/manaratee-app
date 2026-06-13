@@ -34,8 +34,15 @@ import {
 } from "@/components/ui/dialog"
 import { Plus, Pencil, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import Link from "next/link"
+import {
+  buildCampaignAnalytics,
+  fetchCampaignAnalyticsData,
+} from "@/lib/donations/campaign-analytics"
+import { DonationReceiptSettingsForm } from "@/components/donations/donation-receipt-settings-form"
+import { PledgeReminderSettingsForm } from "@/components/donations/pledge-reminder-settings-form"
 
-const settingsTabs = ["General", "Campaigns", "Categories", "Payment Methods", "Receipts", "Notifications"] as const
+const settingsTabs = ["General", "Campaigns", "Categories", "Payment Methods", "Receipts", "Pledge Reminders", "Notifications"] as const
 type SettingsTab = (typeof settingsTabs)[number]
 
 interface Category {
@@ -170,11 +177,10 @@ async function loadCampaigns() {
     return
   }
 
-  const { data, error } = await supabase
-    .from("campaigns")
-    .select("*")
-    .eq("organization_id", orgId)
-    .order("created_at", { ascending: false })
+  const { campaigns, pledges, payments, error } = await fetchCampaignAnalyticsData(
+    supabase,
+    orgId
+  )
 
   if (error) {
     console.error("Error loading campaigns:", error)
@@ -182,23 +188,26 @@ async function loadCampaigns() {
     return
   }
 
+  const analytics = buildCampaignAnalytics(campaigns, pledges, payments)
+  const metricsById = new Map(analytics.map((entry) => [entry.campaign.id, entry.metrics]))
+
   setCampaigns(
-    (data || []).map((c: any) => ({
+    (campaigns || []).map((c) => ({
       id: c.id,
       name: c.name,
-      description: "",
-      goalAmount: 0,
-      raisedAmount: 0,
+      description: c.description || "",
+      goalAmount: Number(c.goal_amount || 0),
+      raisedAmount: metricsById.get(c.id)?.raised ?? 0,
       startDate: c.start_date || "",
       endDate: c.end_date || "",
       status:
-  c.status === "active"
-    ? "Active"
-    : c.status === "completed"
-      ? "Completed"
-      : c.status === "paused"
-        ? "Paused"
-        : "Draft",
+        c.status === "active"
+          ? "Active"
+          : c.status === "completed"
+            ? "Completed"
+            : c.status === "paused"
+              ? "Paused"
+              : "Draft",
       campaignCode: c.code || "",
     }))
   )
@@ -388,6 +397,8 @@ async function handleSaveCampaign() {
   const campaignData = {
     organization_id: orgId,
     name: campaignForm.name.trim(),
+    description: campaignForm.description.trim() || null,
+    goal_amount: campaignForm.goalAmount ? Number(campaignForm.goalAmount) : null,
     start_date: campaignForm.startDate || null,
     end_date: campaignForm.endDate || null,
     status: campaignForm.status.toLowerCase(),
@@ -567,89 +578,7 @@ async function handleDeleteCampaign(campaignId: string) {
         </div>
 
         {activeTab === "General" && (
-          <div className="flex flex-col gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Organization Details</CardTitle>
-                <CardDescription>Information displayed on donation receipts</CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-4">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="flex flex-col gap-2">
-                    <Label htmlFor="org-name">Organization Name</Label>
-                   <Input id="org-name" placeholder="Organization name" />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <Label htmlFor="tax-id">Tax ID / EIN</Label>
-                    <Input id="tax-id" placeholder="Tax ID / EIN" />
-                  </div>
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="address">Address</Label>
-                 <Input id="address" placeholder="Organization address" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Donation Defaults</CardTitle>
-                <CardDescription>Default settings for new donations</CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-4">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="flex flex-col gap-2">
-                    <Label htmlFor="default-category">Default Category</Label>
-                    <Select defaultValue="operations">
-                      <SelectTrigger id="default-category">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categories.map((cat) => (
-                          <SelectItem key={cat.id} value={cat.name.toLowerCase()}>{cat.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <Label htmlFor="min-donation">Minimum Donation Amount</Label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-                      <Input id="min-donation" type="number" placeholder="5" className="pl-7" />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-lg border p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label>Allow Anonymous Donations</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Allow donors to give without providing their name
-                      </p>
-                    </div>
-                    <Switch />
-                  </div>
-                </div>
-
-                <div className="rounded-lg border p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label>Enable Recurring Donations</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Allow donors to set up recurring monthly donations
-                      </p>
-                    </div>
-                    <Switch defaultChecked />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <div className="flex justify-end">
-              <Button>Save Changes</Button>
-            </div>
-          </div>
+          <DonationReceiptSettingsForm mode="general" />
         )}
 
         {activeTab === "Campaigns" && (
@@ -687,7 +616,12 @@ async function handleDeleteCampaign(campaignId: string) {
                       <TableRow key={campaign.id}>
                         <TableCell>
                           <div>
-                            <p className="font-medium">{campaign.name}</p>
+                            <Link
+                              href={`/donations/campaigns/${campaign.id}`}
+                              className="font-medium text-primary hover:underline"
+                            >
+                              {campaign.name}
+                            </Link>
                             <p className="text-sm text-muted-foreground">{campaign.description}</p>
                           </div>
                         </TableCell>
@@ -881,84 +815,9 @@ async function handleDeleteCampaign(campaignId: string) {
           </div>
         )}
 
-        {activeTab === "Receipts" && (
-          <div className="flex flex-col gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Receipt Settings</CardTitle>
-                <CardDescription>Configure donation receipt generation</CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-4">
-                <div className="rounded-lg border p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label>Auto-Generate Receipts</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Automatically generate receipts for all donations
-                      </p>
-                    </div>
-                    <Switch defaultChecked />
-                  </div>
-                </div>
+        {activeTab === "Receipts" && <DonationReceiptSettingsForm mode="receipts" />}
 
-                <div className="rounded-lg border p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label>Email Receipts Automatically</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Send receipts to donors via email upon donation
-                      </p>
-                    </div>
-                    <Switch defaultChecked />
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="receipt-footer">Receipt Footer Text</Label>
-                  <Textarea
-                    id="receipt-footer"
-                    rows={3}
-                    defaultValue="Thank you for your generous donation. Your contribution is tax-deductible to the extent allowed by law."
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Year-End Statements</CardTitle>
-                <CardDescription>Configure annual donation statements</CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-4">
-                <div className="rounded-lg border p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label>Generate Year-End Statements</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Automatically generate annual donation summaries in January
-                      </p>
-                    </div>
-                    <Switch defaultChecked />
-                  </div>
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="flex flex-col gap-2">
-                    <Label htmlFor="statement-threshold">Minimum for Statement</Label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-                      <Input id="statement-threshold" type="number" defaultValue="250" className="pl-7" />
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <div className="flex justify-end">
-              <Button>Save Changes</Button>
-            </div>
-          </div>
-        )}
+        {activeTab === "Pledge Reminders" && <PledgeReminderSettingsForm />}
 
         {activeTab === "Notifications" && (
           <div className="flex flex-col gap-6">

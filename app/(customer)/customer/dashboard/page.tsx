@@ -60,7 +60,7 @@ export default async function CustomerDashboardPage() {
 
   const { count: donationCount } = contact?.id
     ? await supabase
-        .from("donation_payments")
+        .from("payments")
         .select("*", { count: "exact", head: true })
         .eq("organization_id", organizationId)
         .eq("contact_id", contact.id)

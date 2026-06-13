@@ -32,7 +32,6 @@ import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 import { createClient } from "@/lib/supabase/client"
 import { getCurrentOrganizationContext, clearSelectedOrganizationIdCache } from "@/lib/current-organization"
-import { loadOrganizationSidebarModules } from "@/lib/organizations/load-organization-sidebar-modules"
 import { isOrganizationSystemAdmin } from "@/lib/organizations/organization-system-admin"
 import { WORKFORCE_MODULE_LABEL } from "@/lib/hr/hr-module-label"
 import { isFacilitiesOnlyAccess } from "@/lib/permissions/facilities-access"
@@ -120,39 +119,28 @@ function mergeSidebarModules(rows: SidebarModuleRow[]): SidebarModuleRow[] {
   const bySlug = new Map<string, SidebarModuleRow>()
 
   for (const row of rows) {
-    if (!HIDDEN_SIDEBAR_MODULE_SLUGS.has(row.slug)) {
-      bySlug.set(row.slug, row)
+    if (HIDDEN_SIDEBAR_MODULE_SLUGS.has(row.slug)) {
+      continue
     }
-  }
 
-  for (const row of STATIC_SIDEBAR_MODULES) {
-    if (!bySlug.has(row.slug)) {
-      bySlug.set(row.slug, row)
-    }
-  }
-
-  if (!bySlug.has("spaces")) {
-    bySlug.set("spaces", {
-      name: "Facilities",
-      slug: "spaces",
-      route: "/facilities/reservation-center",
-      icon_name: "Building2",
-      group_name: "Facilities",
-      sort_order: 50,
-    })
-  }
-
-  return Array.from(bySlug.values())
-    .map((row) => ({
+    const staticRow = STATIC_SIDEBAR_MODULES.find((item) => item.slug === row.slug)
+    bySlug.set(row.slug, {
+      ...staticRow,
       ...row,
-      sort_order: moduleSortOrderOverride[row.slug] ?? row.sort_order,
-    }))
-    .sort((a, b) => {
-      const aOrder = a.sort_order ?? 999
-      const bOrder = b.sort_order ?? 999
-      if (aOrder !== bOrder) return aOrder - bOrder
-      return a.name.localeCompare(b.name)
+      name: row.name || staticRow?.name || row.slug,
+      route: row.route || staticRow?.route || null,
+      icon_name: row.icon_name || staticRow?.icon_name || null,
+      group_name: row.group_name || staticRow?.group_name || null,
+      sort_order: moduleSortOrderOverride[row.slug] ?? row.sort_order ?? staticRow?.sort_order ?? null,
     })
+  }
+
+  return Array.from(bySlug.values()).sort((a, b) => {
+    const aOrder = a.sort_order ?? 999
+    const bOrder = b.sort_order ?? 999
+    if (aOrder !== bOrder) return aOrder - bOrder
+    return a.name.localeCompare(b.name)
+  })
 }
 
 interface UserPermissionContext {
@@ -294,6 +282,9 @@ const moduleChildren: Record<string, SubItem[]> = {
     { label: "Donors", href: "/donations/donors", matchPrefix: "/donations/donors", permissionKey: "donations.view" },
     { label: "Payments", href: "/donations/payments", matchPrefix: "/donations/payments", permissionKey: "donations.view" },
     { label: "Pledges", href: "/donations/pledges", matchPrefix: "/donations/pledges", permissionKey: "donations.view" },
+    { label: "Recurring", href: "/donations/recurring", matchPrefix: "/donations/recurring", permissionKey: "donations.view" },
+    { label: "Collect", href: "/donations/collect", matchPrefix: "/donations/collect", permissionKey: "donations.view" },
+    { label: "Campaigns", href: "/donations/campaigns", matchPrefix: "/donations/campaigns", permissionKey: "donations.view" },
     { label: "Import", href: "/donations/import", matchPrefix: "/donations/import", permissionKey: "donations.manage" },
     { label: "Reconcile", href: "/donations/reconcile", matchPrefix: "/donations/reconcile", permissionKey: "donations.manage" },
     { label: "Reports", href: "/donations/reports", matchPrefix: "/donations/reports", permissionKey: "reports.view" },
@@ -624,46 +615,17 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      let moduleRows = await loadOrganizationSidebarModules(supabase, organizationId)
+      const modulesResponse = await fetch("/api/organizations/sidebar-modules", {
+        cache: "no-store",
+      })
+      const modulesPayload = modulesResponse.ok
+        ? await modulesResponse.json()
+        : { modules: [] as SidebarModuleRow[] }
 
-      if (moduleRows.length === 0) {
-        const { data, error } = await supabase
-          .from("my_sidebar_modules")
-          .select("name, slug, route, icon_name, group_name, sort_order")
-          .order("sort_order", { ascending: true })
-          .order("name", { ascending: true })
+      const moduleRows = (modulesPayload.modules || []) as SidebarModuleRow[]
 
-        if (error) {
-          console.error("Error loading sidebar modules:", error)
-          setNavItems(
-            filterNavItemsByPermissions(
-              [
-                { label: "Dashboard", href: "/dashboard", icon: Home, matchPrefix: "/dashboard" },
-                {
-                  label: "Settings",
-                  href: "/settings",
-                  icon: Settings,
-                  matchPrefix: "/settings",
-                  group: "System",
-                  children: [
-                    { label: "Users", href: "/settings/users", matchPrefix: "/settings/users", permissionKey: "settings.users.view" },
-                    {
-                      label: "Roles & Permissions",
-                      href: "/settings/roles-permissions",
-                      matchPrefix: "/settings/roles-permissions",
-                      permissionKey: "settings.roles.view",
-                    },
-                  ],
-                },
-              ],
-              permissionContext,
-            ),
-          )
-          setLoading(false)
-          return
-        }
-
-        moduleRows = data || []
+      if (!modulesResponse.ok) {
+        console.error("Error loading sidebar modules:", modulesPayload.error)
       }
 
       setNavItems(buildNavItems(mergeSidebarModules(moduleRows), permissionContext))

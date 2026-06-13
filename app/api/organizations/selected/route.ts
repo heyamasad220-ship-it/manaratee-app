@@ -2,16 +2,31 @@ import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 
 import { createClient } from "@/lib/supabase/server"
-import { isPlatformAdminOrgSupportSession } from "@/lib/platform/platform-org-access"
+import { isCurrentUserPlatformAdmin } from "@/lib/platform/is-platform-admin-user"
+import {
+  getPlatformAdminOrgAccessOrganizationId,
+  isPlatformAdminOrgSupportSession,
+} from "@/lib/platform/platform-org-access"
 
 export const dynamic = "force-dynamic"
 
 export async function GET() {
   const cookieStore = await cookies()
-  const organizationId = cookieStore.get("selected_organization_id")?.value?.trim() || null
+  const supportOrgId = await getPlatformAdminOrgAccessOrganizationId()
+  const selectedOrganizationId =
+    cookieStore.get("selected_organization_id")?.value?.trim() || null
+
+  let organizationId = selectedOrganizationId
+  let platformSupportMode = false
+
+  if (supportOrgId && (await isCurrentUserPlatformAdmin())) {
+    organizationId = supportOrgId
+    platformSupportMode = true
+  } else if (organizationId) {
+    platformSupportMode = await isPlatformAdminOrgSupportSession(organizationId)
+  }
 
   if (organizationId) {
-    const platformSupportMode = await isPlatformAdminOrgSupportSession(organizationId)
     return NextResponse.json({ organizationId, platformSupportMode })
   }
 

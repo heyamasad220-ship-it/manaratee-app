@@ -118,32 +118,7 @@ export default function DashboardPage() {
     async function loadOrganization() {
       const supabase = createClient()
 
-
-const {
-  data: { user },
-} = await supabase.auth.getUser()
-
-if (!user) {
-  console.error("No authenticated user")
-  setOrg(emptyOrganization)
-  setIsLoading(false)
-  return
-}
-
-const { data: profile, error: profileError } = await supabase
-  .from("profiles")
-  .select("organization_id")
-  .eq("id", user.id)
-  .single()
-
-if (profileError || !profile?.organization_id) {
-  console.error("No organization found for this user")
-  setOrg(emptyOrganization)
-  setIsLoading(false)
-  return
-}
-
-const orgId = profile.organization_id
+      const orgId = await getCurrentOrganizationId()
 
       if (!orgId) {
         console.error("No selected organization")

@@ -29,10 +29,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Download, Heart, DollarSign, Users, TrendingUp, FileText, Send, Printer } from "lucide-react"
+import { Download, Heart, DollarSign, Users, TrendingUp, FileText, Send, Printer, Target } from "lucide-react"
 import { cn } from "@/lib/utils"
+import Link from "next/link"
+import { CampaignProgressBar } from "@/components/donations/campaign-progress-bar"
+import { GivingStatementActions } from "@/components/donations/giving-statement-actions"
+import { getReceiptReportingSummaryAction, sendBulkAnnualStatementsAction } from "@/lib/donations/receipt-actions"
+import { getPledgeCollectionReportAction } from "@/lib/donations/pledge-reminder-actions"
+import { getRecurringReportingSummaryAction } from "@/lib/donations/recurring-donation-actions"
+import {
+  buildCampaignAnalytics,
+  fetchCampaignAnalyticsData,
+  formatDonationCurrency,
+  type CampaignAnalyticsEntry,
+} from "@/lib/donations/campaign-analytics"
 
-const reportsTabs = ["Overview", "Donations", "Donors", "Campaigns", "Tax Receipts"] as const
+const reportsTabs = ["Overview", "Donations", "Donors", "Campaigns", "Receipts", "Collection", "Recurring", "Tax Receipts"] as const
 
 type ReportsTab = (typeof reportsTabs)[number]
 
@@ -71,7 +83,39 @@ export default function DonationsReportsPage() {
 
   const [payments, setPayments] = useState<Payment[]>([])
   const [donors, setDonors] = useState<DonorSummary[]>([])
+  const [campaignEntries, setCampaignEntries] = useState<CampaignAnalyticsEntry[]>([])
   const [loading, setLoading] = useState(true)
+  const [receiptSummary, setReceiptSummary] = useState<{
+    receiptsGenerated: number
+    receiptsSent: number
+    receiptsNotSent: number
+    missingReceipts: number
+    totalPayments: number
+  } | null>(null)
+  const [collectionReport, setCollectionReport] = useState<{
+    outstandingCount: number
+    outstandingTotal: number
+    overdueCount: number
+    noPaymentCount: number
+    partialCount: number
+    reminderCount: number
+    pledges: Array<{
+      id: string
+      donorName: string
+      campaignName: string | null
+      balanceRemaining: number
+      lastReminderAt: string | null
+      lastContactedAt: string | null
+    }>
+  } | null>(null)
+  const [recurringReport, setRecurringReport] = useState<{
+    recurringDonorCount: number
+    totalRecurringRevenue: number
+    byCampaign: Array<{ campaignId: string | null; campaignName: string; total: number; donorCount: number }>
+    byDonor: Array<{ donorId: string; donorName: string; total: number; planCount: number }>
+  } | null>(null)
+  const [statementYear, setStatementYear] = useState(String(new Date().getFullYear()))
+  const [bulkSending, setBulkSending] = useState(false)
 
   async function getOrganizationId() {
     const {
@@ -100,23 +144,48 @@ export default function DonationsReportsPage() {
         return
       }
 
-      const { data: paymentData } = await supabase
-        .from("payments")
-        .select(
-          "id, donor_id, sender_name, amount, payment_date, source, category_id, pledge_id, status"
-        )
-        .eq("organization_id", orgId)
-        .order("payment_date", { ascending: false })
-
-      const { data: donorData } = await supabase
-        .from("donor_summary_view")
-        .select("*")
-        .eq("organization_id", orgId)
+      const [{ data: paymentData }, { data: donorData }, campaignBundle] = await Promise.all([
+        supabase
+          .from("payments")
+          .select(
+            "id, donor_id, sender_name, amount, payment_date, source, category_id, pledge_id, campaign_id, contact_id, status"
+          )
+          .eq("organization_id", orgId)
+          .order("payment_date", { ascending: false }),
+        supabase.from("donor_summary_view").select("*").eq("organization_id", orgId),
+        fetchCampaignAnalyticsData(supabase, orgId),
+      ])
 
       setPayments((paymentData || []) as Payment[])
       setDonors((donorData || []) as DonorSummary[])
+      if (!campaignBundle.error) {
+        setCampaignEntries(
+          buildCampaignAnalytics(
+            campaignBundle.campaigns,
+            campaignBundle.pledges,
+            campaignBundle.payments
+          )
+        )
+      } else {
+        setCampaignEntries([])
+      }
 
       setLoading(false)
+
+      const receiptResult = await getReceiptReportingSummaryAction()
+      if (receiptResult.success) {
+        setReceiptSummary(receiptResult.summary)
+      }
+
+      const collectionResult = await getPledgeCollectionReportAction()
+      if (collectionResult.success) {
+        setCollectionReport(collectionResult.report)
+      }
+
+      const recurringResult = await getRecurringReportingSummaryAction()
+      if (recurringResult.success) {
+        setRecurringReport(recurringResult.summary)
+      }
     }
 
     loadData()
@@ -156,11 +225,38 @@ export default function DonationsReportsPage() {
     .sort((a, b) => b.total - a.total)
     .slice(0, 5)
 
+  const yearEndDonorTotals = useMemo(() => {
+    const year = Number(statementYear)
+    const totals = new Map<string, { name: string; email: string; total: number; count: number }>()
+
+    for (const payment of payments) {
+      if (String(payment.status || "").toLowerCase() === "voided") continue
+      if (!payment.donor_id || !payment.payment_date) continue
+      const paymentYear = new Date(payment.payment_date).getFullYear()
+      if (paymentYear !== year) continue
+
+      const donor = donors.find((d) => d.id === payment.donor_id)
+      const existing = totals.get(payment.donor_id) || {
+        name: donor?.full_name || payment.sender_name || "Unknown",
+        email: donor?.email || "",
+        total: 0,
+        count: 0,
+      }
+      existing.total += Number(payment.amount || 0)
+      existing.count += 1
+      totals.set(payment.donor_id, existing)
+    }
+
+    return [...totals.entries()]
+      .map(([id, data]) => ({ id, ...data }))
+      .sort((a, b) => b.total - a.total)
+  }, [payments, donors, statementYear])
+
   const handleSelectAll = () => {
-    if (selectedDonors.length === filteredTaxDonors.length) {
+    if (selectedDonors.length === yearEndDonorTotals.length) {
       setSelectedDonors([])
     } else {
-      setSelectedDonors(filteredTaxDonors.map((d) => d.id))
+      setSelectedDonors(yearEndDonorTotals.map((d) => d.id))
     }
   }
 
@@ -170,6 +266,37 @@ export default function DonationsReportsPage() {
     } else {
       setSelectedDonors([...selectedDonors, id])
     }
+  }
+
+  async function handleBulkSendStatements() {
+    if (!selectedDonors.length) {
+      alert("Select at least one donor.")
+      return
+    }
+
+    if (
+      !confirm(
+        `Send ${selectedDonors.length} year-end statement email(s) for ${statementYear}?`
+      )
+    ) {
+      return
+    }
+
+    setBulkSending(true)
+    const result = await sendBulkAnnualStatementsAction(
+      selectedDonors,
+      Number(statementYear)
+    )
+    setBulkSending(false)
+
+    if (!result.success) {
+      alert(result.error || "Bulk send failed")
+      return
+    }
+
+    alert(
+      `Statements sent: ${result.sentCount}. Failed: ${result.failedCount}.`
+    )
   }
 
   if (loading) {
@@ -430,18 +557,318 @@ export default function DonationsReportsPage() {
         {activeTab === "Campaigns" && (
           <Card>
             <CardHeader>
-              <CardTitle>Campaign Performance</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <Target className="h-5 w-5" />
+                Campaign Performance
+              </CardTitle>
               <CardDescription>
-                Connect campaigns later
+                Donations, pledges, outstanding balances, and donor counts by campaign
               </CardDescription>
             </CardHeader>
 
-            <CardContent>
-              <div className="rounded-md border border-dashed p-8 text-center text-muted-foreground">
-                Campaign reporting can be added after campaign allocation is finalized.
-              </div>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Campaign</TableHead>
+                    <TableHead className="text-right">Donations</TableHead>
+                    <TableHead className="text-right">Pledges</TableHead>
+                    <TableHead className="text-right">Outstanding</TableHead>
+                    <TableHead className="text-right">Donors</TableHead>
+                    <TableHead>Progress</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loading && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                        Loading campaign reports...
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {!loading && campaignEntries.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                        No campaigns to report on yet.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {campaignEntries.map(({ campaign, metrics }) => (
+                    <TableRow key={campaign.id}>
+                      <TableCell>
+                        <Link
+                          href={`/donations/campaigns/${campaign.id}`}
+                          className="font-medium text-primary hover:underline"
+                        >
+                          {campaign.name}
+                        </Link>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {formatDonationCurrency(metrics.raised)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {formatDonationCurrency(metrics.pledged)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {formatDonationCurrency(metrics.outstanding)}
+                      </TableCell>
+                      <TableCell className="text-right">{metrics.donorCount}</TableCell>
+                      <TableCell className="min-w-[140px]">
+                        <CampaignProgressBar progressPercent={metrics.progressPercent} />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </CardContent>
           </Card>
+        )}
+
+        {activeTab === "Receipts" && (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Receipts Generated
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {receiptSummary?.receiptsGenerated ?? 0}
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Receipts Sent
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{receiptSummary?.receiptsSent ?? 0}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Not Sent
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{receiptSummary?.receiptsNotSent ?? 0}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Missing Receipts
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-amber-600">
+                  {receiptSummary?.missingReceipts ?? 0}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  of {receiptSummary?.totalPayments ?? 0} payments
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {activeTab === "Collection" && (
+          <div className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Outstanding Pledges
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {collectionReport?.outstandingCount ?? 0}
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Outstanding Balance
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    ${(collectionReport?.outstandingTotal ?? 0).toLocaleString()}
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    No Payment Yet
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {collectionReport?.noPaymentCount ?? 0}
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Partially Paid
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {collectionReport?.partialCount ?? 0}
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Reminders Logged
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {collectionReport?.reminderCount ?? 0}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Pledge Collection Queue</CardTitle>
+                <CardDescription>
+                  Open and partial pledges with reminder and last-contacted dates
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Donor</TableHead>
+                      <TableHead>Campaign</TableHead>
+                      <TableHead className="text-right">Balance</TableHead>
+                      <TableHead>Last Reminder</TableHead>
+                      <TableHead>Last Contacted</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(collectionReport?.pledges || []).map((pledge) => (
+                      <TableRow key={pledge.id}>
+                        <TableCell className="font-medium">{pledge.donorName}</TableCell>
+                        <TableCell>{pledge.campaignName || "—"}</TableCell>
+                        <TableCell className="text-right">
+                          ${pledge.balanceRemaining.toLocaleString()}
+                        </TableCell>
+                        <TableCell>
+                          {pledge.lastReminderAt
+                            ? new Date(pledge.lastReminderAt).toLocaleDateString()
+                            : "—"}
+                        </TableCell>
+                        <TableCell>
+                          {pledge.lastContactedAt
+                            ? new Date(pledge.lastContactedAt).toLocaleDateString()
+                            : "—"}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {activeTab === "Recurring" && (
+          <div className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Recurring Donors
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {recurringReport?.recurringDonorCount ?? 0}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Donors with recurring payments</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Recurring Revenue (Actual)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    ${(recurringReport?.totalRecurringRevenue ?? 0).toLocaleString()}
+                  </div>
+                  <p className="text-xs text-muted-foreground">From canonical payments linked to plans</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Recurring Revenue by Campaign</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Campaign</TableHead>
+                      <TableHead className="text-right">Donors</TableHead>
+                      <TableHead className="text-right">Revenue</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(recurringReport?.byCampaign || []).map((row) => (
+                      <TableRow key={row.campaignId || "none"}>
+                        <TableCell>{row.campaignName}</TableCell>
+                        <TableCell className="text-right">{row.donorCount}</TableCell>
+                        <TableCell className="text-right">${row.total.toLocaleString()}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Recurring Revenue by Donor</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Donor</TableHead>
+                      <TableHead className="text-right">Plans</TableHead>
+                      <TableHead className="text-right">Revenue</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(recurringReport?.byDonor || []).map((row) => (
+                      <TableRow key={row.donorId}>
+                        <TableCell className="font-medium">{row.donorName}</TableCell>
+                        <TableCell className="text-right">{row.planCount}</TableCell>
+                        <TableCell className="text-right">${row.total.toLocaleString()}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </div>
         )}
 
         {activeTab === "Tax Receipts" && (
@@ -449,8 +876,34 @@ export default function DonationsReportsPage() {
             <CardHeader>
               <CardTitle>Tax Receipts</CardTitle>
               <CardDescription>
-                Year-end donor summaries
+                Year-end donor giving statements from actual payments only
               </CardDescription>
+              <div className="flex flex-wrap items-center gap-2 pt-2">
+                <Select value={statementYear} onValueChange={setStatementYear}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[0, 1, 2].map((offset) => {
+                      const y = new Date().getFullYear() - offset
+                      return (
+                        <SelectItem key={y} value={String(y)}>
+                          {y}
+                        </SelectItem>
+                      )
+                    })}
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="default"
+                  size="sm"
+                  disabled={bulkSending || selectedDonors.length === 0}
+                  onClick={handleBulkSendStatements}
+                >
+                  <Send className="mr-2 h-4 w-4" />
+                  {bulkSending ? "Sending..." : `Send Selected (${selectedDonors.length})`}
+                </Button>
+              </div>
             </CardHeader>
 
             <CardContent className="p-0">
@@ -460,8 +913,8 @@ export default function DonationsReportsPage() {
                     <TableHead className="w-[50px]">
                       <Checkbox
                         checked={
-                          selectedDonors.length === filteredTaxDonors.length &&
-                          filteredTaxDonors.length > 0
+                          selectedDonors.length === yearEndDonorTotals.length &&
+                          yearEndDonorTotals.length > 0
                         }
                         onCheckedChange={handleSelectAll}
                       />
@@ -476,7 +929,7 @@ export default function DonationsReportsPage() {
                 </TableHeader>
 
                 <TableBody>
-                  {filteredTaxDonors.map((donor) => (
+                  {yearEndDonorTotals.map((donor) => (
                     <TableRow key={donor.id}>
                       <TableCell>
                         <Checkbox
@@ -485,43 +938,20 @@ export default function DonationsReportsPage() {
                         />
                       </TableCell>
 
-                      <TableCell className="font-medium">
-                        {donor.name}
-                      </TableCell>
+                      <TableCell className="font-medium">{donor.name}</TableCell>
 
-                      <TableCell>
-                        {donor.email || "N/A"}
-                      </TableCell>
+                      <TableCell>{donor.email || "N/A"}</TableCell>
 
-                      <TableCell>
-                        {donor.donationCount}
-                      </TableCell>
+                      <TableCell>{donor.count}</TableCell>
 
-                      <TableCell>
-                        ${donor.total.toLocaleString()}
-                      </TableCell>
+                      <TableCell>${donor.total.toLocaleString()}</TableCell>
 
                       <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setPreviewDonor(donor as any)
-                              setShowPreviewDialog(true)
-                            }}
-                          >
-                            <FileText className="h-4 w-4" />
-                          </Button>
-
-                          <Button variant="ghost" size="sm">
-                            <Printer className="h-4 w-4" />
-                          </Button>
-
-                          <Button variant="ghost" size="sm">
-                            <Send className="h-4 w-4" />
-                          </Button>
-                        </div>
+                        <GivingStatementActions
+                          donorId={donor.id}
+                          donorName={donor.name}
+                          defaultYear={Number(statementYear)}
+                        />
                       </TableCell>
                     </TableRow>
                   ))}

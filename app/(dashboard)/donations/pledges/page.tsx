@@ -52,25 +52,27 @@ import {
   ArrowUpDown,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-
-type calculated_status = "Open" | "Partial" | "Fulfilled";
-
-type DonationPledgeRow = {
-  id: string;
-  organization_id: string;
-  contact_id: string | null;
-  donor_name: string | null;
-  amount: number | string | null;
-  amount_paid: number | string | null;
-  status: string | null;
-  fund_name: string | null;
-  frequency: string | null;
-  start_date: string | null;
-  end_date: string | null;
-};
+import { ensureDonorExtensionForContact } from "@/lib/donations/donor-contact-bridge";
+import { PledgeReminderActions } from "@/components/donations/pledge-reminder-actions";
+import {
+  DonationAttributionFields,
+  EMPTY_DONATION_ATTRIBUTION_VALUE,
+  toAttributionIds,
+  type DonationAttributionValue,
+} from "@/components/donations/donation-attribution-fields";
+import {
+  fetchPledgeAttribution,
+  toPaymentAttributionColumns,
+} from "@/lib/donations/payment-attribution";
+import {
+  pledgeDisplayStatus,
+  pledgeStatusToDb,
+  type PledgeDisplayStatus,
+} from "@/lib/donations/donation-status";
 
 interface Pledge {
   id: string;
+  donorId: string | null;
   contactId: string | null;
   donorName: string;
   donorType: string;
@@ -80,13 +82,17 @@ interface Pledge {
   frequency: string;
   startDate: string;
   nextPayment: string | null;
-  status: calculated_status;
+  status: PledgeDisplayStatus;
   fundName: string;
+  campaignId: string | null;
+  categoryId: string | null;
+  subcategoryId: string | null;
   notes?: string;
 }
 
-interface ContactOption {
+interface DonorOption {
   id: string;
+  contact_id: string;
   full_name: string | null;
   email: string | null;
 }
@@ -120,40 +126,31 @@ function getTodayPlainDate() {
   return new Date(today.getTime() - timezoneOffset).toISOString().slice(0, 10);
 }
 
-function mapStatus(status: string | null, amount: number, paid: number): calculated_status {
-  const normalized = status?.toLowerCase();
-
-  if (normalized === "fulfilled" || normalized === "paid") return "Fulfilled";
-  if (normalized === "partial" || normalized === "partially_paid") return "Partial";
-
-  if (amount > 0 && paid >= amount) return "Fulfilled";
-  if (paid > 0) return "Partial";
-
-  return "Open";
-}
-
 function formatCurrency(value: number) {
   return `$${value.toLocaleString()}`;
 }
 
 function pledgeFromRow(row: any): Pledge {
+  const amountPledged = Number(row.amount_pledged || 0);
+  const amountPaid = Number(row.amount_paid || 0);
+
   return {
     id: row.id,
-    contactId: null,
+    donorId: row.donor_id || null,
+    contactId: row.contact_id || null,
     donorName: row.donor_name || "Unknown donor",
     donorType: "Donor",
-    amount_pledged: Number(row.amount_pledged || 0),
-    amount_paid: Number(row.amount_paid || 0),
-    balance_remaining: Number(row.balance_remaining || 0),
+    amount_pledged: amountPledged,
+    amount_paid: amountPaid,
+    balance_remaining: Number(row.balance_remaining ?? Math.max(amountPledged - amountPaid, 0)),
     frequency: row.frequency || "One-Time",
     startDate: normalizeDateInput(row.pledge_date) || "",
     nextPayment: null,
-    status: mapStatus(
-      row.calculated_status,
-      Number(row.amount_pledged || 0),
-      Number(row.amount_paid || 0)
-    ),
+    status: pledgeDisplayStatus(row.calculated_status, amountPledged, amountPaid),
     fundName: row.campaign_name || "General Fund",
+    campaignId: row.campaign_id || null,
+    categoryId: null,
+    subcategoryId: null,
     notes: row.notes || undefined,
   };
 }
@@ -182,12 +179,14 @@ export default function PledgesPage() {
   const [loadingPledgePayments, setLoadingPledgePayments] = useState(false);
   const [pledgePaymentsError, setPledgePaymentsError] = useState<string | null>(null);
 
-  const [contacts, setContacts] = useState<ContactOption[]>([]);
-  const [contactId, setContactId] = useState("");
+  const [donorOptions, setDonorOptions] = useState<DonorOption[]>([]);
+  const [selectedContactId, setSelectedContactId] = useState("");
 
   const [fundOptions, setFundOptions] = useState<FundOption[]>([]);
 
-  const [campaignId, setCampaignId] = useState("");
+  const [addAttribution, setAddAttribution] = useState<DonationAttributionValue>(
+    EMPTY_DONATION_ATTRIBUTION_VALUE
+  );
   const [amount, setAmount] = useState("");
   const [pledgeDate, setPledgeDate] = useState("");
   const [frequency, setFrequency] = useState("One-Time");
@@ -195,10 +194,12 @@ export default function PledgesPage() {
   const [saving, setSaving] = useState(false);
 
   const [editAmount, setEditAmount] = useState("");
-  const [editFundName, setEditFundName] = useState("");
+  const [editAttribution, setEditAttribution] = useState<DonationAttributionValue>(
+    EMPTY_DONATION_ATTRIBUTION_VALUE
+  );
   const [editPledgeDate, setEditPledgeDate] = useState("");
   const [editFrequency, setEditFrequency] = useState("One-Time");
-  const [editStatus, setEditStatus] = useState<calculated_status>("Open");
+  const [editStatus, setEditStatus] = useState<PledgeDisplayStatus>("Open");
   const [savingEdit, setSavingEdit] = useState(false);
 
   const [paymentAmount, setPaymentAmount] = useState("");
@@ -229,14 +230,14 @@ export default function PledgesPage() {
     return profile.organization_id as string;
   }
 
-  async function searchContacts(searchValue: string, orgIdOverride?: string) {
+  async function searchDonors(searchValue: string, orgIdOverride?: string) {
     const orgId = orgIdOverride || organizationId;
 
     if (!orgId) return;
 
     let query = supabase
       .from("donors")
-      .select("id, full_name, email")
+      .select("id, contact_id, full_name, email")
       .eq("organization_id", orgId)
       .order("full_name", { ascending: true })
       .limit(50);
@@ -249,51 +250,52 @@ export default function PledgesPage() {
     const { data, error } = await query;
 
     if (error) {
-      console.error("Error searching contacts:", JSON.stringify(error, null, 2));
-      setContacts([]);
+      console.error("Error searching donors:", JSON.stringify(error, null, 2));
+      setDonorOptions([]);
       return;
     }
 
-    setContacts((data || []) as ContactOption[]);
-  }
-async function handleDeletePledge(pledgeId: string) {
-  if (!confirm("Delete this pledge? Related payments will stay in Payments but will be unallocated from this pledge.")) return
-
-  const orgId = organizationId || (await getOrgIdForCurrentUser())
-
-  if (!orgId) {
-    alert("No organization found.")
-    return
+    setDonorOptions((data || []) as DonorOption[]);
   }
 
-  const { error: unlinkPaymentsError } = await supabase
-    .from("payments")
-    .update({ pledge_id: null })
-    .eq("pledge_id", pledgeId)
-    .eq("organization_id", orgId)
+  async function handleDeletePledge(pledgeId: string) {
+    if (!confirm("Delete this pledge? Related payments will stay in Payments but will be unallocated from this pledge.")) return;
 
-  if (unlinkPaymentsError) {
-    alert(unlinkPaymentsError.message)
-    return
+    const orgId = organizationId || (await getOrgIdForCurrentUser());
+
+    if (!orgId) {
+      alert("No organization found.");
+      return;
+    }
+
+    const { error: unlinkPaymentsError } = await supabase
+      .from("payments")
+      .update({ pledge_id: null })
+      .eq("pledge_id", pledgeId)
+      .eq("organization_id", orgId);
+
+    if (unlinkPaymentsError) {
+      alert(unlinkPaymentsError.message);
+      return;
+    }
+
+    const { error: pledgeError } = await supabase
+      .from("pledges")
+      .delete()
+      .eq("id", pledgeId)
+      .eq("organization_id", orgId);
+
+    if (pledgeError) {
+      alert(pledgeError.message);
+      return;
+    }
+
+    setSelectedPledge(null);
+    setPaymentPledge(null);
+    setPledgePayments([]);
+
+    await fetchPledges();
   }
-
-  const { error: pledgeError } = await supabase
-    .from("pledge_status_view")
-    .delete()
-    .eq("id", pledgeId)
-    .eq("organization_id", orgId)
-
-  if (pledgeError) {
-    alert(pledgeError.message)
-    return
-  }
-
-  setSelectedPledge(null)
-  setPaymentPledge(null)
-  setPledgePayments([])
-
-  await fetchPledges()
-}
   async function loadFundOptions(orgId: string, currentPledges: Pledge[] = []) {
     const optionsFromPledges = currentPledges
       .map((pledge) => pledge.fundName)
@@ -343,7 +345,7 @@ async function handleDeletePledge(pledgeId: string) {
     if (!orgId) {
       setOrganizationId(null);
       setPledges([]);
-      setContacts([]);
+      setDonorOptions([]);
       setFundOptions([]);
       setLoading(false);
       return;
@@ -351,15 +353,15 @@ async function handleDeletePledge(pledgeId: string) {
 
     setOrganizationId(orgId);
 
-    await searchContacts("", orgId);
+    await searchDonors("", orgId);
 
     const { data: pledgeData, error: pledgeError } = await supabase
-  .from("pledge_status_view")
-  .select(
-    "id, organization_id, donor_id, donor_name, campaign_id, campaign_name, amount_pledged, amount_paid, balance_remaining, calculated_status, frequency, pledge_date, notes"
-  )
-  .eq("organization_id", orgId)
-  .order("pledge_date", { ascending: false });
+      .from("pledge_status_view")
+      .select(
+        "id, organization_id, donor_id, donor_name, campaign_id, campaign_name, amount_pledged, amount_paid, balance_remaining, calculated_status, frequency, pledge_date, notes"
+      )
+      .eq("organization_id", orgId)
+      .order("pledge_date", { ascending: false });
     if (pledgeError) {
       console.error("Error loading donation pledges:", pledgeError);
       setPledges([]);
@@ -367,7 +369,52 @@ async function handleDeletePledge(pledgeId: string) {
       return;
     }
 
-    const mapped = (pledgeData || []).map(pledgeFromRow);
+    const mapped = (pledgeData || [])
+      .filter((row: any) => String(row.calculated_status || "").toLowerCase() !== "cancelled")
+      .map(pledgeFromRow);
+
+    const donorIds = Array.from(
+      new Set(mapped.map((pledge) => pledge.donorId).filter(Boolean))
+    ) as string[];
+
+    if (donorIds.length > 0) {
+      const { data: donorRows } = await supabase
+        .from("donors")
+        .select("id, contact_id")
+        .eq("organization_id", orgId)
+        .in("id", donorIds);
+
+      const contactByDonor = new Map(
+        (donorRows || []).map((row: any) => [row.id as string, row.contact_id as string | null])
+      );
+
+      for (const pledge of mapped) {
+        if (!pledge.contactId && pledge.donorId) {
+          pledge.contactId = contactByDonor.get(pledge.donorId) ?? null;
+        }
+      }
+    }
+
+    const pledgeIds = mapped.map((pledge) => pledge.id);
+    if (pledgeIds.length > 0) {
+      const { data: attributionRows } = await supabase
+        .from("pledges")
+        .select("id, campaign_id, category_id, subcategory_id")
+        .eq("organization_id", orgId)
+        .in("id", pledgeIds);
+
+      const attributionById = new Map(
+        (attributionRows || []).map((row: any) => [row.id as string, row])
+      );
+
+      for (const pledge of mapped) {
+        const attribution = attributionById.get(pledge.id);
+        if (!attribution) continue;
+        pledge.campaignId = (attribution.campaign_id as string | null) ?? pledge.campaignId;
+        pledge.categoryId = (attribution.category_id as string | null) ?? null;
+        pledge.subcategoryId = (attribution.subcategory_id as string | null) ?? null;
+      }
+    }
 
     setPledges(mapped);
     await loadFundOptions(orgId, mapped);
@@ -380,7 +427,7 @@ async function handleDeletePledge(pledgeId: string) {
 
     const { data, error } = await supabase
       .from("payments")
-      .select("id, amount, payment_date, source, payment_method")
+      .select("id, amount, payment_date, source, memo")
       .eq("organization_id", orgId)
       .eq("pledge_id", pledgeId)
       .order("payment_date", { ascending: false });
@@ -397,8 +444,8 @@ async function handleDeletePledge(pledgeId: string) {
       id: payment.id,
       amount: payment.amount,
       payment_date: normalizeDateInput(payment.payment_date),
-      source: payment.payment_method || payment.source,
-      memo: null,
+      source: payment.source,
+      memo: payment.memo,
     }));
 
     setPledgePayments(mappedPayments);
@@ -422,8 +469,8 @@ async function handleDeletePledge(pledgeId: string) {
   }, [selectedPledge, organizationId]);
 
   const resetAddPledgeForm = () => {
-    setContactId("");
-    setCampaignId("");
+    setSelectedContactId("");
+    setAddAttribution(EMPTY_DONATION_ATTRIBUTION_VALUE);
     setAmount("");
     setPledgeDate("");
     setFrequency("One-Time");
@@ -442,7 +489,11 @@ async function handleDeletePledge(pledgeId: string) {
   const openEditPledge = (pledge: Pledge) => {
     setEditingPledge(pledge);
     setEditAmount(String(pledge.amount_pledged || ""));
-    setEditFundName(pledge.fundName || "General Fund");
+    setEditAttribution({
+      campaignId: pledge.campaignId || "",
+      categoryId: pledge.categoryId || "",
+      subcategoryId: pledge.subcategoryId || "",
+    });
     setEditPledgeDate(pledge.startDate || "");
     setEditFrequency(pledge.frequency || "One-Time");
     setEditStatus(pledge.status || "Open");
@@ -456,8 +507,8 @@ async function handleDeletePledge(pledgeId: string) {
       return;
     }
 
-    if (!contactId) {
-      alert("Please select a contact.");
+    if (!selectedContactId) {
+      alert("Please select a donor.");
       return;
     }
 
@@ -466,21 +517,27 @@ async function handleDeletePledge(pledgeId: string) {
       return;
     }
 
-    const selectedContact = contacts.find((contact) => contact.id === contactId);
-
     setSaving(true);
 
+    const donorId = await ensureDonorExtensionForContact(orgId, selectedContactId);
+
+    if (!donorId) {
+      setSaving(false);
+      alert("Could not resolve a donor record for the selected contact.");
+      return;
+    }
+
     const { error } = await supabase.from("pledges").insert({
-  organization_id: orgId,
-  donor_id: contactId,
-  campaign_id: campaignId || null,
-  amount_pledged: Number(amount),
-  pledge_date: normalizeDateInput(pledgeDate) || getTodayPlainDate(),
-  pledge_type: frequency.toLowerCase().replace("-", "_"),
-frequency: frequency.toLowerCase().replace("-", "_"),
-  status: "open",
-  notes: notes || null,
-});
+      organization_id: orgId,
+      donor_id: donorId,
+      ...toAttributionIds(addAttribution),
+      amount_pledged: Number(amount),
+      pledge_date: normalizeDateInput(pledgeDate) || getTodayPlainDate(),
+      pledge_type: frequency.toLowerCase().replace("-", "_"),
+      frequency: frequency.toLowerCase().replace("-", "_"),
+      status: "open",
+      notes: notes || null,
+    });
 
     setSaving(false);
 
@@ -496,9 +553,9 @@ frequency: frequency.toLowerCase().replace("-", "_"),
 
   const refreshSelectedPledge = async (pledgeId: string, orgId: string) => {
     const { data, error } = await supabase
-      .from("donation_pledges")
+      .from("pledge_status_view")
       .select(
-        "id, organization_id, contact_id, donor_name, amount, amount_paid, status, fund_name, frequency, start_date, end_date"
+        "id, organization_id, donor_id, donor_name, campaign_id, campaign_name, amount_pledged, amount_paid, balance_remaining, calculated_status, frequency, pledge_date, notes"
       )
       .eq("organization_id", orgId)
       .eq("id", pledgeId)
@@ -506,7 +563,7 @@ frequency: frequency.toLowerCase().replace("-", "_"),
 
     if (error || !data) return;
 
-    const updatedPledge = pledgeFromRow(data as DonationPledgeRow);
+    const updatedPledge = pledgeFromRow(data);
 
     setSelectedPledge(updatedPledge);
     setPaymentPledge(updatedPledge);
@@ -530,13 +587,13 @@ frequency: frequency.toLowerCase().replace("-", "_"),
     setSavingEdit(true);
 
     const { error } = await supabase
-      .from("donation_pledges")
+      .from("pledges")
       .update({
-        amount: Number(editAmount),
-        fund_name: editFundName || "General Fund",
-        frequency: editFrequency,
-        start_date: normalizeDateInput(editPledgeDate) || getTodayPlainDate(),
-        status: editStatus,
+        amount_pledged: Number(editAmount),
+        ...toAttributionIds(editAttribution),
+        pledge_date: normalizeDateInput(editPledgeDate) || getTodayPlainDate(),
+        frequency: editFrequency.toLowerCase().replace("-", "_"),
+        status: pledgeStatusToDb(editStatus),
       })
       .eq("id", editingPledge.id)
       .eq("organization_id", orgId);
@@ -573,25 +630,35 @@ frequency: frequency.toLowerCase().replace("-", "_"),
 
     setSavingPayment(true);
 
-    const newPaidAmount = Number(paymentPledge.amount_paid || 0) + Number(paymentAmount || 0);
-    const newStatus =
-      newPaidAmount >= Number(paymentPledge.amount_pledged || 0)
-        ? "Fulfilled"
-        : newPaidAmount > 0
-          ? "Partial"
-          : "Open";
+    let contactId = paymentPledge.contactId;
+
+    if (!contactId && paymentPledge.donorId) {
+      const { data: donorRow } = await supabase
+        .from("donors")
+        .select("contact_id")
+        .eq("id", paymentPledge.donorId)
+        .maybeSingle();
+
+      contactId = (donorRow?.contact_id as string | null) ?? null;
+    }
+
+    const paymentDateValue = normalizeDateInput(paymentDate) || getTodayPlainDate();
+    const pledgeAttribution = await fetchPledgeAttribution(supabase, paymentPledge.id);
 
     const { error: paymentError } = await supabase.from("payments").insert({
       organization_id: orgId,
-      contact_id: paymentPledge.contactId,
+      donor_id: paymentPledge.donorId,
+      contact_id: contactId,
       pledge_id: paymentPledge.id,
-      donor_name: paymentPledge.donorName,
+      sender_name: paymentPledge.donorName,
       amount: Number(paymentAmount),
-      payment_date: normalizeDateInput(paymentDate) || getTodayPlainDate(),
+      payment_date: `${paymentDateValue}T12:00:00`,
       source: paymentSource,
-      payment_method: paymentSource,
-      fund_name: paymentPledge.fundName,
-      status: "Allocated",
+      source_type: "manual",
+      memo: paymentMemo || null,
+      status: "allocated",
+      is_verified: false,
+      ...toPaymentAttributionColumns(pledgeAttribution),
     });
 
     if (paymentError) {
@@ -600,21 +667,21 @@ frequency: frequency.toLowerCase().replace("-", "_"),
       return;
     }
 
-    const { error: pledgeUpdateError } = await supabase
-      .from("donation_pledges")
-      .update({
-        amount_paid: newPaidAmount,
-        status: newStatus,
-      })
-      .eq("id", paymentPledge.id)
-      .eq("organization_id", orgId);
+    if (contactId || paymentPledge.donorId) {
+      try {
+        const { handleDonationAffiliationSync } = await import(
+          "@/lib/contacts/contact-affiliation-sync"
+        );
+        await handleDonationAffiliationSync({
+          donorId: paymentPledge.donorId,
+          contactId,
+        });
+      } catch (syncError) {
+        console.warn("Donation affiliation sync failed:", syncError);
+      }
+    }
 
     setSavingPayment(false);
-
-    if (pledgeUpdateError) {
-      alert(pledgeUpdateError.message);
-      return;
-    }
 
     resetPaymentForm();
     setShowPaymentDialog(false);
@@ -651,7 +718,7 @@ frequency: frequency.toLowerCase().replace("-", "_"),
   const totalRemaining = pledges.reduce((sum, pledge) => sum + pledge.balance_remaining, 0);
   const activePledges = pledges.filter((pledge) => pledge.status !== "Fulfilled").length;
 
-  const getStatusBadge = (status: calculated_status) => {
+  const getStatusBadge = (status: PledgeDisplayStatus) => {
     switch (status) {
       case "Open":
         return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">Open</Badge>;
@@ -664,7 +731,7 @@ frequency: frequency.toLowerCase().replace("-", "_"),
     }
   };
 
-  const filteredContactOptions = contacts;
+  const filteredDonorOptions = donorOptions;
 
   return (
     <>
@@ -884,7 +951,15 @@ frequency: frequency.toLowerCase().replace("-", "_"),
                             >
                               Edit Pledge
                             </DropdownMenuItem>
-                            <DropdownMenuItem>Send Reminder</DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                setSelectedPledge(pledge);
+                              }}
+                            >
+                              Collection / Reminder
+                            </DropdownMenuItem>
                             <DropdownMenuItem
   className="text-red-600"
   onClick={(event) => {
@@ -928,41 +1003,41 @@ frequency: frequency.toLowerCase().replace("-", "_"),
                   setDonorSearch(value);
                   setShowDonorList(true);
 
-                  await searchContacts(value.trim());
+                  await searchDonors(value.trim());
                 }}
               />
 
-              {contactId && (
+              {selectedContactId && (
                 <div className="text-sm text-muted-foreground">
                   Selected:{" "}
                   <span className="font-medium">
-                    {contacts.find((contact) => contact.id === contactId)?.full_name ||
-                      contacts.find((contact) => contact.id === contactId)?.email}
+                    {donorOptions.find((donor) => donor.contact_id === selectedContactId)?.full_name ||
+                      donorOptions.find((donor) => donor.contact_id === selectedContactId)?.email}
                   </span>
                 </div>
               )}
 
               {showDonorList && (
                 <div className="max-h-48 overflow-y-auto rounded-md border">
-                  {filteredContactOptions.length === 0 ? (
+                  {filteredDonorOptions.length === 0 ? (
                     <div className="px-3 py-2 text-sm text-muted-foreground">
-                      No contacts found.
+                      No donors found.
                     </div>
                   ) : (
-                    filteredContactOptions.map((contact) => (
+                    filteredDonorOptions.map((donor) => (
                       <button
-                        key={contact.id}
+                        key={donor.id}
                         type="button"
                         className={`block w-full px-3 py-2 text-left text-sm hover:bg-muted ${
-                          contactId === contact.id ? "bg-muted font-medium" : ""
+                          selectedContactId === donor.contact_id ? "bg-muted font-medium" : ""
                         }`}
                         onClick={() => {
-                          setContactId(contact.id);
-                          setDonorSearch(contact.full_name || contact.email || "");
+                          setSelectedContactId(donor.contact_id);
+                          setDonorSearch(donor.full_name || donor.email || "");
                           setShowDonorList(false);
                         }}
                       >
-                        {contact.full_name || contact.email || "Unnamed contact"}
+                        {donor.full_name || donor.email || "Unnamed donor"}
                       </button>
                     ))
                   )}
@@ -970,40 +1045,28 @@ frequency: frequency.toLowerCase().replace("-", "_"),
               )}
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="total-amount">Total Amount</Label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                    $
-                  </span>
-                  <Input
-                    id="total-amount"
-                    type="number"
-                    placeholder="0.00"
-                    className="pl-7"
-                    value={amount}
-                    onChange={(event) => setAmount(event.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="fund">Fund</Label>
-                <Select value={campaignId} onValueChange={setCampaignId}>
-                  <SelectTrigger id="fund">
-                    <SelectValue placeholder="Select a campaign or fund" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {pledgeFundOptions.map((fund) => (
-                      <SelectItem key={fund.id} value={fund.id}>
-                        {fund.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="total-amount">Total Amount</Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                  $
+                </span>
+                <Input
+                  id="total-amount"
+                  type="number"
+                  placeholder="0.00"
+                  className="pl-7"
+                  value={amount}
+                  onChange={(event) => setAmount(event.target.value)}
+                />
               </div>
             </div>
+
+            <DonationAttributionFields
+              organizationId={organizationId}
+              value={addAttribution}
+              onChange={setAddAttribution}
+            />
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-2">
@@ -1041,9 +1104,6 @@ frequency: frequency.toLowerCase().replace("-", "_"),
                 value={notes}
                 onChange={(event) => setNotes(event.target.value)}
               />
-              <p className="text-xs text-muted-foreground">
-                Notes are not saved yet because the shared donation_pledges table does not currently have a notes column.
-              </p>
             </div>
           </div>
 
@@ -1096,20 +1156,12 @@ frequency: frequency.toLowerCase().replace("-", "_"),
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="edit-fund">Fund</Label>
-                  <Select value={editFundName || "General Fund"} onValueChange={setEditFundName}>
-                    <SelectTrigger id="edit-fund">
-                      <SelectValue placeholder="Select a campaign or fund" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {pledgeFundOptions.map((fund) => (
-                        <SelectItem key={fund.id} value={fund.id}>
-                          {fund.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div className="flex flex-col gap-2 sm:col-span-2">
+                  <DonationAttributionFields
+                    organizationId={organizationId}
+                    value={editAttribution}
+                    onChange={setEditAttribution}
+                  />
                 </div>
               </div>
 
@@ -1142,7 +1194,7 @@ frequency: frequency.toLowerCase().replace("-", "_"),
 
               <div className="flex flex-col gap-2">
                 <Label htmlFor="edit-status">Status</Label>
-                <Select value={editStatus} onValueChange={(value) => setEditStatus(value as calculated_status)}>
+                <Select value={editStatus} onValueChange={(value) => setEditStatus(value as PledgeDisplayStatus)}>
                   <SelectTrigger id="edit-status">
                     <SelectValue />
                   </SelectTrigger>
@@ -1223,9 +1275,6 @@ frequency: frequency.toLowerCase().replace("-", "_"),
                   value={paymentMemo}
                   onChange={(event) => setPaymentMemo(event.target.value)}
                 />
-                <p className="text-xs text-muted-foreground">
-                  Memo is not saved yet because the shared donation_payments table does not currently have a memo column.
-                </p>
               </div>
             </div>
           )}
@@ -1337,6 +1386,19 @@ frequency: frequency.toLowerCase().replace("-", "_"),
                 <div className="rounded-lg bg-muted/50 p-4">
                   <p className="mb-1 text-xs font-medium text-muted-foreground">Notes</p>
                   <p className="text-sm">{selectedPledge.notes}</p>
+                </div>
+              )}
+
+              {selectedPledge.balance_remaining > 0.009 && (
+                <div className="rounded-lg border p-4">
+                  <p className="mb-3 text-sm font-medium">Pledge Collection</p>
+                  <PledgeReminderActions
+                    pledgeId={selectedPledge.id}
+                    donorName={selectedPledge.donorName}
+                    onUpdated={() => {
+                      if (organizationId) refreshSelectedPledge(selectedPledge.id, organizationId);
+                    }}
+                  />
                 </div>
               )}
 

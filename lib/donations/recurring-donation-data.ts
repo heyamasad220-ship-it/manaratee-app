@@ -1,0 +1,241 @@
+import type { SupabaseClient } from "@supabase/supabase-js"
+import {
+  monthlyEquivalentAmount,
+  type RecurringDashboardMetrics,
+  type RecurringDonationPlan,
+  type RecurringDonorSummary,
+  type RecurringPlanWithDonor,
+  type RecurringReportingSummary,
+  type RecurringStatus,
+} from "@/lib/donations/recurring-donation-types"
+
+function isVoidedPayment(status: string | null | undefined): boolean {
+  return String(status || "").toLowerCase() === "voided"
+}
+
+export async function fetchRecurringPlans(
+  supabase: SupabaseClient,
+  organizationId: string,
+  filters?: { status?: RecurringStatus; donorId?: string }
+): Promise<RecurringPlanWithDonor[]> {
+  let query = supabase
+    .from("recurring_donation_plans")
+    .select(
+      "*, donors(full_name, email), campaigns(name)"
+    )
+    .eq("organization_id", organizationId)
+    .order("next_payment_date", { ascending: true })
+
+  if (filters?.status) query = query.eq("status", filters.status)
+  if (filters?.donorId) query = query.eq("donor_id", filters.donorId)
+
+  const { data, error } = await query
+  if (error) throw new Error(error.message)
+
+  return (data || []).map((row: any) => ({
+    id: row.id,
+    organization_id: row.organization_id,
+    donor_id: row.donor_id,
+    contact_id: row.contact_id,
+    campaign_id: row.campaign_id,
+    category_id: row.category_id,
+    subcategory_id: row.subcategory_id,
+    payment_method_id: row.payment_method_id,
+    amount: Number(row.amount || 0),
+    frequency: row.frequency,
+    status: row.status,
+    start_date: row.start_date,
+    next_payment_date: row.next_payment_date,
+    end_date: row.end_date,
+    notes: row.notes,
+    external_processor: row.external_processor,
+    external_processor_id: row.external_processor_id,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    donor_name: row.donors?.full_name ?? null,
+    donor_email: row.donors?.email ?? null,
+    campaign_name: row.campaigns?.name ?? null,
+  }))
+}
+
+export async function buildRecurringDashboardMetrics(
+  supabase: SupabaseClient,
+  organizationId: string
+): Promise<RecurringDashboardMetrics> {
+  const plans = await fetchRecurringPlans(supabase, organizationId)
+
+  const activePlans = plans.filter((p) => p.status === "active")
+  const pausedPlans = plans.filter((p) => p.status === "paused")
+  const cancelledPlans = plans.filter((p) => p.status === "cancelled")
+
+  const activeDonorIds = new Set(activePlans.map((p) => p.donor_id))
+
+  let monthlyRecurringRevenue = 0
+  for (const plan of activePlans) {
+    monthlyRecurringRevenue += monthlyEquivalentAmount(plan.amount, plan.frequency)
+  }
+
+  const now = new Date()
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+
+  const upcomingThisMonth = activePlans.filter((plan) => {
+    const next = new Date(plan.next_payment_date + "T00:00:00")
+    return next >= monthStart && next <= monthEnd
+  }).length
+
+  const { data: recurringPayments } = await supabase
+    .from("payments")
+    .select("amount, status")
+    .eq("organization_id", organizationId)
+    .not("recurring_donation_plan_id", "is", null)
+
+  const actualRecurringRevenue = (recurringPayments || [])
+    .filter((p) => !isVoidedPayment(p.status))
+    .reduce((sum, p) => sum + Number(p.amount || 0), 0)
+
+  return {
+    activeDonorCount: activeDonorIds.size,
+    activePlanCount: activePlans.length,
+    pausedPlanCount: pausedPlans.length,
+    cancelledPlanCount: cancelledPlans.length,
+    monthlyRecurringRevenue,
+    annualRecurringRevenue: monthlyRecurringRevenue * 12,
+    actualRecurringRevenue,
+    upcomingThisMonth,
+  }
+}
+
+export async function buildRecurringDonorSummary(
+  supabase: SupabaseClient,
+  organizationId: string,
+  donorId: string
+): Promise<RecurringDonorSummary> {
+  const activePlans = await fetchRecurringPlans(supabase, organizationId, { donorId })
+
+  const { data: payments, error } = await supabase
+    .from("payments")
+    .select("id, amount, payment_date, source, status, recurring_donation_plan_id")
+    .eq("organization_id", organizationId)
+    .eq("donor_id", donorId)
+    .not("recurring_donation_plan_id", "is", null)
+    .order("payment_date", { ascending: false })
+
+  if (error) throw new Error(error.message)
+
+  const paymentHistory = (payments || [])
+    .filter((p) => !isVoidedPayment(p.status))
+    .map((p) => ({
+      id: p.id,
+      amount: Number(p.amount || 0),
+      payment_date: p.payment_date,
+      source: p.source,
+      recurring_donation_plan_id: p.recurring_donation_plan_id,
+    }))
+
+  const lifetimeRecurringGiving = paymentHistory.reduce((sum, p) => sum + p.amount, 0)
+
+  return {
+    donorId,
+    activePlans: activePlans.filter((p) => p.status === "active" || p.status === "paused"),
+    paymentHistory,
+    lifetimeRecurringGiving,
+  }
+}
+
+export async function buildRecurringReportingSummary(
+  supabase: SupabaseClient,
+  organizationId: string
+): Promise<RecurringReportingSummary> {
+  const { data: payments, error } = await supabase
+    .from("payments")
+    .select(
+      "id, amount, status, donor_id, campaign_id, recurring_donation_plan_id, donors(full_name), campaigns(name)"
+    )
+    .eq("organization_id", organizationId)
+    .not("recurring_donation_plan_id", "is", null)
+
+  if (error) throw new Error(error.message)
+
+  const validPayments = (payments || []).filter((p) => !isVoidedPayment(p.status))
+
+  const donorIds = new Set<string>()
+  let totalRecurringRevenue = 0
+
+  const byCampaignMap = new Map<
+    string,
+    { campaignId: string | null; campaignName: string; total: number; donorIds: Set<string> }
+  >()
+  const byDonorMap = new Map<
+    string,
+    { donorId: string; donorName: string; total: number; planIds: Set<string> }
+  >()
+
+  for (const payment of validPayments) {
+    const amount = Number(payment.amount || 0)
+    totalRecurringRevenue += amount
+    if (payment.donor_id) donorIds.add(payment.donor_id)
+
+    const campaignKey = payment.campaign_id || "none"
+    const campaignEntry =
+      byCampaignMap.get(campaignKey) ||
+      ({
+        campaignId: payment.campaign_id,
+        campaignName: (payment as any).campaigns?.name || "No Campaign",
+        total: 0,
+        donorIds: new Set<string>(),
+      } as const)
+    const campaignMutable = {
+      campaignId: campaignEntry.campaignId,
+      campaignName: campaignEntry.campaignName,
+      total: campaignEntry.total,
+      donorIds: new Set(campaignEntry.donorIds),
+    }
+    campaignMutable.total += amount
+    if (payment.donor_id) campaignMutable.donorIds.add(payment.donor_id)
+    byCampaignMap.set(campaignKey, campaignMutable)
+
+    if (payment.donor_id) {
+      const donorEntry =
+        byDonorMap.get(payment.donor_id) ||
+        ({
+          donorId: payment.donor_id,
+          donorName: (payment as any).donors?.full_name || "Unknown Donor",
+          total: 0,
+          planIds: new Set<string>(),
+        } as const)
+      const donorMutable = {
+        donorId: donorEntry.donorId,
+        donorName: donorEntry.donorName,
+        total: donorEntry.total,
+        planIds: new Set(donorEntry.planIds),
+      }
+      donorMutable.total += amount
+      if (payment.recurring_donation_plan_id) {
+        donorMutable.planIds.add(payment.recurring_donation_plan_id)
+      }
+      byDonorMap.set(payment.donor_id, donorMutable)
+    }
+  }
+
+  return {
+    recurringDonorCount: donorIds.size,
+    totalRecurringRevenue,
+    byCampaign: [...byCampaignMap.values()]
+      .map((entry) => ({
+        campaignId: entry.campaignId,
+        campaignName: entry.campaignName,
+        total: entry.total,
+        donorCount: entry.donorIds.size,
+      }))
+      .sort((a, b) => b.total - a.total),
+    byDonor: [...byDonorMap.values()]
+      .map((entry) => ({
+        donorId: entry.donorId,
+        donorName: entry.donorName,
+        total: entry.total,
+        planCount: entry.planIds.size,
+      }))
+      .sort((a, b) => b.total - a.total),
+  }
+}

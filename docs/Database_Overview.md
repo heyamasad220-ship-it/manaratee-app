@@ -197,7 +197,13 @@ program_financial_assistance_status_history.financial_assistance_id → program_
 
 ## Donations, Pledges, and Payments
 
-* campaigns
+**Canonical ledger (active writes, June 2026 stabilization):** `payments`, `pledges`, `donors` (+ `contacts` for identity). Staff and customer portal now insert only into these tables.
+
+**Dev seed:** `scripts/seed-donations-dev.mjs` inserts test data into canonical tables only (see `docs/Features.md` Donations section). Does not migrate `backup_*` or legacy `donation_*` rows.
+
+**`payments.source` constraint:** lowercase channel keys only (`cash`, `check`, `zelle`, `venmo`, `paypal`, `stripe`, `import`, `manual`). Customer portal normalizes configured payment method display names via `lib/donations/payment-source-channel.ts` before insert.
+
+* campaigns (`goal_amount`, `description`, `start_date`, `end_date`, `status`, `code`)
 * donors
 * donation_categories
 * donation_subcategories
@@ -209,6 +215,17 @@ program_financial_assistance_status_history.financial_assistance_id → program_
 * payment_methods
 * donor_summary_view
 * pledge_status_view
+* donation_settings (receipt + pledge reminder config per org — migrations `090`, `091`)
+* donation_receipts (payment receipts + annual statements — canonical payments only)
+* pledge_reminders (pledge collection reminder activity log — migration `091`)
+* recurring_donation_plans (ongoing giving schedules — migration `092`; not pledges)
+* donation_checkout_sessions (in-flight Stripe Checkout — migration `093`; not a payment ledger)
+* payment_processor_events (Stripe webhook audit + idempotency — migration `093`)
+* transactional_email_log (operational donation email audit — migration `094`)
+
+**Stripe processor columns on `payments` (migration `093`):** `stripe_checkout_session_id`, `stripe_payment_intent_id`, `stripe_charge_id`, `refunded_amount`. Unique partial index on `stripe_payment_intent_id`. Online card donations are inserted only via webhook (`source_type = processor`, `source = stripe`).
+
+**Transactional email (migration `094`):** `transactional_email_log` tracks receipt, year-end statement, and pledge reminder sends. `donation_receipts.status` includes `failed`. `donation_settings.year_end_statement_email_template` for statement email body.
 
 Key relationships:
 
@@ -241,6 +258,42 @@ payments.campaign_id → campaigns.id
 payments.category_id → donation_categories.id
 payments.subcategory_id → donation_subcategories.id
 payments.payment_method_id → payment_methods.id
+
+donation_settings.organization_id → organizations.id
+donation_receipts.organization_id → organizations.id
+donation_receipts.payment_id → payments.id
+donation_receipts.donor_id → donors.id
+donation_receipts.contact_id → contacts.id
+donation_receipts.sent_by → auth.users.id
+
+pledge_reminders.organization_id → organizations.id
+pledge_reminders.pledge_id → pledges.id
+pledge_reminders.donor_id → donors.id
+pledge_reminders.contact_id → contacts.id
+pledge_reminders.sent_by → auth.users.id
+
+recurring_donation_plans.organization_id → organizations.id
+recurring_donation_plans.donor_id → donors.id
+recurring_donation_plans.contact_id → contacts.id
+recurring_donation_plans.campaign_id → campaigns.id
+recurring_donation_plans.category_id → donation_categories.id
+recurring_donation_plans.subcategory_id → donation_subcategories.id
+recurring_donation_plans.payment_method_id → payment_methods.id
+payments.recurring_donation_plan_id → recurring_donation_plans.id
+
+donation_checkout_sessions.organization_id → organizations.id
+donation_checkout_sessions.donor_id → donors.id
+donation_checkout_sessions.contact_id → contacts.id
+donation_checkout_sessions.campaign_id → campaigns.id
+donation_checkout_sessions.category_id → donation_categories.id
+donation_checkout_sessions.subcategory_id → donation_subcategories.id
+donation_checkout_sessions.payment_id → payments.id
+
+payment_processor_events.organization_id → organizations.id
+payment_processor_events.payment_id → payments.id
+payment_processor_events.checkout_session_id → donation_checkout_sessions.id
+
+transactional_email_log.organization_id → organizations.id
 ```
 
 ---
