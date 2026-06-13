@@ -118,6 +118,8 @@ ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Staff view org payments" ON public.payments;
 DROP POLICY IF EXISTS "Staff manage org payments" ON public.payments;
+DROP POLICY IF EXISTS "Staff update org payments" ON public.payments;
+DROP POLICY IF EXISTS "Staff delete org payments" ON public.payments;
 DROP POLICY IF EXISTS "Customers view own payments" ON public.payments;
 DROP POLICY IF EXISTS "Customers insert own portal payments" ON public.payments;
 
@@ -163,6 +165,8 @@ ALTER TABLE public.pledges ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Staff view org pledges" ON public.pledges;
 DROP POLICY IF EXISTS "Staff manage org pledges" ON public.pledges;
+DROP POLICY IF EXISTS "Staff update org pledges" ON public.pledges;
+DROP POLICY IF EXISTS "Staff delete org pledges" ON public.pledges;
 DROP POLICY IF EXISTS "Customers view own pledges" ON public.pledges;
 DROP POLICY IF EXISTS "Customers insert own pledges" ON public.pledges;
 
@@ -206,6 +210,8 @@ ALTER TABLE public.donors ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Staff view org donors" ON public.donors;
 DROP POLICY IF EXISTS "Staff manage org donors" ON public.donors;
+DROP POLICY IF EXISTS "Staff update org donors" ON public.donors;
+DROP POLICY IF EXISTS "Staff delete org donors" ON public.donors;
 DROP POLICY IF EXISTS "Customers view own donor profile" ON public.donors;
 DROP POLICY IF EXISTS "Customers create own donor profile" ON public.donors;
 
@@ -249,6 +255,8 @@ CREATE POLICY "Customers create own donor profile"
 DROP POLICY IF EXISTS "Org members manage recurring donation plans" ON public.recurring_donation_plans;
 DROP POLICY IF EXISTS "Staff view recurring donation plans" ON public.recurring_donation_plans;
 DROP POLICY IF EXISTS "Staff manage recurring donation plans" ON public.recurring_donation_plans;
+DROP POLICY IF EXISTS "Staff update recurring donation plans" ON public.recurring_donation_plans;
+DROP POLICY IF EXISTS "Staff delete recurring donation plans" ON public.recurring_donation_plans;
 
 CREATE POLICY "Staff view recurring donation plans"
   ON public.recurring_donation_plans FOR SELECT
@@ -278,6 +286,8 @@ CREATE POLICY "Staff manage donation settings"
 DROP POLICY IF EXISTS "Org members manage donation receipts" ON public.donation_receipts;
 DROP POLICY IF EXISTS "Staff view donation receipts" ON public.donation_receipts;
 DROP POLICY IF EXISTS "Staff manage donation receipts" ON public.donation_receipts;
+DROP POLICY IF EXISTS "Staff update donation receipts" ON public.donation_receipts;
+DROP POLICY IF EXISTS "Staff delete donation receipts" ON public.donation_receipts;
 
 CREATE POLICY "Staff view donation receipts"
   ON public.donation_receipts FOR SELECT
@@ -299,6 +309,8 @@ CREATE POLICY "Staff delete donation receipts"
 DROP POLICY IF EXISTS "Org members manage pledge reminders" ON public.pledge_reminders;
 DROP POLICY IF EXISTS "Staff view pledge reminders" ON public.pledge_reminders;
 DROP POLICY IF EXISTS "Staff manage pledge reminders" ON public.pledge_reminders;
+DROP POLICY IF EXISTS "Staff update pledge reminders" ON public.pledge_reminders;
+DROP POLICY IF EXISTS "Staff delete pledge reminders" ON public.pledge_reminders;
 
 CREATE POLICY "Staff view pledge reminders"
   ON public.pledge_reminders FOR SELECT
