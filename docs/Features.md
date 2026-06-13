@@ -77,6 +77,7 @@ Completed:
 * Unauthorized page
 * Permission-aware sidebar
 * Subscription-aware modules
+* **Org subscription view (June 2026):** `/settings/subscription` — read-only plan bundle price, persona bundle, and enabled modules (`lib/organizations/organization-subscription-summary.ts`). Requires `settings.users.view` (owners always). Plan changes remain platform-admin managed.
 
 ---
 

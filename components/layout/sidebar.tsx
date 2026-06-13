@@ -507,6 +507,7 @@ function buildNavItems(rows: SidebarModuleRow[], permissionContext: UserPermissi
       children: [
         { label: "Users", href: "/settings/users", matchPrefix: "/settings/users", permissionKey: "settings.users.view" },
         { label: "Roles & Permissions", href: "/settings/roles-permissions", matchPrefix: "/settings/roles-permissions", permissionKey: "settings.roles.view" },
+        { label: "Subscription", href: "/settings/subscription", matchPrefix: "/settings/subscription", permissionKey: "settings.users.view" },
       ],
     },
   ]
