@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { createClient } from "@/lib/supabase/client"
 import { Header } from "@/components/layout/header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -29,17 +28,31 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination"
 import { Download, Heart, DollarSign, Users, TrendingUp, FileText, Send, Printer, Target } from "lucide-react"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
 import { CampaignProgressBar } from "@/components/donations/campaign-progress-bar"
 import { GivingStatementActions } from "@/components/donations/giving-statement-actions"
-import { getReceiptReportingSummaryAction, sendBulkAnnualStatementsAction } from "@/lib/donations/receipt-actions"
+import { sendBulkAnnualStatementsAction } from "@/lib/donations/receipt-actions"
 import { getPledgeCollectionReportAction } from "@/lib/donations/pledge-reminder-actions"
-import { getRecurringReportingSummaryAction } from "@/lib/donations/recurring-donation-actions"
+import { DONATIONS_PAGE_SIZE } from "@/lib/donations/donation-pagination"
 import {
-  buildCampaignAnalytics,
-  fetchCampaignAnalyticsData,
+  getDonationReportsOverviewAction,
+  getDonationReportsCampaignsAction,
+  getDonationReportsDonorsAction,
+  getDonationReportsPaymentsAction,
+  getDonationTaxYearTotalsAction,
+  getRecurringReportSummaryAction,
+} from "@/lib/donations/donation-reports-actions"
+import { getReceiptReportingSummaryAction } from "@/lib/donations/receipt-actions"
+import {
   formatDonationCurrency,
   type CampaignAnalyticsEntry,
 } from "@/lib/donations/campaign-analytics"
@@ -55,8 +68,6 @@ interface Payment {
   amount?: number | null
   payment_date?: string | null
   source?: string | null
-  category_id?: string | null
-  pledge_id?: string | null
   status?: string | null
 }
 
@@ -64,27 +75,33 @@ interface DonorSummary {
   id: string
   full_name: string | null
   email: string | null
-  donor_type: string | null
   donation_count: number | null
   total_donations: number | null
-  last_donation_date: string | null
-  has_open_pledge: boolean | null
 }
 
 export default function DonationsReportsPage() {
-  const supabase = createClient()
-
   const [activeTab, setActiveTab] = useState<ReportsTab>("Overview")
   const [dateRange, setDateRange] = useState("30d")
-  const [taxSearch, setTaxSearch] = useState("")
   const [selectedDonors, setSelectedDonors] = useState<string[]>([])
   const [showPreviewDialog, setShowPreviewDialog] = useState(false)
   const [previewDonor, setPreviewDonor] = useState<DonorSummary | null>(null)
 
+  const [overview, setOverview] = useState({
+    totalDonations: 0,
+    paymentCount: 0,
+    averageDonation: 0,
+    donorCount: 0,
+  })
+  const [topDonors, setTopDonors] = useState<DonorSummary[]>([])
   const [payments, setPayments] = useState<Payment[]>([])
+  const [paymentsPage, setPaymentsPage] = useState(1)
+  const [paymentsTotal, setPaymentsTotal] = useState(0)
   const [donors, setDonors] = useState<DonorSummary[]>([])
+  const [donorsPage, setDonorsPage] = useState(1)
+  const [donorsTotal, setDonorsTotal] = useState(0)
   const [campaignEntries, setCampaignEntries] = useState<CampaignAnalyticsEntry[]>([])
   const [loading, setLoading] = useState(true)
+  const [tabLoading, setTabLoading] = useState(false)
   const [receiptSummary, setReceiptSummary] = useState<{
     receiptsGenerated: number
     receiptsSent: number
@@ -115,81 +132,123 @@ export default function DonationsReportsPage() {
     byDonor: Array<{ donorId: string; donorName: string; total: number; planCount: number }>
   } | null>(null)
   const [statementYear, setStatementYear] = useState(String(new Date().getFullYear()))
+  const [yearEndDonorTotals, setYearEndDonorTotals] = useState<
+    Array<{ id: string; name: string; email: string; total: number; count: number }>
+  >([])
   const [bulkSending, setBulkSending] = useState(false)
 
-  async function getOrganizationId() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) return null
-
-    const { data } = await supabase
-      .from("profiles")
-      .select("organization_id")
-      .eq("id", user.id)
-      .single()
-
-    return data?.organization_id || null
-  }
-
   useEffect(() => {
-    async function loadData() {
+    async function loadOverview() {
       setLoading(true)
 
-      const orgId = await getOrganizationId()
+      const [overviewResult, topDonorsResult, receiptResult, collectionResult, recurringResult] =
+        await Promise.all([
+          getDonationReportsOverviewAction(),
+          getDonationReportsDonorsAction({ page: 1, pageSize: 5 }),
+          getReceiptReportingSummaryAction(),
+          getPledgeCollectionReportAction(),
+          getRecurringReportSummaryAction(),
+        ])
 
-      if (!orgId) {
-        setLoading(false)
-        return
+      if (overviewResult.success) {
+        setOverview(overviewResult.overview)
       }
 
-      const [{ data: paymentData }, { data: donorData }, campaignBundle] = await Promise.all([
-        supabase
-          .from("payments")
-          .select(
-            "id, donor_id, sender_name, amount, payment_date, source, category_id, pledge_id, campaign_id, contact_id, status"
-          )
-          .eq("organization_id", orgId)
-          .order("payment_date", { ascending: false }),
-        supabase.from("donor_summary_view").select("*").eq("organization_id", orgId),
-        fetchCampaignAnalyticsData(supabase, orgId),
-      ])
-
-      setPayments((paymentData || []) as Payment[])
-      setDonors((donorData || []) as DonorSummary[])
-      if (!campaignBundle.error) {
-        setCampaignEntries(
-          buildCampaignAnalytics(
-            campaignBundle.campaigns,
-            campaignBundle.pledges,
-            campaignBundle.payments
-          )
+      if (topDonorsResult.success) {
+        setTopDonors(
+          (topDonorsResult.donors || []).map((donor: any) => ({
+            id: donor.id,
+            full_name: donor.full_name,
+            email: donor.email,
+            donation_count: donor.donation_count,
+            total_donations: donor.total_donations,
+          }))
         )
-      } else {
-        setCampaignEntries([])
       }
 
-      setLoading(false)
-
-      const receiptResult = await getReceiptReportingSummaryAction()
       if (receiptResult.success) {
         setReceiptSummary(receiptResult.summary)
       }
 
-      const collectionResult = await getPledgeCollectionReportAction()
       if (collectionResult.success) {
         setCollectionReport(collectionResult.report)
       }
 
-      const recurringResult = await getRecurringReportingSummaryAction()
       if (recurringResult.success) {
         setRecurringReport(recurringResult.summary)
       }
+
+      setLoading(false)
     }
 
-    loadData()
+    loadOverview()
   }, [])
+
+  useEffect(() => {
+    if (activeTab === "Donations") {
+      setTabLoading(true)
+      getDonationReportsPaymentsAction({ page: paymentsPage }).then((result) => {
+        if (result.success) {
+          setPayments(result.payments as Payment[])
+          setPaymentsTotal(result.total)
+        }
+        setTabLoading(false)
+      })
+    }
+  }, [activeTab, paymentsPage])
+
+  useEffect(() => {
+    if (activeTab === "Donors") {
+      setTabLoading(true)
+      getDonationReportsDonorsAction({ page: donorsPage }).then((result) => {
+        if (result.success) {
+          setDonors(
+            (result.donors || []).map((donor: any) => ({
+              id: donor.id,
+              full_name: donor.full_name,
+              email: donor.email,
+              donation_count: donor.donation_count,
+              total_donations: donor.total_donations,
+            }))
+          )
+          setDonorsTotal(result.total)
+        }
+        setTabLoading(false)
+      })
+    }
+  }, [activeTab, donorsPage])
+
+  useEffect(() => {
+    if (activeTab === "Campaigns" && campaignEntries.length === 0) {
+      setTabLoading(true)
+      getDonationReportsCampaignsAction().then((result) => {
+        if (result.success) {
+          setCampaignEntries(result.entries)
+        }
+        setTabLoading(false)
+      })
+    }
+  }, [activeTab, campaignEntries.length])
+
+  useEffect(() => {
+    if (activeTab === "Tax Receipts") {
+      setTabLoading(true)
+      getDonationTaxYearTotalsAction(Number(statementYear)).then((result) => {
+        if (result.success) {
+          setYearEndDonorTotals(
+            result.donors.map((donor) => ({
+              id: donor.donorId,
+              name: donor.donorName,
+              email: donor.donorEmail,
+              total: donor.totalAmount,
+              count: donor.paymentCount,
+            }))
+          )
+        }
+        setTabLoading(false)
+      })
+    }
+  }, [activeTab, statementYear])
 
   const donorTotals = useMemo(() => {
     return donors.map((donor) => ({
@@ -198,59 +257,22 @@ export default function DonationsReportsPage() {
       email: donor.email || "",
       donationCount: Number(donor.donation_count || 0),
       total: Number(donor.total_donations || 0),
-      lastDonation: donor.last_donation_date || "",
-      hasPledge: donor.has_open_pledge || false,
     }))
   }, [donors])
 
-  const filteredTaxDonors = donorTotals.filter((donor) => {
-    return (
-      donor.name.toLowerCase().includes(taxSearch.toLowerCase()) ||
-      donor.email.toLowerCase().includes(taxSearch.toLowerCase())
-    )
-  })
+  const totalDonations = overview.totalDonations
+  const averageDonation = overview.averageDonation
+  const uniqueDonors = overview.donorCount
 
-  const totalDonations = payments.reduce((sum, payment) => {
-    return sum + Number(payment.amount || 0)
-  }, 0)
-
-  const averageDonation =
-    payments.length > 0
-      ? totalDonations / payments.length
-      : 0
-
-  const uniqueDonors = donorTotals.length
-
-  const topDonors = [...donorTotals]
-    .sort((a, b) => b.total - a.total)
-    .slice(0, 5)
-
-  const yearEndDonorTotals = useMemo(() => {
-    const year = Number(statementYear)
-    const totals = new Map<string, { name: string; email: string; total: number; count: number }>()
-
-    for (const payment of payments) {
-      if (String(payment.status || "").toLowerCase() === "voided") continue
-      if (!payment.donor_id || !payment.payment_date) continue
-      const paymentYear = new Date(payment.payment_date).getFullYear()
-      if (paymentYear !== year) continue
-
-      const donor = donors.find((d) => d.id === payment.donor_id)
-      const existing = totals.get(payment.donor_id) || {
-        name: donor?.full_name || payment.sender_name || "Unknown",
-        email: donor?.email || "",
-        total: 0,
-        count: 0,
-      }
-      existing.total += Number(payment.amount || 0)
-      existing.count += 1
-      totals.set(payment.donor_id, existing)
-    }
-
-    return [...totals.entries()]
-      .map(([id, data]) => ({ id, ...data }))
-      .sort((a, b) => b.total - a.total)
-  }, [payments, donors, statementYear])
+  const topDonorRows = useMemo(
+    () =>
+      topDonors.map((donor) => ({
+        id: donor.id,
+        name: donor.full_name || "Unknown Donor",
+        total: Number(donor.total_donations || 0),
+      })),
+    [topDonors]
+  )
 
   const handleSelectAll = () => {
     if (selectedDonors.length === yearEndDonorTotals.length) {
@@ -413,7 +435,7 @@ export default function DonationsReportsPage() {
 
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    {payments.length}
+                    {overview.paymentCount}
                   </div>
                 </CardContent>
               </Card>
@@ -437,7 +459,7 @@ export default function DonationsReportsPage() {
                   </TableHeader>
 
                   <TableBody>
-                    {topDonors.map((donor) => (
+                    {topDonorRows.map((donor) => (
                       <TableRow key={donor.id}>
                         <TableCell className="font-medium">
                           {donor.name}
@@ -477,6 +499,20 @@ export default function DonationsReportsPage() {
                 </TableHeader>
 
                 <TableBody>
+                  {tabLoading && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
+                        Loading payments...
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {!tabLoading && payments.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
+                        No payments found.
+                      </TableCell>
+                    </TableRow>
+                  )}
                   {payments.map((payment) => (
                     <TableRow key={payment.id}>
                       <TableCell>
@@ -504,6 +540,38 @@ export default function DonationsReportsPage() {
                   ))}
                 </TableBody>
               </Table>
+              {Math.ceil(paymentsTotal / DONATIONS_PAGE_SIZE) > 1 ? (
+                <div className="flex items-center justify-between border-t px-4 py-3">
+                  <p className="text-sm text-muted-foreground">
+                    {(paymentsPage - 1) * DONATIONS_PAGE_SIZE + 1}–
+                    {Math.min(paymentsPage * DONATIONS_PAGE_SIZE, paymentsTotal)} of {paymentsTotal}
+                  </p>
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious
+                          onClick={() => setPaymentsPage((current) => Math.max(1, current - 1))}
+                          className={paymentsPage <= 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                        />
+                      </PaginationItem>
+                      <PaginationItem>
+                        <PaginationNext
+                          onClick={() =>
+                            setPaymentsPage((current) =>
+                              Math.min(Math.ceil(paymentsTotal / DONATIONS_PAGE_SIZE), current + 1)
+                            )
+                          }
+                          className={
+                            paymentsPage >= Math.ceil(paymentsTotal / DONATIONS_PAGE_SIZE)
+                              ? "pointer-events-none opacity-50"
+                              : "cursor-pointer"
+                          }
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                </div>
+              ) : null}
             </CardContent>
           </Card>
         )}
@@ -529,6 +597,13 @@ export default function DonationsReportsPage() {
                 </TableHeader>
 
                 <TableBody>
+                  {tabLoading && (
+                    <TableRow>
+                      <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
+                        Loading donors...
+                      </TableCell>
+                    </TableRow>
+                  )}
                   {donorTotals.map((donor) => (
                     <TableRow key={donor.id}>
                       <TableCell className="font-medium">
@@ -550,6 +625,38 @@ export default function DonationsReportsPage() {
                   ))}
                 </TableBody>
               </Table>
+              {Math.ceil(donorsTotal / DONATIONS_PAGE_SIZE) > 1 ? (
+                <div className="flex items-center justify-between border-t px-4 py-3">
+                  <p className="text-sm text-muted-foreground">
+                    {(donorsPage - 1) * DONATIONS_PAGE_SIZE + 1}–
+                    {Math.min(donorsPage * DONATIONS_PAGE_SIZE, donorsTotal)} of {donorsTotal}
+                  </p>
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious
+                          onClick={() => setDonorsPage((current) => Math.max(1, current - 1))}
+                          className={donorsPage <= 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                        />
+                      </PaginationItem>
+                      <PaginationItem>
+                        <PaginationNext
+                          onClick={() =>
+                            setDonorsPage((current) =>
+                              Math.min(Math.ceil(donorsTotal / DONATIONS_PAGE_SIZE), current + 1)
+                            )
+                          }
+                          className={
+                            donorsPage >= Math.ceil(donorsTotal / DONATIONS_PAGE_SIZE)
+                              ? "pointer-events-none opacity-50"
+                              : "cursor-pointer"
+                          }
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                </div>
+              ) : null}
             </CardContent>
           </Card>
         )}
@@ -579,14 +686,14 @@ export default function DonationsReportsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {loading && (
+                  {loading || tabLoading ? (
                     <TableRow>
                       <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
                         Loading campaign reports...
                       </TableCell>
                     </TableRow>
-                  )}
-                  {!loading && campaignEntries.length === 0 && (
+                  ) : null}
+                  {!loading && !tabLoading && campaignEntries.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
                         No campaigns to report on yet.
@@ -929,6 +1036,13 @@ export default function DonationsReportsPage() {
                 </TableHeader>
 
                 <TableBody>
+                  {tabLoading && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                        Loading tax year totals...
+                      </TableCell>
+                    </TableRow>
+                  )}
                   {yearEndDonorTotals.map((donor) => (
                     <TableRow key={donor.id}>
                       <TableCell>

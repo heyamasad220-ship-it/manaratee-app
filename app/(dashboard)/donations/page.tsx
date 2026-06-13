@@ -49,16 +49,16 @@ import {
   Target,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { createClient } from "@/lib/supabase/client"
 import { formatPaymentStatusLabel, normalizePaymentStatus } from "@/lib/donations/donation-status"
 import { CampaignProgressBar } from "@/components/donations/campaign-progress-bar"
 import {
-  buildCampaignAnalytics,
   formatDonationCurrency,
   type CampaignAnalyticsEntry,
-  type CampaignPledgeRow,
-  type CampaignRow,
 } from "@/lib/donations/campaign-analytics"
+import {
+  getDonationDashboardCampaignsAction,
+  getDonationDashboardSummaryAction,
+} from "@/lib/donations/donation-dashboard-actions"
 
 type Payment = {
   id: string
@@ -71,15 +71,6 @@ type Payment = {
   campaign_id?: string | null
   donor_id?: string | null
   contact_id?: string | null
-}
-
-type PledgeSummary = {
-  id: string
-  amount_pledged: number
-  amount_paid: number
-  balance_remaining: number
-  calculated_status: string | null
-  campaign_id?: string | null
 }
 
 const sourceColors: Record<string, string> = {
@@ -128,7 +119,21 @@ function formatMonth(dateValue: string) {
 export default function DonationsPage() {
   const [timeRange, setTimeRange] = useState("this-year")
   const [payments, setPayments] = useState<Payment[]>([])
-  const [pledges, setPledges] = useState<PledgeSummary[]>([])
+  const [dashboardSummary, setDashboardSummary] = useState({
+    totalCollected: 0,
+    paymentCount: 0,
+    thisMonthCollected: 0,
+    totalPledged: 0,
+    pledgeCollected: 0,
+    outstandingBalance: 0,
+    activePledgeCount: 0,
+  })
+  const [monthlyTotals, setMonthlyTotals] = useState<
+    Array<{ monthKey: string; amount: number; paymentCount: number }>
+  >([])
+  const [sourceTotals, setSourceTotals] = useState<
+    Array<{ sourceKey: string; amount: number }>
+  >([])
   const [campaignEntries, setCampaignEntries] = useState<CampaignAnalyticsEntry[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -138,163 +143,66 @@ export default function DonationsPage() {
       setIsLoading(true)
       setErrorMessage(null)
 
-      const supabase = createClient()
       const rangeStart = getRangeStart(timeRange)
 
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-
-      if (!user) {
-        setErrorMessage("User not authenticated.")
-        setPayments([])
-        setPledges([])
-        setIsLoading(false)
-        return
-      }
-
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("organization_id, role")
-        .eq("id", user.id)
-        .single()
-
-      if (profileError || !profile?.organization_id) {
-        setErrorMessage("Unable to load your organization.")
-        setPayments([])
-        setPledges([])
-        setIsLoading(false)
-        return
-      }
-
-      if (!["super_admin", "admin"].includes(profile.role || "")) {
-        setErrorMessage("You do not have permission to view donations.")
-        setPayments([])
-        setPledges([])
-        setIsLoading(false)
-        return
-      }
-
-      const organizationId = profile.organization_id
-
-      let paymentsQuery = supabase
-        .from("payments")
-        .select("id, sender_name, amount, payment_date, source, status, pledge_id, campaign_id, donor_id, contact_id")
-        .eq("organization_id", organizationId)
-        .order("payment_date", { ascending: false })
-
-      if (rangeStart) {
-        paymentsQuery = paymentsQuery.gte("payment_date", rangeStart.toISOString())
-      }
-
-      const [paymentsResult, pledgesResult, campaignsResult] = await Promise.all([
-        paymentsQuery,
-        supabase
-          .from("pledge_status_view")
-          .select("id, campaign_id, amount_pledged, amount_paid, balance_remaining, calculated_status")
-          .eq("organization_id", organizationId),
-        supabase
-          .from("campaigns")
-          .select("id, organization_id, name, code, description, goal_amount, start_date, end_date, status, created_at")
-          .eq("organization_id", organizationId)
-          .order("created_at", { ascending: false }),
+      const [summaryResult, campaignsResult] = await Promise.all([
+        getDonationDashboardSummaryAction(
+          rangeStart ? rangeStart.toISOString() : null
+        ),
+        getDonationDashboardCampaignsAction(),
       ])
 
-      if (paymentsResult.error || pledgesResult.error || campaignsResult.error) {
-        setErrorMessage(
-          paymentsResult.error?.message ||
-            pledgesResult.error?.message ||
-            campaignsResult.error?.message ||
-            "Unable to load donation data."
-        )
+      if (!summaryResult.success) {
+        setErrorMessage(summaryResult.error)
         setPayments([])
-        setPledges([])
         setCampaignEntries([])
-      } else {
-        const paymentRows = paymentsResult.data || []
-        const pledgeRows = (pledgesResult.data || []) as CampaignPledgeRow[]
-        const campaignRows = (campaignsResult.data || []) as CampaignRow[]
-
-        setPayments(paymentRows)
-        setPledges(pledgesResult.data || [])
-        setCampaignEntries(buildCampaignAnalytics(campaignRows, pledgeRows, paymentRows))
+        setIsLoading(false)
+        return
       }
 
+      if (!campaignsResult.success) {
+        setErrorMessage(campaignsResult.error)
+        setPayments([])
+        setCampaignEntries([])
+        setIsLoading(false)
+        return
+      }
+
+      setDashboardSummary(summaryResult.summary)
+      setMonthlyTotals(summaryResult.monthlyTotals)
+      setSourceTotals(summaryResult.sourceTotals)
+      setPayments(campaignsResult.recentPayments as Payment[])
+      setCampaignEntries(campaignsResult.campaignEntries)
       setIsLoading(false)
     }
 
     loadDonationData()
   }, [timeRange])
 
-  const activePledges = useMemo(
-    () =>
-      pledges.filter(
-        (pledge) => String(pledge.calculated_status || "").toLowerCase() !== "cancelled"
-      ),
-    [pledges]
-  )
-
-  const totalPledged = useMemo(
-    () => activePledges.reduce((sum, pledge) => sum + Number(pledge.amount_pledged || 0), 0),
-    [activePledges]
-  )
-
-  const totalCollected = useMemo(
-    () => payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0),
-    [payments]
-  )
-
-  const outstandingBalance = useMemo(
-    () =>
-      activePledges.reduce(
-        (sum, pledge) => sum + Math.max(Number(pledge.balance_remaining || 0), 0),
-        0
-      ),
-    [activePledges]
-  )
-
-  const paymentsThisMonth = useMemo(() => {
-    const now = new Date()
-    return payments
-      .filter((payment) => {
-        const paymentDate = new Date(payment.payment_date)
-        return paymentDate.getMonth() === now.getMonth() && paymentDate.getFullYear() === now.getFullYear()
-      })
-      .reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
-  }, [payments])
+  const totalPledged = dashboardSummary.totalPledged
+  const totalCollected = dashboardSummary.totalCollected
+  const outstandingBalance = dashboardSummary.outstandingBalance
+  const paymentsThisMonth = dashboardSummary.thisMonthCollected
 
   const paymentsOverTime = useMemo(() => {
-    const monthlyTotals = payments.reduce<Record<string, { month: string; amount: number; count: number }>>(
-      (acc, payment) => {
-        const month = formatMonth(payment.payment_date)
-        if (!acc[month]) {
-          acc[month] = { month, amount: 0, count: 0 }
-        }
-        acc[month].amount += Number(payment.amount || 0)
-        acc[month].count += 1
-        return acc
-      },
-      {}
-    )
-
-    return Object.values(monthlyTotals).reverse()
-  }, [payments])
+    return [...monthlyTotals]
+      .map((row) => ({
+        month: row.monthKey,
+        amount: row.amount,
+        count: row.paymentCount,
+      }))
+      .reverse()
+  }, [monthlyTotals])
 
   const paymentsBySource = useMemo(() => {
-    const sourceTotals = payments.reduce<Record<string, number>>((acc, payment) => {
-      const source = payment.source || "Other"
-      acc[source] = (acc[source] || 0) + Number(payment.amount || 0)
-      return acc
-    }, {})
-
-    return Object.entries(sourceTotals).map(([name, value]) => ({
-      name,
-      value,
-      color: sourceColors[name] || "#6B7280",
+    return sourceTotals.map((row) => ({
+      name: row.sourceKey,
+      value: row.amount,
+      color: sourceColors[row.sourceKey] || sourceColors[row.sourceKey.charAt(0).toUpperCase() + row.sourceKey.slice(1)] || "#6B7280",
     }))
-  }, [payments])
+  }, [sourceTotals])
 
-  const recentPayments = payments.slice(0, 5)
+  const recentPayments = payments
 
   const topCampaigns = useMemo(
     () => [...campaignEntries].sort((a, b) => b.metrics.raised - a.metrics.raised).slice(0, 5),
@@ -358,7 +266,7 @@ export default function DonationsPage() {
                     <p className="text-sm font-medium text-muted-foreground">Total Pledged</p>
                     <p className="text-2xl font-bold text-foreground">{formatCurrency(totalPledged)}</p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      From {activePledges.length} active pledges
+                      From {dashboardSummary.activePledgeCount} active pledges
                     </p>
                   </div>
                   <div className="rounded-full bg-blue-100 p-3">

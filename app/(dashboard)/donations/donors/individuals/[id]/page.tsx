@@ -83,9 +83,10 @@ useEffect(() => {
 
     const { data: payments, error: paymentsError } = await supabase
       .from("payments")
-      .select("*")
+      .select("id, amount, payment_date, source, memo, status, category_id, subcategory_id")
       .eq("donor_id", data.id)
       .order("payment_date", { ascending: false })
+      .limit(100)
 
     if (paymentsError) {
       console.error("Error loading donor payments:", paymentsError)

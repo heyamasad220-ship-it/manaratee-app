@@ -236,6 +236,12 @@ npx supabase db query --linked -f scripts/095_donations_rls_hardening.sql
 npm run validate:donations-security
 ```
 
+**Performance indexes (migration `096_donations_performance_indexes.sql`):** org-scoped indexes on canonical ledger + donation operational tables. See Priority 15 in `docs/Features.md`.
+
+**Analytical views (migration `097_donations_views.sql`):** `pledge_status_view`, `donor_summary_view` with `security_invoker = true` (RLS on underlying tables applies).
+
+**Dashboard RPCs (migration `098_donations_dashboard_rpcs.sql`):** `donation_org_payment_summary`, `donation_org_pledge_summary`, `donation_monthly_payment_totals`, `donation_payment_source_totals`.
+
 Key relationships:
 
 ```text

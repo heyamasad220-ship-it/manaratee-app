@@ -69,6 +69,19 @@ import {
   pledgeStatusToDb,
   type PledgeDisplayStatus,
 } from "@/lib/donations/donation-status";
+import {
+  fetchPledgesPageAction,
+  fetchPledgeSummaryMetricsAction,
+} from "@/lib/donations/donation-list-actions";
+import { DONATIONS_PAGE_SIZE } from "@/lib/donations/donation-pagination";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 interface Pledge {
   id: string;
@@ -162,7 +175,16 @@ export default function PledgesPage() {
   const [showDonorList, setShowDonorList] = useState(false);
   const [organizationId, setOrganizationId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [page, setPage] = useState(1);
+  const [totalPledges, setTotalPledges] = useState(0);
+  const [summaryMetrics, setSummaryMetrics] = useState({
+    totalPledged: 0,
+    totalCollected: 0,
+    outstandingBalance: 0,
+    activePledgeCount: 0,
+  });
   const [fundFilter, setFundFilter] = useState<string>("all");
 
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -337,7 +359,7 @@ export default function PledgesPage() {
     });
   }
 
-  const fetchPledges = async () => {
+  const fetchPledges = async (nextPage = page) => {
     setLoading(true);
 
     const orgId = await getOrgIdForCurrentUser();
@@ -355,21 +377,37 @@ export default function PledgesPage() {
 
     await searchDonors("", orgId);
 
-    const { data: pledgeData, error: pledgeError } = await supabase
-      .from("pledge_status_view")
-      .select(
-        "id, organization_id, donor_id, donor_name, campaign_id, campaign_name, amount_pledged, amount_paid, balance_remaining, calculated_status, frequency, pledge_date, notes"
-      )
-      .eq("organization_id", orgId)
-      .order("pledge_date", { ascending: false });
-    if (pledgeError) {
-      console.error("Error loading donation pledges:", pledgeError);
+    const statusMap: Record<string, string> = {
+      Open: "open",
+      Partial: "partial",
+      Fulfilled: "fulfilled",
+    };
+
+    const [pageResult, metricsResult] = await Promise.all([
+      fetchPledgesPageAction({
+        page: nextPage,
+        pageSize: DONATIONS_PAGE_SIZE,
+        search: debouncedSearch || undefined,
+        status: statusFilter === "all" ? undefined : statusMap[statusFilter],
+      }),
+      fetchPledgeSummaryMetricsAction(),
+    ]);
+
+    if (!pageResult.success) {
+      console.error("Error loading donation pledges:", pageResult.error);
       setPledges([]);
       setLoading(false);
       return;
     }
 
-    const mapped = (pledgeData || [])
+    if (metricsResult.success) {
+      setSummaryMetrics(metricsResult.metrics);
+    }
+
+    setTotalPledges(pageResult.total);
+    setPage(pageResult.page);
+
+    const mapped = (pageResult.pledges || [])
       .filter((row: any) => String(row.calculated_status || "").toLowerCase() !== "cancelled")
       .map(pledgeFromRow);
 
@@ -453,9 +491,18 @@ export default function PledgesPage() {
   };
 
   useEffect(() => {
-    fetchPledges();
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, statusFilter]);
+
+  useEffect(() => {
+    fetchPledges(page);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [debouncedSearch, statusFilter, page]);
 
   useEffect(() => {
     if (!selectedPledge || !organizationId) {
@@ -713,10 +760,10 @@ export default function PledgesPage() {
     return matchesSearch && matchesStatus && matchesFund;
   });
 
-  const totalPledged = pledges.reduce((sum, pledge) => sum + pledge.amount_pledged, 0);
-  const totalCollected = pledges.reduce((sum, pledge) => sum + pledge.amount_paid, 0);
-  const totalRemaining = pledges.reduce((sum, pledge) => sum + pledge.balance_remaining, 0);
-  const activePledges = pledges.filter((pledge) => pledge.status !== "Fulfilled").length;
+  const totalPledged = summaryMetrics.totalPledged;
+  const totalCollected = summaryMetrics.totalCollected;
+  const totalRemaining = summaryMetrics.outstandingBalance;
+  const activePledges = summaryMetrics.activePledgeCount;
 
   const getStatusBadge = (status: PledgeDisplayStatus) => {
     switch (status) {
@@ -748,7 +795,7 @@ export default function PledgesPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{formatCurrency(totalPledged)}</div>
-              <p className="text-xs text-muted-foreground">Across {pledges.length} pledges</p>
+              <p className="text-xs text-muted-foreground">Across {totalPledges} pledges</p>
             </CardContent>
           </Card>
 
@@ -980,6 +1027,44 @@ export default function PledgesPage() {
             </Table>
           </CardContent>
         </Card>
+
+        {Math.ceil(totalPledges / DONATIONS_PAGE_SIZE) > 1 ? (
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  href="#"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    setPage((current) => Math.max(1, current - 1));
+                  }}
+                  className={page <= 1 ? "pointer-events-none opacity-50" : ""}
+                />
+              </PaginationItem>
+              <PaginationItem>
+                <PaginationLink href="#" isActive>
+                  {page} / {Math.ceil(totalPledges / DONATIONS_PAGE_SIZE)}
+                </PaginationLink>
+              </PaginationItem>
+              <PaginationItem>
+                <PaginationNext
+                  href="#"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    setPage((current) =>
+                      Math.min(Math.ceil(totalPledges / DONATIONS_PAGE_SIZE), current + 1)
+                    );
+                  }}
+                  className={
+                    page >= Math.ceil(totalPledges / DONATIONS_PAGE_SIZE)
+                      ? "pointer-events-none opacity-50"
+                      : ""
+                  }
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        ) : null}
       </div>
 
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>

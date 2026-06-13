@@ -39,6 +39,20 @@ import {
 import { Check, ChevronsUpDown, Plus } from "lucide-react";
 import { PaymentReceiptActions } from "@/components/donations/payment-receipt-actions";
 import {
+  fetchOpenPledgesForAllocationAction,
+  fetchPaymentsPageAction,
+  searchDonorsForPickerAction,
+} from "@/lib/donations/donation-list-actions";
+import { DONATIONS_PAGE_SIZE } from "@/lib/donations/donation-pagination";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+import {
   DonationAttributionFields,
   EMPTY_DONATION_ATTRIBUTION_VALUE,
   toAttributionIds,
@@ -115,6 +129,11 @@ export default function PaymentsPage() {
 
   const [organizationId, setOrganizationId] = useState<string | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [totalPayments, setTotalPayments] = useState(0);
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [receiptByPaymentId, setReceiptByPaymentId] = useState<
     Record<string, { receipt_number: string; status: string }>
   >({});
@@ -191,89 +210,98 @@ export default function PaymentsPage() {
     return profile.organization_id as string;
   }
 
-  async function loadPayments() {
+  async function loadPayments(nextPage = page) {
     setLoading(true);
 
-    const orgId = await getOrgIdForCurrentUser();
+    const result = await fetchPaymentsPageAction({
+      page: nextPage,
+      pageSize: DONATIONS_PAGE_SIZE,
+      search: debouncedSearch || undefined,
+      status: statusFilter,
+    });
 
-    if (!orgId) {
+    if (!result.success) {
       setOrganizationId(null);
       setPayments([]);
+      setTotalPayments(0);
       setDonors([]);
       setPledges([]);
       setLoading(false);
       return;
     }
 
-    setOrganizationId(orgId);
+    setPayments(result.payments as Payment[]);
+    setTotalPayments(result.total);
+    setPage(result.page);
 
-    const { data: donorData, error: donorError } = await supabase
-      .from("donors")
-      .select("id, full_name, email, donor_type")
-      .eq("organization_id", orgId)
-      .order("full_name", { ascending: true });
-
-    if (donorError) {
-      console.error("Error loading donors:", donorError);
-      setDonors([]);
-    } else {
-      setDonors((donorData || []) as DonorOption[]);
+    const orgId = organizationId;
+    if (!orgId) {
+      const orgFromProfile = await getOrgIdForCurrentUser();
+      if (orgFromProfile) setOrganizationId(orgFromProfile);
     }
 
-    const { data: pledgeData, error: pledgeError } = await supabase
-      .from("pledge_status_view")
-      .select(
-        "id, donor_id, donor_name, campaign_name, amount_pledged, amount_paid, balance_remaining, calculated_status"
-      )
-      .eq("organization_id", orgId)
-      .order("donor_name", { ascending: true });
+    const effectiveOrgId = organizationId || (await getOrgIdForCurrentUser());
+    if (effectiveOrgId) {
+      const [pledgeResult, receiptData] = await Promise.all([
+        fetchOpenPledgesForAllocationAction(),
+        supabase
+          .from("donation_receipts")
+          .select("payment_id, receipt_number, status")
+          .eq("organization_id", effectiveOrgId)
+          .eq("receipt_type", "payment"),
+      ]);
 
-    if (pledgeError) {
-      console.error("Error loading pledges:", pledgeError);
-      setPledges([]);
-    } else {
-      setPledges((pledgeData || []) as PledgeOption[]);
-    }
-
-    const { data, error } = await supabase
-      .from("payments")
-      .select(
-        "id, amount, payment_date, source, memo, pledge_id, donor_id, status, sender_name"
-      )
-      .eq("organization_id", orgId)
-      .order("payment_date", { ascending: false });
-
-    const { data: receiptData } = await supabase
-      .from("donation_receipts")
-      .select("payment_id, receipt_number, status")
-      .eq("organization_id", orgId)
-      .eq("receipt_type", "payment");
-
-    if (error) {
-      console.error("Error loading payments:", error);
-      setPayments([]);
-    } else {
-      setPayments((data || []) as Payment[]);
-    }
-
-    const receiptMap: Record<string, { receipt_number: string; status: string }> = {};
-    for (const row of receiptData || []) {
-      if (row.payment_id) {
-        receiptMap[row.payment_id] = {
-          receipt_number: row.receipt_number,
-          status: row.status,
-        };
+      if (pledgeResult.success) {
+        setPledges(pledgeResult.pledges as PledgeOption[]);
       }
+
+      const receiptMap: Record<string, { receipt_number: string; status: string }> = {};
+      for (const row of receiptData.data || []) {
+        if (row.payment_id) {
+          receiptMap[row.payment_id] = {
+            receipt_number: row.receipt_number,
+            status: row.status,
+          };
+        }
+      }
+      setReceiptByPaymentId(receiptMap);
     }
-    setReceiptByPaymentId(receiptMap);
 
     setLoading(false);
   }
 
+  async function loadDonorsForPicker(query: string) {
+    const result = await searchDonorsForPickerAction(query, 50);
+    if (result.success) {
+      setDonors(result.donors as DonorOption[]);
+    }
+  }
+
   useEffect(() => {
-    loadPayments();
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, statusFilter]);
+
+  useEffect(() => {
+    void (async () => {
+      const orgId = await getOrgIdForCurrentUser();
+      if (orgId) {
+        setOrganizationId(orgId);
+        await loadDonorsForPicker("");
+      }
+      await loadPayments(page);
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [debouncedSearch, statusFilter, page]);
+
+  useEffect(() => {
+    if (!showAddDialog) return;
+    void loadDonorsForPicker(donorSearch);
+  }, [donorSearch, showAddDialog]);
 
   function resetForm() {
     setDonorId("none");
@@ -429,6 +457,33 @@ export default function PaymentsPage() {
           </Button>
         </div>
 
+        <div className="flex flex-wrap items-center gap-3">
+          <Input
+            placeholder="Search sender, memo, or method..."
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            className="max-w-sm"
+          />
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="allocated">Allocated</SelectItem>
+              <SelectItem value="unallocated">Unallocated</SelectItem>
+              <SelectItem value="pending_review">Pending review</SelectItem>
+              <SelectItem value="unresolved">Unresolved</SelectItem>
+              <SelectItem value="voided">Voided</SelectItem>
+            </SelectContent>
+          </Select>
+          <span className="text-sm text-muted-foreground">
+            {totalPayments > 0
+              ? `${(page - 1) * DONATIONS_PAGE_SIZE + 1}–${Math.min(page * DONATIONS_PAGE_SIZE, totalPayments)} of ${totalPayments}`
+              : "No payments"}
+          </span>
+        </div>
+
         <div className="rounded-lg border bg-white overflow-hidden">
           {loading ? (
             <div className="p-6 text-sm text-muted-foreground">Loading payments...</div>
@@ -509,6 +564,44 @@ export default function PaymentsPage() {
             </div>
           )}
         </div>
+
+        {Math.ceil(totalPayments / DONATIONS_PAGE_SIZE) > 1 ? (
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  href="#"
+                  onClick={(event) => {
+                    event.preventDefault()
+                    setPage((current) => Math.max(1, current - 1))
+                  }}
+                  className={page <= 1 ? "pointer-events-none opacity-50" : ""}
+                />
+              </PaginationItem>
+              <PaginationItem>
+                <PaginationLink href="#" isActive>
+                  {page} / {Math.ceil(totalPayments / DONATIONS_PAGE_SIZE)}
+                </PaginationLink>
+              </PaginationItem>
+              <PaginationItem>
+                <PaginationNext
+                  href="#"
+                  onClick={(event) => {
+                    event.preventDefault()
+                    setPage((current) =>
+                      Math.min(Math.ceil(totalPayments / DONATIONS_PAGE_SIZE), current + 1)
+                    )
+                  }}
+                  className={
+                    page >= Math.ceil(totalPayments / DONATIONS_PAGE_SIZE)
+                      ? "pointer-events-none opacity-50"
+                      : ""
+                  }
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        ) : null}
       </div>
 
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>

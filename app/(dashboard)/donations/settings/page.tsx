@@ -35,12 +35,10 @@ import {
 import { Plus, Pencil, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
-import {
-  buildCampaignAnalytics,
-  fetchCampaignAnalyticsData,
-} from "@/lib/donations/campaign-analytics"
+import { getCampaignAnalyticsAction } from "@/lib/donations/donation-reports-actions"
 import { DonationReceiptSettingsForm } from "@/components/donations/donation-receipt-settings-form"
 import { PledgeReminderSettingsForm } from "@/components/donations/pledge-reminder-settings-form"
+import { DonationOpsPanel } from "@/components/donations/donation-ops-panel"
 
 const settingsTabs = ["General", "Campaigns", "Categories", "Payment Methods", "Receipts", "Pledge Reminders", "Notifications"] as const
 type SettingsTab = (typeof settingsTabs)[number]
@@ -170,45 +168,32 @@ async function handleAddCategory() {
   await loadCategories()
 }
 async function loadCampaigns() {
-  const orgId = await getOrganizationId()
+  const result = await getCampaignAnalyticsAction()
 
-  if (!orgId) {
+  if (!result.success) {
+    console.error("Error loading campaigns:", result.error)
     setCampaigns([])
     return
   }
-
-  const { campaigns, pledges, payments, error } = await fetchCampaignAnalyticsData(
-    supabase,
-    orgId
-  )
-
-  if (error) {
-    console.error("Error loading campaigns:", error)
-    setCampaigns([])
-    return
-  }
-
-  const analytics = buildCampaignAnalytics(campaigns, pledges, payments)
-  const metricsById = new Map(analytics.map((entry) => [entry.campaign.id, entry.metrics]))
 
   setCampaigns(
-    (campaigns || []).map((c) => ({
-      id: c.id,
-      name: c.name,
-      description: c.description || "",
-      goalAmount: Number(c.goal_amount || 0),
-      raisedAmount: metricsById.get(c.id)?.raised ?? 0,
-      startDate: c.start_date || "",
-      endDate: c.end_date || "",
+    (result.entries || []).map(({ campaign, metrics }) => ({
+      id: campaign.id,
+      name: campaign.name,
+      description: campaign.description || "",
+      goalAmount: Number(campaign.goal_amount || 0),
+      raisedAmount: metrics.raised,
+      startDate: campaign.start_date || "",
+      endDate: campaign.end_date || "",
       status:
-        c.status === "active"
+        campaign.status === "active"
           ? "Active"
-          : c.status === "completed"
+          : campaign.status === "completed"
             ? "Completed"
-            : c.status === "paused"
+            : campaign.status === "paused"
               ? "Paused"
               : "Draft",
-      campaignCode: c.code || "",
+      campaignCode: campaign.code || "",
     }))
   )
 }
@@ -578,7 +563,10 @@ async function handleDeleteCampaign(campaignId: string) {
         </div>
 
         {activeTab === "General" && (
-          <DonationReceiptSettingsForm mode="general" />
+          <div className="flex flex-col gap-6">
+            <DonationOpsPanel />
+            <DonationReceiptSettingsForm mode="general" />
+          </div>
         )}
 
         {activeTab === "Campaigns" && (

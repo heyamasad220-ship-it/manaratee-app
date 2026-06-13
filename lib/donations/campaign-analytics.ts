@@ -252,6 +252,227 @@ export function formatCampaignStatusLabel(status: string | null | undefined): st
   return status
 }
 
+type RpcCampaignMetricsRow = {
+  campaign_id: string
+  raised: number | string | null
+  pledged: number | string | null
+  collected_against_pledges: number | string | null
+  outstanding: number | string | null
+  total_committed: number | string | null
+  progress_percent: number | string | null
+  donor_count: number | string | null
+  payment_count: number | string | null
+  average_gift: number | string | null
+  largest_gift: number | string | null
+}
+
+export type OrgReportsOverview = {
+  totalDonations: number
+  paymentCount: number
+  averageDonation: number
+  donorCount: number
+}
+
+export type DonorTaxYearTotal = {
+  donorId: string
+  donorName: string
+  donorEmail: string
+  totalAmount: number
+  paymentCount: number
+}
+
+export type RecurringReportSummary = {
+  recurringDonorCount: number
+  totalRecurringRevenue: number
+  byCampaign: Array<{
+    campaignId: string | null
+    campaignName: string
+    total: number
+    donorCount: number
+  }>
+  byDonor: Array<{
+    donorId: string
+    donorName: string
+    total: number
+    planCount: number
+  }>
+}
+
+function mapRpcCampaignMetrics(row: RpcCampaignMetricsRow): CampaignMetrics {
+  return {
+    campaignId: row.campaign_id,
+    raised: Number(row.raised || 0),
+    pledged: Number(row.pledged || 0),
+    collectedAgainstPledges: Number(row.collected_against_pledges || 0),
+    outstanding: Number(row.outstanding || 0),
+    totalCommitted: Number(row.total_committed || 0),
+    progressPercent:
+      row.progress_percent == null ? null : Number(row.progress_percent),
+    donorCount: Number(row.donor_count || 0),
+    paymentCount: Number(row.payment_count || 0),
+    averageGift: Number(row.average_gift || 0),
+    largestGift: Number(row.largest_gift || 0),
+  }
+}
+
+export async function fetchCampaignAnalyticsEntries(
+  supabase: SupabaseClient,
+  organizationId: string
+): Promise<CampaignAnalyticsEntry[]> {
+  const [campaignsResult, metricsResult] = await Promise.all([
+    supabase
+      .from("campaigns")
+      .select(
+        "id, organization_id, name, code, description, goal_amount, start_date, end_date, status, created_at"
+      )
+      .eq("organization_id", organizationId)
+      .order("created_at", { ascending: false }),
+    supabase.rpc("donation_campaign_metrics", { p_org_id: organizationId }),
+  ])
+
+  if (campaignsResult.error) throw new Error(campaignsResult.error.message)
+  if (metricsResult.error) throw new Error(metricsResult.error.message)
+
+  const metricsByCampaignId = new Map(
+    ((metricsResult.data || []) as RpcCampaignMetricsRow[]).map((row) => [
+      row.campaign_id,
+      mapRpcCampaignMetrics(row),
+    ])
+  )
+
+  return ((campaignsResult.data || []) as CampaignRow[]).map((campaign) => ({
+    campaign,
+    metrics:
+      metricsByCampaignId.get(campaign.id) ||
+      mapRpcCampaignMetrics({
+        campaign_id: campaign.id,
+        raised: 0,
+        pledged: 0,
+        collected_against_pledges: 0,
+        outstanding: 0,
+        total_committed: 0,
+        progress_percent: null,
+        donor_count: 0,
+        payment_count: 0,
+        average_gift: 0,
+        largest_gift: 0,
+      }),
+  }))
+}
+
+export async function fetchCampaignRecentActivity(
+  supabase: SupabaseClient,
+  organizationId: string,
+  campaignId: string,
+  limit = 8
+): Promise<CampaignRecentActivity> {
+  const { data, error } = await supabase.rpc("donation_campaign_recent_activity", {
+    p_org_id: organizationId,
+    p_campaign_id: campaignId,
+    p_limit: limit,
+  })
+
+  if (error) throw new Error(error.message)
+
+  const payload = (data || {}) as {
+    recentDonations?: CampaignPaymentRow[]
+    recentPledges?: CampaignPledgeRow[]
+    recentPledgePayments?: CampaignPaymentRow[]
+  }
+
+  return {
+    recentDonations: payload.recentDonations || [],
+    recentPledges: payload.recentPledges || [],
+    recentPledgePayments: payload.recentPledgePayments || [],
+  }
+}
+
+export async function fetchOrgReportsOverview(
+  supabase: SupabaseClient,
+  organizationId: string
+): Promise<OrgReportsOverview> {
+  const { data, error } = await supabase.rpc("donation_org_reports_overview", {
+    p_org_id: organizationId,
+  })
+
+  if (error) throw new Error(error.message)
+
+  const row = Array.isArray(data) ? data[0] : data
+  return {
+    totalDonations: Number(row?.total_donations || 0),
+    paymentCount: Number(row?.payment_count || 0),
+    averageDonation: Number(row?.average_donation || 0),
+    donorCount: Number(row?.donor_count || 0),
+  }
+}
+
+export async function fetchDonorTaxYearTotals(
+  supabase: SupabaseClient,
+  organizationId: string,
+  taxYear: number
+): Promise<DonorTaxYearTotal[]> {
+  const { data, error } = await supabase.rpc("donation_donor_tax_year_totals", {
+    p_org_id: organizationId,
+    p_tax_year: taxYear,
+  })
+
+  if (error) throw new Error(error.message)
+
+  return (data || []).map((row: any) => ({
+    donorId: row.donor_id,
+    donorName: row.donor_name || "Unknown",
+    donorEmail: row.donor_email || "",
+    totalAmount: Number(row.total_amount || 0),
+    paymentCount: Number(row.payment_count || 0),
+  }))
+}
+
+export async function fetchRecurringReportSummary(
+  supabase: SupabaseClient,
+  organizationId: string
+): Promise<RecurringReportSummary> {
+  const { data, error } = await supabase.rpc("donation_recurring_report_summary", {
+    p_org_id: organizationId,
+  })
+
+  if (error) throw new Error(error.message)
+
+  const payload = (data || {}) as {
+    recurringDonorCount?: number | string
+    totalRecurringRevenue?: number | string
+    byCampaign?: Array<{
+      campaignId: string | null
+      campaignName: string
+      total: number | string
+      donorCount: number | string
+    }>
+    byDonor?: Array<{
+      donorId: string
+      donorName: string
+      total: number | string
+      planCount: number | string
+    }>
+  }
+
+  return {
+    recurringDonorCount: Number(payload.recurringDonorCount || 0),
+    totalRecurringRevenue: Number(payload.totalRecurringRevenue || 0),
+    byCampaign: (payload.byCampaign || []).map((row) => ({
+      campaignId: row.campaignId,
+      campaignName: row.campaignName,
+      total: Number(row.total || 0),
+      donorCount: Number(row.donorCount || 0),
+    })),
+    byDonor: (payload.byDonor || []).map((row) => ({
+      donorId: row.donorId,
+      donorName: row.donorName,
+      total: Number(row.total || 0),
+      planCount: Number(row.planCount || 0),
+    })),
+  }
+}
+
+/** @deprecated Use fetchCampaignAnalyticsEntries for production paths. Kept for parity validation. */
 export async function fetchCampaignAnalyticsData(
   supabase: SupabaseClient,
   organizationId: string

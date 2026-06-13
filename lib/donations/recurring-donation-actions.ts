@@ -20,10 +20,12 @@ export async function getRecurringDashboardAction() {
   const access = await requireDonationStaffAccess("view")
   if (!access.ok) return { success: false as const, error: access.error }
   try {
-    const [metrics, plans] = await Promise.all([
-      buildRecurringDashboardMetrics(access.supabase, access.orgId),
-      fetchRecurringPlans(access.supabase, access.orgId),
-    ])
+    const plans = await fetchRecurringPlans(access.supabase, access.orgId)
+    const metrics = await buildRecurringDashboardMetrics(
+      access.supabase,
+      access.orgId,
+      plans
+    )
     return { success: true as const, metrics, plans }
   } catch (error) {
     return { success: false as const, error: (error as Error).message }

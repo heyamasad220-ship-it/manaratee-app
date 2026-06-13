@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { createClient } from "@/lib/supabase/client"
 import { Header } from "@/components/layout/header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -16,12 +15,11 @@ import {
 } from "@/components/ui/table"
 import { CampaignProgressBar } from "@/components/donations/campaign-progress-bar"
 import {
-  buildCampaignAnalytics,
-  fetchCampaignAnalyticsData,
   formatCampaignStatusLabel,
   formatDonationCurrency,
   type CampaignAnalyticsEntry,
 } from "@/lib/donations/campaign-analytics"
+import { getCampaignAnalyticsAction } from "@/lib/donations/donation-reports-actions"
 import { Plus, Target } from "lucide-react"
 
 export default function DonationsCampaignsPage() {
@@ -34,39 +32,12 @@ export default function DonationsCampaignsPage() {
       setLoading(true)
       setErrorMessage(null)
 
-      const supabase = createClient()
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-
-      if (!user) {
-        setErrorMessage("User not authenticated.")
-        setLoading(false)
-        return
-      }
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("organization_id")
-        .eq("id", user.id)
-        .single()
-
-      if (!profile?.organization_id) {
-        setErrorMessage("Unable to load your organization.")
-        setLoading(false)
-        return
-      }
-
-      const { campaigns, pledges, payments, error } = await fetchCampaignAnalyticsData(
-        supabase,
-        profile.organization_id
-      )
-
-      if (error) {
-        setErrorMessage(error)
+      const result = await getCampaignAnalyticsAction()
+      if (!result.success) {
+        setErrorMessage(result.error)
         setEntries([])
       } else {
-        setEntries(buildCampaignAnalytics(campaigns, pledges, payments))
+        setEntries(result.entries)
       }
 
       setLoading(false)

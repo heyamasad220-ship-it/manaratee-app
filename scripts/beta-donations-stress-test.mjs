@@ -234,26 +234,56 @@ timings.push(
 )
 
 timings.push(
-  await timed("campaign_analytics_bundle", async () => {
-    const [{ data: campaigns }, { data: pledges }, { data: payments }] = await Promise.all([
-      sb.from("campaigns").select("id, name, goal_amount, organization_id").eq("organization_id", orgId),
-      sb
-        .from("pledge_status_view")
-        .select(
-          "id, campaign_id, donor_id, donor_name, amount_pledged, amount_paid, balance_remaining, calculated_status, pledge_date"
-        )
-        .eq("organization_id", orgId),
-      sb
-        .from("payments")
-        .select(
-          "id, campaign_id, pledge_id, donor_id, contact_id, sender_name, amount, payment_date, source, status"
-        )
-        .eq("organization_id", orgId),
+  await timed("campaign_analytics_rpc", async () => {
+    const { data, error } = await sb.rpc("donation_campaign_metrics", { p_org_id: orgId })
+    if (error) throw new Error(error.message)
+    const totalRaised = (data || []).reduce((s, row) => s + Number(row.raised || 0), 0)
+    return { campaigns: (data || []).length, totalRaised }
+  })
+)
+
+timings.push(
+  await timed("campaign_analytics_bundle_legacy", async () => {
+    async function fetchAll(select) {
+      const rows = []
+      let from = 0
+      const pageSize = 1000
+      while (true) {
+        const { data, error } = await sb
+          .from(select.table)
+          .select(select.fields)
+          .eq("organization_id", orgId)
+          .range(from, from + pageSize - 1)
+        if (error) throw new Error(error.message)
+        const chunk = data || []
+        rows.push(...chunk)
+        if (chunk.length < pageSize) break
+        from += pageSize
+      }
+      return rows
+    }
+
+    const [campaigns, pledges, payments] = await Promise.all([
+      fetchAll({
+        table: "campaigns",
+        fields: "id, name, goal_amount, organization_id",
+      }),
+      fetchAll({
+        table: "pledge_status_view",
+        fields:
+          "id, campaign_id, donor_id, donor_name, amount_pledged, amount_paid, balance_remaining, calculated_status, pledge_date",
+      }),
+      fetchAll({
+        table: "payments",
+        fields:
+          "id, campaign_id, pledge_id, donor_id, contact_id, sender_name, amount, payment_date, source, status",
+      }),
     ])
     const analytics = buildCampaignAnalytics(campaigns || [], pledges || [], payments || [])
     return {
       campaigns: analytics.length,
       totalRaised: analytics.reduce((s, e) => s + e.metrics.raised, 0),
+      paymentRows: payments.length,
     }
   })
 )
@@ -278,13 +308,15 @@ const report = {
   timings: timings.map((t) => ({ query: t.label, ms: t.ms, ...t.result })),
   thresholds: {
     fetch_all_payments_warn_ms: 3000,
-    campaign_analytics_warn_ms: 5000,
+    campaign_analytics_rpc_warn_ms: 2000,
+    campaign_analytics_bundle_legacy_warn_ms: 5000,
     pledge_view_warn_ms: 3000,
   },
   warnings: timings
     .filter((t) => {
       if (t.label === "fetch_all_payments") return t.ms > 3000
-      if (t.label === "campaign_analytics_bundle") return t.ms > 5000
+      if (t.label === "campaign_analytics_rpc") return t.ms > 2000
+      if (t.label === "campaign_analytics_bundle_legacy") return t.ms > 5000
       if (t.label === "fetch_all_pledges_view") return t.ms > 3000
       return false
     })

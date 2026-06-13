@@ -253,13 +253,20 @@ export async function sendBulkAnnualStatementsAction(donorIds: string[], taxYear
     error?: string
   }> = []
 
-  for (const donorId of donorIds) {
-    const result = await sendAnnualStatementEmailAction(donorId, taxYear, false)
-    results.push({
-      donorId,
-      sent: result.success,
-      error: result.success ? undefined : result.error,
-    })
+  const BATCH_SIZE = 10
+  for (let index = 0; index < donorIds.length; index += BATCH_SIZE) {
+    const batch = donorIds.slice(index, index + BATCH_SIZE)
+    const batchResults = await Promise.all(
+      batch.map(async (donorId) => {
+        const result = await sendAnnualStatementEmailAction(donorId, taxYear, false)
+        return {
+          donorId,
+          sent: result.success,
+          error: result.success ? undefined : result.error,
+        }
+      })
+    )
+    results.push(...batchResults)
   }
 
   return {

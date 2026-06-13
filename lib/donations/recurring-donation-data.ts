@@ -60,9 +60,10 @@ export async function fetchRecurringPlans(
 
 export async function buildRecurringDashboardMetrics(
   supabase: SupabaseClient,
-  organizationId: string
+  organizationId: string,
+  preloadedPlans?: RecurringPlanWithDonor[]
 ): Promise<RecurringDashboardMetrics> {
-  const plans = await fetchRecurringPlans(supabase, organizationId)
+  const plans = preloadedPlans ?? (await fetchRecurringPlans(supabase, organizationId))
 
   const activePlans = plans.filter((p) => p.status === "active")
   const pausedPlans = plans.filter((p) => p.status === "paused")
@@ -147,95 +148,6 @@ export async function buildRecurringReportingSummary(
   supabase: SupabaseClient,
   organizationId: string
 ): Promise<RecurringReportingSummary> {
-  const { data: payments, error } = await supabase
-    .from("payments")
-    .select(
-      "id, amount, status, donor_id, campaign_id, recurring_donation_plan_id, donors(full_name), campaigns(name)"
-    )
-    .eq("organization_id", organizationId)
-    .not("recurring_donation_plan_id", "is", null)
-
-  if (error) throw new Error(error.message)
-
-  const validPayments = (payments || []).filter((p) => !isVoidedPayment(p.status))
-
-  const donorIds = new Set<string>()
-  let totalRecurringRevenue = 0
-
-  const byCampaignMap = new Map<
-    string,
-    { campaignId: string | null; campaignName: string; total: number; donorIds: Set<string> }
-  >()
-  const byDonorMap = new Map<
-    string,
-    { donorId: string; donorName: string; total: number; planIds: Set<string> }
-  >()
-
-  for (const payment of validPayments) {
-    const amount = Number(payment.amount || 0)
-    totalRecurringRevenue += amount
-    if (payment.donor_id) donorIds.add(payment.donor_id)
-
-    const campaignKey = payment.campaign_id || "none"
-    const campaignEntry =
-      byCampaignMap.get(campaignKey) ||
-      ({
-        campaignId: payment.campaign_id,
-        campaignName: (payment as any).campaigns?.name || "No Campaign",
-        total: 0,
-        donorIds: new Set<string>(),
-      } as const)
-    const campaignMutable = {
-      campaignId: campaignEntry.campaignId,
-      campaignName: campaignEntry.campaignName,
-      total: campaignEntry.total,
-      donorIds: new Set(campaignEntry.donorIds),
-    }
-    campaignMutable.total += amount
-    if (payment.donor_id) campaignMutable.donorIds.add(payment.donor_id)
-    byCampaignMap.set(campaignKey, campaignMutable)
-
-    if (payment.donor_id) {
-      const donorEntry =
-        byDonorMap.get(payment.donor_id) ||
-        ({
-          donorId: payment.donor_id,
-          donorName: (payment as any).donors?.full_name || "Unknown Donor",
-          total: 0,
-          planIds: new Set<string>(),
-        } as const)
-      const donorMutable = {
-        donorId: donorEntry.donorId,
-        donorName: donorEntry.donorName,
-        total: donorEntry.total,
-        planIds: new Set(donorEntry.planIds),
-      }
-      donorMutable.total += amount
-      if (payment.recurring_donation_plan_id) {
-        donorMutable.planIds.add(payment.recurring_donation_plan_id)
-      }
-      byDonorMap.set(payment.donor_id, donorMutable)
-    }
-  }
-
-  return {
-    recurringDonorCount: donorIds.size,
-    totalRecurringRevenue,
-    byCampaign: [...byCampaignMap.values()]
-      .map((entry) => ({
-        campaignId: entry.campaignId,
-        campaignName: entry.campaignName,
-        total: entry.total,
-        donorCount: entry.donorIds.size,
-      }))
-      .sort((a, b) => b.total - a.total),
-    byDonor: [...byDonorMap.values()]
-      .map((entry) => ({
-        donorId: entry.donorId,
-        donorName: entry.donorName,
-        total: entry.total,
-        planCount: entry.planIds.size,
-      }))
-      .sort((a, b) => b.total - a.total),
-  }
+  const { fetchRecurringReportSummary } = await import("@/lib/donations/campaign-analytics")
+  return fetchRecurringReportSummary(supabase, organizationId)
 }

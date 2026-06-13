@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
 import { Header } from "@/components/layout/header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -17,16 +16,13 @@ import {
 } from "@/components/ui/table"
 import { CampaignProgressBar } from "@/components/donations/campaign-progress-bar"
 import {
-  buildPledgeCampaignMap,
-  computeCampaignMetrics,
-  fetchCampaignAnalyticsData,
   formatCampaignStatusLabel,
   formatDonationCurrency,
-  getCampaignRecentActivity,
   type CampaignAnalyticsEntry,
   type CampaignRecentActivity,
   type CampaignRow,
 } from "@/lib/donations/campaign-analytics"
+import { getCampaignDetailAction } from "@/lib/donations/donation-reports-actions"
 import { ArrowLeft, Target, Users } from "lucide-react"
 
 export default function CampaignDetailPage() {
@@ -44,61 +40,19 @@ export default function CampaignDetailPage() {
       setLoading(true)
       setErrorMessage(null)
 
-      const supabase = createClient()
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-
-      if (!user) {
-        setErrorMessage("User not authenticated.")
+      const result = await getCampaignDetailAction(campaignId)
+      if (!result.success) {
+        setErrorMessage(result.error)
+        setCampaign(null)
+        setEntry(null)
+        setActivity(null)
         setLoading(false)
         return
       }
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("organization_id")
-        .eq("id", user.id)
-        .single()
-
-      if (!profile?.organization_id) {
-        setErrorMessage("Unable to load your organization.")
-        setLoading(false)
-        return
-      }
-
-      const { campaigns, pledges, payments, error } = await fetchCampaignAnalyticsData(
-        supabase,
-        profile.organization_id
-      )
-
-      if (error) {
-        setErrorMessage(error)
-        setLoading(false)
-        return
-      }
-
-      const match = campaigns.find((row) => row.id === campaignId)
-      if (!match) {
-        setErrorMessage("Campaign not found.")
-        setLoading(false)
-        return
-      }
-
-      const pledgeCampaignById = buildPledgeCampaignMap(pledges)
-      const metrics = computeCampaignMetrics(
-        campaignId,
-        match.goal_amount,
-        pledges,
-        payments,
-        pledgeCampaignById
-      )
-
-      setCampaign(match)
-      setEntry({ campaign: match, metrics })
-      setActivity(
-        getCampaignRecentActivity(campaignId, pledges, payments, pledgeCampaignById)
-      )
+      setCampaign(result.campaign)
+      setEntry(result.entry)
+      setActivity(result.activity)
       setLoading(false)
     }
 

@@ -788,7 +788,7 @@ Full 10k scale not run in CI (requires explicit approval); extrapolated ~2–3s 
 
 1. ~~Add RLS policies on `payments`, `pledges`, `donors`~~ — **Fixed (Priority 14, migration `095`)**
 2. ~~Enforce `donations.view` / `donations.manage` on server actions and `/donations/*` routes~~ — **Fixed (Priority 14)**
-3. Add pagination to staff payments/donors lists
+3. ~~Add pagination to staff payments/donors lists~~ — **Partially fixed (Priority 15)** — payments, pledges, donors paginated; reports/campaigns still full-load
 4. Isolate validation test data (cleanup Stripe test payments or use dedicated test org)
 
 ## Security & multi-tenant hardening (Priority 14)
@@ -837,6 +837,49 @@ npm run validate:donations-security
 * Staff list pages still fetch via client Supabase (protected by layout + RLS, not server-action wrappers)
 * `transactional_email_log` still uses org-membership SELECT (not permission-key aware)
 * Pagination still recommended before large-org production load
+
+## Production readiness & scalability (Priority 15)
+
+Status: Implemented (June 2026)
+
+### Database performance (migrations `096`–`098`)
+
+* `096_donations_performance_indexes.sql` — org-scoped indexes on `payments`, `pledges`, `donors`, receipts, checkout sessions
+* `097_donations_views.sql` — committed `pledge_status_view` + `donor_summary_view` with `security_invoker = true`
+* `098_donations_dashboard_rpcs.sql` — SQL summaries for dashboard KPIs, monthly chart, source breakdown
+
+Run after `095`:
+
+```bash
+npx supabase db query --linked -f scripts/096_donations_performance_indexes.sql
+npx supabase db query --linked -f scripts/097_donations_views.sql
+npx supabase db query --linked -f scripts/098_donations_dashboard_rpcs.sql
+npm run validate:donations-production
+```
+
+### Pagination & server-side lists
+
+* `lib/donations/donation-list-actions.ts` — paginated payments, pledges, donor summary queries (50/page)
+* `/donations/payments` — server-paginated table + search/status filters
+* `/donations/pledges` — server-paginated table; summary cards via `donation_org_pledge_summary` RPC
+* `/donations/donors` — `DonorsPaginatedList` on `donor_summary_view` (replaces full contact scan)
+* `/donations` dashboard — KPI/chart data via RPCs; recent payments limited to 5 rows
+
+### Operational visibility
+
+* `lib/donations/donation-ops-actions.ts` + `DonationOpsPanel` on settings → General tab
+* Surfaces failed emails, failed receipts, reconcile queue depth, Stripe processor failures
+
+### Email scalability
+
+* `sendBulkAnnualStatementsAction` — parallel batches of 10 (no external queue)
+
+### Remaining scale work
+
+* `/donations/reports` and `/donations/campaigns` still load full org payment/pledge sets for analytics
+* Recurring plans list not paginated (typically smaller dataset)
+* Customer portal payment history unbounded per contact
+* Dedicated test org for validation scripts still recommended
 
 ## Campaign goals & fundraising analytics (Priority 3)
 
