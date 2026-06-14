@@ -8,6 +8,13 @@ import {
   markCheckoutSessionStatus,
   recordProcessorEvent,
 } from "@/lib/donations/stripe/processor-payment"
+import {
+  handleInvoicePaid,
+  handleInvoicePaymentFailed,
+  handleRecurringCheckoutExpiredOrFailed,
+  handleSubscriptionDeleted,
+  handleSubscriptionUpdated,
+} from "@/lib/donations/stripe/processor-subscription"
 import type { CreateOneTimeDonationCheckoutInput } from "@/lib/donations/stripe/types"
 import { getAppBaseUrl, getStripeServerClient } from "@/lib/stripe/stripe-server"
 
@@ -112,16 +119,33 @@ export async function createOneTimeDonationCheckout(
   }
 }
 
+function extractWebhookOrganizationId(event: Stripe.Event): string | null {
+  const object = event.data.object as {
+    metadata?: Record<string, string>
+    subscription?: Stripe.Subscription | string | null
+  }
+
+  if (typeof object.metadata?.organization_id === "string") {
+    return object.metadata.organization_id
+  }
+
+  if (
+    typeof object.subscription === "object" &&
+    object.subscription &&
+    typeof object.subscription.metadata?.organization_id === "string"
+  ) {
+    return object.subscription.metadata.organization_id
+  }
+
+  return null
+}
+
 export async function processStripeDonationWebhookEvent(
   supabase: SupabaseClient,
   event: Stripe.Event
 ) {
-  const payload = event.data.object as Record<string, unknown>
-  const organizationId =
-    typeof (event.data.object as { metadata?: Record<string, string> }).metadata
-      ?.organization_id === "string"
-      ? (event.data.object as { metadata?: Record<string, string> }).metadata!.organization_id
-      : null
+  const payload = event.data.object as unknown as Record<string, unknown>
+  const organizationId = extractWebhookOrganizationId(event)
 
   const eventRecord = await recordProcessorEvent(supabase, {
     stripeEventId: event.id,
@@ -170,6 +194,19 @@ export async function processStripeDonationWebhookEvent(
       }
       case "checkout.session.expired": {
         const session = event.data.object as Stripe.Checkout.Session
+        const metadata = session.metadata ?? {}
+        if (metadata.checkout_type === "recurring_setup") {
+          const checkoutSessionId = await handleRecurringCheckoutExpiredOrFailed(supabase, {
+            manarateeCheckoutId: metadata.manaratee_checkout_id,
+            stripeCheckoutSessionId: session.id,
+            status: "expired",
+          })
+          return {
+            ok: true as const,
+            duplicate: false as const,
+            result: { handled: true, checkoutSessionId, status: "expired" },
+          }
+        }
         const checkoutSessionId = await markCheckoutSessionStatus(supabase, {
           manarateeCheckoutId: session.metadata?.manaratee_checkout_id,
           stripeCheckoutSessionId: session.id,
@@ -180,6 +217,35 @@ export async function processStripeDonationWebhookEvent(
           duplicate: false as const,
           result: { handled: true, checkoutSessionId, status: "expired" },
         }
+      }
+      case "invoice.paid":
+      case "invoice.payment_succeeded": {
+        const result = await handleInvoicePaid(
+          supabase,
+          event.data.object as Stripe.Invoice
+        )
+        return { ok: true as const, duplicate: false as const, result }
+      }
+      case "invoice.payment_failed": {
+        const result = await handleInvoicePaymentFailed(
+          supabase,
+          event.data.object as Stripe.Invoice
+        )
+        return { ok: true as const, duplicate: false as const, result }
+      }
+      case "customer.subscription.updated": {
+        const result = await handleSubscriptionUpdated(
+          supabase,
+          event.data.object as Stripe.Subscription
+        )
+        return { ok: true as const, duplicate: false as const, result }
+      }
+      case "customer.subscription.deleted": {
+        const result = await handleSubscriptionDeleted(
+          supabase,
+          event.data.object as Stripe.Subscription
+        )
+        return { ok: true as const, duplicate: false as const, result }
       }
       default: {
         await supabase

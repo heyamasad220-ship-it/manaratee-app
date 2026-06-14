@@ -2,6 +2,7 @@ import { CustomerNav } from "@/components/customer/customer-nav"
 import { OrgUserSupportBanner } from "@/components/organizations/org-user-support-banner"
 import { getUserPortalCapabilities } from "@/lib/auth/portal-capabilities"
 import { resolveCustomerPortalSession } from "@/lib/auth/customer-portal-session"
+import { loadCustomerPortalEnabledModuleSlugs } from "@/lib/customer/customer-portal-modules-server"
 import { getActiveOrganization } from "@/lib/organizations/get-active-organization"
 import { linkVendorContactsForCurrentUser } from "@/lib/vendor-hub/link-vendor-contact-auth"
 import { createClient } from "@/lib/supabase/server"
@@ -39,12 +40,19 @@ export default async function CustomerLayout({
     await linkVendorContactsForCurrentUser(supabase)
   }
 
+  const enabledModuleSlugs = activeOrganization?.organization_id
+    ? Array.from(
+        await loadCustomerPortalEnabledModuleSlugs(activeOrganization.organization_id)
+      )
+    : []
+
   return (
     <div className="flex min-h-screen bg-muted/30">
       <CustomerNav
         activeOrganization={activeOrganization}
         organizations={organizations}
         portalCapabilities={portalCapabilities}
+        enabledModuleSlugs={enabledModuleSlugs}
       />
 
       <main className="flex-1 overflow-x-hidden">

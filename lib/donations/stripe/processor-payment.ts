@@ -2,55 +2,18 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import type Stripe from "stripe"
 
 import { parseDonationCheckoutMetadata } from "@/lib/donations/stripe/metadata"
+import {
+  loadCheckoutSession,
+  markCheckoutSessionStatus,
+} from "@/lib/donations/stripe/checkout-session-utils"
+import { handleRecurringCheckoutSessionCompleted } from "@/lib/donations/stripe/processor-subscription"
 import { maybeAutoGenerateAndEmailPaymentReceipt } from "@/lib/donations/stripe/receipt-after-payment"
 import type {
   DonationCheckoutMetadata,
   ProcessorPaymentInsertResult,
 } from "@/lib/donations/stripe/types"
 
-type CheckoutSessionRow = {
-  id: string
-  organization_id: string
-  donor_id: string | null
-  contact_id: string | null
-  campaign_id: string | null
-  category_id: string | null
-  subcategory_id: string | null
-  payment_id: string | null
-  status: string
-}
-
-async function loadCheckoutSession(
-  supabase: SupabaseClient,
-  input: {
-    manarateeCheckoutId?: string | null
-    stripeCheckoutSessionId?: string | null
-  }
-): Promise<CheckoutSessionRow | null> {
-  if (input.manarateeCheckoutId) {
-    const { data } = await supabase
-      .from("donation_checkout_sessions")
-      .select(
-        "id, organization_id, donor_id, contact_id, campaign_id, category_id, subcategory_id, payment_id, status"
-      )
-      .eq("id", input.manarateeCheckoutId)
-      .maybeSingle()
-    if (data) return data as CheckoutSessionRow
-  }
-
-  if (input.stripeCheckoutSessionId) {
-    const { data } = await supabase
-      .from("donation_checkout_sessions")
-      .select(
-        "id, organization_id, donor_id, contact_id, campaign_id, category_id, subcategory_id, payment_id, status"
-      )
-      .eq("stripe_checkout_session_id", input.stripeCheckoutSessionId)
-      .maybeSingle()
-    if (data) return data as CheckoutSessionRow
-  }
-
-  return null
-}
+import type { CheckoutSessionRow } from "@/lib/donations/stripe/checkout-session-utils"
 
 function resolveAttribution(
   metadata: DonationCheckoutMetadata,
@@ -211,24 +174,7 @@ export async function recordProcessorEvent(
   return { duplicate: false, eventId: data.id }
 }
 
-export async function markCheckoutSessionStatus(
-  supabase: SupabaseClient,
-  input: {
-    manarateeCheckoutId?: string | null
-    stripeCheckoutSessionId?: string | null
-    status: "expired" | "failed" | "open" | "complete"
-  }
-) {
-  const checkoutSession = await loadCheckoutSession(supabase, input)
-  if (!checkoutSession?.id) return null
-
-  await supabase
-    .from("donation_checkout_sessions")
-    .update({ status: input.status })
-    .eq("id", checkoutSession.id)
-
-  return checkoutSession.id
-}
+export { markCheckoutSessionStatus } from "@/lib/donations/stripe/checkout-session-utils"
 
 export async function handleCheckoutSessionCompleted(
   supabase: SupabaseClient,
@@ -238,7 +184,19 @@ export async function handleCheckoutSessionCompleted(
     (session.metadata ?? {}) as Record<string, string>
   )
 
-  if (!metadata || metadata.checkout_type !== "one_time") {
+  if (!metadata) {
+    return { handled: false as const, reason: "invalid_metadata" }
+  }
+
+  if (metadata.checkout_type === "recurring_setup") {
+    const result = await handleRecurringCheckoutSessionCompleted(supabase, session)
+    if ("handled" in result && result.handled === false) {
+      return result
+    }
+    return { handled: true as const, checkoutType: "recurring_setup" as const, ...result }
+  }
+
+  if (metadata.checkout_type !== "one_time") {
     return { handled: false as const, reason: "unsupported_checkout_type" }
   }
 

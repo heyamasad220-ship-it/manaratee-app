@@ -16,6 +16,7 @@
     "validate:recurring-donations": "node scripts/validate-recurring-donations.mjs",
     "validate:payment-attribution": "node scripts/validate-payment-attribution.mjs",
     "validate:stripe-one-time": "node scripts/validate-stripe-one-time-donations.mjs",
+    "validate:stripe-recurring": "node scripts/validate-stripe-recurring-donations.mjs",
     "validate:transactional-email": "node scripts/validate-transactional-email.mjs",
     "validate:donations-security": "node scripts/validate-donations-security.mjs",
     "validate:donations-production": "node scripts/validate-donations-production-readiness.mjs",

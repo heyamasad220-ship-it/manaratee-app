@@ -1,7 +1,14 @@
 export const RECURRING_FREQUENCIES = ["weekly", "monthly", "quarterly", "annually"] as const
 export type RecurringFrequency = (typeof RECURRING_FREQUENCIES)[number]
 
-export const RECURRING_STATUSES = ["active", "paused", "cancelled", "completed"] as const
+export const RECURRING_STATUSES = [
+  "pending_setup",
+  "active",
+  "paused",
+  "past_due",
+  "cancelled",
+  "completed",
+] as const
 export type RecurringStatus = (typeof RECURRING_STATUSES)[number]
 
 export type RecurringDonationPlan = {
@@ -22,6 +29,7 @@ export type RecurringDonationPlan = {
   notes: string | null
   external_processor: string | null
   external_processor_id: string | null
+  stripe_customer_id: string | null
   created_at: string
   updated_at: string
 }
@@ -79,7 +87,14 @@ export function formatRecurringFrequencyLabel(frequency: string): string {
 }
 
 export function formatRecurringStatusLabel(status: string): string {
-  return status.charAt(0).toUpperCase() + status.slice(1)
+  switch (status) {
+    case "pending_setup":
+      return "Pending Setup"
+    case "past_due":
+      return "Past Due"
+    default:
+      return status.charAt(0).toUpperCase() + status.slice(1)
+  }
 }
 
 export function monthlyEquivalentAmount(amount: number, frequency: RecurringFrequency): number {

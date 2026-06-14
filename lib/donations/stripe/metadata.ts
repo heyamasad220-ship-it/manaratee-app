@@ -12,6 +12,7 @@ export function buildDonationCheckoutMetadata(input: {
   campaignId?: string | null
   categoryId?: string | null
   subcategoryId?: string | null
+  recurringDonationPlanId?: string | null
   checkoutType: DonationCheckoutMetadata["checkout_type"]
   manarateeCheckoutId: string
 }): DonationCheckoutMetadata {
@@ -26,10 +27,12 @@ export function buildDonationCheckoutMetadata(input: {
   const campaignId = cleanMetadataValue(input.campaignId)
   const categoryId = cleanMetadataValue(input.categoryId)
   const subcategoryId = cleanMetadataValue(input.subcategoryId)
+  const recurringDonationPlanId = cleanMetadataValue(input.recurringDonationPlanId)
 
   if (campaignId) metadata.campaign_id = campaignId
   if (categoryId) metadata.category_id = categoryId
   if (subcategoryId) metadata.subcategory_id = subcategoryId
+  if (recurringDonationPlanId) metadata.recurring_donation_plan_id = recurringDonationPlanId
 
   return metadata
 }
@@ -62,5 +65,6 @@ export function parseDonationCheckoutMetadata(
     campaign_id: metadata.campaign_id || undefined,
     category_id: metadata.category_id || undefined,
     subcategory_id: metadata.subcategory_id || undefined,
+    recurring_donation_plan_id: metadata.recurring_donation_plan_id || undefined,
   }
 }

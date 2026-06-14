@@ -219,8 +219,8 @@ export default function RecurringDonationsPage() {
           <div>
             <h2 className="text-lg font-semibold">Recurring Donation Plans</h2>
             <p className="text-sm text-muted-foreground">
-              Ongoing giving commitments — not pledges. Record actual payments manually until
-              processor billing is connected.
+              Ongoing giving commitments — not pledges. Stripe-linked plans bill automatically;
+              manual plans can still record payments here.
             </p>
           </div>
           <div className="flex gap-2">
@@ -302,7 +302,9 @@ export default function RecurringDonationsPage() {
             <SelectContent>
               <SelectItem value="all">All Statuses</SelectItem>
               <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="past_due">Past Due</SelectItem>
               <SelectItem value="paused">Paused</SelectItem>
+              <SelectItem value="pending_setup">Pending Setup</SelectItem>
               <SelectItem value="cancelled">Cancelled</SelectItem>
               <SelectItem value="completed">Completed</SelectItem>
             </SelectContent>
@@ -316,6 +318,7 @@ export default function RecurringDonationsPage() {
                 <TableRow>
                   <TableHead>Donor</TableHead>
                   <TableHead>Campaign</TableHead>
+                  <TableHead>Processor</TableHead>
                   <TableHead className="text-right">Amount</TableHead>
                   <TableHead>Frequency</TableHead>
                   <TableHead>Start</TableHead>
@@ -327,13 +330,13 @@ export default function RecurringDonationsPage() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
+                    <TableCell colSpan={9} className="py-8 text-center text-muted-foreground">
                       Loading recurring plans...
                     </TableCell>
                   </TableRow>
                 ) : filteredPlans.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
+                    <TableCell colSpan={9} className="py-8 text-center text-muted-foreground">
                       No recurring donation plans found.
                     </TableCell>
                   </TableRow>
@@ -342,12 +345,43 @@ export default function RecurringDonationsPage() {
                     <TableRow key={plan.id}>
                       <TableCell className="font-medium">{plan.donor_name || "—"}</TableCell>
                       <TableCell>{plan.campaign_name || "—"}</TableCell>
+                      <TableCell>
+                        {plan.external_processor === "stripe" ? (
+                          <div className="flex flex-col gap-0.5">
+                            <Badge variant="default" className="w-fit text-xs">
+                              Stripe
+                            </Badge>
+                            {plan.external_processor_id ? (
+                              <span
+                                className="max-w-[120px] truncate font-mono text-[10px] text-muted-foreground"
+                                title={plan.external_processor_id}
+                              >
+                                {plan.external_processor_id}
+                              </span>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <Badge variant="outline" className="text-xs">
+                            Manual
+                          </Badge>
+                        )}
+                      </TableCell>
                       <TableCell className="text-right">{formatCurrency(plan.amount)}</TableCell>
                       <TableCell>{formatRecurringFrequencyLabel(plan.frequency)}</TableCell>
                       <TableCell>{formatDate(plan.start_date)}</TableCell>
                       <TableCell>{formatDate(plan.next_payment_date)}</TableCell>
                       <TableCell>
-                        <Badge variant="secondary">{formatRecurringStatusLabel(plan.status)}</Badge>
+                        <Badge
+                          variant={
+                            plan.status === "past_due"
+                              ? "destructive"
+                              : plan.status === "pending_setup"
+                                ? "outline"
+                                : "secondary"
+                          }
+                        >
+                          {formatRecurringStatusLabel(plan.status)}
+                        </Badge>
                       </TableCell>
                       <TableCell>
                         <DropdownMenu>
@@ -357,7 +391,9 @@ export default function RecurringDonationsPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            {(plan.status === "active" || plan.status === "paused") && (
+                            {(plan.status === "active" ||
+                              plan.status === "paused" ||
+                              plan.status === "past_due") && (
                               <DropdownMenuItem
                                 onClick={() => {
                                   setSelectedPlan(plan)
@@ -381,7 +417,9 @@ export default function RecurringDonationsPage() {
                                 Resume Plan
                               </DropdownMenuItem>
                             )}
-                            {(plan.status === "active" || plan.status === "paused") && (
+                            {(plan.status === "active" ||
+                              plan.status === "paused" ||
+                              plan.status === "past_due") && (
                               <DropdownMenuItem
                                 onClick={() => handleStatusChange(plan.id, "cancelled")}
                               >

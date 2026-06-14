@@ -500,7 +500,7 @@ function buildNavItems(rows: SidebarModuleRow[], permissionContext: UserPermissi
     ...dynamicItems,
     {
       label: "Settings",
-      href: "/settings",
+      href: "/settings/users",
       icon: Settings,
       matchPrefix: "/settings",
       group: "System",

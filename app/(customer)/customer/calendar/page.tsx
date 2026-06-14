@@ -1,5 +1,8 @@
 import { redirect } from "next/navigation"
 
-export default function CustomerCalendarRedirect() {
+import { guardCustomerPortalPath } from "@/lib/customer/customer-portal-modules-server"
+
+export default async function CustomerCalendarRedirect() {
+  await guardCustomerPortalPath("/customer/calendar")
   redirect("/customer/rentals/new")
 }

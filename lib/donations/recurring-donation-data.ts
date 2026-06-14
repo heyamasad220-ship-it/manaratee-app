@@ -50,6 +50,7 @@ export async function fetchRecurringPlans(
     notes: row.notes,
     external_processor: row.external_processor,
     external_processor_id: row.external_processor_id,
+    stripe_customer_id: row.stripe_customer_id ?? null,
     created_at: row.created_at,
     updated_at: row.updated_at,
     donor_name: row.donors?.full_name ?? null,

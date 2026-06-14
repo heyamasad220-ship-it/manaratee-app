@@ -99,6 +99,23 @@ Working — requires Supabase email + redirect URL configuration (see `docs/Know
 
 Status: Partial
 
+## Module-aware navigation (June 2026)
+
+Customer sidebar and dashboard only show areas enabled for the active organization (`organization_modules`), matching the staff sidebar.
+
+| Customer area | Required module slug |
+|---------------|----------------------|
+| Venue Rentals / Book a Space | `bookings` |
+| Donations | `donations` |
+| Programs | `programs` |
+| My Bazaars | `vendor-hub` |
+| Opportunities | `membership` |
+| Dashboard / Profile | always visible |
+
+Key files: `lib/customer/customer-portal-modules.ts` (client-safe), `lib/customer/customer-portal-modules-server.ts` (server loaders/guards), `components/customer/customer-nav.tsx`, `app/(customer)/layout.tsx`. Disabled module routes redirect to `/customer/dashboard`.
+
+For a donations-only org (e.g. MAS Dallas on the **Nonprofit** bundle), ensure only `donations` is enabled in platform admin → organization modules (or assign bundle `nonprofit`).
+
 ## Organization Switching
 
 Completed
@@ -695,7 +712,71 @@ stripe listen --forward-to localhost:3000/api/webhooks/stripe/donations
 
 ### Out of scope (P11)
 
-Stripe subscriptions, refunds, pledge-via-Stripe, per-org Stripe Connect onboarding.
+Refunds, pledge-via-Stripe, per-org Stripe Connect onboarding. (Stripe **subscriptions** moved to Priority 16.)
+
+## Stripe recurring donation subscriptions (Priority 16)
+
+Status: Implemented (June 2026)
+
+### Goal
+
+Stripe-powered recurring billing on top of existing `recurring_donation_plans`. Canonical `payments` rows are created only from `invoice.paid` / `invoice.payment_succeeded` webhooks — not at checkout start.
+
+### Schema (migration `100_stripe_recurring_donations.sql`)
+
+* `payments.stripe_invoice_id` — unique partial index for invoice idempotency
+* `recurring_donation_plans.stripe_customer_id`
+* Plan statuses extended: `pending_setup`, `past_due` (plus existing `active`, `paused`, `cancelled`, `completed`)
+
+### Customer portal
+
+* `/customer/donation` — **Recurring Donation** dialog: amount, frequency (monthly / quarterly / annually), campaign, category/fund, Stripe card checkout
+* `createRecurringDonationCheckoutAction` creates `recurring_donation_plans` (`pending_setup`) + `donation_checkout_sessions` (`recurring_setup`) + Stripe Checkout `mode: subscription`
+* Success redirect: `/customer/donation?checkout=success&type=recurring&session_id={CHECKOUT_SESSION_ID}`
+
+### Webhook events (`POST /api/webhooks/stripe/donations`)
+
+| Event | Behavior |
+|-------|----------|
+| `checkout.session.completed` (recurring_setup) | Link `external_processor_id` (subscription), `stripe_customer_id`, activate plan; **no** payment insert |
+| `invoice.paid` / `invoice.payment_succeeded` | Insert canonical `payments` with `recurring_donation_plan_id`, `stripe_invoice_id`; auto-receipt when enabled |
+| `invoice.payment_failed` | Log event; set plan `past_due`; no payment |
+| `customer.subscription.updated` | Sync plan status + `next_payment_date` from Stripe period |
+| `customer.subscription.deleted` | Set plan `cancelled` |
+
+One-time checkout events unchanged (P11).
+
+### Key files
+
+| Area | Path |
+|------|------|
+| Recurring checkout | `lib/donations/stripe/recurring-checkout.ts` |
+| Subscription webhooks | `lib/donations/stripe/processor-subscription.ts` |
+| Stripe helpers | `lib/donations/stripe/recurring-stripe-utils.ts` |
+| Server actions | `lib/donations/stripe-donation-actions.ts` |
+| Portal UI | `app/(customer)/customer/donation/page.tsx` |
+| Staff UI | `app/(dashboard)/donations/(operations)/recurring/page.tsx` |
+
+### Validation
+
+```bash
+npx supabase db query --linked -f scripts/100_stripe_recurring_donations.sql
+npm run validate:stripe-recurring
+```
+
+**Validated (June 2026):** 19/19 — subscription checkout, plan link, invoice payment insert, idempotency (invoice + event), attribution FKs, donor/recurring/campaign reporting, legacy tables untouched.
+
+### Manual test (Stripe CLI)
+
+```bash
+stripe listen --forward-to localhost:3000/api/webhooks/stripe/donations
+# Portal → Recurring Donation → test card 4242 4242 4242 4242
+# Subscribe to webhook events: checkout.session.completed, invoice.paid, invoice.payment_failed, customer.subscription.updated, customer.subscription.deleted
+```
+
+### Out of scope (P16)
+
+Refunds, donor self-service pause/cancel in portal, Stripe Customer Portal for card updates, per-org Stripe Connect, weekly frequency in portal (staff manual plans still support weekly).
 
 ## Transactional email delivery (Priority 12)
 
@@ -769,6 +850,7 @@ Status: Audit complete (June 2026)
 | `validate:campaign-analytics` | 6/9 | Expected values stale after Stripe validation inserts |
 | `validate:recurring-donations` | 9/9 | Pass |
 | `validate:stripe-one-time` | 14/14 | Pass |
+| `validate:stripe-recurring` | 19/19 | Pass |
 | `validate:transactional-email` | 8/8 | Pass |
 | `validate:donation-receipts` | — | Fails when multiple orgs share seed campaign code (`maybeSingle` ambiguity) |
 | `validate:pledge-reminders` | — | Same org-scoping issue |
@@ -1069,9 +1151,7 @@ Recurring donations are **not** pledges and do **not** auto-create receipts.
 
 ### Future processor integration
 
-* `external_processor` + `external_processor_id` columns reserved on plans.
-* Payment recording action can be swapped for webhook-driven inserts without schema changes.
-* Stripe billing subscriptions would populate processor fields and set `source_type=processor`.
+* Implemented in Priority 16 — Stripe subscriptions populate `external_processor` / `external_processor_id` / `stripe_customer_id`; invoice webhooks insert canonical `payments` with `source_type=processor`.
 
 ### Validation
 

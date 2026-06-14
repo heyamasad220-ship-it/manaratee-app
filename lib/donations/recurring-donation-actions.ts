@@ -125,8 +125,8 @@ export async function recordRecurringDonationPaymentAction(input: {
     return { success: false as const, error: planError?.message || "Plan not found" }
   }
 
-  if (plan.status !== "active" && plan.status !== "paused") {
-    return { success: false as const, error: "Only active or paused plans can receive payments" }
+  if (plan.status !== "active" && plan.status !== "paused" && plan.status !== "past_due") {
+    return { success: false as const, error: "Only active, paused, or past-due plans can receive payments" }
   }
 
   const amount = input.amount ?? Number(plan.amount)

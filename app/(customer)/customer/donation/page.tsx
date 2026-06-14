@@ -9,6 +9,7 @@ import {
   Plus,
   CheckCircle2,
   Clock,
+  RefreshCw,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { loadCustomerDonationPortalData } from "@/lib/customer/customer-portal-data-actions"
@@ -21,6 +22,7 @@ import {
 import { normalizePaymentSourceChannel, isStripeCheckoutPaymentMethod } from "@/lib/donations/payment-source-channel"
 import {
   createOneTimeDonationCheckoutAction,
+  createRecurringDonationCheckoutAction,
   getDonationCheckoutStatusAction,
 } from "@/lib/donations/stripe-donation-actions"
 import {
@@ -150,13 +152,16 @@ export default function CustomerDonationsPage() {
   const [showPaymentDialog, setShowPaymentDialog] = useState(false)
   const [showNewPledgeDialog, setShowNewPledgeDialog] = useState(false)
   const [showOneTimeDonationDialog, setShowOneTimeDonationDialog] = useState(false)
+  const [showRecurringDonationDialog, setShowRecurringDonationDialog] = useState(false)
 
   const [paymentAmount, setPaymentAmount] = useState("")
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("")
   const [isProcessing, setIsProcessing] = useState(false)
   const [paymentSuccess, setPaymentSuccess] = useState(false)
   const [oneTimeDonationSuccess, setOneTimeDonationSuccess] = useState(false)
+  const [recurringDonationSuccess, setRecurringDonationSuccess] = useState(false)
   const [checkoutSuccessAmount, setCheckoutSuccessAmount] = useState<number | null>(null)
+  const [checkoutSuccessFrequency, setCheckoutSuccessFrequency] = useState<string | null>(null)
   const [formError, setFormError] = useState("")
 
   const [newPledgeForm, setNewPledgeForm] = useState({
@@ -174,6 +179,14 @@ export default function CustomerDonationsPage() {
     category: "",
     fund: "",
     paymentMethod: "",
+  })
+
+  const [recurringDonationForm, setRecurringDonationForm] = useState({
+    amount: "",
+    frequency: "monthly" as "monthly" | "quarterly" | "annually",
+    campaign: "",
+    category: "",
+    fund: "",
   })
 
   useEffect(() => {
@@ -257,11 +270,16 @@ export default function CustomerDonationsPage() {
 
     const params = new URLSearchParams(window.location.search)
     const checkoutState = params.get("checkout")
+    const checkoutType = params.get("type")
     const stripeSessionId = params.get("session_id")
 
     if (checkoutState === "cancelled") {
       setFormError("Online payment was cancelled. You can try again or choose an offline method.")
-      setShowOneTimeDonationDialog(true)
+      if (checkoutType === "recurring") {
+        setShowRecurringDonationDialog(true)
+      } else {
+        setShowOneTimeDonationDialog(true)
+      }
       window.history.replaceState({}, "", "/customer/donation")
       return
     }
@@ -272,6 +290,29 @@ export default function CustomerDonationsPage() {
       const result = await getDonationCheckoutStatusAction(stripeSessionId!)
       if (!result.success) {
         setFormError(result.error || "Could not confirm your payment yet. Please check back shortly.")
+        return
+      }
+
+      if (result.checkoutType === "recurring_setup") {
+        if (result.status === "complete" && result.recurringPlan?.status === "active") {
+          setCheckoutSuccessAmount(result.amount)
+          setCheckoutSuccessFrequency(result.recurringPlan.frequency)
+          setRecurringDonationSuccess(true)
+          setShowRecurringDonationDialog(true)
+        } else if (result.status === "complete") {
+          setCheckoutSuccessAmount(result.amount)
+          setCheckoutSuccessFrequency(result.recurringPlan?.frequency ?? null)
+          setRecurringDonationSuccess(true)
+          setShowRecurringDonationDialog(true)
+          setFormError(
+            "Your recurring gift is set up. The first charge may take a moment to appear in your history."
+          )
+        } else {
+          setFormError(
+            "Your recurring setup is still processing. Refresh this page in a moment."
+          )
+        }
+        window.history.replaceState({}, "", "/customer/donation")
         return
       }
 
@@ -367,6 +408,52 @@ export default function CustomerDonationsPage() {
     setOneTimeDonationSuccess(false)
     setFormError("")
     setShowOneTimeDonationDialog(true)
+  }
+
+  const handleOpenRecurringDonation = () => {
+    setRecurringDonationForm({
+      amount: "",
+      frequency: "monthly",
+      campaign: "",
+      category: "",
+      fund: "",
+    })
+    setRecurringDonationSuccess(false)
+    setFormError("")
+    setShowRecurringDonationDialog(true)
+  }
+
+  const processRecurringDonation = async () => {
+    if (!contact) return
+
+    setIsProcessing(true)
+    setFormError("")
+
+    const hasStripeMethod = savedPaymentMethods.some((method) =>
+      isStripeCheckoutPaymentMethod(method.name)
+    )
+
+    if (!hasStripeMethod) {
+      setFormError("Online card payments are not available for recurring gifts yet.")
+      setIsProcessing(false)
+      return
+    }
+
+    const result = await createRecurringDonationCheckoutAction({
+      amount: Number(recurringDonationForm.amount || 0),
+      frequency: recurringDonationForm.frequency,
+      campaignId: recurringDonationForm.campaign || null,
+      categoryId: recurringDonationForm.category || null,
+      subcategoryId: recurringDonationForm.fund || null,
+    })
+
+    if (!result.success || !result.checkoutUrl) {
+      setFormError(result.error || "Could not start recurring checkout. Please try again.")
+      setIsProcessing(false)
+      return
+    }
+
+    window.location.href = result.checkoutUrl
   }
 
   const handleOpenNewPledge = () => {
@@ -753,6 +840,10 @@ export default function CustomerDonationsPage() {
                 <Button size="sm" onClick={handleOpenOneTimeDonation}>
                   <Heart className="mr-1 h-4 w-4" />
                   One-Time Donation
+                </Button>
+                <Button variant="secondary" size="sm" onClick={handleOpenRecurringDonation}>
+                  <RefreshCw className="mr-1 h-4 w-4" />
+                  Recurring Donation
                 </Button>
                 <Button variant="outline" size="sm" onClick={handleOpenNewPledge}>
                   <Plus className="mr-1 h-4 w-4" />
@@ -1155,6 +1246,210 @@ export default function CustomerDonationsPage() {
                     <>
                       <DollarSign className="h-4 w-4" />
                       Record {formatCurrency(Number(oneTimeDonationForm.amount) || 0)} offline
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Recurring Donation Dialog */}
+      <Dialog open={showRecurringDonationDialog} onOpenChange={setShowRecurringDonationDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {recurringDonationSuccess
+                ? "Recurring Gift Started"
+                : "Set Up a Recurring Donation"}
+            </DialogTitle>
+            <DialogDescription>
+              {recurringDonationSuccess
+                ? "Thank you for your ongoing support!"
+                : "Choose an amount and frequency. You will complete card setup securely on Stripe."}
+            </DialogDescription>
+          </DialogHeader>
+
+          {recurringDonationSuccess ? (
+            <div className="flex flex-col items-center gap-4 py-6">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100">
+                <CheckCircle2 className="h-8 w-8 text-emerald-600" />
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-foreground">
+                  {formatCurrency(checkoutSuccessAmount ?? Number(recurringDonationForm.amount || 0))}
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {checkoutSuccessFrequency
+                    ? `${checkoutSuccessFrequency.charAt(0).toUpperCase()}${checkoutSuccessFrequency.slice(1)} recurring gift — card on file with Stripe`
+                    : "Recurring gift set up with Stripe"}
+                </p>
+              </div>
+              <Button className="mt-4 w-full" onClick={() => setShowRecurringDonationDialog(false)}>
+                Done
+              </Button>
+            </div>
+          ) : (
+            <>
+              <div className="flex flex-col gap-4 py-4">
+                <div className="flex flex-col gap-2">
+                  <Label>Donation Amount</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                      $
+                    </span>
+                    <Input
+                      type="number"
+                      value={recurringDonationForm.amount}
+                      onChange={(e) =>
+                        setRecurringDonationForm({
+                          ...recurringDonationForm,
+                          amount: e.target.value,
+                        })
+                      }
+                      className="pl-7"
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <Label>Frequency</Label>
+                  <Select
+                    value={recurringDonationForm.frequency}
+                    onValueChange={(v) =>
+                      setRecurringDonationForm({
+                        ...recurringDonationForm,
+                        frequency: v as "monthly" | "quarterly" | "annually",
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                      <SelectItem value="quarterly">Quarterly</SelectItem>
+                      <SelectItem value="annually">Annually</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {campaigns.length > 0 ? (
+                  <div className="flex flex-col gap-2">
+                    <Label>Campaign (optional)</Label>
+                    <Select
+                      value={recurringDonationForm.campaign || "none"}
+                      onValueChange={(v) =>
+                        setRecurringDonationForm({
+                          ...recurringDonationForm,
+                          campaign: v === "none" ? "" : v,
+                        })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select campaign" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No campaign</SelectItem>
+                        {campaigns.map((campaign) => (
+                          <SelectItem key={campaign.id} value={campaign.id}>
+                            {campaign.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : null}
+
+                <div className="flex flex-col gap-2">
+                  <Label>Donation Category</Label>
+                  <Select
+                    value={recurringDonationForm.category}
+                    onValueChange={(v) =>
+                      setRecurringDonationForm({
+                        ...recurringDonationForm,
+                        category: v,
+                        fund: "",
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {donationCategories.map((cat) => (
+                        <SelectItem key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {recurringDonationForm.category && (
+                  <div className="flex flex-col gap-2">
+                    <Label>Specific Fund</Label>
+                    <Select
+                      value={recurringDonationForm.fund}
+                      onValueChange={(v) =>
+                        setRecurringDonationForm({
+                          ...recurringDonationForm,
+                          fund: v,
+                        })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select fund" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {donationCategories
+                          .find((c) => c.id === recurringDonationForm.category)
+                          ?.funds.map((fund) => (
+                            <SelectItem key={fund.id} value={fund.id}>
+                              {fund.name}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                <div className="rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground">
+                  Payment method: <span className="font-medium text-foreground">Credit card via Stripe</span>
+                </div>
+
+                {formError && (
+                  <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                    {formError}
+                  </div>
+                )}
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowRecurringDonationDialog(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={processRecurringDonation}
+                  disabled={
+                    !recurringDonationForm.amount ||
+                    !recurringDonationForm.category ||
+                    !recurringDonationForm.fund ||
+                    isProcessing
+                  }
+                  className="gap-2"
+                >
+                  {isProcessing ? (
+                    <>
+                      <Clock className="h-4 w-4 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <CreditCard className="h-4 w-4" />
+                      Continue to Stripe
                     </>
                   )}
                 </Button>

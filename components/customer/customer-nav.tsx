@@ -10,7 +10,6 @@ import {
   ClipboardList,
   Gift,
   GraduationCap,
-  Grid3X3,
   HeartHandshake,
   Home,
   LogOut,
@@ -22,6 +21,10 @@ import { OrganizationSwitcher } from "@/components/organization-switcher"
 import { PortalSwitcher } from "@/components/portal/portal-switcher"
 import type { UserPortalCapabilities } from "@/lib/auth/portal-capabilities-types"
 import type { CustomerOrganization } from "@/lib/customer/customer-organization-types"
+import {
+  CUSTOMER_PORTAL_NAV_ITEMS,
+  filterCustomerPortalNavItems,
+} from "@/lib/customer/customer-portal-modules"
 import { formatCustomerPortalRoleLabel } from "@/lib/customer/customer-portal-role-label"
 import { cn } from "@/lib/utils"
 
@@ -29,19 +32,19 @@ type CustomerNavProps = {
   activeOrganization: CustomerOrganization | null
   organizations: CustomerOrganization[]
   portalCapabilities?: UserPortalCapabilities
+  enabledModuleSlugs?: string[]
 }
 
-const memberNavLinks = [
-  { label: "Dashboard", href: "/customer/dashboard", icon: Home },
-  { label: "Venue Rentals", href: "/customer/rentals", icon: CalendarDays },
-  { label: "Book a Space", href: "/customer/rentals/new", icon: CalendarPlus },
-  { label: "Donations", href: "/customer/donation", icon: Gift },
-  { label: "Programs", href: "/customer/programs", icon: HeartHandshake },
-  { label: "My Bazaars", href: "/customer/bazaars", icon: Store },
-  { label: "Opportunities", href: "/customer/opportunities", icon: ClipboardList },
-  { label: "Profile", href: "/customer/profile", icon: User },
-  { label: "More", href: "/customer/more", icon: Grid3X3 },
-]
+const memberNavIcons = {
+  "/customer/dashboard": Home,
+  "/customer/rentals": CalendarDays,
+  "/customer/rentals/new": CalendarPlus,
+  "/customer/donation": Gift,
+  "/customer/programs": HeartHandshake,
+  "/customer/bazaars": Store,
+  "/customer/opportunities": ClipboardList,
+  "/customer/profile": User,
+} as const
 
 const teachingNavLinks = [
   { label: "My Classes", href: "/my-classes", icon: GraduationCap },
@@ -61,11 +64,22 @@ export function CustomerNav({
   activeOrganization,
   organizations,
   portalCapabilities,
+  enabledModuleSlugs = [],
 }: CustomerNavProps) {
   const pathname = usePathname()
   const portalRoleLabel = formatCustomerPortalRoleLabel(
     activeOrganization?.role_name
   )
+
+  const enabledSlugSet = new Set(enabledModuleSlugs)
+  const filteredMemberNav = filterCustomerPortalNavItems(
+    CUSTOMER_PORTAL_NAV_ITEMS,
+    enabledSlugSet
+  ).map((item) => ({
+    ...item,
+    icon:
+      memberNavIcons[item.href as keyof typeof memberNavIcons] ?? Home,
+  }))
 
   const isTeachingPortal = pathname.startsWith("/my-classes")
   const isStaffPortal = pathname.startsWith("/customer/staff")
@@ -75,11 +89,10 @@ export function CustomerNav({
     : isStaffPortal
       ? staffNavLinks
       : [
-          ...memberNavLinks.slice(0, 5),
+          ...filteredMemberNav,
           ...(portalCapabilities?.hasStaffToolsPortal
             ? [{ label: "Staff Tools", href: "/customer/staff", icon: Briefcase }]
             : []),
-          ...memberNavLinks.slice(5),
           ...(portalCapabilities?.hasTeachingPortal
             ? [{ label: "My Classes", href: "/my-classes", icon: GraduationCap }]
             : []),

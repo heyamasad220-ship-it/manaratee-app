@@ -14,6 +14,10 @@ import {
 import { getCustomerPortalSupabase } from "@/lib/auth/customer-portal-session"
 import { getActiveOrganization } from "@/lib/organizations/get-active-organization"
 import { getUserPortalCapabilities } from "@/lib/auth/portal-capabilities"
+import {
+  isCustomerPortalModuleEnabled,
+} from "@/lib/customer/customer-portal-modules"
+import { loadCustomerPortalEnabledModuleSlugs } from "@/lib/customer/customer-portal-modules-server"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 
@@ -31,6 +35,7 @@ export default async function CustomerDashboardPage() {
   const organizationId = activeOrganization.organization_id
 
   const portalCapabilities = await getUserPortalCapabilities(userId, organizationId)
+  const enabledModuleSlugs = await loadCustomerPortalEnabledModuleSlugs(organizationId)
 
   const { data: contact } = await supabase
     .from("contacts")
@@ -45,57 +50,72 @@ export default async function CustomerDashboardPage() {
     user.email?.split("@")?.[0] ||
     "there"
 
-  const { count: rentalsCount } = await supabase
-    .from("venue_rentals")
-    .select("*", { count: "exact", head: true })
-    .eq("organization_id", organizationId)
-    .eq("customer_user_id", userId)
-
-  const { count: pendingRentalsCount } = await supabase
-    .from("venue_rentals")
-    .select("*", { count: "exact", head: true })
-    .eq("organization_id", organizationId)
-    .eq("customer_user_id", userId)
-    .eq("status", "awaiting_supervisor_approval")
-
-  const { count: donationCount } = contact?.id
+  const { count: rentalsCount } = isCustomerPortalModuleEnabled(enabledModuleSlugs, "bookings")
     ? await supabase
-        .from("payments")
+        .from("venue_rentals")
         .select("*", { count: "exact", head: true })
         .eq("organization_id", organizationId)
-        .eq("contact_id", contact.id)
+        .eq("customer_user_id", userId)
     : { count: 0 }
 
-  const { count: programEnrollmentCount } = contact?.id
+  const { count: pendingRentalsCount } = isCustomerPortalModuleEnabled(
+    enabledModuleSlugs,
+    "bookings"
+  )
     ? await supabase
-        .from("program_enrollments")
+        .from("venue_rentals")
         .select("*", { count: "exact", head: true })
         .eq("organization_id", organizationId)
-        .eq("registrant_contact_id", contact.id)
+        .eq("customer_user_id", userId)
+        .eq("status", "awaiting_supervisor_approval")
     : { count: 0 }
+
+  const { count: donationCount } =
+    contact?.id && isCustomerPortalModuleEnabled(enabledModuleSlugs, "donations")
+      ? await supabase
+          .from("payments")
+          .select("*", { count: "exact", head: true })
+          .eq("organization_id", organizationId)
+          .eq("contact_id", contact.id)
+      : { count: 0 }
+
+  const { count: programEnrollmentCount } =
+    contact?.id && isCustomerPortalModuleEnabled(enabledModuleSlugs, "programs")
+      ? await supabase
+          .from("program_enrollments")
+          .select("*", { count: "exact", head: true })
+          .eq("organization_id", organizationId)
+          .eq("registrant_contact_id", contact.id)
+      : { count: 0 }
 
   const overviewCards = [
-    {
-      title: "Venue Rentals",
-      value: rentalsCount || 0,
-      description: "Venue requests and reservations",
-      href: "/customer/rentals",
-      icon: CalendarDays,
-    },
-    {
-      title: "Donations",
-      value: donationCount || 0,
-      description: "Giving history and contributions",
-      href: "/customer/donation",
-      icon: Gift,
-    },
-    {
-      title: "Programs",
-      value: programEnrollmentCount || 0,
-      description: "Program registrations and enrollments",
-      href: "/customer/programs",
-      icon: GraduationCap,
-    },
+    isCustomerPortalModuleEnabled(enabledModuleSlugs, "bookings")
+      ? {
+          title: "Venue Rentals",
+          value: rentalsCount || 0,
+          description: "Venue requests and reservations",
+          href: "/customer/rentals",
+          icon: CalendarDays,
+        }
+      : null,
+    isCustomerPortalModuleEnabled(enabledModuleSlugs, "donations")
+      ? {
+          title: "Donations",
+          value: donationCount || 0,
+          description: "Giving history and contributions",
+          href: "/customer/donation",
+          icon: Gift,
+        }
+      : null,
+    isCustomerPortalModuleEnabled(enabledModuleSlugs, "programs")
+      ? {
+          title: "Programs",
+          value: programEnrollmentCount || 0,
+          description: "Program registrations and enrollments",
+          href: "/customer/programs",
+          icon: GraduationCap,
+        }
+      : null,
     {
       title: "Profile",
       value: "View",
@@ -103,7 +123,13 @@ export default async function CustomerDashboardPage() {
       href: "/customer/profile",
       icon: User,
     },
-  ]
+  ].filter(Boolean) as Array<{
+    title: string
+    value: number | string
+    description: string
+    href: string
+    icon: React.ElementType
+  }>
 
   return (
     <div className="space-y-6">
@@ -117,17 +143,19 @@ export default async function CustomerDashboardPage() {
               Welcome back, {firstName}
             </h1>
             <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-              This is your portal overview for bookings, donations, programs,
-              applications, and account activity.
+              This is your portal overview for your organization&apos;s enabled
+              services and account activity.
             </p>
           </div>
 
-          <Button asChild>
-            <Link href="/customer/more">
-              Explore Portal
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
-          </Button>
+          {overviewCards.length > 1 ? (
+            <Button asChild>
+              <Link href={overviewCards[0]?.href ?? "/customer/profile"}>
+                Open Portal
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          ) : null}
         </div>
       </section>
 
@@ -165,28 +193,34 @@ export default async function CustomerDashboardPage() {
           </CardHeader>
 
           <CardContent className="grid gap-3 sm:grid-cols-2">
-            <DashboardAction
-              href="/customer/rentals"
-              icon={CalendarDays}
-              title="Venue Rentals"
-              description={`${pendingRentalsCount || 0} pending request${
-                pendingRentalsCount === 1 ? "" : "s"
-              }`}
-            />
+            {isCustomerPortalModuleEnabled(enabledModuleSlugs, "bookings") ? (
+              <DashboardAction
+                href="/customer/rentals"
+                icon={CalendarDays}
+                title="Venue Rentals"
+                description={`${pendingRentalsCount || 0} pending request${
+                  pendingRentalsCount === 1 ? "" : "s"
+                }`}
+              />
+            ) : null}
 
-            <DashboardAction
-              href="/customer/donation"
-              icon={Gift}
-              title="Donations"
-              description="View giving history and donation options"
-            />
+            {isCustomerPortalModuleEnabled(enabledModuleSlugs, "donations") ? (
+              <DashboardAction
+                href="/customer/donation"
+                icon={Gift}
+                title="Donations"
+                description="View giving history and donation options"
+              />
+            ) : null}
 
-            <DashboardAction
-              href="/customer/programs"
-              icon={HeartHandshake}
-              title="Programs"
-              description="View available and enrolled programs"
-            />
+            {isCustomerPortalModuleEnabled(enabledModuleSlugs, "programs") ? (
+              <DashboardAction
+                href="/customer/programs"
+                icon={HeartHandshake}
+                title="Programs"
+                description="View available and enrolled programs"
+              />
+            ) : null}
 
             <DashboardAction
               href="/customer/profile"
