@@ -196,13 +196,13 @@ export async function ensureVolunteerForContact(contactId: string) {
     throw new Error(contactError?.message || "Contact not found")
   }
 
-  await addRolesToContact(contactId, ["volunteer"], {
+  const contactInfo = {
     fullName: contact.full_name || "Unnamed Contact",
     email: contact.email,
     phone: contact.phone,
-  })
+  }
 
-  const { data: volunteer, error: volunteerError } = await supabase
+  const { data: existingVolunteer, error: volunteerError } = await supabase
     .from("volunteers")
     .select("id")
     .eq("organization_id", organizationId)
@@ -213,15 +213,14 @@ export async function ensureVolunteerForContact(contactId: string) {
     throw new Error(volunteerError.message || "Could not load volunteer record")
   }
 
-  if (volunteer) {
-    return volunteer.id as string
+  if (existingVolunteer) {
+    await syncContactAffiliations(contactId, organizationId, supabase)
+    revalidateVolunteerPaths()
+    revalidatePath(`/contacts/${contactId}`)
+    return existingVolunteer.id as string
   }
 
-  await ensureHrExtensionRecords(organizationId, contactId, ["volunteer"], {
-    fullName: contact.full_name || "Unnamed Contact",
-    email: contact.email,
-    phone: contact.phone,
-  })
+  await ensureHrExtensionRecords(organizationId, contactId, ["volunteer"], contactInfo)
 
   const { data: createdVolunteer, error: createdError } = await supabase
     .from("volunteers")
@@ -233,6 +232,8 @@ export async function ensureVolunteerForContact(contactId: string) {
   if (createdError || !createdVolunteer) {
     throw new Error(createdError?.message || "Could not create volunteer record")
   }
+
+  await syncContactAffiliations(contactId, organizationId, supabase)
 
   revalidateVolunteerPaths()
   revalidatePath(`/contacts/${contactId}`)

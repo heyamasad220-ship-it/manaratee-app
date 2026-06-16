@@ -29,6 +29,83 @@ function stripePeriodEndToDateOnly(periodEndUnix) {
   return `${y}-${m}-${d}`
 }
 
+async function maybeSyncDonorAffiliation(sb, input) {
+  const organizationId = input.organizationId?.trim?.() ?? input.organizationId
+  if (!organizationId || (!input.contactId && !input.donorId)) return
+
+  try {
+    let contactId = input.contactId ?? null
+    if (!contactId && input.donorId) {
+      const { data: donor } = await sb
+        .from("donors")
+        .select("contact_id")
+        .eq("organization_id", organizationId)
+        .eq("id", input.donorId)
+        .maybeSingle()
+      contactId = donor?.contact_id ?? null
+    }
+    if (!contactId) return
+
+    const [{ count: paymentCount }, { count: donorCount }] = await Promise.all([
+      sb
+        .from("payments")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", organizationId)
+        .eq("contact_id", contactId),
+      sb
+        .from("donors")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", organizationId)
+        .eq("contact_id", contactId),
+    ])
+
+    if ((paymentCount ?? 0) > 0 || (donorCount ?? 0) > 0) {
+      const { error } = await sb.from("contact_roles").insert({
+        organization_id: organizationId,
+        contact_id: contactId,
+        role: "donor",
+        is_manual: false,
+      })
+      if (error && error.code !== "23505") {
+        throw new Error(error.message)
+      }
+    }
+  } catch (error) {
+    console.error(
+      `[validate-stripe] donation affiliation sync failed (${input.context}): ${
+        error?.message || error
+      }`
+    )
+  }
+}
+
+async function syncAffiliationForPlan(sb, input) {
+  let organizationId = input.metadata?.organization_id ?? ""
+  let contactId = input.metadata?.contact_id ?? null
+  let donorId = input.metadata?.donor_id ?? null
+
+  if (input.planId) {
+    const { data: plan } = await sb
+      .from("recurring_donation_plans")
+      .select("organization_id, donor_id, contact_id")
+      .eq("id", input.planId)
+      .maybeSingle()
+
+    if (plan) {
+      organizationId = plan.organization_id
+      contactId = plan.contact_id ?? contactId
+      donorId = plan.donor_id ?? donorId
+    }
+  }
+
+  await maybeSyncDonorAffiliation(sb, {
+    organizationId,
+    contactId,
+    donorId,
+    context: input.context,
+  })
+}
+
 export async function simulateRecurringCheckoutCompleted(sb, session) {
   const metadata = parseMetadata(session.metadata)
   if (!metadata || metadata.checkout_type !== "recurring_setup") {
@@ -67,6 +144,13 @@ export async function simulateRecurringCheckoutCompleted(sb, session) {
     .select("id")
     .maybeSingle()
 
+  await maybeSyncDonorAffiliation(sb, {
+    organizationId: metadata.organization_id,
+    contactId: metadata.contact_id,
+    donorId: metadata.donor_id,
+    context: `recurring checkout ${session.id}`,
+  })
+
   return {
     planId: metadata.recurring_donation_plan_id,
     linked: true,
@@ -87,6 +171,12 @@ export async function simulateInvoicePaid(sb, invoice) {
     .maybeSingle()
 
   if (existingByInvoice?.id) {
+    await syncAffiliationForPlan(sb, {
+      planId: existingByInvoice.recurring_donation_plan_id,
+      metadata: invoice.metadata,
+      context: `invoice existing ${invoice.id}`,
+    })
+
     return {
       paymentId: existingByInvoice.id,
       created: false,
@@ -103,6 +193,12 @@ export async function simulateInvoicePaid(sb, invoice) {
       .maybeSingle()
 
     if (existingByIntent?.id) {
+      await syncAffiliationForPlan(sb, {
+        planId: existingByIntent.recurring_donation_plan_id,
+        metadata: invoice.metadata,
+        context: `invoice existing payment_intent ${paymentIntentId}`,
+      })
+
       return {
         paymentId: existingByIntent.id,
         created: false,
@@ -159,6 +255,12 @@ export async function simulateInvoicePaid(sb, invoice) {
     .from("recurring_donation_plans")
     .update({ status: "active", next_payment_date: nextPaymentDate })
     .eq("id", plan.id)
+
+  await syncAffiliationForPlan(sb, {
+    planId: plan.id,
+    metadata: invoice.metadata,
+    context: `invoice new payment ${invoice.id}`,
+  })
 
   return {
     paymentId: payment.id,

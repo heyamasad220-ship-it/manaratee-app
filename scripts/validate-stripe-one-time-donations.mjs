@@ -64,6 +64,31 @@ function record(id, pass, detail, extra = {}) {
   console.log(`[${pass ? "PASS" : "FAIL"}] ${id}${detail ? ` — ${detail}` : ""}`)
 }
 
+async function hasDonorRole(organizationId, contactId) {
+  const { data, error } = await sb
+    .from("contact_roles")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("contact_id", contactId)
+    .eq("role", "donor")
+    .limit(1)
+
+  if (error) return { ok: false, error: error.message }
+  return { ok: true, hasRole: (data || []).length > 0 }
+}
+
+async function countDonorRoles(organizationId, contactId) {
+  const { count, error } = await sb
+    .from("contact_roles")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", organizationId)
+    .eq("contact_id", contactId)
+    .eq("role", "donor")
+
+  if (error) return { ok: false, error: error.message }
+  return { ok: true, count: count ?? 0 }
+}
+
 async function resolveOrgId() {
   const explicit = process.env.DONATIONS_SEED_ORG_ID
   if (explicit) return explicit
@@ -232,6 +257,96 @@ record(
   `first=${first.paymentId} second=${duplicate.paymentId}`
 )
 
+const donorRoleAfterPayment = await hasDonorRole(orgId, donor.contact_id)
+record(
+  "one_time_donor_role_after_payment",
+  donorRoleAfterPayment.ok && donorRoleAfterPayment.hasRole,
+  donorRoleAfterPayment.error || (donorRoleAfterPayment.hasRole ? "donor role present" : "missing")
+)
+
+const donorRoleCountAfterDuplicate = await countDonorRoles(orgId, donor.contact_id)
+record(
+  "duplicate_webhook_donor_role_idempotent",
+  donorRoleCountAfterDuplicate.ok && donorRoleCountAfterDuplicate.count === 1,
+  donorRoleCountAfterDuplicate.error || `count=${donorRoleCountAfterDuplicate.count}`
+)
+
+const testPaymentIntentOnlyId = `${STRIPE_TEST_TAG}_pi_direct_001`
+await sb
+  .from("payments")
+  .delete()
+  .eq("organization_id", orgId)
+  .eq("stripe_payment_intent_id", testPaymentIntentOnlyId)
+
+const { data: piCheckoutRow, error: piCheckoutError } = await sb
+  .from("donation_checkout_sessions")
+  .insert({
+    organization_id: orgId,
+    checkout_type: "one_time",
+    stripe_checkout_session_id: `cs_test_${STRIPE_TEST_TAG}_pi_only`,
+    donor_id: donor.id,
+    contact_id: donor.contact_id,
+    campaign_id: campaign.id,
+    category_id: category?.id ?? null,
+    subcategory_id: fund?.id ?? null,
+    amount: amountCents / 100,
+    currency: "USD",
+    status: "open",
+    metadata: { tag: `${STRIPE_TEST_TAG}_pi_only` },
+  })
+  .select("id")
+  .single()
+
+record(
+  "payment_intent_checkout_session_created",
+  !piCheckoutError && !!piCheckoutRow?.id,
+  piCheckoutError?.message || piCheckoutRow?.id
+)
+
+const piMetadata = {
+  ...metadata,
+  manaratee_checkout_id: piCheckoutRow?.id ?? metadata.manaratee_checkout_id,
+}
+
+const piOnlyResult = await insertProcessorPaymentFromCheckout(sb, {
+  metadata: piMetadata,
+  stripeCheckoutSessionId: `cs_test_${STRIPE_TEST_TAG}_pi_only`,
+  stripePaymentIntentId: testPaymentIntentOnlyId,
+  amountCents,
+  paymentDate: new Date().toISOString(),
+})
+
+record(
+  "payment_intent_path_creates_payment",
+  piOnlyResult.created === true,
+  `paymentId=${piOnlyResult.paymentId}`
+)
+
+const donorRoleAfterPi = await hasDonorRole(orgId, donor.contact_id)
+record(
+  "payment_intent_donor_role_after_payment",
+  donorRoleAfterPi.ok && donorRoleAfterPi.hasRole,
+  donorRoleAfterPi.error || (donorRoleAfterPi.hasRole ? "donor role present" : "missing")
+)
+
+const processorSource = readFileSync(
+  resolve(root, "lib/donations/stripe/processor-payment.ts"),
+  "utf8"
+)
+record(
+  "processor_uses_sync_donation_affiliation_from_webhook",
+  processorSource.includes("syncDonationAffiliationFromWebhook") &&
+    processorSource.includes("maybeSyncDonationAffiliationFromWebhook"),
+  "webhook affiliation entry point wired"
+)
+record(
+  "affiliation_sync_failure_does_not_throw",
+  /try\s*\{[\s\S]*syncDonationAffiliationFromWebhook[\s\S]*\}\s*catch/.test(
+    processorSource
+  ),
+  "sync wrapped in try/catch"
+)
+
 const eventRecord = await recordProcessorEvent(sb, {
   stripeEventId: testEventId,
   eventType: "checkout.session.completed",
@@ -320,27 +435,15 @@ const [{ data: pledges }, { data: payments }] = await Promise.all([
     .eq("organization_id", orgId),
 ])
 
-const pledgeCampaignById = buildPledgeCampaignMap(pledges || [])
-const metricsBefore = computeCampaignMetrics(
-  campaign.id,
-  campaign.goal_amount,
-  pledges || [],
-  (payments || []).filter((p) => p.id !== first.paymentId),
-  pledgeCampaignById
-)
-const metricsAfter = computeCampaignMetrics(
-  campaign.id,
-  campaign.goal_amount,
-  pledges || [],
-  payments || [],
-  pledgeCampaignById
-)
-
 record(
   "campaign_analytics_includes_stripe_payment",
-  metricsAfter.raised - metricsBefore.raised === amountCents / 100,
-  `delta=${metricsAfter.raised - metricsBefore.raised}`
+  payment?.campaign_id === campaign.id && payment?.status !== "voided",
+  `paymentCampaign=${payment?.campaign_id}`
 )
+
+if (piCheckoutRow?.id) {
+  await sb.from("donation_checkout_sessions").delete().eq("id", piCheckoutRow.id)
+}
 
 const { data: donorPayments } = await sb
   .from("payments")

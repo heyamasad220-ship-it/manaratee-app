@@ -63,6 +63,39 @@ export function isVenueRentalTerminal(status: VenueRentalStatus): boolean {
   )
 }
 
+const STAFF_CANCELLABLE_STATUSES = new Set<VenueRentalStatus>([
+  VENUE_RENTAL_STATUSES.awaitingSupervisorApproval,
+  VENUE_RENTAL_STATUSES.approvedPendingPayment,
+  VENUE_RENTAL_STATUSES.depositPaid,
+  VENUE_RENTAL_STATUSES.securityDepositPaid,
+  VENUE_RENTAL_STATUSES.confirmed,
+])
+
+/** Active rentals staff may cancel from the rental detail page. */
+export function canStaffCancelVenueRental(status: VenueRentalStatus): boolean {
+  return STAFF_CANCELLABLE_STATUSES.has(status)
+}
+
+/** Whether cancellation should use cancelled_after_payment vs cancelled_before_payment. */
+export function shouldCancelVenueRentalAfterPayment(input: {
+  status: VenueRentalStatus
+  depositPaid?: boolean
+  securityDepositPaid?: boolean
+}): boolean {
+  if (input.status === VENUE_RENTAL_STATUSES.confirmed) {
+    return true
+  }
+
+  if (
+    input.status === VENUE_RENTAL_STATUSES.depositPaid ||
+    input.status === VENUE_RENTAL_STATUSES.securityDepositPaid
+  ) {
+    return true
+  }
+
+  return Boolean(input.depositPaid || input.securityDepositPaid)
+}
+
 export function bothRequiredDepositsPaid(input: {
   depositPaid: boolean
   securityDepositPaid: boolean

@@ -10,6 +10,7 @@ import {
 } from "@/lib/memberships/membership-constants"
 import { syncMembershipContactRole } from "@/lib/memberships/membership-role-sync"
 import { findOrCreateContact } from "@/lib/contacts/contact-actions"
+import { hasPermission, PERMISSIONS } from "@/lib/permissions/permissions"
 
 import {
   MEMBERSHIP_BASE_PATH,
@@ -17,6 +18,13 @@ import {
   MEMBERSHIP_BENEFITS_PATH,
   MEMBERSHIP_SETTINGS_PATH,
 } from "@/lib/memberships/membership-module-label"
+
+async function assertMembershipManagePermission() {
+  const canManage = await hasPermission(PERMISSIONS.MEMBERSHIP_MANAGE)
+  if (!canManage) {
+    throw new Error("You do not have permission to manage memberships.")
+  }
+}
 
 function revalidateMembershipPaths(contactId?: string) {
   revalidatePath(MEMBERSHIP_BASE_PATH)
@@ -88,6 +96,8 @@ export async function saveMembershipType(input: {
   isActive?: boolean
   sortOrder?: number
 }) {
+  await assertMembershipManagePermission()
+
   const supabase = await createClient()
   const organizationId = await getSelectedOrganizationId()
 
@@ -138,6 +148,8 @@ export async function createMembership(input: {
   renewalDate?: string | null
   notes?: string | null
 }) {
+  await assertMembershipManagePermission()
+
   const supabase = await createClient()
   const organizationId = await getSelectedOrganizationId()
 
@@ -207,6 +219,8 @@ export async function updateMembership(input: {
   renewalDate?: string | null
   notes?: string | null
 }) {
+  await assertMembershipManagePermission()
+
   const supabase = await createClient()
   const organizationId = await getSelectedOrganizationId()
 
@@ -274,6 +288,8 @@ export async function updateMembership(input: {
 }
 
 export async function lapseMembership(membershipId: string) {
+  await assertMembershipManagePermission()
+
   const supabase = await createClient()
   const organizationId = await getSelectedOrganizationId()
 
@@ -316,6 +332,8 @@ export async function addMemberWithMembership(input: {
   renewalDate?: string | null
   notes?: string | null
 }) {
+  await assertMembershipManagePermission()
+
   const organizationId = await getSelectedOrganizationId()
 
   if (!organizationId) {

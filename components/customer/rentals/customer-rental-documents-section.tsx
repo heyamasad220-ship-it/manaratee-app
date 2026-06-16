@@ -1,5 +1,6 @@
-import { Download, FileText, FileSignature } from "lucide-react"
+import { Download, FileSignature, FileText } from "lucide-react"
 
+import { CustomerRentalProcessGuidanceCallout } from "@/components/customer/rentals/customer-rental-process-guidance-callout"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -33,12 +34,20 @@ export function CustomerRentalDocumentsSection({
   documents,
   contract,
 }: CustomerRentalDocumentsSectionProps) {
+  const agreementNeedsReview =
+    contract?.canSign &&
+    documents.some((document) => document.type === "rental_agreement")
+
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Documents</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
+        {agreementNeedsReview ? (
+          <CustomerRentalProcessGuidanceCallout variant="contract" />
+        ) : null}
+
         {documents.map((document) => (
           <div
             key={document.id}
@@ -63,11 +72,6 @@ export function CustomerRentalDocumentsSection({
                     <Download className="mr-2 h-4 w-4" />
                     Download
                   </a>
-                </Button>
-              ) : null}
-              {document.type === "rental_agreement" && contract?.canSign ? (
-                <Button size="sm" disabled title="Signing will be available in a future release">
-                  Sign contract
                 </Button>
               ) : null}
             </div>

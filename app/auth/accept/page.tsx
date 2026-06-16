@@ -60,6 +60,12 @@ function AuthAcceptContent() {
 
       const code = searchParams.get("code")
       if (code) {
+        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
+        if (!exchangeError) {
+          await finishAuth()
+          return
+        }
+
         window.location.replace(`/auth/callback?${searchParams.toString()}`)
         return
       }
@@ -95,7 +101,9 @@ function AuthAcceptContent() {
       }
 
       setError(
-        "This invite link is invalid or has expired. Ask your administrator to send a new invitation."
+        searchParams.get("type") === "recovery"
+          ? "This password reset link is invalid or has expired. Go to the sign-in page and use Forgot password to request a new link."
+          : "This invite link is invalid or has expired. Ask your administrator to send a new invitation."
       )
     }
 

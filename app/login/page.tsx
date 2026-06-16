@@ -15,6 +15,88 @@ import { Separator } from "@/components/ui/separator"
 
 type AuthMode = "login" | "signup"
 
+function friendlyAuthError(message: string, mode: AuthMode) {
+  const normalized = message.toLowerCase()
+
+  if (
+    normalized.includes("invalid login credentials") ||
+    normalized.includes("invalid email or password")
+  ) {
+    return mode === "login"
+      ? "Incorrect email or password. If you were invited, open your invite email to set a password first, or use Forgot password."
+      : message
+  }
+
+  if (
+    normalized.includes("already registered") ||
+    normalized.includes("already been registered") ||
+    normalized.includes("already exists")
+  ) {
+    return "This email already has an account (likely from an organization invite). Open your invite email and use that link to set your password, or use Forgot password on the sign-in page."
+  }
+
+  return message
+}
+
+async function handleEmailPasswordLogin(
+  supabase: ReturnType<typeof createClient>,
+  email: string,
+  password: string,
+  router: ReturnType<typeof useRouter>
+): Promise<string | null> {
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  })
+
+  if (error) {
+    return friendlyAuthError(error.message, "login")
+  }
+
+  if (!data.user) {
+    return "Login failed. Please try again."
+  }
+
+  await routeUserByRole(data.user.id, router)
+  return null
+}
+
+async function handleSignUp(
+  supabase: ReturnType<typeof createClient>,
+  email: string,
+  password: string,
+  repeatPassword: string,
+  router: ReturnType<typeof useRouter>
+): Promise<string | null> {
+  if (password !== repeatPassword) {
+    return "Passwords do not match."
+  }
+
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      emailRedirectTo: authCallbackUrl("/dashboard"),
+    },
+  })
+
+  if (error) {
+    return friendlyAuthError(error.message, "signup")
+  }
+
+  if (!data.user) {
+    return "Sign up failed. Please try again."
+  }
+
+  if (!data.session) {
+    router.push("/auth/confirm")
+    return null
+  }
+
+  await routeUserByRole(data.user.id, router)
+  return null
+}
+
 function GoogleIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none">
@@ -78,75 +160,22 @@ function LoginContent() {
     }
   }, [searchParams])
 
-  async function handleEmailPasswordLogin() {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
-
-    if (error) {
-      throw new Error(error.message)
-    }
-
-    if (!data.user) {
-      throw new Error("Login failed")
-    }
-
-    await routeUserByRole(data.user.id, router)
-  }
-
-  async function handleSignUp() {
-    if (password !== repeatPassword) {
-      throw new Error("Passwords do not match")
-    }
-
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: authCallbackUrl("/dashboard"),
-      },
-    })
-
-    if (error) {
-      const normalized = error.message.toLowerCase()
-      if (
-        normalized.includes("already registered") ||
-        normalized.includes("already been registered") ||
-        normalized.includes("already exists")
-      ) {
-        throw new Error(
-          "This email already has an account (likely from an organization invite). Open your invite email and use that link to set your password, or use Forgot password on the sign-in page."
-        )
-      }
-      throw error
-    }
-
-    if (!data.user) {
-      throw new Error("Sign up failed")
-    }
-
-    if (!data.session) {
-      router.push("/auth/confirm")
-      return
-    }
-
-    await routeUserByRole(data.user.id, router)
-  }
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setIsLoading(true)
     setError(null)
 
     try {
-      if (mode === "signup") {
-        await handleSignUp()
-      } else {
-        await handleEmailPasswordLogin()
+      const authError =
+        mode === "signup"
+          ? await handleSignUp(supabase, email, password, repeatPassword, router)
+          : await handleEmailPasswordLogin(supabase, email, password, router)
+
+      if (authError) {
+        setError(authError)
+        setIsLoading(false)
       }
     } catch (err: unknown) {
-      console.error("LOGIN ERROR:", err)
       setError(err instanceof Error ? err.message : "Authentication failed")
       setIsLoading(false)
     }

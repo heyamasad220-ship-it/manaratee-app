@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import type Stripe from "stripe"
 
 import { parseDonationCheckoutMetadata } from "@/lib/donations/stripe/metadata"
+import { maybeSyncDonationAffiliationFromWebhook } from "@/lib/donations/stripe/processor-payment"
 import { maybeAutoGenerateAndEmailPaymentReceipt } from "@/lib/donations/stripe/receipt-after-payment"
 import {
   mapStripeSubscriptionStatus,
@@ -151,6 +152,13 @@ export async function handleRecurringCheckoutSessionCompleted(
     recurringDonationPlanId: planId,
   })
 
+  await maybeSyncDonationAffiliationFromWebhook(supabase, {
+    organizationId: metadata.organization_id,
+    contactId: plan.contact_id ?? metadata.contact_id,
+    donorId: plan.donor_id ?? metadata.donor_id,
+    context: `recurring checkout ${session.id}`,
+  })
+
   return {
     planId,
     linked: !alreadyLinked,
@@ -178,6 +186,35 @@ async function resolvePlanForInvoice(
   return null
 }
 
+async function syncRecurringDonationAffiliation(
+  supabase: SupabaseClient,
+  input: {
+    planId?: string | null
+    metadata?: DonationCheckoutMetadata | null
+    context: string
+  }
+) {
+  let organizationId = input.metadata?.organization_id ?? ""
+  let contactId = input.metadata?.contact_id ?? null
+  let donorId = input.metadata?.donor_id ?? null
+
+  if (input.planId) {
+    const plan = await loadRecurringPlan(supabase, { planId: input.planId })
+    if (plan) {
+      organizationId = plan.organization_id
+      contactId = plan.contact_id ?? contactId
+      donorId = plan.donor_id ?? donorId
+    }
+  }
+
+  await maybeSyncDonationAffiliationFromWebhook(supabase, {
+    organizationId,
+    contactId,
+    donorId,
+    context: input.context,
+  })
+}
+
 export async function insertProcessorPaymentFromInvoice(
   supabase: SupabaseClient,
   invoice: Stripe.Invoice,
@@ -203,6 +240,12 @@ export async function insertProcessorPaymentFromInvoice(
     .maybeSingle()
 
   if (existingByInvoice?.id) {
+    await syncRecurringDonationAffiliation(supabase, {
+      planId: existingByInvoice.recurring_donation_plan_id as string,
+      metadata,
+      context: `invoice existing ${invoice.id}`,
+    })
+
     return {
       paymentId: existingByInvoice.id,
       created: false,
@@ -219,6 +262,12 @@ export async function insertProcessorPaymentFromInvoice(
       .maybeSingle()
 
     if (existingByIntent?.id) {
+      await syncRecurringDonationAffiliation(supabase, {
+        planId: existingByIntent.recurring_donation_plan_id as string,
+        metadata,
+        context: `invoice existing payment_intent ${paymentIntentId}`,
+      })
+
       return {
         paymentId: existingByIntent.id,
         created: false,
@@ -295,6 +344,12 @@ export async function insertProcessorPaymentFromInvoice(
     plan.organization_id,
     payment.id
   )
+
+  await syncRecurringDonationAffiliation(supabase, {
+    planId: plan.id,
+    metadata: metadata ?? subscriptionMetadata,
+    context: `invoice new payment ${invoice.id}`,
+  })
 
   return {
     paymentId: payment.id,

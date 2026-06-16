@@ -1,8 +1,11 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import type { SupabaseClient } from "@supabase/supabase-js"
 
+import { syncContactAffiliations } from "@/lib/contacts/contact-affiliation-sync"
 import { createClient } from "@/lib/supabase/server"
+import { findOrCreateContact } from "@/lib/contacts/contact-actions"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { hasAnyPermission, PERMISSIONS } from "@/lib/permissions/permissions"
 import { revalidateTicketingPaths } from "@/lib/tickets/revalidate-ticketing-paths"
@@ -42,11 +45,130 @@ function generateTicketCode() {
 async function assertTicketingManagePermission() {
   const canManage = await hasAnyPermission(
     PERMISSIONS.EVENTS_MANAGE,
-    PERMISSIONS.PROGRAMS_MANAGE
+    PERMISSIONS.PROGRAMS_MANAGE,
+    PERMISSIONS.TICKETING_MANAGE
   )
   if (!canManage) {
     throw new Error("You do not have permission to manage ticket orders.")
   }
+}
+
+type TicketOrderContactRow = {
+  id: string
+  contact_id: string | null
+  purchaser_name: string | null
+  purchaser_email: string
+  status: string
+}
+
+async function ensureOrderContactId(
+  supabase: SupabaseClient,
+  organizationId: string,
+  order: TicketOrderContactRow
+): Promise<string | null> {
+  if (order.contact_id) {
+    return order.contact_id
+  }
+
+  const cleanEmail = order.purchaser_email?.trim().toLowerCase()
+  if (!cleanEmail) {
+    return null
+  }
+
+  const cleanName = order.purchaser_name?.trim() || cleanEmail
+  const { contactId } = await findOrCreateContact({
+    organizationId,
+    fullName: cleanName,
+    email: cleanEmail,
+  })
+
+  const { error } = await supabase
+    .from("ticket_orders")
+    .update({ contact_id: contactId })
+    .eq("id", order.id)
+    .eq("organization_id", organizationId)
+
+  if (error) {
+    throw new Error(error.message || "Could not link order to contact")
+  }
+
+  return contactId
+}
+
+async function syncEventAttendeeAffiliationForContact(
+  supabase: SupabaseClient,
+  organizationId: string,
+  contactId: string,
+  context: string,
+  options?: { throwOnFailure?: boolean }
+): Promise<void> {
+  try {
+    await syncContactAffiliations(contactId, organizationId, supabase)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    console.error(`[ticket-order] affiliation sync failed (${context}, contact ${contactId}): ${message}`)
+    if (options?.throwOnFailure) {
+      throw error instanceof Error ? error : new Error(message)
+    }
+  }
+}
+
+async function handleCompletedOrderAffiliationSync(
+  supabase: SupabaseClient,
+  organizationId: string,
+  orderId: string,
+  options?: { throwOnFailure?: boolean }
+): Promise<void> {
+  const { data: order, error } = await supabase
+    .from("ticket_orders")
+    .select("id, contact_id, purchaser_name, purchaser_email, status")
+    .eq("id", orderId)
+    .eq("organization_id", organizationId)
+    .maybeSingle()
+
+  if (error) {
+    const message = error.message || "Could not load order for affiliation sync"
+    console.error(`[ticket-order] affiliation sync skipped (order ${orderId}): ${message}`)
+    if (options?.throwOnFailure) {
+      throw new Error(message)
+    }
+    return
+  }
+
+  if (!order || order.status !== "completed") {
+    return
+  }
+
+  let contactId: string | null = null
+  try {
+    contactId = await ensureOrderContactId(
+      supabase,
+      organizationId,
+      order as TicketOrderContactRow
+    )
+  } catch (linkError) {
+    const message = linkError instanceof Error ? linkError.message : String(linkError)
+    console.error(`[ticket-order] affiliation sync skipped (order ${orderId}): ${message}`)
+    if (options?.throwOnFailure) {
+      throw linkError instanceof Error ? linkError : new Error(message)
+    }
+    return
+  }
+
+  if (!contactId) {
+    console.error(
+      `[ticket-order] affiliation sync skipped (order ${orderId}): missing contact_id and purchaser_email`
+    )
+    return
+  }
+
+  await syncEventAttendeeAffiliationForContact(
+    supabase,
+    organizationId,
+    contactId,
+    `order ${orderId}`,
+    options
+  )
 }
 
 export async function updateEventTicketingSalesStatus(
@@ -175,11 +297,18 @@ export async function createTicketOrder(input: CreateTicketOrderInput) {
     ((event.ticketing_config as Record<string, unknown>)?.currency as string) || "USD"
   const status = input.status || "completed"
 
+  const { contactId } = await findOrCreateContact({
+    organizationId,
+    fullName: cleanName,
+    email: cleanEmail,
+  })
+
   const { data: order, error: orderError } = await supabase
     .from("ticket_orders")
     .insert({
       organization_id: organizationId,
       internal_event_id: input.internalEventId,
+      contact_id: contactId,
       order_number: generateOrderNumber(),
       status,
       subtotal_cents: subtotalCents,
@@ -235,6 +364,15 @@ export async function createTicketOrder(input: CreateTicketOrderInput) {
     }
   }
 
+  if (status === "completed") {
+    await syncEventAttendeeAffiliationForContact(
+      supabase,
+      organizationId,
+      contactId,
+      `create order ${order.id}`
+    )
+  }
+
   revalidateTicketingPaths()
   revalidatePath(`/event-management/${input.internalEventId}`)
 
@@ -254,6 +392,19 @@ export async function updateTicketOrderStatus(orderId: string, status: TicketOrd
     throw new Error("No organization selected")
   }
 
+  const { data: existingOrder, error: loadError } = await supabase
+    .from("ticket_orders")
+    .select("status")
+    .eq("id", orderId)
+    .eq("organization_id", organizationId)
+    .maybeSingle()
+
+  if (loadError || !existingOrder) {
+    throw new Error(loadError?.message || "Order not found")
+  }
+
+  const previousStatus = existingOrder.status as string
+
   const { error } = await supabase
     .from("ticket_orders")
     .update({ status })
@@ -262,6 +413,10 @@ export async function updateTicketOrderStatus(orderId: string, status: TicketOrd
 
   if (error) {
     throw new Error(error.message || "Could not update order status")
+  }
+
+  if (status === "completed" && previousStatus !== "completed") {
+    await handleCompletedOrderAffiliationSync(supabase, organizationId, orderId)
   }
 
   revalidateTicketingPaths()
@@ -282,6 +437,17 @@ export async function bulkUpdateTicketOrderStatus(
     throw new Error("No organization selected")
   }
 
+  const ordersBeforeUpdate =
+    status === "completed"
+      ? (
+          await supabase
+            .from("ticket_orders")
+            .select("id, status")
+            .eq("organization_id", organizationId)
+            .in("id", orderIds)
+        ).data || []
+      : []
+
   const { error } = await supabase
     .from("ticket_orders")
     .update({ status })
@@ -290,6 +456,33 @@ export async function bulkUpdateTicketOrderStatus(
 
   if (error) {
     throw new Error(error.message || "Could not update selected orders")
+  }
+
+  if (status === "completed") {
+    const ordersToSync = ordersBeforeUpdate.filter(
+      (order) => (order.status as string) !== "completed"
+    )
+    const syncFailures: string[] = []
+
+    for (const order of ordersToSync) {
+      try {
+        await handleCompletedOrderAffiliationSync(supabase, organizationId, order.id as string, {
+          throwOnFailure: true,
+        })
+      } catch (syncError) {
+        const message = syncError instanceof Error ? syncError.message : String(syncError)
+        syncFailures.push(`${order.id}: ${message}`)
+        console.error(
+          `[ticket-order] bulk affiliation sync failed (order ${order.id}): ${message}`
+        )
+      }
+    }
+
+    if (syncFailures.length > 0) {
+      console.error(
+        `[ticket-order] bulk affiliation sync completed with ${syncFailures.length} failure(s): ${syncFailures.join("; ")}`
+      )
+    }
   }
 
   revalidateTicketingPaths()

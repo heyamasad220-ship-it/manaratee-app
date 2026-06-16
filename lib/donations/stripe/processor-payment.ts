@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type Stripe from "stripe"
 
+import { syncDonationAffiliationFromWebhook } from "@/lib/contacts/contact-affiliation-sync"
 import { parseDonationCheckoutMetadata } from "@/lib/donations/stripe/metadata"
 import {
   loadCheckoutSession,
@@ -14,6 +15,35 @@ import type {
 } from "@/lib/donations/stripe/types"
 
 import type { CheckoutSessionRow } from "@/lib/donations/stripe/checkout-session-utils"
+
+export async function maybeSyncDonationAffiliationFromWebhook(
+  supabase: SupabaseClient,
+  input: {
+    organizationId: string
+    contactId?: string | null
+    donorId?: string | null
+    context: string
+  }
+): Promise<void> {
+  const organizationId = input.organizationId?.trim()
+  if (!organizationId || (!input.contactId && !input.donorId)) {
+    return
+  }
+
+  try {
+    await syncDonationAffiliationFromWebhook({
+      organizationId,
+      supabaseClient: supabase,
+      contactId: input.contactId,
+      donorId: input.donorId,
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    console.error(
+      `[stripe-webhook] donation affiliation sync failed (${input.context}): ${message}`
+    )
+  }
+}
 
 function resolveAttribution(
   metadata: DonationCheckoutMetadata,
@@ -45,6 +75,13 @@ export async function insertProcessorPaymentFromCheckout(
   })
 
   if (checkoutSession?.payment_id) {
+    await maybeSyncDonationAffiliationFromWebhook(supabase, {
+      organizationId: input.metadata.organization_id,
+      contactId: input.metadata.contact_id,
+      donorId: input.metadata.donor_id,
+      context: `checkout existing payment ${input.stripeCheckoutSessionId}`,
+    })
+
     return {
       paymentId: checkoutSession.payment_id,
       created: false,
@@ -69,6 +106,13 @@ export async function insertProcessorPaymentFromCheckout(
         })
         .eq("id", checkoutSession.id)
     }
+
+    await maybeSyncDonationAffiliationFromWebhook(supabase, {
+      organizationId: input.metadata.organization_id,
+      contactId: input.metadata.contact_id,
+      donorId: input.metadata.donor_id,
+      context: `payment_intent existing ${input.stripePaymentIntentId}`,
+    })
 
     return {
       paymentId: existingByIntent.id,
@@ -126,6 +170,13 @@ export async function insertProcessorPaymentFromCheckout(
     input.metadata.organization_id,
     payment.id
   )
+
+  await maybeSyncDonationAffiliationFromWebhook(supabase, {
+    organizationId: input.metadata.organization_id,
+    contactId: input.metadata.contact_id,
+    donorId: input.metadata.donor_id,
+    context: `checkout new payment ${input.stripeCheckoutSessionId}`,
+  })
 
   return {
     paymentId: payment.id,

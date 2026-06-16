@@ -593,6 +593,20 @@ export default function PledgesPage() {
       return;
     }
 
+    try {
+      const { handleDonationAffiliationSync } = await import(
+        "@/lib/contacts/contact-affiliation-sync"
+      );
+      await handleDonationAffiliationSync({
+        organizationId: orgId,
+        contactId: selectedContactId,
+        donorId,
+      });
+    } catch (syncError) {
+      const message = syncError instanceof Error ? syncError.message : String(syncError);
+      console.error(`[staff-pledges] affiliation sync failed (pledge creation): ${message}`);
+    }
+
     resetAddPledgeForm();
     setShowAddDialog(false);
     await fetchPledges();
@@ -720,11 +734,13 @@ export default function PledgesPage() {
           "@/lib/contacts/contact-affiliation-sync"
         );
         await handleDonationAffiliationSync({
+          organizationId: orgId,
           donorId: paymentPledge.donorId,
           contactId,
         });
       } catch (syncError) {
-        console.warn("Donation affiliation sync failed:", syncError);
+        const message = syncError instanceof Error ? syncError.message : String(syncError);
+        console.error(`[staff-pledges] affiliation sync failed (pledge payment): ${message}`);
       }
     }
 

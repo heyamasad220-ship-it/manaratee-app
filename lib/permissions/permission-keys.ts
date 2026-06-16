@@ -21,6 +21,12 @@ export const PERMISSIONS = {
   EVENTS_VIEW: "events.view",
   EVENTS_MANAGE: "events.manage",
 
+  TICKETING_VIEW: "ticketing.view",
+  TICKETING_MANAGE: "ticketing.manage",
+
+  MEMBERSHIP_VIEW: "membership.view",
+  MEMBERSHIP_MANAGE: "membership.manage",
+
   BOOKINGS_VIEW: "bookings.view",
   BOOKINGS_MANAGE: "bookings.manage",
 
@@ -32,6 +38,9 @@ export const PERMISSIONS = {
 
   VENDOR_HUB_VIEW: "vendor_hub.view",
   VENDOR_HUB_MANAGE: "vendor_hub.manage",
+
+  CONTACTS_VIEW: "contacts.view",
+  CONTACTS_MANAGE: "contacts.manage",
 } as const
 
 export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS]

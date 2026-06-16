@@ -5,16 +5,9 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import {
-  AUTO_REMOVABLE_DERIVED_ROLES,
+  PROGRAM_PARTICIPANT_TERMINAL_STATUSES,
   type DerivedAffiliationRole,
 } from "@/lib/contacts/contact-affiliation-rules"
-import { ensureDonorExtensionForContact } from "@/lib/donations/donor-contact-bridge"
-
-type RoleRow = {
-  id: string
-  role: string
-  is_manual: boolean
-}
 
 export async function computeDerivedAffiliations(
   organizationId: string,
@@ -134,29 +127,30 @@ export async function computeDerivedAffiliations(
     derived.add("childcare_provider")
   }
 
-  return derived
-}
+  const terminalStatuses = PROGRAM_PARTICIPANT_TERMINAL_STATUSES.join(",")
+  const { count: programEnrollmentCount } = await supabase
+    .from("program_enrollments")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", organizationId)
+    .eq("participant_contact_id", contactId)
+    .not("status", "in", `(${terminalStatuses})`)
 
-async function upsertDerivedRole(
-  supabase: SupabaseClient,
-  organizationId: string,
-  contactId: string,
-  role: DerivedAffiliationRole,
-  existingRows: RoleRow[]
-) {
-  const existing = existingRows.find((row) => row.role === role)
-  if (existing) return
-
-  const { error } = await supabase.from("contact_roles").insert({
-    organization_id: organizationId,
-    contact_id: contactId,
-    role,
-    is_manual: false,
-  })
-
-  if (error && error.code !== "23505") {
-    throw new Error(error.message || `Could not add ${role} affiliation`)
+  if ((programEnrollmentCount ?? 0) > 0) {
+    derived.add("program_participant")
   }
+
+  const { count: completedTicketOrderCount } = await supabase
+    .from("ticket_orders")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", organizationId)
+    .eq("contact_id", contactId)
+    .eq("status", "completed")
+
+  if ((completedTicketOrderCount ?? 0) > 0) {
+    derived.add("event_attendee")
+  }
+
+  return derived
 }
 
 function revalidateAffiliationPaths() {
@@ -175,6 +169,7 @@ function revalidateAffiliationPaths() {
 /**
  * Reconcile contact_roles with activity-derived affiliations.
  * Manual overrides (is_manual=true) are preserved unless staff edits them directly.
+ * Authoritative logic lives in `sync_contact_affiliations` (SECURITY DEFINER RPC).
  */
 export async function syncContactAffiliations(
   contactId: string,
@@ -186,77 +181,40 @@ export async function syncContactAffiliations(
 
   if (!organizationId || !contactId) return
 
-  const derived = await computeDerivedAffiliations(organizationId, contactId, supabase)
+  const { error } = await supabase.rpc("sync_contact_affiliations", {
+    p_organization_id: organizationId,
+    p_contact_id: contactId,
+  })
 
-  if (derived.has("donor")) {
-    await ensureDonorExtensionForContact(organizationId, contactId, supabase)
-  }
-
-  let existingRows: RoleRow[] = []
-  const { data: roleRows, error: roleError } = await supabase
-    .from("contact_roles")
-    .select("id, role, is_manual")
-    .eq("organization_id", organizationId)
-    .eq("contact_id", contactId)
-
-  if (roleError) {
-    if (roleError.code === "42703") {
-      const { data: legacyRows, error: legacyError } = await supabase
-        .from("contact_roles")
-        .select("id, role")
-        .eq("organization_id", organizationId)
-        .eq("contact_id", contactId)
-
-      if (legacyError) {
-        throw new Error(legacyError.message || "Could not load contact affiliations")
-      }
-
-      existingRows = (legacyRows || []).map((row) => ({
-        id: row.id as string,
-        role: row.role as string,
-        is_manual: false,
-      }))
-    } else {
-      throw new Error(roleError.message || "Could not load contact affiliations")
-    }
-  } else {
-    existingRows = (roleRows || []) as RoleRow[]
-  }
-
-  for (const role of derived) {
-    await upsertDerivedRole(supabase, organizationId, contactId, role, existingRows)
-  }
-
-  for (const row of existingRows) {
-    if (row.is_manual) continue
-    if (!AUTO_REMOVABLE_DERIVED_ROLES.includes(row.role as DerivedAffiliationRole)) {
-      continue
-    }
-    if (derived.has(row.role as DerivedAffiliationRole)) {
-      continue
-    }
-
-    const { error: deleteError } = await supabase
-      .from("contact_roles")
-      .delete()
-      .eq("id", row.id)
-
-    if (deleteError) {
-      throw new Error(deleteError.message || "Could not remove outdated affiliation")
-    }
+  if (error) {
+    throw new Error(error.message || "Could not sync contact affiliations")
   }
 
   revalidateAffiliationPaths()
   revalidatePath(`/contacts/${contactId}`)
 }
 
-/** Call after a donation payment is recorded or matched. */
-export async function handleDonationAffiliationSync(input: {
+export type HandleDonationAffiliationSyncInput = {
   contactId?: string | null
   donorId?: string | null
-}) {
-  const supabase = await createClient()
-  const organizationId = await getSelectedOrganizationId()
+  /** Required for webhook/service-role callers without a staff session. */
+  organizationId?: string | null
+  /** Service-role or server Supabase client (e.g. Stripe webhooks). */
+  supabaseClient?: SupabaseClient
+}
+
+/**
+ * Call after a donation payment is recorded or matched.
+ *
+ * Staff UI callers may omit `organizationId` and `supabaseClient` (selected org session is used).
+ * Webhook and background jobs must pass explicit `organizationId` and `supabaseClient`.
+ */
+export async function handleDonationAffiliationSync(
+  input: HandleDonationAffiliationSyncInput
+) {
+  const supabase = input.supabaseClient ?? (await createClient())
+  const organizationId =
+    input.organizationId ?? (await getSelectedOrganizationId())
   if (!organizationId) return
 
   let contactId = input.contactId ?? null
@@ -274,8 +232,37 @@ export async function handleDonationAffiliationSync(input: {
 
   if (!contactId) return
 
-  await ensureDonorExtensionForContact(organizationId, contactId, supabase)
   await syncContactAffiliations(contactId, organizationId, supabase)
+}
+
+export type WebhookDonationAffiliationSyncInput = {
+  organizationId: string
+  supabaseClient: SupabaseClient
+  contactId?: string | null
+  donorId?: string | null
+}
+
+/**
+ * Stripe webhooks and other service-role jobs must use this entry point.
+ * Requires explicit organizationId and service-role client — never uses session cookies.
+ */
+export async function syncDonationAffiliationFromWebhook(
+  input: WebhookDonationAffiliationSyncInput
+): Promise<void> {
+  const organizationId = input.organizationId?.trim()
+  if (!organizationId) {
+    throw new Error("Webhook donation affiliation sync requires organizationId")
+  }
+  if (!input.supabaseClient) {
+    throw new Error("Webhook donation affiliation sync requires supabaseClient")
+  }
+
+  await handleDonationAffiliationSync({
+    organizationId,
+    supabaseClient: input.supabaseClient,
+    contactId: input.contactId,
+    donorId: input.donorId,
+  })
 }
 
 /** Call after staff records change for a linked contact. */

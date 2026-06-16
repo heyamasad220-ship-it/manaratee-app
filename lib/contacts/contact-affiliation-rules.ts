@@ -1,5 +1,12 @@
 import type { ContactRoleValue } from "@/lib/contacts/contact-constants"
 
+/** Terminal program enrollment statuses — do not confer program_participant. */
+export const PROGRAM_PARTICIPANT_TERMINAL_STATUSES = [
+  "cancelled",
+  "withdrawn",
+  "transferred",
+] as const
+
 /** Affiliation roles computed automatically from activity (not manually assigned). */
 export const DERIVED_AFFILIATION_ROLES = [
   "donor",
@@ -8,6 +15,8 @@ export const DERIVED_AFFILIATION_ROLES = [
   "member",
   "vendor",
   "childcare_provider",
+  "program_participant",
+  "event_attendee",
 ] as const satisfies readonly ContactRoleValue[]
 
 export type DerivedAffiliationRole = (typeof DERIVED_AFFILIATION_ROLES)[number]
@@ -20,7 +29,13 @@ export const AUTO_REMOVABLE_DERIVED_ROLES: DerivedAffiliationRole[] = [
 ]
 
 /** Roles that stick once earned (never auto-removed by sync). */
-export const STICKY_DERIVED_ROLES: DerivedAffiliationRole[] = ["donor", "volunteer", "vendor"]
+export const STICKY_DERIVED_ROLES: DerivedAffiliationRole[] = [
+  "donor",
+  "volunteer",
+  "vendor",
+  "program_participant",
+  "event_attendee",
+]
 
 /** Application types that trigger affiliation sync on submit or status change. */
 export const AFFILIATION_APPLICATION_TYPES = ["vendor", "childcare_provider"] as const
@@ -83,5 +98,21 @@ export const AFFILIATION_RULE_DEFINITIONS: AffiliationRuleDefinition[] = [
     autoAdd: "Yes — when membership is active",
     autoRemove: "Yes — when membership lapses (unless manually overridden)",
     moduleList: "Membership → Members",
+  },
+  {
+    role: "program_participant",
+    label: "Program Participant",
+    trigger: "Non-terminal program enrollment for participant_contact_id",
+    autoAdd: "Yes — on registration",
+    autoRemove: "Never — alumni/history retained",
+    moduleList: "Programs → Registrations",
+  },
+  {
+    role: "event_attendee",
+    label: "Event Attendee",
+    trigger: "Completed ticket order linked to contact",
+    autoAdd: "Yes — on completed ticket purchase",
+    autoRemove: "Never — attendance history retained",
+    moduleList: "Events → Ticketing",
   },
 ]

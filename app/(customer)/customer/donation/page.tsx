@@ -137,6 +137,29 @@ function resolvePaymentCampaignLabel(
   return payment.memo || "General Fund"
 }
 
+async function syncDonorAffiliationAfterDonation(input: {
+  organizationId: string
+  contactId: string
+  donorId: string
+  context: string
+}) {
+  try {
+    const { handleDonationAffiliationSync } = await import(
+      "@/lib/contacts/contact-affiliation-sync"
+    )
+    await handleDonationAffiliationSync({
+      organizationId: input.organizationId,
+      contactId: input.contactId,
+      donorId: input.donorId,
+    })
+  } catch (syncError) {
+    const message = syncError instanceof Error ? syncError.message : String(syncError)
+    console.error(
+      `[customer-donation] affiliation sync failed (${input.context}): ${message}`
+    )
+  }
+}
+
 export default function CustomerDonationsPage() {
   const supabase = createClient()
 
@@ -516,6 +539,13 @@ export default function CustomerDonationsPage() {
       return
     }
 
+    await syncDonorAffiliationAfterDonation({
+      organizationId: contact.organization_id,
+      contactId: contact.id,
+      donorId,
+      context: "portal pledge payment",
+    })
+
     setPayments((currentPayments) => [
       {
         id: data.id,
@@ -604,6 +634,13 @@ export default function CustomerDonationsPage() {
       return
     }
 
+    await syncDonorAffiliationAfterDonation({
+      organizationId: contact.organization_id,
+      contactId: contact.id,
+      donorId,
+      context: "portal offline one-time donation",
+    })
+
     setPayments((currentPayments) => [
       {
         id: data.id,
@@ -672,6 +709,13 @@ export default function CustomerDonationsPage() {
       setIsProcessing(false)
       return
     }
+
+    await syncDonorAffiliationAfterDonation({
+      organizationId: contact.organization_id,
+      contactId: contact.id,
+      donorId,
+      context: "portal pledge creation",
+    })
 
     const { data: pledgeView } = await supabase
       .from("pledge_status_view")

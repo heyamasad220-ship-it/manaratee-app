@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import {
   AlertTriangle,
   ArrowLeft,
+  Ban,
   CheckCircle2,
   Clock,
   XCircle,
@@ -14,6 +15,7 @@ import {
 import {
   approveVenueRentalRequest,
   approveSecurityDepositRefund,
+  cancelVenueRental,
   declineVenueRentalRequest,
   extendVenueRentalHold,
   markRentalPaymentPaid,
@@ -21,8 +23,10 @@ import {
 } from "@/lib/bookings/venue-rental-actions"
 import { formatVenueRentalTimeRange } from "@/lib/bookings/venue-rental-format"
 import {
+  canStaffCancelVenueRental,
   getVenueRentalCalendarColorClasses,
   getVenueRentalStatusLabel,
+  shouldCancelVenueRentalAfterPayment,
 } from "@/lib/bookings/venue-rental-status"
 import type {
   RentalPaymentRecord,
@@ -40,6 +44,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { VenueRentalBillingContactCard } from "@/components/bookings/venue-rental-billing-contact-card"
 
 type VenueRentalDetailClientProps = {
@@ -73,6 +87,8 @@ export function VenueRentalDetailClient({
   const [extendReason, setExtendReason] = useState("")
   const [refundAmount, setRefundAmount] = useState("")
   const [refundReason, setRefundReason] = useState("")
+  const [cancelReason, setCancelReason] = useState("")
+  const [showCancelDialog, setShowCancelDialog] = useState(false)
 
   const statusClasses = getVenueRentalCalendarColorClasses(rental.calendarColor)
 
@@ -98,6 +114,28 @@ export function VenueRentalDetailClient({
       securityPaid: security ? paidStatuses.has(security.status) : false,
     }
   }, [payments])
+
+  const cancelAfterPayment = useMemo(
+    () =>
+      shouldCancelVenueRentalAfterPayment({
+        status: rental.status,
+        depositPaid: paymentSummary.depositPaid,
+        securityDepositPaid: paymentSummary.securityPaid,
+      }),
+    [paymentSummary.depositPaid, paymentSummary.securityPaid, rental.status]
+  )
+
+  const canCancelRental = canManage && canStaffCancelVenueRental(rental.status)
+
+  async function submitCancellation() {
+    await cancelVenueRental({
+      venueRentalId: rental.id,
+      reason: cancelReason,
+      afterPayment: cancelAfterPayment,
+    })
+    setShowCancelDialog(false)
+    setCancelReason("")
+  }
 
   function runAction(action: () => Promise<void>) {
     setError(null)
@@ -424,6 +462,77 @@ export function VenueRentalDetailClient({
           </CardContent>
         </Card>
       ) : null}
+
+      {canCancelRental ? (
+        <Card className="border-red-200">
+          <CardHeader>
+            <CardTitle className="text-base text-red-900">Cancel rental</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3 max-w-xl">
+            <p className="text-sm text-muted-foreground">
+              Cancelling releases the calendar hold for this rental. Email the customer manually
+              to confirm cancellation and any refund policy.
+            </p>
+            {cancelAfterPayment ? (
+              <p className="text-sm text-amber-900">
+                Payments have been recorded on this rental. The deposit is non-refundable per
+                policy. Process any security deposit or remaining balance refunds outside the
+                system, then record outcomes separately when refund workflows are available.
+              </p>
+            ) : null}
+            <div className="grid gap-2">
+              <Label htmlFor="cancel-reason">Cancellation reason</Label>
+              <Textarea
+                id="cancel-reason"
+                placeholder="Reason recorded in the audit log and rental notes"
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+              />
+            </div>
+            <Button
+              variant="destructive"
+              disabled={isPending || !cancelReason.trim()}
+              onClick={() => {
+                if (cancelAfterPayment) {
+                  setShowCancelDialog(true)
+                  return
+                }
+
+                runAction(submitCancellation)
+              }}
+            >
+              <Ban className="mr-2 h-4 w-4" />
+              Cancel rental
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel rental after payment?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This rental has recorded payments or is confirmed. Cancelling will release the
+              calendar block and mark the rental as cancelled after payment. Deposits are
+              non-refundable. Handle any security deposit or balance refunds manually.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isPending}>Keep rental</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isPending || !cancelReason.trim()}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(event) => {
+                event.preventDefault()
+                runAction(submitCancellation)
+              }}
+            >
+              Cancel rental
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

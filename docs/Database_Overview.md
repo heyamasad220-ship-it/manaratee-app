@@ -101,6 +101,45 @@ person_tags.tag_id → discount_tags.id
 discount_tags.organization_id → organizations.id
 ```
 
+**Participation roles (migration `101_contact_participation_roles.sql`):** `contact_roles.role` CHECK includes `program_participant`, `event_attendee`, `venue_rental_customer` (alongside donor, customer, volunteer, employee, member, vendor, service_provider, childcare_provider). Run after `100_stripe_recurring_donations.sql`.
+
+**Phase 1 identity linkage (June 2026):**
+
+| Table / column | Purpose |
+|----------------|---------|
+| `contacts.person_id` | Canonical person ↔ contact link (family, participants) |
+| `program_enrollments.participant_contact_id` | Program participant identity + `program_participant` derivation |
+| `program_enrollments.registrant_contact_id` | Guardian/registrant (preserved separately from participant) |
+| `program_enrollments.payer_contact_id` | Payer (preserved separately from participant) |
+| `ticket_orders.contact_id` | Ticketing purchaser identity + `event_attendee` derivation |
+| `donors.contact_id` | Donor extension + `donor` derivation |
+| `volunteers.contact_id` | Volunteer roster + `volunteer` derivation |
+
+Affiliation writes use `sync_contact_affiliations` RPC via `syncContactAffiliations` / `handleDonationAffiliationSync` — not manual `contact_roles` inserts on activity write paths. Profile open may call `refreshContactAffiliations` for reconciliation only; Phase 1 modules do not depend on it.
+
+**RLS hardening (migrations `102`–`111`, June 2026):**
+
+| Helper / RPC | Purpose |
+|--------------|---------|
+| `auth_user_can_view_contacts` | Staff CRM read (`contacts.view` or owner) |
+| `auth_user_can_manage_contacts` | Staff CRM write (`contacts.manage` or owner) |
+| `auth_user_can_view_family_contact` | Customer SELECT on linked family contacts |
+| `auth_user_may_sync_derived_affiliations` | Gate for `sync_contact_affiliations` (M6b: + events/ticketing/membership) |
+| `auth_user_may_create_contact_via_module` | Gate for `find_or_create_contact_for_org` (M6b: + events/ticketing/membership.manage) |
+| `auth_user_may_ensure_contact_for_person` | Gate for `ensure_contact_for_person` |
+| `sync_contact_affiliations` | SECURITY DEFINER derive + reconcile `contact_roles` + donor bridge |
+
+Staff policies on `contacts`, `contact_roles`, `contact_notes` require `contacts.view` / `contacts.manage`. Customer self-contact UPDATE/SELECT uses `auth_user_contact_ids()`. Migration `111` drops legacy open policies after G6 validation.
+
+Run order: `102` → … → `110` → (G6 GREEN) → `111`.
+
+Validate:
+
+```bash
+npm run validate:contacts-g6
+npm run validate:contacts-security -- --post-m4   # after 111
+```
+
 ---
 
 ## Programs Module
@@ -164,6 +203,9 @@ program_enrollments.session_id → program_sessions.id
 program_enrollments.lunch_option_id → program_lunch_options.id
 program_enrollments.department_id → departments.id
 program_enrollments.child_person_id → people.id
+program_enrollments.participant_contact_id → contacts.id
+program_enrollments.registrant_contact_id → contacts.id
+program_enrollments.payer_contact_id → contacts.id
 program_enrollments.cart_item_id → registration_cart_items.id
 program_enrollments.order_id → registration_orders.id
 

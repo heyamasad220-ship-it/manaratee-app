@@ -32,6 +32,7 @@ function SetPasswordContent() {
   const supabase = createClient()
 
   const [checkingSession, setCheckingSession] = useState(true)
+  const [isRecovery, setIsRecovery] = useState(false)
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
@@ -39,6 +40,11 @@ function SetPasswordContent() {
 
   useEffect(() => {
     async function ensureSession() {
+      const isRecoveryFlow =
+        searchParams.get("type") === "recovery" ||
+        searchParams.get("mode") === "recovery"
+      setIsRecovery(isRecoveryFlow)
+
       const hash = window.location.hash
       if (hash.includes("access_token") || hash.includes("refresh_token")) {
         await supabase.auth.getSession()
@@ -55,7 +61,9 @@ function SetPasswordContent() {
         if (emailParam) loginParams.set("email", emailParam)
         loginParams.set(
           "error",
-          "Your invite link expired or was already used. Sign in with your password, or ask for a new invite."
+          isRecoveryFlow
+            ? "Your password reset link expired or was already used. Request a new link from the sign-in page."
+            : "Your invite link expired or was already used. Sign in with your password, or ask for a new invite."
         )
         router.replace(`/login?${loginParams.toString()}`)
         return
@@ -94,7 +102,11 @@ function SetPasswordContent() {
       } = await supabase.auth.getUser()
 
       if (!user) {
-        throw new Error("Session expired. Open the invite link again.")
+        throw new Error(
+          isRecovery
+            ? "Session expired. Request a new password reset link from the sign-in page."
+            : "Session expired. Open the invite link again."
+        )
       }
 
       const organizationId = user.user_metadata?.organization_id as string | undefined
@@ -126,8 +138,12 @@ function SetPasswordContent() {
 
   return (
     <AuthLayout
-      heading="Create your password"
-      subheading="Choose a password to finish setting up your Manaratee account."
+      heading={isRecovery ? "Reset your password" : "Create your password"}
+      subheading={
+        isRecovery
+          ? "Choose a new password for your Manaratee account."
+          : "Choose a password to finish setting up your Manaratee account."
+      }
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-5">
         <div className="flex flex-col gap-2">
@@ -166,6 +182,8 @@ function SetPasswordContent() {
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               Saving...
             </>
+          ) : isRecovery ? (
+            "Save new password"
           ) : (
             "Save password and continue"
           )}

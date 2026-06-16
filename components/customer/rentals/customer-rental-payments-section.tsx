@@ -1,9 +1,11 @@
 import { AlertTriangle, Check, Clock } from "lucide-react"
 
+import { CustomerRentalProcessGuidanceCallout } from "@/components/customer/rentals/customer-rental-process-guidance-callout"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type { CustomerRentalPaymentSummaryDto } from "@/lib/bookings/customer-venue-rental-dtos"
 import { formatCustomerCurrency } from "@/lib/bookings/customer-venue-rental-queries"
+import { isCustomerPaymentActionType } from "@/lib/bookings/customer-rental-process-guidance"
 import { cn } from "@/lib/utils"
 
 type CustomerRentalPaymentsSectionProps = {
@@ -68,6 +70,26 @@ export function CustomerRentalPaymentsSection({
   const hasPaymentRows =
     payments.deposit || payments.securityDeposit || payments.remainingBalance
 
+  const hasOutstandingPayment =
+    payments.deposit?.isDue ||
+    payments.securityDeposit?.isDue ||
+    payments.remainingBalance?.isDue ||
+    payments.outstandingBalance > 0
+
+  const duePaymentActionType = payments.deposit?.isDue
+    ? "pay_deposit"
+    : payments.securityDeposit?.isDue
+      ? "pay_security_deposit"
+      : payments.remainingBalance?.isDue
+        ? "pay_remaining_balance"
+        : undefined
+
+  const dueDateLabel =
+    payments.deposit?.dueDateLabel ??
+    payments.securityDeposit?.dueDateLabel ??
+    payments.remainingBalance?.dueDateLabel ??
+    null
+
   return (
     <Card>
       <CardHeader>
@@ -80,6 +102,14 @@ export function CustomerRentalPaymentsSection({
           </p>
         ) : (
           <>
+            {hasOutstandingPayment && isCustomerPaymentActionType(duePaymentActionType) ? (
+              <CustomerRentalProcessGuidanceCallout
+                variant="payment"
+                actionType={duePaymentActionType}
+                dueDateLabel={dueDateLabel}
+              />
+            ) : null}
+
             <div className="space-y-3 rounded-lg border p-4">
               <PaymentLine label="Deposit" payment={payments.deposit} />
               <PaymentLine label="Security deposit" payment={payments.securityDeposit} />

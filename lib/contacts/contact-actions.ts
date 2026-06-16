@@ -77,31 +77,43 @@ export async function findOrCreateContact(input: FindOrCreateContactInput) {
     return { contactId: existingContact.id, created: false }
   }
 
+  const { data: contactId, error: rpcError } = await supabase.rpc(
+    "find_or_create_contact_for_org",
+    {
+      p_organization_id: input.organizationId,
+      p_full_name: cleanName,
+      p_email: cleanEmail,
+      p_phone: cleanPhone,
+      p_contact_type: input.contactType || "individual",
+    }
+  )
+
+  if (rpcError || !contactId) {
+    throw new Error(rpcError?.message || "Could not create contact")
+  }
+
   const isOrganization = input.contactType === "organization"
   const primaryContactName = isOrganization
     ? input.primaryContactName?.trim() || null
     : null
+  const notes = input.notes?.trim() || null
 
-  const { data: newContact, error: contactError } = await supabase
-    .from("contacts")
-    .insert({
-      organization_id: input.organizationId,
-      full_name: cleanName,
-      email: cleanEmail,
-      phone: cleanPhone,
-      primary_contact_name: primaryContactName,
-      contact_type: input.contactType || "individual",
-      notes: input.notes?.trim() || null,
-      status: "active",
-    })
-    .select("id")
-    .single()
+  if (primaryContactName || notes) {
+    const { error: updateError } = await supabase
+      .from("contacts")
+      .update({
+        primary_contact_name: primaryContactName,
+        notes,
+      })
+      .eq("id", contactId)
+      .eq("organization_id", input.organizationId)
 
-  if (contactError || !newContact) {
-    throw new Error(contactError?.message || "Could not create contact")
+    if (updateError) {
+      throw new Error(updateError.message || "Could not update contact details")
+    }
   }
 
-  return { contactId: newContact.id, created: true }
+  return { contactId: contactId as string, created: true }
 }
 
 export async function ensureContactForPerson(input: {
@@ -118,20 +130,6 @@ export async function ensureContactForPerson(input: {
     throw new Error("Organization and person are required.")
   }
 
-  const { data: person, error: personError } = await supabase
-    .from("people")
-    .select("id, first_name, last_name, email, phone")
-    .eq("id", personId)
-    .eq("organization_id", organizationId)
-    .single()
-
-  if (personError || !person) {
-    throw new Error(personError?.message || "Person not found.")
-  }
-
-  const fullName =
-    `${person.first_name ?? ""} ${person.last_name ?? ""}`.trim() || "Family Member"
-
   const { data: linkedContact, error: linkedContactError } = await supabase
     .from("contacts")
     .select("id")
@@ -147,25 +145,19 @@ export async function ensureContactForPerson(input: {
   let created = false
 
   if (!contactId) {
-    const { data: newContact, error: contactError } = await supabase
-      .from("contacts")
-      .insert({
-        organization_id: organizationId,
-        full_name: fullName,
-        person_id: personId,
-        email: person.email || null,
-        phone: person.phone || null,
-        contact_type: "individual",
-        status: "active",
-      })
-      .select("id")
-      .single()
+    const { data: rpcContactId, error: rpcError } = await supabase.rpc(
+      "ensure_contact_for_person",
+      {
+        p_organization_id: organizationId,
+        p_person_id: personId,
+      }
+    )
 
-    if (contactError || !newContact) {
-      throw new Error(contactError?.message || "Could not create contact for family member.")
+    if (rpcError || !rpcContactId) {
+      throw new Error(rpcError?.message || "Could not create contact for family member.")
     }
 
-    contactId = newContact.id as string
+    contactId = rpcContactId as string
     created = true
   }
 

@@ -185,7 +185,7 @@ const modulePermissionMap: Record<string, string> = {
   staff: "staff.view",
   applications: "applications.view",
   contacts: "contacts.view",
-  membership: "contacts.view",
+  membership: "membership.view",
   reports: "reports.view",
   ticketing: "ticketing.view",
   bookings: "bookings.view",
@@ -197,6 +197,7 @@ const modulePermissionMap: Record<string, string> = {
 /** Until roles are updated, show Event Management to users with Programs access. */
 const modulePermissionFallbacks: Record<string, string[]> = {
   "event-management": ["programs.view", "ticketing.view", "ticketing.manage"],
+  membership: ["contacts.view"],
 }
 
 const subItemPermissionFallbacks: Record<string, string[]> = {
@@ -205,6 +206,8 @@ const subItemPermissionFallbacks: Record<string, string[]> = {
   "reports.view": ["events.view", "programs.view"],
   "ticketing.view": ["events.view", "programs.view", "ticketing.manage"],
   "ticketing.manage": ["events.manage", "programs.manage"],
+  "membership.view": ["contacts.view"],
+  "membership.manage": ["contacts.manage"],
 }
 
 const SIDEBAR_GROUP_ORDER = [
@@ -282,10 +285,10 @@ const moduleChildren: Record<string, SubItem[]> = {
     { label: "Settings", href: "/contacts/settings", matchPrefix: "/contacts/settings", permissionKey: "contacts.view" },
   ],
   membership: [
-    { label: "Overview", href: "/membership", matchPrefix: "/membership", permissionKey: "contacts.view" },
-    { label: "Members", href: "/membership/members", matchPrefix: "/membership/members", permissionKey: "contacts.view" },
-    { label: "Teams", href: "/membership/teams", matchPrefix: "/membership/teams", permissionKey: "contacts.view" },
-    { label: "Settings", href: "/membership/settings", matchPrefix: "/membership/settings", permissionKey: "contacts.view" },
+    { label: "Overview", href: "/membership", matchPrefix: "/membership", permissionKey: "membership.view" },
+    { label: "Members", href: "/membership/members", matchPrefix: "/membership/members", permissionKey: "membership.view" },
+    { label: "Teams", href: "/membership/teams", matchPrefix: "/membership/teams", permissionKey: "membership.view" },
+    { label: "Settings", href: "/membership/settings", matchPrefix: "/membership/settings", permissionKey: "membership.manage" },
   ],
   donations: [
     { label: "Overview", href: "/donations", matchPrefix: "/donations", permissionKey: "donations.view" },

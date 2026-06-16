@@ -4,8 +4,10 @@ import {
   Briefcase,
   Building2,
   Calendar,
+  GraduationCap,
   Heart,
   Store,
+  Ticket,
   UserCheck,
   Wrench,
 } from "lucide-react"
@@ -39,12 +41,20 @@ export const CONTACT_ORGANIZATION_AFFILIATION_ROLES = [
 /** Workforce roles managed under Workforce module — not assigned via Contacts CRM. */
 export const CONTACT_WORKFORCE_ROLES = ["employee", "volunteer"] as const
 
+/** Participation roles derived from enrollments, ticketing, rentals (not manual CRM picks). */
+export const CONTACT_PARTICIPATION_DERIVED_ROLES = [
+  "event_attendee",
+  "program_participant",
+  "venue_rental_customer",
+] as const
+
 /** All contact role values (including membership-derived member tag). */
 export const CONTACT_ROLE_VALUES = [
   ...CONTACT_PERSON_AFFILIATION_ROLES,
   MEMBERSHIP_DERIVED_ROLE,
   "customer",
   ...CONTACT_WORKFORCE_ROLES,
+  ...CONTACT_PARTICIPATION_DERIVED_ROLES,
 ] as const
 
 export type ContactRoleValue = (typeof CONTACT_ROLE_VALUES)[number]
@@ -58,6 +68,9 @@ export type ContactRoleLabel =
   | "Vendor"
   | "Child Care Provider"
   | "Service Provider"
+  | "Program Participant"
+  | "Event Attendee"
+  | "Venue Rental Customer"
 
 export type ContactRecordType = "individual" | "organization"
 
@@ -77,6 +90,9 @@ export const ROLE_VALUE_TO_LABEL: Record<ContactRoleValue, ContactRoleLabel> = {
   vendor: "Vendor",
   childcare_provider: "Child Care Provider",
   service_provider: "Service Provider",
+  program_participant: "Program Participant",
+  event_attendee: "Event Attendee",
+  venue_rental_customer: "Venue Rental Customer",
 }
 
 export const ROLE_LABEL_TO_VALUE: Record<ContactRoleLabel, ContactRoleValue> = {
@@ -88,6 +104,9 @@ export const ROLE_LABEL_TO_VALUE: Record<ContactRoleLabel, ContactRoleValue> = {
   Vendor: "vendor",
   "Child Care Provider": "childcare_provider",
   "Service Provider": "service_provider",
+  "Program Participant": "program_participant",
+  "Event Attendee": "event_attendee",
+  "Venue Rental Customer": "venue_rental_customer",
 }
 
 const INDIVIDUAL_AFFILIATION_OPTIONS: { label: ContactRoleLabel; value: ContactRoleValue }[] =
@@ -157,7 +176,9 @@ export function getEditableAllowedRolesForRecordType(
   recordType: ContactRecordType
 ): ContactRoleValue[] {
   return getAllowedRolesForRecordType(recordType).filter(
-    (role) => role !== MEMBERSHIP_DERIVED_ROLE
+    (role) =>
+      role !== MEMBERSHIP_DERIVED_ROLE &&
+      !(CONTACT_PARTICIPATION_DERIVED_ROLES as readonly string[]).includes(role)
   )
 }
 
@@ -170,6 +191,9 @@ export const ROLE_COLORS: Record<ContactRoleLabel, string> = {
   Vendor: "bg-amber-100 text-amber-700",
   "Child Care Provider": "bg-teal-100 text-teal-700",
   "Service Provider": "bg-purple-100 text-purple-700",
+  "Program Participant": "bg-violet-100 text-violet-700",
+  "Event Attendee": "bg-cyan-100 text-cyan-700",
+  "Venue Rental Customer": "bg-orange-100 text-orange-800",
 }
 
 export const ROLE_ICONS: Record<ContactRoleLabel, LucideIcon> = {
@@ -181,6 +205,9 @@ export const ROLE_ICONS: Record<ContactRoleLabel, LucideIcon> = {
   Vendor: Store,
   "Child Care Provider": Baby,
   "Service Provider": Wrench,
+  "Program Participant": GraduationCap,
+  "Event Attendee": Ticket,
+  "Venue Rental Customer": Building2,
 }
 
 export const STATUS_COLORS: Record<ContactStatus, string> = {

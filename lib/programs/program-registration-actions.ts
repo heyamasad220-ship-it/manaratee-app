@@ -13,6 +13,8 @@ import {
 } from "@/lib/programs/program-registration-option-queries"
 import type { ProgramRegistrationOptionType } from "@/lib/programs/program-registration-option-types"
 import { getActiveSessionIdsForOffering } from "@/lib/programs/program-registration-session-access"
+import { syncAffiliationAfterEnrollmentCreation } from "@/lib/programs/program-enrollment-actions"
+import { resolveParticipantContactIdForRegistration } from "@/lib/programs/person-actions"
 import {
   getCustomerContactForUser,
   verifyParticipantInRegistrantFamily,
@@ -233,15 +235,21 @@ async function registerSingleParticipant(input: {
     input.redirectBase
   )
 
+  const participantContactIdForRpc = input.isAdultProgram
+    ? null
+    : await resolveParticipantContactIdForRegistration({
+        organizationId: input.organizationId,
+        participantContactId: input.participant.participantContactId,
+        redirectBase: input.redirectBase,
+      })
+
   const { data: rpcData, error: rpcError } = await input.supabase.rpc(
     "register_for_program",
     {
       p_organization_id: input.organizationId,
       p_program_id: input.programId,
       p_registration_option_id: input.registrationOptionId,
-      p_participant_contact_id: input.isAdultProgram
-        ? null
-        : input.participant.participantContactId,
+      p_participant_contact_id: participantContactIdForRpc,
       p_session_ids: input.sessionIdsForAccess,
       p_mode: input.rpcMode,
       p_parent_name: input.customerContact.full_name,
@@ -280,6 +288,15 @@ async function registerSingleParticipant(input: {
 
   if (!result?.ok) {
     redirect(`${input.redirectBase}?error=save-failed`)
+  }
+
+  if (result.enrollment_id && result.mode !== "waitlist") {
+    await syncAffiliationAfterEnrollmentCreation({
+      supabase: input.supabase,
+      organizationId: input.organizationId,
+      enrollmentId: result.enrollment_id,
+      context: "register_for_program",
+    })
   }
 
   return result

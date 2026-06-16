@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type { CustomerRentalContractDto } from "@/lib/bookings/customer-venue-rental-dtos"
+import { getCustomerContractProcessGuidance } from "@/lib/bookings/customer-rental-process-guidance"
 
 type CustomerRentalContractSectionProps = {
   contract: CustomerRentalContractDto | null
@@ -9,6 +10,7 @@ export function CustomerRentalContractSection({
   contract,
 }: CustomerRentalContractSectionProps) {
   const status = contract?.status ?? "Not Available"
+  const contractGuidance = getCustomerContractProcessGuidance()
 
   return (
     <Card>
@@ -25,9 +27,7 @@ export function CustomerRentalContractSection({
             Your rental agreement is available in the Documents section below.
           </p>
         ) : contract?.canSign ? (
-          <p className="text-muted-foreground">
-            Your agreement is ready to review. Signing will be available in a future release.
-          </p>
+          <p className="text-muted-foreground">{contractGuidance.description}</p>
         ) : (
           <p className="text-muted-foreground">
             A contract will appear here after your request is approved.

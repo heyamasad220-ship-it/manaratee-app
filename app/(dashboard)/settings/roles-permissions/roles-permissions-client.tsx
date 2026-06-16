@@ -156,6 +156,30 @@ const permissionDefinitions: PermissionDefinition[] = [
     group: "Events",
   },
   {
+    key: "ticketing.view",
+    label: "View Ticketing",
+    description: "Can open ticketing and event sales pages.",
+    group: "Events",
+  },
+  {
+    key: "ticketing.manage",
+    label: "Manage Ticketing",
+    description: "Can create and complete ticket orders.",
+    group: "Events",
+  },
+  {
+    key: "membership.view",
+    label: "View Membership",
+    description: "Can open membership pages and view members.",
+    group: "Membership",
+  },
+  {
+    key: "membership.manage",
+    label: "Manage Membership",
+    description: "Can add members, create memberships, and update status.",
+    group: "Membership",
+  },
+  {
     key: "bookings.view",
     label: "View Venue Rentals",
     description: "Can open Venue Rentals pages.",
@@ -178,6 +202,18 @@ const permissionDefinitions: PermissionDefinition[] = [
     label: "Manage Facilities",
     description: "Can manage spaces and update facility setup notes.",
     group: "Facilities",
+  },
+  {
+    key: "contacts.view",
+    label: "View Contacts",
+    description: "Can open Contacts pages and view contact records.",
+    group: "Contacts",
+  },
+  {
+    key: "contacts.manage",
+    label: "Manage Contacts",
+    description: "Can create, edit, and delete contacts and affiliations.",
+    group: "Contacts",
   },
 ]
 

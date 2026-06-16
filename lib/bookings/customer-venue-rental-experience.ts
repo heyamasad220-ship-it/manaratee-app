@@ -1,4 +1,10 @@
 import type { CustomerRentalFinancialContext } from "./customer-venue-rental-dtos"
+import {
+  getCustomerContractNextActionLabel,
+  getCustomerContractNextStepLabel,
+  getCustomerPaymentNextActionLabel,
+  getCustomerPaymentNextStepLabel,
+} from "./customer-rental-process-guidance"
 import type { VenueRentalQueueRow, VenueRentalStatus } from "./venue-rental-types"
 import { VENUE_RENTAL_STATUSES } from "./venue-rental-types"
 import {
@@ -174,7 +180,7 @@ function resolvePaymentAction(
 
   if (contract?.canSign) {
     return {
-      label: "Review and sign agreement",
+      label: getCustomerContractNextActionLabel(),
       requiresAction: true,
       actionType: "sign_agreement",
     }
@@ -182,7 +188,9 @@ function resolvePaymentAction(
 
   if (payments.deposit?.isDue) {
     return {
-      label: "Pay deposit",
+      label: getCustomerPaymentNextActionLabel("pay_deposit", {
+        dueDateLabel: payments.deposit.dueDateLabel,
+      }),
       requiresAction: true,
       actionType: "pay_deposit",
     }
@@ -190,18 +198,19 @@ function resolvePaymentAction(
 
   if (payments.securityDeposit?.isDue) {
     return {
-      label: "Pay security deposit",
+      label: getCustomerPaymentNextActionLabel("pay_security_deposit", {
+        dueDateLabel: payments.securityDeposit.dueDateLabel,
+      }),
       requiresAction: true,
       actionType: "pay_security_deposit",
     }
   }
 
   if (payments.remainingBalance?.isDue) {
-    const dueLabel = payments.remainingBalance.dueDateLabel
-      ? `Pay remaining balance by ${payments.remainingBalance.dueDateLabel}`
-      : "Pay remaining balance"
     return {
-      label: dueLabel,
+      label: getCustomerPaymentNextActionLabel("pay_remaining_balance", {
+        dueDateLabel: payments.remainingBalance.dueDateLabel,
+      }),
       requiresAction: true,
       actionType: "pay_remaining_balance",
     }
@@ -232,14 +241,16 @@ export function getCustomerRentalNextAction(
     case VENUE_RENTAL_STATUSES.approvedPendingPayment:
       return {
         label: holdDeadline
-          ? `Complete payment by ${holdDeadline}`
-          : "Complete deposit and security deposit payment",
+          ? getCustomerPaymentNextActionLabel("pay_deposit", {
+              holdDeadlineLabel: holdDeadline,
+            })
+          : "Complete deposit and security deposit payment — our team will send instructions",
         requiresAction: true,
         actionType: "pay_deposit",
       }
     case VENUE_RENTAL_STATUSES.depositPaid:
       return {
-        label: "Pay security deposit to confirm your rental",
+        label: "Security deposit due — watch for payment instructions from our team",
         requiresAction: true,
         actionType: "pay_security_deposit",
       }
@@ -304,22 +315,7 @@ export function getCustomerDashboardActionLabel(
   row: VenueRentalQueueRow,
   context?: CustomerRentalFinancialContext
 ): string {
-  const nextAction = getCustomerRentalNextAction(row, context)
-
-  switch (nextAction.actionType) {
-    case "sign_agreement":
-      return "Sign agreement"
-    case "pay_deposit":
-      return "Pay deposit"
-    case "pay_security_deposit":
-      return "Pay security deposit"
-    case "pay_remaining_balance":
-      return "Pay remaining balance"
-    case "submit_new_request":
-      return "Submit new request"
-    default:
-      return nextAction.label
-  }
+  return getCustomerRentalNextStepLabel(row, context)
 }
 
 export function isCustomerHistoryStatus(status: VenueRentalStatus): boolean {
@@ -378,17 +374,23 @@ export function getCustomerRentalNextStepLabel(
 
   switch (nextAction.actionType) {
     case "sign_agreement":
-      return "Review agreement"
+      return getCustomerContractNextStepLabel()
     case "pay_deposit":
-      return "Pay deposit"
+      return getCustomerPaymentNextStepLabel("pay_deposit", {
+        dueDateLabel: context?.payments.deposit?.dueDateLabel,
+      })
     case "pay_security_deposit":
-      return "Pay security deposit"
+      return getCustomerPaymentNextStepLabel("pay_security_deposit", {
+        dueDateLabel: context?.payments.securityDeposit?.dueDateLabel,
+      })
     case "pay_remaining_balance":
-      return "Pay remaining balance"
+      return getCustomerPaymentNextStepLabel("pay_remaining_balance", {
+        dueDateLabel: context?.payments.remainingBalance?.dueDateLabel,
+      })
     case "submit_new_request":
       return "Submit new request"
     default:
-      return getCustomerDashboardActionLabel(row, context)
+      return nextAction.label
   }
 }
 

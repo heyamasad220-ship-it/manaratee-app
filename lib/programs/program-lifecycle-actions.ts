@@ -1,6 +1,7 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
+import { syncAffiliationAfterEnrollmentCreation } from "@/lib/programs/program-enrollment-actions"
 import type { LifecycleRpcResult } from "@/lib/programs/program-lifecycle-types"
 
 function parseLifecycleError(message: string) {
@@ -52,10 +53,22 @@ export async function promoteWaitlistRpc(input: {
   organizationId: string
   waitlistId: string
 }) {
-  return callLifecycleRpc<LifecycleRpcResult>("promote_waitlist", {
+  const result = await callLifecycleRpc<LifecycleRpcResult>("promote_waitlist", {
     p_organization_id: input.organizationId,
     p_waitlist_id: input.waitlistId,
   })
+
+  if (result.enrollment_id) {
+    const supabase = await createClient()
+    await syncAffiliationAfterEnrollmentCreation({
+      supabase,
+      organizationId: input.organizationId,
+      enrollmentId: result.enrollment_id,
+      context: "promote_waitlist",
+    })
+  }
+
+  return result
 }
 
 export async function removeWaitlistRpc(input: {

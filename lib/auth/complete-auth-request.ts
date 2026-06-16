@@ -47,13 +47,25 @@ export async function completeAuthFromSearchParams(
   }
 
   if (tokenHash && type) {
-    const { error: verifyError } = await supabase.auth.verifyOtp({
+    const { data, error: verifyError } = await supabase.auth.verifyOtp({
       token_hash: tokenHash,
       type,
     })
     if (verifyError) {
       return authAcceptErrorRedirect(origin, verifyError.message)
     }
+
+    // Recovery fires PASSWORD_RECOVERY; ensure session cookies are persisted (supabase/ssr).
+    if (type === "recovery" && data.session) {
+      const { error: sessionError } = await supabase.auth.setSession({
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+      })
+      if (sessionError) {
+        return authAcceptErrorRedirect(origin, sessionError.message)
+      }
+    }
+
     return NextResponse.redirect(`${origin}${safeNext}`)
   }
 

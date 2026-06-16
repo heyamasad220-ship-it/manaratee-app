@@ -63,6 +63,31 @@ function record(id, pass, detail, extra = {}) {
   console.log(`[${pass ? "PASS" : "FAIL"}] ${id}${detail ? ` — ${detail}` : ""}`)
 }
 
+async function hasDonorRole(organizationId, contactId) {
+  const { data, error } = await sb
+    .from("contact_roles")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("contact_id", contactId)
+    .eq("role", "donor")
+    .limit(1)
+
+  if (error) return { ok: false, error: error.message }
+  return { ok: true, hasRole: (data || []).length > 0 }
+}
+
+async function countDonorRoles(organizationId, contactId) {
+  const { count, error } = await sb
+    .from("contact_roles")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", organizationId)
+    .eq("contact_id", contactId)
+    .eq("role", "donor")
+
+  if (error) return { ok: false, error: error.message }
+  return { ok: true, count: count ?? 0 }
+}
+
 async function resolveOrgId() {
   const explicit = process.env.DONATIONS_SEED_ORG_ID
   if (explicit) return explicit
@@ -276,6 +301,13 @@ record(
   `plan=${checkoutResult.planId}`
 )
 
+const donorRoleAfterCheckout = await hasDonorRole(orgId, donor.contact_id)
+record(
+  "recurring_checkout_donor_role",
+  donorRoleAfterCheckout.ok && donorRoleAfterCheckout.hasRole,
+  donorRoleAfterCheckout.error || (donorRoleAfterCheckout.hasRole ? "donor role present" : "missing")
+)
+
 const { data: linkedPlan } = await sb
   .from("recurring_donation_plans")
   .select("external_processor, external_processor_id, stripe_customer_id, status")
@@ -333,6 +365,32 @@ record(
   "invoice_webhook_idempotent",
   duplicateInvoice.created === false && duplicateInvoice.paymentId === firstInvoice.paymentId,
   `first=${firstInvoice.paymentId} second=${duplicateInvoice.paymentId}`
+)
+
+const donorRoleAfterInvoice = await hasDonorRole(orgId, donor.contact_id)
+record(
+  "invoice_renewal_donor_role",
+  donorRoleAfterInvoice.ok && donorRoleAfterInvoice.hasRole,
+  donorRoleAfterInvoice.error || (donorRoleAfterInvoice.hasRole ? "donor role present" : "missing")
+)
+
+const donorRoleCountAfterDuplicateInvoice = await countDonorRoles(orgId, donor.contact_id)
+record(
+  "duplicate_invoice_donor_role_idempotent",
+  donorRoleCountAfterDuplicateInvoice.ok && donorRoleCountAfterDuplicateInvoice.count >= 1,
+  donorRoleCountAfterDuplicateInvoice.error ||
+    `count=${donorRoleCountAfterDuplicateInvoice.count}`
+)
+
+const subscriptionSource = readFileSync(
+  resolve(root, "lib/donations/stripe/processor-subscription.ts"),
+  "utf8"
+)
+record(
+  "subscription_processor_uses_webhook_affiliation_sync",
+  subscriptionSource.includes("maybeSyncDonationAffiliationFromWebhook") &&
+    subscriptionSource.includes("syncRecurringDonationAffiliation"),
+  "recurring webhook affiliation wired"
 )
 
 const invoiceEvent = await recordProcessorEvent(sb, {

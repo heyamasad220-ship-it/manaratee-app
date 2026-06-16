@@ -1,5 +1,40 @@
 # KNOWN_ISSUES.md
 
+---
+
+## Password Reset (Forgot Password)
+
+Status: Fixed (June 2026) — retest in your environment
+
+Files:
+
+* `app/forgot-password/page.tsx` — sends reset email via `resetPasswordForEmail`
+* `app/auth/confirm/route.ts` — exchanges `token_hash` + `type=recovery` (SSR/PKCE-safe)
+* `app/auth/set-password/page.tsx` — user chooses new password
+* `lib/auth/auth-redirect.ts` — `passwordResetRedirectUrl()` → `/auth/confirm?next=/auth/set-password`
+* `supabase/templates/recovery.html` — local dev email template (token_hash link)
+
+**Required for hosted Supabase:** update **Authentication → Email Templates → Reset password** so the link uses `token_hash` (not the default `{{ .ConfirmationURL }}` PKCE callback):
+
+```html
+<a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery&next=/auth/set-password">
+  Reset password
+</a>
+```
+
+Without this template change, reset links redirect through `/auth/callback` with a PKCE `code` that fails when the email is opened on a different device or browser than the one that requested the reset.
+
+Flow:
+
+1. User submits email on `/forgot-password`
+2. Email link → `/auth/confirm?token_hash=…&type=recovery&next=/auth/set-password`
+3. Server verifies OTP and sets session cookies
+4. User sets new password on `/auth/set-password` → redirected by role
+
+Also verify redirect URLs include `/auth/confirm` (see User Invitations section below).
+
+---
+
 ## User Invitations
 
 Status: Fixed (May 2026) — retest in your environment

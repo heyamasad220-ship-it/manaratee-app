@@ -27,8 +27,9 @@ export function inviteAcceptRedirectUrl(baseUrl?: string) {
   return authCallbackUrl(SET_PASSWORD_PATH, baseUrl)
 }
 
+/** Password reset uses /auth/confirm + token_hash (PKCE callback breaks across devices). */
 export function passwordResetRedirectUrl(baseUrl?: string) {
-  return inviteAcceptRedirectUrl(baseUrl)
+  return authConfirmUrl(SET_PASSWORD_PATH, baseUrl)
 }
 
 export function authConfirmUrl(nextPath: string = SET_PASSWORD_PATH, baseUrl?: string) {

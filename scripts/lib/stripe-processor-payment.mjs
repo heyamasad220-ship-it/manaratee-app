@@ -19,6 +19,56 @@ function parseMetadata(metadata) {
   }
 }
 
+async function maybeSyncDonorAffiliation(sb, input) {
+  const organizationId = input.organizationId?.trim?.() ?? input.organizationId
+  if (!organizationId || (!input.contactId && !input.donorId)) return
+
+  try {
+    let contactId = input.contactId ?? null
+    if (!contactId && input.donorId) {
+      const { data: donor } = await sb
+        .from("donors")
+        .select("contact_id")
+        .eq("organization_id", organizationId)
+        .eq("id", input.donorId)
+        .maybeSingle()
+      contactId = donor?.contact_id ?? null
+    }
+    if (!contactId) return
+
+    const [{ count: paymentCount }, { count: donorCount }] = await Promise.all([
+      sb
+        .from("payments")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", organizationId)
+        .eq("contact_id", contactId),
+      sb
+        .from("donors")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", organizationId)
+        .eq("contact_id", contactId),
+    ])
+
+    if ((paymentCount ?? 0) > 0 || (donorCount ?? 0) > 0) {
+      const { error } = await sb.from("contact_roles").insert({
+        organization_id: organizationId,
+        contact_id: contactId,
+        role: "donor",
+        is_manual: false,
+      })
+      if (error && error.code !== "23505") {
+        throw new Error(error.message)
+      }
+    }
+  } catch (error) {
+    console.error(
+      `[validate-stripe] donation affiliation sync failed (${input.context}): ${
+        error?.message || error
+      }`
+    )
+  }
+}
+
 async function loadCheckoutSession(sb, { manarateeCheckoutId, stripeCheckoutSessionId }) {
   if (manarateeCheckoutId) {
     const { data } = await sb
@@ -46,6 +96,13 @@ export async function insertProcessorPaymentFromCheckout(sb, input) {
   })
 
   if (checkoutSession?.payment_id) {
+    await maybeSyncDonorAffiliation(sb, {
+      organizationId: input.metadata.organization_id,
+      contactId: input.metadata.contact_id,
+      donorId: input.metadata.donor_id,
+      context: `checkout existing payment ${input.stripeCheckoutSessionId}`,
+    })
+
     return {
       paymentId: checkoutSession.payment_id,
       created: false,
@@ -70,6 +127,14 @@ export async function insertProcessorPaymentFromCheckout(sb, input) {
         })
         .eq("id", checkoutSession.id)
     }
+
+    await maybeSyncDonorAffiliation(sb, {
+      organizationId: input.metadata.organization_id,
+      contactId: input.metadata.contact_id,
+      donorId: input.metadata.donor_id,
+      context: `payment_intent existing ${input.stripePaymentIntentId}`,
+    })
+
     return {
       paymentId: existingByIntent.id,
       created: false,
@@ -118,6 +183,13 @@ export async function insertProcessorPaymentFromCheckout(sb, input) {
       })
       .eq("id", checkoutSession.id)
   }
+
+  await maybeSyncDonorAffiliation(sb, {
+    organizationId: input.metadata.organization_id,
+    contactId: input.metadata.contact_id,
+    donorId: input.metadata.donor_id,
+    context: `checkout new payment ${input.stripeCheckoutSessionId}`,
+  })
 
   return {
     paymentId: payment.id,

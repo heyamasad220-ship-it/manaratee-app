@@ -21,8 +21,10 @@ import { assertNoReservationConflicts } from "@/lib/reservations/reservation-con
 
 import {
   computeHoldExpiresAt,
-  isHoldExpired,
+  canStaffCancelVenueRental,
+  shouldCancelVenueRentalAfterPayment,
 } from "./venue-rental-status"
+import { expireVenueRentalHoldsForScope } from "./venue-rental-hold-expiry"
 import { getBlockingReservationsForVenue } from "./venue-rental-queries"
 import {
   assertLegacyVenueBookingAvailableForMigration,
@@ -891,44 +893,17 @@ export async function expireVenueRentalHolds(now = new Date()) {
     throw new Error("No organization selected")
   }
 
-  const holdPaymentStatuses = new Set<string>([
-    VENUE_RENTAL_STATUSES.approvedPendingPayment,
-    VENUE_RENTAL_STATUSES.depositPaid,
-    VENUE_RENTAL_STATUSES.securityDepositPaid,
-  ])
+  const result = await expireVenueRentalHoldsForScope({
+    supabase,
+    organizationId,
+    now,
+  })
 
-  const { data: rentals, error } = await supabase
-    .from("venue_rentals")
-    .select("id, hold_expires_at, status")
-    .eq("organization_id", organizationId)
-    .in("status", Array.from(holdPaymentStatuses))
-
-  if (error) {
-    throw new Error(error.message || "Failed to load rentals for hold expiration")
+  if (result.expiredCount > 0) {
+    revalidateVenueRentalPaths()
   }
 
-  const expiredIds = (rentals || [])
-    .filter((rental) => isHoldExpired(rental.hold_expires_at as string | null, now))
-    .map((rental) => rental.id as string)
-
-  if (!expiredIds.length) {
-    return 0
-  }
-
-  await supabase
-    .from("venue_rentals")
-    .update({ status: VENUE_RENTAL_STATUSES.holdExpired, hold_expires_at: null })
-    .in("id", expiredIds)
-    .eq("organization_id", organizationId)
-
-  await supabase
-    .from("rental_reservations")
-    .update({ status: RENTAL_RESERVATION_STATUSES.expired, hold_expires_at: null })
-    .in("venue_rental_id", expiredIds)
-    .eq("organization_id", organizationId)
-
-  revalidateVenueRentalPaths()
-  return expiredIds.length
+  return result.expiredCount
 }
 
 export async function markVenueRentalCompletedAndAwaitingRefund(input: {
@@ -1166,25 +1141,95 @@ export async function cancelVenueRental(input: {
     throw new Error("Staff user is required.")
   }
 
-  const nextStatus = input.afterPayment
+  const { data: rental, error: rentalError } = await supabase
+    .from("venue_rentals")
+    .select("id, status, notes")
+    .eq("id", input.venueRentalId)
+    .eq("organization_id", organizationId)
+    .maybeSingle()
+
+  if (rentalError || !rental) {
+    throw new Error("Rental not found.")
+  }
+
+  const currentStatus = rental.status as VenueRentalStatus
+
+  if (!canStaffCancelVenueRental(currentStatus)) {
+    throw new Error("This rental cannot be cancelled in its current status.")
+  }
+
+  const { data: paymentRows, error: paymentsError } = await supabase
+    .from("rental_payments")
+    .select("payment_type, status")
+    .eq("venue_rental_id", input.venueRentalId)
+    .eq("organization_id", organizationId)
+
+  if (paymentsError) {
+    throw new Error("Failed to load rental payments.")
+  }
+
+  const paidStatuses = new Set<string>([
+    RENTAL_PAYMENT_STATUSES.paidManually,
+    RENTAL_PAYMENT_STATUSES.paidStripeLater,
+  ])
+
+  const depositPaid = (paymentRows || []).some(
+    (payment) =>
+      payment.payment_type === RENTAL_PAYMENT_TYPES.deposit &&
+      paidStatuses.has(payment.status as string)
+  )
+  const securityDepositPaid = (paymentRows || []).some(
+    (payment) =>
+      payment.payment_type === RENTAL_PAYMENT_TYPES.securityDeposit &&
+      paidStatuses.has(payment.status as string)
+  )
+
+  const inferredAfterPayment = shouldCancelVenueRentalAfterPayment({
+    status: currentStatus,
+    depositPaid,
+    securityDepositPaid,
+  })
+
+  if (
+    input.afterPayment !== undefined &&
+    input.afterPayment !== inferredAfterPayment
+  ) {
+    throw new Error("Cancellation type does not match recorded payments.")
+  }
+
+  const afterPayment = input.afterPayment ?? inferredAfterPayment
+  const nextStatus = afterPayment
     ? VENUE_RENTAL_STATUSES.cancelledAfterPayment
     : VENUE_RENTAL_STATUSES.cancelledBeforePayment
 
-  await supabase
+  const cancellationNote = `[Cancelled ${new Date().toISOString()}] ${reason}`
+  const nextNotes = [rental.notes as string | null, cancellationNote]
+    .filter(Boolean)
+    .join("\n\n")
+
+  const { error: updateError } = await supabase
     .from("venue_rentals")
     .update({
       status: nextStatus,
       hold_expires_at: null,
-      notes: reason,
+      notes: nextNotes,
     })
     .eq("id", input.venueRentalId)
     .eq("organization_id", organizationId)
 
-  await supabase
+  if (updateError) {
+    throw new Error(updateError.message || "Failed to cancel rental.")
+  }
+
+  const { error: reservationError } = await supabase
     .from("rental_reservations")
     .update({ status: RENTAL_RESERVATION_STATUSES.cancelled, hold_expires_at: null })
     .eq("venue_rental_id", input.venueRentalId)
     .eq("organization_id", organizationId)
+
+  if (reservationError) {
+    throw new Error(reservationError.message || "Failed to release rental reservations.")
+  }
 
   await logOverride({
     organizationId,
@@ -1192,7 +1237,11 @@ export async function cancelVenueRental(input: {
     action: "cancel_rental",
     reason,
     staffUserId: user.id,
-    metadata: { after_payment: Boolean(input.afterPayment) },
+    metadata: {
+      after_payment: afterPayment,
+      previous_status: currentStatus,
+      next_status: nextStatus,
+    },
   })
 
   fireModuleNotifications([

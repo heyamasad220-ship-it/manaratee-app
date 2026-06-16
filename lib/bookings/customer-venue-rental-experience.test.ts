@@ -97,9 +97,11 @@ describe("customer venue rental experience", () => {
 
     assert.equal(action.requiresAction, true)
     assert.equal(action.actionType, "sign_agreement")
+    assert.match(action.label, /agreement/i)
+    assert.match(action.label, /team/i)
   })
 
-  it("returns pay deposit when deposit is due", () => {
+  it("returns staff-mediated payment action when deposit is due", () => {
     const action = getCustomerRentalNextAction(
       baseRental({ status: VENUE_RENTAL_STATUSES.approvedPendingPayment }),
       financialContext({
@@ -129,6 +131,7 @@ describe("customer venue rental experience", () => {
 
     assert.equal(action.actionType, "pay_deposit")
     assert.equal(action.requiresAction, true)
+    assert.match(action.label, /payment instructions/i)
   })
 
   it("partitions dashboard rentals into active and past", () => {

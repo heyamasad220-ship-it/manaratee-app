@@ -37,6 +37,12 @@ Uses:
 * OAuth callback route
 * Google Cloud OAuth credentials
 
+### Password reset
+
+* Route: `/forgot-password` — request reset email
+* Route: `/auth/set-password` — set new password after email link
+* Route: `/auth/confirm` — server-side `token_hash` exchange for recovery (see `docs/Known_Issues.md` for Supabase email template)
+
 ---
 
 # Roles, Permissions & Access Control
@@ -115,6 +121,33 @@ Customer sidebar and dashboard only show areas enabled for the active organizati
 Key files: `lib/customer/customer-portal-modules.ts` (client-safe), `lib/customer/customer-portal-modules-server.ts` (server loaders/guards), `components/customer/customer-nav.tsx`, `app/(customer)/layout.tsx`. Disabled module routes redirect to `/customer/dashboard`.
 
 For a donations-only org (e.g. MAS Dallas on the **Nonprofit** bundle), ensure only `donations` is enabled in platform admin → organization modules (or assign bundle `nonprofit`).
+
+## Customer Venue Rentals (pilot — Phase 1 UX)
+
+Status: Pilot preparation (June 2026)
+
+Routes: `/customer/rentals`, `/customer/rentals/new`, `/customer/rentals/[id]`
+
+**Phase 1 Deliverable #3 (payment UX honesty):** Customer payment and contract-signing flows clearly state that **staff will email payment instructions** and handle agreement follow-up. Disabled “Pay deposit” / “Sign agreement” buttons removed; informational callouts replace them. Payment architecture unchanged — `rental_payments` ledger and future Stripe checkout (Phase 6) remain the target path.
+
+**Phase 1 Deliverable #1 (cancel rental staff UI):** Staff can cancel active rentals from `/bookings/rentals/[id]` via `cancelVenueRental`. Eligible statuses: awaiting approval, awaiting payment, partial payment, confirmed. Blocked during refund workflow and terminal states. Releases `rental_reservations` (calendar sync), appends cancellation to rental notes, writes `reservation_override_logs`. After-payment cancellations require confirmation when payments are recorded.
+
+**Phase 1 Deliverable #2 (hold expiry automation):** Unpaid holds expire automatically via scheduled cron. Targets only `approved_pending_payment`, `deposit_paid`, and `security_deposit_paid` when `hold_expires_at` has elapsed. Sets rental → `hold_expired`, `rental_reservations` → `expired` (calendar release via existing sync). Multi-tenant safe: service-role job processes all organizations with org-scoped updates; staff `expireVenueRentalHolds` remains for single-org manual runs. Cron: `GET|POST /api/cron/venue-rental-hold-expiry` (Bearer `CRON_SECRET`; dev open when unset). Vercel schedule: hourly (`0 * * * *`). No schema changes.
+
+**Live-safe validation:** `node scripts/validate-venue-rental-hold-expiry.mjs` — read-only dry-run (SELECT only; no cron invocation). Requires `NEXT_PUBLIC_SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` in `.env.local`. Production also requires `CRON_SECRET`. Report: `scripts/reports/venue-rental-hold-expiry-validation.json`.
+
+Key files:
+
+* `lib/bookings/customer-rental-process-guidance.ts` — customer-facing copy for staff-mediated payment and contract review
+* `components/customer/rentals/customer-rental-process-guidance-callout.tsx` — shared callout UI
+* `components/customer/rentals/customer-rental-next-action-panel.tsx`, `customer-rental-payments-section.tsx`, `customer-rental-documents-section.tsx`
+* `components/bookings/venue-rental-detail-client.tsx` — staff cancel UI
+* `lib/bookings/venue-rental-status.ts` — `canStaffCancelVenueRental`, `shouldCancelVenueRentalAfterPayment`
+* `lib/bookings/venue-rental-hold-expiry.ts` — `expireVenueRentalHoldsForScope`, `runVenueRentalHoldExpiryJob`
+* `app/api/cron/venue-rental-hold-expiry/route.ts` — cron entry point
+* `vercel.json` — hourly hold-expiry schedule
+
+Tests: `lib/bookings/customer-rental-process-guidance.test.ts`, `lib/bookings/customer-venue-rental-experience.test.ts`, `lib/bookings/venue-rental-cancel.test.ts`, `lib/bookings/venue-rental-hold-expiry.test.ts` (included in `npm run test:conflicts`).
 
 ## Organization Switching
 
@@ -1163,3 +1196,190 @@ npm run validate:recurring-donations
 **Validated (June 2026):** recurring donations 9/9 (`scripts/validate-recurring-donations.mjs`).
 
 **Apply migration:** `scripts/092_recurring_donations.sql`
+
+## Contacts identity & affiliation sync (Phase 1) — Closeout
+
+**Status:** Complete (June 2026) — tickets **S-01 through S-13** delivered and validated.
+
+**North star:** One Contact · Many Roles · Many Activities · No Duplicate Identities
+
+**Validation gate (run before release or after affiliation changes):**
+
+```bash
+npm run validate:contacts-phase1
+npm run validate:contacts-phase1:report   # optional JSON → scripts/reports/contacts-phase1-validation.json
+```
+
+**Required migration:**
+
+```bash
+npx supabase db query --linked -f scripts/101_contact_participation_roles.sql
+```
+
+(Run after `100_stripe_recurring_donations.sql`.)
+
+### Goal
+
+Stabilize canonical contact identity across donations, programs, ticketing, and volunteers without merge UI or segmentation. Activity-derived roles sync through approved helpers only — never manual `contact_roles` inserts on write paths, never profile-refresh dependency for new activity.
+
+### Architecture (approved — do not redesign)
+
+```
+Activity write (donation, enrollment, ticket order, volunteer roster)
+        │
+        ├─ Donations (portal / staff UI) ──► handleDonationAffiliationSync
+        ├─ Donations (Stripe webhooks) ──────► syncDonationAffiliationFromWebhook
+        └─ Programs / ticketing / volunteers ► syncContactAffiliations(orgId explicit)
+                    │
+                    ▼
+           computeDerivedAffiliations (validation / diagnostics)
+                    │
+                    ▼
+           sync_contact_affiliations RPC (authoritative reconcile)
+                    │
+                    ▼
+           contact_roles upsert (idempotent)
+```
+
+`refreshContactAffiliations` on contact profile open (`app/(dashboard)/contacts/[id]/page.tsx`) reconciles stale rows for staff viewing — Phase 1 write paths do **not** depend on it.
+
+### Ticket delivery (S-01 – S-13)
+
+| Ticket | Scope |
+|--------|-------|
+| **S-01** | `handleDonationAffiliationSync` accepts optional `organizationId` + `supabaseClient` for webhook/service-role callers |
+| **S-02/S-03** | Stripe webhook donation affiliation sync via `syncDonationAffiliationFromWebhook` |
+| **S-04A/B** | Participation roles `program_participant`, `event_attendee` (+ schema slot `venue_rental_customer`); derivation in `computeDerivedAffiliations` |
+| **S-05/S-06** | Portal offline donation, portal pledge payment/creation, staff pledge creation → `handleDonationAffiliationSync` |
+| **S-07** | `createTicketOrder` → `findOrCreateContact` + `ticket_orders.contact_id` |
+| **S-08** | Ticketing completion → `syncContactAffiliations` on completed orders |
+| **S-09/S-10** | Program `participant_contact_id` via `ensureContactForPerson`; enrollment → `syncContactAffiliations` for `program_participant` |
+| **S-11** | `ensureVolunteerForContact` fixed — roster + `syncContactAffiliations` only |
+| **S-12** | Unified validation runner + shared lib + cross-module role accumulation |
+| **S-13** | Documentation closeout — `Features.md`, `Project_Context.md`, `Database_Overview.md`, `Module_Inventory.md` |
+
+### Affiliation derivation (Phase 1)
+
+| Role | Activity trigger | Auto-remove | Sync entry |
+|------|------------------|-------------|------------|
+| `donor` | `donors` row and/or `payments` for contact | Never (sticky) | `handleDonationAffiliationSync` / webhook helper |
+| `volunteer` | `volunteers` row for contact | Never (sticky) | `syncContactAffiliations` |
+| `program_participant` | `program_enrollments.participant_contact_id`, status ∉ `cancelled`, `withdrawn`, `transferred` | Never (sticky) | `syncContactAffiliations` |
+| `event_attendee` | `ticket_orders.contact_id` with `status = completed` | Never (sticky) | `syncContactAffiliations` |
+| `member` | Active `memberships` row | Yes when membership lapses | `syncContactAffiliations` |
+
+`venue_rental_customer` is in the CHECK constraint only; derivation deferred until venue rental linkage lands.
+
+### Module write paths
+
+| Module | Identity helper | Affiliation trigger | Key files |
+|--------|-----------------|---------------------|-----------|
+| Stripe donations | Payment/donor metadata | After payment/plan insert (webhook) | `lib/donations/stripe/processor-payment.ts`, `processor-subscription.ts` |
+| Portal/staff donations | Existing donor/contact | After payment or pledge insert | `app/(customer)/customer/donation/page.tsx`, `app/(dashboard)/donations/(operations)/pledges/page.tsx` |
+| Ticketing | `findOrCreateContact` | Order reaches `completed` | `lib/tickets/ticket-order-actions.ts` |
+| Programs | `ensureContactForPerson` / `resolveParticipantContactIdForRegistration` | Enrollment created (not waitlist-only); `promote_waitlist` | `lib/programs/program-registration-actions.ts`, `program-enrollment-actions.ts`, `program-lifecycle-actions.ts` |
+| Volunteers | Reuse canonical `contact_id` | Volunteer roster row created | `lib/volunteers/volunteer-actions.ts` |
+
+### Key files
+
+| File | Purpose |
+|------|---------|
+| `lib/contacts/contact-affiliation-sync.ts` | `computeDerivedAffiliations` (diagnostics), `syncContactAffiliations` → RPC, webhook helpers |
+| `lib/contacts/contact-affiliation-rules.ts` | Terminal enrollment statuses, sticky/removable role policy |
+| `lib/contacts/contact-actions.ts` | `findOrCreateContact`, `ensureContactForPerson` → gated RPCs |
+| `lib/tickets/ticket-order-actions.ts` | FOC + `contact_id`; completion sync |
+| `lib/programs/person-actions.ts` | `ensureParticipantContactForPerson`, `resolveParticipantContactIdForRegistration` |
+| `lib/programs/program-enrollment-actions.ts` | `syncAffiliationAfterEnrollmentCreation` |
+| `lib/programs/program-registration-actions.ts` | Customer registration identity + sync |
+| `lib/programs/program-lifecycle-actions.ts` | Waitlist promotion sync |
+| `lib/volunteers/volunteer-actions.ts` | `createVolunteer`, `ensureVolunteerForContact` |
+| `scripts/lib/contacts-phase1-validation.mjs` | Shared validation utilities (S-12) |
+| `scripts/validate-contacts-phase1.mjs` | Unified runner (S-12) |
+
+### Validation (S-12)
+
+Unified runner executes policy checks, six module suites, and cross-module role accumulation.
+
+| Suite | Command | Ticket |
+|-------|---------|--------|
+| **Unified** | `validate:contacts-phase1` | S-12 |
+| Stripe one-time | `validate:stripe-one-time` | S-02 |
+| Stripe recurring | `validate:stripe-recurring` | S-03 |
+| Portal + pledge | `validate:portal-pledge-donation-sync` | S-05/S-06 |
+| Ticketing completion | `validate:ticketing-completion-sync` | S-08 |
+| Program participant | `validate:program-participant-sync` | S-09/S-10 |
+| Volunteer identity | `validate:volunteer-identity-sync` | S-11 |
+
+**Matrix covered:** donations (one-time, recurring, pledge create/pay), ticketing (complete, pending→complete, contact reuse), programs (enroll, contact create/reuse, sticky terminal), volunteers (create, reuse, dedupe), cross-module accumulation (donor + volunteer + program_participant + event_attendee on one contact), policy (sticky roles, member auto-removable, sync primary path, no profile-refresh dependency).
+
+**Last validated:** June 2026 — policy 8/8, suites 7/7, checks 75/75 (`validate:contacts-phase1:report`).
+
+### Deferred (Phase 2+)
+
+* Historical enrollment/ticket `contact_id` backfill
+* Participant merge UI and dedupe tooling
+* `venue_rental_customer` activity linkage
+* Contact segmentation / advanced CRM panels
+* Volunteer application approval → automatic roster (approval UX unchanged in Phase 1)
+* Staff enrollment paths outside `register_for_program` / `promote_waitlist`
+
+---
+
+## Contacts security remediation (RLS wave 1) — G6 complete, M4 authorized
+
+**Status:** M1–M6b + CR-8 implemented in repo (June 2026). **M4** script `111` is **authorized** for staging after `109`–`110` applied.
+
+**Rollout:** Hybrid C→B — additive policies (102–106) → M6/M6b RPC gates → G6 validation → M4 drop open policies (`111`).
+
+### SQL migrations (run in order after `101_contact_participation_roles.sql`)
+
+```bash
+npx supabase db query --linked -f scripts/102_contacts_rls_helpers.sql
+npx supabase db query --linked -f scripts/103_contacts_rls_support_helpers.sql
+npx supabase db query --linked -f scripts/104_contacts_rls_policies.sql
+npx supabase db query --linked -f scripts/105_contact_roles_rls_policies.sql
+npx supabase db query --linked -f scripts/106_contact_notes_rls_policies.sql
+npx supabase db query --linked -f scripts/107_contacts_permission_seeds.sql
+npx supabase db query --linked -f scripts/108_contacts_affiliation_sync_rpcs.sql
+npx supabase db query --linked -f scripts/109_contacts_rls_gate_alignment.sql
+npx supabase db query --linked -f scripts/110_contacts_membership_permission_seeds.sql
+# After staging smoke + npm run validate:contacts-security --post-m4:
+npx supabase db query --linked -f scripts/111_contacts_m4_drop_open_policies.sql
+```
+
+| Script | Scope |
+|--------|-------|
+| `102`–`108` | M1–M6 (helpers, policies, seeds, affiliation RPCs) |
+| `109` | **M6b:** events/ticketing/membership in create + sync RPC gates |
+| `110` | **M6b:** `membership.view` / `membership.manage` seeds; `events.*` → `contacts.view` cross-grant |
+| `111` | **M4:** Drop legacy `USING(true)` contacts / contact_roles policies |
+
+### App changes (M6 + M6b + CR-7)
+
+* RPC routing: `syncContactAffiliations`, `findOrCreateContact`, `ensureContactForPerson`
+* Permissions: `contacts.*`, `membership.*`, `ticketing.*` in `permission-keys.ts` + Roles UI
+* `assertTicketingManagePermission` — includes `ticketing.manage`
+* `assertMembershipManagePermission` on membership write paths
+* Sidebar: membership module gated by `membership.view` (fallback `contacts.view`)
+
+### Validation (CR-8 / G6)
+
+```bash
+npm run validate:contacts-g6              # CR-8 + Phase 1 (report written)
+npm run validate:contacts-security        # CR-8 repo + DB helpers/RPCs
+npm run validate:contacts-security:report # + JSON → scripts/reports/
+npm run validate:contacts-security -- --post-m4   # after 111 applied
+```
+
+**G6 result (June 2026):** `54/54` checks passed (`validate:contacts-g6`). Report: `scripts/reports/contacts-security-validation.json`.
+
+### M4 authorization
+
+**Authorized** for staging deployment of `111` when:
+
+1. `102`–`110` applied on target database
+2. `npm run validate:contacts-g6` GREEN
+3. Manual smoke: ticketing order complete, membership add-member, CRM notes (staff with `contacts.manage`)
+4. `npm run validate:contacts-security -- --post-m4` GREEN after `111`
+
+**Not authorized for production** until staging post-M4 soak completes without P0 regressions.
