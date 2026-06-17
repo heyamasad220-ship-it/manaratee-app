@@ -13,7 +13,6 @@ import {
   addContactWithRoles,
 } from "@/lib/contacts/contact-actions"
 import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
-import { fetchHrTeams } from "@/lib/hr/hr-team-actions"
 import {
   type ContactRecordType,
   type ContactRoleValue,
@@ -111,13 +110,6 @@ function formatDate(value?: string | null) {
   return date.toLocaleDateString()
 }
 
-function formatTeamSummary(teams: ContactListRow["teams"]) {
-  if (teams.length === 0) return "—"
-  if (teams.length === 1) return teams[0].name
-  if (teams.length === 2) return `${teams[0].name}, ${teams[1].name}`
-  return `${teams[0].name} +${teams.length - 1}`
-}
-
 function RoleCheckboxGroup({
   selected,
   onChange,
@@ -205,8 +197,6 @@ export function ContactsCrmList({
   const [roleFilter, setRoleFilter] = useState<ContactRoleValue | "all">("all")
   const [recordTypeFilter, setRecordTypeFilter] = useState<ContactRecordType | "all">("all")
   const [statusFilter, setStatusFilter] = useState<ContactStatus | "all">("all")
-  const [teamFilter, setTeamFilter] = useState<string>("all")
-  const [teamOptions, setTeamOptions] = useState<{ id: string; name: string }[]>([])
 
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
@@ -228,15 +218,8 @@ export function ContactsCrmList({
   }, [searchQuery])
 
   useEffect(() => {
-    if (lockedRecordType === "organization") return
-    void fetchHrTeams({ includeInactive: false }).then((teams) => {
-      setTeamOptions(teams.map((team) => ({ id: team.id, name: team.name })))
-    })
-  }, [lockedRecordType])
-
-  useEffect(() => {
     setPage(1)
-  }, [debouncedSearch, roleFilter, recordTypeFilter, statusFilter, teamFilter])
+  }, [debouncedSearch, roleFilter, recordTypeFilter, statusFilter])
 
   const loadStats = useCallback(async () => {
     try {
@@ -259,7 +242,6 @@ export function ContactsCrmList({
         recordType: lockedRecordType ? "all" : recordTypeFilter,
         lockedRecordType,
         status: statusFilter,
-        teamId: lockedRecordType === "organization" ? "all" : teamFilter,
         page,
         pageSize: PAGE_SIZE,
       })
@@ -274,7 +256,7 @@ export function ContactsCrmList({
     } finally {
       setLoading(false)
     }
-  }, [debouncedSearch, lockedRecordType, page, recordTypeFilter, roleFilter, statusFilter, teamFilter])
+  }, [debouncedSearch, lockedRecordType, page, recordTypeFilter, roleFilter, statusFilter])
 
   useEffect(() => {
     if (showStats) {
@@ -292,10 +274,9 @@ export function ContactsCrmList({
       debouncedSearch ||
         roleFilter !== "all" ||
         recordTypeFiltered ||
-        statusFilter !== "all" ||
-        (lockedRecordType !== "organization" && teamFilter !== "all")
+        statusFilter !== "all"
     )
-  }, [debouncedSearch, lockedRecordType, recordTypeFilter, roleFilter, statusFilter, teamFilter])
+  }, [debouncedSearch, lockedRecordType, recordTypeFilter, roleFilter, statusFilter])
 
   const listTitle = isRecentView ? `Recent ${entityLabel}` : entityLabel
   const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
@@ -317,7 +298,6 @@ export function ContactsCrmList({
       setRecordTypeFilter("all")
     }
     setStatusFilter("all")
-    setTeamFilter("all")
     setPage(1)
   }
 
@@ -449,8 +429,7 @@ export function ContactsCrmList({
         ]
 
   const tableColumnCount =
-    lockedRecordType === "organization" ? 7 : lockedRecordType ? 7 : 8
-  const showTeamsColumn = lockedRecordType !== "organization"
+    lockedRecordType === "organization" ? 7 : lockedRecordType === "individual" ? 6 : 7
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -531,22 +510,6 @@ export function ContactsCrmList({
           </SelectContent>
         </Select>
 
-        {lockedRecordType !== "organization" && (
-          <Select value={teamFilter} onValueChange={setTeamFilter}>
-            <SelectTrigger className="h-9 w-full sm:w-[180px]">
-              <SelectValue placeholder="Team" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Teams</SelectItem>
-              {teamOptions.map((team) => (
-                <SelectItem key={team.id} value={team.id}>
-                  {team.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-
         {hasActiveFilters && (
           <Button type="button" variant="ghost" size="sm" onClick={clearFilters}>
             Clear Filters
@@ -598,9 +561,6 @@ export function ContactsCrmList({
               <TableRow>
                 <TableHead>Contact</TableHead>
                 <TableHead>Affiliations</TableHead>
-                {showTeamsColumn ? (
-                  <TableHead className="hidden lg:table-cell">Teams</TableHead>
-                ) : null}
                 {lockedRecordType === "organization" ? (
                   <TableHead className="hidden md:table-cell">Primary Contact</TableHead>
                 ) : null}
@@ -682,17 +642,6 @@ export function ContactsCrmList({
                         )}
                       </div>
                     </TableCell>
-
-                    {showTeamsColumn ? (
-                      <TableCell className="hidden max-w-[220px] truncate lg:table-cell">
-                        <span
-                          className="text-sm text-muted-foreground"
-                          title={formatTeamSummary(contact.teams)}
-                        >
-                          {formatTeamSummary(contact.teams)}
-                        </span>
-                      </TableCell>
-                    ) : null}
 
                     {lockedRecordType === "organization" ? (
                       <TableCell className="hidden md:table-cell text-sm text-muted-foreground">

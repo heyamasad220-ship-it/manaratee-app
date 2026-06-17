@@ -1,0 +1,245 @@
+{
+  "generatedAt": "2026-06-16T20:10:55.193Z",
+  "organizationId": "95c4eb7d-b151-4aa1-a489-a3c1e1289c7e",
+  "seedTag": "DONATIONS_DEV_SEED_V1",
+  "checks": [
+    {
+      "id": "legacy_table_untouched:donation_payments",
+      "pass": true,
+      "detail": "0 rows (seed must not write here)"
+    },
+    {
+      "id": "legacy_table_untouched:donation_pledges",
+      "pass": true,
+      "detail": "0 rows (seed must not write here)"
+    },
+    {
+      "id": "seed_rows:contacts",
+      "pass": true,
+      "detail": "4 rows for org"
+    },
+    {
+      "id": "seed_rows:donors",
+      "pass": true,
+      "detail": "1003 rows for org"
+    },
+    {
+      "id": "seed_rows:campaigns",
+      "pass": true,
+      "detail": "6 rows for org"
+    },
+    {
+      "id": "seed_rows:donation_categories",
+      "pass": true,
+      "detail": "2 rows for org"
+    },
+    {
+      "id": "seed_rows:donation_subcategories",
+      "pass": true,
+      "detail": "2 rows for org"
+    },
+    {
+      "id": "seed_rows:payment_methods",
+      "pass": true,
+      "detail": "4 rows for org"
+    },
+    {
+      "id": "seed_rows:pledges",
+      "pass": true,
+      "detail": "1003 rows for org"
+    },
+    {
+      "id": "seed_rows:payments",
+      "pass": true,
+      "detail": "10011 rows for org"
+    },
+    {
+      "id": "seed_rows:payment_import_batches",
+      "pass": true,
+      "detail": "1 rows for org"
+    },
+    {
+      "id": "seed_rows:payment_import_rows",
+      "pass": true,
+      "detail": "2 rows for org"
+    },
+    {
+      "id": "pledge_balance_from_payments_only",
+      "pass": true,
+      "detail": "3/3 pledges match view vs payments",
+      "samples": [
+        {
+          "pledge_id": "7c49af3a-7dfe-46d8-b325-d672a734ffd9",
+          "amount_pledged": 1000,
+          "view_amount_paid": 250,
+          "computed_from_payments": 250,
+          "view_balance": 750,
+          "computed_balance": 750,
+          "calculated_status": "partial",
+          "match": true
+        },
+        {
+          "pledge_id": "aac76079-ab3e-4b31-85e4-89cc37f3d26e",
+          "amount_pledged": 500,
+          "view_amount_paid": 500,
+          "computed_from_payments": 500,
+          "view_balance": 0,
+          "computed_balance": 0,
+          "calculated_status": "fulfilled",
+          "match": true
+        },
+        {
+          "pledge_id": "485008b5-fea0-410e-a967-6243d32ea20f",
+          "amount_pledged": 300,
+          "view_amount_paid": 0,
+          "computed_from_payments": 0,
+          "view_balance": 300,
+          "computed_balance": 300,
+          "calculated_status": "open",
+          "match": true
+        }
+      ]
+    },
+    {
+      "id": "dashboard_totals",
+      "pass": false,
+      "detail": "pledged=125889 collected=53539 outstanding=94265",
+      "expected": {
+        "totalPledged": 1800,
+        "totalCollected": 1075,
+        "outstandingBalance": 1050
+      },
+      "actual": {
+        "totalPledged": 125889,
+        "totalCollected": 53539,
+        "outstandingBalance": 94265
+      }
+    },
+    {
+      "id": "portal_one_time_donation",
+      "pass": true,
+      "detail": "display=\"Seed Zelle\" source=\"zelle\""
+    },
+    {
+      "id": "portal_pledge_payment",
+      "pass": true,
+      "detail": "display=\"Seed Zelle\" source=\"zelle\""
+    },
+    {
+      "id": "import_promoted_payment",
+      "pass": true,
+      "detail": "source_type=import insert/delete OK"
+    },
+    {
+      "id": "manual_staff_payment",
+      "pass": true,
+      "detail": "source_type=manual insert/delete OK"
+    },
+    {
+      "id": "portal_payment_method_display_names",
+      "pass": true,
+      "detail": "Seed Zelle→zelle, Seed Cash→cash, Seed Check→check, Stripe→stripe, Zelle→zelle, Venmo→venmo, Check→check, Cash→cash, Credit Card→stripe",
+      "mappings": [
+        {
+          "displayName": "Seed Zelle",
+          "source": "zelle",
+          "pass": true,
+          "error": null
+        },
+        {
+          "displayName": "Seed Cash",
+          "source": "cash",
+          "pass": true,
+          "error": null
+        },
+        {
+          "displayName": "Seed Check",
+          "source": "check",
+          "pass": true,
+          "error": null
+        },
+        {
+          "displayName": "Stripe",
+          "source": "stripe",
+          "pass": true,
+          "error": null
+        },
+        {
+          "displayName": "Zelle",
+          "source": "zelle",
+          "pass": true,
+          "error": null
+        },
+        {
+          "displayName": "Venmo",
+          "source": "venmo",
+          "pass": true,
+          "error": null
+        },
+        {
+          "displayName": "Check",
+          "source": "check",
+          "pass": true,
+          "error": null
+        },
+        {
+          "displayName": "Cash",
+          "source": "cash",
+          "pass": true,
+          "error": null
+        },
+        {
+          "displayName": "Credit Card",
+          "source": "stripe",
+          "pass": true,
+          "error": null
+        }
+      ]
+    },
+    {
+      "id": "import_reconcile_flow",
+      "pass": true,
+      "detail": "batch=donations-import-test.csv rows=2 pending_review=1",
+      "batch": {
+        "id": "1e37fdd5-7007-45f0-a415-fdec386dd540",
+        "file_name": "donations-import-test.csv",
+        "status": "uploaded",
+        "row_count": 2
+      },
+      "importRows": [
+        {
+          "id": "917ffad6-5ca7-4664-ac50-a47ed4387f9d",
+          "sender_name": "Seed Import Donor",
+          "amount": 75,
+          "import_status": "pending"
+        },
+        {
+          "id": "f28d8108-7523-4631-a429-5871e5905f28",
+          "sender_name": "Unknown Import Name",
+          "amount": 120.5,
+          "import_status": "pending"
+        }
+      ],
+      "pendingPayments": [
+        {
+          "id": "c32250c4-055c-4438-8378-63483b3505cc",
+          "sender_name": "Seed Import Donor",
+          "amount": 75,
+          "status": "pending_review",
+          "source_type": "import"
+        }
+      ],
+      "fixturePath": "scripts/fixtures/donations-import-test.csv"
+    },
+    {
+      "id": "donor_summary_view",
+      "pass": true,
+      "detail": "5 donor summaries loaded"
+    }
+  ],
+  "summary": {
+    "pass": 20,
+    "fail": 1
+  },
+  "overallPass": false
+}

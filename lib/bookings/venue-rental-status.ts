@@ -76,6 +76,51 @@ export function canStaffCancelVenueRental(status: VenueRentalStatus): boolean {
   return STAFF_CANCELLABLE_STATUSES.has(status)
 }
 
+const STAFF_FORCE_BOOK_STATUSES = new Set<VenueRentalStatus>([
+  VENUE_RENTAL_STATUSES.awaitingSupervisorApproval,
+  VENUE_RENTAL_STATUSES.approvedPendingPayment,
+  VENUE_RENTAL_STATUSES.depositPaid,
+  VENUE_RENTAL_STATUSES.securityDepositPaid,
+])
+
+export const VENUE_RENTAL_FORCE_BOOK_STATUSES: VenueRentalStatus[] = Array.from(
+  STAFF_FORCE_BOOK_STATUSES
+)
+
+/** Pre-confirmation rentals staff may force-book as an operational exception. */
+export function canStaffForceBookVenueRental(status: VenueRentalStatus): boolean {
+  return STAFF_FORCE_BOOK_STATUSES.has(status)
+}
+
+export function summarizeOutstandingRentalPayments(input: {
+  depositPaid: boolean
+  securityDepositPaid: boolean
+  remainingBalanceDue?: boolean
+  remainingPaid?: boolean
+}): {
+  outstandingLabels: string[]
+  requiresPaymentAcknowledgement: boolean
+} {
+  const outstandingLabels: string[] = []
+
+  if (!input.depositPaid) {
+    outstandingLabels.push("Deposit (non-refundable)")
+  }
+
+  if (!input.securityDepositPaid) {
+    outstandingLabels.push("Security deposit (refundable)")
+  }
+
+  if (input.remainingBalanceDue && !input.remainingPaid) {
+    outstandingLabels.push("Remaining balance")
+  }
+
+  return {
+    outstandingLabels,
+    requiresPaymentAcknowledgement: outstandingLabels.length > 0,
+  }
+}
+
 /** Whether cancellation should use cancelled_after_payment vs cancelled_before_payment. */
 export function shouldCancelVenueRentalAfterPayment(input: {
   status: VenueRentalStatus

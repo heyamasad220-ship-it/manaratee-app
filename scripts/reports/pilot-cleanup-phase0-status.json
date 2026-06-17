@@ -1,0 +1,32 @@
+{
+  "phase": "phase0-complete",
+  "completedAt": "2026-06-16T20:12:00.000Z",
+  "backupStatus": {
+    "fullDatabaseDump": {
+      "status": "blocked",
+      "reason": "supabase db dump --linked requires Docker Desktop (not running on this machine)",
+      "recommendation": "Take a Supabase Dashboard backup (Project Settings → Database → Backups) before Phase 1 deletions"
+    },
+    "backupTablesExport": {
+      "status": "complete",
+      "manifest": "scripts/backups/backup-tables-manifest-2026-06-16.json",
+      "totalRowsExported": 579,
+      "files": [
+        "scripts/backups/backup_donors_2026_05_24-2026-06-16.json",
+        "scripts/backups/backup_payments_2026_05_24-2026-06-16.json",
+        "scripts/backups/backup_donation_pledges_2026_05_24-2026-06-16.json",
+        "scripts/backups/backup_donation_payments_2026_05_24-2026-06-16.json",
+        "scripts/backups/backup_pledges_2026_05_24-2026-06-16.json"
+      ]
+    },
+    "baselineSnapshot": "scripts/reports/pilot-cleanup-phase0-baseline.json",
+    "executionPreview": "scripts/reports/pilot-cleanup-execution-preview.json"
+  },
+  "validationBaseline": {
+    "contactsSecurity": "53/53 passed",
+    "donationsSecurity": "35/38 passed (3 non-blockers: 2 missing layout files, 1 anon timeout)",
+    "donationsSeed": "20/21 passed (seed validation expects Asad seed present)",
+    "venueRentalPilotReadiness": "28/30 — NO_GO (missing CRON_SECRET, syncVenueRentalStatusAfterPayment static check)"
+  },
+  "awaitingApproval": "Execute Phase 1+ after confirming stress-data org discrepancy"
+}

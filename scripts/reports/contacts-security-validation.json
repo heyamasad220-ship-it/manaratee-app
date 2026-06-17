@@ -1,0 +1,358 @@
+{
+  "startedAt": "2026-06-16T00:39:57.715Z",
+  "finishedAt": "2026-06-16T00:40:39.621Z",
+  "mode": "pre-m4",
+  "suites": [
+    {
+      "id": "repo",
+      "label": "Repository / static",
+      "passed": 41,
+      "total": 41,
+      "checks": [
+        {
+          "id": "migration-102_contacts_rls_helpers.sql",
+          "suite": "repo",
+          "pass": true,
+          "detail": "present"
+        },
+        {
+          "id": "migration-103_contacts_rls_support_helpers.sql",
+          "suite": "repo",
+          "pass": true,
+          "detail": "present"
+        },
+        {
+          "id": "migration-104_contacts_rls_policies.sql",
+          "suite": "repo",
+          "pass": true,
+          "detail": "present"
+        },
+        {
+          "id": "migration-105_contact_roles_rls_policies.sql",
+          "suite": "repo",
+          "pass": true,
+          "detail": "present"
+        },
+        {
+          "id": "migration-106_contact_notes_rls_policies.sql",
+          "suite": "repo",
+          "pass": true,
+          "detail": "present"
+        },
+        {
+          "id": "migration-107_contacts_permission_seeds.sql",
+          "suite": "repo",
+          "pass": true,
+          "detail": "present"
+        },
+        {
+          "id": "migration-108_contacts_affiliation_sync_rpcs.sql",
+          "suite": "repo",
+          "pass": true,
+          "detail": "present"
+        },
+        {
+          "id": "migration-109_contacts_rls_gate_alignment.sql",
+          "suite": "repo",
+          "pass": true,
+          "detail": "present"
+        },
+        {
+          "id": "migration-110_contacts_membership_permission_seeds.sql",
+          "suite": "repo",
+          "pass": true,
+          "detail": "present"
+        },
+        {
+          "id": "m4-migration-file",
+          "suite": "repo",
+          "pass": true,
+          "detail": "111 script"
+        },
+        {
+          "id": "gate-sql-present",
+          "suite": "repo",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "id": "gate-create-events.manage",
+          "suite": "repo",
+          "pass": true,
+          "detail": "in create gate"
+        },
+        {
+          "id": "gate-create-ticketing.manage",
+          "suite": "repo",
+          "pass": true,
+          "detail": "in create gate"
+        },
+        {
+          "id": "gate-create-membership.manage",
+          "suite": "repo",
+          "pass": true,
+          "detail": "in create gate"
+        },
+        {
+          "id": "gate-sync-events.view",
+          "suite": "repo",
+          "pass": true,
+          "detail": "in sync gate"
+        },
+        {
+          "id": "gate-sync-events.manage",
+          "suite": "repo",
+          "pass": true,
+          "detail": "in sync gate"
+        },
+        {
+          "id": "gate-sync-ticketing.view",
+          "suite": "repo",
+          "pass": true,
+          "detail": "in sync gate"
+        },
+        {
+          "id": "gate-sync-ticketing.manage",
+          "suite": "repo",
+          "pass": true,
+          "detail": "in sync gate"
+        },
+        {
+          "id": "gate-sync-membership.view",
+          "suite": "repo",
+          "pass": true,
+          "detail": "in sync gate"
+        },
+        {
+          "id": "gate-sync-membership.manage",
+          "suite": "repo",
+          "pass": true,
+          "detail": "in sync gate"
+        },
+        {
+          "id": "policy-migration-contacts-Staff view org contacts",
+          "suite": "repo",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "id": "policy-migration-contacts-Staff insert org contacts",
+          "suite": "repo",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "id": "policy-migration-contacts-Staff update org contacts",
+          "suite": "repo",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "id": "policy-migration-contacts-Staff delete org contacts",
+          "suite": "repo",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "id": "policy-migration-contacts-Customers view own contacts",
+          "suite": "repo",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "id": "policy-migration-contacts-Customers view family contacts",
+          "suite": "repo",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "id": "policy-migration-contacts-Customers update own contacts",
+          "suite": "repo",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "id": "policy-migration-contact_roles-Staff view org contact roles",
+          "suite": "repo",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "id": "policy-migration-contact_roles-Staff insert org contact roles",
+          "suite": "repo",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "id": "policy-migration-contact_roles-Staff update org contact roles",
+          "suite": "repo",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "id": "policy-migration-contact_roles-Staff delete org contact roles",
+          "suite": "repo",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "id": "policy-migration-contact_notes-Staff view org contact notes",
+          "suite": "repo",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "id": "policy-migration-contact_notes-Staff insert org contact notes",
+          "suite": "repo",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "id": "policy-migration-contact_notes-Staff update org contact notes",
+          "suite": "repo",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "id": "policy-migration-contact_notes-Staff delete org contact notes",
+          "suite": "repo",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "id": "rpc-sync-routing",
+          "suite": "repo",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "id": "rpc-foc-routing",
+          "suite": "repo",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "id": "rpc-ensure-person-routing",
+          "suite": "repo",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "id": "ticketing-assert-m6b",
+          "suite": "repo",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "id": "membership-assert-m6b",
+          "suite": "repo",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "id": "permission-keys-m6b",
+          "suite": "repo",
+          "pass": true,
+          "detail": "ok"
+        }
+      ]
+    },
+    {
+      "id": "database",
+      "label": "Database / live",
+      "passed": 12,
+      "total": 12,
+      "checks": [
+        {
+          "id": "credentials",
+          "suite": "database",
+          "pass": true,
+          "detail": "service role connected"
+        },
+        {
+          "id": "helper-auth_user_has_contact_permission",
+          "suite": "database",
+          "pass": true,
+          "detail": "callable"
+        },
+        {
+          "id": "helper-auth_user_can_view_contacts",
+          "suite": "database",
+          "pass": true,
+          "detail": "callable"
+        },
+        {
+          "id": "helper-auth_user_can_manage_contacts",
+          "suite": "database",
+          "pass": true,
+          "detail": "callable"
+        },
+        {
+          "id": "helper-auth_user_can_view_family_contact",
+          "suite": "database",
+          "pass": true,
+          "detail": "callable"
+        },
+        {
+          "id": "helper-auth_user_may_sync_derived_affiliations",
+          "suite": "database",
+          "pass": true,
+          "detail": "callable"
+        },
+        {
+          "id": "helper-auth_user_may_create_contact_via_module",
+          "suite": "database",
+          "pass": true,
+          "detail": "callable"
+        },
+        {
+          "id": "helper-auth_user_may_ensure_contact_for_person",
+          "suite": "database",
+          "pass": true,
+          "detail": "callable"
+        },
+        {
+          "id": "rpc-sync_contact_affiliations",
+          "suite": "database",
+          "pass": true,
+          "detail": "callable"
+        },
+        {
+          "id": "rpc-find_or_create_contact_for_org",
+          "suite": "database",
+          "pass": true,
+          "detail": "callable"
+        },
+        {
+          "id": "rpc-ensure_contact_for_person",
+          "suite": "database",
+          "pass": true,
+          "detail": "callable"
+        },
+        {
+          "id": "live-policies",
+          "suite": "database",
+          "pass": true,
+          "detail": "skipped (Could not find the table 'public.pg_policies' in the schema cache) — verify policies via SQL editor or --post-m4 after 111"
+        }
+      ]
+    },
+    {
+      "id": "phase1",
+      "label": "Phase 1 affiliation regression",
+      "passed": 1,
+      "total": 1,
+      "checks": [
+        {
+          "id": "runner-exit",
+          "suite": "phase1",
+          "pass": true,
+          "detail": "exit 0"
+        }
+      ]
+    }
+  ],
+  "totalPassed": 54,
+  "totalChecks": 54,
+  "pass": true
+}

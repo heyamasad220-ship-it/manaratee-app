@@ -1,0 +1,175 @@
+{
+  "startedAt": "2026-06-16T02:31:06.091Z",
+  "mode": "live-safe-read-only",
+  "suites": [
+    {
+      "id": "static",
+      "label": "Repository / static",
+      "passed": 9,
+      "total": 9,
+      "checks": [
+        {
+          "id": "cron-route-exists",
+          "pass": true,
+          "detail": "app/api/cron/venue-rental-hold-expiry/route.ts"
+        },
+        {
+          "id": "cron-route-cr-secret-auth",
+          "pass": true,
+          "detail": "Bearer CRON_SECRET pattern"
+        },
+        {
+          "id": "cron-route-force-dynamic",
+          "pass": true,
+          "detail": "force-dynamic export"
+        },
+        {
+          "id": "cron-route-get-post",
+          "pass": true,
+          "detail": "GET and POST handlers"
+        },
+        {
+          "id": "vercel-cron-registered",
+          "pass": true,
+          "detail": "schedule 0 * * * *"
+        },
+        {
+          "id": "job-status-filter",
+          "pass": true,
+          "detail": "VENUE_RENTAL_HOLD_PAYMENT_STATUSES constants"
+        },
+        {
+          "id": "job-org-scoped-updates",
+          "pass": true,
+          "detail": "organization_id + status guards on update"
+        },
+        {
+          "id": "job-reservation-expired",
+          "pass": true,
+          "detail": "rental_reservations -> expired"
+        },
+        {
+          "id": "calendar-sync-trigger",
+          "pass": true,
+          "detail": "expired reservation deletes resource_reservations row"
+        }
+      ]
+    },
+    {
+      "id": "environment",
+      "label": "Environment variables",
+      "passed": 2,
+      "total": 3,
+      "checks": [
+        {
+          "id": "env-next-public-supabase-url",
+          "pass": true,
+          "detail": null
+        },
+        {
+          "id": "env-supabase-service-role-key",
+          "pass": true,
+          "detail": null
+        },
+        {
+          "id": "env-cron-secret",
+          "pass": false,
+          "detail": "unset — cron auth bypassed only when NODE_ENV=development"
+        }
+      ]
+    },
+    {
+      "id": "database",
+      "label": "Live read-only dry-run",
+      "passed": 11,
+      "total": 11,
+      "checks": [
+        {
+          "id": "db-connect",
+          "pass": true,
+          "detail": "service role client created"
+        },
+        {
+          "id": "dry-run-eligible-query",
+          "pass": true,
+          "detail": "0 row(s) would expire now"
+        },
+        {
+          "id": "exclusion-confirmed-past-hold",
+          "pass": true,
+          "detail": "0 confirmed rental(s) with past hold_expires_at (must NOT be in eligible set)"
+        },
+        {
+          "id": "exclusion-confirmed-not-eligible",
+          "pass": true,
+          "detail": "no confirmed rentals in eligible dry-run set"
+        },
+        {
+          "id": "exclusion-terminal-past-hold",
+          "pass": true,
+          "detail": "0 terminal rental(s) with past hold_expires_at (job query excludes by status)"
+        },
+        {
+          "id": "exclusion-terminal-not-eligible",
+          "pass": true,
+          "detail": "no terminal rentals in eligible dry-run set"
+        },
+        {
+          "id": "exclusion-protected-active-statuses",
+          "pass": true,
+          "detail": "0 protected active rental(s) with past hold_expires_at outside eligible statuses"
+        },
+        {
+          "id": "active-future-holds-present",
+          "pass": true,
+          "detail": "0 hold-payment rental(s) still within hold window"
+        },
+        {
+          "id": "reservation-probe",
+          "pass": true,
+          "detail": "no eligible rentals — reservation probe skipped"
+        },
+        {
+          "id": "org-isolation-reservation-org-match",
+          "pass": true,
+          "detail": "no eligible rentals"
+        },
+        {
+          "id": "org-isolation-multi-tenant-grouping",
+          "pass": true,
+          "detail": "0 organization(s) represented in dry-run eligible set"
+        }
+      ]
+    }
+  ],
+  "dryRun": {
+    "asOf": "2026-06-16T02:31:06.116Z",
+    "eligibleCount": 0,
+    "eligibleByOrganization": {},
+    "eligibleByStatus": {},
+    "eligibleRentalIds": [],
+    "confirmedPastHoldCount": 0,
+    "terminalPastHoldCount": 0,
+    "protectedActivePastHoldCount": 0,
+    "activeFutureHoldCount": 0,
+    "reservationProbe": {
+      "linkedCount": 0,
+      "nonExpiredLinked": 0,
+      "sample": []
+    },
+    "wouldMutate": false
+  },
+  "warnings": [
+    "CRON_SECRET is unset locally. Production must set CRON_SECRET or the cron route returns 401."
+  ],
+  "finishedAt": "2026-06-16T02:31:07.277Z",
+  "summary": {
+    "passed": 22,
+    "total": 23,
+    "failed": [
+      "env-cron-secret"
+    ],
+    "dryRunEligibleCount": 0,
+    "wouldMutateLiveData": false
+  }
+}

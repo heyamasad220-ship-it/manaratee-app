@@ -1,0 +1,638 @@
+{
+  "capturedAt": "2026-06-16T20:19:50.138Z",
+  "deletionSteps": [
+    {
+      "table": "vendor_hub_participation_evaluations",
+      "deleted": 0,
+      "error": null
+    },
+    {
+      "table": "vendor_hub_payments",
+      "deleted": 0,
+      "error": null
+    },
+    {
+      "table": "vendor_hub_announcement_recipients",
+      "deleted": 0,
+      "error": null
+    },
+    {
+      "table": "vendor_hub_booth_assignments",
+      "deleted": 0,
+      "error": null
+    },
+    {
+      "table": "vendor_hub_participant_status",
+      "deleted": 0,
+      "error": null
+    },
+    {
+      "table": "vendor_hub_announcements",
+      "deleted": 0,
+      "error": null
+    },
+    {
+      "table": "vendor_hub_event_reminder_log",
+      "deleted": 0,
+      "error": null
+    },
+    {
+      "table": "vendor_hub_vendors",
+      "deleted": 0,
+      "error": null
+    },
+    {
+      "table": "vendors",
+      "deleted": 255,
+      "error": null
+    }
+  ],
+  "before": {
+    "vendor_hub_participation_evaluations": {
+      "count": 0,
+      "error": null
+    },
+    "vendor_hub_payments": {
+      "count": 0,
+      "error": null
+    },
+    "vendor_hub_announcement_recipients": {
+      "count": 0,
+      "error": null
+    },
+    "vendor_hub_booth_assignments": {
+      "count": 0,
+      "error": null
+    },
+    "vendor_hub_participant_status": {
+      "count": 0,
+      "error": null
+    },
+    "vendor_hub_announcements": {
+      "count": 0,
+      "error": null
+    },
+    "vendor_hub_event_reminder_log": {
+      "count": 0,
+      "error": null
+    },
+    "vendor_hub_vendors": {
+      "count": 0,
+      "error": null
+    },
+    "vendors": {
+      "count": 255,
+      "error": null
+    },
+    "vendor_categories": {
+      "count": 8,
+      "error": null
+    },
+    "vendor_hub_vendor_types": {
+      "count": 22,
+      "error": null
+    },
+    "vendor_hub_booth_attributes": {
+      "count": 22,
+      "error": null
+    },
+    "vendor_hub_booth_types": {
+      "count": 5,
+      "error": null
+    },
+    "vendor_hub_booths": {
+      "count": 3,
+      "error": null
+    },
+    "vendor_hub_events": {
+      "count": 1,
+      "error": null
+    },
+    "vendor_hub_booth_setup_templates": {
+      "count": 0,
+      "error": null
+    },
+    "vendor_hub_booth_setup_template_lines": {
+      "count": 0,
+      "error": null
+    },
+    "vendor_hub_booth_type_attributes": {
+      "count": 0,
+      "error": null
+    },
+    "vendor_hub_booth_attribute_links": {
+      "count": 0,
+      "error": null
+    },
+    "modules": {
+      "count": 11,
+      "error": null
+    },
+    "organization_modules": {
+      "count": 12,
+      "error": null
+    },
+    "organization_roles": {
+      "count": 6,
+      "error": null
+    },
+    "role_permissions": {
+      "count": 119,
+      "error": null
+    },
+    "organizations": {
+      "count": 2,
+      "error": null
+    },
+    "profiles": {
+      "count": 7,
+      "error": null
+    },
+    "organization_members": {
+      "count": 9,
+      "error": null
+    },
+    "organization_users": {
+      "count": 9,
+      "error": null
+    },
+    "platform_admins": {
+      "count": 1,
+      "error": null
+    },
+    "platform_settings": {
+      "count": 1,
+      "error": null
+    },
+    "application_type_definitions": {
+      "count": 6,
+      "error": null
+    },
+    "vendor_applications": {
+      "count": 0,
+      "error": null
+    },
+    "contact_roles_vendor": {
+      "count": 0,
+      "error": null
+    },
+    "byOrg": {
+      "MAS_DALLAS": {
+        "vendors": {
+          "count": 255,
+          "error": null
+        },
+        "vendor_hub_vendors": {
+          "count": 0,
+          "error": ""
+        },
+        "vendor_applications": {
+          "count": 0,
+          "error": null
+        }
+      },
+      "ASAD_REALTY": {
+        "vendors": {
+          "count": 0,
+          "error": null
+        },
+        "vendor_hub_vendors": {
+          "count": 0,
+          "error": ""
+        },
+        "vendor_applications": {
+          "count": 0,
+          "error": null
+        }
+      }
+    }
+  },
+  "after": {
+    "vendor_hub_participation_evaluations": {
+      "count": 0,
+      "error": null
+    },
+    "vendor_hub_payments": {
+      "count": 0,
+      "error": null
+    },
+    "vendor_hub_announcement_recipients": {
+      "count": 0,
+      "error": null
+    },
+    "vendor_hub_booth_assignments": {
+      "count": 0,
+      "error": null
+    },
+    "vendor_hub_participant_status": {
+      "count": 0,
+      "error": null
+    },
+    "vendor_hub_announcements": {
+      "count": 0,
+      "error": null
+    },
+    "vendor_hub_event_reminder_log": {
+      "count": 0,
+      "error": null
+    },
+    "vendor_hub_vendors": {
+      "count": 0,
+      "error": null
+    },
+    "vendors": {
+      "count": 0,
+      "error": null
+    },
+    "vendor_categories": {
+      "count": 8,
+      "error": null
+    },
+    "vendor_hub_vendor_types": {
+      "count": 22,
+      "error": null
+    },
+    "vendor_hub_booth_attributes": {
+      "count": 22,
+      "error": null
+    },
+    "vendor_hub_booth_types": {
+      "count": 5,
+      "error": null
+    },
+    "vendor_hub_booths": {
+      "count": 3,
+      "error": null
+    },
+    "vendor_hub_events": {
+      "count": 1,
+      "error": null
+    },
+    "vendor_hub_booth_setup_templates": {
+      "count": 0,
+      "error": null
+    },
+    "vendor_hub_booth_setup_template_lines": {
+      "count": 0,
+      "error": null
+    },
+    "vendor_hub_booth_type_attributes": {
+      "count": 0,
+      "error": null
+    },
+    "vendor_hub_booth_attribute_links": {
+      "count": 0,
+      "error": null
+    },
+    "modules": {
+      "count": 11,
+      "error": null
+    },
+    "organization_modules": {
+      "count": 12,
+      "error": null
+    },
+    "organization_roles": {
+      "count": 6,
+      "error": null
+    },
+    "role_permissions": {
+      "count": 119,
+      "error": null
+    },
+    "organizations": {
+      "count": 2,
+      "error": null
+    },
+    "profiles": {
+      "count": 7,
+      "error": null
+    },
+    "organization_members": {
+      "count": 9,
+      "error": null
+    },
+    "organization_users": {
+      "count": 9,
+      "error": null
+    },
+    "platform_admins": {
+      "count": 1,
+      "error": null
+    },
+    "platform_settings": {
+      "count": 1,
+      "error": null
+    },
+    "application_type_definitions": {
+      "count": 6,
+      "error": null
+    },
+    "vendor_applications": {
+      "count": 0,
+      "error": null
+    },
+    "contact_roles_vendor": {
+      "count": 0,
+      "error": null
+    },
+    "byOrg": {
+      "MAS_DALLAS": {
+        "vendors": {
+          "count": 0,
+          "error": null
+        },
+        "vendor_hub_vendors": {
+          "count": 0,
+          "error": ""
+        },
+        "vendor_applications": {
+          "count": 0,
+          "error": null
+        }
+      },
+      "ASAD_REALTY": {
+        "vendors": {
+          "count": 0,
+          "error": null
+        },
+        "vendor_hub_vendors": {
+          "count": 0,
+          "error": ""
+        },
+        "vendor_applications": {
+          "count": 0,
+          "error": null
+        }
+      }
+    }
+  },
+  "rowCountChanges": {
+    "vendor_hub_participation_evaluations": {
+      "before": 0,
+      "after": 0,
+      "deleted": 0
+    },
+    "vendor_hub_payments": {
+      "before": 0,
+      "after": 0,
+      "deleted": 0
+    },
+    "vendor_hub_announcement_recipients": {
+      "before": 0,
+      "after": 0,
+      "deleted": 0
+    },
+    "vendor_hub_booth_assignments": {
+      "before": 0,
+      "after": 0,
+      "deleted": 0
+    },
+    "vendor_hub_participant_status": {
+      "before": 0,
+      "after": 0,
+      "deleted": 0
+    },
+    "vendor_hub_announcements": {
+      "before": 0,
+      "after": 0,
+      "deleted": 0
+    },
+    "vendor_hub_event_reminder_log": {
+      "before": 0,
+      "after": 0,
+      "deleted": 0
+    },
+    "vendor_hub_vendors": {
+      "before": 0,
+      "after": 0,
+      "deleted": 0
+    },
+    "vendors": {
+      "before": 255,
+      "after": 0,
+      "deleted": 255
+    }
+  },
+  "protectedDiff": {
+    "profiles": {
+      "before": 7,
+      "after": 7,
+      "delta": 0
+    },
+    "contacts": {
+      "before": 7,
+      "after": 7,
+      "delta": 0
+    },
+    "organization_members": {
+      "before": 9,
+      "after": 9,
+      "delta": 0
+    },
+    "organization_users": {
+      "before": 9,
+      "after": 9,
+      "delta": 0
+    },
+    "organizations": {
+      "before": 2,
+      "after": 2,
+      "delta": 0
+    },
+    "organization_roles": {
+      "before": 6,
+      "after": 6,
+      "delta": 0
+    },
+    "role_permissions": {
+      "before": 119,
+      "after": 119,
+      "delta": 0
+    },
+    "platform_admins": {
+      "before": 1,
+      "after": 1,
+      "delta": 0
+    },
+    "platform_settings": {
+      "before": 1,
+      "after": 1,
+      "delta": 0
+    },
+    "modules": {
+      "before": 11,
+      "after": 11,
+      "delta": 0
+    },
+    "organization_modules": {
+      "before": 12,
+      "after": 12,
+      "delta": 0
+    },
+    "organization_sidebar_modules": {
+      "before": 12,
+      "after": 12,
+      "delta": 0
+    },
+    "plans": {
+      "before": 4,
+      "after": 4,
+      "delta": 0
+    },
+    "plan_modules": {
+      "before": 21,
+      "after": 21,
+      "delta": 0
+    },
+    "plan_limits": {
+      "before": 8,
+      "after": 8,
+      "delta": 0
+    }
+  },
+  "authUsers": {
+    "before": 7,
+    "after": 7
+  },
+  "orphans": [],
+  "validation": [
+    {
+      "id": "preserve_catalog_tables_readable",
+      "pass": true,
+      "tables": [
+        {
+          "table": "vendor_categories",
+          "count": 8,
+          "error": null
+        },
+        {
+          "table": "vendor_hub_vendor_types",
+          "count": 22,
+          "error": null
+        },
+        {
+          "table": "vendor_hub_booth_attributes",
+          "count": 22,
+          "error": null
+        },
+        {
+          "table": "vendor_hub_booth_types",
+          "count": 5,
+          "error": null
+        },
+        {
+          "table": "vendor_hub_booths",
+          "count": 3,
+          "error": null
+        },
+        {
+          "table": "vendor_hub_events",
+          "count": 1,
+          "error": null
+        },
+        {
+          "table": "vendor_hub_booth_setup_templates",
+          "count": 0,
+          "error": null
+        },
+        {
+          "table": "vendor_hub_booth_setup_template_lines",
+          "count": 0,
+          "error": null
+        },
+        {
+          "table": "vendor_hub_booth_type_attributes",
+          "count": 0,
+          "error": null
+        },
+        {
+          "table": "vendor_hub_booth_attribute_links",
+          "count": 0,
+          "error": null
+        },
+        {
+          "table": "modules",
+          "count": 11,
+          "error": null
+        },
+        {
+          "table": "organization_modules",
+          "count": 12,
+          "error": null
+        },
+        {
+          "table": "organization_roles",
+          "count": 6,
+          "error": null
+        },
+        {
+          "table": "role_permissions",
+          "count": 119,
+          "error": null
+        },
+        {
+          "table": "organizations",
+          "count": 2,
+          "error": null
+        },
+        {
+          "table": "profiles",
+          "count": 7,
+          "error": null
+        },
+        {
+          "table": "organization_members",
+          "count": 9,
+          "error": null
+        },
+        {
+          "table": "organization_users",
+          "count": 9,
+          "error": null
+        },
+        {
+          "table": "platform_admins",
+          "count": 1,
+          "error": null
+        },
+        {
+          "table": "platform_settings",
+          "count": 1,
+          "error": null
+        },
+        {
+          "table": "application_type_definitions",
+          "count": 6,
+          "error": null
+        }
+      ]
+    },
+    {
+      "id": "vendor_application_type_exists",
+      "pass": false,
+      "detail": "column application_type_definitions.application_type does not exist"
+    },
+    {
+      "id": "vendor_hub_events_accessible",
+      "pass": true,
+      "count": 1
+    },
+    {
+      "id": "vendor_hub_booth_types_accessible",
+      "pass": true,
+      "count": 5
+    },
+    {
+      "id": "vendors_operational_cleared",
+      "pass": true,
+      "count": 0
+    }
+  ],
+  "vendorHubOperational": false,
+  "selfRegistrationArchitecture": {
+    "applicationTypeVendor": false,
+    "vendorHubEvents": true,
+    "contactCentricModel": "New vendors register via applications → contact_id (see lib/vendor-hub/contact-centric-model.ts)"
+  }
+}

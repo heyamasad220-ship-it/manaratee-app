@@ -1,0 +1,181 @@
+{
+  "capturedAt": "2026-06-16T20:26:03.323Z",
+  "organization": {
+    "id": "e057e00a-e4e3-4adf-9af5-f465db1894be",
+    "name": "MAS Dallas",
+    "slug": "mas-dallas"
+  },
+  "A_preCleanup": {
+    "contact_import_staging_mas_dallas": 4651,
+    "contact_import_staging_total": 4651,
+    "contact_import_staging_asad_realty": 0,
+    "protected": {
+      "profiles": {
+        "count": 7,
+        "error": null
+      },
+      "contacts": {
+        "count": 7,
+        "error": null
+      },
+      "people": {
+        "count": 10,
+        "error": null
+      },
+      "organization_members": {
+        "count": 9,
+        "error": null
+      },
+      "organization_users": {
+        "count": 9,
+        "error": null
+      },
+      "organizations": {
+        "count": 2,
+        "error": null
+      },
+      "organization_roles": {
+        "count": 6,
+        "error": null
+      },
+      "role_permissions": {
+        "count": 119,
+        "error": null
+      },
+      "modules": {
+        "count": 11,
+        "error": null
+      },
+      "organization_modules": {
+        "count": 12,
+        "error": null
+      },
+      "organization_sidebar_modules": {
+        "count": 12,
+        "error": null
+      },
+      "plans": {
+        "count": 4,
+        "error": null
+      },
+      "plan_modules": {
+        "count": 21,
+        "error": null
+      },
+      "plan_limits": {
+        "count": 8,
+        "error": null
+      },
+      "platform_admins": {
+        "count": 1,
+        "error": null
+      },
+      "platform_settings": {
+        "count": 1,
+        "error": null
+      },
+      "auth_users": {
+        "count": 7,
+        "error": null
+      }
+    }
+  },
+  "B_backupExport": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\contact-import-staging\\contact_import_staging-mas-dallas-2026-06-16.json",
+  "C_deletionResult": {
+    "deleted": 4651,
+    "expected": 4651,
+    "success": true
+  },
+  "D_postCleanupValidation": {
+    "contact_import_staging_mas_dallas": 0,
+    "contact_import_staging_total": 0,
+    "protectedDiff": {
+      "profiles": {
+        "before": 7,
+        "after": 7,
+        "delta": 0
+      },
+      "contacts": {
+        "before": 7,
+        "after": 7,
+        "delta": 0
+      },
+      "people": {
+        "before": 10,
+        "after": 10,
+        "delta": 0
+      },
+      "organization_members": {
+        "before": 9,
+        "after": 9,
+        "delta": 0
+      },
+      "organization_users": {
+        "before": 9,
+        "after": 9,
+        "delta": 0
+      },
+      "organizations": {
+        "before": 2,
+        "after": 2,
+        "delta": 0
+      },
+      "organization_roles": {
+        "before": 6,
+        "after": 6,
+        "delta": 0
+      },
+      "role_permissions": {
+        "before": 119,
+        "after": 119,
+        "delta": 0
+      },
+      "modules": {
+        "before": 11,
+        "after": 11,
+        "delta": 0
+      },
+      "organization_modules": {
+        "before": 12,
+        "after": 12,
+        "delta": 0
+      },
+      "organization_sidebar_modules": {
+        "before": 12,
+        "after": 12,
+        "delta": 0
+      },
+      "plans": {
+        "before": 4,
+        "after": 4,
+        "delta": 0
+      },
+      "plan_modules": {
+        "before": 21,
+        "after": 21,
+        "delta": 0
+      },
+      "plan_limits": {
+        "before": 8,
+        "after": 8,
+        "delta": 0
+      },
+      "platform_admins": {
+        "before": 1,
+        "after": 1,
+        "delta": 0
+      },
+      "platform_settings": {
+        "before": 1,
+        "after": 1,
+        "delta": 0
+      }
+    },
+    "auth_users": {
+      "before": 7,
+      "after": 7,
+      "delta": 0
+    }
+  },
+  "E_onlyStagingAffected": true
+}

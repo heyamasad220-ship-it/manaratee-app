@@ -1,0 +1,265 @@
+{
+  "startedAt": "2026-06-16T20:09:44.141Z",
+  "mode": "pilot-readiness-read-only",
+  "suites": [
+    {
+      "id": "deliverables",
+      "label": "Phase 1 deliverables (static)",
+      "passed": 9,
+      "total": 9,
+      "failed": [],
+      "blockers": [],
+      "checks": [
+        {
+          "id": "d3-customer-guidance-module",
+          "pass": true,
+          "detail": "customer-rental-process-guidance.ts",
+          "severity": "blocker"
+        },
+        {
+          "id": "d3-no-disabled-pay-buttons",
+          "pass": true,
+          "detail": "payments section uses guidance callout",
+          "severity": "blocker"
+        },
+        {
+          "id": "d3-guidance-callout-present",
+          "pass": true,
+          "detail": "staff-mediated payment copy",
+          "severity": "blocker"
+        },
+        {
+          "id": "d1-cancel-ui",
+          "pass": true,
+          "detail": "staff cancel card",
+          "severity": "blocker"
+        },
+        {
+          "id": "d4-force-book-ui",
+          "pass": true,
+          "detail": "force-book card + dialog",
+          "severity": "blocker"
+        },
+        {
+          "id": "d2-hold-expiry-job",
+          "pass": true,
+          "detail": "hold expiry job module",
+          "severity": "blocker"
+        },
+        {
+          "id": "d2-cron-route",
+          "pass": true,
+          "detail": "cron route",
+          "severity": "blocker"
+        },
+        {
+          "id": "d2-cron-secret-auth",
+          "pass": true,
+          "detail": "Bearer CRON_SECRET",
+          "severity": "blocker"
+        },
+        {
+          "id": "d2-vercel-cron",
+          "pass": true,
+          "detail": "hourly schedule registered",
+          "severity": "blocker"
+        }
+      ]
+    },
+    {
+      "id": "workflow",
+      "label": "Core workflow + calendar + legacy (static)",
+      "passed": 11,
+      "total": 12,
+      "failed": [
+        "workflow-action-syncVenueRentalStatusAfterPayment"
+      ],
+      "blockers": [
+        "workflow-action-syncVenueRentalStatusAfterPayment"
+      ],
+      "checks": [
+        {
+          "id": "workflow-action-submitVenueRentalRequest",
+          "pass": true,
+          "detail": "submitVenueRentalRequest",
+          "severity": "blocker"
+        },
+        {
+          "id": "workflow-action-approveVenueRentalRequest",
+          "pass": true,
+          "detail": "approveVenueRentalRequest",
+          "severity": "blocker"
+        },
+        {
+          "id": "workflow-action-markRentalPaymentPaid",
+          "pass": true,
+          "detail": "markRentalPaymentPaid",
+          "severity": "blocker"
+        },
+        {
+          "id": "workflow-action-syncVenueRentalStatusAfterPayment",
+          "pass": false,
+          "detail": "syncVenueRentalStatusAfterPayment",
+          "severity": "blocker"
+        },
+        {
+          "id": "workflow-action-cancelVenueRental",
+          "pass": true,
+          "detail": "cancelVenueRental",
+          "severity": "blocker"
+        },
+        {
+          "id": "workflow-action-forceBookVenueRentalWithOverride",
+          "pass": true,
+          "detail": "forceBookVenueRentalWithOverride",
+          "severity": "blocker"
+        },
+        {
+          "id": "workflow-action-expireVenueRentalHolds",
+          "pass": true,
+          "detail": "expireVenueRentalHolds",
+          "severity": "blocker"
+        },
+        {
+          "id": "audit-cancel-log",
+          "pass": true,
+          "detail": "cancel writes override log",
+          "severity": "blocker"
+        },
+        {
+          "id": "audit-force-book-log",
+          "pass": true,
+          "detail": "force-book writes metadata",
+          "severity": "blocker"
+        },
+        {
+          "id": "calendar-sync-trigger",
+          "pass": true,
+          "detail": "cancelled/expired releases calendar",
+          "severity": "blocker"
+        },
+        {
+          "id": "legacy-containment-comment",
+          "pass": true,
+          "detail": "venue-rental-actions guards legacy path",
+          "severity": "blocker"
+        },
+        {
+          "id": "customer-submit-route",
+          "pass": true,
+          "detail": "customer new rental route",
+          "severity": "blocker"
+        }
+      ]
+    },
+    {
+      "id": "environment",
+      "label": "Environment variables",
+      "passed": 2,
+      "total": 3,
+      "failed": [
+        "env-cron-secret"
+      ],
+      "blockers": [
+        "env-cron-secret"
+      ],
+      "checks": [
+        {
+          "id": "env-supabase-url",
+          "pass": true,
+          "detail": null,
+          "severity": "blocker"
+        },
+        {
+          "id": "env-service-role",
+          "pass": true,
+          "detail": null,
+          "severity": "blocker"
+        },
+        {
+          "id": "env-cron-secret",
+          "pass": false,
+          "detail": "unset — required in production",
+          "severity": "blocker"
+        }
+      ]
+    },
+    {
+      "id": "tests",
+      "label": "Regression tests",
+      "passed": 1,
+      "total": 1,
+      "failed": [],
+      "blockers": [],
+      "checks": [
+        {
+          "id": "unit-tests-conflicts",
+          "pass": true,
+          "detail": "npm run test:conflicts passed",
+          "severity": "blocker"
+        }
+      ]
+    },
+    {
+      "id": "database",
+      "label": "Live read-only probes",
+      "passed": 5,
+      "total": 5,
+      "failed": [],
+      "blockers": [],
+      "checks": [
+        {
+          "id": "db-connect",
+          "pass": true,
+          "detail": "service role",
+          "severity": "blocker"
+        },
+        {
+          "id": "hold-expiry-dry-run-zero",
+          "pass": true,
+          "detail": "0 eligible hold(s)",
+          "severity": "blocker"
+        },
+        {
+          "id": "audit-log-table-readable",
+          "pass": true,
+          "detail": "cancel_rental logs: 1, force_book logs: 0",
+          "severity": "blocker"
+        },
+        {
+          "id": "live-rentals-readable",
+          "pass": true,
+          "detail": "0 active pipeline rental(s)",
+          "severity": "info"
+        },
+        {
+          "id": "legacy-venue-bookings-table",
+          "pass": true,
+          "detail": "1 legacy venue_bookings row(s) — new flow uses venue_rentals",
+          "severity": "info"
+        }
+      ]
+    }
+  ],
+  "dryRun": {
+    "eligibleCount": 0,
+    "asOf": "2026-06-16T20:09:49.294Z"
+  },
+  "testRun": {
+    "exitCode": 0,
+    "stdoutTail": "ℹ suites 10\nℹ pass 47\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 1605.7343\n"
+  },
+  "readinessScore": 93,
+  "recommendation": "NO_GO",
+  "finishedAt": "2026-06-16T20:09:50.531Z",
+  "summary": {
+    "passed": 28,
+    "total": 30,
+    "blockers": [
+      "workflow-action-syncVenueRentalStatusAfterPayment",
+      "env-cron-secret"
+    ],
+    "readinessScore": 93,
+    "recommendation": "NO_GO"
+  }
+}

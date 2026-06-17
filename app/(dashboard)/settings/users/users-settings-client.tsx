@@ -1,8 +1,13 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { createClient } from "@/lib/supabase/client"
 import { Header } from "@/components/layout/header"
+import {
+  fetchOrganizationUsersForSettings,
+  updateOrganizationMemberRole,
+  type OrganizationSettingsRole,
+  type OrganizationSettingsUser,
+} from "@/lib/organizations/organization-users-actions"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -55,66 +60,17 @@ import { OrganizationJoinLinkCard } from "@/components/settings/organization-joi
 import { enterCustomerPortalAsUser } from "@/lib/organizations/org-user-access-actions"
 import { isOrganizationSystemAdmin } from "@/lib/organizations/organization-system-admin"
 
-type OrgRole = {
-  id: string
-  name: string
-  description: string | null
-}
-
-type OrgMemberRow = {
-  id: string
-  user_id: string
-  organization_id: string
-  role: string
-  role_id: string | null
-  created_at: string | null
-}
-
-type ProfileRow = {
-  id: string
-  first_name: string | null
-  last_name: string | null
-  email: string | null
-  created_at: string | null
-  updated_at: string | null
-}
-
-type OrgUser = {
-  membershipId: string
-  userId: string
-  name: string
-  email: string
-  systemRole: string
-  roleId: string | null
-  roleName: string
-  status: string
-  lastLogin: string | null
-  createdAt: string | null
-}
-
-function formatSystemRole(value: string | null | undefined) {
-  if (!value) return "Member"
-
-  return value
-    .replace(/_/g, " ")
-    .split(" ")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ")
-}
-
 export function UsersSettingsClient({
   organizationId,
   organizationName,
   organizationSlug,
 }: {
-  organizationId: string
+  organizationId: string | null
   organizationName: string
   organizationSlug: string | null
 }) {
-  const supabase = createClient()
-
-  const [users, setUsers] = useState<OrgUser[]>([])
-  const [roles, setRoles] = useState<OrgRole[]>([])
+  const [users, setUsers] = useState<OrganizationSettingsUser[]>([])
+  const [roles, setRoles] = useState<OrganizationSettingsRole[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -130,97 +86,43 @@ export function UsersSettingsClient({
   const [sendingInvite, setSendingInvite] = useState(false)
 
   const [showRoleDialog, setShowRoleDialog] = useState(false)
-  const [selectedUser, setSelectedUser] = useState<OrgUser | null>(null)
+  const [selectedUser, setSelectedUser] = useState<OrganizationSettingsUser | null>(null)
   const [selectedRoleId, setSelectedRoleId] = useState("")
   const [savingRole, setSavingRole] = useState(false)
 
   async function loadUsers() {
+    if (!organizationId) {
+      setUsers([])
+      setRoles([])
+      setError("No organization selected.")
+      setLoading(false)
+      return
+    }
+
     setLoading(true)
     setError(null)
 
-    const rolesResult = await supabase
-      .from("organization_roles")
-      .select("id, name, description")
-      .eq("organization_id", organizationId)
-      .order("name", { ascending: true })
+    try {
+      const payload = await fetchOrganizationUsersForSettings()
+      setRoles(payload.roles)
+      setUsers(payload.users)
 
-    if (rolesResult.error) {
-      setError(rolesResult.error.message)
+      if (!inviteRoleId && payload.roles.length > 0) {
+        const adminRole = payload.roles.find((role) => role.name.toLowerCase() === "admin")
+        setInviteRoleId(adminRole?.id ?? payload.roles[0].id)
+      }
+    } catch (loadError) {
+      console.error(loadError)
       setRoles([])
       setUsers([])
+      setError(
+        loadError instanceof Error
+          ? loadError.message
+          : "Could not load organization users."
+      )
+    } finally {
       setLoading(false)
-      return
     }
-
-    const roleRows = (rolesResult.data ?? []) as OrgRole[]
-    setRoles(roleRows)
-
-    if (!inviteRoleId && roleRows.length > 0) {
-      const adminRole = roleRows.find((role) => role.name.toLowerCase() === "admin")
-      setInviteRoleId(adminRole?.id ?? roleRows[0].id)
-    }
-
-    const membersResult = await supabase
-      .from("organization_members")
-      .select("id, user_id, organization_id, role, role_id, created_at")
-      .eq("organization_id", organizationId)
-      .order("created_at", { ascending: false })
-
-    if (membersResult.error) {
-      setError(membersResult.error.message)
-      setUsers([])
-      setLoading(false)
-      return
-    }
-
-    const members = (membersResult.data ?? []) as OrgMemberRow[]
-    const userIds = members.map((member) => member.user_id)
-
-    let profiles: ProfileRow[] = []
-
-    if (userIds.length > 0) {
-      const profilesResult = await supabase
-        .from("profiles")
-        .select("id, first_name, last_name, email, created_at, updated_at")
-        .in("id", userIds)
-
-      if (profilesResult.error) {
-        setError(profilesResult.error.message)
-        setUsers([])
-        setLoading(false)
-        return
-      }
-
-      profiles = (profilesResult.data ?? []) as ProfileRow[]
-    }
-
-    const roleById = new Map(roleRows.map((role) => [role.id, role]))
-    const profileById = new Map(profiles.map((profile) => [profile.id, profile]))
-
-    const formattedUsers: OrgUser[] = members.map((member) => {
-      const profile = profileById.get(member.user_id)
-      const customRole = member.role_id ? roleById.get(member.role_id) : null
-      const email = profile?.email ?? "No email found"
-      const name =
-        `${profile?.first_name ?? ""} ${profile?.last_name ?? ""}`.trim() ||
-        email
-
-      return {
-        membershipId: member.id,
-        userId: member.user_id,
-        name,
-        email,
-        systemRole: member.role,
-        roleId: member.role_id,
-        roleName: customRole?.name ?? formatSystemRole(member.role),
-        status: "Active",
-        lastLogin: profile?.updated_at ?? null,
-        createdAt: profile?.created_at ?? member.created_at,
-      }
-    })
-
-    setUsers(formattedUsers)
-    setLoading(false)
   }
 
   useEffect(() => {
@@ -302,7 +204,7 @@ export function UsersSettingsClient({
     }
   }
 
-  function openChangeRoleDialog(user: OrgUser) {
+  function openChangeRoleDialog(user: OrganizationSettingsUser) {
     setSelectedUser(user)
     setSelectedRoleId(user.roleId ?? "")
     setShowRoleDialog(true)
@@ -319,16 +221,15 @@ export function UsersSettingsClient({
     setSavingRole(true)
     setError(null)
 
-    const { error } = await supabase
-      .from("organization_members")
-      .update({
-        role_id: selectedRoleId,
+    try {
+      await updateOrganizationMemberRole({
+        membershipId: selectedUser.membershipId,
+        roleId: selectedRoleId,
       })
-      .eq("id", selectedUser.membershipId)
-      .eq("organization_id", organizationId)
-
-    if (error) {
-      setError(error.message)
+    } catch (saveError) {
+      setError(
+        saveError instanceof Error ? saveError.message : "Could not update user role."
+      )
       setSavingRole(false)
       return
     }
@@ -453,7 +354,7 @@ export function UsersSettingsClient({
                 <div>
                   <CardTitle>All Users</CardTitle>
                   <CardDescription>
-                    Users are loaded from organization_members and roles are loaded from organization_roles.
+                    Staff accounts for this organization, including invited Super Admins.
                   </CardDescription>
                 </div>
 

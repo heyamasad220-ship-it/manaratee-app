@@ -4,6 +4,7 @@
  * Usage:
  *   node scripts/seed-donations-dev.mjs --confirm-dev
  *   node scripts/seed-donations-dev.mjs --confirm-dev --clean
+ *   node scripts/seed-donations-dev.mjs --confirm-dev --clean-only
  *   DONATIONS_SEED_ORG_ID=<uuid> node scripts/seed-donations-dev.mjs --confirm-dev
  *
  * Requires SUPABASE_SERVICE_ROLE_KEY in .env.local (dev project only).
@@ -45,15 +46,21 @@ function parseArgs(argv) {
   return {
     confirmDev: argv.includes("--confirm-dev"),
     clean: argv.includes("--clean"),
+    cleanOnly: argv.includes("--clean-only"),
   }
 }
 
 loadEnvLocal()
 
-const { confirmDev, clean } = parseArgs(process.argv.slice(2))
+const { confirmDev, clean, cleanOnly } = parseArgs(process.argv.slice(2))
 
 if (!confirmDev) {
   console.error("Refusing to run without --confirm-dev")
+  process.exit(1)
+}
+
+if (cleanOnly && !clean) {
+  console.error("--clean-only requires --clean")
   process.exit(1)
 }
 
@@ -115,12 +122,20 @@ async function cleanSeed(orgId) {
     await sb.from("payments").delete().eq("organization_id", orgId).in("pledge_id", pledgeIds)
   }
 
-  await sb.from("payments").delete().eq("organization_id", orgId).eq("memo", SEED_TAG)
-  await sb
-    .from("payments")
-    .delete()
+  await sb.from("payments").delete().eq("organization_id", orgId).ilike("memo", `%${SEED_TAG}%`)
+  await sb.from("payments").delete().eq("organization_id", orgId).like("sender_name", "Seed %")
+
+  const { data: seedPledgesByNotes } = await sb
+    .from("pledges")
+    .select("id")
     .eq("organization_id", orgId)
-    .like("sender_name", "Seed Import%")
+    .ilike("notes", `%${SEED_TAG}%`)
+
+  const notesPledgeIds = (seedPledgesByNotes || []).map((p) => p.id).filter((id) => !pledgeIds.includes(id))
+  if (notesPledgeIds.length) {
+    await sb.from("payments").delete().eq("organization_id", orgId).in("pledge_id", notesPledgeIds)
+    await sb.from("pledges").delete().in("id", notesPledgeIds)
+  }
 
   if (pledgeIds.length) {
     await sb.from("pledges").delete().in("id", pledgeIds)
@@ -549,11 +564,11 @@ try {
 
   if (clean) {
     await cleanSeed(orgId)
-    if (!confirmDev) {
+    if (cleanOnly || !confirmDev) {
       console.log("Clean complete.")
       process.exit(0)
     }
-    // --clean --confirm-dev: reset then re-seed below
+    // --clean --confirm-dev (without --clean-only): reset then re-seed below
   } else if (existing.length > 0) {
     console.error(
       "Seed contacts already exist. Run with --clean --confirm-dev to reset and re-seed."

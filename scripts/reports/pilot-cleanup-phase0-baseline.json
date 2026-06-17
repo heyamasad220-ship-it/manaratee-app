@@ -1,0 +1,334 @@
+{
+  "capturedAt": "2026-06-16T20:09:05.057Z",
+  "phase": "phase0-baseline",
+  "organizations": {
+    "masDallas": "e057e00a-e4e3-4adf-9af5-f465db1894be",
+    "asadRealty": "95c4eb7d-b151-4aa1-a489-a3c1e1289c7e"
+  },
+  "preserveCounts": {
+    "organizations": {
+      "count": 2,
+      "error": null
+    },
+    "profiles": {
+      "count": 7,
+      "error": null
+    },
+    "organization_members": {
+      "count": 9,
+      "error": null
+    },
+    "organization_users": {
+      "count": 9,
+      "error": null
+    },
+    "organization_roles": {
+      "count": 6,
+      "error": null
+    },
+    "role_permissions": {
+      "count": 119,
+      "error": null
+    },
+    "platform_admins": {
+      "count": 1,
+      "error": null
+    },
+    "platform_settings": {
+      "count": 1,
+      "error": null
+    },
+    "organization_modules": {
+      "count": 12,
+      "error": null
+    },
+    "organization_sidebar_modules": {
+      "count": 12,
+      "error": null
+    },
+    "modules": {
+      "count": 11,
+      "error": null
+    },
+    "plans": {
+      "count": 4,
+      "error": null
+    },
+    "plan_modules": {
+      "count": 21,
+      "error": null
+    },
+    "plan_limits": {
+      "count": 8,
+      "error": null
+    },
+    "platform_admin_org_access_log": {
+      "count": 7,
+      "error": null
+    },
+    "reservation_override_logs": {
+      "count": 1,
+      "error": null
+    },
+    "organization_invites": {
+      "count": 0,
+      "error": null
+    }
+  },
+  "asadSeedTargets": {
+    "seedContactsByEmail": [
+      {
+        "id": "d9f7a323-c9f8-468d-afb1-b2ae0a80e1fa",
+        "email": "donations-seed-individual@dev.test",
+        "full_name": "Seed Individual Donor",
+        "notes": "DONATIONS_DEV_SEED_V1",
+        "organization_id": "95c4eb7d-b151-4aa1-a489-a3c1e1289c7e"
+      },
+      {
+        "id": "903b8ff2-993f-4836-aac9-4d420d8df652",
+        "email": "donations-seed-org@dev.test",
+        "full_name": "Seed Organization Donor",
+        "notes": "DONATIONS_DEV_SEED_V1",
+        "organization_id": "95c4eb7d-b151-4aa1-a489-a3c1e1289c7e"
+      }
+    ],
+    "seedContactsByNotes": [
+      {
+        "id": "d9f7a323-c9f8-468d-afb1-b2ae0a80e1fa",
+        "email": "donations-seed-individual@dev.test",
+        "full_name": "Seed Individual Donor",
+        "notes": "DONATIONS_DEV_SEED_V1",
+        "organization_id": "95c4eb7d-b151-4aa1-a489-a3c1e1289c7e"
+      },
+      {
+        "id": "903b8ff2-993f-4836-aac9-4d420d8df652",
+        "email": "donations-seed-org@dev.test",
+        "full_name": "Seed Organization Donor",
+        "notes": "DONATIONS_DEV_SEED_V1",
+        "organization_id": "95c4eb7d-b151-4aa1-a489-a3c1e1289c7e"
+      }
+    ],
+    "campaignDevRamadan": {
+      "count": 1,
+      "error": null
+    },
+    "donorsTotal": {
+      "count": 1003,
+      "error": null
+    },
+    "paymentsByMemo": {
+      "count": 2,
+      "error": null
+    },
+    "paymentsBySender": {
+      "count": 1,
+      "error": null
+    },
+    "paymentImportBatches": {
+      "count": 1,
+      "error": null
+    }
+  },
+  "masStressTargets": {
+    "stressDonors": {
+      "count": 0,
+      "error": null
+    },
+    "stressCampaigns": {
+      "count": 0,
+      "error": null
+    },
+    "stressDonorIdCount": 0,
+    "paymentsLinkedToStressDonors": {
+      "count": 0,
+      "error": null
+    },
+    "pledgesLinkedToStressDonors": {
+      "count": 0,
+      "error": null
+    },
+    "donorsTotal": {
+      "count": 2,
+      "error": null
+    },
+    "paymentsTotal": {
+      "count": 8,
+      "error": null
+    },
+    "pledgesTotal": {
+      "count": 3,
+      "error": null
+    },
+    "campaignsTotal": {
+      "count": 3,
+      "error": null
+    },
+    "recurringPlans": {
+      "count": 2,
+      "error": null
+    },
+    "donationReceipts": {
+      "count": 2,
+      "error": null
+    },
+    "pledgeReminders": {
+      "count": 1,
+      "error": null
+    },
+    "checkoutSessions": {
+      "count": 0,
+      "error": null
+    },
+    "processorEvents": {
+      "count": 0,
+      "error": null
+    },
+    "transactionalEmailLog": {
+      "count": 0,
+      "error": null
+    },
+    "paymentImportBatches": {
+      "count": 2,
+      "error": null
+    },
+    "paymentImportRows": {
+      "count": 2,
+      "error": null
+    },
+    "donorImportBatches": {
+      "count": 4,
+      "error": null
+    }
+  },
+  "masImportStaging": {
+    "total": {
+      "count": 4651,
+      "error": null
+    }
+  },
+  "masVenueRentalChain": {
+    "rental": {
+      "rows": [
+        {
+          "id": "49ce1da2-fd1e-4f4c-9cfc-62c33e07eb9d",
+          "status": "cancelled_before_payment",
+          "organization_id": "e057e00a-e4e3-4adf-9af5-f465db1894be"
+        }
+      ],
+      "error": null
+    },
+    "rentalReservations": {
+      "count": 1,
+      "error": null
+    },
+    "rentalPayments": {
+      "count": 2,
+      "error": null
+    },
+    "rentalContracts": {
+      "count": 1,
+      "error": null
+    },
+    "rentalSelectedAddons": {
+      "count": 3,
+      "error": null
+    },
+    "resourceReservations": {
+      "count": 0,
+      "error": null
+    },
+    "venueBookings": {
+      "count": 1,
+      "error": null
+    },
+    "overrideLogsPreserved": {
+      "count": 1,
+      "error": null
+    }
+  },
+  "contactsInventory": {
+    "asadAll": [
+      {
+        "id": "d9f7a323-c9f8-468d-afb1-b2ae0a80e1fa",
+        "email": "donations-seed-individual@dev.test",
+        "full_name": "Seed Individual Donor",
+        "notes": "DONATIONS_DEV_SEED_V1",
+        "organization_id": "95c4eb7d-b151-4aa1-a489-a3c1e1289c7e"
+      },
+      {
+        "id": "903b8ff2-993f-4836-aac9-4d420d8df652",
+        "email": "donations-seed-org@dev.test",
+        "full_name": "Seed Organization Donor",
+        "notes": "DONATIONS_DEV_SEED_V1",
+        "organization_id": "95c4eb7d-b151-4aa1-a489-a3c1e1289c7e"
+      },
+      {
+        "id": "f9188893-a5b0-4e6a-9ac5-e9521f95f122",
+        "email": "rls-cust-a-1781315989532@security.test",
+        "full_name": "DONATIONS_SECURITY_VALIDATION Contact A",
+        "notes": null,
+        "organization_id": "95c4eb7d-b151-4aa1-a489-a3c1e1289c7e"
+      },
+      {
+        "id": "032b6ecf-835e-4796-ba95-fffa7abfdc67",
+        "email": "rls-cust-b-1781315989532@security.test",
+        "full_name": "DONATIONS_SECURITY_VALIDATION Contact B",
+        "notes": null,
+        "organization_id": "95c4eb7d-b151-4aa1-a489-a3c1e1289c7e"
+      }
+    ],
+    "masAll": [
+      {
+        "id": "9d937c17-2fa8-4f5c-9aec-f6360cf18aa6",
+        "email": "donations-seed-individual@dev.test",
+        "full_name": "Seed Individual Donor",
+        "notes": "DONATIONS_DEV_SEED_V1",
+        "organization_id": "e057e00a-e4e3-4adf-9af5-f465db1894be",
+        "person_id": "9972aff0-1f05-4db7-a0c4-3599092be671"
+      },
+      {
+        "id": "d2e15a7e-2f6a-4572-9d59-558246bb0808",
+        "email": "donations-seed-org@dev.test",
+        "full_name": "Seed Organization Donor",
+        "notes": "DONATIONS_DEV_SEED_V1",
+        "organization_id": "e057e00a-e4e3-4adf-9af5-f465db1894be",
+        "person_id": "ffa65212-8ca2-4547-8544-af2dbb288a70"
+      },
+      {
+        "id": "95597501-f927-4074-9dea-226eb519a068",
+        "email": "heyamasad220@gmail.com",
+        "full_name": "Heyam Asad",
+        "notes": null,
+        "organization_id": "e057e00a-e4e3-4adf-9af5-f465db1894be",
+        "person_id": "09aa96cb-532a-4b34-b9f6-656dbd7df027"
+      }
+    ]
+  },
+  "authSummary": {
+    "authUsersTotal": 7,
+    "authUsersError": null,
+    "profileCount": 7
+  },
+  "backupTables": {
+    "backup_donors_2026_05_24": {
+      "count": 479,
+      "error": null
+    },
+    "backup_payments_2026_05_24": {
+      "count": 95,
+      "error": null
+    },
+    "backup_donation_pledges_2026_05_24": {
+      "count": 5,
+      "error": null
+    },
+    "backup_donation_payments_2026_05_24": {
+      "count": 0,
+      "error": null
+    },
+    "backup_pledges_2026_05_24": {
+      "count": 0,
+      "error": null
+    }
+  }
+}

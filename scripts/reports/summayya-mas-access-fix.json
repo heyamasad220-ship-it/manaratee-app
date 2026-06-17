@@ -1,0 +1,83 @@
+{
+  "email": "summayya.khalid@gmail.com",
+  "execute": false,
+  "before": {
+    "profile": {
+      "id": "ef9442b6-7379-4d75-8229-92f5a3cb0979",
+      "email": "summayya.khalid@gmail.com",
+      "first_name": "Summayya",
+      "last_name": "Khalid",
+      "organization_id": "e057e00a-e4e3-4adf-9af5-f465db1894be",
+      "role": "admin"
+    },
+    "memberships": [
+      {
+        "id": "014ffa4b-e5ee-4e62-8f1d-9c89675e6e9f",
+        "organization_id": "e057e00a-e4e3-4adf-9af5-f465db1894be",
+        "role": "admin",
+        "role_id": "93bf80d1-a46c-44f5-90cd-32a0dc609836",
+        "status": "active",
+        "organizations": {
+          "name": "MAS Dallas"
+        }
+      }
+    ],
+    "keyPermissions": [
+      {
+        "permission_key": "settings.users.view",
+        "enabled": true
+      },
+      {
+        "permission_key": "settings.roles.view",
+        "enabled": true
+      },
+      {
+        "permission_key": "donations.view",
+        "enabled": true
+      },
+      {
+        "permission_key": "donations.manage",
+        "enabled": true
+      }
+    ],
+    "enabledModules": [
+      "contacts",
+      "donations"
+    ]
+  },
+  "after": {
+    "membership": {
+      "id": "014ffa4b-e5ee-4e62-8f1d-9c89675e6e9f",
+      "organization_id": "e057e00a-e4e3-4adf-9af5-f465db1894be",
+      "role": "admin",
+      "role_id": "93bf80d1-a46c-44f5-90cd-32a0dc609836",
+      "status": "active",
+      "organization_roles": {
+        "name": "Super Admin"
+      }
+    },
+    "keyPermissions": [
+      {
+        "permission_key": "settings.users.view",
+        "enabled": true
+      },
+      {
+        "permission_key": "settings.roles.view",
+        "enabled": true
+      },
+      {
+        "permission_key": "donations.view",
+        "enabled": true
+      },
+      {
+        "permission_key": "donations.manage",
+        "enabled": true
+      }
+    ],
+    "enabledModules": [
+      "contacts",
+      "donations"
+    ]
+  },
+  "steps": []
+}

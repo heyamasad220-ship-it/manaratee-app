@@ -136,18 +136,48 @@ Routes: `/customer/rentals`, `/customer/rentals/new`, `/customer/rentals/[id]`
 
 **Live-safe validation:** `node scripts/validate-venue-rental-hold-expiry.mjs` — read-only dry-run (SELECT only; no cron invocation). Requires `NEXT_PUBLIC_SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` in `.env.local`. Production also requires `CRON_SECRET`. Report: `scripts/reports/venue-rental-hold-expiry-validation.json`.
 
+**Phase 1 Deliverable #4 (force-book override UI):** Authorized staff (`BOOKINGS_MANAGE` or `PROGRAMS_MANAGE` + finance visibility) can force-book pre-confirmation rentals from `/bookings/rentals/[id]` via `forceBookVenueRentalWithOverride`. Exception-only UI with amber warning card, required override reason, confirmation dialog, conflict visibility, and outstanding-payment acknowledgement. Sets rental → `confirmed` without marking payments paid; writes `reservation_override_logs` (`action: force_book`) with previous/next status and override metadata. Blocked for confirmed, terminal, and refund workflow states.
+
 Key files:
 
 * `lib/bookings/customer-rental-process-guidance.ts` — customer-facing copy for staff-mediated payment and contract review
 * `components/customer/rentals/customer-rental-process-guidance-callout.tsx` — shared callout UI
 * `components/customer/rentals/customer-rental-next-action-panel.tsx`, `customer-rental-payments-section.tsx`, `customer-rental-documents-section.tsx`
-* `components/bookings/venue-rental-detail-client.tsx` — staff cancel UI
-* `lib/bookings/venue-rental-status.ts` — `canStaffCancelVenueRental`, `shouldCancelVenueRentalAfterPayment`
+* `components/bookings/venue-rental-detail-client.tsx` — staff cancel + force-book UI
+* `lib/bookings/venue-rental-status.ts` — `canStaffCancelVenueRental`, `canStaffForceBookVenueRental`, `summarizeOutstandingRentalPayments`
 * `lib/bookings/venue-rental-hold-expiry.ts` — `expireVenueRentalHoldsForScope`, `runVenueRentalHoldExpiryJob`
 * `app/api/cron/venue-rental-hold-expiry/route.ts` — cron entry point
 * `vercel.json` — hourly hold-expiry schedule
 
-Tests: `lib/bookings/customer-rental-process-guidance.test.ts`, `lib/bookings/customer-venue-rental-experience.test.ts`, `lib/bookings/venue-rental-cancel.test.ts`, `lib/bookings/venue-rental-hold-expiry.test.ts` (included in `npm run test:conflicts`).
+Tests: `lib/bookings/customer-rental-process-guidance.test.ts`, `lib/bookings/customer-venue-rental-experience.test.ts`, `lib/bookings/venue-rental-cancel.test.ts`, `lib/bookings/venue-rental-force-book.test.ts`, `lib/bookings/venue-rental-hold-expiry.test.ts` (included in `npm run test:conflicts`).
+
+**Phase 1 Deliverable #5 (pilot readiness validation):** Read-only harness `node scripts/validate-venue-rental-pilot-readiness.mjs` checks deliverables, workflow actions, env vars, unit tests, hold-expiry dry-run (`eligibleCount = 0`), and audit log readability. Full staff/customer E2E still requires manual walkthrough — no live mutations during validation. Pilot assumes **external payment collection** and **staff-mediated email** for payment instructions (no Stripe checkout for venue rentals in Phase 1).
+
+## Pilot Data Cleanup — Vendor Hub (June 2026)
+
+Status: **Vendor import cleanup complete** (MAS Dallas pilot org)
+
+Removed **255** legacy imported rows from `public.vendors` (May 2026 CSV import). These were standalone directory records with no `contact_id` — not part of the contact-centric Vendor Hub model (`lib/vendor-hub/contact-centric-model.ts`).
+
+**Preserved:** vendor catalog/config (`vendor_categories`, `vendor_hub_vendor_types`, booth attributes/types, booths, events), applications engine (`application_type_definitions` includes `vendor`), auth, profiles, contacts, memberships, permissions, module configuration.
+
+**Backup:** `scripts/backups/vendor-cleanup/vendors-2026-06-16.json` (255 rows). Reports: `scripts/reports/vendor-cleanup-pre-2026-06-16.json`, `scripts/reports/vendor-cleanup-post-2026-06-16.json`.
+
+**Tooling:** `node scripts/vendor-cleanup-pilot.mjs` (inventory + export); `node scripts/vendor-cleanup-pilot.mjs --execute` (FK-safe operational delete).
+
+**Pending pilot cleanup (separate approval):** donations stress/seed data, experimental venue rental chain — see `scripts/reports/pilot-cleanup-execution-preview.json`.
+
+**MAS Dallas `contact_import_staging` cleared (June 2026):** 4,651 staging rows deleted. Backup: `scripts/backups/contact-import-staging/contact_import_staging-mas-dallas-2026-06-16.json`. Tool: `node scripts/clear-mas-contact-import-staging.mjs --execute`.
+
+**MAS Dallas contacts cleaned (June 2026):** Removed `DONATIONS_DEV_SEED_V1` test contacts; only pilot contact Heyam Asad retained. Removed erroneous `member` membership/role from Heyam (kept `employee` via active staff record). Tool: `node scripts/clean-mas-contacts-pilot.mjs`.
+
+**Contacts list UI (June 2026):** Removed Teams column and team filter from `ContactsCrmList` (`/contacts`, `/contacts/people`, `/contacts/organizations`). Team assignment remains on individual contact profiles where HR teams are enabled.
+
+**Settings → Users list fix (June 2026):** `/settings/users` now loads members via `fetchOrganizationUsersForSettings()` (service role + `settings.users.view`) instead of browser Supabase queries limited by RLS — admins see all org members (e.g. invited Super Admins), not only their own row. Key file: `lib/organizations/organization-users-actions.ts`.
+
+**MAS Dallas program registrations cleared (June 2026):** Removed 4 experimental enrollments (Youth Seasonal Camps), 3 charges, 9 charge lines, and related status/lifecycle rows. Preserved programs catalog (2 programs), sessions, offerings, and registration options. Reset program `enrolled`/`waitlist` counters. Backup: `scripts/backups/program-registrations/`. Report: `scripts/reports/mas-program-registrations-cleanup-2026-06-16.json`. Tool: `node scripts/clean-mas-program-registrations.mjs --execute`.
+
+**MAS Dallas donations seed config cleared (June 2026):** Removed `DONATIONS_DEV_SEED_V1` categories, subcategories, payment methods, campaign, seed contacts/donors, pledges, payments, and **orphaned `donation_receipts`** (2 rows left after ledger delete). Reports overview/collection/receipts should read $0 / 0 pledges after tab refresh. Tool: `node scripts/clean-mas-donations-seed.mjs --execute`. Reports tabs refetch on tab switch (`app/(dashboard)/donations/reports/page.tsx`) so Receipts/Collection no longer show stale seed totals.
 
 ## Organization Switching
 
@@ -199,6 +229,10 @@ Possible causes:
 # Programs Module
 
 Status: Active Development
+
+## Dashboard access (June 2026)
+
+Staff routes under `/programs/*` require the **Programs** product module to be enabled for the selected organization (`organization_modules.enabled = true`, module catalog `is_active`). Disabled modules redirect to `/dashboard` even when the user role still has `programs.view` / `programs.manage`. Layout: `app/(dashboard)/programs/layout.tsx`; helper: `lib/modules/dashboard-module-access-server.ts`.
 
 ## Staff setup UI (June 2026)
 
@@ -621,7 +655,8 @@ Dev-only scripts to populate and verify the stabilized ledger **without** touchi
 
 ```bash
 npm run seed:donations-dev
-# reset: node scripts/seed-donations-dev.mjs --clean --confirm-dev
+# reset + re-seed: node scripts/seed-donations-dev.mjs --clean --confirm-dev
+# remove seed only (no re-seed): node scripts/seed-donations-dev.mjs --clean --clean-only --confirm-dev
 npm run validate:donations-seed
 ```
 
@@ -1030,7 +1065,7 @@ Status: Implemented (June 2026)
 | `/donations/campaigns/[id]` | Campaign detail (summary, donor metrics, recent activity) |
 | `/donations` | Dashboard widgets: Top Campaigns, Campaign Progress, Goal Achievement |
 | `/donations/reports` | Campaigns tab — donations/pledges/outstanding/donors by campaign |
-| `/donations/settings` | Campaign CRUD persists goal + description; live raised totals |
+| `/donations/settings` | Campaign CRUD persists goal + description; live raised totals; Categories and Payment Methods support delete (June 2026) |
 
 ### Validation
 

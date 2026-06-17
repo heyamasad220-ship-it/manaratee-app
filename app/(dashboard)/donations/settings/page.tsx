@@ -265,6 +265,35 @@ async function handleSavePaymentMethod() {
 
   await loadPaymentMethods()
 }
+async function handleDeletePaymentMethod(methodId: string) {
+  if (
+    !confirm(
+      "Delete this payment method? Existing donation records are kept; their payment method link will be cleared."
+    )
+  ) {
+    return
+  }
+
+  const orgId = await getOrganizationId()
+
+  if (!orgId) {
+    alert("No organization found.")
+    return
+  }
+
+  const { error } = await supabase
+    .from("payment_methods")
+    .delete()
+    .eq("id", methodId)
+    .eq("organization_id", orgId)
+
+  if (error) {
+    alert(error.message)
+    return
+  }
+
+  await loadPaymentMethods()
+}
 async function loadPaymentMethods() {
   const orgId = await getOrganizationId()
 
@@ -779,20 +808,30 @@ async function handleDeleteCampaign(campaignId: string) {
                           />
                         </TableCell>
                         <TableCell>
-                          <Button
-  variant="ghost"
-  size="icon"
-  className="h-8 w-8"
-  onClick={() => {
-    setEditingPaymentMethod(method)
-    setPaymentMethodName(method.name)
-    setPaymentMethodFee(method.fee)
-    setPaymentMethodEnabled(method.enabled)
-    setShowPaymentMethodDialog(true)
-  }}
->
-  <Pencil className="h-4 w-4" />
-</Button>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => {
+                                setEditingPaymentMethod(method)
+                                setPaymentMethodName(method.name)
+                                setPaymentMethodFee(method.fee)
+                                setPaymentMethodEnabled(method.enabled)
+                                setShowPaymentMethodDialog(true)
+                              }}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-red-600"
+                              onClick={() => handleDeletePaymentMethod(method.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}

@@ -1,0 +1,460 @@
+{
+  "capturedAt": "2026-06-16T20:19:26.182Z",
+  "mode": "execute",
+  "before": {
+    "vendor_hub_participation_evaluations": {
+      "count": 0,
+      "error": null
+    },
+    "vendor_hub_payments": {
+      "count": 0,
+      "error": null
+    },
+    "vendor_hub_announcement_recipients": {
+      "count": 0,
+      "error": null
+    },
+    "vendor_hub_booth_assignments": {
+      "count": 0,
+      "error": null
+    },
+    "vendor_hub_participant_status": {
+      "count": 0,
+      "error": null
+    },
+    "vendor_hub_announcements": {
+      "count": 0,
+      "error": null
+    },
+    "vendor_hub_event_reminder_log": {
+      "count": 0,
+      "error": null
+    },
+    "vendor_hub_vendors": {
+      "count": 0,
+      "error": null
+    },
+    "vendors": {
+      "count": 255,
+      "error": null
+    },
+    "vendor_categories": {
+      "count": 8,
+      "error": null
+    },
+    "vendor_hub_vendor_types": {
+      "count": 22,
+      "error": null
+    },
+    "vendor_hub_booth_attributes": {
+      "count": 22,
+      "error": null
+    },
+    "vendor_hub_booth_types": {
+      "count": 5,
+      "error": null
+    },
+    "vendor_hub_booths": {
+      "count": 3,
+      "error": null
+    },
+    "vendor_hub_events": {
+      "count": 1,
+      "error": null
+    },
+    "vendor_hub_booth_setup_templates": {
+      "count": 0,
+      "error": null
+    },
+    "vendor_hub_booth_setup_template_lines": {
+      "count": 0,
+      "error": null
+    },
+    "vendor_hub_booth_type_attributes": {
+      "count": 0,
+      "error": null
+    },
+    "vendor_hub_booth_attribute_links": {
+      "count": 0,
+      "error": null
+    },
+    "modules": {
+      "count": 11,
+      "error": null
+    },
+    "organization_modules": {
+      "count": 12,
+      "error": null
+    },
+    "organization_roles": {
+      "count": 6,
+      "error": null
+    },
+    "role_permissions": {
+      "count": 119,
+      "error": null
+    },
+    "organizations": {
+      "count": 2,
+      "error": null
+    },
+    "profiles": {
+      "count": 7,
+      "error": null
+    },
+    "organization_members": {
+      "count": 9,
+      "error": null
+    },
+    "organization_users": {
+      "count": 9,
+      "error": null
+    },
+    "platform_admins": {
+      "count": 1,
+      "error": null
+    },
+    "platform_settings": {
+      "count": 1,
+      "error": null
+    },
+    "application_type_definitions": {
+      "count": 6,
+      "error": null
+    },
+    "vendor_applications": {
+      "count": 0,
+      "error": null
+    },
+    "contact_roles_vendor": {
+      "count": 0,
+      "error": null
+    },
+    "byOrg": {
+      "MAS_DALLAS": {
+        "vendors": {
+          "count": 255,
+          "error": null
+        },
+        "vendor_hub_vendors": {
+          "count": 0,
+          "error": ""
+        },
+        "vendor_applications": {
+          "count": 0,
+          "error": null
+        }
+      },
+      "ASAD_REALTY": {
+        "vendors": {
+          "count": 0,
+          "error": null
+        },
+        "vendor_hub_vendors": {
+          "count": 0,
+          "error": ""
+        },
+        "vendor_applications": {
+          "count": 0,
+          "error": null
+        }
+      }
+    }
+  },
+  "beforeAuth": {
+    "count": 7,
+    "error": null
+  },
+  "beforeProtected": {
+    "profiles": {
+      "count": 7,
+      "error": null
+    },
+    "contacts": {
+      "count": 7,
+      "error": null
+    },
+    "organization_members": {
+      "count": 9,
+      "error": null
+    },
+    "organization_users": {
+      "count": 9,
+      "error": null
+    },
+    "organizations": {
+      "count": 2,
+      "error": null
+    },
+    "organization_roles": {
+      "count": 6,
+      "error": null
+    },
+    "role_permissions": {
+      "count": 119,
+      "error": null
+    },
+    "platform_admins": {
+      "count": 1,
+      "error": null
+    },
+    "platform_settings": {
+      "count": 1,
+      "error": null
+    },
+    "modules": {
+      "count": 11,
+      "error": null
+    },
+    "organization_modules": {
+      "count": 12,
+      "error": null
+    },
+    "organization_sidebar_modules": {
+      "count": 12,
+      "error": null
+    },
+    "plans": {
+      "count": 4,
+      "error": null
+    },
+    "plan_modules": {
+      "count": 21,
+      "error": null
+    },
+    "plan_limits": {
+      "count": 8,
+      "error": null
+    }
+  },
+  "contactOverlap": {
+    "vendorRows": 0,
+    "vendorsWithContactId": 0,
+    "uniqueLinkedContacts": 0,
+    "linkedContactsSample": [],
+    "contactsLinkedToProfiles": 0,
+    "vendorsLinkedToProfileContacts": 0
+  },
+  "exports": [
+    {
+      "table": "vendor_hub_participation_evaluations",
+      "rowCount": 0,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\vendor-cleanup\\vendor_hub_participation_evaluations-2026-06-16.json",
+      "error": null
+    },
+    {
+      "table": "vendor_hub_payments",
+      "rowCount": 0,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\vendor-cleanup\\vendor_hub_payments-2026-06-16.json",
+      "error": null
+    },
+    {
+      "table": "vendor_hub_announcement_recipients",
+      "rowCount": 0,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\vendor-cleanup\\vendor_hub_announcement_recipients-2026-06-16.json",
+      "error": null
+    },
+    {
+      "table": "vendor_hub_booth_assignments",
+      "rowCount": 0,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\vendor-cleanup\\vendor_hub_booth_assignments-2026-06-16.json",
+      "error": null
+    },
+    {
+      "table": "vendor_hub_participant_status",
+      "rowCount": 0,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\vendor-cleanup\\vendor_hub_participant_status-2026-06-16.json",
+      "error": null
+    },
+    {
+      "table": "vendor_hub_announcements",
+      "rowCount": 0,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\vendor-cleanup\\vendor_hub_announcements-2026-06-16.json",
+      "error": null
+    },
+    {
+      "table": "vendor_hub_event_reminder_log",
+      "rowCount": 0,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\vendor-cleanup\\vendor_hub_event_reminder_log-2026-06-16.json",
+      "error": null
+    },
+    {
+      "table": "vendor_hub_vendors",
+      "rowCount": 0,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\vendor-cleanup\\vendor_hub_vendors-2026-06-16.json",
+      "error": null
+    },
+    {
+      "table": "vendors",
+      "rowCount": 255,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\vendor-cleanup\\vendors-2026-06-16.json",
+      "error": null
+    },
+    {
+      "table": "applications_vendor_type",
+      "rowCount": 0,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\vendor-cleanup\\applications-2026-06-16.json",
+      "error": null
+    }
+  ],
+  "safety": {
+    "contactsWillBeDeleted": false,
+    "profilesWillBeDeleted": false,
+    "authUsersWillBeDeleted": false,
+    "organizationMembersWillBeDeleted": false,
+    "configurationTablesWillBeDeleted": false,
+    "vendorContactOverlap": {
+      "vendorRows": 0,
+      "vendorsWithContactId": 0,
+      "uniqueLinkedContacts": 0,
+      "linkedContactsSample": [],
+      "contactsLinkedToProfiles": 0,
+      "vendorsLinkedToProfileContacts": 0
+    },
+    "note": "Only operational vendor tables are targeted. Contact rows are preserved even when linked from vendors.contact_id."
+  },
+  "expectedDeletes": {
+    "vendor_hub_participation_evaluations": {
+      "before": 0,
+      "after": 0,
+      "delete": 0
+    },
+    "vendor_hub_payments": {
+      "before": 0,
+      "after": 0,
+      "delete": 0
+    },
+    "vendor_hub_announcement_recipients": {
+      "before": 0,
+      "after": 0,
+      "delete": 0
+    },
+    "vendor_hub_booth_assignments": {
+      "before": 0,
+      "after": 0,
+      "delete": 0
+    },
+    "vendor_hub_participant_status": {
+      "before": 0,
+      "after": 0,
+      "delete": 0
+    },
+    "vendor_hub_announcements": {
+      "before": 0,
+      "after": 0,
+      "delete": 0
+    },
+    "vendor_hub_event_reminder_log": {
+      "before": 0,
+      "after": 0,
+      "delete": 0
+    },
+    "vendor_hub_vendors": {
+      "before": 0,
+      "after": 0,
+      "delete": 0
+    },
+    "vendors": {
+      "before": 255,
+      "after": 0,
+      "delete": 255
+    }
+  },
+  "preserveTablesBefore": {
+    "vendor_categories": {
+      "count": 8,
+      "error": null
+    },
+    "vendor_hub_vendor_types": {
+      "count": 22,
+      "error": null
+    },
+    "vendor_hub_booth_attributes": {
+      "count": 22,
+      "error": null
+    },
+    "vendor_hub_booth_types": {
+      "count": 5,
+      "error": null
+    },
+    "vendor_hub_booths": {
+      "count": 3,
+      "error": null
+    },
+    "vendor_hub_events": {
+      "count": 1,
+      "error": null
+    },
+    "vendor_hub_booth_setup_templates": {
+      "count": 0,
+      "error": null
+    },
+    "vendor_hub_booth_setup_template_lines": {
+      "count": 0,
+      "error": null
+    },
+    "vendor_hub_booth_type_attributes": {
+      "count": 0,
+      "error": null
+    },
+    "vendor_hub_booth_attribute_links": {
+      "count": 0,
+      "error": null
+    },
+    "modules": {
+      "count": 11,
+      "error": null
+    },
+    "organization_modules": {
+      "count": 12,
+      "error": null
+    },
+    "organization_roles": {
+      "count": 6,
+      "error": null
+    },
+    "role_permissions": {
+      "count": 119,
+      "error": null
+    },
+    "organizations": {
+      "count": 2,
+      "error": null
+    },
+    "profiles": {
+      "count": 7,
+      "error": null
+    },
+    "organization_members": {
+      "count": 9,
+      "error": null
+    },
+    "organization_users": {
+      "count": 9,
+      "error": null
+    },
+    "platform_admins": {
+      "count": 1,
+      "error": null
+    },
+    "platform_settings": {
+      "count": 1,
+      "error": null
+    },
+    "application_type_definitions": {
+      "count": 6,
+      "error": null
+    }
+  },
+  "deletionOrder": [
+    "vendor_hub_participation_evaluations",
+    "vendor_hub_payments",
+    "vendor_hub_announcement_recipients",
+    "vendor_hub_booth_assignments",
+    "vendor_hub_participant_status",
+    "vendor_hub_announcements",
+    "vendor_hub_event_reminder_log",
+    "vendor_hub_vendors",
+    "vendors"
+  ]
+}

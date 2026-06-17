@@ -11,9 +11,19 @@ import {
   MEMBERSHIP_SETTINGS_PATH,
   MEMBERSHIP_TEAMS_PATH,
 } from "@/lib/memberships/membership-module-label"
+import {
+  isOrganizationModuleEnabled,
+  loadOrganizationEnabledModuleSlugs,
+} from "@/lib/modules/dashboard-module-access-server"
+import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 
 export default async function MembershipOverviewPage() {
   const stats = await fetchMembershipOverviewStats()
+  const organizationId = await getSelectedOrganizationId()
+  const enabledModuleSlugs = organizationId
+    ? await loadOrganizationEnabledModuleSlugs(organizationId)
+    : new Set<string>()
+  const programsEnabled = isOrganizationModuleEnabled(enabledModuleSlugs, "programs")
 
   const metrics = [
     {
@@ -66,12 +76,23 @@ export default async function MembershipOverviewPage() {
         <Card className="border-dashed">
           <CardContent className="p-6">
             <p className="text-sm text-muted-foreground">
-              {MEMBERSHIP_MODULE_LABEL} covers who belongs to MAS Dallas, their benefits, and
-              optional team assignments. Program participants and workforce records stay in{" "}
-              <Link href="/programs/registrations" className="font-medium text-primary hover:underline">
-                Programs
-              </Link>{" "}
-              and{" "}
+              {MEMBERSHIP_MODULE_LABEL} covers who belongs to your organization, their benefits,
+              and optional team assignments.
+              {programsEnabled ? (
+                <>
+                  {" "}
+                  Program participants stay in{" "}
+                  <Link
+                    href="/programs/registrations"
+                    className="font-medium text-primary hover:underline"
+                  >
+                    Programs
+                  </Link>
+                  ; workforce records stay in{" "}
+                </>
+              ) : (
+                <> Workforce records stay in </>
+              )}
               <Link href="/workforce" className="font-medium text-primary hover:underline">
                 Organization
               </Link>

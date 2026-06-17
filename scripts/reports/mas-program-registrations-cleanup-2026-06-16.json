@@ -1,0 +1,432 @@
+{
+  "capturedAt": "2026-06-16T20:47:03.548Z",
+  "execute": true,
+  "before": {
+    "program_payment_allocations": {
+      "count": 0,
+      "error": null
+    },
+    "program_charge_lines": {
+      "count": 9,
+      "error": null
+    },
+    "program_charge_schedule": {
+      "count": 0,
+      "error": null
+    },
+    "program_enrollment_status_history": {
+      "count": 5,
+      "error": null
+    },
+    "program_registration_lifecycle_events": {
+      "count": 5,
+      "error": null
+    },
+    "program_enrollment_sessions": {
+      "count": 0,
+      "error": null
+    },
+    "program_extended_care": {
+      "count": 0,
+      "error": null
+    },
+    "program_financial_assistance_documents": {
+      "count": 0,
+      "error": null
+    },
+    "program_financial_assistance_status_history": {
+      "count": 0,
+      "error": null
+    },
+    "program_financial_assistance": {
+      "count": 0,
+      "error": null
+    },
+    "program_charges": {
+      "count": 3,
+      "error": null
+    },
+    "program_checkouts": {
+      "count": 0,
+      "error": null
+    },
+    "registration_cart_item_fees": {
+      "count": 0,
+      "error": null
+    },
+    "registration_cart_items": {
+      "count": 0,
+      "error": null
+    },
+    "registration_carts": {
+      "count": 0,
+      "error": null
+    },
+    "registration_orders": {
+      "count": 0,
+      "error": null
+    },
+    "program_waitlist_status_history": {
+      "count": 0,
+      "error": null
+    },
+    "program_waitlist": {
+      "count": 0,
+      "error": null
+    },
+    "program_enrollments": {
+      "count": 4,
+      "error": null
+    },
+    "contacts": {
+      "count": 1,
+      "error": null
+    },
+    "people": {
+      "count": 6,
+      "error": null
+    },
+    "profiles": {
+      "count": 7,
+      "error": null
+    },
+    "organization_members": {
+      "count": 9,
+      "error": null
+    },
+    "organizations": {
+      "count": 2,
+      "error": null
+    },
+    "programs": {
+      "count": 2,
+      "error": null
+    },
+    "program_sessions": {
+      "count": 4,
+      "error": null
+    },
+    "program_offerings": {
+      "count": 6,
+      "error": null
+    },
+    "program_registration_options": {
+      "count": 9,
+      "error": null
+    }
+  },
+  "after": {
+    "program_payment_allocations": {
+      "count": 0,
+      "error": null
+    },
+    "program_charge_lines": {
+      "count": 0,
+      "error": null
+    },
+    "program_charge_schedule": {
+      "count": 0,
+      "error": null
+    },
+    "program_enrollment_status_history": {
+      "count": 0,
+      "error": null
+    },
+    "program_registration_lifecycle_events": {
+      "count": 0,
+      "error": null
+    },
+    "program_enrollment_sessions": {
+      "count": 0,
+      "error": null
+    },
+    "program_extended_care": {
+      "count": 0,
+      "error": null
+    },
+    "program_financial_assistance_documents": {
+      "count": 0,
+      "error": null
+    },
+    "program_financial_assistance_status_history": {
+      "count": 0,
+      "error": null
+    },
+    "program_financial_assistance": {
+      "count": 0,
+      "error": null
+    },
+    "program_charges": {
+      "count": 0,
+      "error": null
+    },
+    "program_checkouts": {
+      "count": 0,
+      "error": null
+    },
+    "registration_cart_item_fees": {
+      "count": 0,
+      "error": null
+    },
+    "registration_cart_items": {
+      "count": 0,
+      "error": null
+    },
+    "registration_carts": {
+      "count": 0,
+      "error": null
+    },
+    "registration_orders": {
+      "count": 0,
+      "error": null
+    },
+    "program_waitlist_status_history": {
+      "count": 0,
+      "error": null
+    },
+    "program_waitlist": {
+      "count": 0,
+      "error": null
+    },
+    "program_enrollments": {
+      "count": 0,
+      "error": null
+    },
+    "contacts": {
+      "count": 1,
+      "error": null
+    },
+    "people": {
+      "count": 6,
+      "error": null
+    },
+    "profiles": {
+      "count": 7,
+      "error": null
+    },
+    "organization_members": {
+      "count": 9,
+      "error": null
+    },
+    "organizations": {
+      "count": 2,
+      "error": null
+    },
+    "programs": {
+      "count": 2,
+      "error": null
+    },
+    "program_sessions": {
+      "count": 4,
+      "error": null
+    },
+    "program_offerings": {
+      "count": 6,
+      "error": null
+    },
+    "program_registration_options": {
+      "count": 9,
+      "error": null
+    }
+  },
+  "exports": [
+    {
+      "table": "program_payment_allocations",
+      "rowCount": 0,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\program-registrations\\program_payment_allocations-mas-dallas-2026-06-16.json"
+    },
+    {
+      "table": "program_charge_lines",
+      "rowCount": 9,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\program-registrations\\program_charge_lines-mas-dallas-2026-06-16.json"
+    },
+    {
+      "table": "program_charge_schedule",
+      "rowCount": 0,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\program-registrations\\program_charge_schedule-mas-dallas-2026-06-16.json"
+    },
+    {
+      "table": "program_enrollment_status_history",
+      "rowCount": 5,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\program-registrations\\program_enrollment_status_history-mas-dallas-2026-06-16.json"
+    },
+    {
+      "table": "program_registration_lifecycle_events",
+      "rowCount": 5,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\program-registrations\\program_registration_lifecycle_events-mas-dallas-2026-06-16.json"
+    },
+    {
+      "table": "program_enrollment_sessions",
+      "rowCount": 0,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\program-registrations\\program_enrollment_sessions-mas-dallas-2026-06-16.json"
+    },
+    {
+      "table": "program_extended_care",
+      "rowCount": 0,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\program-registrations\\program_extended_care-mas-dallas-2026-06-16.json"
+    },
+    {
+      "table": "program_financial_assistance_documents",
+      "rowCount": 0,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\program-registrations\\program_financial_assistance_documents-mas-dallas-2026-06-16.json"
+    },
+    {
+      "table": "program_financial_assistance_status_history",
+      "rowCount": 0,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\program-registrations\\program_financial_assistance_status_history-mas-dallas-2026-06-16.json"
+    },
+    {
+      "table": "program_financial_assistance",
+      "rowCount": 0,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\program-registrations\\program_financial_assistance-mas-dallas-2026-06-16.json"
+    },
+    {
+      "table": "program_charges",
+      "rowCount": 3,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\program-registrations\\program_charges-mas-dallas-2026-06-16.json"
+    },
+    {
+      "table": "program_checkouts",
+      "rowCount": 0,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\program-registrations\\program_checkouts-mas-dallas-2026-06-16.json"
+    },
+    {
+      "table": "registration_cart_item_fees",
+      "rowCount": 0,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\program-registrations\\registration_cart_item_fees-mas-dallas-2026-06-16.json"
+    },
+    {
+      "table": "registration_cart_items",
+      "rowCount": 0,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\program-registrations\\registration_cart_items-mas-dallas-2026-06-16.json"
+    },
+    {
+      "table": "registration_carts",
+      "rowCount": 0,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\program-registrations\\registration_carts-mas-dallas-2026-06-16.json"
+    },
+    {
+      "table": "registration_orders",
+      "rowCount": 0,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\program-registrations\\registration_orders-mas-dallas-2026-06-16.json"
+    },
+    {
+      "table": "program_waitlist_status_history",
+      "rowCount": 0,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\program-registrations\\program_waitlist_status_history-mas-dallas-2026-06-16.json"
+    },
+    {
+      "table": "program_waitlist",
+      "rowCount": 0,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\program-registrations\\program_waitlist-mas-dallas-2026-06-16.json"
+    },
+    {
+      "table": "program_enrollments",
+      "rowCount": 4,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\program-registrations\\program_enrollments-mas-dallas-2026-06-16.json"
+    }
+  ],
+  "deletionSteps": [
+    {
+      "table": "program_payment_allocations",
+      "deleted": 0,
+      "error": null
+    },
+    {
+      "table": "program_charge_lines",
+      "deleted": 9,
+      "error": null
+    },
+    {
+      "table": "program_charge_schedule",
+      "deleted": 0,
+      "error": null
+    },
+    {
+      "table": "program_enrollment_status_history",
+      "deleted": 5,
+      "error": null
+    },
+    {
+      "table": "program_registration_lifecycle_events",
+      "deleted": 5,
+      "error": null
+    },
+    {
+      "table": "program_enrollment_sessions",
+      "deleted": 0,
+      "error": null
+    },
+    {
+      "table": "program_extended_care",
+      "deleted": 0,
+      "error": null
+    },
+    {
+      "table": "program_financial_assistance_documents",
+      "deleted": 0,
+      "error": null
+    },
+    {
+      "table": "program_financial_assistance_status_history",
+      "deleted": 0,
+      "error": null
+    },
+    {
+      "table": "program_financial_assistance",
+      "deleted": 0,
+      "error": null
+    },
+    {
+      "table": "program_charges",
+      "deleted": 3,
+      "error": null
+    },
+    {
+      "table": "program_checkouts",
+      "deleted": 0,
+      "error": null
+    },
+    {
+      "table": "registration_cart_item_fees",
+      "deleted": 0,
+      "error": null
+    },
+    {
+      "table": "registration_cart_items",
+      "deleted": 0,
+      "error": null
+    },
+    {
+      "table": "registration_carts",
+      "deleted": 0,
+      "error": null
+    },
+    {
+      "table": "registration_orders",
+      "deleted": 0,
+      "error": null
+    },
+    {
+      "table": "program_waitlist_status_history",
+      "deleted": 0,
+      "error": null
+    },
+    {
+      "table": "program_waitlist",
+      "deleted": 0,
+      "error": null
+    },
+    {
+      "table": "program_enrollments",
+      "deleted": 4,
+      "error": null
+    },
+    {
+      "counterReset": {
+        "programsReset": 2
+      }
+    }
+  ],
+  "protectedUnchanged": true
+}

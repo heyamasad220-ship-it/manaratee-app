@@ -1,0 +1,141 @@
+{
+  "capturedAt": "2026-06-16T20:58:58.219Z",
+  "execute": true,
+  "MAS": "e057e00a-e4e3-4adf-9af5-f465db1894be",
+  "steps": [
+    {
+      "table": "payments",
+      "deleted": 0
+    },
+    {
+      "table": "pledges",
+      "deleted": 0
+    },
+    {
+      "table": "payment_import_rows",
+      "deleted": 0
+    },
+    {
+      "table": "payment_import_batches",
+      "deleted": 0
+    },
+    {
+      "table": "donors",
+      "deleted": 0
+    },
+    {
+      "table": "contacts",
+      "deleted": 0
+    },
+    {
+      "table": "people",
+      "deleted": 0
+    },
+    {
+      "table": "donation_subcategories",
+      "deleted": 0
+    },
+    {
+      "table": "donation_categories",
+      "deleted": 0
+    },
+    {
+      "table": "payment_methods",
+      "deleted": 0
+    },
+    {
+      "table": "campaigns",
+      "deleted": 0
+    },
+    {
+      "table": "donation_receipts",
+      "deleted": 2
+    }
+  ],
+  "before": {
+    "payments": {
+      "count": 0,
+      "error": null
+    },
+    "pledges": {
+      "count": 0,
+      "error": null
+    },
+    "donors": {
+      "count": 0,
+      "error": null
+    },
+    "donation_receipts": {
+      "count": 2,
+      "error": null
+    },
+    "contacts": {
+      "count": 1,
+      "error": null
+    },
+    "seedContacts": {
+      "count": 0,
+      "error": null
+    },
+    "seedPaymentsByMemo": {
+      "count": 0,
+      "error": null
+    },
+    "seedPaymentsBySender": {
+      "count": 0,
+      "error": null
+    },
+    "reportsOverview": {
+      "total_donations": 0,
+      "payment_count": 0,
+      "average_donation": 0,
+      "donor_count": 0
+    }
+  },
+  "after": {
+    "payments": {
+      "count": 0,
+      "error": null
+    },
+    "pledges": {
+      "count": 0,
+      "error": null
+    },
+    "donors": {
+      "count": 0,
+      "error": null
+    },
+    "donation_receipts": {
+      "count": 0,
+      "error": null
+    },
+    "contacts": {
+      "count": 1,
+      "error": null
+    },
+    "seedContacts": {
+      "count": 0,
+      "error": null
+    },
+    "seedPaymentsBySender": {
+      "count": 0,
+      "error": null
+    },
+    "reportsOverview": {
+      "total_donations": 0,
+      "payment_count": 0,
+      "average_donation": 0,
+      "donor_count": 0
+    }
+  },
+  "inventory": {
+    "seedPaymentIds": 0,
+    "seedPledgeIds": 0,
+    "seedDonorIds": 0,
+    "seedContactIds": 0,
+    "importRows": 0,
+    "seedCategories": 0,
+    "seedMethods": 0,
+    "seedCampaigns": 0
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "capturedAt": "2026-06-16T20:11:49.791Z",
+  "approvedExecutionPreview": {
+    "phase1_asad_seed_only": {
+      "contacts": 2,
+      "people_orphan_after_contacts": 2,
+      "donors": 2,
+      "pledges": 3,
+      "payments_on_pledges": 4,
+      "payments_by_memo": 2,
+      "payments_by_sender": 1,
+      "campaign_dev_ramadan": 1,
+      "payment_import_batches": 1
+    },
+    "phase2_mas_stress_as_approved": {
+      "stressDonors": 0,
+      "stressCampaigns": 0,
+      "paymentsLinked": 0,
+      "pledgesLinked": 0,
+      "paymentsByStressSender": 0
+    },
+    "phase3_mas_import_staging": {
+      "rows": 4651
+    },
+    "phase4_mas_venue_rental_chain": {
+      "venue_rentals": 1,
+      "rental_reservations": 1,
+      "rental_payments": 2,
+      "rental_contracts": 1,
+      "rental_selected_addons": 3,
+      "resource_reservations_by_reservation": 0,
+      "venue_bookings_mas": 1,
+      "reservation_override_logs_preserved": 1
+    }
+  },
+  "criticalFinding": {
+    "message": "BETA_STRESS_V1 bulk data (10,000 payments, 1,000 donors) is on ASAD REALTY, not MAS Dallas. Approved item 5 targeting MAS is currently a NO-OP for stress tags.",
+    "asadStressActualLocation": {
+      "stressDonors": 1000,
+      "stressCampaigns": 5,
+      "paymentsLinked": 0,
+      "pledgesLinked": 0,
+      "paymentsByStressSender": 10000
+    }
+  },
+  "outOfScopeButPresentOnMasPilotOrg": {
+    "masSeedContacts": [
+      {
+        "id": "9d937c17-2fa8-4f5c-9aec-f6360cf18aa6",
+        "email": "donations-seed-individual@dev.test"
+      },
+      {
+        "id": "d2e15a7e-2f6a-4572-9d59-558246bb0808",
+        "email": "donations-seed-org@dev.test"
+      }
+    ],
+    "masSeedDonors": 2,
+    "masPaymentsWithSeedMemo": 6,
+    "realContactPreserved": {
+      "email": "heyamasad220@gmail.com",
+      "full_name": "Heyam Asad"
+    }
+  },
+  "preserveUnchanged": {
+    "reservation_override_logs": 1,
+    "platform_admin_org_access_log": 7,
+    "organization_members": 9,
+    "role_permissions": 119,
+    "profiles": 7,
+    "organizations": 2
+  }
+}

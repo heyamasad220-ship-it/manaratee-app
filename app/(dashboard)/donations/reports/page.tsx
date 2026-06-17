@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { usePathname } from "next/navigation"
 import { Header } from "@/components/layout/header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -56,6 +57,7 @@ import {
   formatDonationCurrency,
   type CampaignAnalyticsEntry,
 } from "@/lib/donations/campaign-analytics"
+import { clearSelectedOrganizationIdCache } from "@/lib/current-organization"
 
 const reportsTabs = ["Overview", "Donations", "Donors", "Campaigns", "Receipts", "Collection", "Recurring", "Tax Receipts"] as const
 
@@ -80,6 +82,7 @@ interface DonorSummary {
 }
 
 export default function DonationsReportsPage() {
+  const pathname = usePathname()
   const [activeTab, setActiveTab] = useState<ReportsTab>("Overview")
   const [dateRange, setDateRange] = useState("30d")
   const [selectedDonors, setSelectedDonors] = useState<string[]>([])
@@ -138,8 +141,24 @@ export default function DonationsReportsPage() {
   const [bulkSending, setBulkSending] = useState(false)
 
   useEffect(() => {
+    const summaryTabs = ["Overview", "Receipts", "Collection", "Recurring"] as const
+    if (!summaryTabs.includes(activeTab as (typeof summaryTabs)[number])) {
+      return
+    }
+
     async function loadOverview() {
+      clearSelectedOrganizationIdCache()
       setLoading(true)
+      setOverview({
+        totalDonations: 0,
+        paymentCount: 0,
+        averageDonation: 0,
+        donorCount: 0,
+      })
+      setTopDonors([])
+      setReceiptSummary(null)
+      setCollectionReport(null)
+      setRecurringReport(null)
 
       const [overviewResult, topDonorsResult, receiptResult, collectionResult, recurringResult] =
         await Promise.all([
@@ -182,7 +201,7 @@ export default function DonationsReportsPage() {
     }
 
     loadOverview()
-  }, [])
+  }, [pathname, activeTab])
 
   useEffect(() => {
     if (activeTab === "Donations") {

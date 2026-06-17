@@ -22,7 +22,10 @@ import { assertNoReservationConflicts } from "@/lib/reservations/reservation-con
 import {
   computeHoldExpiresAt,
   canStaffCancelVenueRental,
+  canStaffForceBookVenueRental,
   shouldCancelVenueRentalAfterPayment,
+  summarizeOutstandingRentalPayments,
+  VENUE_RENTAL_FORCE_BOOK_STATUSES,
 } from "./venue-rental-status"
 import { expireVenueRentalHoldsForScope } from "./venue-rental-hold-expiry"
 import { getBlockingReservationsForVenue } from "./venue-rental-queries"
@@ -1065,6 +1068,8 @@ export async function approveSecurityDepositRefund(input: {
 export async function forceBookVenueRentalWithOverride(input: {
   venueRentalId: string
   reason: string
+  acknowledgeConflict?: boolean
+  acknowledgeOutstandingPayments?: boolean
 }) {
   await assertCanManageVenueRentals()
 
@@ -1088,13 +1093,120 @@ export async function forceBookVenueRentalWithOverride(input: {
     throw new Error("Staff user is required.")
   }
 
-  await supabase
+  const { data: rental, error: rentalError } = await supabase
     .from("venue_rentals")
-    .update({ status: VENUE_RENTAL_STATUSES.confirmed, hold_expires_at: null })
+    .select("id, status")
     .eq("id", input.venueRentalId)
     .eq("organization_id", organizationId)
+    .maybeSingle()
 
-  await supabase
+  if (rentalError || !rental) {
+    throw new Error("Rental not found.")
+  }
+
+  const previousStatus = rental.status as VenueRentalStatus
+
+  if (!canStaffForceBookVenueRental(previousStatus)) {
+    throw new Error("This rental cannot be force-booked in its current status.")
+  }
+
+  const { data: reservations, error: reservationsError } = await supabase
+    .from("rental_reservations")
+    .select("id, venue_id, start_at, end_at")
+    .eq("venue_rental_id", input.venueRentalId)
+    .eq("organization_id", organizationId)
+
+  if (reservationsError) {
+    throw new Error("Failed to load rental reservations.")
+  }
+
+  let hasConflict = false
+  for (const reservation of reservations || []) {
+    const blocking = await getBlockingReservationsForVenue(
+      organizationId,
+      reservation.venue_id as string,
+      reservation.start_at as string,
+      reservation.end_at as string,
+      reservation.id as string
+    )
+
+    if (blocking.length > 0) {
+      hasConflict = true
+      break
+    }
+  }
+
+  if (hasConflict && !input.acknowledgeConflict) {
+    throw new Error(
+      "Calendar conflicts exist. Acknowledge the conflict override before force-booking."
+    )
+  }
+
+  const { data: paymentRows, error: paymentsError } = await supabase
+    .from("rental_payments")
+    .select("payment_type, status")
+    .eq("venue_rental_id", input.venueRentalId)
+    .eq("organization_id", organizationId)
+
+  if (paymentsError) {
+    throw new Error("Failed to load rental payments.")
+  }
+
+  const paidStatuses = new Set<string>([
+    RENTAL_PAYMENT_STATUSES.paidManually,
+    RENTAL_PAYMENT_STATUSES.paidStripeLater,
+  ])
+
+  const depositPaid = (paymentRows || []).some(
+    (payment) =>
+      payment.payment_type === RENTAL_PAYMENT_TYPES.deposit &&
+      paidStatuses.has(payment.status as string)
+  )
+  const securityDepositPaid = (paymentRows || []).some(
+    (payment) =>
+      payment.payment_type === RENTAL_PAYMENT_TYPES.securityDeposit &&
+      paidStatuses.has(payment.status as string)
+  )
+  const remainingPaid = (paymentRows || []).some(
+    (payment) =>
+      payment.payment_type === RENTAL_PAYMENT_TYPES.remainingBalance &&
+      paidStatuses.has(payment.status as string)
+  )
+  const remainingBalanceDue = (paymentRows || []).some(
+    (payment) => payment.payment_type === RENTAL_PAYMENT_TYPES.remainingBalance
+  )
+
+  const outstandingPayments = summarizeOutstandingRentalPayments({
+    depositPaid,
+    securityDepositPaid,
+    remainingBalanceDue,
+    remainingPaid,
+  })
+
+  if (
+    outstandingPayments.requiresPaymentAcknowledgement &&
+    !input.acknowledgeOutstandingPayments
+  ) {
+    throw new Error(
+      "Outstanding payments remain. Acknowledge the payment bypass before force-booking."
+    )
+  }
+
+  const { error: rentalUpdateError } = await supabase
+    .from("venue_rentals")
+    .update({
+      status: VENUE_RENTAL_STATUSES.confirmed,
+      hold_expires_at: null,
+    })
+    .eq("id", input.venueRentalId)
+    .eq("organization_id", organizationId)
+    .in("status", VENUE_RENTAL_FORCE_BOOK_STATUSES)
+
+  if (rentalUpdateError) {
+    throw new Error(rentalUpdateError.message || "Failed to force-book rental.")
+  }
+
+  const { error: reservationUpdateError } = await supabase
     .from("rental_reservations")
     .update({
       status: RENTAL_RESERVATION_STATUSES.confirmed,
@@ -1103,12 +1215,26 @@ export async function forceBookVenueRentalWithOverride(input: {
     .eq("venue_rental_id", input.venueRentalId)
     .eq("organization_id", organizationId)
 
+  if (reservationUpdateError) {
+    throw new Error(
+      reservationUpdateError.message || "Failed to confirm rental reservations."
+    )
+  }
+
   await logOverride({
     organizationId,
     venueRentalId: input.venueRentalId,
     action: "force_book",
     reason,
     staffUserId: user.id,
+    metadata: {
+      previous_status: previousStatus,
+      next_status: VENUE_RENTAL_STATUSES.confirmed,
+      has_conflict: hasConflict,
+      acknowledge_conflict: Boolean(input.acknowledgeConflict),
+      outstanding_payments: outstandingPayments.outstandingLabels,
+      acknowledge_outstanding_payments: Boolean(input.acknowledgeOutstandingPayments),
+    },
   })
 
   revalidateVenueRentalPaths()

@@ -1,0 +1,84 @@
+{
+  "validatedAt": "2026-06-16T02:31:39.551Z",
+  "rentalId": "49ce1da2-fd1e-4f4c-9cfc-62c33e07eb9d",
+  "organizationId": "e057e00a-e4e3-4adf-9af5-f465db1894be",
+  "rental": {
+    "id": "49ce1da2-fd1e-4f4c-9cfc-62c33e07eb9d",
+    "status": "cancelled_before_payment",
+    "notes": "[Cancelled 2026-06-16T02:30:27.633Z] Customer cancelled the reservation\n\n[Staff note 2026-06-16T02:31:39.126Z] Experimental hold cleanup before enabling hold expiry automation.",
+    "hold_expires_at": null,
+    "organization_id": "e057e00a-e4e3-4adf-9af5-f465db1894be"
+  },
+  "reservations": [
+    {
+      "id": "ac1e0a98-4f8e-49ba-8de2-1f6544d8bcd4",
+      "status": "cancelled",
+      "hold_expires_at": null,
+      "organization_id": "e057e00a-e4e3-4adf-9af5-f465db1894be",
+      "venue_rental_id": "49ce1da2-fd1e-4f4c-9cfc-62c33e07eb9d"
+    }
+  ],
+  "resourceReservationsRemaining": [],
+  "cancelLogs": [
+    {
+      "id": "9e9d59ad-d261-4e35-955a-c2f5d7dc4c43",
+      "action": "cancel_rental",
+      "reason": "Customer cancelled the reservation",
+      "metadata": {
+        "next_status": "cancelled_before_payment",
+        "after_payment": false,
+        "previous_status": "approved_pending_payment"
+      },
+      "created_at": "2026-06-16T02:30:27.938425+00:00",
+      "staff_user_id": "6737aecf-575a-429d-b542-ed18167d9537"
+    }
+  ],
+  "dryRunEligibleCount": 0,
+  "checks": [
+    {
+      "id": "rental-cancelled-status",
+      "pass": true,
+      "detail": "status=cancelled_before_payment"
+    },
+    {
+      "id": "rental-before-payment-appropriate",
+      "pass": true,
+      "detail": "approved_pending_payment with no paid deposits -> cancelled_before_payment"
+    },
+    {
+      "id": "rental-hold-cleared",
+      "pass": true,
+      "detail": "hold_expires_at null"
+    },
+    {
+      "id": "notes-appended-not-overwritten",
+      "pass": true,
+      "detail": "notes length 176"
+    },
+    {
+      "id": "reservations-cancelled",
+      "pass": true,
+      "detail": "ac1e0a98-4f8e-49ba-8de2-1f6544d8bcd4:cancelled"
+    },
+    {
+      "id": "calendar-blocks-released",
+      "pass": true,
+      "detail": "no resource_reservations for rental reservation source ids"
+    },
+    {
+      "id": "audit-log-cancel-entry",
+      "pass": false,
+      "detail": "found 1 cancel_rental log(s), none with exact reason"
+    },
+    {
+      "id": "hold-expiry-dry-run-eligible-count",
+      "pass": true,
+      "detail": "0 eligible hold(s) remaining"
+    }
+  ],
+  "summary": {
+    "passed": 7,
+    "total": 8,
+    "allPassed": false
+  }
+}

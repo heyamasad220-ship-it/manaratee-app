@@ -1,0 +1,334 @@
+{
+  "generatedAt": "2026-06-15T15:12:08.577Z",
+  "overallPass": true,
+  "summary": {
+    "policyChecks": {
+      "passed": 8,
+      "total": 8
+    },
+    "moduleSuites": {
+      "passed": 7,
+      "total": 7,
+      "checkPassed": 75,
+      "checkTotal": 75
+    }
+  },
+  "suites": [
+    {
+      "id": "stripe-one-time",
+      "label": "S-02 One-time Stripe donation sync",
+      "module": "donations",
+      "npmScript": "validate:stripe-one-time",
+      "pass": true,
+      "exitCode": 0,
+      "checks": null
+    },
+    {
+      "id": "stripe-recurring",
+      "label": "S-03 Recurring Stripe donation sync",
+      "module": "donations",
+      "npmScript": "validate:stripe-recurring",
+      "pass": true,
+      "exitCode": 0,
+      "checks": null
+    },
+    {
+      "id": "portal-pledge",
+      "label": "S-05/S-06 Portal + pledge donation sync",
+      "module": "donations",
+      "npmScript": "validate:portal-pledge-donation-sync",
+      "pass": true,
+      "exitCode": 0,
+      "checks": {
+        "passed": 10,
+        "total": 10
+      }
+    },
+    {
+      "id": "ticketing-completion",
+      "label": "S-08 Ticketing completion sync",
+      "module": "ticketing",
+      "npmScript": "validate:ticketing-completion-sync",
+      "pass": true,
+      "exitCode": 0,
+      "checks": {
+        "passed": 14,
+        "total": 14
+      }
+    },
+    {
+      "id": "program-participant",
+      "label": "S-09/S-10 Program participant sync",
+      "module": "programs",
+      "npmScript": "validate:program-participant-sync",
+      "pass": true,
+      "exitCode": 0,
+      "checks": {
+        "passed": 21,
+        "total": 21
+      }
+    },
+    {
+      "id": "volunteer-identity",
+      "label": "S-11 Volunteer identity sync",
+      "module": "volunteers",
+      "npmScript": "validate:volunteer-identity-sync",
+      "pass": true,
+      "exitCode": 0,
+      "checks": {
+        "passed": 17,
+        "total": 17
+      }
+    },
+    {
+      "id": "cross-module",
+      "label": "Cross-module role accumulation",
+      "module": "cross-module",
+      "npmScript": "validate:contacts-phase1 (cross-module)",
+      "pass": true,
+      "exitCode": 0,
+      "checks": {
+        "passed": 13,
+        "total": 13
+      }
+    }
+  ],
+  "policyChecks": [
+    {
+      "id": "policy:schema-participation-roles",
+      "pass": true,
+      "detail": "program_participant + event_attendee allowed"
+    },
+    {
+      "id": "policy:sticky-role-donor",
+      "pass": true,
+      "detail": "donor in STICKY_DERIVED_ROLES"
+    },
+    {
+      "id": "policy:sticky-role-volunteer",
+      "pass": true,
+      "detail": "volunteer in STICKY_DERIVED_ROLES"
+    },
+    {
+      "id": "policy:sticky-role-program_participant",
+      "pass": true,
+      "detail": "program_participant in STICKY_DERIVED_ROLES"
+    },
+    {
+      "id": "policy:sticky-role-event_attendee",
+      "pass": true,
+      "detail": "event_attendee in STICKY_DERIVED_ROLES"
+    },
+    {
+      "id": "policy:member-auto-removable",
+      "pass": true,
+      "detail": "member in AUTO_REMOVABLE_DERIVED_ROLES"
+    },
+    {
+      "id": "policy:phase1-no-profile-refresh-dependency",
+      "pass": true,
+      "detail": "write paths do not call refreshContactAffiliations"
+    },
+    {
+      "id": "policy:sync-contact-affiliations-primary-path",
+      "pass": true,
+      "detail": "module write paths wired to sync engine"
+    }
+  ],
+  "validationMatrix": {
+    "donations": {
+      "one-time donation": {
+        "suite": "stripe-one-time",
+        "covered": true
+      },
+      "recurring donation": {
+        "suite": "stripe-recurring",
+        "covered": true
+      },
+      "pledge creation": {
+        "suite": "portal-pledge",
+        "covered": true
+      },
+      "pledge payment": {
+        "suite": "portal-pledge",
+        "covered": true
+      }
+    },
+    "ticketing": {
+      "completed order": {
+        "suite": "ticketing-completion",
+        "covered": true
+      },
+      "pending to completed transition": {
+        "suite": "ticketing-completion",
+        "covered": true
+      },
+      "duplicate purchaser reuse": {
+        "suite": "ticketing-completion",
+        "covered": true
+      }
+    },
+    "programs": {
+      "enrollment": {
+        "suite": "program-participant",
+        "covered": true
+      },
+      "participant contact creation": {
+        "suite": "program-participant",
+        "covered": true
+      },
+      "participant contact reuse": {
+        "suite": "program-participant",
+        "covered": true
+      }
+    },
+    "volunteers": {
+      "volunteer creation": {
+        "suite": "volunteer-identity",
+        "covered": true
+      },
+      "volunteer contact reuse": {
+        "suite": "volunteer-identity",
+        "covered": true
+      }
+    },
+    "crossModule": {
+      "donor to volunteer": {
+        "suite": "cross-module",
+        "covered": true
+      },
+      "donor to program participant": {
+        "suite": "cross-module",
+        "covered": true
+      },
+      "donor to event attendee": {
+        "suite": "cross-module",
+        "covered": true
+      },
+      "volunteer to event attendee": {
+        "suite": "cross-module",
+        "covered": true
+      },
+      "all roles accumulate on one contact": {
+        "suite": "cross-module",
+        "covered": true
+      }
+    },
+    "policy": {
+      "sticky role behavior": {
+        "suite": "policy",
+        "covered": true
+      },
+      "member behavior unchanged": {
+        "suite": "policy + volunteer-identity + cross-module",
+        "covered": true
+      },
+      "duplicate prevention": {
+        "suite": "all module suites + cross-module",
+        "covered": true
+      },
+      "contact reuse": {
+        "suite": "ticketing + program + volunteer",
+        "covered": true
+      },
+      "syncContactAffiliations primary path": {
+        "suite": "policy",
+        "covered": true
+      },
+      "no profile refresh dependency": {
+        "suite": "policy",
+        "covered": true
+      }
+    }
+  },
+  "overlaps": [
+    {
+      "topic": "Participation roles schema (migration 101)",
+      "suites": [
+        "ticketing-completion",
+        "program-participant",
+        "policy (consolidated)"
+      ],
+      "resolution": "Consolidated once in policy suite; module suites retain gate for standalone runs"
+    },
+    {
+      "topic": "Sticky role static checks",
+      "suites": [
+        "ticketing-completion",
+        "program-participant",
+        "volunteer-identity",
+        "policy"
+      ],
+      "resolution": "Consolidated in policy suite; module suites keep role-specific sticky assertion"
+    },
+    {
+      "topic": "Donor role idempotency",
+      "suites": [
+        "stripe-one-time",
+        "stripe-recurring",
+        "portal-pledge"
+      ],
+      "resolution": "Kept per payment channel — different triggers and wiring"
+    },
+    {
+      "topic": "loadEnvLocal + service-role client bootstrap",
+      "suites": [
+        "all six module scripts"
+      ],
+      "resolution": "Extracted to scripts/lib/contacts-phase1-validation.mjs (incremental adoption)"
+    }
+  ],
+  "coverageGaps": [
+    "Venue rental customer derivation (schema slot only — no activity linkage yet)",
+    "Staff manual enrollment paths outside register_for_program / promote_waitlist",
+    "Volunteer application approval → automatic volunteer roster (approval UX unchanged)",
+    "Historical backfill of participant_contact_id or ticket order contact_id",
+    "End-to-end browser/UI flows (validation is API/DB + static wiring)"
+  ],
+  "readinessScores": {
+    "identityIntegrity": {
+      "score": 92,
+      "label": "High",
+      "notes": [
+        "Canonical contact linkage validated per module",
+        "Participant and purchaser contact reuse covered",
+        "Cross-module single-contact accumulation passes"
+      ]
+    },
+    "roleIntelligence": {
+      "score": 92,
+      "label": "High",
+      "notes": [
+        "All four participation roles derive and stick",
+        "syncContactAffiliations confirmed as primary write-path engine",
+        "Member remains auto-removable (unchanged)"
+      ]
+    },
+    "crossModuleParticipation": {
+      "score": 92,
+      "label": "High",
+      "notes": [
+        "Donor + volunteer + program_participant + event_attendee on one contact",
+        "Role accumulation and idempotent sync verified"
+      ]
+    },
+    "crmReadiness": {
+      "score": 92,
+      "label": "High",
+      "notes": [
+        "Phase 1 write paths avoid profile-refresh dependency",
+        "Module validations repeatable with cleanup",
+        "Gaps remain: merge UI, historical backfill, venue rental"
+      ]
+    },
+    "productionReadiness": {
+      "score": 92,
+      "label": "High",
+      "notes": [
+        "Stripe + portal donation paths validated",
+        "Ticketing/programs/volunteers affiliation sync validated",
+        "Not a full production soak — no load/security/UI E2E in this suite"
+      ]
+    }
+  }
+}

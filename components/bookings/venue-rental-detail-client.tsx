@@ -9,6 +9,7 @@ import {
   Ban,
   CheckCircle2,
   Clock,
+  ShieldAlert,
   XCircle,
 } from "lucide-react"
 
@@ -18,15 +19,18 @@ import {
   cancelVenueRental,
   declineVenueRentalRequest,
   extendVenueRentalHold,
+  forceBookVenueRentalWithOverride,
   markRentalPaymentPaid,
   markVenueRentalCompletedAndAwaitingRefund,
 } from "@/lib/bookings/venue-rental-actions"
 import { formatVenueRentalTimeRange } from "@/lib/bookings/venue-rental-format"
 import {
   canStaffCancelVenueRental,
+  canStaffForceBookVenueRental,
   getVenueRentalCalendarColorClasses,
   getVenueRentalStatusLabel,
   shouldCancelVenueRentalAfterPayment,
+  summarizeOutstandingRentalPayments,
 } from "@/lib/bookings/venue-rental-status"
 import type {
   RentalPaymentRecord,
@@ -89,6 +93,8 @@ export function VenueRentalDetailClient({
   const [refundReason, setRefundReason] = useState("")
   const [cancelReason, setCancelReason] = useState("")
   const [showCancelDialog, setShowCancelDialog] = useState(false)
+  const [forceBookReason, setForceBookReason] = useState("")
+  const [showForceBookDialog, setShowForceBookDialog] = useState(false)
 
   const statusClasses = getVenueRentalCalendarColorClasses(rental.calendarColor)
 
@@ -126,6 +132,24 @@ export function VenueRentalDetailClient({
   )
 
   const canCancelRental = canManage && canStaffCancelVenueRental(rental.status)
+  const canForceBookRental =
+    canManage && canViewFinance && canStaffForceBookVenueRental(rental.status)
+
+  const outstandingPayments = useMemo(() => {
+    const remaining = payments.find(
+      (payment) => payment.payment_type === RENTAL_PAYMENT_TYPES.remainingBalance
+    )
+    const remainingPaid =
+      remaining?.status === RENTAL_PAYMENT_STATUSES.paidManually ||
+      remaining?.status === RENTAL_PAYMENT_STATUSES.paidStripeLater
+
+    return summarizeOutstandingRentalPayments({
+      depositPaid: paymentSummary.depositPaid,
+      securityDepositPaid: paymentSummary.securityPaid,
+      remainingBalanceDue: Boolean(remaining),
+      remainingPaid,
+    })
+  }, [paymentSummary.depositPaid, paymentSummary.securityPaid, payments])
 
   async function submitCancellation() {
     await cancelVenueRental({
@@ -135,6 +159,17 @@ export function VenueRentalDetailClient({
     })
     setShowCancelDialog(false)
     setCancelReason("")
+  }
+
+  async function submitForceBook() {
+    await forceBookVenueRentalWithOverride({
+      venueRentalId: rental.id,
+      reason: forceBookReason,
+      acknowledgeConflict: rental.hasConflict,
+      acknowledgeOutstandingPayments: outstandingPayments.requiresPaymentAcknowledgement,
+    })
+    setShowForceBookDialog(false)
+    setForceBookReason("")
   }
 
   function runAction(action: () => Promise<void>) {
@@ -463,6 +498,66 @@ export function VenueRentalDetailClient({
         </Card>
       ) : null}
 
+      {canForceBookRental ? (
+        <Card className="border-amber-300 bg-amber-50/40">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base text-amber-950">
+              <ShieldAlert className="h-4 w-4" />
+              Force-book override (exception only)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3 max-w-2xl">
+            <p className="text-sm text-amber-950">
+              Force-book confirms this rental without completing the normal approval and
+              payment workflow. Use only for operational exceptions. Payments are not marked
+              paid automatically — record them separately if money has been collected.
+            </p>
+            {rental.hasConflict ? (
+              <div className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
+                <p className="font-medium">Calendar conflict detected</p>
+                <p className="mt-1">
+                  Another reservation overlaps one or more spaces on this rental. Force-booking
+                  will confirm this rental anyway and may double-book the calendar.
+                </p>
+              </div>
+            ) : null}
+            {outstandingPayments.outstandingLabels.length ? (
+              <div className="rounded-md border border-amber-300 bg-white px-3 py-2 text-sm text-amber-950">
+                <p className="font-medium">Outstanding payments</p>
+                <ul className="mt-1 list-disc pl-5">
+                  {outstandingPayments.outstandingLabels.map((label) => (
+                    <li key={label}>{label}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Required deposits appear paid or not yet configured. Force-book still bypasses
+                the standard confirmation path.
+              </p>
+            )}
+            <div className="grid gap-2">
+              <Label htmlFor="force-book-reason">Override reason</Label>
+              <Textarea
+                id="force-book-reason"
+                placeholder="Document why this exception is authorized"
+                value={forceBookReason}
+                onChange={(e) => setForceBookReason(e.target.value)}
+              />
+            </div>
+            <Button
+              variant="outline"
+              className="border-amber-500 text-amber-950 hover:bg-amber-100"
+              disabled={isPending || !forceBookReason.trim()}
+              onClick={() => setShowForceBookDialog(true)}
+            >
+              <ShieldAlert className="mr-2 h-4 w-4" />
+              Review force-book override
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
+
       {canCancelRental ? (
         <Card className="border-red-200">
           <CardHeader>
@@ -529,6 +624,59 @@ export function VenueRentalDetailClient({
               }}
             >
               Cancel rental
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showForceBookDialog} onOpenChange={setShowForceBookDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm force-book override?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm text-muted-foreground">
+                <p>
+                  This is an administrative exception. The rental will move directly to{" "}
+                  <strong>Confirmed</strong> without running the normal payment confirmation
+                  checks.
+                </p>
+                {rental.hasConflict ? (
+                  <p className="text-red-700">
+                    Calendar conflicts exist. You are authorizing a potential double-booking.
+                  </p>
+                ) : null}
+                {outstandingPayments.outstandingLabels.length ? (
+                  <div>
+                    <p className="font-medium text-foreground">Payments still outstanding:</p>
+                    <ul className="mt-1 list-disc pl-5">
+                      {outstandingPayments.outstandingLabels.map((label) => (
+                        <li key={label}>{label}</li>
+                      ))}
+                    </ul>
+                    <p className="mt-2">
+                      Force-book does not mark these paid. Collect payment manually and update
+                      the payment ledger separately.
+                    </p>
+                  </div>
+                ) : null}
+                <p>
+                  Reason recorded in the audit log:{" "}
+                  <span className="text-foreground">{forceBookReason.trim()}</span>
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isPending}>Keep current workflow</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isPending || !forceBookReason.trim()}
+              className="bg-amber-600 text-white hover:bg-amber-700"
+              onClick={(event) => {
+                event.preventDefault()
+                runAction(submitForceBook)
+              }}
+            >
+              Force-book rental
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
