@@ -81,6 +81,7 @@ import {
   User,
   Loader2,
   MoreHorizontal,
+  Pencil,
   Trash2,
   Filter,
 } from "lucide-react"
@@ -832,7 +833,9 @@ export function ContactsListView({
                 filteredContacts.map((contact) => (
                   <TableRow
                     key={contact.id}
-                    onClick={() => router.push(`/contacts/${contact.id}`)}
+                    onClick={() =>
+                      router.push(contactProfileHref(contact.id, { edit: true }))
+                    }
                     className="cursor-pointer hover:bg-muted/50"
                   >
                     <TableCell>
@@ -905,9 +908,9 @@ export function ContactsListView({
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem asChild>
-                            <Link href={contactProfileHref(contact.id)}>
-                              <User className="mr-2 h-4 w-4" />
-                              View profile
+                            <Link href={contactProfileHref(contact.id, { edit: true })}>
+                              <Pencil className="mr-2 h-4 w-4" />
+                              View & edit profile
                             </Link>
                           </DropdownMenuItem>
                           <DropdownMenuItem

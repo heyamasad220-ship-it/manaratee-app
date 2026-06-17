@@ -6,6 +6,7 @@ import { readFileSync, existsSync } from "node:fs"
 import { resolve, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 import { createClient } from "@supabase/supabase-js"
+import { applyDonorAffiliationMirror } from "./lib/contacts-phase1-validation.mjs"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const root = resolve(__dirname, "..")
@@ -72,10 +73,12 @@ record(
   "processPayment calls affiliation sync"
 )
 record(
-  "portal-pledge-creation-sync-wired",
-  portalSource.includes("portal pledge creation") &&
-    portalSource.includes("syncDonorAffiliationAfterDonation"),
-  "createPledge calls affiliation sync"
+  "portal-pledge-creation-no-affiliation-sync",
+  portalSource.includes("createPledge") &&
+    !/createPledge[\s\S]*syncDonorAffiliationAfterDonation[\s\S]*portal pledge creation/.test(
+      portalSource
+    ),
+  "createPledge does not sync donor affiliation on pledge-only save"
 )
 record(
   "portal-sync-failure-non-throwing",
@@ -86,11 +89,10 @@ record(
   "portal sync wrapped with error logging"
 )
 record(
-  "staff-pledge-creation-sync-wired",
-  pledgesSource.includes("pledge creation") &&
-    pledgesSource.includes("handleDonationAffiliationSync") &&
-    /handleAddPledge[\s\S]*handleDonationAffiliationSync/.test(pledgesSource),
-  "handleAddPledge calls affiliation sync"
+  "staff-pledge-creation-no-affiliation-sync",
+  pledgesSource.includes("handleAddPledge") &&
+    !/handleAddPledge[\s\S]*handleDonationAffiliationSync/.test(pledgesSource),
+  "handleAddPledge does not sync donor affiliation on pledge-only save"
 )
 record(
   "staff-pledge-payment-sync-wired",
@@ -112,25 +114,8 @@ async function hasDonorRole(organizationId, contactId) {
   return { ok: true, hasRole: (data || []).length > 0 }
 }
 
-async function applyDonorAffiliationMirror(organizationId, contactId) {
-  const { count: donorCount } = await sb
-    .from("donors")
-    .select("id", { count: "exact", head: true })
-    .eq("organization_id", organizationId)
-    .eq("contact_id", contactId)
-
-  if ((donorCount ?? 0) === 0) return
-
-  const { error } = await sb.from("contact_roles").insert({
-    organization_id: organizationId,
-    contact_id: contactId,
-    role: "donor",
-    is_manual: false,
-  })
-
-  if (error && error.code !== "23505") {
-    throw new Error(error.message)
-  }
+async function applyDonorAffiliationMirrorForOrg(organizationId, contactId) {
+  await applyDonorAffiliationMirror(sb, organizationId, contactId)
 }
 
 let { data: donor } = await sb
@@ -182,7 +167,7 @@ record(
 
 if (pledge?.id) {
   try {
-    await applyDonorAffiliationMirror(orgId, contactId)
+    await applyDonorAffiliationMirrorForOrg(orgId, contactId)
   } catch (error) {
     record("pledge-creation-donor-role", false, error.message)
   }
@@ -190,8 +175,9 @@ if (pledge?.id) {
   const roleAfterPledge = await hasDonorRole(orgId, contactId)
   record(
     "pledge-creation-donor-role",
-    roleAfterPledge.ok && roleAfterPledge.hasRole,
-    roleAfterPledge.error || (roleAfterPledge.hasRole ? "donor role present" : "missing")
+    roleAfterPledge.ok && !roleAfterPledge.hasRole,
+    roleAfterPledge.error ||
+      (roleAfterPledge.hasRole ? "donor role should not be assigned yet" : "no donor role (expected)")
   )
 
   const { data: payment, error: paymentError } = await sb
@@ -218,7 +204,7 @@ if (pledge?.id) {
     paymentError?.message || payment?.id
   )
 
-  await applyDonorAffiliationMirror(orgId, contactId)
+  await applyDonorAffiliationMirrorForOrg(orgId, contactId)
   const roleAfterPayment = await hasDonorRole(orgId, contactId)
   record(
     "pledge-payment-donor-role",

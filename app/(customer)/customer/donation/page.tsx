@@ -710,13 +710,6 @@ export default function CustomerDonationsPage() {
       return
     }
 
-    await syncDonorAffiliationAfterDonation({
-      organizationId: contact.organization_id,
-      contactId: contact.id,
-      donorId,
-      context: "portal pledge creation",
-    })
-
     const { data: pledgeView } = await supabase
       .from("pledge_status_view")
       .select(

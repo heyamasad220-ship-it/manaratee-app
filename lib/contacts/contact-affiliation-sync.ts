@@ -8,6 +8,7 @@ import {
   PROGRAM_PARTICIPANT_TERMINAL_STATUSES,
   type DerivedAffiliationRole,
 } from "@/lib/contacts/contact-affiliation-rules"
+import { loadAffiliationAutoSyncFlags } from "@/lib/contacts/contact-affiliation-settings"
 
 export async function computeDerivedAffiliations(
   organizationId: string,
@@ -36,10 +37,6 @@ export async function computeDerivedAffiliations(
     .eq("contact_id", contactId)
 
   const donorIds = (donorRows || []).map((row) => row.id as string)
-
-  if (donorIds.length > 0) {
-    derived.add("donor")
-  }
 
   const { count: paymentByContactCount } = await supabase
     .from("payments")
@@ -148,6 +145,13 @@ export async function computeDerivedAffiliations(
 
   if ((completedTicketOrderCount ?? 0) > 0) {
     derived.add("event_attendee")
+  }
+
+  const autoSyncFlags = await loadAffiliationAutoSyncFlags(organizationId, supabase)
+  for (const role of [...derived]) {
+    if (!autoSyncFlags.get(role)) {
+      derived.delete(role)
+    }
   }
 
   return derived

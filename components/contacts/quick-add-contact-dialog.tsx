@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { addContactWithRoles } from "@/lib/contacts/contact-actions"
+import type { ContactRecordType } from "@/lib/contacts/contact-constants"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -13,12 +14,20 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 export type QuickAddContactResult = {
   contactId: string
   full_name: string | null
   email: string | null
   phone: string | null
+  contact_type: ContactRecordType
 }
 
 export type QuickAddContactDialogProps = {
@@ -47,6 +56,21 @@ export function parseContactSearchDefaults(search: string) {
   return { name: trimmed, email: "", phone: "" }
 }
 
+function guessContactTypeFromName(name: string): ContactRecordType {
+  const trimmed = name.trim()
+  if (!trimmed) return "individual"
+
+  if (
+    /\b(LLC|L\.L\.C\.|Inc\.?|Corp\.?|Corporation|Company|Co\.|Foundation|Trust|Association)\b/i.test(
+      trimmed
+    )
+  ) {
+    return "organization"
+  }
+
+  return "individual"
+}
+
 export function QuickAddContactDialog({
   open,
   onOpenChange,
@@ -56,6 +80,8 @@ export function QuickAddContactDialog({
   const [contactName, setContactName] = useState("")
   const [contactEmail, setContactEmail] = useState("")
   const [contactPhone, setContactPhone] = useState("")
+  const [contactType, setContactType] = useState<ContactRecordType>("individual")
+  const [primaryContactName, setPrimaryContactName] = useState("")
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -65,6 +91,8 @@ export function QuickAddContactDialog({
     setContactName(defaults.name)
     setContactEmail(defaults.email)
     setContactPhone(defaults.phone)
+    setContactType(guessContactTypeFromName(defaults.name))
+    setPrimaryContactName("")
   }, [open, searchHint])
 
   async function handleSave() {
@@ -82,7 +110,9 @@ export function QuickAddContactDialog({
         fullName: cleanName,
         email: contactEmail.trim() || undefined,
         phone: contactPhone.trim() || undefined,
-        contactType: "individual",
+        contactType,
+        primaryContactName:
+          contactType === "organization" ? primaryContactName.trim() || undefined : undefined,
         roles: [],
       })
 
@@ -91,6 +121,7 @@ export function QuickAddContactDialog({
         full_name: cleanName,
         email: contactEmail.trim() || null,
         phone: contactPhone.trim() || null,
+        contact_type: contactType,
       })
       onOpenChange(false)
     } catch (error) {
@@ -101,27 +132,59 @@ export function QuickAddContactDialog({
     }
   }
 
+  const isOrganization = contactType === "organization"
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Add Contact</DialogTitle>
           <DialogDescription>
-            Create a contact to use for this pledge. Affiliations such as donor sync automatically
-            when the pledge is saved.
+            Create a person or organization for this pledge. The Donor affiliation is added after
+            the first payment, not when the pledge is saved.
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col gap-4 py-4">
           <div className="flex flex-col gap-2">
-            <Label htmlFor="quick-add-name">Full Name</Label>
+            <Label htmlFor="quick-add-type">Record type</Label>
+            <Select
+              value={contactType}
+              onValueChange={(value) => setContactType(value as ContactRecordType)}
+            >
+              <SelectTrigger id="quick-add-type">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="individual">Person</SelectItem>
+                <SelectItem value="organization">Organization</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="quick-add-name">
+              {isOrganization ? "Organization name" : "Full name"}
+            </Label>
             <Input
               id="quick-add-name"
-              placeholder="Enter full name"
+              placeholder={isOrganization ? "Enter organization name" : "Enter full name"}
               value={contactName}
               onChange={(event) => setContactName(event.target.value)}
             />
           </div>
+
+          {isOrganization ? (
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="quick-add-primary-contact">Primary contact name</Label>
+              <Input
+                id="quick-add-primary-contact"
+                placeholder="Person we reach at this organization"
+                value={primaryContactName}
+                onChange={(event) => setPrimaryContactName(event.target.value)}
+              />
+            </div>
+          ) : null}
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-2">

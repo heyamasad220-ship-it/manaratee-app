@@ -34,6 +34,7 @@ import type { ProgramStaffAssignmentWithDetails } from "@/lib/programs/program-s
 import { canHaveProgramStaffAssignments } from "@/lib/hr/staff-role-utils"
 import type { StaffSummaryForContact } from "@/lib/hr/staff-summary"
 import { getContactProfileModuleFlags } from "@/lib/contacts/contact-profile-module-access"
+import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
 import {
   ArrowLeft,
   Briefcase,
@@ -43,6 +44,7 @@ import {
   History,
   Loader2,
   Mail,
+  Pencil,
   Phone,
   Store,
   User,
@@ -113,6 +115,7 @@ export function ContactProfileClient({
   const router = useRouter()
   const searchParams = useSearchParams()
   const tabParam = searchParams.get("tab")
+  const isEditMode = searchParams.get("edit") === "1"
 
   const modules = useMemo(
     () => getContactProfileModuleFlags(enabledModuleSlugs),
@@ -200,10 +203,33 @@ export function ContactProfileClient({
     setActiveTab(normalizeTab(tabParam, availableTabs))
   }, [tabParam, availableTabs])
 
+  useEffect(() => {
+    if (isEditMode && activeTab !== "overview") {
+      setActiveTab("overview")
+    }
+  }, [isEditMode, activeTab])
+
+  function setContactEditMode(edit: boolean) {
+    const tab = normalizeTab(tabParam, availableTabs)
+    router.replace(
+      contactProfileHref(contact.id, {
+        tab: tab === "overview" ? undefined : tab,
+        edit,
+      }),
+      { scroll: false }
+    )
+  }
+
   function handleTabChange(value: string) {
     const tab = normalizeTab(value, availableTabs)
     setActiveTab(tab)
-    router.replace(`/contacts/${contact.id}?tab=${tab}`, { scroll: false })
+    router.replace(
+      contactProfileHref(contact.id, {
+        tab: tab === "overview" ? undefined : tab,
+        edit: false,
+      }),
+      { scroll: false }
+    )
   }
 
   return (
@@ -246,22 +272,35 @@ export function ContactProfileClient({
         </TabsList>
 
         <TabsContent value="overview" className="mt-0 space-y-6">
-          <div className="flex items-center gap-2">
-            {isOrganization ? (
-              <Building2 className="h-6 w-6 text-muted-foreground" />
-            ) : (
-              <User className="h-6 w-6 text-muted-foreground" />
-            )}
-            <div>
-              <h1 className="text-2xl font-bold">{contact.full_name || "Unnamed Contact"}</h1>
-              <p className="text-sm text-muted-foreground capitalize">
-                {formatText(contact.contact_type)}
-              </p>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex items-center gap-2">
+              {isOrganization ? (
+                <Building2 className="h-6 w-6 text-muted-foreground" />
+              ) : (
+                <User className="h-6 w-6 text-muted-foreground" />
+              )}
+              <div>
+                <h1 className="text-2xl font-bold">{contact.full_name || "Unnamed Contact"}</h1>
+                <p className="text-sm text-muted-foreground capitalize">
+                  {formatText(contact.contact_type)}
+                </p>
+              </div>
             </div>
+            {!isEditMode ? (
+              <Button variant="outline" size="sm" onClick={() => setContactEditMode(true)}>
+                <Pencil className="mr-2 h-4 w-4" />
+                Edit contact
+              </Button>
+            ) : null}
           </div>
 
           <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
-            <ContactBasicsPanel contact={contact} onSaved={onContactUpdated} />
+            <ContactBasicsPanel
+              contact={contact}
+              defaultEditing={isEditMode}
+              onEditingChange={setContactEditMode}
+              onSaved={onContactUpdated}
+            />
 
             <div className="flex flex-col gap-6">
               <ContactRolesCard

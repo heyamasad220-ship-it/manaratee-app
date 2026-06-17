@@ -227,23 +227,47 @@ export async function upsertDerivedRoleMirror(sb, organizationId, contactId, rol
   }
 }
 
-/** Mirrors computeDerivedAffiliations donor derivation. */
+/** Mirrors computeDerivedAffiliations donor derivation (payment required). */
 export async function applyDonorAffiliationMirror(sb, organizationId, contactId) {
-  const { count: donorCount } = await sb
-    .from("donors")
-    .select("id", { count: "exact", head: true })
-    .eq("organization_id", organizationId)
-    .eq("contact_id", contactId)
-
-  const { count: paymentCount } = await sb
+  const { count: paymentByContactCount, error: paymentByContactError } = await sb
     .from("payments")
     .select("id", { count: "exact", head: true })
     .eq("organization_id", organizationId)
     .eq("contact_id", contactId)
 
-  if ((donorCount ?? 0) === 0 && (paymentCount ?? 0) === 0) {
+  if (paymentByContactError) {
+    throw new Error(paymentByContactError.message || "Could not count payments by contact")
+  }
+
+  if ((paymentByContactCount ?? 0) > 0) {
+    await upsertDerivedRoleMirror(sb, organizationId, contactId, "donor")
     return
   }
+
+  const { data: donorRows, error: donorError } = await sb
+    .from("donors")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("contact_id", contactId)
+
+  if (donorError) {
+    throw new Error(donorError.message || "Could not load donor extension")
+  }
+
+  const donorIds = (donorRows || []).map((row) => row.id)
+  if (donorIds.length === 0) return
+
+  const { count: paymentByDonorCount, error: paymentByDonorError } = await sb
+    .from("payments")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", organizationId)
+    .in("donor_id", donorIds)
+
+  if (paymentByDonorError) {
+    throw new Error(paymentByDonorError.message || "Could not count payments by donor")
+  }
+
+  if ((paymentByDonorCount ?? 0) === 0) return
 
   await upsertDerivedRoleMirror(sb, organizationId, contactId, "donor")
 }

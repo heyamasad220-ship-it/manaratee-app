@@ -47,17 +47,60 @@ export type AffiliationRuleDefinition = {
   autoAdd: string
   autoRemove: string
   moduleList: string
+  /** Product module slugs required for this affiliation (any match enables by default). */
+  moduleSlugs: readonly string[]
 }
 
-/** Documented policies — configured per product decisions (Contacts → Settings). */
+/** Module slugs that gate each derived affiliation when no org override exists. */
+export const AFFILIATION_ROLE_MODULE_SLUGS: Record<
+  DerivedAffiliationRole,
+  readonly string[]
+> = {
+  donor: ["donations"],
+  vendor: ["vendor-hub", "bazaar"],
+  childcare_provider: ["workforce", "child-care", "applications", "hr"],
+  volunteer: ["workforce", "hr"],
+  employee: ["workforce", "hr"],
+  member: ["membership"],
+  program_participant: ["programs"],
+  event_attendee: ["event-management", "ticketing"],
+}
+
+function normalizeAffiliationModuleSlug(slug: string): string {
+  if (slug === "bazaar") return "vendor-hub"
+  if (slug === "hr") return "workforce"
+  return slug
+}
+
+export function isAffiliationModuleAvailable(
+  role: DerivedAffiliationRole,
+  enabledSlugs: Set<string>
+): boolean {
+  const normalizedEnabled = new Set(
+    Array.from(enabledSlugs, (slug) => normalizeAffiliationModuleSlug(slug))
+  )
+  return AFFILIATION_ROLE_MODULE_SLUGS[role].some((slug) =>
+    normalizedEnabled.has(normalizeAffiliationModuleSlug(slug))
+  )
+}
+
+export function defaultAffiliationAutoSyncEnabled(
+  role: DerivedAffiliationRole,
+  enabledSlugs: Set<string>
+): boolean {
+  return isAffiliationModuleAvailable(role, enabledSlugs)
+}
+
+/** Documented policies — defaults follow subscribed modules; staff override in Contacts → Settings. */
 export const AFFILIATION_RULE_DEFINITIONS: AffiliationRuleDefinition[] = [
   {
     role: "donor",
     label: "Donor",
-    trigger: "Any linked donation payment or donor record",
-    autoAdd: "Yes — on first gift",
+    trigger: "Any linked donation payment (pledge alone does not qualify)",
+    autoAdd: "Yes — on first payment",
     autoRemove: "Never — once a donor, always a donor",
     moduleList: "Donations → Donors",
+    moduleSlugs: AFFILIATION_ROLE_MODULE_SLUGS.donor,
   },
   {
     role: "vendor",
@@ -66,6 +109,7 @@ export const AFFILIATION_RULE_DEFINITIONS: AffiliationRuleDefinition[] = [
     autoAdd: "Yes — on approval or first vendor record",
     autoRemove: "Never — once a vendor, always a vendor",
     moduleList: "Vendor Hub → Vendors",
+    moduleSlugs: AFFILIATION_ROLE_MODULE_SLUGS.vendor,
   },
   {
     role: "childcare_provider",
@@ -74,6 +118,7 @@ export const AFFILIATION_RULE_DEFINITIONS: AffiliationRuleDefinition[] = [
     autoAdd: "Yes — when application is approved",
     autoRemove: "Yes — when no approved application remains (unless manually overridden)",
     moduleList: "Workforce → Child Care Providers",
+    moduleSlugs: AFFILIATION_ROLE_MODULE_SLUGS.childcare_provider,
   },
   {
     role: "volunteer",
@@ -82,6 +127,7 @@ export const AFFILIATION_RULE_DEFINITIONS: AffiliationRuleDefinition[] = [
     autoAdd: "Yes — when added to volunteer roster",
     autoRemove: "Never — kept for history",
     moduleList: "Workforce → Volunteers",
+    moduleSlugs: AFFILIATION_ROLE_MODULE_SLUGS.volunteer,
   },
   {
     role: "employee",
@@ -90,6 +136,7 @@ export const AFFILIATION_RULE_DEFINITIONS: AffiliationRuleDefinition[] = [
     autoAdd: "Yes — when staff is active",
     autoRemove: "Yes — when staff is inactive or removed (unless manually overridden)",
     moduleList: "Workforce → Employees",
+    moduleSlugs: AFFILIATION_ROLE_MODULE_SLUGS.employee,
   },
   {
     role: "member",
@@ -98,6 +145,7 @@ export const AFFILIATION_RULE_DEFINITIONS: AffiliationRuleDefinition[] = [
     autoAdd: "Yes — when membership is active",
     autoRemove: "Yes — when membership lapses (unless manually overridden)",
     moduleList: "Membership → Members",
+    moduleSlugs: AFFILIATION_ROLE_MODULE_SLUGS.member,
   },
   {
     role: "program_participant",
@@ -106,6 +154,7 @@ export const AFFILIATION_RULE_DEFINITIONS: AffiliationRuleDefinition[] = [
     autoAdd: "Yes — on registration",
     autoRemove: "Never — alumni/history retained",
     moduleList: "Programs → Registrations",
+    moduleSlugs: AFFILIATION_ROLE_MODULE_SLUGS.program_participant,
   },
   {
     role: "event_attendee",
@@ -114,5 +163,6 @@ export const AFFILIATION_RULE_DEFINITIONS: AffiliationRuleDefinition[] = [
     autoAdd: "Yes — on completed ticket purchase",
     autoRemove: "Never — attendance history retained",
     moduleList: "Events → Ticketing",
+    moduleSlugs: AFFILIATION_ROLE_MODULE_SLUGS.event_attendee,
   },
 ]

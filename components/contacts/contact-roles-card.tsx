@@ -153,7 +153,7 @@ export function ContactRolesCard({
           </div>
           <p className="text-sm text-muted-foreground">
             {isOrganization
-              ? "Donor is added automatically when this organization gives. Customer and service provider labels can be edited here."
+              ? "Donor is added automatically after this organization's first payment. Customer and service provider labels can be edited here."
               : "Donor, vendor, and child care provider affiliations sync from applications and activity. Service provider and donor can also be set manually."}
           </p>
           <div className="flex flex-wrap gap-2">
@@ -172,8 +172,8 @@ export function ContactRolesCard({
             <DialogTitle>Edit affiliations</DialogTitle>
             <DialogDescription>
               {isOrganization
-                ? "Select customer or service provider labels. Donor is applied automatically when this organization donates."
-                : "Add or remove manual affiliations. Vendor, child care provider, workforce, membership, and donor (when giving history exists) are managed by activity sync."}
+                ? "Select customer or service provider labels. Donor is applied automatically after the first payment."
+                : "Add or remove manual affiliations. Vendor, child care provider, workforce, membership, and donor (after first payment) are managed by activity sync."}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-2 sm:grid-cols-2">

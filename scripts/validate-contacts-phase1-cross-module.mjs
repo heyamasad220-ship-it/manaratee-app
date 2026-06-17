@@ -153,6 +153,27 @@ try {
   record("seed-donor-extension", !donorError && !!donor?.id, donorError?.message)
   if (donor?.id) created.donors.push(donor.id)
 
+  const paymentDate = new Date().toISOString().slice(0, 10)
+  const { data: payment, error: paymentError } = await sb
+    .from("payments")
+    .insert({
+      organization_id: orgId,
+      donor_id: donor?.id,
+      contact_id: contact.id,
+      amount: 5,
+      payment_date: `${paymentDate}T12:00:00`,
+      source: "cash",
+      source_type: "validation",
+      status: "unallocated",
+      is_verified: false,
+      memo: TAG,
+    })
+    .select("id")
+    .single()
+
+  record("seed-donor-payment", !paymentError && !!payment?.id, paymentError?.message)
+  if (payment?.id) created.payments.push(payment.id)
+
   await applyDonorAffiliationMirror(sb, orgId, contact.id)
   const donorRole = await hasRole(sb, orgId, contact.id, "donor")
   record(

@@ -4,6 +4,7 @@ import * as React from "react"
 import { useRouter } from "next/navigation"
 import { AffiliationRulesPanel } from "@/components/contacts/affiliation-rules-panel"
 import { DiscountPoliciesPanel } from "@/components/hr/discount-policies-panel"
+import type { OrganizationAffiliationSettingRow } from "@/lib/contacts/contact-affiliation-settings"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Tags, Users } from "lucide-react"
 
@@ -28,9 +29,11 @@ type DiscountTag = {
 
 export function ContactsSettingsClient({
   tags,
+  affiliationSettings,
   initialTab,
 }: {
   tags: DiscountTag[]
+  affiliationSettings: OrganizationAffiliationSettingRow[]
   initialTab?: string | null
 }) {
   const router = useRouter()
@@ -68,7 +71,7 @@ export function ContactsSettingsClient({
         </TabsList>
 
         <TabsContent value="affiliations" className="mt-0">
-          <AffiliationRulesPanel />
+          <AffiliationRulesPanel settings={affiliationSettings} />
         </TabsContent>
 
         <TabsContent value="discount-tags" className="mt-0">

@@ -177,11 +177,17 @@ Removed **255** legacy imported rows from `public.vendors` (May 2026 CSV import)
 
 **Contacts add form (June 2026):** Add Contact no longer requires affiliations at create time; donor and other tags sync from activity or can be set on the contact profile.
 
+**Donor affiliation after first payment (June 2026):** Pledge-only or `donors` extension rows do **not** assign the Donor affiliation. The tag is added on the first linked `payments` row (staff, portal, or Stripe). Migration `scripts/114_donor_affiliation_requires_payment.sql` patches `sync_contact_affiliations` and removes incorrect auto-assigned donor roles with no payments. Key files: `lib/contacts/contact-affiliation-sync.ts`, `lib/contacts/contact-affiliation-rules.ts`.
+
 **Contacts search fix (June 2026):** Contact list search no longer references `primary_contact_name` when that column is absent in the database — fixes production search errors after bulk import.
 
 **Contact profile module gating (June 2026):** Contact detail tabs and panels respect org-enabled modules from `/api/organizations/sidebar-modules` — e.g. MAS Dallas (donations-only) hides Workforce, venue rentals, programs/membership participation, and applications sections. Key files: `lib/contacts/contact-profile-module-access.ts`, `components/contacts/contact-profile-client.tsx`.
 
-**Donation contact picker (June 2026):** Add Pledge and Record Payment search **org contacts** (name, email, phone), not only existing `donors` rows. On save, `ensureDonorExtensionForContact` creates the donor extension when needed. Add Pledge shows an **Add contact** button when search returns no matches; quick-add dialog pre-fills phone/email/name from the search text. Key files: `lib/donations/donation-list-actions.ts`, `components/contacts/quick-add-contact-dialog.tsx`.
+**Configurable automatic affiliations (June 2026):** Contacts → Settings → **Affiliations** lets each org turn activity-based affiliations on/off. Defaults follow subscribed modules (e.g. venue-only orgs have Donor off when Donations is not enabled). Stored in `organization_affiliation_settings`; enforced by `sync_contact_affiliations` (migration `115`). Manual affiliations on contact profiles are unchanged. Files: `lib/contacts/contact-affiliation-settings.ts`, `components/contacts/affiliation-rules-panel.tsx`, `scripts/115_organization_affiliation_settings.sql`.
+
+**Contacts profile edit (June 2026):** Contacts list **View & edit profile** (and row click) opens `/contacts/[id]?edit=1` with the Contact information form in edit mode. Profile header includes **Edit contact**; record type and primary contact are editable on save. Files: `components/contacts/contact-profile-client.tsx`, `components/contacts/contact-basics-panel.tsx`, `lib/contacts/contact-profile-path.ts`.
+
+**Donation contact picker (June 2026):** Add Pledge and Record Payment search **org contacts** (name, email, phone), not only existing `donors` rows. On save, `ensureDonorExtensionForContact` creates the donor extension when needed. Add Pledge shows an **Add contact** button when search returns no matches; quick-add dialog supports **Person / Organization**, primary contact name for organizations, and auto-suggests Organization when the name looks like a company (LLC, Inc, etc.). Donor affiliation syncs on **first payment**, not pledge creation. Key files: `lib/donations/donation-list-actions.ts`, `components/contacts/quick-add-contact-dialog.tsx`.
 
 **Campaign progress gauge (June 2026):** Speedometer-style fundraising gauge on `/donations/campaigns` (card grid for campaigns with goals) and campaign detail **Goal Progress**. Red/orange/green arc, needle, and total raised; supports exceeding 100% of goal. Component: `components/donations/campaign-progress-gauge.tsx`.
 
@@ -1305,7 +1311,7 @@ Activity write (donation, enrollment, ticket order, volunteer roster)
 | **S-01** | `handleDonationAffiliationSync` accepts optional `organizationId` + `supabaseClient` for webhook/service-role callers |
 | **S-02/S-03** | Stripe webhook donation affiliation sync via `syncDonationAffiliationFromWebhook` |
 | **S-04A/B** | Participation roles `program_participant`, `event_attendee` (+ schema slot `venue_rental_customer`); derivation in `computeDerivedAffiliations` |
-| **S-05/S-06** | Portal offline donation, portal pledge payment/creation, staff pledge creation → `handleDonationAffiliationSync` |
+| **S-05/S-06** | Portal/staff pledge **payment** → `handleDonationAffiliationSync`; pledge create does not sync donor |
 | **S-07** | `createTicketOrder` → `findOrCreateContact` + `ticket_orders.contact_id` |
 | **S-08** | Ticketing completion → `syncContactAffiliations` on completed orders |
 | **S-09/S-10** | Program `participant_contact_id` via `ensureContactForPerson`; enrollment → `syncContactAffiliations` for `program_participant` |
@@ -1317,7 +1323,7 @@ Activity write (donation, enrollment, ticket order, volunteer roster)
 
 | Role | Activity trigger | Auto-remove | Sync entry |
 |------|------------------|-------------|------------|
-| `donor` | `donors` row and/or `payments` for contact | Never (sticky) | `handleDonationAffiliationSync` / webhook helper |
+| `donor` | Linked `payments` for contact (direct or via `donor_id`) | Never (sticky) | `handleDonationAffiliationSync` / webhook helper |
 | `volunteer` | `volunteers` row for contact | Never (sticky) | `syncContactAffiliations` |
 | `program_participant` | `program_enrollments.participant_contact_id`, status ∉ `cancelled`, `withdrawn`, `transferred` | Never (sticky) | `syncContactAffiliations` |
 | `event_attendee` | `ticket_orders.contact_id` with `status = completed` | Never (sticky) | `syncContactAffiliations` |
@@ -1330,7 +1336,7 @@ Activity write (donation, enrollment, ticket order, volunteer roster)
 | Module | Identity helper | Affiliation trigger | Key files |
 |--------|-----------------|---------------------|-----------|
 | Stripe donations | Payment/donor metadata | After payment/plan insert (webhook) | `lib/donations/stripe/processor-payment.ts`, `processor-subscription.ts` |
-| Portal/staff donations | Existing donor/contact | After payment or pledge insert | `app/(customer)/customer/donation/page.tsx`, `app/(dashboard)/donations/(operations)/pledges/page.tsx` |
+| Portal/staff donations | Existing donor/contact | After payment insert (not pledge-only) | `app/(customer)/customer/donation/page.tsx`, `app/(dashboard)/donations/(operations)/pledges/page.tsx` |
 | Ticketing | `findOrCreateContact` | Order reaches `completed` | `lib/tickets/ticket-order-actions.ts` |
 | Programs | `ensureContactForPerson` / `resolveParticipantContactIdForRegistration` | Enrollment created (not waitlist-only); `promote_waitlist` | `lib/programs/program-registration-actions.ts`, `program-enrollment-actions.ts`, `program-lifecycle-actions.ts` |
 | Volunteers | Reuse canonical `contact_id` | Volunteer roster row created | `lib/volunteers/volunteer-actions.ts` |

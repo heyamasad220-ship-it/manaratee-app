@@ -5,14 +5,35 @@ export type ContactProfileTab =
   | "financial"
   | "activity"
 
+type ContactProfileHrefOptions = {
+  tab?: ContactProfileTab
+  edit?: boolean
+}
+
 export function contactProfileHref(
   contactId: string,
-  tab?: ContactProfileTab
+  tabOrOptions?: ContactProfileTab | ContactProfileHrefOptions
 ): string {
-  if (!tab || tab === "overview") {
-    return `/contacts/${contactId}`
+  let tab: ContactProfileTab | undefined
+  let edit = false
+
+  if (typeof tabOrOptions === "string") {
+    tab = tabOrOptions
+  } else if (tabOrOptions) {
+    tab = tabOrOptions.tab
+    edit = tabOrOptions.edit ?? false
   }
-  return `/contacts/${contactId}?tab=${tab}`
+
+  const params = new URLSearchParams()
+  if (tab && tab !== "overview") {
+    params.set("tab", tab)
+  }
+  if (edit) {
+    params.set("edit", "1")
+  }
+
+  const query = params.toString()
+  return query ? `/contacts/${contactId}?${query}` : `/contacts/${contactId}`
 }
 
 export function staffMemberProfileHref(input: {

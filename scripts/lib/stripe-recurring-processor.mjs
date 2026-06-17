@@ -46,20 +46,25 @@ async function maybeSyncDonorAffiliation(sb, input) {
     }
     if (!contactId) return
 
-    const [{ count: paymentCount }, { count: donorCount }] = await Promise.all([
-      sb
+    const { count: paymentByContactCount } = await sb
+      .from("payments")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .eq("contact_id", contactId)
+
+    let shouldSync = (paymentByContactCount ?? 0) > 0
+
+    if (!shouldSync && input.donorId) {
+      const { count: paymentByDonorCount } = await sb
         .from("payments")
         .select("id", { count: "exact", head: true })
         .eq("organization_id", organizationId)
-        .eq("contact_id", contactId),
-      sb
-        .from("donors")
-        .select("id", { count: "exact", head: true })
-        .eq("organization_id", organizationId)
-        .eq("contact_id", contactId),
-    ])
+        .eq("donor_id", input.donorId)
 
-    if ((paymentCount ?? 0) > 0 || (donorCount ?? 0) > 0) {
+      shouldSync = (paymentByDonorCount ?? 0) > 0
+    }
+
+    if (shouldSync) {
       const { error } = await sb.from("contact_roles").insert({
         organization_id: organizationId,
         contact_id: contactId,

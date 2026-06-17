@@ -15,7 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { updateContactBasics } from "@/lib/contacts/contact-actions"
-import { STATUS_OPTIONS, statusToDbValue } from "@/lib/contacts/contact-constants"
+import { STATUS_OPTIONS, statusToDbValue, type ContactRecordType } from "@/lib/contacts/contact-constants"
 
 type ContactBasicsPanelProps = {
   contact: {
@@ -28,6 +28,8 @@ type ContactBasicsPanelProps = {
     status?: string | null
     created_at?: string | null
   }
+  defaultEditing?: boolean
+  onEditingChange?: (editing: boolean) => void
   onSaved: () => Promise<void>
 }
 
@@ -38,9 +40,13 @@ function formatDate(value: string | null | undefined) {
   return date.toLocaleDateString()
 }
 
-export function ContactBasicsPanel({ contact, onSaved }: ContactBasicsPanelProps) {
-  const isOrganization = contact.contact_type === "organization"
-  const [isEditing, setIsEditing] = useState(false)
+export function ContactBasicsPanel({
+  contact,
+  defaultEditing = false,
+  onEditingChange,
+  onSaved,
+}: ContactBasicsPanelProps) {
+  const [isEditing, setIsEditing] = useState(defaultEditing)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
@@ -50,7 +56,25 @@ export function ContactBasicsPanel({ contact, onSaved }: ContactBasicsPanelProps
   const [primaryContactName, setPrimaryContactName] = useState(
     contact.primary_contact_name || ""
   )
+  const [contactType, setContactType] = useState<ContactRecordType>(
+    contact.contact_type === "organization" ? "organization" : "individual"
+  )
   const [status, setStatus] = useState(statusToDbValue((contact.status as any) || "Active"))
+
+  const isOrganization = contactType === "organization"
+
+  function setEditing(next: boolean) {
+    setIsEditing(next)
+    onEditingChange?.(next)
+  }
+
+  useEffect(() => {
+    setEditing(defaultEditing)
+    if (defaultEditing) {
+      resetForm()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [defaultEditing, contact.id])
 
   useEffect(() => {
     if (!isEditing) {
@@ -63,6 +87,7 @@ export function ContactBasicsPanel({ contact, onSaved }: ContactBasicsPanelProps
     contact.email,
     contact.phone,
     contact.primary_contact_name,
+    contact.contact_type,
     contact.status,
   ])
 
@@ -71,13 +96,14 @@ export function ContactBasicsPanel({ contact, onSaved }: ContactBasicsPanelProps
     setEmail(contact.email || "")
     setPhone(contact.phone || "")
     setPrimaryContactName(contact.primary_contact_name || "")
+    setContactType(contact.contact_type === "organization" ? "organization" : "individual")
     setStatus(statusToDbValue((contact.status as any) || "Active"))
     setError(null)
   }
 
   function handleCancel() {
     resetForm()
-    setIsEditing(false)
+    setEditing(false)
   }
 
   function handleSave() {
@@ -90,9 +116,11 @@ export function ContactBasicsPanel({ contact, onSaved }: ContactBasicsPanelProps
           email: email || null,
           phone: phone || null,
           primaryContactName: primaryContactName || null,
+          contactType,
           status,
         })
-        setIsEditing(false)
+        setEditing(false)
+        onEditingChange?.(false)
         await onSaved()
       } catch (saveError) {
         setError(
@@ -107,7 +135,7 @@ export function ContactBasicsPanel({ contact, onSaved }: ContactBasicsPanelProps
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
         <CardTitle className="text-base">Contact information</CardTitle>
         {!isEditing ? (
-          <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
+          <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
             <Pencil className="mr-2 h-4 w-4" />
             Edit
           </Button>
@@ -152,6 +180,21 @@ export function ContactBasicsPanel({ contact, onSaved }: ContactBasicsPanelProps
                 />
               </div>
             </div>
+            <div className="space-y-2 sm:max-w-xs">
+              <Label htmlFor="profile-contact-type">Record type</Label>
+              <Select
+                value={contactType}
+                onValueChange={(value) => setContactType(value as ContactRecordType)}
+              >
+                <SelectTrigger id="profile-contact-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="individual">Person</SelectItem>
+                  <SelectItem value="organization">Organization</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             {isOrganization ? (
               <div className="space-y-2">
                 <Label htmlFor="profile-primary-contact">Primary contact name</Label>
@@ -195,6 +238,10 @@ export function ContactBasicsPanel({ contact, onSaved }: ContactBasicsPanelProps
           </div>
         ) : (
           <dl className="grid gap-4 text-sm sm:grid-cols-2">
+            <div>
+              <dt className="font-medium text-muted-foreground">Record type</dt>
+              <dd>{isOrganization ? "Organization" : "Person"}</dd>
+            </div>
             <div>
               <dt className="font-medium text-muted-foreground">Email</dt>
               <dd>{contact.email || "—"}</dd>

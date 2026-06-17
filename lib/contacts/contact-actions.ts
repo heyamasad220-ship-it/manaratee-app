@@ -527,6 +527,7 @@ export async function updateContactBasics(input: {
   email?: string | null
   phone?: string | null
   primaryContactName?: string | null
+  contactType?: ContactRecordType
   status: string
 }) {
   const supabase = await createClient()
@@ -552,7 +553,8 @@ export async function updateContactBasics(input: {
     throw new Error("Contact not found")
   }
 
-  const isOrganization = existing.contact_type === "organization"
+  const isOrganization =
+    (input.contactType ?? existing.contact_type) === "organization"
 
   const { error } = await supabase
     .from("contacts")
@@ -560,6 +562,7 @@ export async function updateContactBasics(input: {
       full_name: cleanName,
       email: input.email?.trim().toLowerCase() || null,
       phone: normalizePhone(input.phone) || null,
+      contact_type: input.contactType ?? existing.contact_type,
       primary_contact_name: isOrganization
         ? input.primaryContactName?.trim() || null
         : null,

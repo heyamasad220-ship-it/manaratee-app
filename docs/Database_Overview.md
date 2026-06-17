@@ -79,6 +79,7 @@ organization_modules.module_id → modules.id
 * contacts
 * contact_notes
 * contact_roles
+* organization_affiliation_settings
 * person_relationships
 * person_tags
 * discount_tags
@@ -93,6 +94,7 @@ contact_notes.contact_id → contacts.id
 contact_notes.organization_id → organizations.id
 contact_roles.contact_id → contacts.id
 contact_roles.organization_id → organizations.id
+organization_affiliation_settings.organization_id → organizations.id
 person_relationships.organization_id → organizations.id
 person_relationships.person_id → people.id
 person_relationships.related_person_id → people.id
@@ -112,7 +114,7 @@ discount_tags.organization_id → organizations.id
 | `program_enrollments.registrant_contact_id` | Guardian/registrant (preserved separately from participant) |
 | `program_enrollments.payer_contact_id` | Payer (preserved separately from participant) |
 | `ticket_orders.contact_id` | Ticketing purchaser identity + `event_attendee` derivation |
-| `donors.contact_id` | Donor extension + `donor` derivation |
+| `donors.contact_id` | Donor extension (pledges/payments FK); `donor` affiliation requires a payment |
 | `volunteers.contact_id` | Volunteer roster + `volunteer` derivation |
 
 Affiliation writes use `sync_contact_affiliations` RPC via `syncContactAffiliations` / `handleDonationAffiliationSync` — not manual `contact_roles` inserts on activity write paths. Profile open may call `refreshContactAffiliations` for reconciliation only; Phase 1 modules do not depend on it.
@@ -127,11 +129,11 @@ Affiliation writes use `sync_contact_affiliations` RPC via `syncContactAffiliati
 | `auth_user_may_sync_derived_affiliations` | Gate for `sync_contact_affiliations` (M6b: + events/ticketing/membership) |
 | `auth_user_may_create_contact_via_module` | Gate for `find_or_create_contact_for_org` (M6b: + events/ticketing/membership.manage) |
 | `auth_user_may_ensure_contact_for_person` | Gate for `ensure_contact_for_person` |
-| `sync_contact_affiliations` | SECURITY DEFINER derive + reconcile `contact_roles` + donor bridge |
+| `sync_contact_affiliations` | SECURITY DEFINER derive + reconcile `contact_roles` + donor bridge; respects `organization_affiliation_settings` |
 
 Staff policies on `contacts`, `contact_roles`, `contact_notes` require `contacts.view` / `contacts.manage`. Customer self-contact UPDATE/SELECT uses `auth_user_contact_ids()`. Migration `111` drops legacy open policies after G6 validation.
 
-Run order: `102` → … → `110` → (G6 GREEN) → `111`.
+Run order: `102` → … → `110` → `112` → (G6 GREEN) → `111` → `114` (donor affiliation requires payment) → `115` (org affiliation settings).
 
 Validate:
 
