@@ -525,11 +525,6 @@ export function ContactsListView({
       alert("Contact name is required")
       return
     }
-    if (contactRoles.length === 0) {
-      alert("Select at least one role")
-      return
-    }
-
     setSaving(true)
     try {
       const result = await addContactWithRoles({
@@ -938,8 +933,9 @@ export function ContactsListView({
           <DialogHeader>
             <DialogTitle>Add New Contact</DialogTitle>
             <DialogDescription>
-              Create a person or organization and assign one or more roles. Existing contacts are
-              matched by email, phone, or name — never duplicated.
+              Create a person or organization with basic details. Affiliations sync automatically
+              from donations and other activity; add manual affiliations on the contact profile if
+              needed. Existing contacts are matched by email, phone, or name — never duplicated.
             </DialogDescription>
           </DialogHeader>
 
@@ -998,15 +994,6 @@ export function ContactsListView({
                 </Select>
               </div>
             )}
-
-            <div className="flex flex-col gap-2">
-              <Label>Roles</Label>
-              <RoleCheckboxGroup
-                idPrefix="add"
-                selected={contactRoles}
-                onChange={setContactRoles}
-              />
-            </div>
 
             <div className="flex flex-col gap-2">
               <Label htmlFor="notes">Notes (Optional)</Label>

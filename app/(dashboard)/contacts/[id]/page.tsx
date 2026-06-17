@@ -187,6 +187,8 @@ export default function ContactDetailPage() {
 
   const [organizationId, setOrganizationId] = useState<string | null>(null)
 
+  const [enabledModuleSlugs, setEnabledModuleSlugs] = useState<string[]>([])
+
   const [loading, setLoading] = useState(true)
 
   const [profileLoading, setProfileLoading] = useState(true)
@@ -271,6 +273,8 @@ export default function ContactDetailPage() {
       setStaffSummary(null)
 
       setOrganizationId(null)
+
+      setEnabledModuleSlugs([])
 
       setErrorMessage("No organization selected.")
 
@@ -366,7 +370,24 @@ export default function ContactDetailPage() {
     setContact(data)
     setOrganizationId(orgId)
 
-
+    try {
+      const modulesResponse = await fetch("/api/organizations/sidebar-modules")
+      if (modulesResponse.ok) {
+        const modulesPayload = (await modulesResponse.json()) as {
+          modules?: Array<{ slug?: string | null }>
+        }
+        setEnabledModuleSlugs(
+          (modulesPayload.modules ?? [])
+            .map((module) => module.slug?.trim())
+            .filter(Boolean) as string[]
+        )
+      } else {
+        setEnabledModuleSlugs([])
+      }
+    } catch (modulesError) {
+      console.warn("Could not load organization modules for contact profile:", modulesError)
+      setEnabledModuleSlugs([])
+    }
 
     const roles = filterContactRoles(
 
@@ -559,6 +580,7 @@ export default function ContactDetailPage() {
         staffRecordId={staffRecordId}
         staffSummary={staffSummary}
         organizationId={organizationId}
+        enabledModuleSlugs={enabledModuleSlugs}
         onNotesChanged={handleNotesChanged}
 
         onRolesUpdated={handleRolesUpdated}

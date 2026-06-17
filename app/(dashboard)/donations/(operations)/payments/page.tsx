@@ -41,8 +41,9 @@ import { PaymentReceiptActions } from "@/components/donations/payment-receipt-ac
 import {
   fetchOpenPledgesForAllocationAction,
   fetchPaymentsPageAction,
-  searchDonorsForPickerAction,
+  searchContactsForDonationPickerAction,
 } from "@/lib/donations/donation-list-actions";
+import { ensureDonorExtensionForContact } from "@/lib/donations/donor-contact-bridge";
 import { DONATIONS_PAGE_SIZE } from "@/lib/donations/donation-pagination";
 import {
   Pagination,
@@ -75,11 +76,11 @@ type Payment = {
   sender_name: string | null;
 };
 
-type DonorOption = {
-  id: string;
+type ContactPickerOption = {
+  contactId: string;
   full_name: string | null;
   email: string | null;
-  donor_type: string | null;
+  phone: string | null;
 };
 
 type PledgeOption = {
@@ -115,14 +116,6 @@ function formatStatus(status: string | null) {
   return status.replaceAll("_", " ");
 }
 
-const normalizeName = (value: string) =>
-  value
-    .toLowerCase()
-    .replace(/^dr\.?\s+/i, "")
-    .replace(/\s+[a-z]\.?\s+/gi, " ")
-    .replace(/\s*\([^)]*\)/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
 
 export default function PaymentsPage() {
   const supabase = createClient();
@@ -139,13 +132,13 @@ export default function PaymentsPage() {
   >({});
   const [loading, setLoading] = useState(true);
 
-  const [donors, setDonors] = useState<DonorOption[]>([]);
+  const [contacts, setContacts] = useState<ContactPickerOption[]>([]);
   const [pledges, setPledges] = useState<PledgeOption[]>([]);
 
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const [donorId, setDonorId] = useState("none");
+  const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [donorOpen, setDonorOpen] = useState(false);
   const [donorSearch, setDonorSearch] = useState("");
 
@@ -162,29 +155,15 @@ export default function PaymentsPage() {
   const [selectedPledgeId, setSelectedPledgeId] = useState("");
   const [allocating, setAllocating] = useState(false);
 
-  const selectedDonorName = useMemo(() => {
-    if (donorId === "none") return "No donor selected";
+  const selectedContactName = useMemo(() => {
+    if (!selectedContactId) return "No contact selected";
 
-    const donor = donors.find((item) => item.id === donorId);
+    const contact = contacts.find((item) => item.contactId === selectedContactId);
 
-    return donor?.full_name || donor?.email || "No donor selected";
-  }, [donorId, donors]);
+    return contact?.full_name || contact?.email || contact?.phone || "No contact selected";
+  }, [selectedContactId, contacts]);
 
-  const uniqueDonors = donors.filter(
-    (donor, index, self) =>
-      index ===
-      self.findIndex(
-        (item) =>
-          normalizeName(item.full_name || item.email || "") ===
-          normalizeName(donor.full_name || donor.email || "")
-      )
-  );
-
-  const filteredDonors = uniqueDonors.filter((donor) =>
-    normalizeName(donor.full_name || donor.email || "").includes(
-      normalizeName(donorSearch)
-    )
-  );
+  const filteredContacts = contacts;
 
   const allocationPledges = selectedPayment?.donor_id
     ? pledges.filter((pledge) => pledge.donor_id === selectedPayment.donor_id)
@@ -224,7 +203,7 @@ export default function PaymentsPage() {
       setOrganizationId(null);
       setPayments([]);
       setTotalPayments(0);
-      setDonors([]);
+      setContacts([]);
       setPledges([]);
       setLoading(false);
       return;
@@ -270,10 +249,10 @@ export default function PaymentsPage() {
     setLoading(false);
   }
 
-  async function loadDonorsForPicker(query: string) {
-    const result = await searchDonorsForPickerAction(query, 50);
+  async function loadContactsForPicker(query: string) {
+    const result = await searchContactsForDonationPickerAction(query, 50);
     if (result.success) {
-      setDonors(result.donors as DonorOption[]);
+      setContacts(result.contacts);
     }
   }
 
@@ -291,7 +270,7 @@ export default function PaymentsPage() {
       const orgId = await getOrgIdForCurrentUser();
       if (orgId) {
         setOrganizationId(orgId);
-        await loadDonorsForPicker("");
+        await loadContactsForPicker("");
       }
       await loadPayments(page);
     })();
@@ -300,11 +279,11 @@ export default function PaymentsPage() {
 
   useEffect(() => {
     if (!showAddDialog) return;
-    void loadDonorsForPicker(donorSearch);
+    void loadContactsForPicker(donorSearch);
   }, [donorSearch, showAddDialog]);
 
   function resetForm() {
-    setDonorId("none");
+    setSelectedContactId(null);
     setDonorOpen(false);
     setDonorSearch("");
     setAmount("");
@@ -327,24 +306,35 @@ export default function PaymentsPage() {
       return;
     }
 
-    const selectedDonor =
-      donorId === "none"
-        ? null
-        : donors.find((donor) => donor.id === donorId);
+    const selectedContact = selectedContactId
+      ? contacts.find((contact) => contact.contactId === selectedContactId)
+      : null;
 
     setSaving(true);
 
+    let resolvedDonorId: string | null = null;
+
+    if (selectedContactId) {
+      resolvedDonorId = await ensureDonorExtensionForContact(orgId, selectedContactId);
+
+      if (!resolvedDonorId) {
+        setSaving(false);
+        alert("Could not resolve a donor record for the selected contact.");
+        return;
+      }
+    }
+
     const { error } = await supabase.from("payments").insert({
       organization_id: orgId,
-      donor_id: donorId === "none" ? null : donorId,
+      donor_id: resolvedDonorId,
       pledge_id: null,
-      sender_name: selectedDonor?.full_name || selectedDonor?.email || null,
+      sender_name: selectedContact?.full_name || selectedContact?.email || null,
       amount: Number(amount),
       payment_date: paymentDate ? `${paymentDate}T12:00:00` : new Date().toISOString(),
       source,
       source_type: "manual",
       memo: memo || null,
-      status: donorId === "none" ? "pending_review" : "unallocated",
+      status: resolvedDonorId ? "unallocated" : "pending_review",
       is_verified: false,
       ...toAttributionIds(attribution),
     });
@@ -356,24 +346,13 @@ export default function PaymentsPage() {
       return;
     }
 
-    const selectedDonorContactId =
-      donorId === "none"
-        ? null
-        : (
-            await supabase
-              .from("donors")
-              .select("contact_id")
-              .eq("id", donorId)
-              .maybeSingle()
-          ).data?.contact_id ?? null;
-
     try {
       const { handleDonationAffiliationSync } = await import(
         "@/lib/contacts/contact-affiliation-sync"
       );
       await handleDonationAffiliationSync({
-        donorId: donorId === "none" ? null : donorId,
-        contactId: selectedDonorContactId,
+        donorId: resolvedDonorId,
+        contactId: selectedContactId,
       });
     } catch (syncError) {
       console.warn("Donation affiliation sync failed:", syncError);
@@ -431,11 +410,7 @@ export default function PaymentsPage() {
   }
 
   function getPaymentDonorName(payment: Payment) {
-    const donor = payment.donor_id
-      ? donors.find((item) => item.id === payment.donor_id)
-      : null;
-
-    return donor?.full_name || donor?.email || payment.sender_name || "—";
+    return payment.sender_name || "—";
   }
 
   return (
@@ -615,7 +590,7 @@ export default function PaymentsPage() {
 
           <div className="flex flex-col gap-4 py-4">
             <div className="flex flex-col gap-2">
-              <Label>Donor</Label>
+              <Label>Contact</Label>
 
               <Popover open={donorOpen} onOpenChange={setDonorOpen} modal={true}>
                 <PopoverTrigger asChild>
@@ -626,7 +601,7 @@ export default function PaymentsPage() {
                     aria-expanded={donorOpen}
                     className="w-full justify-between font-normal"
                   >
-                    <span className="truncate">{selectedDonorName}</span>
+                    <span className="truncate">{selectedContactName}</span>
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
@@ -634,19 +609,19 @@ export default function PaymentsPage() {
                 <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                   <Command shouldFilter={false}>
                     <CommandInput
-                      placeholder="Search donor name..."
+                      placeholder="Search contact name, email, or phone..."
                       value={donorSearch}
                       onValueChange={setDonorSearch}
                     />
 
                     <CommandList>
-                      <CommandEmpty>No donor found.</CommandEmpty>
+                      <CommandEmpty>No contact found.</CommandEmpty>
 
                       <CommandGroup>
                         <CommandItem
-                          value="No donor selected"
+                          value="No contact selected"
                           onSelect={() => {
-                            setDonorId("none");
+                            setSelectedContactId(null);
                             setDonorOpen(false);
                             setDonorSearch("");
                           }}
@@ -654,18 +629,18 @@ export default function PaymentsPage() {
                           <Check
                             className={cn(
                               "mr-2 h-4 w-4",
-                              donorId === "none" ? "opacity-100" : "opacity-0"
+                              !selectedContactId ? "opacity-100" : "opacity-0"
                             )}
                           />
-                          No donor selected
+                          No contact selected
                         </CommandItem>
 
-                        {filteredDonors.map((donor) => (
+                        {filteredContacts.map((contact) => (
                           <CommandItem
-                            key={donor.id}
-                            value={donor.full_name || donor.email || donor.id}
+                            key={contact.contactId}
+                            value={contact.full_name || contact.email || contact.contactId}
                             onSelect={() => {
-                              setDonorId(donor.id);
+                              setSelectedContactId(contact.contactId);
                               setDonorOpen(false);
                               setDonorSearch("");
                             }}
@@ -673,10 +648,12 @@ export default function PaymentsPage() {
                             <Check
                               className={cn(
                                 "mr-2 h-4 w-4",
-                                donorId === donor.id ? "opacity-100" : "opacity-0"
+                                selectedContactId === contact.contactId
+                                  ? "opacity-100"
+                                  : "opacity-0"
                               )}
                             />
-                            {donor.full_name || donor.email || "Unnamed donor"}
+                            {contact.full_name || contact.email || contact.phone || "Unnamed contact"}
                           </CommandItem>
                         ))}
                       </CommandGroup>

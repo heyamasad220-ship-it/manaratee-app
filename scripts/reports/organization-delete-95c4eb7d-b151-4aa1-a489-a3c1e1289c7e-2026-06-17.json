@@ -1,0 +1,510 @@
+{
+  "capturedAt": "2026-06-17T16:06:24.175Z",
+  "organization": {
+    "id": "95c4eb7d-b151-4aa1-a489-a3c1e1289c7e",
+    "name": "The Asad Realty",
+    "slug": "the-asad-realty"
+  },
+  "execute": false,
+  "inventory": {
+    "transactional_email_log": {
+      "count": 8,
+      "skipped": false,
+      "error": null
+    },
+    "payment_processor_events": {
+      "count": 3,
+      "skipped": false,
+      "error": null
+    },
+    "donation_checkout_sessions": {
+      "count": 2,
+      "skipped": false,
+      "error": null
+    },
+    "pledge_reminders": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "donation_receipts": {
+      "count": 2,
+      "skipped": false,
+      "error": null
+    },
+    "payment_import_rows": {
+      "count": 2,
+      "skipped": false,
+      "error": null
+    },
+    "payments": {
+      "count": 7511,
+      "skipped": false,
+      "error": null
+    },
+    "donation_payments": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "pledges": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "donation_pledges": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "recurring_donation_plans": {
+      "count": 19,
+      "skipped": false,
+      "error": null
+    },
+    "donors": {
+      "count": 1003,
+      "skipped": false,
+      "error": null
+    },
+    "payment_import_batches": {
+      "count": 1,
+      "skipped": false,
+      "error": null
+    },
+    "contact_import_staging": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "ticket_order_items": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "ticket_orders": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "program_financial_assistance_documents": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "program_financial_assistance_status_history": {
+      "count": null,
+      "skipped": false,
+      "error": ""
+    },
+    "program_financial_assistance": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "program_waitlist_status_history": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "program_waitlist": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "program_enrollment_status_history": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "program_enrollment_sessions": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "program_enrollments": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "program_payment_allocations": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "program_charge_lines": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "program_charges": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "program_charge_schedule": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "program_checkouts": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "registration_cart_item_fees": {
+      "count": null,
+      "skipped": false,
+      "error": ""
+    },
+    "registration_cart_items": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "registration_carts": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "registration_orders": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "program_extended_care": {
+      "count": null,
+      "skipped": false,
+      "error": ""
+    },
+    "program_registration_lifecycle_events": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "rental_selected_addons": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "rental_payments": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "rental_contracts": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "rental_reservations": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "venue_rentals": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "venue_bookings": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "resource_reservations": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "reservation_override_logs": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "operational_briefs": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "vendor_hub_participation_evaluations": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "vendor_hub_payments": {
+      "count": null,
+      "skipped": false,
+      "error": ""
+    },
+    "vendor_hub_announcement_recipients": {
+      "count": null,
+      "skipped": false,
+      "error": ""
+    },
+    "vendor_hub_booth_assignments": {
+      "count": null,
+      "skipped": false,
+      "error": ""
+    },
+    "vendor_hub_participant_status": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "vendor_hub_announcements": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "vendor_hub_event_reminder_log": {
+      "count": null,
+      "skipped": false,
+      "error": ""
+    },
+    "vendor_hub_vendors": {
+      "count": null,
+      "skipped": false,
+      "error": ""
+    },
+    "vendors": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "application_documents": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "application_history": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "applications": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "service_participations": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "hr_team_memberships": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "contact_notes": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "contact_roles": {
+      "count": 1,
+      "skipped": false,
+      "error": null
+    },
+    "memberships": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "membership_status_history": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "volunteer_assignments": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "volunteers": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "employees": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "contacts": {
+      "count": 4,
+      "skipped": false,
+      "error": null
+    },
+    "people": {
+      "count": 2,
+      "skipped": false,
+      "error": null
+    },
+    "donation_amount_options": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "donation_subcategories": {
+      "count": 2,
+      "skipped": false,
+      "error": null
+    },
+    "donation_categories": {
+      "count": 2,
+      "skipped": false,
+      "error": null
+    },
+    "payment_methods": {
+      "count": 4,
+      "skipped": false,
+      "error": null
+    },
+    "campaigns": {
+      "count": 6,
+      "skipped": false,
+      "error": null
+    },
+    "donation_settings": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "organization_settings": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "module_notification_settings": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "venues": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "spaces": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "programs": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "program_sessions": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "program_offerings": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "events": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "internal_events": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "hr_teams": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "hr_positions": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "discount_tags": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "person_tags": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "subscriptions": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "organization_sidebar_modules": {
+      "count": 8,
+      "skipped": false,
+      "error": null
+    },
+    "organization_modules": {
+      "count": 8,
+      "skipped": false,
+      "error": null
+    },
+    "organization_invites": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "platform_admin_org_access_log": {
+      "count": 2,
+      "skipped": false,
+      "error": null
+    },
+    "role_permissions": {
+      "count": 3,
+      "skipped": false,
+      "error": null
+    },
+    "organization_roles": {
+      "count": 2,
+      "skipped": false,
+      "error": null
+    },
+    "customer_profiles": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    }
+  },
+  "members": [
+    {
+      "user_id": "38b633ca-3dcf-4fcc-9a83-59e787f23b22",
+      "role": "super_admin",
+      "status": "active"
+    },
+    {
+      "user_id": "b111b540-dcc5-4665-9e61-979af81a76c1",
+      "role": "viewer",
+      "status": "active"
+    },
+    {
+      "user_id": "c63f0848-2a94-4431-97a8-0e959ca80f82",
+      "role": "admin",
+      "status": "active"
+    },
+    {
+      "user_id": "0b5f8a1d-7582-4d9d-9d2d-f8582d92a2a8",
+      "role": "admin",
+      "status": "active"
+    }
+  ],
+  "backupFile": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\organization-delete\\organization-delete-95c4eb7d-b151-4aa1-a489-a3c1e1289c7e-2026-06-17.json",
+  "steps": [
+    {
+      "action": "dry_run_complete",
+      "message": "Re-run with --execute --confirm-name=\"Exact Org Name\" to delete."
+    }
+  ]
+}

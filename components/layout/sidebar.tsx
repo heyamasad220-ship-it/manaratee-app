@@ -294,7 +294,7 @@ const moduleChildren: Record<string, SubItem[]> = {
     { label: "Overview", href: "/donations", matchPrefix: "/donations", permissionKey: "donations.view" },
     { label: "Donors", href: "/donations/donors", matchPrefix: "/donations/donors", permissionKey: "donations.view" },
     {
-      label: "Payments",
+      label: "All Donations",
       href: "/donations/payments",
       matchPrefix: "/donations/payments",
       alsoMatchPrefixes: [

@@ -440,11 +440,6 @@ export async function addContactWithRoles(input: {
     Array.from(new Set(input.roles)),
     input.contactType || "individual"
   )
-  const isOrganization = input.contactType === "organization"
-
-  if (uniqueRoles.length === 0 && !isOrganization) {
-    throw new Error("Select at least one affiliation")
-  }
 
   const { contactId, created } = await findOrCreateContact({
     organizationId,

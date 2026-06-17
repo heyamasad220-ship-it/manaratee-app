@@ -33,6 +33,7 @@ import type { ContactProfileData } from "@/lib/contacts/contact-profile-data"
 import type { ProgramStaffAssignmentWithDetails } from "@/lib/programs/program-staff-assignment-types"
 import { canHaveProgramStaffAssignments } from "@/lib/hr/staff-role-utils"
 import type { StaffSummaryForContact } from "@/lib/hr/staff-summary"
+import { getContactProfileModuleFlags } from "@/lib/contacts/contact-profile-module-access"
 import {
   ArrowLeft,
   Briefcase,
@@ -89,6 +90,7 @@ type ContactProfileClientProps = {
   staffRecordId: string | null
   staffSummary: StaffSummaryForContact | null
   organizationId: string | null
+  enabledModuleSlugs?: string[]
   onNotesChanged: () => Promise<void>
   onRolesUpdated: () => Promise<void>
   onContactUpdated: () => Promise<void>
@@ -103,6 +105,7 @@ export function ContactProfileClient({
   staffRecordId,
   staffSummary,
   organizationId,
+  enabledModuleSlugs = [],
   onNotesChanged,
   onRolesUpdated,
   onContactUpdated,
@@ -110,6 +113,11 @@ export function ContactProfileClient({
   const router = useRouter()
   const searchParams = useSearchParams()
   const tabParam = searchParams.get("tab")
+
+  const modules = useMemo(
+    () => getContactProfileModuleFlags(enabledModuleSlugs),
+    [enabledModuleSlugs]
+  )
 
   const roles = useMemo(() => {
     const filtered = filterContactRoles(
@@ -140,6 +148,8 @@ export function ContactProfileClient({
   const isOrganization = contact.contact_type === "organization"
 
   const showDonorPanel = useMemo(() => {
+    if (!modules.donations) return false
+    if (isOrganization) return true
     if (hasRole("donor")) return true
     if (!profileData) return false
     return (
@@ -147,32 +157,40 @@ export function ContactProfileClient({
       profileData.donorStats.totalDonated > 0 ||
       profileData.donorStats.pledgeCount > 0
     )
-  }, [hasRole, profileData])
+  }, [hasRole, isOrganization, modules.donations, profileData])
 
   const showRentalsPanel = useMemo(() => {
-    if (!profileData) return isOrganization
-    return isOrganization || profileData.rentalStats.rentalCount > 0
-  }, [isOrganization, profileData])
+    if (!modules.bookings) return false
+    if (isOrganization) return true
+    if (!profileData) return false
+    return profileData.rentalStats.rentalCount > 0
+  }, [isOrganization, modules.bookings, profileData])
 
-  const showParticipationTab = !isOrganization
+  const showParticipationTab =
+    !isOrganization && (modules.programs || modules.membership)
+
+  const showWorkforceTab = modules.workforce || modules.vendorHub
+
+  const showFinancialTab = modules.donations || modules.bookings
 
   const showProgramAssignments = useMemo(() => {
+    if (!modules.programs) return false
     if (programAssignments.length > 0) return true
     return canHaveProgramStaffAssignments({
       staffType: staffSummary?.staffType,
       hrJobRoleName: staffSummary?.hrJobRoleName,
       contactRoles: roles,
     })
-  }, [programAssignments.length, roles, staffSummary])
+  }, [modules.programs, programAssignments.length, roles, staffSummary])
 
   const availableTabs = useMemo(() => {
     const tabs: ContactTab[] = ["overview"]
     if (showParticipationTab) tabs.push("participation")
-    tabs.push("workforce")
-    tabs.push("financial")
+    if (showWorkforceTab) tabs.push("workforce")
+    if (showFinancialTab) tabs.push("financial")
     tabs.push("activity")
     return tabs
-  }, [showParticipationTab])
+  }, [showFinancialTab, showParticipationTab, showWorkforceTab])
 
   const [activeTab, setActiveTab] = useState<ContactTab>(
     normalizeTab(tabParam, availableTabs)
@@ -209,14 +227,18 @@ export function ContactProfileClient({
               Participation
             </TabsTrigger>
           ) : null}
-          <TabsTrigger value="workforce" className="gap-2">
-            <Briefcase className="size-4" />
-            Workforce
-          </TabsTrigger>
-          <TabsTrigger value="financial" className="gap-2">
-            <Heart className="size-4" />
-            Financial
-          </TabsTrigger>
+          {showWorkforceTab ? (
+            <TabsTrigger value="workforce" className="gap-2">
+              <Briefcase className="size-4" />
+              Workforce
+            </TabsTrigger>
+          ) : null}
+          {showFinancialTab ? (
+            <TabsTrigger value="financial" className="gap-2">
+              <Heart className="size-4" />
+              Financial
+            </TabsTrigger>
+          ) : null}
           <TabsTrigger value="activity" className="gap-2">
             <History className="size-4" />
             Activity
@@ -264,16 +286,20 @@ export function ContactProfileClient({
 
         {showParticipationTab ? (
           <TabsContent value="participation" className="mt-0 space-y-6">
-            <ContactMembershipPanel
-              contactId={contact.id}
-              contactName={contact.full_name || "Unnamed Contact"}
-              teamsCount={profileData?.activeTeamsCount ?? 0}
-              onMembershipChanged={onRolesUpdated}
-            />
-            <ContactProgramEnrollmentsPanel
-              enrollments={profileData?.enrollmentRecords ?? []}
-              loading={profileLoading}
-            />
+            {modules.membership ? (
+              <ContactMembershipPanel
+                contactId={contact.id}
+                contactName={contact.full_name || "Unnamed Contact"}
+                teamsCount={profileData?.activeTeamsCount ?? 0}
+                onMembershipChanged={onRolesUpdated}
+              />
+            ) : null}
+            {modules.programs ? (
+              <ContactProgramEnrollmentsPanel
+                enrollments={profileData?.enrollmentRecords ?? []}
+                loading={profileLoading}
+              />
+            ) : null}
             {showProgramAssignments &&
               (assignmentsLoading ? (
                 <Card>
@@ -291,14 +317,15 @@ export function ContactProfileClient({
           </TabsContent>
         ) : null}
 
+        {showWorkforceTab ? (
         <TabsContent value="workforce" className="mt-0 space-y-6">
-          {staffRecordId ? (
+          {modules.workforce && staffRecordId ? (
             <ContactEmployeePanel
               staffId={staffRecordId}
               organizationId={organizationId}
               contactRoles={roles}
             />
-          ) : hasRole("employee") ? (
+          ) : modules.workforce && hasRole("employee") ? (
             <Card>
               <CardContent className="p-6 text-sm text-muted-foreground">
                 This contact has an employee affiliation but no linked staff record yet.
@@ -307,7 +334,7 @@ export function ContactProfileClient({
             </Card>
           ) : null}
 
-          {hasRole("volunteer") ? (
+          {modules.workforce && hasRole("volunteer") ? (
             <>
               <ContactVolunteerDetails contactId={contact.id} />
               <ContactVolunteerPanel
@@ -319,12 +346,15 @@ export function ContactProfileClient({
             </>
           ) : null}
 
-          {(hasRole("volunteer") ||
+          {modules.workforce &&
+          (hasRole("volunteer") ||
             hasRole("employee") ||
             hasRole("childcare_provider") ||
-            staffRecordId) && <WorkforceCredentialsPanel contactId={contact.id} />}
+            staffRecordId) ? (
+            <WorkforceCredentialsPanel contactId={contact.id} />
+          ) : null}
 
-          {hasRole("vendor") ? (
+          {modules.vendorHub && hasRole("vendor") ? (
             <>
               <ContactVendorEvaluationsPanel contactId={contact.id} />
               <Card>
@@ -346,7 +376,7 @@ export function ContactProfileClient({
             </>
           ) : null}
 
-          {hasRole("service_provider") ? (
+          {modules.workforce && hasRole("service_provider") ? (
             <Card>
               <CardContent className="p-6">
                 <div className="mb-2 flex items-center gap-2">
@@ -374,7 +404,9 @@ export function ContactProfileClient({
             </Card>
           ) : null}
         </TabsContent>
+        ) : null}
 
+        {showFinancialTab ? (
         <TabsContent value="financial" className="mt-0 space-y-6">
             <ContactDonorPanel
               donorStats={
@@ -386,7 +418,7 @@ export function ContactProfileClient({
                 }
               }
               donations={profileData?.donationRecords ?? []}
-              showPanel={isOrganization ? !profileLoading : showDonorPanel}
+              showPanel={showDonorPanel && !profileLoading}
               title={isOrganization ? "Donations" : "Donor Details"}
             />
             <ContactRentalsPanel
@@ -397,23 +429,17 @@ export function ContactProfileClient({
                 }
               }
               rentals={profileData?.rentalRecords ?? []}
-              showPanel={isOrganization ? !profileLoading : showRentalsPanel && !profileLoading}
+              showPanel={showRentalsPanel && !profileLoading}
             />
-            {!showDonorPanel && !isOrganization && !profileLoading ? (
+            {!showDonorPanel && !showRentalsPanel && !profileLoading ? (
               <Card>
                 <CardContent className="p-6 text-sm text-muted-foreground">
-                  No donation history for this contact.
-                </CardContent>
-              </Card>
-            ) : null}
-            {!showRentalsPanel && !isOrganization && !profileLoading ? (
-              <Card>
-                <CardContent className="p-6 text-sm text-muted-foreground">
-                  No venue rental history for this contact.
+                  No financial activity for this contact in enabled modules yet.
                 </CardContent>
               </Card>
             ) : null}
           </TabsContent>
+        ) : null}
 
         <TabsContent value="activity" className="mt-0 space-y-6">
           <ContactRelationshipSummaryCard
@@ -423,7 +449,9 @@ export function ContactProfileClient({
             loading={profileLoading}
             hideTeams={isOrganization}
           />
-          {!isOrganization ? <ContactApplicationsPanel contactId={contact.id} /> : null}
+          {!isOrganization && modules.applications ? (
+            <ContactApplicationsPanel contactId={contact.id} />
+          ) : null}
           <ContactTimelinePanel items={profileData?.timeline ?? []} loading={profileLoading} />
           <ContactNotesPanel
             contactId={contact.id}

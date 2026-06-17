@@ -240,17 +240,22 @@ async function handleSavePaymentMethod() {
     return
   }
 
-  if (!editingPaymentMethod) return
+  const payload = {
+    name: paymentMethodName.trim(),
+    fee: paymentMethodFee.trim() || "None",
+    enabled: paymentMethodEnabled,
+  }
 
-  const { error } = await supabase
-    .from("payment_methods")
-    .update({
-      name: paymentMethodName.trim(),
-      fee: paymentMethodFee.trim() || "None",
-      enabled: paymentMethodEnabled,
-    })
-    .eq("id", editingPaymentMethod.id)
-    .eq("organization_id", orgId)
+  const { error } = editingPaymentMethod
+    ? await supabase
+        .from("payment_methods")
+        .update(payload)
+        .eq("id", editingPaymentMethod.id)
+        .eq("organization_id", orgId)
+    : await supabase.from("payment_methods").insert({
+        organization_id: orgId,
+        ...payload,
+      })
 
   if (error) {
     alert(error.message)
@@ -264,6 +269,18 @@ async function handleSavePaymentMethod() {
   setShowPaymentMethodDialog(false)
 
   await loadPaymentMethods()
+}
+
+function resetPaymentMethodForm() {
+  setEditingPaymentMethod(null)
+  setPaymentMethodName("")
+  setPaymentMethodFee("")
+  setPaymentMethodEnabled(true)
+}
+
+function openAddPaymentMethodDialog() {
+  resetPaymentMethodForm()
+  setShowPaymentMethodDialog(true)
 }
 async function handleDeletePaymentMethod(methodId: string) {
   if (
@@ -778,11 +795,17 @@ async function handleDeleteCampaign(campaignId: string) {
 
         {activeTab === "Payment Methods" && (
           <div className="flex flex-col gap-4">
-            <div>
-              <h3 className="text-base font-semibold text-foreground">Payment Methods</h3>
-              <p className="text-sm text-muted-foreground">
-                Configure accepted payment methods for donations
-              </p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-semibold text-foreground">Payment Methods</h3>
+                <p className="text-sm text-muted-foreground">
+                  Configure accepted payment methods for donations
+                </p>
+              </div>
+              <Button onClick={openAddPaymentMethodDialog}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Payment Method
+              </Button>
             </div>
 
             <Card>
@@ -797,6 +820,14 @@ async function handleDeleteCampaign(campaignId: string) {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
+                    {paymentMethods.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
+                          No payment methods yet. Add one to accept donations through your portal and
+                          staff forms.
+                        </TableCell>
+                      </TableRow>
+                    )}
                     {paymentMethods.map((method) => (
                       <TableRow key={method.id}>
                         <TableCell className="font-medium">{method.name}</TableCell>
@@ -906,13 +937,23 @@ async function handleDeleteCampaign(campaignId: string) {
           </div>
         )}
       </div>
-      {/* Edit Payment Method Dialog */}
-<Dialog open={showPaymentMethodDialog} onOpenChange={setShowPaymentMethodDialog}>
+      {/* Add/Edit Payment Method Dialog */}
+<Dialog
+  open={showPaymentMethodDialog}
+  onOpenChange={(open) => {
+    setShowPaymentMethodDialog(open)
+    if (!open) resetPaymentMethodForm()
+  }}
+>
   <DialogContent>
     <DialogHeader>
-      <DialogTitle>Edit Payment Method</DialogTitle>
+      <DialogTitle>
+        {editingPaymentMethod ? "Edit Payment Method" : "Add Payment Method"}
+      </DialogTitle>
       <DialogDescription>
-        Update this accepted payment method
+        {editingPaymentMethod
+          ? "Update this accepted payment method"
+          : "Create a custom payment method for donations"}
       </DialogDescription>
     </DialogHeader>
 
@@ -921,6 +962,7 @@ async function handleDeleteCampaign(campaignId: string) {
         <Label htmlFor="payment-method-name">Method Name</Label>
         <Input
           id="payment-method-name"
+          placeholder="e.g. Venmo, Wire Transfer, In-kind"
           value={paymentMethodName}
           onChange={(event) => setPaymentMethodName(event.target.value)}
         />
@@ -934,6 +976,9 @@ async function handleDeleteCampaign(campaignId: string) {
           value={paymentMethodFee}
           onChange={(event) => setPaymentMethodFee(event.target.value)}
         />
+        <p className="text-xs text-muted-foreground">
+          Shown to staff only — e.g. &quot;None&quot; or &quot;Processing fee applies&quot;
+        </p>
       </div>
 
       <div className="flex items-center gap-2">
@@ -950,10 +995,7 @@ async function handleDeleteCampaign(campaignId: string) {
       <Button
         variant="outline"
         onClick={() => {
-          setEditingPaymentMethod(null)
-          setPaymentMethodName("")
-          setPaymentMethodFee("")
-          setPaymentMethodEnabled(true)
+          resetPaymentMethodForm()
           setShowPaymentMethodDialog(false)
         }}
       >
@@ -961,7 +1003,7 @@ async function handleDeleteCampaign(campaignId: string) {
       </Button>
 
       <Button onClick={handleSavePaymentMethod}>
-        Save Changes
+        {editingPaymentMethod ? "Save Changes" : "Add Payment Method"}
       </Button>
     </DialogFooter>
   </DialogContent>

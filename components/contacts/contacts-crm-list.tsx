@@ -19,13 +19,9 @@ import {
   type ContactStatus,
   ROLE_COLORS,
   ROLE_ICONS,
-  ROLE_OPTIONS,
-  getContactsCrmRoleOptions,
   getRoleOptionsForRecordType,
   STATUS_COLORS,
   STATUS_OPTIONS,
-  getAllowedRolesForRecordType,
-  MEMBERSHIP_DERIVED_ROLE,
 } from "@/lib/contacts/contact-constants"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
@@ -34,7 +30,6 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { StatCard, StatCardsRow } from "@/components/ui/stat-card"
-import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
   DialogContent,
@@ -108,45 +103,6 @@ function formatDate(value?: string | null) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return "-"
   return date.toLocaleDateString()
-}
-
-function RoleCheckboxGroup({
-  selected,
-  onChange,
-  idPrefix,
-  roleOptions = ROLE_OPTIONS,
-}: {
-  selected: ContactRoleValue[]
-  onChange: (roles: ContactRoleValue[]) => void
-  idPrefix: string
-  roleOptions?: { label: string; value: ContactRoleValue }[]
-}) {
-  function toggleRole(role: ContactRoleValue, checked: boolean) {
-    if (checked) {
-      onChange(Array.from(new Set([...selected, role])))
-      return
-    }
-    onChange(selected.filter((item) => item !== role))
-  }
-
-  return (
-    <div className="grid gap-2 sm:grid-cols-2">
-      {roleOptions.map((role) => (
-        <label
-          key={role.value}
-          htmlFor={`${idPrefix}-${role.value}`}
-          className="flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm"
-        >
-          <Checkbox
-            id={`${idPrefix}-${role.value}`}
-            checked={selected.includes(role.value)}
-            onCheckedChange={(checked) => toggleRole(role.value, checked === true)}
-          />
-          {role.label}
-        </label>
-      ))}
-    </div>
-  )
 }
 
 export function ContactsCrmList({
@@ -334,11 +290,6 @@ export function ContactsCrmList({
       alert("Contact name is required")
       return
     }
-    if (contactRoles.length === 0 && !isOrganizationType(contactType)) {
-      alert("Select at least one affiliation")
-      return
-    }
-
     setSaving(true)
     try {
       await addContactWithRoles({
@@ -744,8 +695,9 @@ export function ContactsCrmList({
           <DialogHeader>
             <DialogTitle>Add New {entitySingular === "contact" ? "Contact" : entitySingular === "person" ? "Person" : "Organization"}</DialogTitle>
             <DialogDescription>
-              Create a {entitySingular} and assign affiliations. Existing records are matched by
-              email, phone, or name — never duplicated.
+              Create a {entitySingular} with basic details. Affiliations such as donor sync
+              automatically from activity; add manual affiliations later on the contact profile if
+              needed. Existing records are matched by email, phone, or name — never duplicated.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-4 py-4">
@@ -807,15 +759,6 @@ export function ContactsCrmList({
                 </Select>
               </div>
             )}
-            <div className="flex flex-col gap-2">
-              <Label>Affiliations</Label>
-              <RoleCheckboxGroup
-                idPrefix="crm-add"
-                selected={contactRoles}
-                onChange={setContactRoles}
-                roleOptions={getContactsCrmRoleOptions(contactType)}
-              />
-            </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="crm-notes">Notes</Label>
               <Textarea

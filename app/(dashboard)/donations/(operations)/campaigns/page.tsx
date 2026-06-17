@@ -14,6 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { CampaignProgressBar } from "@/components/donations/campaign-progress-bar"
+import { CampaignProgressGauge } from "@/components/donations/campaign-progress-gauge"
 import {
   formatCampaignStatusLabel,
   formatDonationCurrency,
@@ -80,6 +81,29 @@ export default function DonationsCampaignsPage() {
               </Link>
             </Button>
           </div>
+
+          {!loading && sortedEntries.some((entry) => Number(entry.campaign.goal_amount || 0) > 0) ? (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {sortedEntries
+                .filter((entry) => Number(entry.campaign.goal_amount || 0) > 0)
+                .slice(0, 6)
+                .map(({ campaign, metrics }) => (
+                  <Card key={campaign.id}>
+                    <CardContent className="flex flex-col items-center pt-6">
+                      <CampaignProgressGauge
+                        title={campaign.name}
+                        raised={metrics.raised}
+                        goal={Number(campaign.goal_amount || 0)}
+                        size="md"
+                      />
+                      <Button variant="outline" size="sm" className="mt-4" asChild>
+                        <Link href={`/donations/campaigns/${campaign.id}`}>View campaign</Link>
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+            </div>
+          ) : null}
 
           <Card>
             <CardHeader>

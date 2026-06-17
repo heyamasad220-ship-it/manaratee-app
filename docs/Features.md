@@ -175,6 +175,26 @@ Removed **255** legacy imported rows from `public.vendors` (May 2026 CSV import)
 
 **Settings → Users list fix (June 2026):** `/settings/users` now loads members via `fetchOrganizationUsersForSettings()` (service role + `settings.users.view`) instead of browser Supabase queries limited by RLS — admins see all org members (e.g. invited Super Admins), not only their own row. Key file: `lib/organizations/organization-users-actions.ts`.
 
+**Contacts add form (June 2026):** Add Contact no longer requires affiliations at create time; donor and other tags sync from activity or can be set on the contact profile.
+
+**Contacts search fix (June 2026):** Contact list search no longer references `primary_contact_name` when that column is absent in the database — fixes production search errors after bulk import.
+
+**Contact profile module gating (June 2026):** Contact detail tabs and panels respect org-enabled modules from `/api/organizations/sidebar-modules` — e.g. MAS Dallas (donations-only) hides Workforce, venue rentals, programs/membership participation, and applications sections. Key files: `lib/contacts/contact-profile-module-access.ts`, `components/contacts/contact-profile-client.tsx`.
+
+**Donation contact picker (June 2026):** Add Pledge and Record Payment search **org contacts** (name, email, phone), not only existing `donors` rows. On save, `ensureDonorExtensionForContact` creates the donor extension when needed. Add Pledge shows an **Add contact** button when search returns no matches; quick-add dialog pre-fills phone/email/name from the search text. Key files: `lib/donations/donation-list-actions.ts`, `components/contacts/quick-add-contact-dialog.tsx`.
+
+**Campaign progress gauge (June 2026):** Speedometer-style fundraising gauge on `/donations/campaigns` (card grid for campaigns with goals) and campaign detail **Goal Progress**. Red/orange/green arc, needle, and total raised; supports exceeding 100% of goal. Component: `components/donations/campaign-progress-gauge.tsx`.
+
+**Donations payment methods add (June 2026):** Donations Settings → Payment Methods now supports **Add Payment Method** (custom name, processing fee label, enabled toggle) in addition to edit/delete/toggle. File: `app/(dashboard)/donations/settings/page.tsx`.
+
+**Donations sidebar label (June 2026):** Staff sidebar sub-item under Donations renamed from **Payments** to **All Donations** (still routes to `/donations/payments` and highlights pledges, campaigns, import, etc.). File: `components/layout/sidebar.tsx`.
+
+**Pledges summary cards (June 2026):** Pledges page stat cards match Donations Overview styling (colored left border, rounded icon badges). File: `app/(dashboard)/donations/(operations)/pledges/page.tsx`.
+
+**Donation attribution fields (June 2026):** Add Pledge / Record Payment forms pick **Fund** first (enabled); **Category** auto-fills from the fund and is read-only when funds exist in settings. File: `components/donations/donation-attribution-fields.tsx`.
+
+**The Asad Realty org removed (June 2026):** Deleted dev/stress org `95c4eb7d-b151-4aa1-a489-a3c1e1289c7e` and org-scoped data (~7.5k payments, 1k donors, campaigns, contacts, etc.). **MAS Dallas pilot org preserved.** Backup: `scripts/backups/organization-delete/organization-delete-95c4eb7d-...json`. Tools: `node scripts/delete-organization.mjs` (dry run / `--execute --confirm-name=...`), `node scripts/cleanup-organization-orphans.mjs` for leftover rows. Auth users with **only** Asad membership were removed; `heyamasad220@gmail.com` kept (MAS membership).
+
 **MAS Dallas program registrations cleared (June 2026):** Removed 4 experimental enrollments (Youth Seasonal Camps), 3 charges, 9 charge lines, and related status/lifecycle rows. Preserved programs catalog (2 programs), sessions, offerings, and registration options. Reset program `enrolled`/`waitlist` counters. Backup: `scripts/backups/program-registrations/`. Report: `scripts/reports/mas-program-registrations-cleanup-2026-06-16.json`. Tool: `node scripts/clean-mas-program-registrations.mjs --execute`.
 
 **MAS Dallas donations seed config cleared (June 2026):** Removed `DONATIONS_DEV_SEED_V1` categories, subcategories, payment methods, campaign, seed contacts/donors, pledges, payments, and **orphaned `donation_receipts`** (2 rows left after ledger delete). Reports overview/collection/receipts should read $0 / 0 pledges after tab refresh. Tool: `node scripts/clean-mas-donations-seed.mjs --execute`. Reports tabs refetch on tab switch (`app/(dashboard)/donations/reports/page.tsx`) so Receipts/Collection no longer show stale seed totals.
@@ -683,8 +703,8 @@ Every canonical `payments` and `pledges` write path stores `campaign_id`, `categ
 
 | Path | File | Behavior |
 |------|------|----------|
-| Staff one-time payment | `app/(dashboard)/donations/payments/page.tsx` | Attribution pickers on insert; pledge allocate copies FKs from pledge |
-| Staff pledge create/edit | `app/(dashboard)/donations/pledges/page.tsx` | Full FK pickers; **fixed** edit pledge writing campaign UUID (was display name) |
+| Staff one-time payment | `app/(dashboard)/donations/payments/page.tsx` | Contact picker searches all contacts; attribution pickers on insert; pledge allocate copies FKs from pledge |
+| Staff pledge create/edit | `app/(dashboard)/donations/pledges/page.tsx` | Contact picker searches all contacts; full FK pickers; **fixed** edit pledge writing campaign UUID (was display name) |
 | Staff pledge payment | `app/(dashboard)/donations/pledges/page.tsx` | Copies pledge FKs onto payment |
 | Portal one-time / pledge / pledge pay | `app/(customer)/customer/donation/page.tsx` | FKs on insert; optional campaign picker |
 | Portal data | `lib/customer/customer-portal-data-actions.ts` | Payments select includes attribution columns; loads campaigns |
@@ -1065,7 +1085,7 @@ Status: Implemented (June 2026)
 | `/donations/campaigns/[id]` | Campaign detail (summary, donor metrics, recent activity) |
 | `/donations` | Dashboard widgets: Top Campaigns, Campaign Progress, Goal Achievement |
 | `/donations/reports` | Campaigns tab — donations/pledges/outstanding/donors by campaign |
-| `/donations/settings` | Campaign CRUD persists goal + description; live raised totals; Categories and Payment Methods support delete (June 2026) |
+| `/donations/settings` | Campaign CRUD persists goal + description; live raised totals; Categories and Payment Methods support add/edit/delete (June 2026) |
 
 ### Validation
 

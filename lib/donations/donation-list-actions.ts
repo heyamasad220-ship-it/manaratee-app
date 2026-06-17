@@ -179,26 +179,58 @@ export async function fetchDonorSummaryPageAction(input: DonorsPageInput = {}) {
   }
 }
 
-export async function searchDonorsForPickerAction(search: string, limit = 50) {
+export type DonationPickerContact = {
+  contactId: string
+  full_name: string | null
+  email: string | null
+  phone: string | null
+}
+
+/** Search org contacts for donation pledge/payment pickers (not limited to existing donors). */
+export async function searchContactsForDonationPickerAction(search: string, limit = 50) {
   const access = await requireDonationStaffAccess("view")
   if (!access.ok) return { success: false as const, error: access.error }
 
   let query = access.supabase
-    .from("donors")
-    .select("id, full_name, email, donor_type")
+    .from("contacts")
+    .select("id, full_name, email, phone")
     .eq("organization_id", access.orgId)
     .order("full_name", { ascending: true })
     .limit(Math.min(limit, 100))
 
   if (search.trim()) {
     const term = `%${escapeIlike(search.trim())}%`
-    query = query.or(`full_name.ilike.${term},email.ilike.${term}`)
+    query = query.or(`full_name.ilike.${term},email.ilike.${term},phone.ilike.${term}`)
   }
 
   const { data, error } = await query
 
   if (error) return { success: false as const, error: error.message }
-  return { success: true as const, donors: data || [] }
+
+  const contacts: DonationPickerContact[] = (data || []).map((row) => ({
+    contactId: row.id as string,
+    full_name: row.full_name as string | null,
+    email: row.email as string | null,
+    phone: row.phone as string | null,
+  }))
+
+  return { success: true as const, contacts }
+}
+
+/** @deprecated Prefer searchContactsForDonationPickerAction — searches contacts, not donor rows. */
+export async function searchDonorsForPickerAction(search: string, limit = 50) {
+  const result = await searchContactsForDonationPickerAction(search, limit)
+  if (!result.success) return result
+
+  return {
+    success: true as const,
+    donors: result.contacts.map((contact) => ({
+      id: contact.contactId,
+      full_name: contact.full_name,
+      email: contact.email,
+      donor_type: null,
+    })),
+  }
 }
 
 export async function fetchOpenPledgesForAllocationAction(donorId?: string | null) {

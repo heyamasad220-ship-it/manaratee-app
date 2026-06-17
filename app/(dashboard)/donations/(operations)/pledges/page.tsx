@@ -4,7 +4,7 @@ import { PaymentHistory } from "@/components/donations/payment-history";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/header";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -46,14 +46,19 @@ import {
   Plus,
   MoreHorizontal,
   DollarSign,
-  TrendingUp,
-  Clock,
+  Heart,
+  AlertCircle,
+  ArrowUpRight,
   CheckCircle2,
   ArrowUpDown,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { ensureDonorExtensionForContact } from "@/lib/donations/donor-contact-bridge";
 import { PledgeReminderActions } from "@/components/donations/pledge-reminder-actions";
+import {
+  QuickAddContactDialog,
+  type QuickAddContactResult,
+} from "@/components/contacts/quick-add-contact-dialog";
 import {
   DonationAttributionFields,
   EMPTY_DONATION_ATTRIBUTION_VALUE,
@@ -72,6 +77,7 @@ import {
 import {
   fetchPledgesPageAction,
   fetchPledgeSummaryMetricsAction,
+  searchContactsForDonationPickerAction,
 } from "@/lib/donations/donation-list-actions";
 import { DONATIONS_PAGE_SIZE } from "@/lib/donations/donation-pagination";
 import {
@@ -103,11 +109,11 @@ interface Pledge {
   notes?: string;
 }
 
-interface DonorOption {
-  id: string;
-  contact_id: string;
+interface ContactPickerOption {
+  contactId: string;
   full_name: string | null;
   email: string | null;
+  phone: string | null;
 }
 
 type FundOption = {
@@ -173,6 +179,7 @@ export default function PledgesPage() {
   const router = useRouter();
 
   const [showDonorList, setShowDonorList] = useState(false);
+  const [showQuickAddContact, setShowQuickAddContact] = useState(false);
   const [organizationId, setOrganizationId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -201,7 +208,7 @@ export default function PledgesPage() {
   const [loadingPledgePayments, setLoadingPledgePayments] = useState(false);
   const [pledgePaymentsError, setPledgePaymentsError] = useState<string | null>(null);
 
-  const [donorOptions, setDonorOptions] = useState<DonorOption[]>([]);
+  const [contactOptions, setContactOptions] = useState<ContactPickerOption[]>([]);
   const [selectedContactId, setSelectedContactId] = useState("");
 
   const [fundOptions, setFundOptions] = useState<FundOption[]>([]);
@@ -252,32 +259,16 @@ export default function PledgesPage() {
     return profile.organization_id as string;
   }
 
-  async function searchDonors(searchValue: string, orgIdOverride?: string) {
-    const orgId = orgIdOverride || organizationId;
+  async function searchContactsForPicker(searchValue: string) {
+    const result = await searchContactsForDonationPickerAction(searchValue, 50);
 
-    if (!orgId) return;
-
-    let query = supabase
-      .from("donors")
-      .select("id, contact_id, full_name, email")
-      .eq("organization_id", orgId)
-      .order("full_name", { ascending: true })
-      .limit(50);
-
-    if (searchValue.trim().length >= 1) {
-      const cleanSearch = searchValue.trim().replaceAll(",", "").replaceAll("%", "");
-      query = query.or(`full_name.ilike.%${cleanSearch}%,email.ilike.%${cleanSearch}%`);
-    }
-
-    const { data, error } = await query;
-
-    if (error) {
-      console.error("Error searching donors:", JSON.stringify(error, null, 2));
-      setDonorOptions([]);
+    if (!result.success) {
+      console.error("Error searching contacts:", result.error);
+      setContactOptions([]);
       return;
     }
 
-    setDonorOptions((data || []) as DonorOption[]);
+    setContactOptions(result.contacts);
   }
 
   async function handleDeletePledge(pledgeId: string) {
@@ -367,15 +358,13 @@ export default function PledgesPage() {
     if (!orgId) {
       setOrganizationId(null);
       setPledges([]);
-      setDonorOptions([]);
+      setContactOptions([]);
       setFundOptions([]);
       setLoading(false);
       return;
     }
 
     setOrganizationId(orgId);
-
-    await searchDonors("", orgId);
 
     const statusMap: Record<string, string> = {
       Open: "open",
@@ -515,6 +504,12 @@ export default function PledgesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPledge, organizationId]);
 
+  useEffect(() => {
+    if (!showAddDialog) return;
+    void searchContactsForPicker(donorSearch);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [donorSearch, showAddDialog]);
+
   const resetAddPledgeForm = () => {
     setSelectedContactId("");
     setAddAttribution(EMPTY_DONATION_ATTRIBUTION_VALUE);
@@ -523,6 +518,21 @@ export default function PledgesPage() {
     setFrequency("One-Time");
     setNotes("");
     setDonorSearch("");
+    setShowDonorList(false);
+    setShowQuickAddContact(false);
+  };
+
+  const handleQuickAddContactCreated = (contact: QuickAddContactResult) => {
+    setContactOptions([
+      {
+        contactId: contact.contactId,
+        full_name: contact.full_name,
+        email: contact.email,
+        phone: contact.phone,
+      },
+    ]);
+    setSelectedContactId(contact.contactId);
+    setDonorSearch(contact.full_name || contact.email || contact.phone || "");
     setShowDonorList(false);
   };
 
@@ -555,7 +565,7 @@ export default function PledgesPage() {
     }
 
     if (!selectedContactId) {
-      alert("Please select a donor.");
+      alert("Please select a contact.");
       return;
     }
 
@@ -794,7 +804,7 @@ export default function PledgesPage() {
     }
   };
 
-  const filteredDonorOptions = donorOptions;
+  const filteredContactOptions = contactOptions;
 
   return (
     <>
@@ -802,57 +812,68 @@ export default function PledgesPage() {
 
       <div className="p-6">
         <div className="mb-6 flex flex-wrap gap-4 [&>*]:w-fit">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Total Pledged
-              </CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(totalPledged)}</div>
-              <p className="text-xs text-muted-foreground">Across {totalPledges} pledges</p>
+          <Card className="border-l-4 border-l-blue-500">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Total Pledged</p>
+                  <p className="text-2xl font-bold text-foreground">{formatCurrency(totalPledged)}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Across {totalPledges} pledges
+                  </p>
+                </div>
+                <div className="rounded-full bg-blue-100 p-3">
+                  <Heart className="h-5 w-5 text-blue-600" />
+                </div>
+              </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Collected
-              </CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(totalCollected)}</div>
-              <p className="text-xs text-muted-foreground">
-                {totalPledged > 0 ? Math.round((totalCollected / totalPledged) * 100) : 0}% of total
-              </p>
+          <Card className="border-l-4 border-l-emerald-500">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Collected</p>
+                  <p className="text-2xl font-bold text-emerald-600">{formatCurrency(totalCollected)}</p>
+                  <div className="mt-1 flex items-center text-xs text-emerald-600">
+                    <ArrowUpRight className="mr-1 h-3 w-3" />
+                    {totalPledged > 0 ? Math.round((totalCollected / totalPledged) * 100) : 0}% of total
+                  </div>
+                </div>
+                <div className="rounded-full bg-emerald-100 p-3">
+                  <DollarSign className="h-5 w-5 text-emerald-600" />
+                </div>
+              </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Remaining
-              </CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(totalRemaining)}</div>
-              <p className="text-xs text-muted-foreground">Yet to be collected</p>
+          <Card className="border-l-4 border-l-amber-500">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Remaining</p>
+                  <p className="text-2xl font-bold text-amber-600">{formatCurrency(totalRemaining)}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Yet to be collected</p>
+                </div>
+                <div className="rounded-full bg-amber-100 p-3">
+                  <AlertCircle className="h-5 w-5 text-amber-600" />
+                </div>
+              </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Active Pledges
-              </CardTitle>
-              <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{activePledges}</div>
-              <p className="text-xs text-muted-foreground">Not yet fulfilled</p>
+          <Card className="border-l-4 border-l-purple-500">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Active Pledges</p>
+                  <p className="text-2xl font-bold text-foreground">{activePledges}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Not yet fulfilled</p>
+                </div>
+                <div className="rounded-full bg-purple-100 p-3">
+                  <CheckCircle2 className="h-5 w-5 text-purple-600" />
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -1092,19 +1113,17 @@ export default function PledgesPage() {
 
           <div className="flex flex-col gap-4 py-4">
             <div className="flex flex-col gap-2">
-              <Label htmlFor="donor">Donor</Label>
+              <Label htmlFor="contact">Contact</Label>
               <Input
-                id="donor"
-                placeholder="Search contact by name or email..."
+                id="contact"
+                placeholder="Search contact by name, email, or phone..."
                 value={donorSearch}
                 onFocus={() => setShowDonorList(true)}
-                onChange={async (event) => {
+                onChange={(event) => {
                   const value = event.target.value;
 
                   setDonorSearch(value);
                   setShowDonorList(true);
-
-                  await searchDonors(value.trim());
                 }}
               />
 
@@ -1112,33 +1131,47 @@ export default function PledgesPage() {
                 <div className="text-sm text-muted-foreground">
                   Selected:{" "}
                   <span className="font-medium">
-                    {donorOptions.find((donor) => donor.contact_id === selectedContactId)?.full_name ||
-                      donorOptions.find((donor) => donor.contact_id === selectedContactId)?.email}
+                    {contactOptions.find((contact) => contact.contactId === selectedContactId)
+                      ?.full_name ||
+                      contactOptions.find((contact) => contact.contactId === selectedContactId)
+                        ?.email}
                   </span>
                 </div>
               )}
 
               {showDonorList && (
                 <div className="max-h-48 overflow-y-auto rounded-md border">
-                  {filteredDonorOptions.length === 0 ? (
-                    <div className="px-3 py-2 text-sm text-muted-foreground">
-                      No donors found.
+                  {filteredContactOptions.length === 0 ? (
+                    <div className="space-y-2 px-3 py-3 text-sm text-muted-foreground">
+                      <p>No contacts found.</p>
+                      {donorSearch.trim() ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                          onClick={() => setShowQuickAddContact(true)}
+                        >
+                          <Plus className="mr-2 h-4 w-4" />
+                          Add contact
+                        </Button>
+                      ) : null}
                     </div>
                   ) : (
-                    filteredDonorOptions.map((donor) => (
+                    filteredContactOptions.map((contact) => (
                       <button
-                        key={donor.id}
+                        key={contact.contactId}
                         type="button"
                         className={`block w-full px-3 py-2 text-left text-sm hover:bg-muted ${
-                          selectedContactId === donor.contact_id ? "bg-muted font-medium" : ""
+                          selectedContactId === contact.contactId ? "bg-muted font-medium" : ""
                         }`}
                         onClick={() => {
-                          setSelectedContactId(donor.contact_id);
-                          setDonorSearch(donor.full_name || donor.email || "");
+                          setSelectedContactId(contact.contactId);
+                          setDonorSearch(contact.full_name || contact.email || "");
                           setShowDonorList(false);
                         }}
                       >
-                        {donor.full_name || donor.email || "Unnamed donor"}
+                        {contact.full_name || contact.email || contact.phone || "Unnamed contact"}
                       </button>
                     ))
                   )}
@@ -1225,6 +1258,13 @@ export default function PledgesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <QuickAddContactDialog
+        open={showQuickAddContact}
+        onOpenChange={setShowQuickAddContact}
+        searchHint={donorSearch}
+        onCreated={handleQuickAddContactCreated}
+      />
 
       <Dialog open={!!editingPledge} onOpenChange={(open) => !open && setEditingPledge(null)}>
         <DialogContent className="max-w-lg">

@@ -15,6 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { CampaignProgressBar } from "@/components/donations/campaign-progress-bar"
+import { CampaignProgressGauge } from "@/components/donations/campaign-progress-gauge"
 import {
   formatCampaignStatusLabel,
   formatDonationCurrency,
@@ -170,14 +171,19 @@ export default function CampaignDetailPage() {
                   Goal Progress
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="flex flex-col items-center gap-4">
+                <CampaignProgressGauge
+                  raised={metrics.raised}
+                  goal={Number(campaign.goal_amount || 0) || null}
+                  size="lg"
+                />
                 <CampaignProgressBar
                   progressPercent={metrics.progressPercent}
-                  className="mb-4"
+                  className="w-full"
                 />
-                <p className="text-sm text-muted-foreground">
+                <p className="text-center text-sm text-muted-foreground">
                   {metrics.progressPercent == null
-                    ? "No goal set for this campaign."
+                    ? "Set a goal in Donations Settings to track progress on the gauge."
                     : `${formatDonationCurrency(metrics.raised)} raised of ${formatDonationCurrency(Number(campaign.goal_amount || 0))} goal`}
                 </p>
               </CardContent>

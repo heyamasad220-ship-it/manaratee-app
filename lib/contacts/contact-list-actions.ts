@@ -245,9 +245,15 @@ async function runContactsQuery(
   const trimmedSearch = input.search?.trim()
   if (trimmedSearch) {
     const pattern = `%${escapeIlike(trimmedSearch)}%`
-    query = query.or(
-      `full_name.ilike.${pattern},email.ilike.${pattern},phone.ilike.${pattern},primary_contact_name.ilike.${pattern}`
-    )
+    const searchFields = [
+      `full_name.ilike.${pattern}`,
+      `email.ilike.${pattern}`,
+      `phone.ilike.${pattern}`,
+    ]
+    if (options.includePrimaryContactName) {
+      searchFields.push(`primary_contact_name.ilike.${pattern}`)
+    }
+    query = query.or(searchFields.join(","))
   }
 
   if (options.includeActivityColumns) {
