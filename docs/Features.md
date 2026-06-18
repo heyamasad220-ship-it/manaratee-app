@@ -189,6 +189,10 @@ Removed **255** legacy imported rows from `public.vendors` (May 2026 CSV import)
 
 **Donation contact picker (June 2026):** Add Pledge and Record Payment search **org contacts** (name, email, phone), not only existing `donors` rows. On save, `ensureDonorExtensionForContact` creates the donor extension when needed. Add Pledge shows an **Add contact** button when search returns no matches; quick-add dialog supports **Person / Organization**, primary contact name for organizations, and auto-suggests Organization when the name looks like a company (LLC, Inc, etc.). Donor affiliation syncs on **first payment**, not pledge creation. Key files: `lib/donations/donation-list-actions.ts`, `components/contacts/quick-add-contact-dialog.tsx`.
 
+**Payment import & match (June 2026 — unified flow):** `/donations/import` replaces the old staging + reconcile split. Upload CSV → payments are created immediately in the match queue (`pending_review`) in **100-row server chunks** (avoids Next.js 1 MB server-action body limit). Duplicate keys tracked in `payment_import_batches.import_seen_keys` during import (migration `118`). **Match Queue** tab matches payments to contacts by name, email, and phone; supports manual search, **Add new contact**, bulk auto-match (≥85% confidence), pledge allocation, and unresolved marking. Donor affiliation syncs on first matched payment. Optional CSV columns: `email`, `phone`, `source`, `campaign`, `category`, `fund`. Audit history on History tab via `payment_import_batches` + `payments.import_batch_id`. Migration `117_payment_import_match_foundation.sql`. `/donations/reconcile` redirects to `?tab=match`. Key files: `components/donations/payment-import-match-workspace.tsx`, `lib/donations/payment-import-match-actions.ts`, `lib/donations/payment-import-csv.ts`, `lib/donations/payment-contact-matching.ts`.
+
+**Payment reconcile matching (June 2026):** Superseded by unified Import & Match flow above. Legacy reconcile page redirects to `/donations/import?tab=match`.
+
 **Campaign progress gauge (June 2026):** Speedometer-style fundraising gauge on `/donations/campaigns` (card grid for campaigns with goals) and campaign detail **Goal Progress**. Red/orange/green arc, needle, and total raised; supports exceeding 100% of goal. Component: `components/donations/campaign-progress-gauge.tsx`.
 
 **Donations payment methods add (June 2026):** Donations Settings → Payment Methods now supports **Add Payment Method** (custom name, processing fee label, enabled toggle) in addition to edit/delete/toggle. File: `app/(dashboard)/donations/settings/page.tsx`.
@@ -715,8 +719,8 @@ Every canonical `payments` and `pledges` write path stores `campaign_id`, `categ
 | Portal one-time / pledge / pledge pay | `app/(customer)/customer/donation/page.tsx` | FKs on insert; optional campaign picker |
 | Portal data | `lib/customer/customer-portal-data-actions.ts` | Payments select includes attribution columns; loads campaigns |
 | Recurring plan create | `app/(dashboard)/donations/recurring/page.tsx` | Category + fund + campaign on plan (`recurring-donation-actions` already copies to manual payments) |
-| CSV import | `app/(dashboard)/donations/import/page.tsx` | Optional CSV columns + default attribution UI; resolves names via `raw_row` |
-| Reconcile allocate | `app/(dashboard)/donations/reconcile/page.tsx` | Copies pledge FKs when matching donor/pledge |
+| CSV import & match | `app/(dashboard)/donations/import/page.tsx` | Upload CSV → payments created directly; Match Queue tab; email/phone matching; bulk auto-match; add contact |
+| Legacy reconcile URL | `/donations/reconcile` | Redirects to `/donations/import?tab=match` |
 
 ### Validation
 
@@ -1063,8 +1067,8 @@ Status: Implemented (June 2026)
 
 * Sidebar reduced to **Overview**, **Donors**, **Payments**, **Reports**, **Settings** (`components/layout/sidebar.tsx`)
 * Operational routes grouped under **Payments** via horizontal tab bar (`components/donations/donation-payments-nav.tsx`)
-* Tab bar layout: `app/(dashboard)/donations/(operations)/layout.tsx` — wraps payments, pledges, recurring, collect, campaigns, import, reconcile
-* URLs unchanged; Import/Reconcile tabs hidden unless user has `donations.manage`
+* Tab bar layout: `app/(dashboard)/donations/(operations)/layout.tsx` — wraps payments, pledges, recurring, collect, campaigns, import & match
+* URLs unchanged; **Import & Match** tab hidden unless user has `donations.manage`; `/donations/reconcile` redirects to match queue
 * Sidebar **Payments** item stays active on all operational routes via `alsoMatchPrefixes`
 
 ## Campaign goals & fundraising analytics (Priority 3)

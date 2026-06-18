@@ -17,8 +17,7 @@ export const DONATION_PAYMENTS_TABS: DonationPaymentsTab[] = [
   { label: "Recurring", href: "/donations/recurring", matchPrefix: "/donations/recurring" },
   { label: "Collect", href: "/donations/collect", matchPrefix: "/donations/collect" },
   { label: "Campaigns", href: "/donations/campaigns", matchPrefix: "/donations/campaigns" },
-  { label: "Import", href: "/donations/import", matchPrefix: "/donations/import", requiresManage: true },
-  { label: "Reconcile", href: "/donations/reconcile", matchPrefix: "/donations/reconcile", requiresManage: true },
+  { label: "Import & Match", href: "/donations/import", matchPrefix: "/donations/import", requiresManage: true },
 ]
 
 function isTabActive(tab: DonationPaymentsTab, pathname: string, tabs: DonationPaymentsTab[]) {

@@ -284,7 +284,12 @@ npm run validate:donations-security
 
 **Performance indexes (migration `096_donations_performance_indexes.sql`):** org-scoped indexes on canonical ledger + donation operational tables. See Priority 15 in `docs/Features.md`.
 
-**Analytical views (migration `097_donations_views.sql`):** `pledge_status_view`, `donor_summary_view` with `security_invoker = true` (RLS on underlying tables applies).
+**Analytical views (migration `097_donations_views.sql`):** `pledge_status_view`, `donor_summary_view` with `security_invoker = true` (RLS on underlying tables applies). `donor_summary_view` includes `contact_id` (patch `116_donor_summary_view_contact_id.sql`) for payment contact matching.
+
+**Import columns on `payments` (migration `117`):** `import_email`, `import_phone`, `import_batch_id` — CSV match hints and batch audit link. Staff import flow no longer uses `payment_import_rows` staging in the UI.
+
+**Chunked CSV import (migration `118`):** `payment_import_batches.import_seen_keys` holds duplicate keys while a file imports in 100-row server-action chunks; cleared when import completes.
+
 
 **Dashboard RPCs (migration `098_donations_dashboard_rpcs.sql`):** `donation_org_payment_summary`, `donation_org_pledge_summary`, `donation_monthly_payment_totals`, `donation_payment_source_totals`.
 

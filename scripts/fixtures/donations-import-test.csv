@@ -1,3 +1,3 @@
-sender_name,amount,payment_date,reference
-Seed Import Donor,75.00,2026-06-10,ZELLE-SEED-001
-Unknown Import Name,120.50,2026-06-11,CHK-SEED-002
+sender_name,email,phone,amount,payment_date,reference,source
+Seed Import Donor,donor@example.com,2145550100,75.00,2026-06-10,ZELLE-SEED-001,zelle
+Unknown Import Name,,,120.50,2026-06-11,CHK-SEED-002,check

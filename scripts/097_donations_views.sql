@@ -43,6 +43,7 @@ AS
 SELECT
   d.id,
   d.organization_id,
+  d.contact_id,
   d.donor_type,
   d.full_name,
   d.email,
