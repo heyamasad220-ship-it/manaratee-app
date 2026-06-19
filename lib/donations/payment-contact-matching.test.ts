@@ -4,6 +4,7 @@ import { describe, it } from "node:test"
 import {
   isAutoMatchEligible,
   rankContactMatches,
+  resolvePaymentMatchHints,
   scoreContactMatch,
 } from "./payment-contact-matching"
 
@@ -73,5 +74,15 @@ describe("payment contact matching", () => {
     ])
 
     assert.equal(eligible, false)
+  })
+
+  it("infers email from sender_name when import_email is empty", () => {
+    const hints = resolvePaymentMatchHints({
+      senderName: "donor@example.com",
+      importEmail: null,
+      importPhone: null,
+    })
+
+    assert.equal(hints.email, "donor@example.com")
   })
 })

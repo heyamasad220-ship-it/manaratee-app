@@ -189,7 +189,7 @@ Removed **255** legacy imported rows from `public.vendors` (May 2026 CSV import)
 
 **Donation contact picker (June 2026):** Add Pledge and Record Payment search **org contacts** (name, email, phone), not only existing `donors` rows. On save, `ensureDonorExtensionForContact` creates the donor extension when needed. Add Pledge shows an **Add contact** button when search returns no matches; quick-add dialog supports **Person / Organization**, primary contact name for organizations, and auto-suggests Organization when the name looks like a company (LLC, Inc, etc.). Donor affiliation syncs on **first payment**, not pledge creation. Key files: `lib/donations/donation-list-actions.ts`, `components/contacts/quick-add-contact-dialog.tsx`.
 
-**Payment import & match (June 2026 — unified flow):** `/donations/import` replaces the old staging + reconcile split. Upload CSV → payments are created immediately in the match queue (`pending_review`) in **100-row server chunks** (avoids Next.js 1 MB server-action body limit). Duplicate keys tracked in `payment_import_batches.import_seen_keys` during import (migration `118`). **Match Queue** tab matches payments to contacts by name, email, and phone; supports manual search, **Add new contact**, bulk auto-match (≥85% confidence), pledge allocation, and unresolved marking. Donor affiliation syncs on first matched payment. Optional CSV columns: `email`, `phone`, `source`, `campaign`, `category`, `fund`. Audit history on History tab via `payment_import_batches` + `payments.import_batch_id`. Migration `117_payment_import_match_foundation.sql`. `/donations/reconcile` redirects to `?tab=match`. Key files: `components/donations/payment-import-match-workspace.tsx`, `lib/donations/payment-import-match-actions.ts`, `lib/donations/payment-import-csv.ts`, `lib/donations/payment-contact-matching.ts`.
+**Payment import & match (June 2026 — unified flow):** `/donations/import` replaces the old staging + reconcile split. Upload CSV → payments are created immediately in the match queue (`pending_review`) in **100-row server chunks**. **Auto-match after import** is on by default: high-confidence contact matches (≥85%, email/phone/exact name) link automatically; remainder stays in Match Queue for manual review. **Auto-allocate to best pledge** (default on with auto-match) uses `lib/donations/payment-pledge-allocation.ts`: prefers **lump-sum** (`one_time`) open pledges over **installment** schedules (`monthly`, `quarterly`, `yearly`); skips installment pledges when donor has an active `recurring_donation_plans` row and a lump-sum pledge exists; leaves payment **unallocated** when two pledges tie on top balance. Bulk auto-match and **Quick Apply** share the same picker. Migrations `116`–`118`. Key files: `components/donations/payment-import-match-workspace.tsx`, `lib/donations/payment-import-match-actions.ts`, `lib/donations/payment-contact-matching.ts`, `lib/donations/payment-pledge-allocation.ts`.
 
 **Payment reconcile matching (June 2026):** Superseded by unified Import & Match flow above. Legacy reconcile page redirects to `/donations/import?tab=match`.
 
@@ -197,7 +197,9 @@ Removed **255** legacy imported rows from `public.vendors` (May 2026 CSV import)
 
 **Donations payment methods add (June 2026):** Donations Settings → Payment Methods now supports **Add Payment Method** (custom name, processing fee label, enabled toggle) in addition to edit/delete/toggle. File: `app/(dashboard)/donations/settings/page.tsx`.
 
-**Donations sidebar label (June 2026):** Staff sidebar sub-item under Donations renamed from **Payments** to **All Donations** (still routes to `/donations/payments` and highlights pledges, campaigns, import, etc.). File: `components/layout/sidebar.tsx`.
+**Donations pilot blockers (June 2026):** Migrations `119`–`120` — voided payments excluded from `pledge_status_view` balances and headline totals; cancelled pledges emit `calculated_status = cancelled` (excluded from Collect/allocation); portal pledge pay saves `status = allocated`. Validation: `lib/donations/pilot-blocker-validation.test.ts`. Apply: `119_donations_pilot_blocker_views.sql`, `120_donations_pilot_blocker_totals.sql`.
+
+**Donations sidebar (June 2026):** Under Donations: **Overview**, **Donors**, **Records** (Payments, Pledges, Recurring, Campaigns tabs), **Donation Manager** (Collect, Import & Match tabs), **Reports**, **Settings**. Donation Manager routes: `/donations/collect`, `/donations/import`; `/donations/reconcile` redirects to match queue. Files: `components/layout/sidebar.tsx`, `components/donations/donation-payments-nav.tsx`, `components/donations/donation-manager-nav.tsx`, `app/(dashboard)/donations/(donation-manager)/layout.tsx`.
 
 **Pledges summary cards (June 2026):** Pledges page stat cards match Donations Overview styling (colored left border, rounded icon badges). File: `app/(dashboard)/donations/(operations)/pledges/page.tsx`.
 
@@ -1065,11 +1067,10 @@ npm run validate:donations-production
 
 Status: Implemented (June 2026)
 
-* Sidebar reduced to **Overview**, **Donors**, **Payments**, **Reports**, **Settings** (`components/layout/sidebar.tsx`)
-* Operational routes grouped under **Payments** via horizontal tab bar (`components/donations/donation-payments-nav.tsx`)
-* Tab bar layout: `app/(dashboard)/donations/(operations)/layout.tsx` — wraps payments, pledges, recurring, collect, campaigns, import & match
+* Sidebar: **Overview**, **Donors**, **Records**, **Donation Manager**, **Reports**, **Settings** (`components/layout/sidebar.tsx`)
+* **Records** — horizontal tab bar for Payments, Pledges, Recurring, Campaigns (`components/donations/donation-payments-nav.tsx`, `app/(dashboard)/donations/(operations)/layout.tsx`)
+* **Donation Manager** — Collect and Import & Match tabs (`components/donations/donation-manager-nav.tsx`, `app/(dashboard)/donations/(donation-manager)/layout.tsx`)
 * URLs unchanged; **Import & Match** tab hidden unless user has `donations.manage`; `/donations/reconcile` redirects to match queue
-* Sidebar **Payments** item stays active on all operational routes via `alsoMatchPrefixes`
 
 ## Campaign goals & fundraising analytics (Priority 3)
 

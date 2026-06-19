@@ -240,7 +240,7 @@ AS $$
 $$;
 
 -- ---------------------------------------------------------------------------
--- Reports overview (includes voided payments — matches reports page)
+-- Reports overview (excludes voided — aligned with dashboard; superseded by 120_donations_pilot_blocker_totals.sql)
 -- ---------------------------------------------------------------------------
 
 CREATE OR REPLACE FUNCTION public.donation_org_reports_overview(p_org_id uuid)
@@ -386,7 +386,7 @@ COMMENT ON FUNCTION public.donation_campaign_recent_activity IS
   'Recent donations, pledges, and pledge payments for a single campaign (limited).';
 
 COMMENT ON FUNCTION public.donation_org_reports_overview IS
-  'Reports overview totals (includes voided payment amounts per reports page).';
+  'Reports overview totals (excludes voided payment amounts; aligned with dashboard).';
 
 COMMENT ON FUNCTION public.donation_donor_tax_year_totals IS
   'Per-donor giving totals for tax year statements (excludes voided).';

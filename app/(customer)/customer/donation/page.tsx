@@ -526,7 +526,7 @@ export default function CustomerDonationsPage() {
         payment_date: `${paymentDate}T12:00:00`,
         source: normalizePaymentSourceChannel(paymentMethodName),
         source_type: "portal",
-        status: "unallocated",
+        status: "allocated",
         is_verified: false,
         ...toPaymentAttributionColumns(pledgeAttribution),
       })

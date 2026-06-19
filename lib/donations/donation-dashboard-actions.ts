@@ -74,17 +74,18 @@ export async function getDonationDashboardSummaryAction(
   if (timeRangeStart) {
     const { data: rangePayments, error } = await access.supabase
       .from("payments")
-      .select("amount")
+      .select("amount, status")
       .eq("organization_id", access.orgId)
       .gte("payment_date", timeRangeStart)
 
     if (error) return { success: false, error: error.message }
 
-    totalCollected = (rangePayments || []).reduce(
-      (sum, row) => sum + Number(row.amount || 0),
-      0
+    const validPayments = (rangePayments || []).filter(
+      (row) => String(row.status || "").toLowerCase() !== "voided"
     )
-    paymentCount = (rangePayments || []).length
+
+    totalCollected = validPayments.reduce((sum, row) => sum + Number(row.amount || 0), 0)
+    paymentCount = validPayments.length
     thisMonthCollected = Number(paymentRow?.this_month_collected || 0)
   }
 

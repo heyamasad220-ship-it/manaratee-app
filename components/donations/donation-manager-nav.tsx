@@ -4,21 +4,24 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 
-export type DonationPaymentsTab = {
+export type DonationManagerTab = {
   label: string
   href: string
   matchPrefix: string
   requiresManage?: boolean
 }
 
-export const DONATION_PAYMENTS_TABS: DonationPaymentsTab[] = [
-  { label: "Payments", href: "/donations/payments", matchPrefix: "/donations/payments" },
-  { label: "Pledges", href: "/donations/pledges", matchPrefix: "/donations/pledges" },
-  { label: "Recurring", href: "/donations/recurring", matchPrefix: "/donations/recurring" },
-  { label: "Campaigns", href: "/donations/campaigns", matchPrefix: "/donations/campaigns" },
+export const DONATION_MANAGER_TABS: DonationManagerTab[] = [
+  { label: "Collect", href: "/donations/collect", matchPrefix: "/donations/collect" },
+  {
+    label: "Import & Match",
+    href: "/donations/import",
+    matchPrefix: "/donations/import",
+    requiresManage: true,
+  },
 ]
 
-function isTabActive(tab: DonationPaymentsTab, pathname: string, tabs: DonationPaymentsTab[]) {
+function isTabActive(tab: DonationManagerTab, pathname: string, tabs: DonationManagerTab[]) {
   const matches = pathname === tab.href || pathname.startsWith(`${tab.matchPrefix}/`)
   if (!matches) return false
 
@@ -32,9 +35,9 @@ function isTabActive(tab: DonationPaymentsTab, pathname: string, tabs: DonationP
   return !overridden
 }
 
-export function DonationPaymentsNav({ canManage }: { canManage: boolean }) {
+export function DonationManagerNav({ canManage }: { canManage: boolean }) {
   const pathname = usePathname()
-  const visibleTabs = DONATION_PAYMENTS_TABS.filter((tab) => !tab.requiresManage || canManage)
+  const visibleTabs = DONATION_MANAGER_TABS.filter((tab) => !tab.requiresManage || canManage)
 
   return (
     <div className="border-b border-border bg-background px-6">

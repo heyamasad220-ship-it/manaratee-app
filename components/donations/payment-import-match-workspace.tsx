@@ -34,6 +34,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Dialog,
@@ -122,7 +123,18 @@ function formatDate(value: string | null) {
 export function PaymentImportMatchWorkspace() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const activeTab = searchParams.get("tab") === "match" ? "match" : searchParams.get("tab") === "history" ? "history" : "upload"
+  const [activeTab, setActiveTab] = useState<"upload" | "match" | "history">("upload")
+  const [tabsMounted, setTabsMounted] = useState(false)
+
+  useEffect(() => {
+    const tab = searchParams.get("tab")
+    if (tab === "match" || tab === "history") {
+      setActiveTab(tab)
+    } else {
+      setActiveTab("upload")
+    }
+    setTabsMounted(true)
+  }, [searchParams])
 
   const [organizationId, setOrganizationId] = useState<string | null>(null)
   const [fileName, setFileName] = useState("")
@@ -155,6 +167,8 @@ export function PaymentImportMatchWorkspace() {
 
   const [history, setHistory] = useState<ImportHistoryBatch[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
+  const [autoMatchAfterImport, setAutoMatchAfterImport] = useState(true)
+  const [autoAllocatePledge, setAutoAllocatePledge] = useState(true)
 
   const validRows = useMemo(
     () => parsedRows.filter((row) => validatePaymentCsvRow(row).valid),
@@ -190,6 +204,7 @@ export function PaymentImportMatchWorkspace() {
 
   const setTab = useCallback(
     (tab: "upload" | "match" | "history") => {
+      setActiveTab(tab)
       const params = new URLSearchParams(searchParams.toString())
       if (tab === "upload") params.delete("tab")
       else params.set("tab", tab)
@@ -288,6 +303,75 @@ export function PaymentImportMatchWorkspace() {
     })
   }
 
+  async function runBulkAutoMatch(options?: {
+    importBatchId?: string | null
+    showAlert?: boolean
+  }) {
+    let totalMatched = 0
+    let totalAllocated = 0
+    let totalMatchedUnallocated = 0
+    let totalSkipped = 0
+    let remaining = 1
+    let rounds = 0
+
+    while (remaining > 0 && rounds < 50) {
+      rounds += 1
+      setImportProgress(
+        options?.importBatchId
+          ? `Auto-matching payments (${totalMatched} matched so far)...`
+          : `Auto-matching batch ${rounds}...`
+      )
+
+      const result = await bulkAutoMatchImportPaymentsAction({
+        minScore: 85,
+        importBatchId: options?.importBatchId ?? null,
+        autoAllocatePledge,
+      })
+
+      if (!result.success) {
+        if (options?.showAlert) alert(result.error)
+        return {
+          success: false as const,
+          error: result.error,
+          totalMatched,
+          totalAllocated,
+          totalMatchedUnallocated,
+          totalSkipped,
+        }
+      }
+
+      totalMatched += result.matched
+      totalAllocated += result.allocated
+      totalMatchedUnallocated += result.matchedUnallocated
+      totalSkipped += result.skipped
+      remaining = result.remaining
+
+      if (result.matched === 0) break
+    }
+
+    if (options?.showAlert) {
+      alert(
+        `Auto-matched ${totalMatched} payment(s).` +
+          (totalAllocated > 0 ? ` ${totalAllocated} allocated to pledges.` : "") +
+          (totalMatchedUnallocated > 0
+            ? ` ${totalMatchedUnallocated} matched but need pledge selection.`
+            : "") +
+          (totalSkipped > 0 ? ` ${totalSkipped} need manual review in the last batch.` : "") +
+          (remaining > 0 ? ` ${remaining} still need manual matching.` : "")
+      )
+    }
+
+    await loadQueue()
+    return {
+      success: true as const,
+      totalMatched,
+      totalAllocated,
+      totalMatchedUnallocated,
+      totalSkipped,
+      remaining,
+    }
+  }
+
   async function handleImportCsv() {
     if (validRows.length === 0) {
       alert("No valid payment rows to import")
@@ -346,15 +430,47 @@ export function PaymentImportMatchWorkspace() {
       dbDuplicates += chunkResult.duplicates
     }
 
-    setImporting(false)
-    setImportProgress(null)
-
     const duplicates = fileDuplicates + dbDuplicates
-    alert(
-      `Imported ${imported} payment(s) into the match queue.` +
-        (duplicates > 0 ? ` Skipped ${duplicates} duplicate(s).` : "") +
-        (invalidRows.length > 0 ? ` ${invalidRows.length} row(s) were invalid.` : "")
-    )
+
+    if (autoMatchAfterImport && imported > 0) {
+      setImportProgress("Auto-matching high-confidence contacts...")
+      const autoMatch = await runBulkAutoMatch({ importBatchId: begin.batchId })
+
+      setImporting(false)
+      setImportProgress(null)
+
+      if (!autoMatch.success) {
+        alert(
+          `Imported ${imported} payment(s), but auto-match failed: ${autoMatch.error}` +
+            (duplicates > 0 ? ` Skipped ${duplicates} duplicate(s).` : "")
+        )
+      } else {
+        alert(
+          `Imported ${imported} payment(s).` +
+            (duplicates > 0 ? ` Skipped ${duplicates} duplicate(s).` : "") +
+            (invalidRows.length > 0 ? ` ${invalidRows.length} row(s) were invalid.` : "") +
+            ` Auto-matched ${autoMatch.totalMatched}.` +
+            (autoMatch.totalAllocated > 0
+              ? ` ${autoMatch.totalAllocated} allocated to pledges.`
+              : "") +
+            (autoMatch.totalMatchedUnallocated > 0
+              ? ` ${autoMatch.totalMatchedUnallocated} matched but need pledge selection.`
+              : "") +
+            (autoMatch.remaining > 0
+              ? ` ${autoMatch.remaining} still need manual review.`
+              : " All high-confidence payments matched.")
+        )
+      }
+    } else {
+      setImporting(false)
+      setImportProgress(null)
+
+      alert(
+        `Imported ${imported} payment(s) into the match queue.` +
+          (duplicates > 0 ? ` Skipped ${duplicates} duplicate(s).` : "") +
+          (invalidRows.length > 0 ? ` ${invalidRows.length} row(s) were invalid.` : "")
+      )
+    }
 
     setParsedRows([])
     setFileName("")
@@ -365,21 +481,22 @@ export function PaymentImportMatchWorkspace() {
 
   async function handleBulkAutoMatch() {
     const confirmed = window.confirm(
-      `Auto-match all pending payments with a single high-confidence contact match (${">="}85%)?`
+      `Auto-match all pending payments with a single high-confidence contact match (≥85%)?` +
+        (autoAllocatePledge
+          ? " Clear lump-sum pledges are preferred over installment schedules."
+          : " Pledges will not be auto-allocated.")
     )
     if (!confirmed) return
 
     setBulkMatching(true)
-    const result = await bulkAutoMatchImportPaymentsAction(85)
+    setImportProgress("Auto-matching...")
+    const result = await runBulkAutoMatch({ showAlert: true })
     setBulkMatching(false)
+    setImportProgress(null)
 
     if (!result.success) {
       alert(result.error)
-      return
     }
-
-    alert(`Auto-matched ${result.matched} payment(s). Skipped ${result.skipped}.`)
-    await loadQueue()
   }
 
   async function handleManualSearch() {
@@ -544,16 +661,19 @@ export function PaymentImportMatchWorkspace() {
     <>
       <Header title="Import & Match Payments" />
 
+      {!tabsMounted ? (
+        <div className="p-6 text-sm text-muted-foreground">Loading...</div>
+      ) : (
       <Tabs value={activeTab} onValueChange={(value) => setTab(value as "upload" | "match" | "history")} className="p-6">
         <TabsList className="mb-6">
           <TabsTrigger value="upload">Upload</TabsTrigger>
           <TabsTrigger value="match">
             Match Queue
-            {pendingCount > 0 && (
+            {pendingCount > 0 ? (
               <Badge variant="secondary" className="ml-2">
                 {pendingCount}
               </Badge>
-            )}
+            ) : null}
           </TabsTrigger>
           <TabsTrigger value="history">History</TabsTrigger>
         </TabsList>
@@ -596,6 +716,42 @@ export function PaymentImportMatchWorkspace() {
                   value={defaultAttribution}
                   onChange={setDefaultAttribution}
                 />
+              </div>
+
+              <div className="flex items-start gap-3 rounded-md border p-4">
+                <Checkbox
+                  id="auto-match-after-import"
+                  checked={autoMatchAfterImport}
+                  onCheckedChange={(checked) => setAutoMatchAfterImport(checked === true)}
+                />
+                <div className="space-y-1">
+                  <Label htmlFor="auto-match-after-import" className="text-sm font-medium">
+                    Auto-match after import (recommended)
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Links payments to contacts automatically when email, phone, or name match is
+                    high confidence (≥85%). Unmatched rows stay in the queue for manual review.
+                  </p>
+                  {autoMatchAfterImport && (
+                    <div className="mt-3 flex items-start gap-3 rounded-md border bg-muted/30 p-3">
+                      <Checkbox
+                        id="auto-allocate-pledge"
+                        checked={autoAllocatePledge}
+                        onCheckedChange={(checked) => setAutoAllocatePledge(checked === true)}
+                      />
+                      <div className="space-y-1">
+                        <Label htmlFor="auto-allocate-pledge" className="text-sm font-medium">
+                          Auto-allocate to best pledge
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                          Prefers lump-sum (one-time) open pledges over installment schedules,
+                          especially when the donor has an active recurring plan. Ambiguous ties
+                          stay matched but unallocated.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <Button onClick={handleImportCsv} disabled={importing || validRows.length === 0}>
@@ -658,12 +814,23 @@ export function PaymentImportMatchWorkspace() {
         </TabsContent>
 
         <TabsContent value="match">
-          <div className="mb-4 flex flex-wrap gap-3">
+          <div className="mb-4 flex flex-wrap items-center gap-3">
             <Button variant="outline" onClick={handleBulkAutoMatch} disabled={bulkMatching || pendingCount === 0}>
               {bulkMatching ? "Auto-matching..." : "Auto-match high confidence"}
             </Button>
-            <p className="self-center text-sm text-muted-foreground">
-              Match imported payments to contacts. Donor affiliation applies on first matched payment.
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="bulk-auto-allocate-pledge"
+                checked={autoAllocatePledge}
+                onCheckedChange={(checked) => setAutoAllocatePledge(checked === true)}
+              />
+              <Label htmlFor="bulk-auto-allocate-pledge" className="text-sm text-muted-foreground">
+                Auto-allocate to best pledge
+              </Label>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Review payments that could not be auto-matched. Quick Apply prefers lump-sum pledges
+              over installment schedules.
             </p>
           </div>
 
@@ -953,6 +1120,7 @@ export function PaymentImportMatchWorkspace() {
           </Card>
         </TabsContent>
       </Tabs>
+      )}
 
       <QuickAddContactDialog
         open={showQuickAdd}

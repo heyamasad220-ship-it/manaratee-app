@@ -4,14 +4,21 @@ import { handleDonationAffiliationSync } from "@/lib/contacts/contact-affiliatio
 import { requireDonationStaffAccess } from "@/lib/donations/donation-action-auth"
 import { ensureDonorExtensionForContact } from "@/lib/donations/donor-contact-bridge"
 import {
+  buildContactLookupIndex,
   buildContactSearchFilter,
   buildManualSearchFilter,
+  findAutoMatchForPayment,
   getNameParts,
-  isAutoMatchEligible,
   rankContactMatches,
+  resolvePaymentMatchHints,
+  type ContactLookupIndex,
   type ContactMatchInput,
   type ContactMatchResult,
 } from "@/lib/donations/payment-contact-matching"
+import {
+  pickPledgeForImportAllocation,
+  type PledgeAllocationCandidate,
+} from "@/lib/donations/payment-pledge-allocation"
 import {
   dedupeValidPaymentCsvRows,
   makePaymentDuplicateKey,
@@ -35,6 +42,10 @@ import {
 
 const PAYMENT_INSERT_BATCH_SIZE = 200
 const PAYMENT_KEY_PAGE_SIZE = 1000
+const BULK_AUTO_MATCH_PAYMENT_BATCH = 500
+const BULK_PAYMENT_UPDATE_PARALLEL = 40
+const BULK_AFFILIATION_SYNC_PARALLEL = 20
+const CONTACT_FETCH_PAGE_SIZE = 1000
 
 async function fetchExistingPaymentKeys(
   supabase: Awaited<ReturnType<typeof requireDonationStaffAccess>> extends { ok: true; supabase: infer S }
@@ -462,15 +473,13 @@ export async function findContactMatchesForPaymentAction(input: {
     phone: input.importPhone,
   })
 
-  const matches = rankContactMatches(
-    {
-      senderName: input.senderName,
-      email: input.importEmail,
-      phone: input.importPhone,
-    },
-    contacts,
-    5
-  )
+  const hints = resolvePaymentMatchHints({
+    senderName: input.senderName,
+    importEmail: input.importEmail,
+    importPhone: input.importPhone,
+  })
+
+  const matches = rankContactMatches(hints, contacts, 5)
 
   return { success: true as const, matches }
 }
@@ -536,6 +545,116 @@ async function resolveDonorForContact(orgId: string, contactId: string) {
   return { donorId, contactId }
 }
 
+async function fetchDonorIdsWithActiveRecurringPlans(
+  supabase: SupabaseFromAccess,
+  orgId: string,
+  donorIds: string[]
+) {
+  const active = new Set<string>()
+  if (donorIds.length === 0) return active
+
+  for (let index = 0; index < donorIds.length; index += 200) {
+    const chunk = donorIds.slice(index, index + 200)
+    const { data, error } = await supabase
+      .from("recurring_donation_plans")
+      .select("donor_id")
+      .eq("organization_id", orgId)
+      .in("donor_id", chunk)
+      .in("status", ["active", "past_due"])
+
+    if (error) throw new Error(error.message)
+
+    for (const row of data || []) {
+      const donorId = row.donor_id as string | null
+      if (donorId) active.add(donorId)
+    }
+  }
+
+  return active
+}
+
+async function fetchOpenPledgesByDonorIds(
+  supabase: SupabaseFromAccess,
+  orgId: string,
+  donorIds: string[]
+) {
+  const byDonor = new Map<string, PledgeAllocationCandidate[]>()
+  if (donorIds.length === 0) return byDonor
+
+  for (let index = 0; index < donorIds.length; index += 200) {
+    const chunk = donorIds.slice(index, index + 200)
+    const { data, error } = await supabase
+      .from("pledge_status_view")
+      .select("id, donor_id, balance_remaining, frequency, pledge_type")
+      .eq("organization_id", orgId)
+      .in("donor_id", chunk)
+      .gt("balance_remaining", 0)
+      .neq("calculated_status", "cancelled")
+
+    if (error) throw new Error(error.message)
+
+    for (const row of data || []) {
+      const donorId = row.donor_id as string | null
+      if (!donorId) continue
+
+      const list = byDonor.get(donorId) || []
+      list.push({
+        id: row.id as string,
+        donorId,
+        balanceRemaining: Number(row.balance_remaining || 0),
+        frequency: (row.frequency as string | null) || null,
+        pledgeType: (row.pledge_type as string | null) || null,
+      })
+      byDonor.set(donorId, list)
+    }
+  }
+
+  return byDonor
+}
+
+async function pickSmartPledgeForDonor(
+  supabase: SupabaseFromAccess,
+  orgId: string,
+  donorId: string,
+  pledgesByDonor: Map<string, PledgeAllocationCandidate[]>,
+  recurringDonorIds: Set<string>
+) {
+  const pledges = pledgesByDonor.get(donorId) || []
+  return pickPledgeForImportAllocation(pledges, {
+    donorHasActiveRecurringPlan: recurringDonorIds.has(donorId),
+  })
+}
+
+async function applyPaymentContactMatch(
+  supabase: SupabaseFromAccess,
+  orgId: string,
+  input: {
+    paymentId: string
+    donorId: string
+    contactId: string
+    pledgeId?: string | null
+    pledgeAttributionColumns?: Record<string, unknown>
+    reconciledAt: string
+  }
+) {
+  const allocated = Boolean(input.pledgeId)
+
+  const { error } = await supabase
+    .from("payments")
+    .update({
+      donor_id: input.donorId,
+      contact_id: input.contactId,
+      pledge_id: input.pledgeId ?? null,
+      status: allocated ? "allocated" : "unallocated",
+      reconciled_at: input.reconciledAt,
+      ...(input.pledgeAttributionColumns || {}),
+    })
+    .eq("organization_id", orgId)
+    .eq("id", input.paymentId)
+
+  return { error, allocated }
+}
+
 export async function matchPaymentToContactAction(input: {
   paymentId: string
   contactId: string
@@ -550,25 +669,29 @@ export async function matchPaymentToContactAction(input: {
   }
 
   if (input.mode === "allocate_best_pledge") {
-    const { data: pledges, error: pledgeError } = await access.supabase
-      .from("pledge_status_view")
-      .select("id, balance_remaining")
-      .eq("organization_id", access.orgId)
-      .eq("donor_id", resolved.donorId)
-      .gt("balance_remaining", 0)
-      .order("balance_remaining", { ascending: false })
-      .limit(1)
+    const pledgesByDonor = await fetchOpenPledgesByDonorIds(
+      access.supabase,
+      access.orgId,
+      [resolved.donorId]
+    )
+    const recurringDonorIds = await fetchDonorIdsWithActiveRecurringPlans(
+      access.supabase,
+      access.orgId,
+      [resolved.donorId]
+    )
+    const bestPledge = await pickSmartPledgeForDonor(
+      access.supabase,
+      access.orgId,
+      resolved.donorId,
+      pledgesByDonor,
+      recurringDonorIds
+    )
 
-    if (pledgeError) {
-      return { success: false as const, error: pledgeError.message }
-    }
-
-    const bestPledge = pledges?.[0]
     if (bestPledge?.id) {
       const { fetchPledgeAttribution, toPaymentAttributionColumns } = await import(
         "@/lib/donations/payment-attribution"
       )
-      const pledgeAttribution = await fetchPledgeAttribution(access.supabase, bestPledge.id as string)
+      const pledgeAttribution = await fetchPledgeAttribution(access.supabase, bestPledge.id)
 
       const { error } = await access.supabase
         .from("payments")
@@ -676,59 +799,344 @@ export async function markPaymentUnresolvedAction(paymentId: string) {
   return { success: true as const }
 }
 
-export async function bulkAutoMatchImportPaymentsAction(minScore = 85) {
+type SupabaseFromAccess = Awaited<
+  ReturnType<typeof requireDonationStaffAccess>
+> extends { ok: true; supabase: infer S }
+  ? S
+  : never
+
+async function fetchAllOrgContacts(supabase: SupabaseFromAccess, orgId: string) {
+  const contacts: ContactMatchInput[] = []
+  let from = 0
+
+  while (true) {
+    const { data, error } = await supabase
+      .from("contacts")
+      .select("id, full_name, email, phone")
+      .eq("organization_id", orgId)
+      .order("full_name", { ascending: true })
+      .range(from, from + CONTACT_FETCH_PAGE_SIZE - 1)
+
+    if (error) throw new Error(error.message)
+
+    const rows = data || []
+    for (const row of rows) {
+      contacts.push({
+        contactId: row.id as string,
+        full_name: row.full_name as string | null,
+        email: row.email as string | null,
+        phone: row.phone as string | null,
+      })
+    }
+
+    if (rows.length < CONTACT_FETCH_PAGE_SIZE) break
+    from += CONTACT_FETCH_PAGE_SIZE
+  }
+
+  return contacts
+}
+
+async function fetchDonorsByContactId(supabase: SupabaseFromAccess, orgId: string) {
+  const donorsByContactId = new Map<string, string>()
+  let from = 0
+
+  while (true) {
+    const { data, error } = await supabase
+      .from("donors")
+      .select("id, contact_id")
+      .eq("organization_id", orgId)
+      .not("contact_id", "is", null)
+      .range(from, from + CONTACT_FETCH_PAGE_SIZE - 1)
+
+    if (error) throw new Error(error.message)
+
+    const rows = data || []
+    for (const row of rows) {
+      const contactId = row.contact_id as string | null
+      if (contactId) donorsByContactId.set(contactId, row.id as string)
+    }
+
+    if (rows.length < CONTACT_FETCH_PAGE_SIZE) break
+    from += CONTACT_FETCH_PAGE_SIZE
+  }
+
+  return donorsByContactId
+}
+
+async function bulkEnsureDonorExtensions(
+  supabase: SupabaseFromAccess,
+  orgId: string,
+  contactIds: string[],
+  donorsByContactId: Map<string, string>
+) {
+  const missing = [...new Set(contactIds)].filter((contactId) => !donorsByContactId.has(contactId))
+  if (missing.length === 0) return donorsByContactId
+
+  for (let index = 0; index < missing.length; index += 200) {
+    const chunk = missing.slice(index, index + 200)
+    const { data: contacts, error: contactError } = await supabase
+      .from("contacts")
+      .select("id, full_name, email, phone, contact_type")
+      .eq("organization_id", orgId)
+      .in("id", chunk)
+
+    if (contactError) throw new Error(contactError.message)
+
+    const payload = (contacts || []).map((contact) => ({
+      organization_id: orgId,
+      contact_id: contact.id as string,
+      full_name: (contact.full_name as string | null) || "Unnamed",
+      email: contact.email as string | null,
+      phone: contact.phone as string | null,
+      donor_type:
+        (contact.contact_type as string | null) === "organization" ? "organization" : "individual",
+      status: "active",
+    }))
+
+    if (payload.length === 0) continue
+
+    const { data: created, error: insertError } = await supabase
+      .from("donors")
+      .insert(payload)
+      .select("id, contact_id")
+
+    if (insertError) {
+      for (const contactId of chunk) {
+        const donorId = await ensureDonorExtensionForContact(orgId, contactId, supabase)
+        if (donorId) donorsByContactId.set(contactId, donorId)
+      }
+      continue
+    }
+
+    for (const row of created || []) {
+      const contactId = row.contact_id as string | null
+      if (contactId) donorsByContactId.set(contactId, row.id as string)
+    }
+  }
+
+  return donorsByContactId
+}
+
+export type BulkAutoMatchInput = {
+  minScore?: number
+  importBatchId?: string | null
+  limit?: number
+  autoAllocatePledge?: boolean
+}
+
+export async function bulkAutoMatchImportPaymentsAction(input: BulkAutoMatchInput = {}) {
   const access = await requireDonationStaffAccess("manage")
   if (!access.ok) return { success: false as const, error: access.error }
 
-  const queueResult = await fetchPaymentMatchQueueAction()
-  if (!queueResult.success) return queueResult
+  const minScore = input.minScore ?? 85
+  const limit = Math.min(input.limit ?? BULK_AUTO_MATCH_PAYMENT_BATCH, BULK_AUTO_MATCH_PAYMENT_BATCH)
+  const autoAllocatePledge = input.autoAllocatePledge !== false
 
-  const pending = queueResult.payments.filter((payment) => payment.status === "pending_review")
+  try {
+    let contactIndex: ContactLookupIndex | null = null
+    let donorsByContactId: Map<string, string> | null = null
 
-  let matched = 0
-  let skipped = 0
-  const errors: string[] = []
-
-  for (const payment of pending) {
-    const matchResult = await findContactMatchesForPaymentAction({
-      senderName: payment.senderName,
-      importEmail: payment.importEmail,
-      importPhone: payment.importPhone,
-    })
-
-    if (!matchResult.success) {
-      errors.push(`${payment.senderName}: ${matchResult.error}`)
-      skipped += 1
-      continue
+    const loadIndexes = async () => {
+      if (!contactIndex || !donorsByContactId) {
+        const [contacts, donors] = await Promise.all([
+          fetchAllOrgContacts(access.supabase, access.orgId),
+          fetchDonorsByContactId(access.supabase, access.orgId),
+        ])
+        contactIndex = buildContactLookupIndex(contacts)
+        donorsByContactId = donors
+      }
     }
 
-    if (!isAutoMatchEligible(matchResult.matches, minScore)) {
-      skipped += 1
-      continue
+    await loadIndexes()
+
+    let paymentQuery = access.supabase
+      .from("payments")
+      .select("id, sender_name, import_email, import_phone")
+      .eq("organization_id", access.orgId)
+      .eq("status", "pending_review")
+      .is("contact_id", null)
+      .order("payment_date", { ascending: false })
+      .limit(limit)
+
+    if (input.importBatchId) {
+      paymentQuery = paymentQuery.eq("import_batch_id", input.importBatchId)
     }
 
-    const topMatch = matchResult.matches[0]
-    const result = await matchPaymentToContactAction({
-      paymentId: payment.id,
-      contactId: topMatch.contactId,
-      mode: "match_only",
-    })
+    const { data: pendingPayments, error: paymentError } = await paymentQuery
+    if (paymentError) return { success: false as const, error: paymentError.message }
 
-    if (!result.success) {
-      errors.push(`${payment.senderName}: ${result.error}`)
-      skipped += 1
-      continue
+    const toMatch: Array<{ paymentId: string; contactId: string }> = []
+    let skipped = 0
+
+    for (const payment of pendingPayments || []) {
+      const hints = resolvePaymentMatchHints({
+        senderName: (payment.sender_name as string | null) || "",
+        importEmail: payment.import_email as string | null,
+        importPhone: payment.import_phone as string | null,
+      })
+
+      const match = findAutoMatchForPayment(
+        hints,
+        contactIndex!,
+        donorsByContactId!,
+        minScore
+      )
+
+      if (!match) {
+        skipped += 1
+        continue
+      }
+
+      toMatch.push({ paymentId: payment.id as string, contactId: match.contactId })
     }
 
-    matched += 1
+    if (toMatch.length === 0) {
+      const remaining = await countRemainingPendingPayments(
+        access.supabase,
+        access.orgId,
+        input.importBatchId
+      )
+      return {
+        success: true as const,
+        matched: 0,
+        allocated: 0,
+        matchedUnallocated: 0,
+        skipped,
+        remaining,
+        errors: [] as string[],
+      }
+    }
+
+    const contactIds = toMatch.map((row) => row.contactId)
+    donorsByContactId = await bulkEnsureDonorExtensions(
+      access.supabase,
+      access.orgId,
+      contactIds,
+      donorsByContactId!
+    )
+
+    const donorIds = [
+      ...new Set(
+        toMatch
+          .map((row) => donorsByContactId!.get(row.contactId))
+          .filter((donorId): donorId is string => Boolean(donorId))
+      ),
+    ]
+
+    const [pledgesByDonor, recurringDonorIds] = await Promise.all([
+      fetchOpenPledgesByDonorIds(access.supabase, access.orgId, donorIds),
+      fetchDonorIdsWithActiveRecurringPlans(access.supabase, access.orgId, donorIds),
+    ])
+
+    const { fetchPledgeAttribution, toPaymentAttributionColumns } = await import(
+      "@/lib/donations/payment-attribution"
+    )
+    const attributionByPledgeId = new Map<string, Record<string, unknown>>()
+
+    const reconciledAt = new Date().toISOString()
+    let allocated = 0
+    let matchedUnallocated = 0
+
+    for (let index = 0; index < toMatch.length; index += BULK_PAYMENT_UPDATE_PARALLEL) {
+      const chunk = toMatch.slice(index, index + BULK_PAYMENT_UPDATE_PARALLEL)
+      await Promise.all(
+        chunk.map(async (row) => {
+          const donorId = donorsByContactId!.get(row.contactId)
+          if (!donorId) return
+
+          let pledgeId: string | null = null
+          let pledgeAttributionColumns: Record<string, unknown> = {}
+
+          if (autoAllocatePledge) {
+            const bestPledge = pickPledgeForImportAllocation(
+              pledgesByDonor.get(donorId) || [],
+              { donorHasActiveRecurringPlan: recurringDonorIds.has(donorId) }
+            )
+
+            if (bestPledge?.id) {
+              pledgeId = bestPledge.id
+              if (!attributionByPledgeId.has(pledgeId)) {
+                const attribution = await fetchPledgeAttribution(access.supabase, pledgeId)
+                attributionByPledgeId.set(pledgeId, toPaymentAttributionColumns(attribution))
+              }
+              pledgeAttributionColumns = attributionByPledgeId.get(pledgeId) || {}
+            }
+          }
+
+          const result = await applyPaymentContactMatch(access.supabase, access.orgId, {
+            paymentId: row.paymentId,
+            donorId,
+            contactId: row.contactId,
+            pledgeId,
+            pledgeAttributionColumns,
+            reconciledAt,
+          })
+
+          if (!result.error) {
+            if (result.allocated) allocated += 1
+            else matchedUnallocated += 1
+          }
+        })
+      )
+    }
+
+    const uniqueContactIds = [...new Set(contactIds)]
+    for (let index = 0; index < uniqueContactIds.length; index += BULK_AFFILIATION_SYNC_PARALLEL) {
+      const chunk = uniqueContactIds.slice(index, index + BULK_AFFILIATION_SYNC_PARALLEL)
+      await Promise.all(
+        chunk.map((contactId) =>
+          handleDonationAffiliationSync({
+            organizationId: access.orgId,
+            supabaseClient: access.supabase,
+            contactId,
+            donorId: donorsByContactId!.get(contactId) ?? null,
+          })
+        )
+      )
+    }
+
+    const remaining = await countRemainingPendingPayments(
+      access.supabase,
+      access.orgId,
+      input.importBatchId
+    )
+
+    return {
+      success: true as const,
+      matched: toMatch.length,
+      allocated,
+      matchedUnallocated,
+      skipped,
+      remaining,
+      errors: [] as string[],
+    }
+  } catch (error) {
+    return {
+      success: false as const,
+      error: error instanceof Error ? error.message : "Bulk auto-match failed",
+    }
+  }
+}
+
+async function countRemainingPendingPayments(
+  supabase: SupabaseFromAccess,
+  orgId: string,
+  importBatchId?: string | null
+) {
+  let query = supabase
+    .from("payments")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", orgId)
+    .eq("status", "pending_review")
+    .is("contact_id", null)
+
+  if (importBatchId) {
+    query = query.eq("import_batch_id", importBatchId)
   }
 
-  return {
-    success: true as const,
-    matched,
-    skipped,
-    errors,
-  }
+  const { count, error } = await query
+  if (error) throw new Error(error.message)
+  return count ?? 0
 }
 
 export async function fetchPaymentImportHistoryAction() {

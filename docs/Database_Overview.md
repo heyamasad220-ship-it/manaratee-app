@@ -286,12 +286,16 @@ npm run validate:donations-security
 
 **Analytical views (migration `097_donations_views.sql`):** `pledge_status_view`, `donor_summary_view` with `security_invoker = true` (RLS on underlying tables applies). `donor_summary_view` includes `contact_id` (patch `116_donor_summary_view_contact_id.sql`) for payment contact matching.
 
+**Pilot blocker view fixes (migration `119_donations_pilot_blocker_views.sql`):** `pledge_status_view` excludes voided payments from pledge balances; cancelled pledges expose `calculated_status = cancelled` and `balance_remaining = 0`. `donor_summary_view` excludes voided from `total_donations`.
+
 **Import columns on `payments` (migration `117`):** `import_email`, `import_phone`, `import_batch_id` — CSV match hints and batch audit link. Staff import flow no longer uses `payment_import_rows` staging in the UI.
 
 **Chunked CSV import (migration `118`):** `payment_import_batches.import_seen_keys` holds duplicate keys while a file imports in 100-row server-action chunks; cleared when import completes.
 
 
-**Dashboard RPCs (migration `098_donations_dashboard_rpcs.sql`):** `donation_org_payment_summary`, `donation_org_pledge_summary`, `donation_monthly_payment_totals`, `donation_payment_source_totals`.
+**Dashboard RPCs (migration `098_donations_dashboard_rpcs.sql`):** `donation_org_payment_summary`, `donation_org_pledge_summary`, `donation_monthly_payment_totals`, `donation_payment_source_totals`. Payment sum RPCs updated by `120_donations_pilot_blocker_totals.sql` to exclude voided (aligned with Reports Overview).
+
+**Money received (post-120):** `SUM(payments.amount)` where `LOWER(status) <> 'voided'`.
 
 Key relationships:
 

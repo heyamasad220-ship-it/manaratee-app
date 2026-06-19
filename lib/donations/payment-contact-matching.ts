@@ -157,3 +157,124 @@ export function isAutoMatchEligible(matches: ContactMatchResult[], minScore = 85
   if (matches.length > 1 && matches[1].confidenceScore === top.confidenceScore) return false
   return true
 }
+
+export type ContactLookupIndex = {
+  byEmail: Map<string, ContactMatchInput[]>
+  byPhone: Map<string, ContactMatchInput[]>
+  byExactName: Map<string, ContactMatchInput[]>
+  byNamePart: Map<string, ContactMatchInput[]>
+}
+
+/** Use import_email/phone, or infer email from sender_name when CSV put it there. */
+export function resolvePaymentMatchHints(input: {
+  senderName: string
+  importEmail?: string | null
+  importPhone?: string | null
+}): PaymentMatchHints {
+  let email = normalizeEmail(input.importEmail)
+  const phone = normalizePhone(input.importPhone)
+  const senderName = normalizeText(input.senderName)
+
+  if (!email && senderName.includes("@")) {
+    email = normalizeEmail(senderName)
+  }
+
+  return {
+    senderName: senderName || "Unknown",
+    email: email || null,
+    phone: phone || null,
+  }
+}
+
+export function buildContactLookupIndex(contacts: ContactMatchInput[]): ContactLookupIndex {
+  const byEmail = new Map<string, ContactMatchInput[]>()
+  const byPhone = new Map<string, ContactMatchInput[]>()
+  const byExactName = new Map<string, ContactMatchInput[]>()
+  const byNamePart = new Map<string, ContactMatchInput[]>()
+
+  for (const contact of contacts) {
+    const email = normalizeEmail(contact.email)
+    if (email) {
+      const list = byEmail.get(email) || []
+      list.push(contact)
+      byEmail.set(email, list)
+    }
+
+    const phone = normalizePhone(contact.phone)
+    if (phone.length >= 7) {
+      const list = byPhone.get(phone) || []
+      list.push(contact)
+      byPhone.set(phone, list)
+    }
+
+    const exactName = normalizeName(contact.full_name || "")
+    if (exactName) {
+      const list = byExactName.get(exactName) || []
+      list.push(contact)
+      byExactName.set(exactName, list)
+    }
+
+    for (const part of getNameParts(contact.full_name || "")) {
+      if (part.length < 2) continue
+      const list = byNamePart.get(part) || []
+      if (!list.some((row) => row.contactId === contact.contactId)) {
+        list.push(contact)
+      }
+      byNamePart.set(part, list)
+    }
+  }
+
+  return { byEmail, byPhone, byExactName, byNamePart }
+}
+
+export function collectAutoMatchCandidates(
+  hints: PaymentMatchHints,
+  index: ContactLookupIndex
+): ContactMatchInput[] {
+  const candidates = new Map<string, ContactMatchInput>()
+
+  const email = normalizeEmail(hints.email)
+  if (email) {
+    for (const contact of index.byEmail.get(email) || []) {
+      candidates.set(contact.contactId, contact)
+    }
+  }
+
+  const phone = normalizePhone(hints.phone)
+  if (phone.length >= 7) {
+    for (const contact of index.byPhone.get(phone) || []) {
+      candidates.set(contact.contactId, contact)
+    }
+  }
+
+  const exactName = normalizeName(hints.senderName)
+  if (exactName) {
+    for (const contact of index.byExactName.get(exactName) || []) {
+      candidates.set(contact.contactId, contact)
+    }
+  }
+
+  for (const part of getNameParts(hints.senderName).slice(0, 2)) {
+    for (const contact of index.byNamePart.get(part) || []) {
+      candidates.set(contact.contactId, contact)
+    }
+  }
+
+  return Array.from(candidates.values())
+}
+
+export function findAutoMatchForPayment(
+  hints: PaymentMatchHints,
+  index: ContactLookupIndex,
+  donorsByContactId: Map<string, string>,
+  minScore = 85
+): ContactMatchResult | null {
+  const candidates = collectAutoMatchCandidates(hints, index).map((contact) => ({
+    ...contact,
+    donorId: donorsByContactId.get(contact.contactId) ?? null,
+  }))
+
+  const matches = rankContactMatches(hints, candidates, 5)
+  if (!isAutoMatchEligible(matches, minScore)) return null
+  return matches[0]
+}
