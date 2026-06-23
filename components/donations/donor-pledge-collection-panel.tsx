@@ -75,21 +75,24 @@ export function DonorPledgeCollectionPanel({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <DonationMetricCardGrid>
+        <DonationMetricCardGrid colorful columns={3}>
           <DonationMetricCard
             title="Active Pledges"
             value={data.activePledges.length}
             icon={Heart}
+            accent="blue"
           />
           <DonationMetricCard
             title="Outstanding Balance"
             value={formatCurrency(data.outstandingBalance)}
             icon={DollarSign}
+            accent="amber"
           />
           <DonationMetricCard
             title="Last Reminder"
             value={formatDate(data.lastReminderAt)}
             icon={Mail}
+            accent="purple"
             description={`Last contacted: ${formatDate(data.lastContactedAt)}`}
           />
         </DonationMetricCardGrid>

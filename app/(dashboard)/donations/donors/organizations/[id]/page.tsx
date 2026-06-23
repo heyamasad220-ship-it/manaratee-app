@@ -49,6 +49,7 @@ import { DonorGivingSummary } from "@/components/donations/donor-giving-summary"
 import { DonorPledgeCollectionPanel } from "@/components/donations/donor-pledge-collection-panel"
 import { DonorRecurringPanel } from "@/components/donations/donor-recurring-panel"
 import { PaymentReceiptActions } from "@/components/donations/payment-receipt-actions"
+import { updateDonorContactProfileAction } from "@/lib/donations/donor-profile-actions"
 import {
   Dialog,
   DialogContent,
@@ -62,69 +63,129 @@ import {
 export default function OrganizationDonorDetailPage() {
   const [donor, setDonor] = useState<any>(null)
 
-const params = useParams()
-const supabase = createClient()
-  
-  const [isEditing, setIsEditing] = useState(false)
-  const [showRecordDonation, setShowRecordDonation] = useState(false)
-  useEffect(() => {
-  const fetchDonor = async () => {
-    const { data, error } = await supabase
-      .from("donor_summary_view")
-.select("*")
-      .eq("id", params.id as string)
-      .single()
+  const params = useParams()
+  const supabase = createClient()
 
-    if (error) {
-      console.error("Error loading organization donor:", error)
+  const [isEditing, setIsEditing] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [editForm, setEditForm] = useState({ name: "", email: "", phone: "", contact: "" })
+  const [showRecordDonation, setShowRecordDonation] = useState(false)
+
+  useEffect(() => {
+    const fetchDonor = async () => {
+      const { data, error } = await supabase
+        .from("donor_summary_view")
+        .select("*")
+        .eq("id", params.id as string)
+        .single()
+
+      if (error) {
+        console.error("Error loading organization donor:", error)
+        return
+      }
+
+      let primaryContactName = ""
+      if (data.contact_id) {
+        const { data: contact } = await supabase
+          .from("contacts")
+          .select("primary_contact_name")
+          .eq("id", data.contact_id)
+          .maybeSingle()
+        primaryContactName = contact?.primary_contact_name || ""
+      }
+
+      const { data: payments } = await supabase
+        .from("payments")
+        .select("*")
+        .eq("donor_id", data.id)
+        .order("payment_date", { ascending: false })
+
+      setDonor({
+        id: data.id,
+        contactId: data.contact_id,
+        name: data.full_name,
+        email: data.email,
+        phone: data.phone,
+        status: data.status || "Active",
+        hasPledge: data.has_open_pledge || false,
+        preferredCategory: data.preferred_category || "",
+        address: {
+          street: data.street || "",
+          city: data.city || "",
+          state: data.state || "",
+          zip: data.zip || "",
+        },
+        contact: primaryContactName,
+        type: data.organization_type || "",
+        totalDonations: Number(data.total_donations || 0),
+        donationCount: Number(data.donation_count || 0),
+        lastDonation: data.last_donation_date || "",
+        notes: data.notes || "",
+        donationHistory: (payments || []).map((p: any) => ({
+          id: p.id,
+          date: p.payment_date,
+          amount: p.amount,
+          category: p.category || "General",
+          method: p.source || "Unknown",
+          receipt: p.id,
+        })),
+        createdAt: data.created_at,
+      })
+    }
+
+    fetchDonor()
+  }, [params.id, supabase])
+
+  async function handleSave() {
+    if (!donor) return
+    setIsSaving(true)
+    setSaveError(null)
+
+    const result = await updateDonorContactProfileAction({
+      donorId: donor.id,
+      contactId: donor.contactId,
+      fullName: editForm.name,
+      email: editForm.email,
+      phone: editForm.phone,
+      primaryContactName: editForm.contact,
+    })
+
+    setIsSaving(false)
+
+    if (!result.success) {
+      setSaveError(result.error)
       return
     }
 
-    const { data: payments } = await supabase
-      .from("payments")
-      .select("*")
-      .eq("donor_id", data.id)
-      .order("payment_date", { ascending: false })
-
-    setDonor({
-      id: data.id,
-      name: data.full_name,
-      email: data.email,
-      phone: data.phone,
-      status: data.status || "Active",
-      hasPledge: data.has_open_pledge || false,
-      preferredCategory: data.preferred_category || "",
-      address: {
-        street: data.street || "",
-        city: data.city || "",
-        state: data.state || "",
-        zip: data.zip || "",
-      },
-      contact: data.contact_person || "",
-      type: data.organization_type || "",
-
-      totalDonations: Number(data.total_donations || 0),
-donationCount: Number(data.donation_count || 0),
-lastDonation: data.last_donation_date || "",
-
-      notes: data.notes || "",
-
-      donationHistory: (payments || []).map((p: any) => ({
-        id: p.id,
-        date: p.payment_date,
-        amount: p.amount,
-        category: p.category || "General",
-        method: p.source || "Unknown",
-        receipt: p.id,
-      })),
-
-      createdAt: data.created_at,
-    })
+    setDonor((prev: any) => ({
+      ...prev,
+      name: editForm.name.trim(),
+      email: editForm.email.trim(),
+      phone: editForm.phone.trim(),
+      contact: editForm.contact.trim(),
+    }))
+    setIsEditing(false)
   }
 
-  fetchDonor()
-}, [params.id])
-if (!donor) return <div className="p-6">Loading...</div>
+  function startEditing() {
+    if (!donor) return
+    setEditForm({
+      name: donor.name || "",
+      email: donor.email || "",
+      phone: donor.phone || "",
+      contact: donor.contact || "",
+    })
+    setSaveError(null)
+    setIsEditing(true)
+  }
+
+  function cancelEditing() {
+    setSaveError(null)
+    setIsEditing(false)
+  }
+
+  if (!donor) return <div className="p-6">Loading...</div>
   return (
     <>
       <Header title="Organization Donor Details" />
@@ -161,21 +222,23 @@ if (!donor) return <div className="p-6">Loading...</div>
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col items-end gap-2">
+            {saveError ? <p className="text-sm text-destructive">{saveError}</p> : null}
+            <div className="flex items-center gap-2">
             {isEditing ? (
               <>
-                <Button variant="outline" onClick={() => setIsEditing(false)}>
+                <Button variant="outline" onClick={cancelEditing} disabled={isSaving}>
                   <X className="mr-2 h-4 w-4" />
                   Cancel
                 </Button>
-                <Button onClick={() => setIsEditing(false)}>
+                <Button onClick={handleSave} disabled={isSaving}>
                   <Save className="mr-2 h-4 w-4" />
-                  Save Changes
+                  {isSaving ? "Saving..." : "Save Changes"}
                 </Button>
               </>
             ) : (
               <>
-                <Button variant="outline" onClick={() => setIsEditing(true)}>
+                <Button variant="outline" onClick={startEditing}>
                   <Pencil className="mr-2 h-4 w-4" />
                   Edit
                 </Button>
@@ -185,6 +248,7 @@ if (!donor) return <div className="p-6">Loading...</div>
                 </Button>
               </>
             )}
+            </div>
           </div>
         </div>
 
@@ -225,6 +289,25 @@ if (!donor) return <div className="p-6">Loading...</div>
                   <div className="flex items-start gap-3">
                     <Building2 className="mt-0.5 h-4 w-4 text-muted-foreground" />
                     <div className="flex-1">
+                      <Label className="text-xs text-muted-foreground">Organization Name</Label>
+                      {isEditing ? (
+                        <Input
+                          value={editForm.name}
+                          onChange={(event) =>
+                            setEditForm((prev) => ({ ...prev, name: event.target.value }))
+                          }
+                          className="mt-1"
+                          placeholder="Organization name"
+                        />
+                      ) : (
+                        <p className="font-medium">{donor.name || "—"}</p>
+                      )}
+                    </div>
+                  </div>
+                  <Separator />
+                  <div className="flex items-start gap-3">
+                    <Building2 className="mt-0.5 h-4 w-4 text-muted-foreground" />
+                    <div className="flex-1">
                       <Label className="text-xs text-muted-foreground">Organization Type</Label>
                       {isEditing ? (
                         <Select defaultValue={donor.type}>
@@ -250,9 +333,15 @@ if (!donor) return <div className="p-6">Loading...</div>
                     <div className="flex-1">
                       <Label className="text-xs text-muted-foreground">Contact Person</Label>
                       {isEditing ? (
-                        <Input defaultValue={donor.contact} className="mt-1" />
+                        <Input
+                          value={editForm.contact}
+                          onChange={(event) =>
+                            setEditForm((prev) => ({ ...prev, contact: event.target.value }))
+                          }
+                          className="mt-1"
+                        />
                       ) : (
-                        <p className="font-medium">{donor.contact}</p>
+                        <p className="font-medium">{donor.contact || "—"}</p>
                       )}
                     </div>
                   </div>
@@ -262,9 +351,15 @@ if (!donor) return <div className="p-6">Loading...</div>
                     <div className="flex-1">
                       <Label className="text-xs text-muted-foreground">Email</Label>
                       {isEditing ? (
-                        <Input defaultValue={donor.email} className="mt-1" />
+                        <Input
+                          value={editForm.email}
+                          onChange={(event) =>
+                            setEditForm((prev) => ({ ...prev, email: event.target.value }))
+                          }
+                          className="mt-1"
+                        />
                       ) : (
-                        <p className="font-medium">{donor.email}</p>
+                        <p className="font-medium">{donor.email || "—"}</p>
                       )}
                     </div>
                   </div>
@@ -274,9 +369,15 @@ if (!donor) return <div className="p-6">Loading...</div>
                     <div className="flex-1">
                       <Label className="text-xs text-muted-foreground">Phone</Label>
                       {isEditing ? (
-                        <Input defaultValue={donor.phone} className="mt-1" />
+                        <Input
+                          value={editForm.phone}
+                          onChange={(event) =>
+                            setEditForm((prev) => ({ ...prev, phone: event.target.value }))
+                          }
+                          className="mt-1"
+                        />
                       ) : (
-                        <p className="font-medium">{donor.phone}</p>
+                        <p className="font-medium">{donor.phone || "—"}</p>
                       )}
                     </div>
                   </div>
