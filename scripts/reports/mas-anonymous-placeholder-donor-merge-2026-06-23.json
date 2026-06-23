@@ -1,0 +1,170 @@
+{
+  "mode": "execute",
+  "organizationId": "e057e00a-e4e3-4adf-9af5-f465db1894be",
+  "target": {
+    "id": "5ea5d575-5cb4-44f1-b80c-456b6d0c5a49",
+    "full_name": "Anonymous",
+    "contact_id": "f0ab673f-cf3c-4996-8118-905b2cc41910"
+  },
+  "duplicateAnonymousMerged": [
+    {
+      "id": "ed2696c1-8f02-416e-b7a3-a218c6f9489f",
+      "full_name": "Anonymous"
+    }
+  ],
+  "sourceDonorCount": 12,
+  "sources": [
+    {
+      "id": "ed2696c1-8f02-416e-b7a3-a218c6f9489f",
+      "full_name": "Anonymous",
+      "contact_id": "99b0ac7f-e0ca-47f9-bbb2-468a6fef96a3",
+      "email": null
+    },
+    {
+      "id": "4f1414d8-ac0a-40ca-91fd-566691596965",
+      "full_name": "??? ????",
+      "contact_id": "911df94e-6a78-4806-ac1d-5e7185a53876",
+      "email": null
+    },
+    {
+      "id": "72e54617-04a4-4cce-99e2-6de1b266b175",
+      "full_name": "???? ??? ?????",
+      "contact_id": "f8e97f4a-3843-4611-a4e5-e82b4e940e0c",
+      "email": null
+    },
+    {
+      "id": "e417b92d-8a67-4b76-b489-6e10d0870d00",
+      "full_name": "???? ????",
+      "contact_id": "2cfae906-a94e-408b-9327-3b22b151623f",
+      "email": null
+    },
+    {
+      "id": "dc606fcb-5ceb-40b9-94a6-949d4b4adf26",
+      "full_name": "???? ????",
+      "contact_id": "36f5999e-5c4d-48fa-b1b1-2d7b740addd5",
+      "email": null
+    },
+    {
+      "id": "14fc7f0e-a343-4310-b5c7-1b64ecf49c84",
+      "full_name": "????? ??????",
+      "contact_id": "d7801a8a-3083-4fa0-a24b-00dd5e086485",
+      "email": null
+    },
+    {
+      "id": "c882fb1b-e3f5-4cd8-8360-e81ba12812f7",
+      "full_name": "????? ????",
+      "contact_id": "da09ff12-42e0-4cb9-99a4-5bb0ef3a29a7",
+      "email": null
+    },
+    {
+      "id": "8df0e1e2-8d23-4f2c-982e-e79756d4a0ef",
+      "full_name": "??? ??? ??????",
+      "contact_id": "ecec6134-a09c-4fb6-94e0-061b31e5387b",
+      "email": null
+    },
+    {
+      "id": "27aba43a-89b2-4d57-a69b-82c81e7caee9",
+      "full_name": "???? ?????",
+      "contact_id": "28280ed6-5d18-43ac-b4d4-32002386ba0b",
+      "email": null
+    },
+    {
+      "id": "f7e80f80-085b-40c6-9594-6d00c4fd91e6",
+      "full_name": "?Taufique",
+      "contact_id": "1ced7094-6a03-4c25-94bd-75f1fe638131",
+      "email": null
+    },
+    {
+      "id": "7b947d31-cb04-4087-9714-2e1fa34412a8",
+      "full_name": "?Alif Rehman",
+      "contact_id": "570f9262-2c52-4496-898e-07ffe8f3a4c6",
+      "email": null
+    },
+    {
+      "id": "0039beaa-9a9b-4383-be02-47f847b4ba8f",
+      "full_name": "?Kashif Mushtaq",
+      "contact_id": "9bdc3916-e766-4b5c-a8ba-1e20bc2ff8c8",
+      "email": null
+    }
+  ],
+  "inventory": {
+    "pledges": 14,
+    "payments": 8,
+    "recurringPlans": 0,
+    "paymentTotal": 2300,
+    "pledgeTotal": 3400
+  },
+  "steps": [
+    {
+      "table": "payments",
+      "reassigned": 12,
+      "rows": 8
+    },
+    {
+      "table": "pledges",
+      "reassigned": 12,
+      "rows": 14
+    },
+    {
+      "table": "recurring_donation_plans",
+      "reassigned": 12,
+      "rows": 0
+    },
+    {
+      "table": "donation_checkout_sessions",
+      "reassigned": 12
+    },
+    {
+      "table": "donors",
+      "deleted": 12
+    },
+    {
+      "table": "contacts",
+      "deleted": 1
+    },
+    {
+      "table": "contacts",
+      "deleted": 1
+    },
+    {
+      "table": "contacts",
+      "deleted": 1
+    },
+    {
+      "table": "contacts",
+      "deleted": 1
+    },
+    {
+      "table": "contacts",
+      "deleted": 1
+    },
+    {
+      "table": "contacts",
+      "deleted": 1
+    },
+    {
+      "table": "contacts",
+      "deleted": 1
+    },
+    {
+      "table": "contacts",
+      "deleted": 1
+    },
+    {
+      "table": "contacts",
+      "deleted": 1
+    },
+    {
+      "table": "contacts",
+      "deleted": 1
+    },
+    {
+      "table": "contacts",
+      "deleted": 1
+    },
+    {
+      "table": "contacts",
+      "deleted": 1
+    }
+  ]
+}
