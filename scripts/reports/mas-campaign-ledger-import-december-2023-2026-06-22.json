@@ -1,0 +1,90 @@
+{
+  "mode": "execute",
+  "file": "C:\\Users\\danan\\Downloads\\All Campaigns.csv",
+  "campaignFilter": "December 2023",
+  "rowCount": 203,
+  "skippedEmpty": 15,
+  "skippedDuplicate": 0,
+  "contactsMatched": 123,
+  "contactsCreated": 63,
+  "donorsCreated": 136,
+  "campaignsCreated": 0,
+  "pledgesCreated": 138,
+  "paymentsCreated": 152,
+  "ambiguousMatches": [
+    {
+      "csvName": "Omar Tamalli",
+      "matchedName": "Tamalli Omar",
+      "reason": "fuzzy_name:85"
+    }
+  ],
+  "errors": [],
+  "samples": [
+    {
+      "rowKey": "MAS_CAMPAIGN_LEDGER_V1|cc78f30c2265",
+      "name": "Manal Wadi",
+      "campaign": "December 2023",
+      "pledge": 25000,
+      "payments": []
+    },
+    {
+      "rowKey": "MAS_CAMPAIGN_LEDGER_V1|8ea223502bec",
+      "name": "Nabil Zahra",
+      "campaign": "December 2023",
+      "pledge": 20000,
+      "payments": [
+        10000
+      ]
+    },
+    {
+      "rowKey": "MAS_CAMPAIGN_LEDGER_V1|ddddbaa110d3",
+      "name": "Mohamad Eido",
+      "campaign": "December 2023",
+      "pledge": 15000,
+      "payments": []
+    },
+    {
+      "rowKey": "MAS_CAMPAIGN_LEDGER_V1|53a5df5ac9d9",
+      "name": "Dr. Amr Morsy",
+      "campaign": "December 2023",
+      "pledge": 10000,
+      "payments": []
+    },
+    {
+      "rowKey": "MAS_CAMPAIGN_LEDGER_V1|59d808bc9f6c",
+      "name": "Dr. Hesham Elghouhari",
+      "campaign": "December 2023",
+      "pledge": 10000,
+      "payments": [
+        5000
+      ]
+    },
+    {
+      "rowKey": "MAS_CAMPAIGN_LEDGER_V1|e22091803070",
+      "name": "Mohammad Elashi",
+      "campaign": "December 2023",
+      "pledge": 10000,
+      "payments": [
+        10000
+      ]
+    },
+    {
+      "rowKey": "MAS_CAMPAIGN_LEDGER_V1|dd4009e59d03",
+      "name": "Ali Rifai",
+      "campaign": "December 2023",
+      "pledge": 5000,
+      "payments": [
+        5000
+      ]
+    },
+    {
+      "rowKey": "MAS_CAMPAIGN_LEDGER_V1|800dc67b176c",
+      "name": "Mohamed Shamali (MASA)",
+      "campaign": "December 2023",
+      "pledge": 6000,
+      "payments": [
+        6000
+      ]
+    }
+  ]
+}

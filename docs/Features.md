@@ -197,6 +197,8 @@ Removed **255** legacy imported rows from `public.vendors` (May 2026 CSV import)
 
 **Donations payment methods add (June 2026):** Donations Settings → Payment Methods now supports **Add Payment Method** (custom name, processing fee label, enabled toggle) in addition to edit/delete/toggle. File: `app/(dashboard)/donations/settings/page.tsx`.
 
+**MAS campaign ledger import (June 2026):** Historical pledge/payment spreadsheet import via `node scripts/import-mas-campaign-ledger.mjs --file <csv> [--campaign <name>] [--execute] [--create-campaigns]`. Dry-run by default. Maps Pledge → `pledges`, Cash/Checks/One-time/Recurring → `payments`, normalizes names for contact matching. Tag: `MAS_CAMPAIGN_LEDGER_V1`.
+
 **Donations pilot blockers (June 2026):** Migrations `119`–`120` — voided payments excluded from `pledge_status_view` balances and headline totals; cancelled pledges emit `calculated_status = cancelled` (excluded from Collect/allocation); portal pledge pay saves `status = allocated`. Validation: `lib/donations/pilot-blocker-validation.test.ts`. Apply: `119_donations_pilot_blocker_views.sql`, `120_donations_pilot_blocker_totals.sql`.
 
 **Donations sidebar (June 2026):** Under Donations: **Overview**, **Donors**, **Records** (Payments, Pledges, Recurring, Campaigns tabs), **Donation Manager** (Collect, Import & Match tabs), **Reports**, **Settings**. Donation Manager routes: `/donations/collect`, `/donations/import`; `/donations/reconcile` redirects to match queue. Files: `components/layout/sidebar.tsx`, `components/donations/donation-payments-nav.tsx`, `components/donations/donation-manager-nav.tsx`, `app/(dashboard)/donations/(donation-manager)/layout.tsx`.

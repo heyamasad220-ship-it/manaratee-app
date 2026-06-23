@@ -1,0 +1,426 @@
+{
+  "mode": "execute",
+  "file": "C:\\Users\\danan\\Downloads\\All Campaigns.csv",
+  "campaignFilter": null,
+  "rowCount": 1446,
+  "skippedEmpty": 182,
+  "skippedDuplicate": 138,
+  "contactsMatched": 755,
+  "contactsCreated": 162,
+  "donorsCreated": 412,
+  "campaignsCreated": 1,
+  "pledgesCreated": 924,
+  "paymentsCreated": 1000,
+  "ambiguousMatches": [
+    {
+      "csvName": "Noor Wadi & Mohammed Hassan",
+      "matchedName": "Mohammed Hassan",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "Mohammed Al-Amin",
+      "matchedName": "Mohammed Amin",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "Ehab Faheid/Nahla Hosny",
+      "matchedName": "Nahla Hosny",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "MOHAMMAD F KHAN",
+      "matchedName": "Mohammad Khan",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "MD Rahman",
+      "matchedName": "Mohamed Shakeelur Rahman Md",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "Mohammad Jehengir Khan",
+      "matchedName": "Mohammad Khan",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "MUJIB MUSSA",
+      "matchedName": "Mujib Hamid Mussa",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "Badia Alamari &family",
+      "matchedName": "Badia Alamari",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "NAVIN GAZI",
+      "matchedName": "Sanoj Shahul & Navin Gazi",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "Abdul Majid",
+      "matchedName": "Majid Mohammed Abdul",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "Muhammad Nauman Ahmed",
+      "matchedName": "Muhammad Ahmed",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "Islamic Relief USA",
+      "matchedName": "Islamic Relief",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "Usamah Ali",
+      "matchedName": "Usamah Ali",
+      "reason": "fuzzy_name:100"
+    },
+    {
+      "csvName": "Dr. Amr Morsy",
+      "matchedName": "Amr Morsy Md",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "Faisal Jahangiri",
+      "matchedName": "Faisal R. Jahangiri",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "Abu Bashar Sharif Ammus",
+      "matchedName": "Sharif Ammus",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "Manal Elkarmi & Musa Wadi",
+      "matchedName": "Manal Wadi",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "Mostafa Ahmed",
+      "matchedName": "Ahmed Mostafa",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "Sunday School",
+      "matchedName": "MAS Sunday School",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "Nafe Alsawfta & Dalia Faheid",
+      "matchedName": "Nafe Alsawfta",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "ANGIE HASAN HASAN",
+      "matchedName": "Angie Hasan",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "Zakir & Sanobar Shaikh",
+      "matchedName": "Zakir Shaikh",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "Dr. Hesham Elgouhari",
+      "matchedName": "Hesham M Elgouhari",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "Wedad Atwan",
+      "matchedName": "Wedad Atwan",
+      "reason": "fuzzy_name:100"
+    },
+    {
+      "csvName": "Mervat Farag",
+      "matchedName": "Mervat F Farag",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "USAMAH MOHD ZAKIR",
+      "matchedName": "Usamah Mohd Zakir",
+      "reason": "fuzzy_name:100"
+    },
+    {
+      "csvName": "Dr. Raed Sbeit",
+      "matchedName": "Raed O Sbeit",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "Mohammed Hassan & Noor Wadi",
+      "matchedName": "Mohammed Hassan",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "Dr. Amal Durra",
+      "matchedName": "Dr. Amal Al-Durra",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "AHMED ALOBAIDI",
+      "matchedName": "Ahmed Alobaidi",
+      "reason": "fuzzy_name:100"
+    },
+    {
+      "csvName": "Mohamad Maasarani",
+      "matchedName": "Mohamad Maasarani",
+      "reason": "fuzzy_name:100"
+    },
+    {
+      "csvName": "Noha Abdellatif",
+      "matchedName": "Noha Abdellatif",
+      "reason": "fuzzy_name:100"
+    },
+    {
+      "csvName": "Aisha Abdelrahman",
+      "matchedName": "Aisha Abdelrahman",
+      "reason": "fuzzy_name:100"
+    },
+    {
+      "csvName": "Ali Alsaleh",
+      "matchedName": "Ali Alsaleh",
+      "reason": "fuzzy_name:100"
+    },
+    {
+      "csvName": "HEBA EL MANAWY",
+      "matchedName": "Heba El Manawy",
+      "reason": "fuzzy_name:100"
+    },
+    {
+      "csvName": "Gulam Moinuddin Jeddy",
+      "matchedName": "Gulam Moinuddin Jeddy",
+      "reason": "fuzzy_name:100"
+    },
+    {
+      "csvName": "Hana Saleh",
+      "matchedName": "Hana Saleh",
+      "reason": "fuzzy_name:100"
+    },
+    {
+      "csvName": "Amany Elsharkawi",
+      "matchedName": "Amany Elsharkawi",
+      "reason": "fuzzy_name:100"
+    },
+    {
+      "csvName": "Fadi Joumma",
+      "matchedName": "Fadi Joumma",
+      "reason": "fuzzy_name:100"
+    },
+    {
+      "csvName": "Mohammad Sowayci",
+      "matchedName": "Mohammad Sowayci",
+      "reason": "fuzzy_name:100"
+    },
+    {
+      "csvName": "Omer Hassen",
+      "matchedName": "Omer Hassen",
+      "reason": "fuzzy_name:100"
+    },
+    {
+      "csvName": "Rayane Kabbara",
+      "matchedName": "Rayane Kabbara",
+      "reason": "fuzzy_name:100"
+    },
+    {
+      "csvName": "Aihab Hassan",
+      "matchedName": "Aihab Hassan",
+      "reason": "fuzzy_name:100"
+    },
+    {
+      "csvName": "AZIZA OWDA",
+      "matchedName": "Aziza Owda",
+      "reason": "fuzzy_name:100"
+    },
+    {
+      "csvName": "Fatma Aboulnasr",
+      "matchedName": "Fatma Aboulnasr",
+      "reason": "fuzzy_name:100"
+    },
+    {
+      "csvName": "Muhammad Ahmed",
+      "matchedName": "Muhammad Ahmed",
+      "reason": "fuzzy_name:100"
+    },
+    {
+      "csvName": "RIFAZ IQBAL",
+      "matchedName": "Rifaz Iqbal",
+      "reason": "fuzzy_name:100"
+    },
+    {
+      "csvName": "Aisha Ahmed",
+      "matchedName": "Aisha Ahmed",
+      "reason": "fuzzy_name:100"
+    },
+    {
+      "csvName": "Halah Altameemi",
+      "matchedName": "Halah Altameemi",
+      "reason": "fuzzy_name:100"
+    },
+    {
+      "csvName": "Hanan Ahmed",
+      "matchedName": "Hanan Ahmed",
+      "reason": "fuzzy_name:100"
+    },
+    {
+      "csvName": "Mustafa Aljumaili",
+      "matchedName": "Mustafa Aljumaili",
+      "reason": "fuzzy_name:100"
+    },
+    {
+      "csvName": "niana mahrouq",
+      "matchedName": "Niana Mahrouq",
+      "reason": "fuzzy_name:100"
+    },
+    {
+      "csvName": "Ghina Ereksousi",
+      "matchedName": "Ghina Ereksousi",
+      "reason": "fuzzy_name:100"
+    },
+    {
+      "csvName": "Mohamed Elmrabet",
+      "matchedName": "Mohamed Elmrabet",
+      "reason": "fuzzy_name:100"
+    },
+    {
+      "csvName": "SARA BABAA",
+      "matchedName": "Sara Babaa",
+      "reason": "fuzzy_name:100"
+    },
+    {
+      "csvName": "Declan Cherico",
+      "matchedName": "Declan Cherico",
+      "reason": "fuzzy_name:100"
+    },
+    {
+      "csvName": "Abid Rahman",
+      "matchedName": "Abid Rahman",
+      "reason": "fuzzy_name:100"
+    },
+    {
+      "csvName": "Bilal Mahmood",
+      "matchedName": "Bilal Mahmood",
+      "reason": "fuzzy_name:100"
+    },
+    {
+      "csvName": "Esraa Adel Hassan",
+      "matchedName": "Esraa Adel Hassan",
+      "reason": "fuzzy_name:100"
+    },
+    {
+      "csvName": "Faisal Ahmed",
+      "matchedName": "Faisal Ahmed",
+      "reason": "fuzzy_name:100"
+    },
+    {
+      "csvName": "Imran Shah",
+      "matchedName": "Imran Shah",
+      "reason": "fuzzy_name:100"
+    },
+    {
+      "csvName": "Mona Ibrahim",
+      "matchedName": "Mona Ibrahim",
+      "reason": "fuzzy_name:100"
+    },
+    {
+      "csvName": "Shahd Elbadawi",
+      "matchedName": "Shahd Elbadawi",
+      "reason": "fuzzy_name:100"
+    },
+    {
+      "csvName": "Umar Ndanusa",
+      "matchedName": "Umar Ndanusa",
+      "reason": "fuzzy_name:100"
+    },
+    {
+      "csvName": "SUHAIR YOUNES",
+      "matchedName": "Suhair Younes",
+      "reason": "fuzzy_name:100"
+    },
+    {
+      "csvName": "Yasmin Siddiqi",
+      "matchedName": "Yasmin Siddiqi",
+      "reason": "fuzzy_name:100"
+    },
+    {
+      "csvName": "Dr. Sameeh Zalloum (Haya Qassim Zalloum)",
+      "matchedName": "Sameeh Zalloum",
+      "reason": "fuzzy_name:100"
+    }
+  ],
+  "errors": [],
+  "samples": [
+    {
+      "rowKey": "MAS_CAMPAIGN_LEDGER_V1|845292672b0a",
+      "name": "Abed Abu Kar",
+      "campaign": "December 2023",
+      "pledge": 0,
+      "payments": [
+        1000
+      ]
+    },
+    {
+      "rowKey": "MAS_CAMPAIGN_LEDGER_V1|3128bbb1d4ea",
+      "name": "Omar Ata",
+      "campaign": "December 2023",
+      "pledge": 0,
+      "payments": [
+        5000
+      ]
+    },
+    {
+      "rowKey": "MAS_CAMPAIGN_LEDGER_V1|33ce8897a4e3",
+      "name": "Tariq Alsmadi",
+      "campaign": "December 2023",
+      "pledge": 0,
+      "payments": [
+        5000
+      ]
+    },
+    {
+      "rowKey": "MAS_CAMPAIGN_LEDGER_V1|31bc77129fe6",
+      "name": "Abdulrahman Selim",
+      "campaign": "December 2023",
+      "pledge": 0,
+      "payments": [
+        2000
+      ]
+    },
+    {
+      "rowKey": "MAS_CAMPAIGN_LEDGER_V1|5c7ca5cd425b",
+      "name": "Mohammad Aladra",
+      "campaign": "December 2023",
+      "pledge": 0,
+      "payments": [
+        2000
+      ]
+    },
+    {
+      "rowKey": "MAS_CAMPAIGN_LEDGER_V1|22271c00db17",
+      "name": "Susan Almasri",
+      "campaign": "December 2023",
+      "pledge": 0,
+      "payments": [
+        2000
+      ]
+    },
+    {
+      "rowKey": "MAS_CAMPAIGN_LEDGER_V1|79d3baedb30c",
+      "name": "Luay Abdeljaber",
+      "campaign": "December 2023",
+      "pledge": 0,
+      "payments": [
+        1440
+      ]
+    },
+    {
+      "rowKey": "MAS_CAMPAIGN_LEDGER_V1|e4cb6e3ca870",
+      "name": "Fadi Jaber",
+      "campaign": "December 2023",
+      "pledge": 0,
+      "payments": [
+        1200
+      ]
+    }
+  ]
+}
