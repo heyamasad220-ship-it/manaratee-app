@@ -415,26 +415,30 @@ export default function DonationsReportsPage() {
 
         {activeTab === "Overview" && (
           <div className="flex flex-col gap-6">
-            <DonationMetricCardGrid>
+            <DonationMetricCardGrid colorful>
               <DonationMetricCard
                 title="Total Donations"
                 value={`$${totalDonations.toLocaleString()}`}
                 icon={DollarSign}
+                accent="blue"
               />
               <DonationMetricCard
                 title="Active Donors"
                 value={uniqueDonors}
                 icon={Users}
+                accent="emerald"
               />
               <DonationMetricCard
                 title="Avg. Donation"
                 value={`$${averageDonation.toFixed(0)}`}
                 icon={Heart}
+                accent="amber"
               />
               <DonationMetricCard
                 title="Total Payments"
                 value={overview.paymentCount}
                 icon={TrendingUp}
+                accent="purple"
               />
             </DonationMetricCardGrid>
 
@@ -459,7 +463,12 @@ export default function DonationsReportsPage() {
                     {topDonorRows.map((donor) => (
                       <TableRow key={donor.id}>
                         <TableCell className="font-medium">
-                          {donor.name}
+                          <Link
+                            href={`/donations/donors/individuals/${donor.id}`}
+                            className="text-primary hover:underline"
+                          >
+                            {donor.name}
+                          </Link>
                         </TableCell>
 
                         <TableCell className="text-right">
@@ -604,7 +613,12 @@ export default function DonationsReportsPage() {
                   {donorTotals.map((donor) => (
                     <TableRow key={donor.id}>
                       <TableCell className="font-medium">
-                        {donor.name}
+                        <Link
+                          href={`/donations/donors/individuals/${donor.id}`}
+                          className="text-primary hover:underline"
+                        >
+                          {donor.name}
+                        </Link>
                       </TableCell>
 
                       <TableCell>
