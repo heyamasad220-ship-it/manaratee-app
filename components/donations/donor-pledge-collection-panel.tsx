@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import {
+  DonationMetricCard,
+  DonationMetricCardGrid,
+} from "@/components/donations/donation-metric-card"
 import { Badge } from "@/components/ui/badge"
 import {
   Table,
@@ -14,6 +18,7 @@ import {
 import { getDonorPledgeCollectionSummaryAction } from "@/lib/donations/pledge-reminder-actions"
 import { PledgeReminderActions } from "@/components/donations/pledge-reminder-actions"
 import { formatPledgeStatusLabel } from "@/lib/donations/donation-status"
+import { Heart, DollarSign, Mail } from "lucide-react"
 
 type DonorPledgeCollectionPanelProps = {
   donorId: string
@@ -70,23 +75,24 @@ export function DonorPledgeCollectionPanel({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid gap-4 sm:grid-cols-3">
-          <div>
-            <p className="text-xs text-muted-foreground">Active Pledges</p>
-            <p className="text-xl font-bold">{data.activePledges.length}</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">Outstanding Balance</p>
-            <p className="text-xl font-bold">{formatCurrency(data.outstandingBalance)}</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">Last Reminder</p>
-            <p className="text-sm font-medium">{formatDate(data.lastReminderAt)}</p>
-            <p className="text-xs text-muted-foreground">
-              Last contacted: {formatDate(data.lastContactedAt)}
-            </p>
-          </div>
-        </div>
+        <DonationMetricCardGrid>
+          <DonationMetricCard
+            title="Active Pledges"
+            value={data.activePledges.length}
+            icon={Heart}
+          />
+          <DonationMetricCard
+            title="Outstanding Balance"
+            value={formatCurrency(data.outstandingBalance)}
+            icon={DollarSign}
+          />
+          <DonationMetricCard
+            title="Last Reminder"
+            value={formatDate(data.lastReminderAt)}
+            icon={Mail}
+            description={`Last contacted: ${formatDate(data.lastContactedAt)}`}
+          />
+        </DonationMetricCardGrid>
 
         {data.activePledges.length > 0 && (
           <Table>

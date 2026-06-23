@@ -5,6 +5,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/header";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  DonationMetricCard,
+  DonationMetricCardGrid,
+} from "@/components/donations/donation-metric-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -797,72 +801,37 @@ export default function PledgesPage() {
       <Header title="Pledges" />
 
       <div className="p-6">
-        <div className="mb-6 flex flex-wrap gap-4 [&>*]:w-fit">
-          <Card className="border-l-4 border-l-blue-500">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Total Pledged</p>
-                  <p className="text-2xl font-bold text-foreground">{formatCurrency(totalPledged)}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Across {totalPledges} pledges
-                  </p>
-                </div>
-                <div className="rounded-full bg-blue-100 p-3">
-                  <Heart className="h-5 w-5 text-blue-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-l-4 border-l-emerald-500">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Collected</p>
-                  <p className="text-2xl font-bold text-emerald-600">{formatCurrency(totalCollected)}</p>
-                  <div className="mt-1 flex items-center text-xs text-emerald-600">
-                    <ArrowUpRight className="mr-1 h-3 w-3" />
-                    {totalPledged > 0 ? Math.round((totalCollected / totalPledged) * 100) : 0}% of total
-                  </div>
-                </div>
-                <div className="rounded-full bg-emerald-100 p-3">
-                  <DollarSign className="h-5 w-5 text-emerald-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-l-4 border-l-amber-500">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Remaining</p>
-                  <p className="text-2xl font-bold text-amber-600">{formatCurrency(totalRemaining)}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">Yet to be collected</p>
-                </div>
-                <div className="rounded-full bg-amber-100 p-3">
-                  <AlertCircle className="h-5 w-5 text-amber-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-l-4 border-l-purple-500">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Active Pledges</p>
-                  <p className="text-2xl font-bold text-foreground">{activePledges}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">Not yet fulfilled</p>
-                </div>
-                <div className="rounded-full bg-purple-100 p-3">
-                  <CheckCircle2 className="h-5 w-5 text-purple-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <DonationMetricCardGrid className="mb-6">
+          <DonationMetricCard
+            title="Total Pledged"
+            value={formatCurrency(totalPledged)}
+            icon={Heart}
+            description={`Across ${totalPledges} pledges`}
+          />
+          <DonationMetricCard
+            title="Collected"
+            value={formatCurrency(totalCollected)}
+            icon={DollarSign}
+            description={
+              <span className="inline-flex items-center">
+                <ArrowUpRight className="mr-1 h-3 w-3" />
+                {totalPledged > 0 ? Math.round((totalCollected / totalPledged) * 100) : 0}% of total
+              </span>
+            }
+          />
+          <DonationMetricCard
+            title="Remaining"
+            value={formatCurrency(totalRemaining)}
+            icon={AlertCircle}
+            description="Yet to be collected"
+          />
+          <DonationMetricCard
+            title="Active Pledges"
+            value={activePledges}
+            icon={CheckCircle2}
+            description="Not yet fulfilled"
+          />
+        </DonationMetricCardGrid>
 
         <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-1 flex-col gap-2 sm:flex-row sm:items-center">
@@ -1440,32 +1409,20 @@ export default function PledgesPage() {
                 <Badge variant="secondary">{selectedPledge.frequency}</Badge>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-3">
-                <div className="rounded-lg border p-4 text-center">
-                  <p className="text-2xl font-bold">
-                    {formatCurrency(selectedPledge.amount_pledged)}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Amount Pledged</p>
-                </div>
-
-                <div className="rounded-lg border p-4 text-center">
-                  <p className="text-2xl font-bold text-emerald-600">
-                    {formatCurrency(selectedPledge.amount_paid)}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Amount Paid</p>
-                </div>
-
-                <div className="rounded-lg border p-4 text-center">
-                  <p
-                    className={`text-2xl font-bold ${
-                      selectedPledge.balance_remaining > 0 ? "text-amber-600" : "text-muted-foreground"
-                    }`}
-                  >
-                    {formatCurrency(selectedPledge.balance_remaining)}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Balance</p>
-                </div>
-              </div>
+              <DonationMetricCardGrid>
+                <DonationMetricCard
+                  title="Amount Pledged"
+                  value={formatCurrency(selectedPledge.amount_pledged)}
+                />
+                <DonationMetricCard
+                  title="Amount Paid"
+                  value={formatCurrency(selectedPledge.amount_paid)}
+                />
+                <DonationMetricCard
+                  title="Balance"
+                  value={formatCurrency(selectedPledge.balance_remaining)}
+                />
+              </DonationMetricCardGrid>
 
               <div>
                 <div className="mb-2 flex justify-between text-sm">

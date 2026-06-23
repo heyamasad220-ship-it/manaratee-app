@@ -1,0 +1,78 @@
+{
+  "mode": "execute",
+  "organizationId": "e057e00a-e4e3-4adf-9af5-f465db1894be",
+  "canonical": {
+    "id": "ac82666d-762a-4b63-b8f5-5c76dec65111",
+    "name": "Ramadan 2025",
+    "goal_amount": 250000,
+    "start_date": "2025-03-01",
+    "end_date": "2025-08-31",
+    "status": "active"
+  },
+  "duplicate": {
+    "id": "fa4b5f7d-d2fc-4a9c-8105-79c23b188290",
+    "name": "Ramadan2025",
+    "goal_amount": null,
+    "start_date": null,
+    "end_date": null,
+    "status": "active"
+  },
+  "steps": [
+    {
+      "table": "pledges",
+      "before": {
+        "duplicate": 38,
+        "canonical": 0
+      },
+      "reassigned": 38,
+      "after": {
+        "duplicate": 0,
+        "canonical": 38
+      }
+    },
+    {
+      "table": "payments",
+      "before": {
+        "duplicate": 50,
+        "canonical": 0
+      },
+      "reassigned": 50,
+      "after": {
+        "duplicate": 0,
+        "canonical": 50
+      }
+    },
+    {
+      "table": "recurring_donation_plans",
+      "before": {
+        "duplicate": 0,
+        "canonical": 0
+      },
+      "reassigned": 0,
+      "after": {
+        "duplicate": 0,
+        "canonical": 0
+      }
+    },
+    {
+      "table": "donation_checkout_sessions",
+      "before": {
+        "duplicate": 0,
+        "canonical": 0
+      },
+      "reassigned": 0,
+      "after": {
+        "duplicate": 0,
+        "canonical": 0
+      }
+    }
+  ],
+  "errors": [],
+  "remainingOnDuplicate": {
+    "pledges": 0,
+    "payments": 0,
+    "recurring_donation_plans": 0,
+    "donation_checkout_sessions": 0
+  },
+  "duplicateDeleted": true
+}

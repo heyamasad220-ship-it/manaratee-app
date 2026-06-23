@@ -28,6 +28,10 @@ import {
   toAttributionIds,
   type DonationAttributionValue,
 } from "@/components/donations/donation-attribution-fields"
+import {
+  DonationMetricCard,
+  DonationMetricCardGrid,
+} from "@/components/donations/donation-metric-card"
 import { Header } from "@/components/layout/header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -834,34 +838,16 @@ export function PaymentImportMatchWorkspace() {
             </p>
           </div>
 
-          <div className="mb-6 grid gap-4 sm:grid-cols-4">
-            <Card>
-              <CardContent className="p-4">
-                <p className="text-2xl font-bold">{pendingCount}</p>
-                <p className="text-xs text-muted-foreground">Needs match</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <p className="text-2xl font-bold">{matchedCount}</p>
-                <p className="text-xs text-muted-foreground">Matched, not allocated</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <p className="text-2xl font-bold">{unresolvedCount}</p>
-                <p className="text-xs text-muted-foreground">Unresolved</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <p className="text-2xl font-bold">
-                  ${payments.reduce((sum, payment) => sum + payment.amount, 0).toLocaleString()}
-                </p>
-                <p className="text-xs text-muted-foreground">Queue amount</p>
-              </CardContent>
-            </Card>
-          </div>
+          <DonationMetricCardGrid className="mb-6">
+            <DonationMetricCard title="Needs match" value={pendingCount} icon={Clock} />
+            <DonationMetricCard title="Matched, not allocated" value={matchedCount} icon={Link2} />
+            <DonationMetricCard title="Unresolved" value={unresolvedCount} icon={AlertCircle} />
+            <DonationMetricCard
+              title="Queue amount"
+              value={`$${payments.reduce((sum, payment) => sum + payment.amount, 0).toLocaleString()}`}
+              icon={DollarSign}
+            />
+          </DonationMetricCardGrid>
 
           <div className="grid gap-6 lg:grid-cols-2">
             <Card className="flex flex-col">

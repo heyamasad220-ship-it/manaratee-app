@@ -3,6 +3,10 @@
 import { useEffect, useMemo, useState } from "react"
 import { Header } from "@/components/layout/header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  DonationMetricCard,
+  DonationMetricCardGrid,
+} from "@/components/donations/donation-metric-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -235,64 +239,32 @@ export default function RecurringDonationsPage() {
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Active Recurring Donors
-              </CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{metrics.activeDonorCount}</div>
-              <p className="text-xs text-muted-foreground">{metrics.activePlanCount} active plans</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Monthly Recurring Revenue
-              </CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {formatCurrency(metrics.monthlyRecurringRevenue)}
-              </div>
-              <p className="text-xs text-muted-foreground">Projected from active plans</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Annual Recurring Revenue
-              </CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {formatCurrency(metrics.annualRecurringRevenue)}
-              </div>
-              <p className="text-xs text-muted-foreground">MRR × 12</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Paused / Cancelled
-              </CardTitle>
-              <Pause className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {metrics.pausedPlanCount} / {metrics.cancelledPlanCount}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {formatCurrency(metrics.actualRecurringRevenue)} received to date
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+        <DonationMetricCardGrid>
+          <DonationMetricCard
+            title="Active Recurring Donors"
+            value={metrics.activeDonorCount}
+            icon={Users}
+            description={`${metrics.activePlanCount} active plans`}
+          />
+          <DonationMetricCard
+            title="Monthly Recurring Revenue"
+            value={formatCurrency(metrics.monthlyRecurringRevenue)}
+            icon={DollarSign}
+            description="Projected from active plans"
+          />
+          <DonationMetricCard
+            title="Annual Recurring Revenue"
+            value={formatCurrency(metrics.annualRecurringRevenue)}
+            icon={DollarSign}
+            description="MRR × 12"
+          />
+          <DonationMetricCard
+            title="Paused / Cancelled"
+            value={`${metrics.pausedPlanCount} / ${metrics.cancelledPlanCount}`}
+            icon={Pause}
+            description={`${formatCurrency(metrics.actualRecurringRevenue)} received to date`}
+          />
+        </DonationMetricCardGrid>
 
         <div className="flex items-center gap-2">
           <Select value={statusFilter} onValueChange={setStatusFilter}>

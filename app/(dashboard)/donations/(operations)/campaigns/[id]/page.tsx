@@ -17,6 +17,10 @@ import {
 import { CampaignProgressBar } from "@/components/donations/campaign-progress-bar"
 import { CampaignProgressGauge } from "@/components/donations/campaign-progress-gauge"
 import {
+  DonationMetricCard,
+  DonationMetricCardGrid,
+} from "@/components/donations/donation-metric-card"
+import {
   formatCampaignStatusLabel,
   formatDonationCurrency,
   type CampaignAnalyticsEntry,
@@ -24,7 +28,7 @@ import {
   type CampaignRow,
 } from "@/lib/donations/campaign-analytics"
 import { getCampaignDetailAction } from "@/lib/donations/donation-reports-actions"
-import { ArrowLeft, Target, Users } from "lucide-react"
+import { ArrowLeft, Target, Users, DollarSign, Heart, AlertCircle, TrendingUp } from "lucide-react"
 
 export default function CampaignDetailPage() {
   const params = useParams()
@@ -82,10 +86,10 @@ export default function CampaignDetailPage() {
     if (!entry) return []
     const { metrics } = entry
     return [
-      { label: "Raised", value: formatDonationCurrency(metrics.raised) },
-      { label: "Pledged", value: formatDonationCurrency(metrics.pledged) },
-      { label: "Outstanding", value: formatDonationCurrency(metrics.outstanding) },
-      { label: "Total Committed", value: formatDonationCurrency(metrics.totalCommitted) },
+      { label: "Raised", value: formatDonationCurrency(metrics.raised), icon: DollarSign },
+      { label: "Pledged", value: formatDonationCurrency(metrics.pledged), icon: Heart },
+      { label: "Outstanding", value: formatDonationCurrency(metrics.outstanding), icon: AlertCircle },
+      { label: "Total Committed", value: formatDonationCurrency(metrics.totalCommitted), icon: Target },
     ]
   }, [entry])
 
@@ -192,16 +196,16 @@ export default function CampaignDetailPage() {
 
           <div>
             <h3 className="mb-3 text-base font-semibold">Fundraising Summary</h3>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <DonationMetricCardGrid>
               {summaryCards.map((card) => (
-                <Card key={card.label}>
-                  <CardContent className="pt-6">
-                    <p className="text-sm text-muted-foreground">{card.label}</p>
-                    <p className="text-2xl font-bold">{card.value}</p>
-                  </CardContent>
-                </Card>
+                <DonationMetricCard
+                  key={card.label}
+                  title={card.label}
+                  value={card.value}
+                  icon={card.icon}
+                />
               ))}
-            </div>
+            </DonationMetricCardGrid>
             <p className="mt-2 text-xs text-muted-foreground">
               Collected against pledges: {formatDonationCurrency(metrics.collectedAgainstPledges)}
             </p>
@@ -212,26 +216,19 @@ export default function CampaignDetailPage() {
               <Users className="h-4 w-4" />
               Donor Metrics
             </h3>
-            <div className="grid gap-4 sm:grid-cols-3">
-              <Card>
-                <CardContent className="pt-6">
-                  <p className="text-sm text-muted-foreground">Donors</p>
-                  <p className="text-2xl font-bold">{metrics.donorCount}</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="pt-6">
-                  <p className="text-sm text-muted-foreground">Average Gift</p>
-                  <p className="text-2xl font-bold">{formatDonationCurrency(metrics.averageGift)}</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="pt-6">
-                  <p className="text-sm text-muted-foreground">Largest Gift</p>
-                  <p className="text-2xl font-bold">{formatDonationCurrency(metrics.largestGift)}</p>
-                </CardContent>
-              </Card>
-            </div>
+            <DonationMetricCardGrid>
+              <DonationMetricCard title="Donors" value={metrics.donorCount} icon={Users} />
+              <DonationMetricCard
+                title="Average Gift"
+                value={formatDonationCurrency(metrics.averageGift)}
+                icon={DollarSign}
+              />
+              <DonationMetricCard
+                title="Largest Gift"
+                value={formatDonationCurrency(metrics.largestGift)}
+                icon={TrendingUp}
+              />
+            </DonationMetricCardGrid>
           </div>
 
           <div className="grid gap-6 lg:grid-cols-3">

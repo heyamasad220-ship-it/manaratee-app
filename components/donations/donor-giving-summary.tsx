@@ -3,6 +3,10 @@
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { DollarSign, Calendar, TrendingUp } from "lucide-react"
+import {
+  DonationMetricCard,
+  DonationMetricCardGrid,
+} from "@/components/donations/donation-metric-card"
 import { getDonorGivingTotalsAction } from "@/lib/donations/receipt-actions"
 import type { DonorGivingTotals } from "@/lib/donations/receipt-types"
 import { GivingStatementActions } from "@/components/donations/giving-statement-actions"
@@ -10,6 +14,7 @@ import { GivingStatementActions } from "@/components/donations/giving-statement-
 type DonorGivingSummaryProps = {
   donorId: string
   donorName: string
+  statementOnly?: boolean
 }
 
 function formatCurrency(amount: number) {
@@ -20,7 +25,11 @@ function formatCurrency(amount: number) {
   }).format(amount)
 }
 
-export function DonorGivingSummary({ donorId, donorName }: DonorGivingSummaryProps) {
+export function DonorGivingSummary({
+  donorId,
+  donorName,
+  statementOnly = false,
+}: DonorGivingSummaryProps) {
   const [totals, setTotals] = useState<DonorGivingTotals | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -34,6 +43,19 @@ export function DonorGivingSummary({ donorId, donorName }: DonorGivingSummaryPro
     load()
   }, [donorId])
 
+  if (statementOnly) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Annual Giving Statement</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <GivingStatementActions donorId={donorId} donorName={donorName} />
+        </CardContent>
+      </Card>
+    )
+  }
+
   if (loading) {
     return <div className="text-sm text-muted-foreground">Loading giving totals...</div>
   }
@@ -42,44 +64,26 @@ export function DonorGivingSummary({ donorId, donorName }: DonorGivingSummaryPro
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-4 [&>*]:w-fit">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Lifetime Giving
-            </CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(totals.lifetimeGiving)}</div>
-            <p className="text-xs text-muted-foreground">All actual payments</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              {totals.currentYear} Giving
-            </CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(totals.currentYearGiving)}</div>
-            <p className="text-xs text-muted-foreground">Current calendar year</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              {totals.previousYear} Giving
-            </CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(totals.previousYearGiving)}</div>
-            <p className="text-xs text-muted-foreground">Prior calendar year</p>
-          </CardContent>
-        </Card>
-      </div>
+      <DonationMetricCardGrid>
+        <DonationMetricCard
+          title="Lifetime Giving"
+          value={formatCurrency(totals.lifetimeGiving)}
+          icon={DollarSign}
+          description="All actual payments"
+        />
+        <DonationMetricCard
+          title={`${totals.currentYear} Giving`}
+          value={formatCurrency(totals.currentYearGiving)}
+          icon={Calendar}
+          description="Current calendar year"
+        />
+        <DonationMetricCard
+          title={`${totals.previousYear} Giving`}
+          value={formatCurrency(totals.previousYearGiving)}
+          icon={TrendingUp}
+          description="Prior calendar year"
+        />
+      </DonationMetricCardGrid>
 
       <Card>
         <CardHeader>

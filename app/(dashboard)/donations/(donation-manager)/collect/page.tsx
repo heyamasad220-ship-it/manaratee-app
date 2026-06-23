@@ -2,7 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { Header } from "@/components/layout/header"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
+import {
+  DonationMetricCard,
+  DonationMetricCardGrid,
+} from "@/components/donations/donation-metric-card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -85,47 +89,31 @@ export default function PledgeCollectionPage() {
           </p>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Outstanding</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totals.count}</div>
-              <p className="text-xs text-muted-foreground">Open + partial pledges</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Balance Due</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(totals.outstandingTotal)}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">No Payment Yet</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totals.noPayment}</div>
-              <p className="text-xs text-muted-foreground">{totals.partial} partially paid</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Past Pledge Date</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totals.overdue}</div>
-              <p className="text-xs text-muted-foreground">Based on pledge date</p>
-            </CardContent>
-          </Card>
-        </div>
+        <DonationMetricCardGrid>
+          <DonationMetricCard
+            title="Outstanding"
+            value={totals.count}
+            icon={Users}
+            description="Open + partial pledges"
+          />
+          <DonationMetricCard
+            title="Balance Due"
+            value={formatCurrency(totals.outstandingTotal)}
+            icon={DollarSign}
+          />
+          <DonationMetricCard
+            title="No Payment Yet"
+            value={totals.noPayment}
+            icon={Clock}
+            description={`${totals.partial} partially paid`}
+          />
+          <DonationMetricCard
+            title="Past Pledge Date"
+            value={totals.overdue}
+            icon={AlertTriangle}
+            description="Based on pledge date"
+          />
+        </DonationMetricCardGrid>
 
         <div className="relative max-w-sm">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />

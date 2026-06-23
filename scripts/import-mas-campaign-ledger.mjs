@@ -78,6 +78,12 @@ function normalizeText(value) {
   return String(value ?? "").trim()
 }
 
+const LEDGER_SUMMARY_ROW_NAMES = new Set(["total", "subtotal", "grand total"])
+
+function isLedgerSummaryRowName(name) {
+  return LEDGER_SUMMARY_ROW_NAMES.has(normalizeName(name))
+}
+
 function normalizeName(value) {
   return normalizeText(value)
     .toLowerCase()
@@ -351,6 +357,7 @@ async function main() {
     campaignFilter: args.campaign,
     rowCount: rows.length,
     skippedEmpty: 0,
+    skippedSummary: 0,
     skippedDuplicate: 0,
     contactsMatched: 0,
     contactsCreated: 0,
@@ -536,6 +543,11 @@ async function main() {
 
     if (!campaignName || !normalizeText(row.Name)) {
       report.skippedEmpty += 1
+      continue
+    }
+
+    if (isLedgerSummaryRowName(row.Name)) {
+      report.skippedSummary += 1
       continue
     }
 

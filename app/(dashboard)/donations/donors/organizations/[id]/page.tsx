@@ -26,6 +26,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { DonorProfileMetrics } from "@/components/donations/donor-profile-metrics"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
@@ -187,75 +188,15 @@ if (!donor) return <div className="p-6">Loading...</div>
           </div>
         </div>
 
-        {/* Stats Cards */}
-        <div className="mb-6 flex flex-wrap gap-4 [&>*]:w-fit">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Total Donations
-              </CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">${donor.totalDonations.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">All-time contributions</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Donation Count
-              </CardTitle>
-              <Heart className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{donor.donationCount}</div>
-              <p className="text-xs text-muted-foreground">Total donations made</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Average Donation
-              </CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                ${donor.donationCount > 0
-  ? Math.round(donor.totalDonations / donor.donationCount).toLocaleString()
-  : "0"}
-              </div>
-              <p className="text-xs text-muted-foreground">Per donation</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Last Donation
-              </CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {donor.lastDonation
-  ? new Date(donor.lastDonation).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-    })
-  : "N/A"}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {donor.lastDonation
-  ? new Date(donor.lastDonation).getFullYear()
-  : ""}
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+        <DonorProfileMetrics
+          donorId={donor.id}
+          totalDonations={donor.totalDonations}
+          donationCount={donor.donationCount}
+          lastDonation={donor.lastDonation}
+        />
 
         <div className="mb-6">
-          <DonorGivingSummary donorId={donor.id} donorName={donor.name} />
+          <DonorGivingSummary donorId={donor.id} donorName={donor.name} statementOnly />
         </div>
 
         <div className="mb-6">

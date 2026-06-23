@@ -1,0 +1,58 @@
+{
+  "mode": "execute",
+  "organizationId": "e057e00a-e4e3-4adf-9af5-f465db1894be",
+  "contacts": [
+    {
+      "id": "c6a93165-ae4b-4292-9e07-d2fa22534f9b",
+      "full_name": "Total"
+    }
+  ],
+  "donors": [
+    {
+      "id": "3b181489-aed9-4a4a-8120-dc148c6c5652",
+      "full_name": "Total",
+      "contact_id": "c6a93165-ae4b-4292-9e07-d2fa22534f9b"
+    }
+  ],
+  "inventory": {
+    "pledges": 2,
+    "payments": 8,
+    "recurringPlans": 0,
+    "receipts": 0,
+    "pledgeReminders": 0,
+    "pledgeTotal": 898271,
+    "paymentTotal": 740016,
+    "taggedPledges": 2,
+    "taggedPayments": 8
+  },
+  "steps": [
+    {
+      "table": "donation_receipts",
+      "deleted": 0
+    },
+    {
+      "table": "pledge_reminders",
+      "deleted": 0
+    },
+    {
+      "table": "payments",
+      "deleted": 8
+    },
+    {
+      "table": "pledges",
+      "deleted": 2
+    },
+    {
+      "table": "recurring_donation_plans",
+      "deleted": 0
+    },
+    {
+      "table": "donors",
+      "deleted": 1
+    },
+    {
+      "table": "contacts",
+      "deleted": 1
+    }
+  ]
+}

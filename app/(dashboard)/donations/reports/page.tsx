@@ -36,10 +36,27 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination"
-import { Download, Heart, DollarSign, Users, TrendingUp, FileText, Send, Printer, Target } from "lucide-react"
+import {
+  Download,
+  Heart,
+  DollarSign,
+  Users,
+  TrendingUp,
+  FileText,
+  Send,
+  Printer,
+  Target,
+  AlertCircle,
+  Clock,
+  Mail,
+} from "lucide-react"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
 import { CampaignProgressBar } from "@/components/donations/campaign-progress-bar"
+import {
+  DonationMetricCard,
+  DonationMetricCardGrid,
+} from "@/components/donations/donation-metric-card"
 import { GivingStatementActions } from "@/components/donations/giving-statement-actions"
 import { sendBulkAnnualStatementsAction } from "@/lib/donations/receipt-actions"
 import { getPledgeCollectionReportAction } from "@/lib/donations/pledge-reminder-actions"
@@ -398,67 +415,28 @@ export default function DonationsReportsPage() {
 
         {activeTab === "Overview" && (
           <div className="flex flex-col gap-6">
-            <div className="flex flex-wrap gap-4 [&>*]:w-fit">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    Total Donations
-                  </CardTitle>
-                  <DollarSign className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    ${totalDonations.toLocaleString()}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    Active Donors
-                  </CardTitle>
-                  <Users className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {uniqueDonors}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    Avg. Donation
-                  </CardTitle>
-                  <Heart className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    ${averageDonation.toFixed(0)}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    Total Payments
-                  </CardTitle>
-                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {overview.paymentCount}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+            <DonationMetricCardGrid>
+              <DonationMetricCard
+                title="Total Donations"
+                value={`$${totalDonations.toLocaleString()}`}
+                icon={DollarSign}
+              />
+              <DonationMetricCard
+                title="Active Donors"
+                value={uniqueDonors}
+                icon={Users}
+              />
+              <DonationMetricCard
+                title="Avg. Donation"
+                value={`$${averageDonation.toFixed(0)}`}
+                icon={Heart}
+              />
+              <DonationMetricCard
+                title="Total Payments"
+                value={overview.paymentCount}
+                icon={TrendingUp}
+              />
+            </DonationMetricCardGrid>
 
             <Card>
               <CardHeader>
@@ -751,121 +729,60 @@ export default function DonationsReportsPage() {
         )}
 
         {activeTab === "Receipts" && (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Receipts Generated
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {receiptSummary?.receiptsGenerated ?? 0}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Receipts Sent
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{receiptSummary?.receiptsSent ?? 0}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Not Sent
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{receiptSummary?.receiptsNotSent ?? 0}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Missing Receipts
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-amber-600">
-                  {receiptSummary?.missingReceipts ?? 0}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  of {receiptSummary?.totalPayments ?? 0} payments
-                </p>
-              </CardContent>
-            </Card>
-          </div>
+          <DonationMetricCardGrid>
+            <DonationMetricCard
+              title="Receipts Generated"
+              value={receiptSummary?.receiptsGenerated ?? 0}
+              icon={FileText}
+            />
+            <DonationMetricCard
+              title="Receipts Sent"
+              value={receiptSummary?.receiptsSent ?? 0}
+              icon={Send}
+            />
+            <DonationMetricCard
+              title="Not Sent"
+              value={receiptSummary?.receiptsNotSent ?? 0}
+              icon={Mail}
+            />
+            <DonationMetricCard
+              title="Missing Receipts"
+              value={receiptSummary?.missingReceipts ?? 0}
+              icon={AlertCircle}
+              description={`of ${receiptSummary?.totalPayments ?? 0} payments`}
+            />
+          </DonationMetricCardGrid>
         )}
 
         {activeTab === "Collection" && (
           <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    Outstanding Pledges
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {collectionReport?.outstandingCount ?? 0}
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    Outstanding Balance
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    ${(collectionReport?.outstandingTotal ?? 0).toLocaleString()}
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    No Payment Yet
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {collectionReport?.noPaymentCount ?? 0}
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    Partially Paid
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {collectionReport?.partialCount ?? 0}
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    Reminders Logged
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {collectionReport?.reminderCount ?? 0}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+            <DonationMetricCardGrid>
+              <DonationMetricCard
+                title="Outstanding Pledges"
+                value={collectionReport?.outstandingCount ?? 0}
+                icon={Users}
+              />
+              <DonationMetricCard
+                title="Outstanding Balance"
+                value={`$${(collectionReport?.outstandingTotal ?? 0).toLocaleString()}`}
+                icon={DollarSign}
+              />
+              <DonationMetricCard
+                title="No Payment Yet"
+                value={collectionReport?.noPaymentCount ?? 0}
+                icon={Clock}
+              />
+              <DonationMetricCard
+                title="Partially Paid"
+                value={collectionReport?.partialCount ?? 0}
+                icon={TrendingUp}
+              />
+              <DonationMetricCard
+                title="Reminders Logged"
+                value={collectionReport?.reminderCount ?? 0}
+                icon={Mail}
+              />
+            </DonationMetricCardGrid>
 
             <Card>
               <CardHeader>
@@ -914,34 +831,20 @@ export default function DonationsReportsPage() {
 
         {activeTab === "Recurring" && (
           <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    Recurring Donors
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {recurringReport?.recurringDonorCount ?? 0}
-                  </div>
-                  <p className="text-xs text-muted-foreground">Donors with recurring payments</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    Recurring Revenue (Actual)
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    ${(recurringReport?.totalRecurringRevenue ?? 0).toLocaleString()}
-                  </div>
-                  <p className="text-xs text-muted-foreground">From canonical payments linked to plans</p>
-                </CardContent>
-              </Card>
-            </div>
+            <DonationMetricCardGrid>
+              <DonationMetricCard
+                title="Recurring Donors"
+                value={recurringReport?.recurringDonorCount ?? 0}
+                icon={Users}
+                description="Donors with recurring payments"
+              />
+              <DonationMetricCard
+                title="Recurring Revenue (Actual)"
+                value={`$${(recurringReport?.totalRecurringRevenue ?? 0).toLocaleString()}`}
+                icon={DollarSign}
+                description="From canonical payments linked to plans"
+              />
+            </DonationMetricCardGrid>
 
             <Card>
               <CardHeader>

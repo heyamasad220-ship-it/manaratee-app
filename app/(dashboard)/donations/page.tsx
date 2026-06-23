@@ -52,6 +52,10 @@ import { cn } from "@/lib/utils"
 import { formatPaymentStatusLabel, normalizePaymentStatus } from "@/lib/donations/donation-status"
 import { CampaignProgressBar } from "@/components/donations/campaign-progress-bar"
 import {
+  DonationMetricCard,
+  DonationMetricCardGrid,
+} from "@/components/donations/donation-metric-card"
+import {
   formatDonationCurrency,
   type CampaignAnalyticsEntry,
 } from "@/lib/donations/campaign-analytics"
@@ -258,81 +262,60 @@ export default function DonationsPage() {
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-4 [&>*]:w-fit">
-            <Card className="border-l-4 border-l-blue-500">
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Total Pledged</p>
-                    <p className="text-2xl font-bold text-foreground">{formatCurrency(totalPledged)}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      From {dashboardSummary.activePledgeCount} active pledges
-                    </p>
-                  </div>
-                  <div className="rounded-full bg-blue-100 p-3">
-                    <Heart className="h-5 w-5 text-blue-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-l-4 border-l-emerald-500">
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Total Collected</p>
-                    <p className="text-2xl font-bold text-emerald-600">{formatCurrency(totalCollected)}</p>
-                    <div className="mt-1 flex items-center text-xs text-emerald-600">
-                      <ArrowUpRight className="mr-1 h-3 w-3" />
-                      {payments.length} transactions
-                    </div>
-                  </div>
-                  <div className="rounded-full bg-emerald-100 p-3">
-                    <DollarSign className="h-5 w-5 text-emerald-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-l-4 border-l-amber-500">
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Outstanding Balance</p>
-                    <p className="text-2xl font-bold text-amber-600">{formatCurrency(outstandingBalance)}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {totalPledged > 0 ? `${((outstandingBalance / totalPledged) * 100).toFixed(0)}% of pledges unpaid` : "No pledges yet"}
-                    </p>
-                  </div>
-                  <div className="rounded-full bg-amber-100 p-3">
-                    <AlertCircle className="h-5 w-5 text-amber-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-l-4 border-l-purple-500">
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Payments This Month</p>
-                    <p className="text-2xl font-bold text-foreground">{formatCurrency(paymentsThisMonth)}</p>
-                    <div className="mt-1 flex items-center text-xs text-emerald-600">
-                      <ArrowUpRight className="mr-1 h-3 w-3" />
-                      {payments.filter((payment) => {
-                        const paymentDate = new Date(payment.payment_date)
-                        const now = new Date()
-                        return paymentDate.getMonth() === now.getMonth() && paymentDate.getFullYear() === now.getFullYear()
-                      }).length} transactions
-                    </div>
-                  </div>
-                  <div className="rounded-full bg-purple-100 p-3">
-                    <Wallet className="h-5 w-5 text-purple-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          <DonationMetricCardGrid colorful>
+            <DonationMetricCard
+              title="Total Pledged"
+              value={formatCurrency(totalPledged)}
+              icon={Heart}
+              accent="blue"
+              description={`From ${dashboardSummary.activePledgeCount} active pledges`}
+            />
+            <DonationMetricCard
+              title="Total Collected"
+              value={formatCurrency(totalCollected)}
+              icon={DollarSign}
+              accent="emerald"
+              description={
+                <span className="inline-flex items-center">
+                  <ArrowUpRight className="mr-1 h-3 w-3" />
+                  {payments.length} transactions
+                </span>
+              }
+            />
+            <DonationMetricCard
+              title="Outstanding Balance"
+              value={formatCurrency(outstandingBalance)}
+              icon={AlertCircle}
+              accent="amber"
+              description={
+                totalPledged > 0
+                  ? `${((outstandingBalance / totalPledged) * 100).toFixed(0)}% of pledges unpaid`
+                  : "No pledges yet"
+              }
+            />
+            <DonationMetricCard
+              title="Payments This Month"
+              value={formatCurrency(paymentsThisMonth)}
+              icon={Wallet}
+              accent="purple"
+              description={
+                <span className="inline-flex items-center">
+                  <ArrowUpRight className="mr-1 h-3 w-3" />
+                  {
+                    payments.filter((payment) => {
+                      const paymentDate = new Date(payment.payment_date)
+                      const now = new Date()
+                      return (
+                        paymentDate.getMonth() === now.getMonth() &&
+                        paymentDate.getFullYear() === now.getFullYear()
+                      )
+                    }).length
+                  }{" "}
+                  transactions
+                </span>
+              }
+            />
+          </DonationMetricCardGrid>
 
           <div className="grid gap-6 lg:grid-cols-3">
             <Card className="lg:col-span-2">
@@ -613,60 +596,40 @@ export default function DonationsPage() {
             </CardContent>
           </Card>
 
-          <div className="flex flex-wrap gap-4 [&>*]:w-fit">
+          <DonationMetricCardGrid>
             <Link href="/donations/payments">
-              <Card className="h-full transition-colors hover:bg-muted/50">
-                <CardContent className="flex items-center gap-4 pt-6">
-                  <div className="rounded-full bg-emerald-100 p-3">
-                    <CreditCard className="h-5 w-5 text-emerald-600" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-foreground">Payments</p>
-                    <p className="text-sm text-muted-foreground">View all payments</p>
-                  </div>
-                </CardContent>
-              </Card>
+              <DonationMetricCard
+                title="Payments"
+                icon={CreditCard}
+                description="View all payments"
+                className="h-full transition-colors hover:bg-muted/50"
+              />
             </Link>
             <Link href="/donations/pledges">
-              <Card className="h-full transition-colors hover:bg-muted/50">
-                <CardContent className="flex items-center gap-4 pt-6">
-                  <div className="rounded-full bg-amber-100 p-3">
-                    <Heart className="h-5 w-5 text-amber-600" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-foreground">Pledges</p>
-                    <p className="text-sm text-muted-foreground">Track commitments</p>
-                  </div>
-                </CardContent>
-              </Card>
+              <DonationMetricCard
+                title="Pledges"
+                icon={Heart}
+                description="Track commitments"
+                className="h-full transition-colors hover:bg-muted/50"
+              />
             </Link>
             <Link href="/donations/import">
-              <Card className="h-full transition-colors hover:bg-muted/50">
-                <CardContent className="flex items-center gap-4 pt-6">
-                  <div className="rounded-full bg-blue-100 p-3">
-                    <TrendingUp className="h-5 w-5 text-blue-600" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-foreground">Import</p>
-                    <p className="text-sm text-muted-foreground">Upload payment files</p>
-                  </div>
-                </CardContent>
-              </Card>
+              <DonationMetricCard
+                title="Import"
+                icon={TrendingUp}
+                description="Upload payment files"
+                className="h-full transition-colors hover:bg-muted/50"
+              />
             </Link>
             <Link href="/donations/reconcile">
-              <Card className="h-full transition-colors hover:bg-muted/50">
-                <CardContent className="flex items-center gap-4 pt-6">
-                  <div className="rounded-full bg-purple-100 p-3">
-                    <Users className="h-5 w-5 text-purple-600" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-foreground">Reconcile</p>
-                    <p className="text-sm text-muted-foreground">Match payments</p>
-                  </div>
-                </CardContent>
-              </Card>
+              <DonationMetricCard
+                title="Reconcile"
+                icon={Users}
+                description="Match payments"
+                className="h-full transition-colors hover:bg-muted/50"
+              />
             </Link>
-          </div>
+          </DonationMetricCardGrid>
         </div>
       </div>
     </>
