@@ -33,6 +33,11 @@ import {
 } from "@/components/ui/table"
 import { Plus, Pencil, Trash2, Loader2, ShieldCheck } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import {
+  permissionGroupsForDefinitions,
+  type PermissionDefinition,
+} from "@/lib/permissions/permission-definitions"
+import { filterOrganizationRolesForOrganization } from "@/lib/permissions/facilities-access"
 
 type OrganizationRole = {
   id: string
@@ -57,176 +62,20 @@ type RolePermission = {
   enabled: boolean
 }
 
-type PermissionDefinition = {
-  key: string
-  label: string
-  description: string
-  group: string
-}
-
-const permissionDefinitions: PermissionDefinition[] = [
-  {
-    key: "settings.users.view",
-    label: "View Users",
-    description: "Can open the Users page.",
-    group: "Settings",
-  },
-  {
-    key: "settings.users.manage",
-    label: "Manage Users",
-    description: "Can invite users and change user roles.",
-    group: "Settings",
-  },
-  {
-    key: "settings.roles.view",
-    label: "View Roles & Permissions",
-    description: "Can open the Roles & Permissions page.",
-    group: "Settings",
-  },
-  {
-    key: "settings.roles.manage",
-    label: "Manage Roles & Permissions",
-    description: "Can create roles and edit permissions.",
-    group: "Settings",
-  },
-  {
-    key: "applications.view",
-    label: "View Applications",
-    description: "Can open the Applications page.",
-    group: "Applications",
-  },
-  {
-    key: "applications.manage",
-    label: "Manage Applications",
-    description: "Can approve, reject, and update applications.",
-    group: "Applications",
-  },
-  {
-    key: "programs.view",
-    label: "View Programs",
-    description: "Can open Programs pages.",
-    group: "Programs",
-  },
-  {
-    key: "programs.manage",
-    label: "Manage Programs",
-    description: "Can create and edit programs.",
-    group: "Programs",
-  },
-  {
-    key: "staff.view",
-    label: "View Staff",
-    description: "Can open Staff/Instructors pages.",
-    group: "Staff",
-  },
-  {
-    key: "staff.manage",
-    label: "Manage Staff",
-    description: "Can create, edit, and delete staff records.",
-    group: "Staff",
-  },
-  {
-    key: "donations.view",
-    label: "View Donations",
-    description: "Can open donation and fundraising pages.",
-    group: "Donations",
-  },
-  {
-    key: "donations.manage",
-    label: "Manage Donations",
-    description: "Can create, import, reconcile, and update donations.",
-    group: "Donations",
-  },
-  {
-    key: "reports.view",
-    label: "View Reports",
-    description: "Can open reports.",
-    group: "Reports",
-  },
-  {
-    key: "events.view",
-    label: "View Events",
-    description: "Can open Event Management pages.",
-    group: "Events",
-  },
-  {
-    key: "events.manage",
-    label: "Manage Events",
-    description: "Can create and edit internal events and event types.",
-    group: "Events",
-  },
-  {
-    key: "ticketing.view",
-    label: "View Ticketing",
-    description: "Can open ticketing and event sales pages.",
-    group: "Events",
-  },
-  {
-    key: "ticketing.manage",
-    label: "Manage Ticketing",
-    description: "Can create and complete ticket orders.",
-    group: "Events",
-  },
-  {
-    key: "membership.view",
-    label: "View Membership",
-    description: "Can open membership pages and view members.",
-    group: "Membership",
-  },
-  {
-    key: "membership.manage",
-    label: "Manage Membership",
-    description: "Can add members, create memberships, and update status.",
-    group: "Membership",
-  },
-  {
-    key: "bookings.view",
-    label: "View Venue Rentals",
-    description: "Can open Venue Rentals pages.",
-    group: "Venue Rentals",
-  },
-  {
-    key: "bookings.manage",
-    label: "Manage Venue Rentals",
-    description: "Can approve, edit, and manage venue rental workflows.",
-    group: "Venue Rentals",
-  },
-  {
-    key: "spaces.view",
-    label: "View Facilities",
-    description: "Can open Facilities pages, master calendar, and setup briefs.",
-    group: "Facilities",
-  },
-  {
-    key: "spaces.manage",
-    label: "Manage Facilities",
-    description: "Can manage spaces and update facility setup notes.",
-    group: "Facilities",
-  },
-  {
-    key: "contacts.view",
-    label: "View Contacts",
-    description: "Can open Contacts pages and view contact records.",
-    group: "Contacts",
-  },
-  {
-    key: "contacts.manage",
-    label: "Manage Contacts",
-    description: "Can create, edit, and delete contacts and affiliations.",
-    group: "Contacts",
-  },
-]
-
-const permissionGroups = Array.from(
-  new Set(permissionDefinitions.map((permission) => permission.group)),
-)
-
 export function RolesPermissionsClient({
   organizationId,
+  enabledModuleSlugs,
+  permissionDefinitions,
 }: {
   organizationId: string
+  enabledModuleSlugs: string[]
+  permissionDefinitions: PermissionDefinition[]
 }) {
   const supabase = createClient()
+  const permissionGroups = useMemo(
+    () => permissionGroupsForDefinitions(permissionDefinitions),
+    [permissionDefinitions]
+  )
 
   const [roles, setRoles] = useState<OrganizationRole[]>([])
   const [members, setMembers] = useState<OrganizationMember[]>([])
@@ -323,12 +172,17 @@ export function RolesPermissionsClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [organizationId])
 
+  const visibleRoles = useMemo(
+    () => filterOrganizationRolesForOrganization(roles, enabledModuleSlugs),
+    [roles, enabledModuleSlugs]
+  )
+
   const roleCounts = useMemo(() => {
-    return roles.reduce<Record<string, number>>((acc, role) => {
+    return visibleRoles.reduce<Record<string, number>>((acc, role) => {
       acc[role.id] = members.filter((member) => member.role_id === role.id).length
       return acc
     }, {})
-  }, [roles, members])
+  }, [visibleRoles, members])
 
   const permissionsByRoleAndKey = useMemo(() => {
     const map = new Map<string, RolePermission>()
@@ -566,7 +420,7 @@ export function RolesPermissionsClient({
                   )}
 
                   {!loading &&
-                    roles.map((role) => (
+                    visibleRoles.map((role) => (
                       <TableRow key={role.id}>
                         <TableCell className="font-medium">{role.name}</TableCell>
                         <TableCell>{roleCounts[role.id] ?? 0} users</TableCell>
@@ -610,7 +464,7 @@ export function RolesPermissionsClient({
                       </TableRow>
                     ))}
 
-                  {!loading && roles.length === 0 && (
+                  {!loading && visibleRoles.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
                         No custom roles yet. Click Add Role to create one.
@@ -629,7 +483,8 @@ export function RolesPermissionsClient({
                 Permission Matrix
               </CardTitle>
               <CardDescription>
-                Check or uncheck permissions for each role. Changes save immediately.
+                Check or uncheck permissions for each role. Only modules subscribed by your
+                organization are listed. Changes save immediately.
               </CardDescription>
             </CardHeader>
 
@@ -639,7 +494,7 @@ export function RolesPermissionsClient({
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Loading permissions...
                 </div>
-              ) : roles.length === 0 ? (
+              ) : visibleRoles.length === 0 ? (
                 <div className="py-8 text-center text-sm text-muted-foreground">
                   Create a role first, then permissions will appear here.
                 </div>
@@ -649,7 +504,7 @@ export function RolesPermissionsClient({
                     <TableHeader>
                       <TableRow>
                         <TableHead className="min-w-[260px]">Permission</TableHead>
-                        {roles.map((role) => (
+                        {visibleRoles.map((role) => (
                           <TableHead key={role.id} className="min-w-[150px] text-center">
                             {role.name}
                           </TableHead>
@@ -662,7 +517,7 @@ export function RolesPermissionsClient({
   <Fragment key={group}>
                           <TableRow key={`${group}-header`} className="bg-muted/50">
                             <TableCell
-                              colSpan={roles.length + 1}
+                              colSpan={visibleRoles.length + 1}
                               className="font-semibold text-foreground"
                             >
                               {group}
@@ -685,7 +540,7 @@ export function RolesPermissionsClient({
                                   </div>
                                 </TableCell>
 
-                                {roles.map((role) => {
+                                {visibleRoles.map((role) => {
                                   const saveKey = `${role.id}:${permission.key}`
                                   const isSaving = savingPermissionKey === saveKey
 

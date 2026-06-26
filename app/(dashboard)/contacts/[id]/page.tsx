@@ -493,6 +493,14 @@ export default function ContactDetailPage() {
 
 
 
+  const handleContactUpdated = useCallback(async () => {
+
+    router.push("/contacts")
+
+  }, [router])
+
+
+
   if (loading) {
 
     return (
@@ -584,7 +592,7 @@ export default function ContactDetailPage() {
         onNotesChanged={handleNotesChanged}
 
         onRolesUpdated={handleRolesUpdated}
-        onContactUpdated={loadContact}
+        onContactUpdated={handleContactUpdated}
       />
 
     </>

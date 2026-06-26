@@ -184,7 +184,7 @@ export function ContactRelationshipSummaryCard({
       value: formatContactMoney(summary.donationsTotal),
       icon: Heart,
       records: donationPayments,
-      href: "/donations/payments",
+      href: "/donations/payments/one-time",
       viewLabel: "View giving history",
     })
   }

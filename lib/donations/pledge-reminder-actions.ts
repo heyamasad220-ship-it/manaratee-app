@@ -247,6 +247,41 @@ export async function getPledgeReminderHistoryAction(filters?: {
   }
 }
 
+export async function getDonorPledgesAction(donorId: string) {
+  const access = await requireDonationStaffAccess("view")
+  if (!access.ok) return { success: false as const, error: access.error }
+  const { supabase, orgId } = access
+
+  try {
+    const { data: pledgeRows, error } = await supabase
+      .from("pledge_status_view")
+      .select(
+        "id, campaign_name, amount_pledged, amount_paid, balance_remaining, calculated_status, pledge_date, frequency"
+      )
+      .eq("organization_id", orgId)
+      .eq("donor_id", donorId)
+      .order("pledge_date", { ascending: false })
+
+    if (error) throw new Error(error.message)
+
+    return {
+      success: true as const,
+      pledges: (pledgeRows || []).map((row) => ({
+        id: row.id,
+        campaignName: row.campaign_name,
+        amountPledged: Number(row.amount_pledged || 0),
+        amountPaid: Number(row.amount_paid || 0),
+        balanceRemaining: Number(row.balance_remaining || 0),
+        status: row.calculated_status,
+        pledgeDate: row.pledge_date,
+        frequency: row.frequency,
+      })),
+    }
+  } catch (error) {
+    return { success: false as const, error: (error as Error).message }
+  }
+}
+
 export async function getDonorPledgeCollectionSummaryAction(donorId: string) {
   const access = await requireDonationStaffAccess("view")
   if (!access.ok) return { success: false as const, error: access.error }

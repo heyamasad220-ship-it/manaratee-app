@@ -34,6 +34,8 @@ Every organization-specific table should either include `organization_id` direct
 * platform_admins
 * platform_settings
 * organization_settings
+* organization_payment_methods (migration `121` — platform subscription cards on file)
+* organization_billing_invoices (migration `121` — platform subscription invoice history)
 
 Key relationships:
 
@@ -70,6 +72,8 @@ plan_modules.module_id → modules.id
 organization_modules.organization_id → organizations.id
 organization_modules.module_id → modules.id
 ```
+
+**Organization subscription terms (migration `123`):** on `organizations` — `subscription_start_date`, `complimentary_months` (e.g. 3 for three months free), `first_year_special_monthly_rate` (optional promotional rate for year one; standard `plans.monthly_price` after). Platform admin: `PATCH /api/platform/organizations/[organizationId]/billing-terms`. Display: `lib/organizations/organization-subscription-terms.ts`.
 
 ---
 
@@ -288,6 +292,10 @@ npm run validate:donations-security
 
 **Pilot blocker view fixes (migration `119_donations_pilot_blocker_views.sql`):** `pledge_status_view` excludes voided payments from pledge balances; cancelled pledges expose `calculated_status = cancelled` and `balance_remaining = 0`. `donor_summary_view` excludes voided from `total_donations`.
 
+**Outstanding pledge flag (migration `124_donor_summary_outstanding_pledge.sql`):** `donor_summary_view.has_open_pledge` is true only when `pledge_status_view.balance_remaining > 0`. Backfills `pledges.status` from payment totals; trigger `sync_pledge_status_after_payment_change` keeps status in sync on payment changes.
+
+**Payment refunds / net totals (migration `125_payment_refunds_net_amounts.sql`):** `payment_net_amount(amount, refunded_amount)` helper. Views and dashboard RPCs use net amounts. `refresh_pledge_status` and payment trigger include `refunded_amount`. Status values `partially_refunded` and `refunded` on `payments`.
+
 **Import columns on `payments` (migration `117`):** `import_email`, `import_phone`, `import_batch_id` — CSV match hints and batch audit link. Staff import flow no longer uses `payment_import_rows` staging in the UI.
 
 **Chunked CSV import (migration `118`):** `payment_import_batches.import_seen_keys` holds duplicate keys while a file imports in 100-row server-action chunks; cleared when import completes.
@@ -295,7 +303,7 @@ npm run validate:donations-security
 
 **Dashboard RPCs (migration `098_donations_dashboard_rpcs.sql`):** `donation_org_payment_summary`, `donation_org_pledge_summary`, `donation_monthly_payment_totals`, `donation_payment_source_totals`. Payment sum RPCs updated by `120_donations_pilot_blocker_totals.sql` to exclude voided (aligned with Reports Overview).
 
-**Money received (post-120):** `SUM(payments.amount)` where `LOWER(status) <> 'voided'`.
+**Money received (post-125):** `SUM(payment_net_amount(amount, refunded_amount))` where `LOWER(status) <> 'voided'`. Fully refunded payments contribute $0.
 
 Key relationships:
 

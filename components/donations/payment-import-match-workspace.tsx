@@ -32,7 +32,6 @@ import {
   DonationMetricCard,
   DonationMetricCardGrid,
 } from "@/components/donations/donation-metric-card"
-import { Header } from "@/components/layout/header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -124,21 +123,10 @@ function formatDate(value: string | null) {
   return date.toLocaleDateString()
 }
 
-export function PaymentImportMatchWorkspace() {
+export function PaymentImportMatchWorkspace({ mode }: { mode: "import" | "match" }) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [activeTab, setActiveTab] = useState<"upload" | "match" | "history">("upload")
-  const [tabsMounted, setTabsMounted] = useState(false)
-
-  useEffect(() => {
-    const tab = searchParams.get("tab")
-    if (tab === "match" || tab === "history") {
-      setActiveTab(tab)
-    } else {
-      setActiveTab("upload")
-    }
-    setTabsMounted(true)
-  }, [searchParams])
+  const [importSubTab, setImportSubTab] = useState<"upload" | "history">("upload")
 
   const [organizationId, setOrganizationId] = useState<string | null>(null)
   const [fileName, setFileName] = useState("")
@@ -206,13 +194,19 @@ export function PaymentImportMatchWorkspace() {
   const showingFallbackPledges =
     selectedMatch !== null && donorPledges.length === 0 && allPledges.length > 0
 
-  const setTab = useCallback(
-    (tab: "upload" | "match" | "history") => {
-      setActiveTab(tab)
+  useEffect(() => {
+    if (mode !== "import") return
+    setImportSubTab(searchParams.get("tab") === "history" ? "history" : "upload")
+  }, [mode, searchParams])
+
+  const setImportTab = useCallback(
+    (tab: "upload" | "history") => {
+      setImportSubTab(tab)
       const params = new URLSearchParams(searchParams.toString())
       if (tab === "upload") params.delete("tab")
-      else params.set("tab", tab)
-      router.replace(`?${params.toString()}`, { scroll: false })
+      else params.set("tab", "history")
+      const query = params.toString()
+      router.replace(query ? `?${query}` : "?", { scroll: false })
     },
     [router, searchParams]
   )
@@ -272,10 +266,13 @@ export function PaymentImportMatchWorkspace() {
 
   useEffect(() => {
     getCurrentOrganizationId().then(setOrganizationId)
-    loadQueue()
-    loadAllPledges()
+    if (mode === "match") {
+      loadQueue()
+      loadAllPledges()
+      return
+    }
     loadHistory()
-  }, [loadQueue, loadAllPledges, loadHistory])
+  }, [mode, loadQueue, loadAllPledges, loadHistory])
 
   useEffect(() => {
     if (selectedPayment) {
@@ -478,9 +475,8 @@ export function PaymentImportMatchWorkspace() {
 
     setParsedRows([])
     setFileName("")
-    await loadQueue()
     await loadHistory()
-    setTab("match")
+    router.push("/donations/payments/match")
   }
 
   async function handleBulkAutoMatch() {
@@ -661,28 +657,18 @@ export function PaymentImportMatchWorkspace() {
     )
   }
 
-  return (
-    <>
-      <Header title="Import & Match Payments" />
+  const importView = (
+    <Tabs
+      value={importSubTab}
+      onValueChange={(value) => setImportTab(value as "upload" | "history")}
+      className="space-y-6"
+    >
+      <TabsList>
+        <TabsTrigger value="upload">Upload</TabsTrigger>
+        <TabsTrigger value="history">History</TabsTrigger>
+      </TabsList>
 
-      {!tabsMounted ? (
-        <div className="p-6 text-sm text-muted-foreground">Loading...</div>
-      ) : (
-      <Tabs value={activeTab} onValueChange={(value) => setTab(value as "upload" | "match" | "history")} className="p-6">
-        <TabsList className="mb-6">
-          <TabsTrigger value="upload">Upload</TabsTrigger>
-          <TabsTrigger value="match">
-            Match Queue
-            {pendingCount > 0 ? (
-              <Badge variant="secondary" className="ml-2">
-                {pendingCount}
-              </Badge>
-            ) : null}
-          </TabsTrigger>
-          <TabsTrigger value="history">History</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="upload" className="space-y-6">
+      <TabsContent value="upload" className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>Upload payment file</CardTitle>
@@ -817,7 +803,49 @@ export function PaymentImportMatchWorkspace() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="match">
+      <TabsContent value="history">
+          <Card>
+            <CardHeader>
+              <CardTitle>Import history</CardTitle>
+              <CardDescription>Audit trail of uploaded payment files.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingHistory ? (
+                <p className="text-sm text-muted-foreground">Loading history...</p>
+              ) : history.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No imports yet.</p>
+              ) : (
+                <div className="overflow-x-auto rounded-md border">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/50">
+                      <tr className="border-b">
+                        <th className="p-3 text-left">File</th>
+                        <th className="p-3 text-left">Uploaded</th>
+                        <th className="p-3 text-left">Rows in file</th>
+                        <th className="p-3 text-left">Payments created</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {history.map((batch) => (
+                        <tr key={batch.id} className="border-b">
+                          <td className="p-3">{batch.fileName}</td>
+                          <td className="p-3">{formatDate(batch.createdAt)}</td>
+                          <td className="p-3">{batch.rowCount}</td>
+                          <td className="p-3">{batch.importedPayments}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+    </Tabs>
+  )
+
+  const matchView = (
+    <div className="space-y-6">
           <div className="mb-4 flex flex-wrap items-center gap-3">
             <Button variant="outline" onClick={handleBulkAutoMatch} disabled={bulkMatching || pendingCount === 0}>
               {bulkMatching ? "Auto-matching..." : "Auto-match high confidence"}
@@ -1065,49 +1093,15 @@ export function PaymentImportMatchWorkspace() {
               )}
             </Card>
           </div>
-        </TabsContent>
+    </div>
+  )
 
-        <TabsContent value="history">
-          <Card>
-            <CardHeader>
-              <CardTitle>Import history</CardTitle>
-              <CardDescription>Audit trail of uploaded payment files.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {loadingHistory ? (
-                <p className="text-sm text-muted-foreground">Loading history...</p>
-              ) : history.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No imports yet.</p>
-              ) : (
-                <div className="overflow-x-auto rounded-md border">
-                  <table className="w-full text-sm">
-                    <thead className="bg-muted/50">
-                      <tr className="border-b">
-                        <th className="p-3 text-left">File</th>
-                        <th className="p-3 text-left">Uploaded</th>
-                        <th className="p-3 text-left">Rows in file</th>
-                        <th className="p-3 text-left">Payments created</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {history.map((batch) => (
-                        <tr key={batch.id} className="border-b">
-                          <td className="p-3">{batch.fileName}</td>
-                          <td className="p-3">{formatDate(batch.createdAt)}</td>
-                          <td className="p-3">{batch.rowCount}</td>
-                          <td className="p-3">{batch.importedPayments}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-      )}
+  return (
+    <>
+      {mode === "import" ? importView : matchView}
 
+      {mode === "match" ? (
+        <>
       <QuickAddContactDialog
         open={showQuickAdd}
         onOpenChange={setShowQuickAdd}
@@ -1165,6 +1159,8 @@ export function PaymentImportMatchWorkspace() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+        </>
+      ) : null}
     </>
   )
 }

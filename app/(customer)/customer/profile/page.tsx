@@ -27,6 +27,7 @@ import {
   Plus,
   HandCoins,
   Briefcase,
+  Lock,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import {
@@ -60,6 +61,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 interface ProfileData {
   firstName: string
@@ -253,6 +255,8 @@ export default function CustomerProfilePage() {
   const [profile, setProfile] = useState<ProfileData>(emptyProfile)
   const [editData, setEditData] = useState<ProfileData>(emptyProfile)
   const [isEditing, setIsEditing] = useState(false)
+  const [isEditingEmergency, setIsEditingEmergency] = useState(false)
+  const [changingPassword, setChangingPassword] = useState(false)
   const [notifications, setNotifications] = useState<NotificationSettings>(defaultNotifications)
 
   const [userApplications, setUserApplications] = useState<UserApplication[]>([])
@@ -385,6 +389,41 @@ export default function CustomerProfilePage() {
 
   function handleNotificationChange(field: keyof NotificationSettings, value: boolean) {
     setNotifications((prev) => ({ ...prev, [field]: value }))
+  }
+
+  async function handleChangePassword() {
+    if (!profile.email) {
+      alert("Add an email address to your profile before changing your password.")
+      return
+    }
+
+    setChangingPassword(true)
+    const { error } = await supabase.auth.resetPasswordForEmail(profile.email, {
+      redirectTo: `${window.location.origin}/forgot-password`,
+    })
+    setChangingPassword(false)
+
+    if (error) {
+      alert(error.message)
+      return
+    }
+
+    alert("Check your email for a link to reset your password.")
+  }
+
+  function handleEditEmergency() {
+    setEditData({ ...profile })
+    setIsEditingEmergency(true)
+  }
+
+  function handleCancelEmergency() {
+    setEditData({ ...profile })
+    setIsEditingEmergency(false)
+  }
+
+  function handleSaveEmergency() {
+    setProfile({ ...editData })
+    setIsEditingEmergency(false)
   }
 
   async function loadFamilyMembers(parentPersonId: string) {
@@ -588,11 +627,20 @@ export default function CustomerProfilePage() {
         </CardContent>
       </Card>
 
+      <Tabs defaultValue="personal" className="gap-6">
+        <TabsList className="h-auto w-full justify-start sm:w-auto">
+          <TabsTrigger value="personal">Personal Information</TabsTrigger>
+          <TabsTrigger value="family">Family</TabsTrigger>
+          <TabsTrigger value="notifications">Notification Preferences</TabsTrigger>
+          <TabsTrigger value="applications">Applications</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="personal" className="mt-0 flex flex-col gap-6">
       <Card className="border border-border shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle className="text-base font-semibold">Personal Information</CardTitle>
-            <CardDescription>Your basic profile and contact details.</CardDescription>
+            <CardDescription>Your profile, contact details, and address.</CardDescription>
           </div>
           {isEditing ? (
             <div className="flex items-center gap-2">
@@ -680,56 +728,72 @@ export default function CustomerProfilePage() {
             <Label className="text-sm text-muted-foreground">Bio</Label>
             {isEditing ? <Textarea value={editData.bio} onChange={(e) => handleChange("bio", e.target.value)} className="min-h-20 resize-none" placeholder="Tell us a little about yourself..." /> : <span className="text-sm font-medium text-foreground">{profile.bio || "—"}</span>}
           </div>
-        </CardContent>
-      </Card>
 
-      <Card className="border border-border shadow-sm">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base font-semibold"><MapPin className="h-4 w-4" />Address</CardTitle>
-          <CardDescription>Your home or mailing address.</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <Label className="text-sm text-muted-foreground">Street Address</Label>
-            {isEditing ? <Input value={editData.addressLine1} onChange={(e) => handleChange("addressLine1", e.target.value)} className="h-9" /> : <span className="text-sm font-medium text-foreground">{profile.addressLine1 || "—"}</span>}
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label className="text-sm text-muted-foreground">Apartment, Suite, etc.</Label>
-            {isEditing ? <Input value={editData.addressLine2} onChange={(e) => handleChange("addressLine2", e.target.value)} className="h-9" /> : <span className="text-sm font-medium text-foreground">{profile.addressLine2 || "—"}</span>}
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="flex flex-col gap-2"><Label className="text-sm text-muted-foreground">City</Label>{isEditing ? <Input value={editData.city} onChange={(e) => handleChange("city", e.target.value)} className="h-9" /> : <span className="text-sm font-medium text-foreground">{profile.city || "—"}</span>}</div>
-            <div className="flex flex-col gap-2"><Label className="text-sm text-muted-foreground">State</Label>{isEditing ? <Input value={editData.state} onChange={(e) => handleChange("state", e.target.value)} className="h-9" /> : <span className="text-sm font-medium text-foreground">{profile.state || "—"}</span>}</div>
-            <div className="flex flex-col gap-2"><Label className="text-sm text-muted-foreground">Zip Code</Label>{isEditing ? <Input value={editData.zipCode} onChange={(e) => handleChange("zipCode", e.target.value)} className="h-9" /> : <span className="text-sm font-medium text-foreground">{profile.zipCode || "—"}</span>}</div>
-            <div className="flex flex-col gap-2"><Label className="text-sm text-muted-foreground">Country</Label>{isEditing ? <Input value={editData.country} onChange={(e) => handleChange("country", e.target.value)} className="h-9" /> : <span className="text-sm font-medium text-foreground">{profile.country || "—"}</span>}</div>
-          </div>
-        </CardContent>
-      </Card>
+          <Separator />
 
-      <Card className="border border-border shadow-sm">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base font-semibold"><Shield className="h-4 w-4" />Emergency Contact</CardTitle>
-          <CardDescription>Someone we can contact in case of an emergency.</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div className="flex flex-col gap-2"><Label className="text-sm text-muted-foreground">Contact Name</Label>{isEditing ? <Input value={editData.emergencyContactName} onChange={(e) => handleChange("emergencyContactName", e.target.value)} className="h-9" /> : <span className="text-sm font-medium text-foreground">{profile.emergencyContactName || "—"}</span>}</div>
-            <div className="flex flex-col gap-2"><Label className="text-sm text-muted-foreground">Contact Phone</Label>{isEditing ? <Input type="tel" value={editData.emergencyContactPhone} onChange={(e) => handleChange("emergencyContactPhone", e.target.value)} className="h-9" /> : <span className="text-sm font-medium text-foreground">{profile.emergencyContactPhone || "—"}</span>}</div>
-            <div className="flex flex-col gap-2">
-              <Label className="text-sm text-muted-foreground">Relationship</Label>
-              {isEditing ? (
-                <Select value={editData.emergencyContactRelation} onValueChange={(val) => handleChange("emergencyContactRelation", val)}>
-                  <SelectTrigger className="h-9"><SelectValue placeholder="Select relationship" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Spouse">Spouse</SelectItem><SelectItem value="Parent">Parent</SelectItem><SelectItem value="Sibling">Sibling</SelectItem><SelectItem value="Child">Child</SelectItem><SelectItem value="Friend">Friend</SelectItem><SelectItem value="Other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
-              ) : <span className="text-sm font-medium text-foreground">{profile.emergencyContactRelation || "—"}</span>}
+          <div>
+            <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
+              <MapPin className="h-4 w-4" />
+              Address
+            </h3>
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
+                <Label className="text-sm text-muted-foreground">Street Address</Label>
+                {isEditing ? <Input value={editData.addressLine1} onChange={(e) => handleChange("addressLine1", e.target.value)} className="h-9" /> : <span className="text-sm font-medium text-foreground">{profile.addressLine1 || "—"}</span>}
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label className="text-sm text-muted-foreground">Apartment, Suite, etc.</Label>
+                {isEditing ? <Input value={editData.addressLine2} onChange={(e) => handleChange("addressLine2", e.target.value)} className="h-9" /> : <span className="text-sm font-medium text-foreground">{profile.addressLine2 || "—"}</span>}
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="flex flex-col gap-2"><Label className="text-sm text-muted-foreground">City</Label>{isEditing ? <Input value={editData.city} onChange={(e) => handleChange("city", e.target.value)} className="h-9" /> : <span className="text-sm font-medium text-foreground">{profile.city || "—"}</span>}</div>
+                <div className="flex flex-col gap-2"><Label className="text-sm text-muted-foreground">State</Label>{isEditing ? <Input value={editData.state} onChange={(e) => handleChange("state", e.target.value)} className="h-9" /> : <span className="text-sm font-medium text-foreground">{profile.state || "—"}</span>}</div>
+                <div className="flex flex-col gap-2"><Label className="text-sm text-muted-foreground">Zip Code</Label>{isEditing ? <Input value={editData.zipCode} onChange={(e) => handleChange("zipCode", e.target.value)} className="h-9" /> : <span className="text-sm font-medium text-foreground">{profile.zipCode || "—"}</span>}</div>
+                <div className="flex flex-col gap-2"><Label className="text-sm text-muted-foreground">Country</Label>{isEditing ? <Input value={editData.country} onChange={(e) => handleChange("country", e.target.value)} className="h-9" /> : <span className="text-sm font-medium text-foreground">{profile.country || "—"}</span>}</div>
+              </div>
             </div>
           </div>
         </CardContent>
       </Card>
 
+      <Card className="border border-border shadow-sm">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div><CardTitle className="flex items-center gap-2 text-base font-semibold"><CreditCard className="h-4 w-4" />Payment Methods</CardTitle><CardDescription>Manage your saved payment methods for quick checkout.</CardDescription></div>
+          <Button variant="outline" size="sm" onClick={() => setIsAddPaymentDialogOpen(true)}><Plus className="mr-1.5 h-4 w-4" />Add Card</Button>
+        </CardHeader>
+        <CardContent>
+          {paymentMethods.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center"><CreditCard className="mb-3 h-10 w-10 text-muted-foreground/50" /><p className="text-sm font-medium text-foreground">No payment methods saved</p><p className="mt-1 text-xs text-muted-foreground">Add a payment method for faster checkout.</p><Button variant="outline" size="sm" className="mt-4" onClick={() => setIsAddPaymentDialogOpen(true)}><Plus className="mr-1.5 h-4 w-4" />Add Payment Method</Button></div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {paymentMethods.map((method) => (
+                <div key={method.id} className="flex items-center justify-between rounded-lg border border-border bg-muted/30 p-4">
+                  <div className="flex items-center gap-4"><CardBrandIcon type={method.type} /><div className="flex flex-col gap-1"><div className="flex items-center gap-2"><span className="text-sm font-medium text-foreground">{method.type.charAt(0).toUpperCase() + method.type.slice(1)} ending in {method.lastFour}</span>{method.isDefault && <Badge variant="secondary" className="text-xs">Default</Badge>}</div><div className="flex items-center gap-3 text-xs text-muted-foreground"><span>{method.cardholderName}</span><span className="text-muted-foreground/50">|</span><span>Expires {method.expiryMonth}/{method.expiryYear}</span></div></div></div>
+                  <div className="flex items-center gap-2">{!method.isDefault && <Button variant="ghost" size="sm" className="text-xs" onClick={() => handleSetDefaultPaymentMethod(method.id)}>Set as default</Button>}<Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive" onClick={() => handleRemovePaymentMethod(method.id)}><Trash2 className="h-4 w-4" /></Button></div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="border border-border shadow-sm">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+            <Lock className="h-4 w-4" />
+            Password
+          </CardTitle>
+          <CardDescription>Update your account password.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button variant="outline" size="sm" onClick={handleChangePassword} disabled={changingPassword}>
+            {changingPassword ? "Sending..." : "Change Password"}
+          </Button>
+        </CardContent>
+      </Card>
+        </TabsContent>
+
+        <TabsContent value="family" className="mt-0 flex flex-col gap-6">
       <Card className="border border-border shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
@@ -769,61 +833,112 @@ export default function CustomerProfilePage() {
         </CardContent>
       </Card>
 
-      <Dialog open={isAddFamilyDialogOpen} onOpenChange={setIsAddFamilyDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>Add Family Member</DialogTitle><DialogDescription>Add a family member to your account. Children under 18 can be registered for events through your account.</DialogDescription></DialogHeader>
-          <div className="flex flex-col gap-4 py-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="flex flex-col gap-2"><Label htmlFor="fm-firstName">First Name</Label><Input id="fm-firstName" value={newFamilyMember.firstName} onChange={(e) => setNewFamilyMember((prev) => ({ ...prev, firstName: e.target.value }))} placeholder="First name" /></div>
-              <div className="flex flex-col gap-2"><Label htmlFor="fm-lastName">Last Name</Label><Input id="fm-lastName" value={newFamilyMember.lastName} onChange={(e) => setNewFamilyMember((prev) => ({ ...prev, lastName: e.target.value }))} placeholder="Last name" /></div>
-            </div>
-            <div className="flex flex-col gap-2"><Label htmlFor="fm-dob">Date of Birth</Label><BirthDateInput id="fm-dob" value={newFamilyMember.dateOfBirth} onChange={(dateOfBirth) => setNewFamilyMember((prev) => ({ ...prev, dateOfBirth }))} /></div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="flex flex-col gap-2"><Label htmlFor="fm-gender">Gender</Label><Select value={newFamilyMember.gender} onValueChange={(val) => setNewFamilyMember((prev) => ({ ...prev, gender: val }))}><SelectTrigger id="fm-gender"><SelectValue placeholder="Select gender" /></SelectTrigger><SelectContent><SelectItem value="Male">Male</SelectItem><SelectItem value="Female">Female</SelectItem><SelectItem value="Non-binary">Non-binary</SelectItem><SelectItem value="Prefer not to say">Prefer not to say</SelectItem></SelectContent></Select></div>
-              <div className="flex flex-col gap-2"><Label htmlFor="fm-relationship">Relationship</Label><Select value={newFamilyMember.relationship} onValueChange={(val) => setNewFamilyMember((prev) => ({ ...prev, relationship: val }))}><SelectTrigger id="fm-relationship"><SelectValue placeholder="Select relationship" /></SelectTrigger><SelectContent><SelectItem value="child">Child / Grandchild</SelectItem><SelectItem value="guardian">Guardian</SelectItem><SelectItem value="spouse">Spouse</SelectItem><SelectItem value="parent">Parent</SelectItem><SelectItem value="sibling">Sibling</SelectItem><SelectItem value="other">Other</SelectItem></SelectContent></Select></div>
-            </div>
-          </div>
-          <DialogFooter><Button variant="outline" onClick={() => setIsAddFamilyDialogOpen(false)}>Cancel</Button><Button onClick={handleAddFamilyMember} disabled={!newFamilyMember.firstName || !newFamilyMember.lastName || !newFamilyMember.dateOfBirth || !newFamilyMember.gender || !newFamilyMember.relationship}>Add Member</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       <Card className="border border-border shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between">
-          <div><CardTitle className="flex items-center gap-2 text-base font-semibold"><CreditCard className="h-4 w-4" />Payment Methods</CardTitle><CardDescription>Manage your saved payment methods for quick checkout.</CardDescription></div>
-          <Button variant="outline" size="sm" onClick={() => setIsAddPaymentDialogOpen(true)}><Plus className="mr-1.5 h-4 w-4" />Add Card</Button>
-        </CardHeader>
-        <CardContent>
-          {paymentMethods.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 text-center"><CreditCard className="mb-3 h-10 w-10 text-muted-foreground/50" /><p className="text-sm font-medium text-foreground">No payment methods saved</p><p className="mt-1 text-xs text-muted-foreground">Add a payment method for faster checkout.</p><Button variant="outline" size="sm" className="mt-4" onClick={() => setIsAddPaymentDialogOpen(true)}><Plus className="mr-1.5 h-4 w-4" />Add Payment Method</Button></div>
-          ) : (
-            <div className="flex flex-col gap-3">
-              {paymentMethods.map((method) => (
-                <div key={method.id} className="flex items-center justify-between rounded-lg border border-border bg-muted/30 p-4">
-                  <div className="flex items-center gap-4"><CardBrandIcon type={method.type} /><div className="flex flex-col gap-1"><div className="flex items-center gap-2"><span className="text-sm font-medium text-foreground">{method.type.charAt(0).toUpperCase() + method.type.slice(1)} ending in {method.lastFour}</span>{method.isDefault && <Badge variant="secondary" className="text-xs">Default</Badge>}</div><div className="flex items-center gap-3 text-xs text-muted-foreground"><span>{method.cardholderName}</span><span className="text-muted-foreground/50">|</span><span>Expires {method.expiryMonth}/{method.expiryYear}</span></div></div></div>
-                  <div className="flex items-center gap-2">{!method.isDefault && <Button variant="ghost" size="sm" className="text-xs" onClick={() => handleSetDefaultPaymentMethod(method.id)}>Set as default</Button>}<Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive" onClick={() => handleRemovePaymentMethod(method.id)}><Trash2 className="h-4 w-4" /></Button></div>
-                </div>
-              ))}
+          <div>
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+              <Shield className="h-4 w-4" />
+              Emergency Contact
+            </CardTitle>
+            <CardDescription>Someone we can contact in case of an emergency.</CardDescription>
+          </div>
+          {isEditingEmergency ? (
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" onClick={handleCancelEmergency}>
+                <X className="mr-1.5 h-4 w-4" />
+                Cancel
+              </Button>
+              <Button size="sm" onClick={handleSaveEmergency}>
+                <Check className="mr-1.5 h-4 w-4" />
+                Save Changes
+              </Button>
             </div>
+          ) : (
+            <Button variant="outline" size="sm" onClick={handleEditEmergency}>
+              <Pencil className="mr-1.5 h-4 w-4" />
+              Edit
+            </Button>
           )}
-        </CardContent>
-      </Card>
-
-      <Dialog open={isAddPaymentDialogOpen} onOpenChange={setIsAddPaymentDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>Add Payment Method</DialogTitle><DialogDescription>Add a credit or debit card to your account.</DialogDescription></DialogHeader>
-          <div className="flex flex-col gap-4 py-4">
-            <div className="flex flex-col gap-2"><Label htmlFor="pm-cardNumber">Card Number</Label><Input id="pm-cardNumber" value={newPaymentMethod.cardNumber} onChange={(e) => setNewPaymentMethod((prev) => ({ ...prev, cardNumber: e.target.value.replace(/\D/g, "").slice(0, 16) }))} placeholder="1234 5678 9012 3456" maxLength={16} /></div>
-            <div className="flex flex-col gap-2"><Label htmlFor="pm-cardholderName">Cardholder Name</Label><Input id="pm-cardholderName" value={newPaymentMethod.cardholderName} onChange={(e) => setNewPaymentMethod((prev) => ({ ...prev, cardholderName: e.target.value }))} placeholder="Cardholder name" /></div>
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div className="flex flex-col gap-2"><Label htmlFor="pm-expiryMonth">Month</Label><Select value={newPaymentMethod.expiryMonth} onValueChange={(val) => setNewPaymentMethod((prev) => ({ ...prev, expiryMonth: val }))}><SelectTrigger id="pm-expiryMonth"><SelectValue placeholder="MM" /></SelectTrigger><SelectContent>{Array.from({ length: 12 }, (_, i) => { const month = String(i + 1).padStart(2, "0"); return <SelectItem key={month} value={month}>{month}</SelectItem> })}</SelectContent></Select></div>
-              <div className="flex flex-col gap-2"><Label htmlFor="pm-expiryYear">Year</Label><Select value={newPaymentMethod.expiryYear} onValueChange={(val) => setNewPaymentMethod((prev) => ({ ...prev, expiryYear: val }))}><SelectTrigger id="pm-expiryYear"><SelectValue placeholder="YYYY" /></SelectTrigger><SelectContent>{Array.from({ length: 10 }, (_, i) => { const year = String(new Date().getFullYear() + i); return <SelectItem key={year} value={year}>{year}</SelectItem> })}</SelectContent></Select></div>
-              <div className="flex flex-col gap-2"><Label htmlFor="pm-cvv">CVV</Label><Input id="pm-cvv" type="password" value={newPaymentMethod.cvv} onChange={(e) => setNewPaymentMethod((prev) => ({ ...prev, cvv: e.target.value.replace(/\D/g, "").slice(0, 4) }))} placeholder="123" maxLength={4} /></div>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="flex flex-col gap-2">
+              <Label className="text-sm text-muted-foreground">Contact Name</Label>
+              {isEditingEmergency ? (
+                <Input
+                  value={editData.emergencyContactName}
+                  onChange={(e) => handleChange("emergencyContactName", e.target.value)}
+                  className="h-9"
+                />
+              ) : (
+                <span className="text-sm font-medium text-foreground">
+                  {profile.emergencyContactName || "—"}
+                </span>
+              )}
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label className="text-sm text-muted-foreground">Contact Phone</Label>
+              {isEditingEmergency ? (
+                <Input
+                  type="tel"
+                  value={editData.emergencyContactPhone}
+                  onChange={(e) => handleChange("emergencyContactPhone", e.target.value)}
+                  className="h-9"
+                />
+              ) : (
+                <span className="text-sm font-medium text-foreground">
+                  {profile.emergencyContactPhone || "—"}
+                </span>
+              )}
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label className="text-sm text-muted-foreground">Relationship</Label>
+              {isEditingEmergency ? (
+                <Select
+                  value={editData.emergencyContactRelation}
+                  onValueChange={(val) => handleChange("emergencyContactRelation", val)}
+                >
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="Select relationship" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Spouse">Spouse</SelectItem>
+                    <SelectItem value="Parent">Parent</SelectItem>
+                    <SelectItem value="Sibling">Sibling</SelectItem>
+                    <SelectItem value="Child">Child</SelectItem>
+                    <SelectItem value="Friend">Friend</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              ) : (
+                <span className="text-sm font-medium text-foreground">
+                  {profile.emergencyContactRelation || "—"}
+                </span>
+              )}
             </div>
           </div>
-          <DialogFooter><Button variant="outline" onClick={() => setIsAddPaymentDialogOpen(false)}>Cancel</Button><Button onClick={handleAddPaymentMethod} disabled={!newPaymentMethod.cardNumber || newPaymentMethod.cardNumber.length < 13 || !newPaymentMethod.cardholderName || !newPaymentMethod.expiryMonth || !newPaymentMethod.expiryYear || !newPaymentMethod.cvv || newPaymentMethod.cvv.length < 3}>Add Card</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </CardContent>
+      </Card>
+        </TabsContent>
 
+        <TabsContent value="notifications" className="mt-0">
+      <Card className="border border-border shadow-sm">
+        <CardHeader><CardTitle className="flex items-center gap-2 text-base font-semibold"><Bell className="h-4 w-4" />Notification Preferences</CardTitle><CardDescription>Manage how you receive updates and reminders.</CardDescription></CardHeader>
+        <CardContent className="flex flex-col gap-5">
+          <div className="flex items-center justify-between"><div className="flex flex-col gap-0.5"><span className="text-sm font-medium text-foreground">Event Updates</span><span className="text-xs text-muted-foreground">Receive emails about events you are registered for.</span></div><Switch checked={notifications.emailEvents} onCheckedChange={(val) => handleNotificationChange("emailEvents", val)} /></div>
+          <Separator />
+          <div className="flex items-center justify-between"><div className="flex flex-col gap-0.5"><span className="text-sm font-medium text-foreground">Sign-Up Confirmations</span><span className="text-xs text-muted-foreground">Get notified when your sign-ups are confirmed.</span></div><Switch checked={notifications.emailSignUps} onCheckedChange={(val) => handleNotificationChange("emailSignUps", val)} /></div>
+          <Separator />
+          <div className="flex items-center justify-between"><div className="flex flex-col gap-0.5"><span className="text-sm font-medium text-foreground">Booking Notifications</span><span className="text-xs text-muted-foreground">Updates about your venue booking requests.</span></div><Switch checked={notifications.emailBookings} onCheckedChange={(val) => handleNotificationChange("emailBookings", val)} /></div>
+          <Separator />
+          <div className="flex items-center justify-between"><div className="flex flex-col gap-0.5"><span className="text-sm font-medium text-foreground">Newsletter</span><span className="text-xs text-muted-foreground">Receive our monthly community newsletter.</span></div><Switch checked={notifications.emailNewsletter} onCheckedChange={(val) => handleNotificationChange("emailNewsletter", val)} /></div>
+          <Separator />
+          <div className="flex items-center justify-between"><div className="flex flex-col gap-0.5"><span className="text-sm font-medium text-foreground">SMS Reminders</span><span className="text-xs text-muted-foreground">Get text message reminders for upcoming events.</span></div><Switch checked={notifications.smsReminders} onCheckedChange={(val) => handleNotificationChange("smsReminders", val)} /></div>
+        </CardContent>
+      </Card>
+        </TabsContent>
+
+        <TabsContent value="applications" className="mt-0">
       <Card className="border border-border shadow-sm">
         <CardHeader><CardTitle className="flex items-center gap-2 text-base font-semibold"><Users className="h-4 w-4" />Applications</CardTitle><CardDescription>Apply to become a vendor, volunteer, or take on other roles in our community.</CardDescription></CardHeader>
         <CardContent className="flex flex-col gap-6">
@@ -857,6 +972,42 @@ export default function CustomerProfilePage() {
           )}
         </CardContent>
       </Card>
+        </TabsContent>
+      </Tabs>
+
+      <Dialog open={isAddFamilyDialogOpen} onOpenChange={setIsAddFamilyDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Add Family Member</DialogTitle><DialogDescription>Add a family member to your account. Children under 18 can be registered for events through your account.</DialogDescription></DialogHeader>
+          <div className="flex flex-col gap-4 py-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="flex flex-col gap-2"><Label htmlFor="fm-firstName">First Name</Label><Input id="fm-firstName" value={newFamilyMember.firstName} onChange={(e) => setNewFamilyMember((prev) => ({ ...prev, firstName: e.target.value }))} placeholder="First name" /></div>
+              <div className="flex flex-col gap-2"><Label htmlFor="fm-lastName">Last Name</Label><Input id="fm-lastName" value={newFamilyMember.lastName} onChange={(e) => setNewFamilyMember((prev) => ({ ...prev, lastName: e.target.value }))} placeholder="Last name" /></div>
+            </div>
+            <div className="flex flex-col gap-2"><Label htmlFor="fm-dob">Date of Birth</Label><BirthDateInput id="fm-dob" value={newFamilyMember.dateOfBirth} onChange={(dateOfBirth) => setNewFamilyMember((prev) => ({ ...prev, dateOfBirth }))} /></div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="flex flex-col gap-2"><Label htmlFor="fm-gender">Gender</Label><Select value={newFamilyMember.gender} onValueChange={(val) => setNewFamilyMember((prev) => ({ ...prev, gender: val }))}><SelectTrigger id="fm-gender"><SelectValue placeholder="Select gender" /></SelectTrigger><SelectContent><SelectItem value="Male">Male</SelectItem><SelectItem value="Female">Female</SelectItem><SelectItem value="Non-binary">Non-binary</SelectItem><SelectItem value="Prefer not to say">Prefer not to say</SelectItem></SelectContent></Select></div>
+              <div className="flex flex-col gap-2"><Label htmlFor="fm-relationship">Relationship</Label><Select value={newFamilyMember.relationship} onValueChange={(val) => setNewFamilyMember((prev) => ({ ...prev, relationship: val }))}><SelectTrigger id="fm-relationship"><SelectValue placeholder="Select relationship" /></SelectTrigger><SelectContent><SelectItem value="child">Child / Grandchild</SelectItem><SelectItem value="guardian">Guardian</SelectItem><SelectItem value="spouse">Spouse</SelectItem><SelectItem value="parent">Parent</SelectItem><SelectItem value="sibling">Sibling</SelectItem><SelectItem value="other">Other</SelectItem></SelectContent></Select></div>
+            </div>
+          </div>
+          <DialogFooter><Button variant="outline" onClick={() => setIsAddFamilyDialogOpen(false)}>Cancel</Button><Button onClick={handleAddFamilyMember} disabled={!newFamilyMember.firstName || !newFamilyMember.lastName || !newFamilyMember.dateOfBirth || !newFamilyMember.gender || !newFamilyMember.relationship}>Add Member</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isAddPaymentDialogOpen} onOpenChange={setIsAddPaymentDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Add Payment Method</DialogTitle><DialogDescription>Add a credit or debit card to your account.</DialogDescription></DialogHeader>
+          <div className="flex flex-col gap-4 py-4">
+            <div className="flex flex-col gap-2"><Label htmlFor="pm-cardNumber">Card Number</Label><Input id="pm-cardNumber" value={newPaymentMethod.cardNumber} onChange={(e) => setNewPaymentMethod((prev) => ({ ...prev, cardNumber: e.target.value.replace(/\D/g, "").slice(0, 16) }))} placeholder="1234 5678 9012 3456" maxLength={16} /></div>
+            <div className="flex flex-col gap-2"><Label htmlFor="pm-cardholderName">Cardholder Name</Label><Input id="pm-cardholderName" value={newPaymentMethod.cardholderName} onChange={(e) => setNewPaymentMethod((prev) => ({ ...prev, cardholderName: e.target.value }))} placeholder="Cardholder name" /></div>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="flex flex-col gap-2"><Label htmlFor="pm-expiryMonth">Month</Label><Select value={newPaymentMethod.expiryMonth} onValueChange={(val) => setNewPaymentMethod((prev) => ({ ...prev, expiryMonth: val }))}><SelectTrigger id="pm-expiryMonth"><SelectValue placeholder="MM" /></SelectTrigger><SelectContent>{Array.from({ length: 12 }, (_, i) => { const month = String(i + 1).padStart(2, "0"); return <SelectItem key={month} value={month}>{month}</SelectItem> })}</SelectContent></Select></div>
+              <div className="flex flex-col gap-2"><Label htmlFor="pm-expiryYear">Year</Label><Select value={newPaymentMethod.expiryYear} onValueChange={(val) => setNewPaymentMethod((prev) => ({ ...prev, expiryYear: val }))}><SelectTrigger id="pm-expiryYear"><SelectValue placeholder="YYYY" /></SelectTrigger><SelectContent>{Array.from({ length: 10 }, (_, i) => { const year = String(new Date().getFullYear() + i); return <SelectItem key={year} value={year}>{year}</SelectItem> })}</SelectContent></Select></div>
+              <div className="flex flex-col gap-2"><Label htmlFor="pm-cvv">CVV</Label><Input id="pm-cvv" type="password" value={newPaymentMethod.cvv} onChange={(e) => setNewPaymentMethod((prev) => ({ ...prev, cvv: e.target.value.replace(/\D/g, "").slice(0, 4) }))} placeholder="123" maxLength={4} /></div>
+            </div>
+          </div>
+          <DialogFooter><Button variant="outline" onClick={() => setIsAddPaymentDialogOpen(false)}>Cancel</Button><Button onClick={handleAddPaymentMethod} disabled={!newPaymentMethod.cardNumber || newPaymentMethod.cardNumber.length < 13 || !newPaymentMethod.cardholderName || !newPaymentMethod.expiryMonth || !newPaymentMethod.expiryYear || !newPaymentMethod.cvv || newPaymentMethod.cvv.length < 3}>Add Card</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isApplyDialogOpen} onOpenChange={setIsApplyDialogOpen}>
         <DialogContent className="max-w-lg">
@@ -870,25 +1021,6 @@ export default function CustomerProfilePage() {
         </DialogContent>
       </Dialog>
 
-      <Card className="border border-border shadow-sm">
-        <CardHeader><CardTitle className="flex items-center gap-2 text-base font-semibold"><Bell className="h-4 w-4" />Notification Preferences</CardTitle><CardDescription>Manage how you receive updates and reminders.</CardDescription></CardHeader>
-        <CardContent className="flex flex-col gap-5">
-          <div className="flex items-center justify-between"><div className="flex flex-col gap-0.5"><span className="text-sm font-medium text-foreground">Event Updates</span><span className="text-xs text-muted-foreground">Receive emails about events you are registered for.</span></div><Switch checked={notifications.emailEvents} onCheckedChange={(val) => handleNotificationChange("emailEvents", val)} /></div>
-          <Separator />
-          <div className="flex items-center justify-between"><div className="flex flex-col gap-0.5"><span className="text-sm font-medium text-foreground">Sign-Up Confirmations</span><span className="text-xs text-muted-foreground">Get notified when your sign-ups are confirmed.</span></div><Switch checked={notifications.emailSignUps} onCheckedChange={(val) => handleNotificationChange("emailSignUps", val)} /></div>
-          <Separator />
-          <div className="flex items-center justify-between"><div className="flex flex-col gap-0.5"><span className="text-sm font-medium text-foreground">Booking Notifications</span><span className="text-xs text-muted-foreground">Updates about your venue booking requests.</span></div><Switch checked={notifications.emailBookings} onCheckedChange={(val) => handleNotificationChange("emailBookings", val)} /></div>
-          <Separator />
-          <div className="flex items-center justify-between"><div className="flex flex-col gap-0.5"><span className="text-sm font-medium text-foreground">Newsletter</span><span className="text-xs text-muted-foreground">Receive our monthly community newsletter.</span></div><Switch checked={notifications.emailNewsletter} onCheckedChange={(val) => handleNotificationChange("emailNewsletter", val)} /></div>
-          <Separator />
-          <div className="flex items-center justify-between"><div className="flex flex-col gap-0.5"><span className="text-sm font-medium text-foreground">SMS Reminders</span><span className="text-xs text-muted-foreground">Get text message reminders for upcoming events.</span></div><Switch checked={notifications.smsReminders} onCheckedChange={(val) => handleNotificationChange("smsReminders", val)} /></div>
-        </CardContent>
-      </Card>
-
-      <Card className="border border-border shadow-sm">
-        <CardHeader><CardTitle className="text-base font-semibold">Account</CardTitle><CardDescription>Manage your account settings and security.</CardDescription></CardHeader>
-        <CardContent><Button variant="outline" size="sm">Change Password</Button></CardContent>
-      </Card>
     </div>
   )
 }

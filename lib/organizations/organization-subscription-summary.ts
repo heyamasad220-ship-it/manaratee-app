@@ -4,49 +4,14 @@ import {
   type OrganizationModuleStatus,
 } from "@/lib/modules/organization-module-access"
 import { getServiceRoleClient } from "@/lib/platform/require-platform-admin"
+import { computeOrganizationSubscriptionTerms } from "@/lib/organizations/organization-subscription-terms"
+import {
+  type OrganizationSubscriptionModule,
+  type OrganizationSubscriptionSummary,
+} from "@/lib/organizations/organization-subscription-types"
 
-export type OrganizationSubscriptionModule = {
-  slug: string
-  name: string
-  description: string | null
-  enabled: boolean
-  enabledByPlan: boolean
-  manuallyOverridden: boolean
-}
-
-export type OrganizationSubscriptionSummary = {
-  organizationName: string
-  plan: {
-    id: string
-    name: string
-    description: string | null
-    monthlyPrice: number
-    yearlyPrice: number
-    memberLimit: number | null
-    eventLimit: number | null
-  } | null
-  bundleSlug: string | null
-  bundleName: string | null
-  bundleDescription: string | null
-  billingLabel: string
-  billingAmount: number
-  coreModules: OrganizationSubscriptionModule[]
-  productModules: OrganizationSubscriptionModule[]
-  capabilityModules: OrganizationSubscriptionModule[]
-}
-
-function formatBundlePrice(amount: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  }).format(amount)
-}
-
-export function formatSubscriptionPrice(amount: number) {
-  return formatBundlePrice(amount)
-}
+export type { OrganizationSubscriptionModule, OrganizationSubscriptionSummary } from "@/lib/organizations/organization-subscription-types"
+export { formatSubscriptionPrice } from "@/lib/organizations/organization-subscription-types"
 
 export async function getOrganizationSubscriptionSummary(
   organizationId: string
@@ -58,6 +23,9 @@ export async function getOrganizationSubscriptionSummary(
     .select(
       `
       name,
+      subscription_start_date,
+      complimentary_months,
+      first_year_special_monthly_rate,
       subscription_bundle_slug,
       plan_id,
       plans (
@@ -110,15 +78,30 @@ export async function getOrganizationSubscriptionSummary(
   })
 
   const monthlyPrice = plan?.monthlyPrice ?? 0
+  const subscriptionTerms = computeOrganizationSubscriptionTerms(
+    {
+      subscriptionStartDate: (org.subscription_start_date as string | null) ?? null,
+      complimentaryMonths: Number(org.complimentary_months || 0),
+      firstYearSpecialMonthlyRate:
+        org.first_year_special_monthly_rate == null
+          ? null
+          : Number(org.first_year_special_monthly_rate),
+    },
+    monthlyPrice
+  )
+
+  const billingAmount = plan ? subscriptionTerms.currentEffectiveMonthlyRate : 0
+  const billingLabel = plan ? subscriptionTerms.billingPhaseLabel : "Not assigned"
 
   return {
     organizationName: org.name as string,
+    subscriptionTerms,
     plan,
     bundleSlug,
     bundleName: bundle?.name ?? null,
     bundleDescription: bundle?.description ?? null,
-    billingLabel: plan ? `${formatBundlePrice(monthlyPrice)}/month` : "Not assigned",
-    billingAmount: monthlyPrice,
+    billingLabel,
+    billingAmount,
     coreModules: access.coreModules.map(mapModule),
     productModules: access.catalogModules
       .filter((item) => item.enabled)

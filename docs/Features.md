@@ -83,7 +83,9 @@ Completed:
 * Unauthorized page
 * Permission-aware sidebar
 * Subscription-aware modules
-* **Org subscription view (June 2026):** `/settings/subscription` — read-only plan bundle price, persona bundle, and enabled modules (`lib/organizations/organization-subscription-summary.ts`). Requires `settings.users.view` (owners always). Plan changes remain platform-admin managed.
+* **Roles & Permissions subscription filter (June 2026):** Settings → Roles & Permissions only lists permission rows for modules enabled on the org (`lib/permissions/permission-definitions.ts`, filtered via `loadOrganizationEnabledModuleSlugs`). Core modules (Settings, Contacts) always appear; product modules (e.g. Donations only for MAS Dallas) gate their permission groups. **Facility Manager** and **Facility Coordinator** roles are hidden unless the org has **Facilities** (`spaces`) or **Venue Rentals** (`bookings`) enabled (`filterOrganizationRolesForOrganization` in `lib/permissions/facilities-access.ts`).
+* **Org billing view (June 2026):** `/billing` (sidebar **Billing** under System; `/settings/billing` and `/settings/subscription` redirect here) — plan price, persona bundle, plan limits, enabled modules, payment methods on file, and billing history (`lib/organizations/organization-billing-actions.ts`, `organization-subscription-summary.ts`). Visible to platform support sessions, `organization_members.role` of `super_admin`/`owner`, or org role name **Super Admin**. Apply migration `121_organization_billing.sql` for payment methods and invoice history tables.
+* **Subscription terms (June 2026):** Platform admin → Organizations → **Billing** tab sets `subscription_start_date`, optional **3 months free** (`complimentary_months`), and optional **first year special rate** (`first_year_special_monthly_rate`). Org `/billing` shows start date, complimentary period, effective rate, and first-year pricing notice (standard rate after year one; owner may adjust pricing). Migration `123_organization_subscription_terms.sql`. API: `PATCH /api/platform/organizations/[id]/billing-terms`.
 
 ---
 
@@ -189,9 +191,9 @@ Removed **255** legacy imported rows from `public.vendors` (May 2026 CSV import)
 
 **Donation contact picker (June 2026):** Add Pledge and Record Payment search **org contacts** (name, email, phone), not only existing `donors` rows. On save, `ensureDonorExtensionForContact` creates the donor extension when needed. Add Pledge shows an **Add contact** button when search returns no matches; quick-add dialog supports **Person / Organization**, primary contact name for organizations, and auto-suggests Organization when the name looks like a company (LLC, Inc, etc.). Donor affiliation syncs on **first payment**, not pledge creation. Key files: `lib/donations/donation-list-actions.ts`, `components/contacts/quick-add-contact-dialog.tsx`.
 
-**Payment import & match (June 2026 — unified flow):** `/donations/import` replaces the old staging + reconcile split. Upload CSV → payments are created immediately in the match queue (`pending_review`) in **100-row server chunks**. **Auto-match after import** is on by default: high-confidence contact matches (≥85%, email/phone/exact name) link automatically; remainder stays in Match Queue for manual review. **Auto-allocate to best pledge** (default on with auto-match) uses `lib/donations/payment-pledge-allocation.ts`: prefers **lump-sum** (`one_time`) open pledges over **installment** schedules (`monthly`, `quarterly`, `yearly`); skips installment pledges when donor has an active `recurring_donation_plans` row and a lump-sum pledge exists; leaves payment **unallocated** when two pledges tie on top balance. Bulk auto-match and **Quick Apply** share the same picker. Migrations `116`–`118`. Key files: `components/donations/payment-import-match-workspace.tsx`, `lib/donations/payment-import-match-actions.ts`, `lib/donations/payment-contact-matching.ts`, `lib/donations/payment-pledge-allocation.ts`.
+**Payment import & match (June 2026 — unified flow):** Under **Payments** → **Import** (`/donations/payments/import`; Upload + History sub-tabs) and **Match Payments** (`/donations/payments/match`). Upload CSV → payments are created immediately in the match queue (`pending_review`) in **100-row server chunks**. **Auto-match after import** is on by default: high-confidence contact matches (≥85%, email/phone/exact name) link automatically; remainder stays in Match Queue for manual review. **Auto-allocate to best pledge** (default on with auto-match) uses `lib/donations/payment-pledge-allocation.ts`: prefers **lump-sum** (`one_time`) open pledges over **installment** schedules (`monthly`, `quarterly`, `yearly`); skips installment pledges when donor has an active `recurring_donation_plans` row and a lump-sum pledge exists; leaves payment **unallocated** when two pledges tie on top balance. Bulk auto-match and **Quick Apply** share the same picker. Migrations `116`–`118`. Key files: `components/donations/payment-import-match-workspace.tsx`, `lib/donations/payment-import-match-actions.ts`, `lib/donations/payment-contact-matching.ts`, `lib/donations/payment-pledge-allocation.ts`. Legacy `/donations/import` and `/donations/reconcile` redirect to the new Payments routes.
 
-**Payment reconcile matching (June 2026):** Superseded by unified Import & Match flow above. Legacy reconcile page redirects to `/donations/import?tab=match`.
+**Payment reconcile matching (June 2026):** Superseded by unified Import & Match flow above. Legacy `/donations/reconcile` redirects to `/donations/payments/match`.
 
 **Campaign progress gauge (June 2026):** Speedometer-style fundraising gauge on `/donations/campaigns` (card grid for campaigns with goals) and campaign detail **Goal Progress**. Red/orange/green arc, needle, and total raised; supports exceeding 100% of goal. Component: `components/donations/campaign-progress-gauge.tsx`.
 
@@ -201,7 +203,13 @@ Removed **255** legacy imported rows from `public.vendors` (May 2026 CSV import)
 
 **Donations pilot blockers (June 2026):** Migrations `119`–`120` — voided payments excluded from `pledge_status_view` balances and headline totals; cancelled pledges emit `calculated_status = cancelled` (excluded from Collect/allocation); portal pledge pay saves `status = allocated`. Validation: `lib/donations/pilot-blocker-validation.test.ts`. Apply: `119_donations_pilot_blocker_views.sql`, `120_donations_pilot_blocker_totals.sql`.
 
-**Donations sidebar (June 2026):** Under Donations: **Overview**, **Donors**, **Records** (Payments, Pledges, Recurring, Campaigns tabs), **Donation Manager** (Collect, Import & Match tabs), **Reports**, **Settings**. Donation Manager routes: `/donations/collect`, `/donations/import`; `/donations/reconcile` redirects to match queue. Files: `components/layout/sidebar.tsx`, `components/donations/donation-payments-nav.tsx`, `components/donations/donation-manager-nav.tsx`, `app/(dashboard)/donations/(donation-manager)/layout.tsx`.
+**Donations sidebar (June 2026):** Under Donations: **Overview**, **Payments** (tabs: One-Time Donations, Recurring Donations, Import, Match Payments), **Campaigns** (tabs: Overview, Pledges), **Reports** (Donors, Receipts), **Settings**. Legacy `/donations/collect` and `/donations/reports/collection` redirect to **Pledges** (`/donations/pledges#collection-queue`). Legacy `/donations/import` and `/donations/reconcile` redirect to Payments Import/Match.
+
+**Pledge collection merged into Pledges (June 2026):** Collect tab removed; collection reminders, last-contacted dates, and inline reminder actions live on **Campaigns → Pledges** (`/donations/pledges#collection-queue`). Legacy `/donations/collect` redirects to the same anchor.
+
+**Receipts tab merged (June 2026):** Reports **Receipts** (`/donations/reports/receipts`) combines receipt summary metrics + year-end giving statements table. Per-donor **⋯** menu: View statement, Download PDF, Send statement email. `/donations/reports/tax-receipts` redirects to Receipts. Per-payment receipt actions remain on Payments (`PaymentReceiptActions`).
+
+**Tax Receipts duplicate donor rows (June 2026):** `donation_donor_tax_year_totals` now groups by `donor_id` only (not `sender_name`). App merges RPC rows defensively in `mergeDonorTaxYearTotals`. Apply: `scripts/126_donation_tax_year_totals_group_by_donor.sql` (or re-run updated `125` on fresh installs).
 
 **Pledges summary cards (June 2026):** Pledges page stat cards match Donations Overview styling (colored left border, rounded icon badges). File: `app/(dashboard)/donations/(operations)/pledges/page.tsx`.
 
@@ -211,7 +219,7 @@ Removed **255** legacy imported rows from `public.vendors` (May 2026 CSV import)
 
 **MAS Dallas program registrations cleared (June 2026):** Removed 4 experimental enrollments (Youth Seasonal Camps), 3 charges, 9 charge lines, and related status/lifecycle rows. Preserved programs catalog (2 programs), sessions, offerings, and registration options. Reset program `enrolled`/`waitlist` counters. Backup: `scripts/backups/program-registrations/`. Report: `scripts/reports/mas-program-registrations-cleanup-2026-06-16.json`. Tool: `node scripts/clean-mas-program-registrations.mjs --execute`.
 
-**MAS Dallas donations seed config cleared (June 2026):** Removed `DONATIONS_DEV_SEED_V1` categories, subcategories, payment methods, campaign, seed contacts/donors, pledges, payments, and **orphaned `donation_receipts`** (2 rows left after ledger delete). Reports overview/collection/receipts should read $0 / 0 pledges after tab refresh. Tool: `node scripts/clean-mas-donations-seed.mjs --execute`. Reports tabs refetch on tab switch (`app/(dashboard)/donations/reports/page.tsx`) so Receipts/Collection no longer show stale seed totals.
+**MAS Dallas donations seed config cleared (June 2026):** Removed `DONATIONS_DEV_SEED_V1` categories, subcategories, payment methods, campaign, seed contacts/donors, pledges, payments, and **orphaned `donation_receipts`** (2 rows left after ledger delete). Reports overview/collection/receipts should read $0 / 0 pledges after tab refresh. Tool: `node scripts/clean-mas-donations-seed.mjs --execute`. Report sub-pages refetch on navigation (`app/(dashboard)/donations/reports/**/page.tsx`).
 
 ## Organization Switching
 
@@ -717,14 +725,16 @@ Every canonical `payments` and `pledges` write path stores `campaign_id`, `categ
 
 | Path | File | Behavior |
 |------|------|----------|
-| Staff one-time payment | `app/(dashboard)/donations/payments/page.tsx` | Contact picker searches all contacts; attribution pickers on insert; pledge allocate copies FKs from pledge |
+| Staff one-time payment | `components/donations/donation-payments-panel.tsx` (`/donations/payments/one-time`) | Contact picker searches all contacts; attribution pickers on insert; pledge allocate copies FKs from pledge |
 | Staff pledge create/edit | `app/(dashboard)/donations/pledges/page.tsx` | Contact picker searches all contacts; full FK pickers; **fixed** edit pledge writing campaign UUID (was display name) |
 | Staff pledge payment | `app/(dashboard)/donations/pledges/page.tsx` | Copies pledge FKs onto payment |
 | Portal one-time / pledge / pledge pay | `app/(customer)/customer/donation/page.tsx` | FKs on insert; optional campaign picker |
 | Portal data | `lib/customer/customer-portal-data-actions.ts` | Payments select includes attribution columns; loads campaigns |
-| Recurring plan create | `app/(dashboard)/donations/recurring/page.tsx` | Category + fund + campaign on plan (`recurring-donation-actions` already copies to manual payments) |
-| CSV import & match | `app/(dashboard)/donations/import/page.tsx` | Upload CSV → payments created directly; Match Queue tab; email/phone matching; bulk auto-match; add contact |
-| Legacy reconcile URL | `/donations/reconcile` | Redirects to `/donations/import?tab=match` |
+| Recurring plan create | `components/donations/donation-recurring-panel.tsx` (`/donations/payments/recurring`) | Category + fund + campaign on plan |
+| CSV import | `app/(dashboard)/donations/payments/import/page.tsx` | Upload CSV + import history; `donations.manage` |
+| Match payments | `app/(dashboard)/donations/payments/match/page.tsx` | Match queue; email/phone matching; bulk auto-match; add contact |
+| Legacy import URL | `/donations/import` | Redirects to `/donations/payments/import` (or `/donations/payments/match` when `?tab=match`) |
+| Legacy reconcile URL | `/donations/reconcile` | Redirects to `/donations/payments/match` |
 
 ### Validation
 
@@ -814,7 +824,28 @@ stripe listen --forward-to localhost:3000/api/webhooks/stripe/donations
 
 ### Out of scope (P11)
 
-Refunds, pledge-via-Stripe, per-org Stripe Connect onboarding. (Stripe **subscriptions** moved to Priority 16.)
+Pledge-via-Stripe, per-org Stripe Connect onboarding. (Stripe **subscriptions** moved to Priority 16.) **Refunds** implemented separately — see Payment admin actions below.
+
+### Payment edit, void, and refunds (June 2026)
+
+Staff with `donations.manage` can edit, void, refund, and **allocate** payments from **Donor profile → Donation History** (`/donations/donors/individuals/[id]`, `/donations/donors/organizations/[id]`). Allocate links unallocated payments to an open pledge for that donor (`allocatePaymentToOpenPledgeAction`).
+
+| Action | Manual / import | App Stripe (`source_type = processor`) |
+|--------|-----------------|----------------------------------------|
+| Edit amount/date/method | Yes | Notes only |
+| Void | Yes | Blocked — use Stripe refund |
+| Stripe refund (full/partial) | No | Yes |
+| Record refund (ledger only) | Yes | No (except imported rows) |
+
+Imported CSV payments (`source_type = import`) cannot receive in-app Stripe refunds even if the method column says `stripe`; staff refund externally and **Record Refund** in the app.
+
+**Totals:** migration `125_payment_refunds_net_amounts.sql` — net amount `amount - refunded_amount` in `pledge_status_view`, `donor_summary_view`, dashboard RPCs, and pledge refresh trigger (also fires on `refunded_amount` updates). Payment statuses: `partially_refunded`, `refunded`.
+
+**Key files:** `lib/donations/payment-admin-actions.ts`, `lib/donations/stripe/refund-payment.ts`, `components/donations/donor-donation-history-table.tsx`, webhook `charge.refunded` in `lib/donations/stripe/checkout.ts`.
+
+```bash
+npx supabase db query --linked -f scripts/125_payment_refunds_net_amounts.sql
+```
 
 ## Stripe recurring donation subscriptions (Priority 16)
 
@@ -842,6 +873,7 @@ Stripe-powered recurring billing on top of existing `recurring_donation_plans`. 
 |-------|----------|
 | `checkout.session.completed` (recurring_setup) | Link `external_processor_id` (subscription), `stripe_customer_id`, activate plan; **no** payment insert |
 | `invoice.paid` / `invoice.payment_succeeded` | Insert canonical `payments` with `recurring_donation_plan_id`, `stripe_invoice_id`; auto-receipt when enabled |
+| `charge.refunded` | Sync `payments.refunded_amount` and status from Stripe charge totals (donation refunds) |
 | `invoice.payment_failed` | Log event; set plan `past_due`; no payment |
 | `customer.subscription.updated` | Sync plan status + `next_payment_date` from Stripe period |
 | `customer.subscription.deleted` | Set plan `cancelled` |
@@ -915,7 +947,7 @@ Reliable operational email for donations only — receipts, year-end statements,
 | Flow | Trigger | Status tracking |
 |------|---------|-----------------|
 | Receipt | Auto after Stripe payment when `email_receipts_automatically`; manual from payments UI | `donation_receipts.status` → `sent` / `resent` / `failed` |
-| Year-end statement | Individual or bulk from Reports → Tax Receipts | Same receipt row (`annual_statement`) |
+| Year-end statement | Individual or bulk from Reports → Receipts | Same receipt row (`annual_statement`) |
 | Pledge reminder | Staff send from pledges/collection UI | `pledge_reminders.status` + `delivered_externally` |
 
 PDF attachments included for receipt and statement emails (server-generated via `jspdf`).
@@ -1000,8 +1032,8 @@ Service role (Stripe webhooks, checkout session creation) bypasses RLS unchanged
 ### Server-side permission enforcement
 
 * `app/(dashboard)/donations/layout.tsx` — `donations.view` **or** `donations.manage`
-* `app/(dashboard)/donations/import/layout.tsx` — `donations.manage`
-* `app/(dashboard)/donations/reconcile/layout.tsx` — `donations.manage`
+* `app/(dashboard)/donations/payments/import/layout.tsx` — `donations.manage`
+* `app/(dashboard)/donations/payments/match/layout.tsx` — `donations.manage`
 * `app/(dashboard)/donations/settings/layout.tsx` — `donations.manage`
 * `lib/donations/donation-action-auth.ts` — `requireDonationStaffAccess("view" | "manage")` for receipt, pledge-reminder, and recurring server actions
 
@@ -1045,15 +1077,15 @@ npm run validate:donations-production
 ### Pagination & server-side lists
 
 * `lib/donations/donation-list-actions.ts` — paginated payments, pledges, donor summary queries (50/page)
-* `/donations/payments` — server-paginated table + search/status filters
-* `/donations/pledges` — server-paginated table; summary cards via `donation_org_pledge_summary` RPC
-* `/donations/donors` — `DonorsPaginatedList` on `donor_summary_view` (replaces full contact scan)
-* `/donations` dashboard — KPI/chart data via RPCs; recent payments limited to 5 rows
+* `/donations/payments/one-time` — summary metric cards + server-paginated payments table + search/status filters
+* `/donations/pledges` — server-paginated table; filters: status, campaign, minimum pledged amount; summary cards via `donation_org_pledge_summary` RPC
+* `/donations/donors` — `DonorsPaginatedList` on `donor_summary_view` (replaces full contact scan). Search by name, email, or phone; filter by open pledge status. Donor profile **Pledges** dialog supports edit, record payment, mark as paid, and cancel (`lib/donations/pledge-admin-actions.ts`, `components/donations/donor-pledges-tab.tsx`). **Open pledge** badge and donor profile **Active Pledge** use `has_open_pledge` from `balance_remaining > 0` (migration `124_donor_summary_outstanding_pledge.sql`), not stale `pledges.status = open`.
+* `/donations` dashboard — KPI summary cards, Goal Achievement, recent payments (5 rows), quick links
 
 ### Operational visibility
 
-* `lib/donations/donation-ops-actions.ts` + `DonationOpsPanel` on settings → General tab
-* Surfaces failed emails, failed receipts, reconcile queue depth, Stripe processor failures
+* `lib/donations/donation-ops-actions.ts` + `DonationOpsPanel` on **Payments → Match Payments** (`/donations/payments/match`)
+* Surfaces failed emails, failed receipts, payments needing donor match (`pending_review` + `unresolved` only — not already-matched `unallocated`), Stripe processor failures
 
 ### Email scalability
 
@@ -1069,10 +1101,16 @@ npm run validate:donations-production
 
 Status: Implemented (June 2026)
 
-* Sidebar: **Overview**, **Donors**, **Records**, **Donation Manager**, **Reports**, **Settings** (`components/layout/sidebar.tsx`)
-* **Records** — horizontal tab bar for Payments, Pledges, Recurring, Campaigns (`components/donations/donation-payments-nav.tsx`, `app/(dashboard)/donations/(operations)/layout.tsx`)
-* **Donation Manager** — Collect and Import & Match tabs (`components/donations/donation-manager-nav.tsx`, `app/(dashboard)/donations/(donation-manager)/layout.tsx`)
-* URLs unchanged; **Import & Match** tab hidden unless user has `donations.manage`; `/donations/reconcile` redirects to match queue
+* Sidebar: **Overview**, **Payments**, **Campaigns**, **Reports**, **Settings** (`components/layout/sidebar.tsx`)
+* **Payments** — tabs: **One-Time Donations** (`/donations/payments/one-time`), **Recurring Donations** (`/donations/payments/recurring`), **Import** (`/donations/payments/import`; Upload + History), **Match Payments** (`/donations/payments/match`; manage permission; operational health panel); shell: `components/donations/donation-payments-shell.tsx`
+* **Reports** — tab bar (`components/donations/donation-reports-nav.tsx`):
+  * **Donors** — `/donations/donors` (donor list + profiles under `/donations/donors/individuals/[id]`, `/donations/donors/organizations/[id]`)
+  * **Receipts** — `/donations/reports/receipts`
+* **Campaigns** — tabs: **Overview** (`/donations/campaigns`; campaign list with add/edit/delete), **Pledges** (`/donations/pledges`; pledge management, filters, collection reminders at `#collection-queue`). Campaign detail: `/donations/campaigns/[id]`
+* Former **Donation Manager** sidebar item removed; Collect merged into Pledges; Import & Match moved under Payments
+* Former **Records** sidebar item removed; duplicate read-only tabs (Donations, Donors, Campaigns, Recurring) removed from monolithic reports page
+* `/donations/reports` redirects to **Donors** (`/donations/donors`)
+* Record payment / add pledge remain on donor profile pages; **+ Record Payment** on One-Time Donations list preserved
 
 ## Campaign goals & fundraising analytics (Priority 3)
 
@@ -1094,11 +1132,10 @@ Status: Implemented (June 2026)
 
 | Route | Purpose |
 |-------|---------|
-| `/donations/campaigns` | Campaign list with metrics |
-| `/donations/campaigns/[id]` | Campaign detail (summary, donor metrics, recent activity) |
-| `/donations` | Dashboard widgets: Top Campaigns, Campaign Progress, Goal Achievement |
-| `/donations/reports` | Campaigns tab — donations/pledges/outstanding/donors by campaign |
-| `/donations/settings` | Campaign CRUD persists goal + description; live raised totals; Categories and Payment Methods support add/edit/delete (June 2026) |
+| `/donations/campaigns` | Campaigns Overview — all campaigns table (most recent first) |
+| `/donations/campaigns/[id]` | Campaign detail — clickable name (edit), colorful summary/donor metric cards, donor list dialog, largest-gift donor link |
+| `/donations` | Dashboard widgets: pledge/payment summary cards, Goal Achievement, recent payments, quick links |
+| `/donations/settings` | Categories and Payment Methods support add/edit/delete; receipt and pledge reminder settings (June 2026). Campaign CRUD moved to **Campaigns → Overview** (`/donations/campaigns`). |
 
 ### Validation
 
@@ -1137,10 +1174,9 @@ Migration `scripts/090_donation_receipts.sql`:
 | Route | Receipt features |
 |-------|------------------|
 | `/donations/settings` | General tab — org legal/address/EIN; Receipts tab — full receipt config |
-| `/donations/payments` | Generate, view, download PDF, re-send per payment |
-| `/donations/donors/individuals/[id]` | Lifetime/current/previous year giving; giving statement download |
+| `/donations/donors/individuals/[id]` | Lifetime giving totals; donation history per-payment receipts; annual statement |
 | `/donations/donors/organizations/[id]` | Same as individual donor profile |
-| `/donations/reports` | Receipts tab (generated/sent/missing); Tax Receipts tab (year-end statements) |
+| `/donations/reports/receipts` | Receipt summary + year-end statements (bulk send, ⋯ per donor) |
 
 ### Rules
 
@@ -1183,14 +1219,14 @@ Migration `scripts/091_pledge_reminders.sql`:
 | Route | Features |
 |-------|----------|
 | `/donations/settings` → Pledge Reminders | Enable reminders, message templates, schedule options |
-| `/donations/collect` | Outstanding pledge queue with balances from `pledge_status_view` |
-| `/donations/pledges` | Pledge detail — preview/record reminder, mark contacted |
+| `/donations/pledges` | Pledge list (filters: campaign, status, min amount), add/edit/pay, last reminder/contacted columns, inline reminder actions, detail dialog |
+| `/donations/collect` | Redirects to `/donations/pledges#collection-queue` |
 | `/donations/donors/*/[id]` | Active pledges, outstanding balance, reminder history |
-| `/donations/reports` → Collection | Outstanding/partial/no-payment stats, reminder history summary |
+| `/donations/reports/collection` | Redirects to `/donations/pledges#collection-queue` |
 
 ### Workflow
 
-1. Staff opens outstanding pledge (Collect page or pledge detail).
+1. Staff opens outstanding pledge (Pledges page or pledge detail).
 2. Preview builds message from org settings + canonical pledge balances.
 3. **Record Reminder** inserts `pledge_reminders` row with `delivered_externally=false` and alerts staff that no external email was sent.
 4. **Mark Contacted** logs manual outreach with optional notes (`reminder_type=contacted`).
@@ -1239,9 +1275,8 @@ Recurring donations are **not** pledges and do **not** auto-create receipts.
 
 | Route | Features |
 |-------|----------|
-| `/donations/recurring` | Dashboard (MRR/ARR, active/paused/cancelled), plan list, create plan, record payment |
+| `/donations/payments/recurring` | Dashboard (MRR/ARR, active/paused/cancelled), plan list, create plan, record payment |
 | `/donations/donors/*/[id]` | Active plans, recurring payment history, lifetime recurring giving |
-| `/donations/reports` → Recurring | Donor count, revenue by campaign/donor from linked payments |
 
 ### Payment flow
 

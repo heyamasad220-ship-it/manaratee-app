@@ -8,6 +8,7 @@ import {
   markCheckoutSessionStatus,
   recordProcessorEvent,
 } from "@/lib/donations/stripe/processor-payment"
+import { syncPaymentRefundFromStripeCharge } from "@/lib/donations/stripe/refund-payment"
 import {
   handleInvoicePaid,
   handleInvoicePaymentFailed,
@@ -244,6 +245,13 @@ export async function processStripeDonationWebhookEvent(
         const result = await handleSubscriptionDeleted(
           supabase,
           event.data.object as Stripe.Subscription
+        )
+        return { ok: true as const, duplicate: false as const, result }
+      }
+      case "charge.refunded": {
+        const result = await syncPaymentRefundFromStripeCharge(
+          supabase,
+          event.data.object as Stripe.Charge
         )
         return { ok: true as const, duplicate: false as const, result }
       }

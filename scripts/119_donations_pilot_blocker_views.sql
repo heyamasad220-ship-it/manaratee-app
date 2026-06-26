@@ -66,9 +66,9 @@ SELECT
   (
     EXISTS (
       SELECT 1
-      FROM public.pledges pl
-      WHERE pl.donor_id = d.id
-        AND pl.status = 'open'::text
+      FROM public.pledge_status_view psv
+      WHERE psv.donor_id = d.id
+        AND psv.balance_remaining > 0::numeric
     )
   ) AS has_open_pledge
 FROM public.donors d
@@ -81,4 +81,4 @@ COMMENT ON VIEW public.pledge_status_view IS
   'Pledge balances from non-voided payments. Cancelled pledges have calculated_status=cancelled and balance_remaining=0. security_invoker.';
 
 COMMENT ON VIEW public.donor_summary_view IS
-  'Donor giving summary from non-voided payments. Includes contact_id for reconcile. security_invoker.';
+  'Donor giving summary from non-voided payments. has_open_pledge=true only when pledge_status_view.balance_remaining > 0. Includes contact_id for reconcile. security_invoker.';

@@ -4,6 +4,8 @@ export const PAYMENT_STATUSES = [
   "allocated",
   "unresolved",
   "voided",
+  "refunded",
+  "partially_refunded",
 ] as const
 
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number]

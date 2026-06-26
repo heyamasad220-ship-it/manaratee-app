@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 
+import { countsTowardGivingTotals, paymentNetAmount } from "@/lib/donations/payment-net-amount"
+
 export type CampaignRow = {
   id: string
   organization_id: string
@@ -33,6 +35,7 @@ export type CampaignPaymentRow = {
   contact_id?: string | null
   sender_name?: string | null
   amount?: number | null
+  refunded_amount?: number | null
   payment_date?: string | null
   source?: string | null
   status?: string | null
@@ -63,12 +66,40 @@ export type CampaignRecentActivity = {
   recentPledgePayments: CampaignPaymentRow[]
 }
 
+export type CampaignDonorSummary = {
+  donorId: string | null
+  donorType: string | null
+  displayName: string
+  totalGiven: number
+}
+
+export type CampaignLargestGift = {
+  amount: number
+  donorId: string | null
+  donorType: string | null
+  displayName: string
+}
+
+export type CampaignDonorInsights = {
+  donors: CampaignDonorSummary[]
+  largestGift: CampaignLargestGift | null
+}
+
 export function isActivePledgeStatus(status: string | null | undefined): boolean {
   return String(status || "").toLowerCase() !== "cancelled"
 }
 
 export function isVoidedPayment(status: string | null | undefined): boolean {
   return String(status || "").toLowerCase() === "voided"
+}
+
+export function campaignPaymentNetAmount(payment: CampaignPaymentRow): number {
+  if (isVoidedPayment(payment.status)) return 0
+  return paymentNetAmount(payment.amount, payment.refunded_amount)
+}
+
+export function isCountableCampaignPayment(payment: CampaignPaymentRow): boolean {
+  return countsTowardGivingTotals(payment)
 }
 
 export function buildPledgeCampaignMap(
@@ -95,7 +126,7 @@ export function filterPaymentsForCampaign(
 ): CampaignPaymentRow[] {
   return payments.filter((payment) => {
     const resolved = resolvePaymentCampaignId(payment, pledgeCampaignById)
-    return resolved === campaignId && !isVoidedPayment(payment.status)
+    return resolved === campaignId && isCountableCampaignPayment(payment)
   })
 }
 
@@ -124,14 +155,17 @@ export function computeCampaignMetrics(
     pledgeCampaignById
   )
 
-  const raised = campaignPayments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
+  const raised = campaignPayments.reduce(
+    (sum, payment) => sum + campaignPaymentNetAmount(payment),
+    0
+  )
   const pledged = campaignPledges.reduce(
     (sum, pledge) => sum + Number(pledge.amount_pledged || 0),
     0
   )
   const collectedAgainstPledges = campaignPayments
     .filter((payment) => payment.pledge_id && campaignPledgeIds.has(payment.pledge_id))
-    .reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
+    .reduce((sum, payment) => sum + campaignPaymentNetAmount(payment), 0)
   const outstanding = campaignPledges.reduce(
     (sum, pledge) => sum + Math.max(Number(pledge.balance_remaining || 0), 0),
     0
@@ -152,7 +186,7 @@ export function computeCampaignMetrics(
   }
 
   const paymentCount = campaignPayments.length
-  const amounts = campaignPayments.map((payment) => Number(payment.amount || 0))
+  const amounts = campaignPayments.map((payment) => campaignPaymentNetAmount(payment))
   const largestGift = amounts.length ? Math.max(...amounts) : 0
   const averageGift = paymentCount > 0 ? raised / paymentCount : 0
 
@@ -231,6 +265,176 @@ export function getCampaignRecentActivity(
     recentPledges,
     recentPledgePayments,
   }
+}
+
+type DonorMetaRow = {
+  full_name: string | null
+  donor_type: string | null
+}
+
+export function buildCampaignDonorInsights(
+  campaignId: string,
+  pledges: CampaignPledgeRow[],
+  payments: CampaignPaymentRow[],
+  pledgeCampaignById: Map<string, string | null | undefined>,
+  donorMeta: Map<string, DonorMetaRow>
+): CampaignDonorInsights {
+  const campaignPayments = filterPaymentsForCampaign(campaignId, payments, pledgeCampaignById)
+  const campaignPledges = filterPledgesForCampaign(campaignId, pledges)
+
+  const donorTotals = new Map<
+    string,
+    { donorId: string | null; donorType: string | null; displayName: string; totalGiven: number }
+  >()
+
+  const upsertDonor = (
+    key: string,
+    entry: { donorId: string | null; donorType: string | null; displayName: string },
+    amount: number
+  ) => {
+    const existing = donorTotals.get(key)
+    if (existing) {
+      existing.totalGiven += amount
+      if (!existing.displayName && entry.displayName) {
+        existing.displayName = entry.displayName
+      }
+      return
+    }
+    donorTotals.set(key, { ...entry, totalGiven: amount })
+  }
+
+  for (const payment of campaignPayments) {
+    const amount = campaignPaymentNetAmount(payment)
+    if (payment.donor_id) {
+      const meta = donorMeta.get(payment.donor_id)
+      upsertDonor(
+        `donor:${payment.donor_id}`,
+        {
+          donorId: payment.donor_id,
+          donorType: meta?.donor_type ?? null,
+          displayName: meta?.full_name || payment.sender_name || "Unknown donor",
+        },
+        amount
+      )
+      continue
+    }
+
+    if (payment.contact_id) {
+      upsertDonor(
+        `contact:${payment.contact_id}`,
+        {
+          donorId: null,
+          donorType: null,
+          displayName: payment.sender_name || "Unknown donor",
+        },
+        amount
+      )
+      continue
+    }
+
+    if (payment.sender_name) {
+      upsertDonor(
+        `sender:${payment.sender_name}`,
+        {
+          donorId: null,
+          donorType: null,
+          displayName: payment.sender_name,
+        },
+        amount
+      )
+    }
+  }
+
+  for (const pledge of campaignPledges) {
+    if (!pledge.donor_id) continue
+    const key = `donor:${pledge.donor_id}`
+    if (donorTotals.has(key)) continue
+    const meta = donorMeta.get(pledge.donor_id)
+    upsertDonor(
+      key,
+      {
+        donorId: pledge.donor_id,
+        donorType: meta?.donor_type ?? null,
+        displayName: meta?.full_name || pledge.donor_name || "Unknown donor",
+      },
+      0
+    )
+  }
+
+  const donors = [...donorTotals.values()].sort((a, b) => b.totalGiven - a.totalGiven)
+
+  let largestPayment: CampaignPaymentRow | null = null
+  let largestAmount = 0
+  for (const payment of campaignPayments) {
+    const amount = campaignPaymentNetAmount(payment)
+    if (amount > largestAmount) {
+      largestAmount = amount
+      largestPayment = payment
+    }
+  }
+
+  const largestGift =
+    largestPayment && largestAmount > 0
+      ? (() => {
+          const donorId = largestPayment.donor_id ?? null
+          const meta = donorId ? donorMeta.get(donorId) : null
+          return {
+            amount: largestAmount,
+            donorId,
+            donorType: meta?.donor_type ?? null,
+            displayName: meta?.full_name || largestPayment.sender_name || "Unknown donor",
+          } satisfies CampaignLargestGift
+        })()
+      : null
+
+  return { donors, largestGift }
+}
+
+export async function fetchCampaignDonorInsights(
+  supabase: SupabaseClient,
+  organizationId: string,
+  campaignId: string
+): Promise<CampaignDonorInsights> {
+  const { pledges, payments, error } = await fetchCampaignAnalyticsData(supabase, organizationId)
+  if (error) throw new Error(error)
+
+  const pledgeCampaignById = buildPledgeCampaignMap(pledges)
+  const campaignPayments = filterPaymentsForCampaign(campaignId, payments, pledgeCampaignById)
+  const campaignPledges = filterPledgesForCampaign(campaignId, pledges)
+
+  const donorIds = new Set<string>()
+  for (const payment of campaignPayments) {
+    if (payment.donor_id) donorIds.add(payment.donor_id)
+  }
+  for (const pledge of campaignPledges) {
+    if (pledge.donor_id) donorIds.add(pledge.donor_id)
+  }
+
+  const donorMeta = new Map<string, DonorMetaRow>()
+  if (donorIds.size > 0) {
+    const { data: donorRows, error: donorError } = await supabase
+      .from("donors")
+      .select("id, full_name, donor_type")
+      .eq("organization_id", organizationId)
+      .in("id", [...donorIds])
+
+    if (donorError) throw new Error(donorError.message)
+
+    for (const row of donorRows || []) {
+      donorMeta.set(row.id as string, {
+        full_name: row.full_name as string | null,
+        donor_type: row.donor_type as string | null,
+      })
+    }
+  }
+
+  return buildCampaignDonorInsights(
+    campaignId,
+    pledges,
+    payments,
+    pledgeCampaignById,
+    donorMeta
+  )
 }
 
 export function formatDonationCurrency(value: number): string {
@@ -406,6 +610,33 @@ export async function fetchOrgReportsOverview(
   }
 }
 
+export function mergeDonorTaxYearTotals(rows: DonorTaxYearTotal[]): DonorTaxYearTotal[] {
+  const byDonorId = new Map<string, DonorTaxYearTotal>()
+
+  for (const row of rows) {
+    const existing = byDonorId.get(row.donorId)
+    if (!existing) {
+      byDonorId.set(row.donorId, { ...row })
+      continue
+    }
+
+    existing.totalAmount += row.totalAmount
+    existing.paymentCount += row.paymentCount
+    if (!existing.donorEmail && row.donorEmail) {
+      existing.donorEmail = row.donorEmail
+    }
+    if (
+      (existing.donorName === "Unknown" || !existing.donorName) &&
+      row.donorName &&
+      row.donorName !== "Unknown"
+    ) {
+      existing.donorName = row.donorName
+    }
+  }
+
+  return [...byDonorId.values()].sort((a, b) => b.totalAmount - a.totalAmount)
+}
+
 export async function fetchDonorTaxYearTotals(
   supabase: SupabaseClient,
   organizationId: string,
@@ -418,13 +649,15 @@ export async function fetchDonorTaxYearTotals(
 
   if (error) throw new Error(error.message)
 
-  return (data || []).map((row: any) => ({
-    donorId: row.donor_id,
+  const rows = (data || []).map((row: any) => ({
+    donorId: row.donor_id as string,
     donorName: row.donor_name || "Unknown",
     donorEmail: row.donor_email || "",
     totalAmount: Number(row.total_amount || 0),
     paymentCount: Number(row.payment_count || 0),
   }))
+
+  return mergeDonorTaxYearTotals(rows)
 }
 
 export async function fetchRecurringReportSummary(
@@ -499,7 +732,7 @@ export async function fetchCampaignAnalyticsData(
     supabase
       .from("payments")
       .select(
-        "id, campaign_id, pledge_id, donor_id, contact_id, sender_name, amount, payment_date, source, status"
+        "id, campaign_id, pledge_id, donor_id, contact_id, sender_name, amount, refunded_amount, payment_date, source, status"
       )
       .eq("organization_id", organizationId)
       .order("payment_date", { ascending: false }),

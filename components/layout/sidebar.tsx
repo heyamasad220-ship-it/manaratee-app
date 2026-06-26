@@ -32,7 +32,10 @@ import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 import { createClient } from "@/lib/supabase/client"
 import { getCurrentOrganizationContext, clearSelectedOrganizationIdCache } from "@/lib/current-organization"
-import { isOrganizationSystemAdmin } from "@/lib/organizations/organization-system-admin"
+import {
+  canViewOrganizationBilling,
+  isOrganizationSystemAdmin,
+} from "@/lib/organizations/organization-system-admin"
 import { WORKFORCE_MODULE_LABEL } from "@/lib/hr/hr-module-label"
 import { isFacilitiesOnlyAccess } from "@/lib/permissions/facilities-access"
 import {
@@ -65,6 +68,7 @@ interface NavItem {
   group?: string | null
   permissionKey?: string
   moduleSlug?: string
+  requiresSuperAdmin?: boolean
 }
 
 interface SidebarModuleRow {
@@ -155,6 +159,7 @@ function mergeSidebarModules(rows: SidebarModuleRow[]): SidebarModuleRow[] {
 
 interface UserPermissionContext {
   isOwner: boolean
+  isSuperAdmin: boolean
   enabledPermissions: Set<string>
 }
 
@@ -292,26 +297,27 @@ const moduleChildren: Record<string, SubItem[]> = {
   ],
   donations: [
     { label: "Overview", href: "/donations", matchPrefix: "/donations", permissionKey: "donations.view" },
-    { label: "Donors", href: "/donations/donors", matchPrefix: "/donations/donors", permissionKey: "donations.view" },
     {
-      label: "Records",
-      href: "/donations/payments",
+      label: "Payments",
+      href: "/donations/payments/one-time",
       matchPrefix: "/donations/payments",
-      alsoMatchPrefixes: [
-        "/donations/pledges",
-        "/donations/recurring",
-        "/donations/campaigns",
-      ],
-      permissionKey: "donations.view",
-    },
-    {
-      label: "Donation Manager",
-      href: "/donations/collect",
-      matchPrefix: "/donations/collect",
       alsoMatchPrefixes: ["/donations/import", "/donations/reconcile"],
       permissionKey: "donations.view",
     },
-    { label: "Reports", href: "/donations/reports", matchPrefix: "/donations/reports", permissionKey: "reports.view" },
+    {
+      label: "Campaigns",
+      href: "/donations/campaigns",
+      matchPrefix: "/donations/campaigns",
+      alsoMatchPrefixes: ["/donations/pledges"],
+      permissionKey: "donations.view",
+    },
+    {
+      label: "Reports",
+      href: "/donations/reports",
+      matchPrefix: "/donations/reports",
+      alsoMatchPrefixes: ["/donations/donors"],
+      permissionKey: "donations.view",
+    },
     { label: "Settings", href: "/donations/settings", matchPrefix: "/donations/settings", permissionKey: "donations.manage" },
   ],
   workforce: [
@@ -450,7 +456,12 @@ function groupNavItemsForDisplay(navItems: NavItem[]) {
 
 function filterNavItemsByPermissions(items: NavItem[], permissionContext: UserPermissionContext): NavItem[] {
   const filtered = items
-    .filter((item) => userCanAccessModule(permissionContext, item.permissionKey, item.moduleSlug))
+    .filter((item) => {
+      if (item.requiresSuperAdmin && !permissionContext.isSuperAdmin) {
+        return false
+      }
+      return userCanAccessModule(permissionContext, item.permissionKey, item.moduleSlug)
+    })
     .map((item) => ({
       ...item,
       children: item.children?.filter((child) => userCanAccess(permissionContext, child.permissionKey)),
@@ -506,6 +517,14 @@ function buildNavItems(rows: SidebarModuleRow[], permissionContext: UserPermissi
     { label: "Dashboard", href: "/dashboard", icon: Home, matchPrefix: "/dashboard" },
     ...dynamicItems,
     {
+      label: "Billing",
+      href: "/billing",
+      icon: CreditCard,
+      matchPrefix: "/billing",
+      group: "System",
+      requiresSuperAdmin: true,
+    },
+    {
       label: "Settings",
       href: "/settings/users",
       icon: Settings,
@@ -514,7 +533,6 @@ function buildNavItems(rows: SidebarModuleRow[], permissionContext: UserPermissi
       children: [
         { label: "Users", href: "/settings/users", matchPrefix: "/settings/users", permissionKey: "settings.users.view" },
         { label: "Roles & Permissions", href: "/settings/roles-permissions", matchPrefix: "/settings/roles-permissions", permissionKey: "settings.roles.view" },
-        { label: "Subscription", href: "/settings/subscription", matchPrefix: "/settings/subscription", permissionKey: "settings.users.view" },
       ],
     },
   ]
@@ -621,8 +639,26 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
         return
       }
 
+      let organizationRoleName: string | null = null
+      if (membership.role_id) {
+        const { data: organizationRole } = await supabase
+          .from("organization_roles")
+          .select("name")
+          .eq("organization_id", membership.organization_id)
+          .eq("id", membership.role_id)
+          .maybeSingle()
+        organizationRoleName = (organizationRole?.name as string | null) ?? null
+      }
+
       let permissionContext: UserPermissionContext = {
         isOwner: platformSupportMode || isOrganizationSystemAdmin(membership.role),
+        isSuperAdmin:
+          platformSupportMode ||
+          canViewOrganizationBilling({
+            systemRole: membership.role,
+            organizationRoleName,
+            platformSupport: platformSupportMode,
+          }),
         enabledPermissions: new Set<string>(),
       }
 

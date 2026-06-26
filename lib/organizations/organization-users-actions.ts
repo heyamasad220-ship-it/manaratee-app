@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server"
 import { createServiceRoleClient } from "@/lib/supabase/service-role"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { listOrganizationMembers } from "@/lib/organizations/invite-organization-member"
+import { loadOrganizationEnabledModuleSlugs } from "@/lib/modules/dashboard-module-access-server"
+import { filterOrganizationRolesForOrganization } from "@/lib/permissions/facilities-access"
 import { PERMISSIONS, type PermissionKey } from "@/lib/permissions/permission-keys"
 import { hasPermission } from "@/lib/permissions/permissions"
 
@@ -52,10 +54,15 @@ export async function fetchOrganizationUsersForSettings(): Promise<{
 
   const admin = createServiceRoleClient()
   const payload = await listOrganizationMembers(admin, organizationId)
+  const enabledModuleSlugs = await loadOrganizationEnabledModuleSlugs(organizationId)
+  const visibleRoles = filterOrganizationRolesForOrganization(
+    payload.roles,
+    enabledModuleSlugs
+  )
 
   return {
     users: payload.members,
-    roles: payload.roles.map((role) => ({
+    roles: visibleRoles.map((role) => ({
       id: role.id as string,
       name: role.name as string,
       description: (role.description as string | null) ?? null,

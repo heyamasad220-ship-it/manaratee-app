@@ -14,13 +14,15 @@ import {
 import {
   formatSubscriptionPrice,
   type OrganizationSubscriptionSummary,
-} from "@/lib/organizations/organization-subscription-summary"
+} from "@/lib/organizations/organization-subscription-types"
 import { CreditCard, Layers, Mail, Package } from "lucide-react"
 
 export function SubscriptionSettingsClient({
   summary,
+  title = "Billing",
 }: {
   summary: OrganizationSubscriptionSummary
+  title?: string
 }) {
   const yearlySavings =
     summary.plan && summary.plan.monthlyPrice > 0 && summary.plan.yearlyPrice > 0
@@ -29,14 +31,14 @@ export function SubscriptionSettingsClient({
 
   return (
     <>
-      <Header title="Subscription" />
+      <Header title={title} />
 
       <div className="space-y-6 p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h2 className="text-xl font-semibold text-foreground">Plan &amp; Modules</h2>
+            <h2 className="text-xl font-semibold text-foreground">Plan &amp; billing</h2>
             <p className="text-sm text-muted-foreground">
-              Your organization&apos;s subscription bundle and enabled modules for{" "}
+              Your organization&apos;s subscription plan, pricing, and enabled modules for{" "}
               {summary.organizationName}.
             </p>
           </div>
@@ -213,8 +215,8 @@ export function SubscriptionSettingsClient({
         </Card>
 
         <p className="text-xs text-muted-foreground">
-          Subscription changes are managed by Manaratee platform administrators. Use the button above
-          to request a plan update.
+          Billing and plan changes are managed by Manaratee platform administrators. Use the button
+          above to request a plan update.
         </p>
       </div>
     </>

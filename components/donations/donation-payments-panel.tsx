@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Header } from "@/components/layout/header";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -37,7 +38,6 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Check, ChevronsUpDown, Plus } from "lucide-react";
-import { PaymentReceiptActions } from "@/components/donations/payment-receipt-actions";
 import {
   fetchOpenPledgesForAllocationAction,
   fetchPaymentsPageAction,
@@ -63,6 +63,7 @@ import {
   fetchPledgeAttribution,
   toPaymentAttributionColumns,
 } from "@/lib/donations/payment-attribution";
+import { getDonorProfilePath } from "@/lib/donations/donor-profile-path";
 
 type Payment = {
   id: string;
@@ -72,6 +73,7 @@ type Payment = {
   memo: string | null;
   pledge_id: string | null;
   donor_id: string | null;
+  donor_type: string | null;
   status: string | null;
   sender_name: string | null;
 };
@@ -117,7 +119,7 @@ function formatStatus(status: string | null) {
 }
 
 
-export default function PaymentsPage() {
+export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean }) {
   const supabase = createClient();
 
   const [organizationId, setOrganizationId] = useState<string | null>(null);
@@ -127,9 +129,6 @@ export default function PaymentsPage() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [receiptByPaymentId, setReceiptByPaymentId] = useState<
-    Record<string, { receipt_number: string; status: string }>
-  >({});
   const [loading, setLoading] = useState(true);
 
   const [contacts, setContacts] = useState<ContactPickerOption[]>([]);
@@ -221,29 +220,11 @@ export default function PaymentsPage() {
 
     const effectiveOrgId = organizationId || (await getOrgIdForCurrentUser());
     if (effectiveOrgId) {
-      const [pledgeResult, receiptData] = await Promise.all([
-        fetchOpenPledgesForAllocationAction(),
-        supabase
-          .from("donation_receipts")
-          .select("payment_id, receipt_number, status")
-          .eq("organization_id", effectiveOrgId)
-          .eq("receipt_type", "payment"),
-      ]);
+      const pledgeResult = await fetchOpenPledgesForAllocationAction();
 
       if (pledgeResult.success) {
         setPledges(pledgeResult.pledges as PledgeOption[]);
       }
-
-      const receiptMap: Record<string, { receipt_number: string; status: string }> = {};
-      for (const row of receiptData.data || []) {
-        if (row.payment_id) {
-          receiptMap[row.payment_id] = {
-            receipt_number: row.receipt_number,
-            status: row.status,
-          };
-        }
-      }
-      setReceiptByPaymentId(receiptMap);
     }
 
     setLoading(false);
@@ -415,9 +396,9 @@ export default function PaymentsPage() {
 
   return (
     <>
-      <Header title="Payments" />
+      {!embedded ? <Header title="Payments" /> : null}
 
-      <div className="p-6 space-y-6">
+      <div className={embedded ? "space-y-6" : "p-6 space-y-6"}>
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-lg font-semibold">All Payments</h2>
@@ -476,7 +457,6 @@ export default function PaymentsPage() {
                     <th className="text-left p-3">Pledge</th>
                     <th className="text-left p-3">Status</th>
                     <th className="text-left p-3">Memo</th>
-                    <th className="text-left p-3">Receipt</th>
                     <th className="text-left p-3">Action</th>
                   </tr>
                 </thead>
@@ -486,7 +466,18 @@ export default function PaymentsPage() {
                     <tr key={payment.id} className="border-b">
                       <td className="p-3">{formatDate(payment.payment_date)}</td>
 
-                      <td className="p-3">{getPaymentDonorName(payment)}</td>
+                      <td className="p-3">
+                        {payment.donor_id ? (
+                          <Link
+                            href={getDonorProfilePath(payment.donor_id, payment.donor_type)}
+                            className="font-medium text-primary hover:underline"
+                          >
+                            {getPaymentDonorName(payment)}
+                          </Link>
+                        ) : (
+                          getPaymentDonorName(payment)
+                        )}
+                      </td>
 
                       <td className="p-3 font-medium">
                         {formatCurrency(Number(payment.amount || 0))}
@@ -501,19 +492,6 @@ export default function PaymentsPage() {
                       <td className="p-3 capitalize">{formatStatus(payment.status)}</td>
 
                       <td className="p-3">{payment.memo || "—"}</td>
-
-                      <td className="p-3">
-                        {String(payment.status || "").toLowerCase() === "voided" ? (
-                          <span className="text-muted-foreground">—</span>
-                        ) : (
-                          <PaymentReceiptActions
-                            paymentId={payment.id}
-                            receiptNumber={receiptByPaymentId[payment.id]?.receipt_number}
-                            receiptStatus={receiptByPaymentId[payment.id]?.status}
-                            onUpdated={loadPayments}
-                          />
-                        )}
-                      </td>
 
                       <td className="p-3">
                         {!payment.pledge_id ? (
@@ -763,7 +741,19 @@ export default function PaymentsPage() {
 
                   <div>
                     <span className="text-muted-foreground">Donor / Sender:</span>{" "}
-                    <span className="font-medium">{getPaymentDonorName(selectedPayment)}</span>
+                    {selectedPayment.donor_id ? (
+                      <Link
+                        href={getDonorProfilePath(
+                          selectedPayment.donor_id,
+                          selectedPayment.donor_type
+                        )}
+                        className="font-medium text-primary hover:underline"
+                      >
+                        {getPaymentDonorName(selectedPayment)}
+                      </Link>
+                    ) : (
+                      <span className="font-medium">{getPaymentDonorName(selectedPayment)}</span>
+                    )}
                   </div>
 
                   <div>

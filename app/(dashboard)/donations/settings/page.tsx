@@ -10,13 +10,6 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
   Table,
   TableBody,
   TableCell,
@@ -34,13 +27,10 @@ import {
 } from "@/components/ui/dialog"
 import { Plus, Pencil, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import Link from "next/link"
-import { getCampaignAnalyticsAction } from "@/lib/donations/donation-reports-actions"
 import { DonationReceiptSettingsForm } from "@/components/donations/donation-receipt-settings-form"
 import { PledgeReminderSettingsForm } from "@/components/donations/pledge-reminder-settings-form"
-import { DonationOpsPanel } from "@/components/donations/donation-ops-panel"
 
-const settingsTabs = ["General", "Campaigns", "Categories", "Payment Methods", "Receipts", "Pledge Reminders", "Notifications"] as const
+const settingsTabs = ["General", "Categories", "Payment Methods", "Receipts", "Pledge Reminders", "Notifications"] as const
 type SettingsTab = (typeof settingsTabs)[number]
 
 interface Category {
@@ -57,37 +47,6 @@ interface PaymentMethod {
   fee: string
 }
 
-interface Campaign {
-  id: string
-  name: string
-  description: string
-  goalAmount: number
-  raisedAmount: number
-  startDate: string
-  endDate: string
-  status: "Active" | "Completed" | "Draft" | "Paused"
-  campaignCode?: string
-}
-function getCampaignStatusBadge(status?: string) {
-  if (!status) return "Draft"
-
-  switch (status.toLowerCase()) {
-    case "active":
-      return "Active"
-
-    case "draft":
-      return "Draft"
-
-    case "completed":
-      return "Completed"
-
-    case "paused":
-      return "Paused"
-
-    default:
-      return status
-  }
-}
 export default function DonationsSettingsPage() {
   const supabase = createClient()
   async function getOrganizationId() {
@@ -113,10 +72,7 @@ export default function DonationsSettingsPage() {
   const [activeTab, setActiveTab] = useState<SettingsTab>("General")
   const [categories, setCategories] = useState<Category[]>([])
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([])
-  const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [showAddCategoryDialog, setShowAddCategoryDialog] = useState(false)
-  const [showCampaignDialog, setShowCampaignDialog] = useState(false)
-  const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null)
   const [categoryName, setCategoryName] = useState("")
 const [categoryDescription, setCategoryDescription] = useState("")
 const [editingCategory, setEditingCategory] = useState<Category | null>(null)
@@ -126,15 +82,6 @@ const [paymentMethodName, setPaymentMethodName] = useState("")
 const [paymentMethodFee, setPaymentMethodFee] = useState("")
 const [paymentMethodEnabled, setPaymentMethodEnabled] = useState(true)
 const [showPaymentMethodDialog, setShowPaymentMethodDialog] = useState(false)
-  const [campaignForm, setCampaignForm] = useState({
-    name: "",
-    description: "",
-    goalAmount: "",
-    startDate: "",
-    endDate: "",
-    status: "Draft" as Campaign["status"],
-    campaignCode: "",
-  })
 async function handleAddCategory() {
   const orgId = await getOrganizationId()
 
@@ -166,36 +113,6 @@ async function handleAddCategory() {
   setShowAddCategoryDialog(false)
 
   await loadCategories()
-}
-async function loadCampaigns() {
-  const result = await getCampaignAnalyticsAction()
-
-  if (!result.success) {
-    console.error("Error loading campaigns:", result.error)
-    setCampaigns([])
-    return
-  }
-
-  setCampaigns(
-    (result.entries || []).map(({ campaign, metrics }) => ({
-      id: campaign.id,
-      name: campaign.name,
-      description: campaign.description || "",
-      goalAmount: Number(campaign.goal_amount || 0),
-      raisedAmount: metrics.raised,
-      startDate: campaign.start_date || "",
-      endDate: campaign.end_date || "",
-      status:
-        campaign.status === "active"
-          ? "Active"
-          : campaign.status === "completed"
-            ? "Completed"
-            : campaign.status === "paused"
-              ? "Paused"
-              : "Draft",
-      campaignCode: campaign.code || "",
-    }))
-  )
 }
 
 async function loadCategories() {
@@ -342,143 +259,10 @@ async function loadPaymentMethods() {
 }
 
 useEffect(() => {
-  loadCampaigns()
   loadCategories()
   loadPaymentMethods()
 }, [])
 
-useEffect(() => {
-  if (editingCampaign) {
-    setCampaignForm({
-      name: editingCampaign.name,
-      description: editingCampaign.description,
-      goalAmount: editingCampaign.goalAmount.toString(),
-      startDate: editingCampaign.startDate,
-      endDate: editingCampaign.endDate,
-      status: editingCampaign.status,
-      campaignCode: editingCampaign.campaignCode || "",
-    })
-  } else {
-    setCampaignForm({
-      name: "",
-      description: "",
-      goalAmount: "",
-      startDate: "",
-      endDate: "",
-      status: "Draft",
-      campaignCode: "",
-    })
-  }
-}, [editingCampaign])
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(amount)
-  }
-
-  const formatDate = (dateString: string) => {
-    if (!dateString) return ""
-    // Parse date as local date to avoid timezone offset issues
-    const date = new Date(dateString + "T00:00:00")
-    return date.toLocaleDateString()
-  }
-
-  const generateCampaignCode = (campaignName: string) => {
-    // Create a code from the campaign name: take first letter of each word, uppercase, and add random suffix
-    const words = campaignName.trim().split(/\s+/)
-    const codePrefix = words.map(word => word.charAt(0).toUpperCase()).join('')
-    const randomSuffix = Math.random().toString(36).substring(2, 5).toUpperCase()
-    return `${codePrefix}${randomSuffix}`
-  }
-
-  const getCampaignStatusBadge = (status: Campaign["status"]) => {
-    switch (status) {
-      case "Active":
-        return <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">Active</span>
-      case "Completed":
-        return <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-700">Completed</span>
-      case "Draft":
-        return <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700">Draft</span>
-      case "Paused":
-        return <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700">Paused</span>
-    }
-  }
-async function handleSaveCampaign() {
-  const orgId = await getOrganizationId()
-
-  if (!orgId) {
-    alert("No organization selected")
-    return
-  }
-
-  if (!campaignForm.name.trim()) {
-    alert("Campaign name is required")
-    return
-  }
-
-  // Check for duplicate campaign names (excluding current campaign if editing)
-  const existingCampaign = campaigns.find(c => 
-    c.name.toLowerCase() === campaignForm.name.trim().toLowerCase() && 
-    (!editingCampaign || c.id !== editingCampaign.id)
-  )
-  
-  if (existingCampaign) {
-    alert("A campaign with this name already exists")
-    return
-  }
-
-  const campaignData = {
-    organization_id: orgId,
-    name: campaignForm.name.trim(),
-    description: campaignForm.description.trim() || null,
-    goal_amount: campaignForm.goalAmount ? Number(campaignForm.goalAmount) : null,
-    start_date: campaignForm.startDate || null,
-    end_date: campaignForm.endDate || null,
-    status: campaignForm.status.toLowerCase(),
-  }
-
-  if (editingCampaign) {
-    // Update existing campaign
-    const { error } = await supabase
-      .from("campaigns")
-      .update(campaignData)
-      .eq("id", editingCampaign.id)
-
-    if (error) {
-      console.error("Error updating campaign:", error)
-      alert(error.message)
-      return
-    }
-  } else {
-    // Create new campaign with generated code
-    const campaignDataWithCode = {
-      ...campaignData,
-      code: generateCampaignCode(campaignForm.name.trim())
-    }
-
-    const { error } = await supabase
-      .from("campaigns")
-      .insert(campaignDataWithCode)
-
-    if (error) {
-      console.error("Error saving campaign:", error)
-      alert(error.message)
-      return
-    }
-  }
-
-  setShowCampaignDialog(false)
-  setEditingCampaign(null)
-  setCampaignForm({
-    name: "",
-    description: "",
-    goalAmount: "",
-    startDate: "",
-    endDate: "",
-    status: "Draft",
-    campaignCode: "",
-  })
-
-  await loadCampaigns()
-}
 async function handleTogglePaymentMethod(methodId: string, enabled: boolean) {
   const orgId = await getOrganizationId()
 
@@ -565,24 +349,6 @@ async function handleSaveCategory() {
 
   await loadCategories()
 }
-async function handleDeleteCampaign(campaignId: string) {
-  if (!confirm("Are you sure you want to delete this campaign? This action cannot be undone.")) {
-    return
-  }
-
-  const { error } = await supabase
-    .from("campaigns")
-    .delete()
-    .eq("id", campaignId)
-
-  if (error) {
-    console.error("Error deleting campaign:", error)
-    alert(error.message)
-    return
-  }
-
-  await loadCampaigns()
-}
 
   return (
     <>
@@ -610,119 +376,7 @@ async function handleDeleteCampaign(campaignId: string) {
 
         {activeTab === "General" && (
           <div className="flex flex-col gap-6">
-            <DonationOpsPanel />
             <DonationReceiptSettingsForm mode="general" />
-          </div>
-        )}
-
-        {activeTab === "Campaigns" && (
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-semibold text-foreground">Donation Campaigns</h3>
-                <p className="text-sm text-muted-foreground">
-                  Create and manage fundraising campaigns
-                </p>
-              </div>
-              <Button onClick={() => { setEditingCampaign(null); setShowCampaignDialog(true); }}>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Campaign
-              </Button>
-            </div>
-
-            <Card>
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Campaign</TableHead>
-                      <TableHead>Code</TableHead>
-                      <TableHead>Goal</TableHead>
-                      <TableHead>Raised</TableHead>
-                      <TableHead>Progress</TableHead>
-                      <TableHead>Duration</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="w-[100px]"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {campaigns.map((campaign) => (
-                      <TableRow key={campaign.id}>
-                        <TableCell>
-                          <div>
-                            <Link
-                              href={`/donations/campaigns/${campaign.id}`}
-                              className="font-medium text-primary hover:underline"
-                            >
-                              {campaign.name}
-                            </Link>
-                            <p className="text-sm text-muted-foreground">{campaign.description}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell className="font-mono text-sm">{campaign.campaignCode || "—"}</TableCell>
-                        <TableCell className="font-medium">{formatCurrency(campaign.goalAmount)}</TableCell>
-                        <TableCell className="text-emerald-600 font-medium">{formatCurrency(campaign.raisedAmount)}</TableCell>
-                        <TableCell>
-                          <div className="w-24">
-                            <div className="mb-1 flex justify-between text-xs">
-                             <span>
-  {campaign.goalAmount > 0
-    ? Math.round((campaign.raisedAmount / campaign.goalAmount) * 100)
-    : 0}
-  %
-</span>
-                            </div>
-                            <div className="h-2 w-full rounded-full bg-muted">
-                              <div
-                                className="h-2 rounded-full bg-primary"
-                                style={{
-  width: `${
-    campaign.goalAmount > 0
-      ? Math.min((campaign.raisedAmount / campaign.goalAmount) * 100, 100)
-      : 0
-  }%`,
-}}
-                              />
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {formatDate(campaign.startDate)} - {formatDate(campaign.endDate)}
-                        </TableCell>
-                       <TableCell>
-  <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700">
-    {getCampaignStatusBadge(campaign.status)}
-  </span>
-</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                          <Button
-  variant="ghost"
-  size="icon"
-  className="h-8 w-8"
-  onClick={() => {
-    setEditingCampaign(campaign)
-    setShowCampaignDialog(true)
-  }}
->
-  <Pencil className="h-4 w-4" />
-</Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-muted-foreground hover:text-red-600"
-                              onClick={() => handleDeleteCampaign(campaign.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
           </div>
         )}
 
@@ -1075,103 +729,6 @@ async function handleDeleteCampaign(campaignId: string) {
   </DialogContent>
 </Dialog>
 
-      {/* Campaign Dialog */}
-      <Dialog open={showCampaignDialog} onOpenChange={setShowCampaignDialog}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>{editingCampaign ? "Edit Campaign" : "Add Campaign"}</DialogTitle>
-            <DialogDescription>
-              {editingCampaign ? "Update campaign details" : "Create a new fundraising campaign"}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex flex-col gap-4 py-4">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="camp-name">Campaign Name</Label>
-              <Input
-  id="camp-name"
-  placeholder="e.g., Building Fund 2025"
-  value={campaignForm.name}
-  onChange={(e) => setCampaignForm(prev => ({ ...prev, name: e.target.value }))}
-              />
-            </div>
-            {editingCampaign && campaignForm.campaignCode && (
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="camp-code">Campaign Code</Label>
-                <Input
-                  id="camp-code"
-                  value={campaignForm.campaignCode}
-                  readOnly
-                  className="font-mono bg-muted"
-                />
-              </div>
-            )}
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="camp-description">Description</Label>
-              <Textarea
-                id="camp-description"
-                placeholder="Brief description of this campaign"
-                rows={2}
-                value={campaignForm.description}
-                onChange={(e) => setCampaignForm(prev => ({ ...prev, description: e.target.value }))}
-              />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="camp-goal">Goal Amount</Label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-                <Input
-                  id="camp-goal"
-                  type="number"
-                  placeholder="50000"
-                  className="pl-7"
-                  value={campaignForm.goalAmount}
-                  onChange={(e) => setCampaignForm(prev => ({ ...prev, goalAmount: e.target.value }))}
-                />
-              </div>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="camp-start">Start Date</Label>
-                <Input
-                  id="camp-start"
-                  type="date"
-                  value={campaignForm.startDate}
-                  onChange={(e) => setCampaignForm(prev => ({ ...prev, startDate: e.target.value }))}
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="camp-end">End Date</Label>
-                <Input
-                  id="camp-end"
-                  type="date"
-                  value={campaignForm.endDate}
-                  onChange={(e) => setCampaignForm(prev => ({ ...prev, endDate: e.target.value }))}
-                />
-              </div>
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="camp-status">Status</Label>
-              <Select value={campaignForm.status} onValueChange={(value: Campaign["status"]) => setCampaignForm(prev => ({ ...prev, status: value }))}>
-                <SelectTrigger id="camp-status">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Draft">Draft</SelectItem>
-                  <SelectItem value="Active">Active</SelectItem>
-                  <SelectItem value="Paused">Paused</SelectItem>
-                  <SelectItem value="Completed">Completed</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCampaignDialog(false)}>Cancel</Button>
-            <Button onClick={handleSaveCampaign}>
-              {editingCampaign ? "Save Changes" : "Add Campaign"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </>
   )
 }

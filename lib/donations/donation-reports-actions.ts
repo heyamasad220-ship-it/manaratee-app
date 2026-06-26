@@ -1,14 +1,15 @@
 "use server"
 
+import { revalidatePath } from "next/cache"
+
 import { requireDonationStaffAccess } from "@/lib/donations/donation-action-auth"
 import {
   fetchCampaignAnalyticsEntries,
-  fetchCampaignRecentActivity,
+  fetchCampaignDonorInsights,
   fetchDonorTaxYearTotals,
   fetchOrgReportsOverview,
   fetchRecurringReportSummary,
   type CampaignAnalyticsEntry,
-  type CampaignRecentActivity,
   type CampaignRow,
 } from "@/lib/donations/campaign-analytics"
 import {
@@ -68,7 +69,7 @@ export async function getCampaignDetailAction(campaignId: string) {
           largestGift: 0,
         },
       } satisfies CampaignAnalyticsEntry)
-    const activity = await fetchCampaignRecentActivity(
+    const insights = await fetchCampaignDonorInsights(
       access.supabase,
       access.orgId,
       campaignId
@@ -78,8 +79,73 @@ export async function getCampaignDetailAction(campaignId: string) {
       success: true as const,
       campaign: campaign as CampaignRow,
       entry,
-      activity,
+      insights,
+      canManage: access.canManage,
     }
+  } catch (error) {
+    return { success: false as const, error: (error as Error).message }
+  }
+}
+
+export async function updateCampaignAction(
+  campaignId: string,
+  input: {
+    name: string
+    description?: string | null
+    goal_amount?: number | null
+    start_date?: string | null
+    end_date?: string | null
+    status?: string | null
+  }
+) {
+  const access = await requireDonationStaffAccess("manage")
+  if (!access.ok) return { success: false as const, error: access.error }
+
+  const name = input.name.trim()
+  if (!name) return { success: false as const, error: "Campaign name is required" }
+
+  try {
+    const { data: existing, error: existingError } = await access.supabase
+      .from("campaigns")
+      .select("id")
+      .eq("organization_id", access.orgId)
+      .ilike("name", name)
+      .neq("id", campaignId)
+      .maybeSingle()
+
+    if (existingError) {
+      return { success: false as const, error: existingError.message }
+    }
+    if (existing) {
+      return { success: false as const, error: "A campaign with this name already exists" }
+    }
+
+    const { data: campaign, error } = await access.supabase
+      .from("campaigns")
+      .update({
+        name,
+        description: input.description?.trim() || null,
+        goal_amount: input.goal_amount ?? null,
+        start_date: input.start_date || null,
+        end_date: input.end_date || null,
+        status: input.status?.toLowerCase() || "draft",
+      })
+      .eq("organization_id", access.orgId)
+      .eq("id", campaignId)
+      .select(
+        "id, organization_id, name, code, description, goal_amount, start_date, end_date, status, created_at"
+      )
+      .maybeSingle()
+
+    if (error || !campaign) {
+      return { success: false as const, error: error?.message || "Failed to update campaign" }
+    }
+
+    revalidatePath("/donations/campaigns")
+    revalidatePath(`/donations/campaigns/${campaignId}`)
+    revalidatePath("/donations/settings")
+
+    return { success: true as const, campaign: campaign as CampaignRow }
   } catch (error) {
     return { success: false as const, error: (error as Error).message }
   }

@@ -1,7 +1,7 @@
 "use client";
 
 import { PaymentHistory } from "@/components/donations/payment-history";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -59,6 +59,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { ensureDonorExtensionForContact } from "@/lib/donations/donor-contact-bridge";
 import { PledgeReminderActions } from "@/components/donations/pledge-reminder-actions";
+import { formatPledgeReminderStatusLabel } from "@/lib/donations/pledge-reminder-types";
 import {
   QuickAddContactDialog,
   type QuickAddContactResult,
@@ -106,11 +107,14 @@ interface Pledge {
   startDate: string;
   nextPayment: string | null;
   status: PledgeDisplayStatus;
-  fundName: string;
+  campaignName: string;
   campaignId: string | null;
   categoryId: string | null;
   subcategoryId: string | null;
   notes?: string;
+  lastReminderAt: string | null;
+  lastReminderStatus: string | null;
+  lastContactedAt: string | null;
 }
 
 interface ContactPickerOption {
@@ -120,7 +124,7 @@ interface ContactPickerOption {
   phone: string | null;
 }
 
-type FundOption = {
+type CampaignOption = {
   id: string;
   name: string;
 };
@@ -153,6 +157,70 @@ function formatCurrency(value: number) {
   return `$${value.toLocaleString()}`;
 }
 
+function formatDisplayDate(value: string | null | undefined) {
+  if (!value) return "—";
+  return new Date(value).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+async function attachReminderSummaries(
+  supabase: ReturnType<typeof createClient>,
+  orgId: string,
+  mapped: Pledge[]
+) {
+  const pledgeIds = mapped.map((pledge) => pledge.id);
+  if (pledgeIds.length === 0) return mapped;
+
+  const { data } = await supabase
+    .from("pledge_reminders")
+    .select("pledge_id, status, reminder_type, sent_at, created_at")
+    .eq("organization_id", orgId)
+    .in("pledge_id", pledgeIds)
+    .order("created_at", { ascending: false });
+
+  const summaryByPledge = new Map<
+    string,
+    {
+      lastReminderAt: string | null;
+      lastReminderStatus: string | null;
+      lastContactedAt: string | null;
+    }
+  >();
+
+  for (const row of data || []) {
+    const pledgeId = row.pledge_id as string;
+    const existing = summaryByPledge.get(pledgeId) || {
+      lastReminderAt: null,
+      lastReminderStatus: null,
+      lastContactedAt: null,
+    };
+
+    if (row.reminder_type === "contacted" && !existing.lastContactedAt) {
+      existing.lastContactedAt = (row.sent_at || row.created_at) as string;
+    }
+
+    if (row.reminder_type !== "contacted" && !existing.lastReminderAt) {
+      existing.lastReminderAt = (row.sent_at || row.created_at) as string;
+      existing.lastReminderStatus = row.status as string;
+    }
+
+    summaryByPledge.set(pledgeId, existing);
+  }
+
+  return mapped.map((pledge) => {
+    const summary = summaryByPledge.get(pledge.id);
+    return {
+      ...pledge,
+      lastReminderAt: summary?.lastReminderAt ?? null,
+      lastReminderStatus: summary?.lastReminderStatus ?? null,
+      lastContactedAt: summary?.lastContactedAt ?? null,
+    };
+  });
+}
+
 function pledgeFromRow(row: any): Pledge {
   const amountPledged = Number(row.amount_pledged || 0);
   const amountPaid = Number(row.amount_paid || 0);
@@ -170,11 +238,14 @@ function pledgeFromRow(row: any): Pledge {
     startDate: normalizeDateInput(row.pledge_date) || "",
     nextPayment: null,
     status: pledgeDisplayStatus(row.calculated_status, amountPledged, amountPaid),
-    fundName: row.campaign_name || "General Fund",
+    campaignName: row.campaign_name || "Unassigned",
     campaignId: row.campaign_id || null,
     categoryId: null,
     subcategoryId: null,
     notes: row.notes || undefined,
+    lastReminderAt: null,
+    lastReminderStatus: null,
+    lastContactedAt: null,
   };
 }
 
@@ -188,6 +259,9 @@ export default function PledgesPage() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [campaignFilter, setCampaignFilter] = useState<string>("all");
+  const [minAmountFilter, setMinAmountFilter] = useState("");
+  const [debouncedMinAmount, setDebouncedMinAmount] = useState<number | undefined>(undefined);
   const [page, setPage] = useState(1);
   const [totalPledges, setTotalPledges] = useState(0);
   const [summaryMetrics, setSummaryMetrics] = useState({
@@ -196,8 +270,6 @@ export default function PledgesPage() {
     outstandingBalance: 0,
     activePledgeCount: 0,
   });
-  const [fundFilter, setFundFilter] = useState<string>("all");
-
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [editingPledge, setEditingPledge] = useState<Pledge | null>(null);
@@ -215,7 +287,7 @@ export default function PledgesPage() {
   const [contactOptions, setContactOptions] = useState<ContactPickerOption[]>([]);
   const [selectedContactId, setSelectedContactId] = useState("");
 
-  const [fundOptions, setFundOptions] = useState<FundOption[]>([]);
+  const [campaignOptions, setCampaignOptions] = useState<CampaignOption[]>([]);
 
   const [addAttribution, setAddAttribution] = useState<DonationAttributionValue>(
     EMPTY_DONATION_ATTRIBUTION_VALUE
@@ -313,12 +385,7 @@ export default function PledgesPage() {
 
     await fetchPledges();
   }
-  async function loadFundOptions(orgId: string, currentPledges: Pledge[] = []) {
-    const optionsFromPledges = currentPledges
-      .map((pledge) => pledge.fundName)
-      .filter(Boolean)
-      .map((name) => ({ id: name, name }));
-
+  async function loadCampaignOptions(orgId: string) {
     const { data, error } = await supabase
       .from("campaigns")
       .select("id, name")
@@ -326,32 +393,19 @@ export default function PledgesPage() {
       .order("name", { ascending: true });
 
     if (error) {
-      console.warn("Could not load campaigns table. Using funds already found on pledges.", error);
-      setFundOptions(dedupeFundOptions(optionsFromPledges));
+      console.warn("Could not load campaigns table.", error);
+      setCampaignOptions([]);
       return;
     }
 
-    const campaignOptions = (data || [])
-      .filter((campaign: any) => campaign.name)
-      .map((campaign: any) => ({
-        id: String(campaign.id),
-        name: String(campaign.name),
-      }));
-
-    setFundOptions(dedupeFundOptions([...campaignOptions, ...optionsFromPledges]));
-  }
-
-  function dedupeFundOptions(options: FundOption[]) {
-    const seen = new Set<string>();
-
-    return options.filter((option) => {
-      const key = option.name.toLowerCase();
-
-      if (seen.has(key)) return false;
-
-      seen.add(key);
-      return true;
-    });
+    setCampaignOptions(
+      (data || [])
+        .filter((campaign: { name?: string | null }) => campaign.name)
+        .map((campaign: { id: string; name: string }) => ({
+          id: String(campaign.id),
+          name: String(campaign.name),
+        }))
+    );
   }
 
   const fetchPledges = async (nextPage = page) => {
@@ -363,12 +417,13 @@ export default function PledgesPage() {
       setOrganizationId(null);
       setPledges([]);
       setContactOptions([]);
-      setFundOptions([]);
+      setCampaignOptions([]);
       setLoading(false);
       return;
     }
 
     setOrganizationId(orgId);
+    await loadCampaignOptions(orgId);
 
     const statusMap: Record<string, string> = {
       Open: "open",
@@ -382,6 +437,8 @@ export default function PledgesPage() {
         pageSize: DONATIONS_PAGE_SIZE,
         search: debouncedSearch || undefined,
         status: statusFilter === "all" ? undefined : statusMap[statusFilter],
+        campaignId: campaignFilter === "all" ? undefined : campaignFilter,
+        minAmountPledged: debouncedMinAmount,
       }),
       fetchPledgeSummaryMetricsAction(),
     ]);
@@ -447,8 +504,7 @@ export default function PledgesPage() {
       }
     }
 
-    setPledges(mapped);
-    await loadFundOptions(orgId, mapped);
+    setPledges(await attachReminderSummaries(supabase, orgId, mapped));
     setLoading(false);
   };
 
@@ -489,13 +545,28 @@ export default function PledgesPage() {
   }, [search]);
 
   useEffect(() => {
+    const trimmed = minAmountFilter.trim();
+    const parsed = trimmed ? Number(trimmed.replace(/,/g, "")) : NaN;
+    const timer = setTimeout(() => {
+      setDebouncedMinAmount(Number.isFinite(parsed) && parsed > 0 ? parsed : undefined);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [minAmountFilter]);
+
+  useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, statusFilter]);
+  }, [debouncedSearch, statusFilter, campaignFilter, debouncedMinAmount]);
 
   useEffect(() => {
     fetchPledges(page);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, statusFilter, page]);
+  }, [debouncedSearch, statusFilter, campaignFilter, debouncedMinAmount, page]);
+
+  useEffect(() => {
+    if (window.location.hash === "#collection-queue") {
+      document.getElementById("collection-queue")?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [loading]);
 
   useEffect(() => {
     if (!selectedPledge || !organizationId) {
@@ -754,28 +825,6 @@ export default function PledgesPage() {
     await refreshSelectedPledge(paymentPledge.id, orgId);
   };
 
-  const fundFilterOptions = useMemo(() => {
-    return Array.from(new Set(pledges.map((pledge) => pledge.fundName))).sort();
-  }, [pledges]);
-
-  const pledgeFundOptions = useMemo(() => {
-    const options = fundOptions.length > 0 ? fundOptions : [{ id: "General Fund", name: "General Fund" }];
-
-    if (!options.some((option) => option.name === "General Fund")) {
-      return [{ id: "General Fund", name: "General Fund" }, ...options];
-    }
-
-    return options;
-  }, [fundOptions]);
-
-  const filteredPledges = pledges.filter((pledge) => {
-    const matchesSearch = pledge.donorName.toLowerCase().includes(search.toLowerCase());
-    const matchesStatus = statusFilter === "all" || pledge.status === statusFilter;
-    const matchesFund = fundFilter === "all" || pledge.fundName === fundFilter;
-
-    return matchesSearch && matchesStatus && matchesFund;
-  });
-
   const totalPledged = summaryMetrics.totalPledged;
   const totalCollected = summaryMetrics.totalCollected;
   const totalRemaining = summaryMetrics.outstandingBalance;
@@ -801,17 +850,19 @@ export default function PledgesPage() {
       <Header title="Pledges" />
 
       <div className="p-6">
-        <DonationMetricCardGrid className="mb-6">
+        <DonationMetricCardGrid colorful className="mb-6">
           <DonationMetricCard
             title="Total Pledged"
             value={formatCurrency(totalPledged)}
             icon={Heart}
+            accent="blue"
             description={`Across ${totalPledges} pledges`}
           />
           <DonationMetricCard
             title="Collected"
             value={formatCurrency(totalCollected)}
             icon={DollarSign}
+            accent="emerald"
             description={
               <span className="inline-flex items-center">
                 <ArrowUpRight className="mr-1 h-3 w-3" />
@@ -823,12 +874,14 @@ export default function PledgesPage() {
             title="Remaining"
             value={formatCurrency(totalRemaining)}
             icon={AlertCircle}
+            accent="amber"
             description="Yet to be collected"
           />
           <DonationMetricCard
             title="Active Pledges"
             value={activePledges}
             icon={CheckCircle2}
+            accent="violet"
             description="Not yet fulfilled"
           />
         </DonationMetricCardGrid>
@@ -845,6 +898,21 @@ export default function PledgesPage() {
               />
             </div>
 
+            <Select value={campaignFilter} onValueChange={setCampaignFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Campaign" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Campaigns</SelectItem>
+                <SelectItem value="__none__">Unassigned</SelectItem>
+                {campaignOptions.map((campaign) => (
+                  <SelectItem key={campaign.id} value={campaign.id}>
+                    {campaign.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-[140px]">
                 <SelectValue placeholder="Status" />
@@ -857,19 +925,15 @@ export default function PledgesPage() {
               </SelectContent>
             </Select>
 
-            <Select value={fundFilter} onValueChange={setFundFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Fund" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Funds</SelectItem>
-                {fundFilterOptions.map((fund) => (
-                  <SelectItem key={fund} value={fund}>
-                    {fund}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Input
+              type="number"
+              min={0}
+              step={1}
+              placeholder="Min amount ($)"
+              value={minAmountFilter}
+              onChange={(event) => setMinAmountFilter(event.target.value)}
+              className="w-[150px]"
+            />
           </div>
 
           <Button onClick={() => setShowAddDialog(true)}>
@@ -878,7 +942,7 @@ export default function PledgesPage() {
           </Button>
         </div>
 
-        <Card>
+        <Card id="collection-queue" className="scroll-mt-6">
           <CardContent className="p-0">
             <Table>
               <TableHeader>
@@ -893,26 +957,28 @@ export default function PledgesPage() {
                   <TableHead>Amount Paid</TableHead>
                   <TableHead>Balance</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Fund</TableHead>
-                  <TableHead className="w-[50px]"></TableHead>
+                  <TableHead>Campaign</TableHead>
+                  <TableHead>Last Reminder</TableHead>
+                  <TableHead>Last Contacted</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
 
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center text-muted-foreground">
                       Loading pledges...
                     </TableCell>
                   </TableRow>
-                ) : filteredPledges.length === 0 ? (
+                ) : pledges.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center text-muted-foreground">
                       No pledges found.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredPledges.map((pledge) => (
+                  pledges.map((pledge) => (
                     <TableRow
                       key={pledge.id}
                       className="cursor-pointer hover:bg-muted/50"
@@ -946,71 +1012,83 @@ export default function PledgesPage() {
                       <TableCell>{getStatusBadge(pledge.status)}</TableCell>
 
                       <TableCell>
-                        <Badge variant="outline">{pledge.fundName}</Badge>
+                        <Badge variant="outline">{pledge.campaignName}</Badge>
                       </TableCell>
 
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={(event) => event.stopPropagation()}
-                            >
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={(event) => {
-                                event.preventDefault();
-                                event.stopPropagation();
-                                setSelectedPledge(pledge);
-                              }}
-                            >
-                              View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={(event) => {
-                                event.preventDefault();
-                                event.stopPropagation();
-                                setPaymentPledge(pledge);
-                                setShowPaymentDialog(true);
-                              }}
-                            >
-                              Record Payment
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={(event) => {
-                                event.preventDefault();
-                                event.stopPropagation();
-                                openEditPledge(pledge);
-                              }}
-                            >
-                              Edit Pledge
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={(event) => {
-                                event.preventDefault();
-                                event.stopPropagation();
-                                setSelectedPledge(pledge);
-                              }}
-                            >
-                              Collection / Reminder
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-  className="text-red-600"
-  onClick={(event) => {
-    event.preventDefault()
-    event.stopPropagation()
-    handleDeletePledge(pledge.id)
-  }}
->
-  Delete Pledge
-</DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {pledge.lastReminderAt ? (
+                          <div>
+                            <div>{formatPledgeReminderStatusLabel(pledge.lastReminderStatus)}</div>
+                            <div className="text-xs">{formatDisplayDate(pledge.lastReminderAt)}</div>
+                          </div>
+                        ) : (
+                          "—"
+                        )}
+                      </TableCell>
+
+                      <TableCell>{formatDisplayDate(pledge.lastContactedAt)}</TableCell>
+
+                      <TableCell className="text-right">
+                        <div
+                          className="flex items-center justify-end gap-1"
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          {pledge.balance_remaining > 0.009 ? (
+                            <PledgeReminderActions
+                              pledgeId={pledge.id}
+                              donorName={pledge.donorName}
+                              onUpdated={() => void fetchPledges()}
+                              compact
+                            />
+                          ) : null}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={(event) => {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                  setSelectedPledge(pledge);
+                                }}
+                              >
+                                View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={(event) => {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                  setPaymentPledge(pledge);
+                                  setShowPaymentDialog(true);
+                                }}
+                              >
+                                Record Payment
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={(event) => {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                  openEditPledge(pledge);
+                                }}
+                              >
+                                Edit Pledge
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="text-red-600"
+                                onClick={(event) => {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                  handleDeletePledge(pledge.id);
+                                }}
+                              >
+                                Delete Pledge
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -1405,7 +1483,7 @@ export default function PledgesPage() {
             <div className="flex-1 overflow-y-auto flex flex-col gap-6 py-4 pr-2">
               <div className="flex flex-wrap gap-2">
                 {getStatusBadge(selectedPledge.status)}
-                <Badge variant="outline">{selectedPledge.fundName}</Badge>
+                <Badge variant="outline">{selectedPledge.campaignName}</Badge>
                 <Badge variant="secondary">{selectedPledge.frequency}</Badge>
               </div>
 

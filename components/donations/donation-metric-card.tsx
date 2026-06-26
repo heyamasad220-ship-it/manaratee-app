@@ -66,6 +66,36 @@ type DonationMetricCardProps = {
   accent?: DonationMetricAccent
   className?: string
   valueClassName?: string
+  onValueClick?: () => void
+}
+
+function MetricValue({
+  value,
+  valueClassName,
+  styles,
+  onValueClick,
+}: {
+  value: ReactNode
+  valueClassName?: string
+  styles: { value?: string } | null
+  onValueClick?: () => void
+}) {
+  const className = cn(
+    "mt-1 text-2xl font-bold",
+    styles?.value,
+    valueClassName,
+    onValueClick && "cursor-pointer transition hover:underline"
+  )
+
+  if (onValueClick) {
+    return (
+      <button type="button" onClick={onValueClick} className={cn(className, "text-left")}>
+        {value}
+      </button>
+    )
+  }
+
+  return <div className={className}>{value}</div>
 }
 
 export function DonationMetricCard({
@@ -76,6 +106,7 @@ export function DonationMetricCard({
   accent,
   className,
   valueClassName,
+  onValueClick,
 }: DonationMetricCardProps) {
   const styles = accent ? ACCENT_STYLES[accent] : null
 
@@ -87,9 +118,12 @@ export function DonationMetricCard({
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium text-muted-foreground">{title}</p>
               {value != null && value !== "" ? (
-                <div className={cn("mt-1 text-2xl font-bold", styles.value, valueClassName)}>
-                  {value}
-                </div>
+                <MetricValue
+                  value={value}
+                  valueClassName={valueClassName}
+                  styles={styles}
+                  onValueClick={onValueClick}
+                />
               ) : null}
               {description ? (
                 <div
@@ -121,7 +155,12 @@ export function DonationMetricCard({
       </CardHeader>
       <CardContent>
         {value != null && value !== "" ? (
-          <div className={cn("text-2xl font-bold", valueClassName)}>{value}</div>
+          <MetricValue
+            value={value}
+            valueClassName={valueClassName}
+            styles={null}
+            onValueClick={onValueClick}
+          />
         ) : null}
         {description ? (
           <div className={cn("text-xs text-muted-foreground", value != null && value !== "" && "mt-1")}>

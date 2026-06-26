@@ -10,6 +10,7 @@ import {
   type PaymentReceiptPayload,
 } from "@/lib/donations/receipt-types"
 import { loadDonationReceiptSettings } from "@/lib/donations/receipt-settings"
+import { countsTowardGivingTotals, paymentNetAmount } from "@/lib/donations/payment-net-amount"
 
 type PaymentRow = {
   id: string
@@ -22,6 +23,7 @@ type PaymentRow = {
   subcategory_id: string | null
   sender_name: string | null
   amount: number | null
+  refunded_amount?: number | null
   payment_date: string | null
   source: string | null
   status: string | null
@@ -267,7 +269,7 @@ export async function computeDonorGivingTotals(
 ): Promise<DonorGivingTotals> {
   const { data: payments, error } = await supabase
     .from("payments")
-    .select("amount, payment_date, status")
+    .select("amount, refunded_amount, payment_date, status")
     .eq("organization_id", organizationId)
     .eq("donor_id", donorId)
 
@@ -282,8 +284,8 @@ export async function computeDonorGivingTotals(
   let previousYearGiving = 0
 
   for (const payment of payments || []) {
-    if (isVoidedPaymentForReceipt(payment.status)) continue
-    const amount = Number(payment.amount || 0)
+    if (!countsTowardGivingTotals(payment)) continue
+    const amount = paymentNetAmount(payment.amount, payment.refunded_amount)
     const year = payment.payment_date ? new Date(payment.payment_date).getFullYear() : null
     lifetimeGiving += amount
     if (year === currentYear) currentYearGiving += amount

@@ -71,12 +71,12 @@ const LAYOUT_CHECKS = [
   },
   {
     id: "layout_import_manage",
-    path: "app/(dashboard)/donations/import/layout.tsx",
+    path: "app/(dashboard)/donations/payments/import/layout.tsx",
     mustInclude: ["requirePermission", "DONATIONS_MANAGE"],
   },
   {
-    id: "layout_reconcile_manage",
-    path: "app/(dashboard)/donations/reconcile/layout.tsx",
+    id: "layout_match_manage",
+    path: "app/(dashboard)/donations/payments/match/layout.tsx",
     mustInclude: ["requirePermission", "DONATIONS_MANAGE"],
   },
   {

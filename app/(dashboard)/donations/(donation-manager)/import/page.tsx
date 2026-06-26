@@ -1,13 +1,16 @@
-import { Suspense } from "react"
+import { redirect } from "next/navigation"
 
-import { PaymentImportMatchWorkspace } from "@/components/donations/payment-import-match-workspace"
+export default async function DonationsImportRedirectPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>
+}) {
+  const params = await searchParams
 
-export default function DonationsImportPage() {
-  return (
-    <Suspense
-      fallback={<div className="p-6 text-sm text-muted-foreground">Loading import workspace...</div>}
-    >
-      <PaymentImportMatchWorkspace />
-    </Suspense>
-  )
+  if (params.tab === "match") {
+    redirect("/donations/payments/match")
+  }
+
+  const query = params.tab === "history" ? "?tab=history" : ""
+  redirect(`/donations/payments/import${query}`)
 }

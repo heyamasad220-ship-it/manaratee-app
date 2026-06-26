@@ -5,6 +5,7 @@ import {
   type CampaignAnalyticsEntry,
   type CampaignPaymentRow,
 } from "@/lib/donations/campaign-analytics"
+import { countsTowardGivingTotals, paymentNetAmount } from "@/lib/donations/payment-net-amount"
 import { requireDonationStaffAccess } from "@/lib/donations/donation-action-auth"
 
 export type DonationDashboardSummary = {
@@ -74,17 +75,20 @@ export async function getDonationDashboardSummaryAction(
   if (timeRangeStart) {
     const { data: rangePayments, error } = await access.supabase
       .from("payments")
-      .select("amount, status")
+      .select("amount, refunded_amount, status")
       .eq("organization_id", access.orgId)
       .gte("payment_date", timeRangeStart)
 
     if (error) return { success: false, error: error.message }
 
-    const validPayments = (rangePayments || []).filter(
-      (row) => String(row.status || "").toLowerCase() !== "voided"
+    const validPayments = (rangePayments || []).filter((row) =>
+      countsTowardGivingTotals(row)
     )
 
-    totalCollected = validPayments.reduce((sum, row) => sum + Number(row.amount || 0), 0)
+    totalCollected = validPayments.reduce(
+      (sum, row) => sum + paymentNetAmount(row.amount, row.refunded_amount),
+      0
+    )
     paymentCount = validPayments.length
     thisMonthCollected = Number(paymentRow?.this_month_collected || 0)
   }

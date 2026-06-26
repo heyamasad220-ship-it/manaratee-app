@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { getDonationOpsSnapshotAction } from "@/lib/donations/donation-ops-actions"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 
 export function DonationOpsPanel() {
@@ -20,10 +20,11 @@ export function DonationOpsPanel() {
   }
 
   const { snapshot: data } = snapshot
+  const paymentsNeedingMatch = data.pendingMatchPayments + data.unresolvedPayments
   const hasIssues =
     data.failedEmails > 0 ||
     data.failedReceipts > 0 ||
-    data.pendingReconcilePayments > 0 ||
+    paymentsNeedingMatch > 0 ||
     data.failedProcessorEvents > 0
 
   if (!hasIssues && data.recentFailedEmails.length === 0) {
@@ -31,9 +32,10 @@ export function DonationOpsPanel() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Operational health</CardTitle>
+          <CardDescription>Import, matching, and delivery status</CardDescription>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground">
-          No failed emails, processor events, or reconcile queue items detected.
+          No failed emails, processor events, or unmatched payments detected.
         </CardContent>
       </Card>
     )
@@ -43,19 +45,25 @@ export function DonationOpsPanel() {
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Operational health</CardTitle>
+        <CardDescription>Import, matching, and delivery status</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4 text-sm">
         <div className="flex flex-wrap gap-2">
+          {data.pendingMatchPayments > 0 ? (
+            <Badge variant="secondary">
+              {data.pendingMatchPayments} need donor match
+            </Badge>
+          ) : null}
+          {data.unresolvedPayments > 0 ? (
+            <Badge variant="destructive">
+              {data.unresolvedPayments} unresolved
+            </Badge>
+          ) : null}
           {data.failedEmails > 0 ? (
             <Badge variant="destructive">{data.failedEmails} failed emails</Badge>
           ) : null}
           {data.failedReceipts > 0 ? (
             <Badge variant="destructive">{data.failedReceipts} failed receipts</Badge>
-          ) : null}
-          {data.pendingReconcilePayments > 0 ? (
-            <Badge variant="secondary">
-              {data.pendingReconcilePayments} payments to reconcile
-            </Badge>
           ) : null}
           {data.failedProcessorEvents > 0 ? (
             <Badge variant="destructive">
@@ -64,17 +72,17 @@ export function DonationOpsPanel() {
           ) : null}
         </div>
 
-        {data.pendingReconcilePayments > 0 ? (
+        {paymentsNeedingMatch > 0 ? (
           <p>
-            <Link href="/donations/reconcile" className="text-primary hover:underline">
-              Open reconciliation queue
+            <Link href="/donations/payments/match" className="text-primary hover:underline">
+              Open import &amp; match queue
             </Link>
           </p>
         ) : null}
 
         {data.recentFailedEmails.length > 0 ? (
           <div>
-            <p className="font-medium mb-2">Recent failed emails</p>
+            <p className="mb-2 font-medium">Recent failed emails</p>
             <ul className="space-y-1 text-muted-foreground">
               {data.recentFailedEmails.map((row) => (
                 <li key={row.id}>
@@ -88,7 +96,7 @@ export function DonationOpsPanel() {
 
         {data.recentProcessorFailures.length > 0 ? (
           <div>
-            <p className="font-medium mb-2">Recent Stripe processor failures</p>
+            <p className="mb-2 font-medium">Recent Stripe processor failures</p>
             <ul className="space-y-1 text-muted-foreground">
               {data.recentProcessorFailures.map((row) => (
                 <li key={row.id}>

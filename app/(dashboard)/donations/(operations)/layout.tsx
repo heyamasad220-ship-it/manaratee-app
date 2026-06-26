@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 
-import { DonationPaymentsNav } from "@/components/donations/donation-payments-nav"
+import { DonationCampaignsShell } from "@/components/donations/donation-campaigns-shell"
 import { requireDonationStaffAccess } from "@/lib/donations/donation-action-auth"
 
 export default async function DonationsOperationsLayout({
@@ -14,9 +14,6 @@ export default async function DonationsOperationsLayout({
   }
 
   return (
-    <>
-      <DonationPaymentsNav canManage={access.canManage} />
-      {children}
-    </>
+    <DonationCampaignsShell canManage={access.canManage}>{children}</DonationCampaignsShell>
   )
 }

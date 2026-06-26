@@ -5,7 +5,8 @@ import { requireDonationStaffAccess } from "@/lib/donations/donation-action-auth
 export type DonationOpsSnapshot = {
   failedEmails: number
   failedReceipts: number
-  pendingReconcilePayments: number
+  pendingMatchPayments: number
+  unresolvedPayments: number
   failedProcessorEvents: number
   recentFailedEmails: Array<{
     id: string
@@ -31,7 +32,8 @@ export async function getDonationOpsSnapshotAction() {
   const [
     failedEmailsResult,
     failedReceiptsResult,
-    reconcileResult,
+    pendingMatchResult,
+    unresolvedPaymentsResult,
     processorFailuresResult,
     recentFailedEmails,
     recentProcessorFailures,
@@ -50,8 +52,12 @@ export async function getDonationOpsSnapshotAction() {
       .from("payments")
       .select("id", { count: "exact", head: true })
       .eq("organization_id", orgId)
-      .in("status", ["pending_review", "unallocated", "unresolved"])
-      .is("pledge_id", null),
+      .eq("status", "pending_review"),
+    supabase
+      .from("payments")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", orgId)
+      .eq("status", "unresolved"),
     supabase
       .from("payment_processor_events")
       .select("id", { count: "exact", head: true })
@@ -76,7 +82,8 @@ export async function getDonationOpsSnapshotAction() {
   const snapshot: DonationOpsSnapshot = {
     failedEmails: failedEmailsResult.count ?? 0,
     failedReceipts: failedReceiptsResult.count ?? 0,
-    pendingReconcilePayments: reconcileResult.count ?? 0,
+    pendingMatchPayments: pendingMatchResult.count ?? 0,
+    unresolvedPayments: unresolvedPaymentsResult.count ?? 0,
     failedProcessorEvents: processorFailuresResult.count ?? 0,
     recentFailedEmails: recentFailedEmails.data || [],
     recentProcessorFailures: recentProcessorFailures.data || [],

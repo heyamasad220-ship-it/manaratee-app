@@ -28,7 +28,7 @@ export async function fetchPaymentsPageAction(input: PaymentsPageInput = {}) {
   let query = access.supabase
     .from("payments")
     .select(
-      "id, amount, payment_date, source, memo, pledge_id, donor_id, status, sender_name",
+      "id, amount, payment_date, source, memo, pledge_id, donor_id, status, sender_name, donors ( donor_type )",
       { count: "exact" }
     )
     .eq("organization_id", access.orgId)
@@ -54,7 +54,16 @@ export async function fetchPaymentsPageAction(input: PaymentsPageInput = {}) {
 
   return {
     success: true as const,
-    payments: data || [],
+    payments: (data || []).map((row) => {
+      const donor = Array.isArray(row.donors) ? row.donors[0] : row.donors
+      const { donors: _donors, ...payment } = row as Record<string, unknown> & {
+        donors?: { donor_type?: string | null } | { donor_type?: string | null }[] | null
+      }
+      return {
+        ...payment,
+        donor_type: (donor?.donor_type as string | null) ?? null,
+      }
+    }),
     total: count ?? 0,
     page,
     pageSize,
@@ -66,6 +75,8 @@ export type PledgesPageInput = {
   pageSize?: number
   search?: string
   status?: string
+  campaignId?: string
+  minAmountPledged?: number
   sortBy?: "pledge_date" | "donor_name" | "balance_remaining"
   sortAsc?: boolean
 }
@@ -92,6 +103,14 @@ export async function fetchPledgesPageAction(input: PledgesPageInput = {}) {
 
   if (input.status && input.status !== "all") {
     query = query.eq("calculated_status", input.status)
+  }
+  if (input.campaignId === "__none__") {
+    query = query.is("campaign_id", null)
+  } else if (input.campaignId) {
+    query = query.eq("campaign_id", input.campaignId)
+  }
+  if (input.minAmountPledged != null && input.minAmountPledged > 0) {
+    query = query.gte("amount_pledged", input.minAmountPledged)
   }
   if (input.search?.trim()) {
     const term = `%${escapeIlike(input.search.trim())}%`
@@ -133,10 +152,13 @@ export async function fetchPledgeSummaryMetricsAction() {
   }
 }
 
+export type DonorPledgeFilter = "all" | "open_pledge" | "no_open_pledge"
+
 export type DonorsPageInput = {
   page?: number
   pageSize?: number
   search?: string
+  pledgeFilter?: DonorPledgeFilter
   sortBy?: "full_name" | "total_donations" | "last_donation_date"
   sortAsc?: boolean
 }
@@ -163,7 +185,13 @@ export async function fetchDonorSummaryPageAction(input: DonorsPageInput = {}) {
 
   if (input.search?.trim()) {
     const term = `%${escapeIlike(input.search.trim())}%`
-    query = query.or(`full_name.ilike.${term},email.ilike.${term}`)
+    query = query.or(`full_name.ilike.${term},email.ilike.${term},phone.ilike.${term}`)
+  }
+
+  if (input.pledgeFilter === "open_pledge") {
+    query = query.eq("has_open_pledge", true)
+  } else if (input.pledgeFilter === "no_open_pledge") {
+    query = query.eq("has_open_pledge", false)
   }
 
   const { data, error, count } = await query.range(from, to)

@@ -1,3 +1,4 @@
+import { normalizeModuleSlug } from "@/lib/modules/module-catalog"
 import { PERMISSIONS, type PermissionKey } from "@/lib/permissions/permission-keys"
 
 export const FACILITY_MANAGER_ROLE_NAME = "Facility Manager"
@@ -55,6 +56,32 @@ export function isFacilitiesOnlyAccess(input: {
   }
 
   return !NON_FACILITIES_MODULE_PERMISSIONS.some((key) => enabled.has(key))
+}
+
+export function isFacilitiesOrganizationRole(roleName: string) {
+  const normalized = roleName.trim().toLowerCase()
+  return (
+    normalized === FACILITY_MANAGER_ROLE_NAME.toLowerCase() ||
+    normalized === FACILITY_COORDINATOR_ROLE_NAME.toLowerCase()
+  )
+}
+
+export function isFacilitiesModuleEnabledForOrganization(
+  enabledModuleSlugs: Iterable<string>
+) {
+  const enabled = new Set([...enabledModuleSlugs].map(normalizeModuleSlug))
+  return enabled.has("spaces") || enabled.has("bookings")
+}
+
+export function filterOrganizationRolesForOrganization<T extends { name: string }>(
+  roles: T[],
+  enabledModuleSlugs: Iterable<string>
+) {
+  if (isFacilitiesModuleEnabledForOrganization(enabledModuleSlugs)) {
+    return roles
+  }
+
+  return roles.filter((role) => !isFacilitiesOrganizationRole(role.name))
 }
 
 export function isFacilitiesRoute(pathname: string) {

@@ -21,22 +21,6 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-} from "@/components/ui/chart"
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  PieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-} from "recharts"
-import {
   DollarSign,
   Users,
   TrendingUp,
@@ -50,7 +34,6 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { formatPaymentStatusLabel, normalizePaymentStatus } from "@/lib/donations/donation-status"
-import { CampaignProgressBar } from "@/components/donations/campaign-progress-bar"
 import {
   DonationMetricCard,
   DonationMetricCardGrid,
@@ -86,17 +69,6 @@ const sourceColors: Record<string, string> = {
   Check: "#6B7280",
 }
 
-const chartConfig = {
-  amount: {
-    label: "Amount",
-    color: "hsl(var(--primary))",
-  },
-  count: {
-    label: "Transactions",
-    color: "hsl(var(--muted-foreground))",
-  },
-}
-
 function getRangeStart(timeRange: string) {
   const now = new Date()
 
@@ -116,10 +88,6 @@ function getRangeStart(timeRange: string) {
   return null
 }
 
-function formatMonth(dateValue: string) {
-  return new Intl.DateTimeFormat("en-US", { month: "short" }).format(new Date(dateValue))
-}
-
 export default function DonationsPage() {
   const [timeRange, setTimeRange] = useState("this-year")
   const [payments, setPayments] = useState<Payment[]>([])
@@ -132,12 +100,6 @@ export default function DonationsPage() {
     outstandingBalance: 0,
     activePledgeCount: 0,
   })
-  const [monthlyTotals, setMonthlyTotals] = useState<
-    Array<{ monthKey: string; amount: number; paymentCount: number }>
-  >([])
-  const [sourceTotals, setSourceTotals] = useState<
-    Array<{ sourceKey: string; amount: number }>
-  >([])
   const [campaignEntries, setCampaignEntries] = useState<CampaignAnalyticsEntry[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -173,8 +135,6 @@ export default function DonationsPage() {
       }
 
       setDashboardSummary(summaryResult.summary)
-      setMonthlyTotals(summaryResult.monthlyTotals)
-      setSourceTotals(summaryResult.sourceTotals)
       setPayments(campaignsResult.recentPayments as Payment[])
       setCampaignEntries(campaignsResult.campaignEntries)
       setIsLoading(false)
@@ -188,30 +148,7 @@ export default function DonationsPage() {
   const outstandingBalance = dashboardSummary.outstandingBalance
   const paymentsThisMonth = dashboardSummary.thisMonthCollected
 
-  const paymentsOverTime = useMemo(() => {
-    return [...monthlyTotals]
-      .map((row) => ({
-        month: row.monthKey,
-        amount: row.amount,
-        count: row.paymentCount,
-      }))
-      .reverse()
-  }, [monthlyTotals])
-
-  const paymentsBySource = useMemo(() => {
-    return sourceTotals.map((row) => ({
-      name: row.sourceKey,
-      value: row.amount,
-      color: sourceColors[row.sourceKey] || sourceColors[row.sourceKey.charAt(0).toUpperCase() + row.sourceKey.slice(1)] || "#6B7280",
-    }))
-  }, [sourceTotals])
-
   const recentPayments = payments
-
-  const topCampaigns = useMemo(
-    () => [...campaignEntries].sort((a, b) => b.metrics.raised - a.metrics.raised).slice(0, 5),
-    [campaignEntries]
-  )
 
   const campaignsWithGoals = useMemo(
     () => campaignEntries.filter((entry) => Number(entry.campaign.goal_amount || 0) > 0),
@@ -254,7 +191,7 @@ export default function DonationsPage() {
                 </SelectContent>
               </Select>
               <Button asChild>
-                <Link href="/donations/payments">
+                <Link href="/donations/payments/one-time">
                   <Plus className="mr-2 h-4 w-4" />
                   Record Payment
                 </Link>
@@ -262,7 +199,7 @@ export default function DonationsPage() {
             </div>
           </div>
 
-          <DonationMetricCardGrid colorful>
+          <DonationMetricCardGrid colorful className="lg:grid-cols-5">
             <DonationMetricCard
               title="Total Pledged"
               value={formatCurrency(totalPledged)}
@@ -315,203 +252,14 @@ export default function DonationsPage() {
                 </span>
               }
             />
+            <DonationMetricCard
+              title="Goal Achievement"
+              value={`${campaignsGoalAchieved} / ${campaignsWithGoals.length}`}
+              icon={Target}
+              accent="violet"
+              description="Campaigns that reached 100% of goal"
+            />
           </DonationMetricCardGrid>
-
-          <div className="grid gap-6 lg:grid-cols-3">
-            <Card className="lg:col-span-2">
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <Target className="h-5 w-5" />
-                    Top Campaigns
-                  </CardTitle>
-                  <CardDescription>Ranked by amount raised</CardDescription>
-                </div>
-                <Button variant="outline" size="sm" asChild>
-                  <Link href="/donations/campaigns">View All</Link>
-                </Button>
-              </CardHeader>
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Campaign</TableHead>
-                      <TableHead>Raised</TableHead>
-                      <TableHead>Goal</TableHead>
-                      <TableHead>Progress</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {topCampaigns.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
-                          {isLoading ? "Loading campaigns..." : "No campaigns yet"}
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      topCampaigns.map(({ campaign, metrics }) => (
-                        <TableRow key={campaign.id}>
-                          <TableCell>
-                            <Link
-                              href={`/donations/campaigns/${campaign.id}`}
-                              className="font-medium text-primary hover:underline"
-                            >
-                              {campaign.name}
-                            </Link>
-                          </TableCell>
-                          <TableCell className="font-medium text-emerald-600">
-                            {formatCurrency(metrics.raised)}
-                          </TableCell>
-                          <TableCell>{formatCurrency(Number(campaign.goal_amount || 0))}</TableCell>
-                          <TableCell className="min-w-[120px]">
-                            <CampaignProgressBar progressPercent={metrics.progressPercent} />
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-
-            <div className="flex flex-col gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Campaign Progress</CardTitle>
-                  <CardDescription>Active fundraising goals</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {campaignsWithGoals.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No campaign goals configured yet.</p>
-                  ) : (
-                    campaignsWithGoals.slice(0, 4).map(({ campaign, metrics }) => (
-                      <div key={campaign.id}>
-                        <div className="mb-1 flex justify-between text-sm">
-                          <Link
-                            href={`/donations/campaigns/${campaign.id}`}
-                            className="font-medium hover:underline"
-                          >
-                            {campaign.name}
-                          </Link>
-                          <span>{formatCurrency(metrics.raised)}</span>
-                        </div>
-                        <CampaignProgressBar progressPercent={metrics.progressPercent} />
-                      </div>
-                    ))
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Goal Achievement</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-3xl font-bold">
-                    {campaignsGoalAchieved}
-                    <span className="text-base font-normal text-muted-foreground">
-                      {" "}
-                      / {campaignsWithGoals.length}
-                    </span>
-                  </p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Campaigns that reached 100% of goal
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-
-          <div className="grid gap-6 lg:grid-cols-3">
-            <Card className="lg:col-span-2">
-              <CardHeader>
-                <CardTitle>Payments Over Time</CardTitle>
-                <CardDescription>Monthly payment activity for the selected range</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {paymentsOverTime.length === 0 ? (
-                  <div className="flex h-[300px] items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">
-                    {isLoading ? "Loading donation data..." : "No payment data yet. Add payments from the Record Payment page."}
-                  </div>
-                ) : (
-                  <ChartContainer config={chartConfig} className="h-[300px] w-full">
-                    <LineChart data={paymentsOverTime} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                      <XAxis dataKey="month" tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
-                      <YAxis
-                        tick={{ fontSize: 12 }}
-                        tickLine={false}
-                        axisLine={false}
-                        tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
-                      />
-                      <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatCurrency(value as number)} />} />
-                      <Line
-                        type="monotone"
-                        dataKey="amount"
-                        stroke="hsl(var(--primary))"
-                        strokeWidth={2}
-                        dot={{ fill: "hsl(var(--primary))", strokeWidth: 2, r: 4 }}
-                        activeDot={{ r: 6, strokeWidth: 2 }}
-                      />
-                    </LineChart>
-                  </ChartContainer>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Breakdown by Source</CardTitle>
-                <CardDescription>Payment methods used</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {paymentsBySource.length === 0 ? (
-                  <div className="flex h-[200px] items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">
-                    {isLoading ? "Loading..." : "No sources yet"}
-                  </div>
-                ) : (
-                  <>
-                    <div className="h-[200px] w-full">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie data={paymentsBySource} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={2} dataKey="value">
-                            {paymentsBySource.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.color} />
-                            ))}
-                          </Pie>
-                          <ChartTooltip
-                            content={({ active, payload }) => {
-                              if (active && payload && payload.length) {
-                                const data = payload[0].payload
-                                return (
-                                  <div className="rounded-lg border bg-background p-2 shadow-sm">
-                                    <p className="font-medium">{data.name}</p>
-                                    <p className="text-sm text-muted-foreground">{formatCurrency(data.value)}</p>
-                                  </div>
-                                )
-                              }
-                              return null
-                            }}
-                          />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </div>
-                    <div className="mt-4 grid grid-cols-2 gap-2">
-                      {paymentsBySource.map((source) => (
-                        <div key={source.name} className="flex items-center gap-2">
-                          <div className="h-3 w-3 rounded-full" style={{ backgroundColor: source.color }} />
-                          <span className="text-xs text-muted-foreground">{source.name}</span>
-                          <span className="ml-auto text-xs font-medium">
-                            {((source.value / paymentsBySource.reduce((a, b) => a + b.value, 0)) * 100).toFixed(0)}%
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          </div>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
@@ -520,7 +268,7 @@ export default function DonationsPage() {
                 <CardDescription>Latest payment transactions</CardDescription>
               </div>
               <Button variant="outline" size="sm" asChild>
-                <Link href="/donations/payments">View All Payments</Link>
+                <Link href="/donations/payments/one-time">View All Payments</Link>
               </Button>
             </CardHeader>
             <CardContent className="p-0">
@@ -597,7 +345,7 @@ export default function DonationsPage() {
           </Card>
 
           <DonationMetricCardGrid>
-            <Link href="/donations/payments">
+            <Link href="/donations/payments/one-time">
               <DonationMetricCard
                 title="Payments"
                 icon={CreditCard}
@@ -613,7 +361,7 @@ export default function DonationsPage() {
                 className="h-full transition-colors hover:bg-muted/50"
               />
             </Link>
-            <Link href="/donations/import">
+            <Link href="/donations/payments/import">
               <DonationMetricCard
                 title="Import"
                 icon={TrendingUp}
@@ -621,11 +369,11 @@ export default function DonationsPage() {
                 className="h-full transition-colors hover:bg-muted/50"
               />
             </Link>
-            <Link href="/donations/reconcile">
+            <Link href="/donations/payments/match">
               <DonationMetricCard
-                title="Reconcile"
+                title="Match Payments"
                 icon={Users}
-                description="Match payments"
+                description="Match payments to donors"
                 className="h-full transition-colors hover:bg-muted/50"
               />
             </Link>

@@ -28,7 +28,6 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { DonorProfileMetrics } from "@/components/donations/donor-profile-metrics"
 import { Separator } from "@/components/ui/separator"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Select,
   SelectContent,
@@ -36,19 +35,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
 import { DonorGivingSummary } from "@/components/donations/donor-giving-summary"
 import { DonorPledgeCollectionPanel } from "@/components/donations/donor-pledge-collection-panel"
+import { DonorPledgesTab } from "@/components/donations/donor-pledges-tab"
 import { DonorRecurringPanel } from "@/components/donations/donor-recurring-panel"
-import { PaymentReceiptActions } from "@/components/donations/payment-receipt-actions"
+import { DonorDonationHistoryTable } from "@/components/donations/donor-donation-history-table"
+import { mapPaymentToDonationHistoryRow } from "@/lib/donations/payment-admin-capabilities"
 import { updateDonorContactProfileAction } from "@/lib/donations/donor-profile-actions"
 import {
   Dialog,
@@ -69,65 +62,82 @@ export default function IndividualDonorDetailPage() {
   const [saveError, setSaveError] = useState<string | null>(null)
   const [editForm, setEditForm] = useState({ name: "", email: "", phone: "" })
   const [showRecordDonation, setShowRecordDonation] = useState(false)
+  const [showOverviewDialog, setShowOverviewDialog] = useState(false)
+  const [showDonationsDialog, setShowDonationsDialog] = useState(false)
+  const [showPledgesDialog, setShowPledgesDialog] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
-    const fetchDonor = async () => {
-      const { data, error } = await supabase
-        .from("donor_summary_view")
-        .select("*")
-        .eq("id", params.id as string)
-        .single()
+    void loadDonor()
+  }, [params.id, supabase])
 
-      if (error) {
-        console.error("Error loading donor detail:", error)
-        return
-      }
+  async function loadDonor() {
+    const { data, error } = await supabase
+      .from("donor_summary_view")
+      .select("*")
+      .eq("id", params.id as string)
+      .single()
 
-      const { data: payments, error: paymentsError } = await supabase
-        .from("payments")
-        .select("id, amount, payment_date, source, memo, status, category_id, subcategory_id")
-        .eq("donor_id", data.id)
-        .order("payment_date", { ascending: false })
-        .limit(100)
-
-      if (paymentsError) {
-        console.error("Error loading donor payments:", paymentsError)
-      }
-
-      setDonor({
-        id: data.id,
-        contactId: data.contact_id,
-        name: data.full_name,
-        email: data.email,
-        phone: data.phone,
-        totalDonations: Number(data.total_donations || 0),
-        donationCount: Number(data.donation_count || 0),
-        lastDonation: data.last_donation_date || "",
-        preferredCategory: data.preferred_category || "",
-        status: data.status || "Active",
-        hasPledge: data.has_open_pledge || false,
-        address: {
-          street: data.street || "",
-          city: data.city || "",
-          state: data.state || "",
-          zip: data.zip || "",
-        },
-        notes: data.notes || "",
-        donationHistory: (payments || []).map((p: any) => ({
-          id: p.id,
-          date: p.payment_date,
-          amount: p.amount,
-          category: p.category || "General",
-          method: p.source || "Unknown",
-          receipt: p.id,
-        })),
-        createdAt: data.created_at,
-      })
+    if (error) {
+      console.error("Error loading donor detail:", error)
+      return
     }
 
-    fetchDonor()
-  }, [params.id, supabase])
+    const { data: payments, error: paymentsError } = await supabase
+      .from("payments")
+      .select(
+        `
+        id,
+        amount,
+        refunded_amount,
+        payment_date,
+        source,
+        source_type,
+        memo,
+        status,
+        pledge_id,
+        import_batch_id,
+        stripe_payment_intent_id,
+        stripe_charge_id,
+        category_id,
+        donation_categories ( name )
+      `
+      )
+      .eq("donor_id", data.id)
+      .order("payment_date", { ascending: false })
+      .limit(100)
+
+    if (paymentsError) {
+      console.error("Error loading donor payments:", paymentsError)
+    }
+
+    const donationHistory = (payments || []).map((p: any) =>
+      mapPaymentToDonationHistoryRow(p)
+    )
+
+    setDonor({
+      id: data.id,
+      contactId: data.contact_id,
+      name: data.full_name,
+      email: data.email,
+      phone: data.phone,
+      totalDonations: Number(data.total_donations || 0),
+      donationCount: Number(data.donation_count || 0),
+      lastDonation: data.last_donation_date || "",
+      preferredCategory: data.preferred_category || "",
+      status: data.status || "Active",
+      hasPledge: data.has_open_pledge || false,
+      address: {
+        street: data.street || "",
+        city: data.city || "",
+        state: data.state || "",
+        zip: data.zip || "",
+      },
+      notes: data.notes || "",
+      donationHistory,
+      createdAt: data.created_at,
+    })
+  }
 
   async function handleSave() {
     if (!donor) return
@@ -174,6 +184,18 @@ export default function IndividualDonorDetailPage() {
     setIsEditing(false)
   }
 
+  function openOverviewDialog() {
+    setSaveError(null)
+    setIsEditing(false)
+    setShowOverviewDialog(true)
+  }
+
+  function closeOverviewDialog() {
+    setSaveError(null)
+    setIsEditing(false)
+    setShowOverviewDialog(false)
+  }
+
   if (!donor) return <div className="p-6">Loading...</div>
   return (
     <>
@@ -197,7 +219,13 @@ export default function IndividualDonorDetailPage() {
             </div>
             <div>
               <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold">{donor.name}</h1>
+                <button
+                  type="button"
+                  onClick={openOverviewDialog}
+                  className="text-2xl font-bold text-primary hover:underline"
+                >
+                  {donor.name}
+                </button>
                 <Badge variant={donor.status === "Major Donor" ? "default" : "secondary"}>
                   {donor.status}
                 </Badge>
@@ -212,32 +240,13 @@ export default function IndividualDonorDetailPage() {
             </div>
           </div>
           <div className="flex flex-col items-end gap-2">
-            {saveError ? <p className="text-sm text-destructive">{saveError}</p> : null}
-            <div className="flex items-center gap-2">
-            {isEditing ? (
-              <>
-                <Button variant="outline" onClick={cancelEditing} disabled={isSaving}>
-                  <X className="mr-2 h-4 w-4" />
-                  Cancel
-                </Button>
-                <Button onClick={handleSave} disabled={isSaving}>
-                  <Save className="mr-2 h-4 w-4" />
-                  {isSaving ? "Saving..." : "Save Changes"}
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button variant="outline" onClick={startEditing}>
-                  <Pencil className="mr-2 h-4 w-4" />
-                  Edit
-                </Button>
-                <Button onClick={() => setShowRecordDonation(true)}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Record Donation
-                </Button>
-              </>
-            )}
-            </div>
+            {saveError && !showOverviewDialog ? (
+              <p className="text-sm text-destructive">{saveError}</p>
+            ) : null}
+            <Button onClick={() => setShowRecordDonation(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Record Donation
+            </Button>
           </div>
         </div>
 
@@ -246,6 +255,8 @@ export default function IndividualDonorDetailPage() {
           totalDonations={donor.totalDonations}
           donationCount={donor.donationCount}
           lastDonation={donor.lastDonation}
+          onDonationCountClick={() => setShowDonationsDialog(true)}
+          onPledgesClick={() => setShowPledgesDialog(true)}
         />
 
         <div className="mb-6">
@@ -259,222 +270,221 @@ export default function IndividualDonorDetailPage() {
         <div className="mb-6">
           <DonorRecurringPanel donorId={donor.id} />
         </div>
+      </div>
 
-        <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="donations">Donation History</TabsTrigger>
-            {donor.hasPledge && <TabsTrigger value="pledge">Pledge</TabsTrigger>}
-          </TabsList>
+      <Dialog
+        open={showOverviewDialog}
+        onOpenChange={(open) => {
+          if (!open) closeOverviewDialog()
+          else setShowOverviewDialog(true)
+        }}
+      >
+        <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Donor overview</DialogTitle>
+            <DialogDescription>Contact details and preferences for {donor.name}</DialogDescription>
+          </DialogHeader>
 
-          <TabsContent value="overview" className="space-y-6">
-            <div className="grid gap-6 lg:grid-cols-2">
-              {/* Contact Information */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Contact Information</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-start gap-3">
-                    <User className="mt-0.5 h-4 w-4 text-muted-foreground" />
-                    <div className="flex-1">
-                      <Label className="text-xs text-muted-foreground">Contact Name</Label>
-                      {isEditing ? (
-                        <Input
-                          value={editForm.name}
-                          onChange={(event) =>
-                            setEditForm((prev) => ({ ...prev, name: event.target.value }))
-                          }
-                          className="mt-1"
-                          placeholder="Full name"
-                        />
-                      ) : (
-                        <p className="font-medium">{donor.name || "—"}</p>
-                      )}
-                    </div>
-                  </div>
-                  <Separator />
-                  <div className="flex items-start gap-3">
-                    <Mail className="mt-0.5 h-4 w-4 text-muted-foreground" />
-                    <div className="flex-1">
-                      <Label className="text-xs text-muted-foreground">Email</Label>
-                      {isEditing ? (
-                        <Input
-                          value={editForm.email}
-                          onChange={(event) =>
-                            setEditForm((prev) => ({ ...prev, email: event.target.value }))
-                          }
-                          className="mt-1"
-                        />
-                      ) : (
-                        <p className="font-medium">{donor.email || "—"}</p>
-                      )}
-                    </div>
-                  </div>
-                  <Separator />
-                  <div className="flex items-start gap-3">
-                    <Phone className="mt-0.5 h-4 w-4 text-muted-foreground" />
-                    <div className="flex-1">
-                      <Label className="text-xs text-muted-foreground">Phone</Label>
-                      {isEditing ? (
-                        <Input
-                          value={editForm.phone}
-                          onChange={(event) =>
-                            setEditForm((prev) => ({ ...prev, phone: event.target.value }))
-                          }
-                          className="mt-1"
-                        />
-                      ) : (
-                        <p className="font-medium">{donor.phone || "—"}</p>
-                      )}
-                    </div>
-                  </div>
-                  <Separator />
-                  <div className="flex items-start gap-3">
-                    <MapPin className="mt-0.5 h-4 w-4 text-muted-foreground" />
-                    <div className="flex-1">
-                      <Label className="text-xs text-muted-foreground">Address</Label>
-                      {isEditing ? (
-                        <div className="mt-1 space-y-2">
-                          <Input defaultValue={donor.address.street} placeholder="Street" />
-                          <div className="grid grid-cols-3 gap-2">
-                            <Input defaultValue={donor.address.city} placeholder="City" />
-                            <Input defaultValue={donor.address.state} placeholder="State" />
-                            <Input defaultValue={donor.address.zip} placeholder="ZIP" />
-                          </div>
-                        </div>
-                      ) : (
-                        <p className="font-medium">
-                          {donor.address.street}<br />
-                          {donor.address.city}, {donor.address.state} {donor.address.zip}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Preferences & Notes */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Preferences & Notes</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Preferred Category</Label>
-                    {isEditing ? (
-                      <Select defaultValue={donor.preferredCategory}>
-                        <SelectTrigger className="mt-1">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Operations">Operations</SelectItem>
-                          <SelectItem value="Programs">Programs</SelectItem>
-                          <SelectItem value="Community Support">Community Support</SelectItem>
-                          <SelectItem value="Zakat">Zakat</SelectItem>
-                          <SelectItem value="Sadaqah">Sadaqah</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <p className="mt-1 font-medium">{donor.preferredCategory}</p>
-                    )}
-                  </div>
-                  <Separator />
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Notes</Label>
-                    {isEditing ? (
-                      <Textarea defaultValue={donor.notes} className="mt-1" rows={4} />
-                    ) : (
-                      <p className="mt-1 text-sm">{donor.notes || "No notes"}</p>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="donations">
+          <div className="grid gap-6 py-2 lg:grid-cols-2">
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle>Donation History</CardTitle>
-                  <CardDescription>All donations from this donor</CardDescription>
-                </div>
-                <Button size="sm" onClick={() => setShowRecordDonation(true)}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Record Donation
-                </Button>
+              <CardHeader>
+                <CardTitle>Contact Information</CardTitle>
               </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Amount</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead>Method</TableHead>
-                      <TableHead>Receipt</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {donor.donationHistory.map((donation: any) => (
-                      <TableRow key={donation.id}>
-                        <TableCell>
-                          {new Date(donation.date).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          ${donation.amount.toLocaleString()}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary">{donation.category}</Badge>
-                        </TableCell>
-                        <TableCell>{donation.method}</TableCell>
-                        <TableCell>
-                          <PaymentReceiptActions paymentId={donation.id} compact />
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+              <CardContent className="space-y-4">
+                <div className="flex items-start gap-3">
+                  <User className="mt-0.5 h-4 w-4 text-muted-foreground" />
+                  <div className="flex-1">
+                    <Label className="text-xs text-muted-foreground">Contact Name</Label>
+                    {isEditing ? (
+                      <Input
+                        value={editForm.name}
+                        onChange={(event) =>
+                          setEditForm((prev) => ({ ...prev, name: event.target.value }))
+                        }
+                        className="mt-1"
+                        placeholder="Full name"
+                      />
+                    ) : (
+                      <p className="font-medium">{donor.name || "—"}</p>
+                    )}
+                  </div>
+                </div>
+                <Separator />
+                <div className="flex items-start gap-3">
+                  <Mail className="mt-0.5 h-4 w-4 text-muted-foreground" />
+                  <div className="flex-1">
+                    <Label className="text-xs text-muted-foreground">Email</Label>
+                    {isEditing ? (
+                      <Input
+                        value={editForm.email}
+                        onChange={(event) =>
+                          setEditForm((prev) => ({ ...prev, email: event.target.value }))
+                        }
+                        className="mt-1"
+                      />
+                    ) : (
+                      <p className="font-medium">{donor.email || "—"}</p>
+                    )}
+                  </div>
+                </div>
+                <Separator />
+                <div className="flex items-start gap-3">
+                  <Phone className="mt-0.5 h-4 w-4 text-muted-foreground" />
+                  <div className="flex-1">
+                    <Label className="text-xs text-muted-foreground">Phone</Label>
+                    {isEditing ? (
+                      <Input
+                        value={editForm.phone}
+                        onChange={(event) =>
+                          setEditForm((prev) => ({ ...prev, phone: event.target.value }))
+                        }
+                        className="mt-1"
+                      />
+                    ) : (
+                      <p className="font-medium">{donor.phone || "—"}</p>
+                    )}
+                  </div>
+                </div>
+                <Separator />
+                <div className="flex items-start gap-3">
+                  <MapPin className="mt-0.5 h-4 w-4 text-muted-foreground" />
+                  <div className="flex-1">
+                    <Label className="text-xs text-muted-foreground">Address</Label>
+                    {isEditing ? (
+                      <div className="mt-1 space-y-2">
+                        <Input defaultValue={donor.address.street} placeholder="Street" />
+                        <div className="grid grid-cols-3 gap-2">
+                          <Input defaultValue={donor.address.city} placeholder="City" />
+                          <Input defaultValue={donor.address.state} placeholder="State" />
+                          <Input defaultValue={donor.address.zip} placeholder="ZIP" />
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="font-medium">
+                        {donor.address.street}
+                        <br />
+                        {donor.address.city}, {donor.address.state} {donor.address.zip}
+                      </p>
+                    )}
+                  </div>
+                </div>
               </CardContent>
             </Card>
-          </TabsContent>
 
-          {donor.hasPledge && donor.pledgeInfo && (
-            <TabsContent value="pledge">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Active Pledge</CardTitle>
-                  <CardDescription>Recurring donation commitment</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-                    <div>
-                      <Label className="text-xs text-muted-foreground">Pledge Amount</Label>
-                      <p className="mt-1 text-2xl font-bold">${donor.pledgeInfo.amount.toLocaleString()}</p>
-                      <p className="text-sm text-muted-foreground">{donor.pledgeInfo.frequency}</p>
-                    </div>
-                    <div>
-                      <Label className="text-xs text-muted-foreground">Next Payment</Label>
-                      <p className="mt-1 text-lg font-medium">
-                        {new Date(donor.pledgeInfo.nextPayment).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <div>
-                      <Label className="text-xs text-muted-foreground">Remaining Balance</Label>
-                      <p className="mt-1 text-lg font-medium">${donor.pledgeInfo.remaining.toLocaleString()}</p>
-                    </div>
-                    <div>
-                      <Label className="text-xs text-muted-foreground">Status</Label>
-                      <Badge className="mt-2" variant="default">Active</Badge>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          )}
-        </Tabs>
-      </div>
+            <Card>
+              <CardHeader>
+                <CardTitle>Preferences & Notes</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Preferred Category</Label>
+                  {isEditing ? (
+                    <Select defaultValue={donor.preferredCategory}>
+                      <SelectTrigger className="mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Operations">Operations</SelectItem>
+                        <SelectItem value="Programs">Programs</SelectItem>
+                        <SelectItem value="Community Support">Community Support</SelectItem>
+                        <SelectItem value="Zakat">Zakat</SelectItem>
+                        <SelectItem value="Sadaqah">Sadaqah</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <p className="mt-1 font-medium">{donor.preferredCategory || "—"}</p>
+                  )}
+                </div>
+                <Separator />
+                <div>
+                  <Label className="text-xs text-muted-foreground">Notes</Label>
+                  {isEditing ? (
+                    <Textarea defaultValue={donor.notes} className="mt-1" rows={4} />
+                  ) : (
+                    <p className="mt-1 text-sm">{donor.notes || "No notes"}</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {saveError && showOverviewDialog ? (
+            <p className="text-sm text-destructive">{saveError}</p>
+          ) : null}
+
+          <DialogFooter>
+            {isEditing ? (
+              <>
+                <Button variant="outline" onClick={cancelEditing} disabled={isSaving}>
+                  <X className="mr-2 h-4 w-4" />
+                  Cancel
+                </Button>
+                <Button onClick={handleSave} disabled={isSaving}>
+                  <Save className="mr-2 h-4 w-4" />
+                  {isSaving ? "Saving..." : "Save Changes"}
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="outline" onClick={() => setShowOverviewDialog(false)}>
+                  Close
+                </Button>
+                <Button variant="outline" onClick={startEditing}>
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Edit
+                </Button>
+              </>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDonationsDialog} onOpenChange={setShowDonationsDialog}>
+        <DialogContent className="flex max-h-[90vh] w-full max-w-[calc(100%-2rem)] flex-col gap-4 overflow-hidden sm:max-w-6xl">
+          <DialogHeader>
+            <DialogTitle>Donation History</DialogTitle>
+            <DialogDescription>All donations from {donor.name}</DialogDescription>
+          </DialogHeader>
+
+          <div className="flex justify-end">
+            <Button
+              size="sm"
+              onClick={() => {
+                setShowDonationsDialog(false)
+                setShowRecordDonation(true)
+              }}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Record Donation
+            </Button>
+          </div>
+
+          <div className="min-h-0 overflow-y-auto">
+            <DonorDonationHistoryTable
+              donorId={donor.id}
+              donations={donor.donationHistory}
+              onUpdated={() => void loadDonor()}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showPledgesDialog} onOpenChange={setShowPledgesDialog}>
+        <DialogContent className="flex max-h-[90vh] w-full max-w-[calc(100%-2rem)] flex-col gap-4 overflow-hidden sm:max-w-6xl">
+          <DialogHeader>
+            <DialogTitle>Pledges</DialogTitle>
+            <DialogDescription>All pledges for {donor.name}</DialogDescription>
+          </DialogHeader>
+          <div className="min-h-0 overflow-y-auto">
+            <DonorPledgesTab
+              donorId={donor.id}
+              donorName={donor.name}
+              embedded
+              onUpdated={() => void loadDonor()}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Record Donation Dialog */}
       <Dialog open={showRecordDonation} onOpenChange={setShowRecordDonation}>

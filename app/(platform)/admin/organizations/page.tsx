@@ -48,6 +48,12 @@ import {
 } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
+import { Checkbox } from "@/components/ui/checkbox"
+import type { OrganizationSubscriptionTerms } from "@/lib/organizations/organization-subscription-types"
+import {
+  computeOrganizationSubscriptionTerms,
+  formatDisplayDate,
+} from "@/lib/organizations/organization-subscription-terms"
 import {
   Sheet,
   SheetContent,
@@ -182,6 +188,12 @@ export default function OrganizationsPage() {
   const [inviteRoleId, setInviteRoleId] = useState("")
   const [sendingInvite, setSendingInvite] = useState(false)
 
+  const [loadingBillingTerms, setLoadingBillingTerms] = useState(false)
+  const [savingBillingTerms, setSavingBillingTerms] = useState(false)
+  const [subscriptionStartDate, setSubscriptionStartDate] = useState("")
+  const [threeMonthsFree, setThreeMonthsFree] = useState(false)
+  const [firstYearSpecialRate, setFirstYearSpecialRate] = useState("")
+
   useEffect(() => {
     fetchOrgs()
     loadPlans()
@@ -261,6 +273,94 @@ export default function OrganizationsPage() {
     return result
   }, [organizations, search, activeFilter])
 
+  const billingTermsDraftPreview = useMemo(() => {
+    const plan = plans.find((item) => item.id === selectedOrg?.plan_id)
+    const standardRate = plan?.monthly_price ?? selectedOrg?.mrr ?? 0
+
+    return computeOrganizationSubscriptionTerms(
+      {
+        subscriptionStartDate: subscriptionStartDate || null,
+        complimentaryMonths: threeMonthsFree ? 3 : 0,
+        firstYearSpecialMonthlyRate: firstYearSpecialRate.trim()
+          ? Number(firstYearSpecialRate)
+          : null,
+      },
+      standardRate
+    )
+  }, [
+    plans,
+    selectedOrg?.plan_id,
+    selectedOrg?.mrr,
+    subscriptionStartDate,
+    threeMonthsFree,
+    firstYearSpecialRate,
+  ])
+
+  const loadBillingTerms = async (organizationId: string) => {
+    setLoadingBillingTerms(true)
+    try {
+      const response = await fetch(
+        `/api/platform/organizations/${organizationId}/billing-terms`
+      )
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to load billing terms.")
+      }
+
+      const terms = result.terms as OrganizationSubscriptionTerms
+      setSubscriptionStartDate(terms.subscriptionStartDate || "")
+      setThreeMonthsFree(terms.complimentaryMonths === 3)
+      setFirstYearSpecialRate(
+        terms.firstYearSpecialMonthlyRate == null
+          ? ""
+          : String(terms.firstYearSpecialMonthlyRate)
+      )
+    } catch (error) {
+      console.error(error)
+      setSubscriptionStartDate("")
+      setThreeMonthsFree(false)
+      setFirstYearSpecialRate("")
+    } finally {
+      setLoadingBillingTerms(false)
+    }
+  }
+
+  const saveBillingTerms = async () => {
+    if (!selectedOrg) return
+
+    setSavingBillingTerms(true)
+    try {
+      const response = await fetch(
+        `/api/platform/organizations/${selectedOrg.id}/billing-terms`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            subscriptionStartDate: subscriptionStartDate || null,
+            complimentaryMonths: threeMonthsFree ? 3 : 0,
+            firstYearSpecialMonthlyRate: firstYearSpecialRate.trim()
+              ? Number(firstYearSpecialRate)
+              : null,
+          }),
+        }
+      )
+      const result = await response.json()
+
+      if (!response.ok || !result.success) {
+        alert(result.error || "Failed to save subscription terms.")
+        return
+      }
+
+      alert("Subscription terms saved.")
+    } catch (error) {
+      console.error(error)
+      alert("Unexpected error saving subscription terms.")
+    } finally {
+      setSavingBillingTerms(false)
+    }
+  }
+
   const handleOrgClick = async (org: Organization) => {
     setSelectedOrg(org)
     setSelectedPlanId(org.plan_id || "")
@@ -323,7 +423,10 @@ export default function OrganizationsPage() {
       setLoadingModules(false)
     }
 
-    await loadOrganizationMembers(org.id)
+    await Promise.all([
+      loadOrganizationMembers(org.id),
+      loadBillingTerms(org.id),
+    ])
   }
 
   const loadOrganizationMembers = async (organizationId: string) => {
@@ -1417,6 +1520,93 @@ export default function OrganizationsPage() {
                       Change Plan
                     </Button>
                   </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="space-y-5 pt-4">
+                  <div>
+                    <p className="font-medium">Subscription terms</p>
+                    <p className="text-sm text-muted-foreground">
+                      Set start date, optional complimentary months, and first-year
+                      promotional pricing visible on the organization billing page.
+                    </p>
+                  </div>
+
+                  {loadingBillingTerms ? (
+                    <p className="text-sm text-muted-foreground">Loading subscription terms…</p>
+                  ) : (
+                    <>
+                      <div className="flex flex-col gap-2">
+                        <Label htmlFor="subscription-start-date">Subscription start date</Label>
+                        <Input
+                          id="subscription-start-date"
+                          type="date"
+                          value={subscriptionStartDate}
+                          onChange={(event) => setSubscriptionStartDate(event.target.value)}
+                        />
+                      </div>
+
+                      <div className="flex items-start gap-3 rounded-md border p-3">
+                        <Checkbox
+                          id="three-months-free"
+                          checked={threeMonthsFree}
+                          onCheckedChange={(checked) => setThreeMonthsFree(checked === true)}
+                        />
+                        <div className="space-y-1">
+                          <Label htmlFor="three-months-free" className="cursor-pointer">
+                            3 months free
+                          </Label>
+                          <p className="text-sm text-muted-foreground">
+                            Optional complimentary period before paid billing begins.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-2">
+                        <Label htmlFor="first-year-special-rate">
+                          First year special rate (monthly, optional)
+                        </Label>
+                        <Input
+                          id="first-year-special-rate"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          placeholder="Leave blank to use plan price"
+                          value={firstYearSpecialRate}
+                          onChange={(event) => setFirstYearSpecialRate(event.target.value)}
+                        />
+                        <p className="text-sm text-muted-foreground">
+                          Organizations see this promotional rate for the first subscription year,
+                          then the standard plan price. Pricing may be adjusted after year one.
+                        </p>
+                      </div>
+
+                      {billingTermsDraftPreview.pricingNotes.length > 0 ? (
+                        <div className="rounded-md bg-muted/60 p-3 text-sm text-muted-foreground">
+                          <p className="font-medium text-foreground">Organization preview</p>
+                          <ul className="mt-2 list-disc space-y-1 pl-5">
+                            {billingTermsDraftPreview.pricingNotes.map((note) => (
+                              <li key={note}>{note}</li>
+                            ))}
+                          </ul>
+                          {billingTermsDraftPreview.paidBillingStartsDate ? (
+                            <p className="mt-2">
+                              Paid billing begins{" "}
+                              {formatDisplayDate(billingTermsDraftPreview.paidBillingStartsDate)}
+                            </p>
+                          ) : null}
+                        </div>
+                      ) : null}
+
+                      <Button
+                        onClick={() => void saveBillingTerms()}
+                        disabled={savingBillingTerms}
+                      >
+                        {savingBillingTerms ? "Saving..." : "Save subscription terms"}
+                      </Button>
+                    </>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>

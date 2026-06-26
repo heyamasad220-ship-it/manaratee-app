@@ -2,10 +2,6 @@
 
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import {
-  DonationMetricCard,
-  DonationMetricCardGrid,
-} from "@/components/donations/donation-metric-card"
 import { Badge } from "@/components/ui/badge"
 import {
   Table,
@@ -18,7 +14,6 @@ import {
 import { getDonorPledgeCollectionSummaryAction } from "@/lib/donations/pledge-reminder-actions"
 import { PledgeReminderActions } from "@/components/donations/pledge-reminder-actions"
 import { formatPledgeStatusLabel } from "@/lib/donations/donation-status"
-import { Heart, DollarSign, Mail } from "lucide-react"
 
 type DonorPledgeCollectionPanelProps = {
   donorId: string
@@ -66,38 +61,20 @@ export function DonorPledgeCollectionPanel({
 
   const data = summary.summary
 
+  if (data.activePledges.length === 0 && data.reminderHistory.length === 0) {
+    return null
+  }
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Pledge Collection</CardTitle>
+        <CardTitle className="text-base">Pledge reminders</CardTitle>
         <CardDescription>
-          Active pledges and reminder history from canonical balances
+          Outstanding pledges and reminder history
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <DonationMetricCardGrid colorful columns={3}>
-          <DonationMetricCard
-            title="Active Pledges"
-            value={data.activePledges.length}
-            icon={Heart}
-            accent="blue"
-          />
-          <DonationMetricCard
-            title="Outstanding Balance"
-            value={formatCurrency(data.outstandingBalance)}
-            icon={DollarSign}
-            accent="amber"
-          />
-          <DonationMetricCard
-            title="Last Reminder"
-            value={formatDate(data.lastReminderAt)}
-            icon={Mail}
-            accent="purple"
-            description={`Last contacted: ${formatDate(data.lastContactedAt)}`}
-          />
-        </DonationMetricCardGrid>
-
-        {data.activePledges.length > 0 && (
+        {data.activePledges.length > 0 ? (
           <Table>
             <TableHeader>
               <TableRow>
@@ -131,6 +108,8 @@ export function DonorPledgeCollectionPanel({
               ))}
             </TableBody>
           </Table>
+        ) : (
+          <p className="text-sm text-muted-foreground">No outstanding pledges.</p>
         )}
 
         {data.reminderHistory.length > 0 && (

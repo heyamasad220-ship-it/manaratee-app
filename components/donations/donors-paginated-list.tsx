@@ -2,11 +2,18 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
-import { fetchDonorSummaryPageAction } from "@/lib/donations/donation-list-actions"
+import { fetchDonorSummaryPageAction, type DonorPledgeFilter } from "@/lib/donations/donation-list-actions"
+import { getDonorProfilePath } from "@/lib/donations/donor-profile-path"
 import { DONATIONS_PAGE_SIZE } from "@/lib/donations/donation-pagination"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   Pagination,
   PaginationContent,
@@ -35,6 +42,7 @@ export function DonorsPaginatedList() {
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState("")
   const [debouncedSearch, setDebouncedSearch] = useState("")
+  const [pledgeFilter, setPledgeFilter] = useState<DonorPledgeFilter>("all")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
 
@@ -45,7 +53,7 @@ export function DonorsPaginatedList() {
 
   useEffect(() => {
     setPage(1)
-  }, [debouncedSearch])
+  }, [debouncedSearch, pledgeFilter])
 
   const loadDonors = useCallback(async () => {
     setLoading(true)
@@ -54,6 +62,7 @@ export function DonorsPaginatedList() {
       page,
       pageSize: DONATIONS_PAGE_SIZE,
       search: debouncedSearch || undefined,
+      pledgeFilter: pledgeFilter === "all" ? undefined : pledgeFilter,
       sortBy: "full_name",
     })
 
@@ -66,7 +75,7 @@ export function DonorsPaginatedList() {
       setTotal(result.total)
     }
     setLoading(false)
-  }, [page, debouncedSearch])
+  }, [page, debouncedSearch, pledgeFilter])
 
   useEffect(() => {
     void loadDonors()
@@ -80,11 +89,24 @@ export function DonorsPaginatedList() {
     <div className="p-6 space-y-4">
       <div className="flex flex-wrap items-center gap-3">
         <Input
-          placeholder="Search donors by name or email..."
+          placeholder="Search by name, email, or phone..."
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           className="max-w-sm"
         />
+        <Select
+          value={pledgeFilter}
+          onValueChange={(value) => setPledgeFilter(value as DonorPledgeFilter)}
+        >
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Pledge status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All pledge statuses</SelectItem>
+            <SelectItem value="open_pledge">Open pledge</SelectItem>
+            <SelectItem value="no_open_pledge">No open pledge</SelectItem>
+          </SelectContent>
+        </Select>
         <span className="text-sm text-muted-foreground">
           {total > 0 ? `${rangeStart}–${rangeEnd} of ${total}` : "No donors"}
         </span>
@@ -117,7 +139,7 @@ export function DonorsPaginatedList() {
                   <tr key={donor.id} className="border-b hover:bg-muted/30">
                     <td className="p-3">
                       <Link
-                        href={`/donations/donors/individuals/${donor.id}`}
+                        href={getDonorProfilePath(donor.id, donor.donor_type)}
                         className="font-medium text-primary hover:underline"
                       >
                         {donor.full_name || "Unnamed"}

@@ -6,10 +6,12 @@ type CampaignProgressGaugeProps = {
   raised: number
   goal: number | null
   className?: string
-  size?: "sm" | "md" | "lg"
+  size?: "xs" | "sm" | "md" | "lg"
+  fluid?: boolean
 }
 
 const SIZE_CONFIG = {
+  xs: { width: 180, height: 126, raisedClass: "text-lg", titleClass: "text-xs" },
   sm: { width: 240, height: 168, raisedClass: "text-xl", titleClass: "text-xs" },
   md: { width: 300, height: 210, raisedClass: "text-2xl", titleClass: "text-sm" },
   lg: { width: 360, height: 252, raisedClass: "text-3xl", titleClass: "text-base" },
@@ -56,6 +58,7 @@ export function CampaignProgressGauge({
   goal,
   className,
   size = "md",
+  fluid = false,
 }: CampaignProgressGaugeProps) {
   const config = SIZE_CONFIG[size]
   const normalizedGoal = goal && goal > 0 ? goal : null
@@ -75,7 +78,7 @@ export function CampaignProgressGauge({
   const tickRatios = [0, 0.25, 0.5, 0.75, 1]
 
   return (
-    <div className={cn("flex flex-col items-center", className)}>
+    <div className={cn("flex w-full flex-col items-center", className)}>
       {title ? (
         <p
           className={cn(
@@ -89,8 +92,9 @@ export function CampaignProgressGauge({
 
       <svg
         viewBox="0 0 320 210"
-        width={config.width}
-        height={config.height}
+        width={fluid ? undefined : config.width}
+        height={fluid ? undefined : config.height}
+        className={cn(fluid && "h-auto w-full")}
         role="img"
         aria-label={
           normalizedGoal
