@@ -260,11 +260,11 @@ try {
     if (enrollment?.id) created.enrollments.push(enrollment.id)
 
     await applyProgramParticipantAffiliationMirror(sb, orgId, contact.id)
-    const programRole = await hasRole(sb, orgId, contact.id, "program_participant")
+    const programRole = await hasRole(sb, orgId, contact.id, "customer")
     record(
       "donor-to-program-participant-accumulation",
       donorRole.hasRole && programRole.ok && programRole.hasRole,
-      `donor=${donorRole.hasRole}, program_participant=${programRole.hasRole}`
+      `donor=${donorRole.hasRole}, customer=${programRole.hasRole}`
     )
   }
 
@@ -347,16 +347,16 @@ try {
     if (order?.id) created.orders.push(order.id)
 
     await applyEventAttendeeAffiliationMirror(sb, orgId, contact.id)
-    const attendeeRole = await hasRole(sb, orgId, contact.id, "event_attendee")
+    const attendeeRole = await hasRole(sb, orgId, contact.id, "customer")
     record(
       "donor-to-event-attendee-accumulation",
       donorRole.hasRole && attendeeRole.ok && attendeeRole.hasRole,
-      `donor=${donorRole.hasRole}, event_attendee=${attendeeRole.hasRole}`
+      `donor=${donorRole.hasRole}, customer=${attendeeRole.hasRole}`
     )
     record(
       "volunteer-to-event-attendee-accumulation",
       volunteerRole.hasRole && attendeeRole.ok && attendeeRole.hasRole,
-      `volunteer=${volunteerRole.hasRole}, event_attendee=${attendeeRole.hasRole}`
+      `volunteer=${volunteerRole.hasRole}, customer=${attendeeRole.hasRole}`
     )
   }
 
@@ -377,9 +377,8 @@ try {
       await applyDonorAffiliationMirror(sb, orgId, contact.id)
     } else if (role === "volunteer") {
       await applyVolunteerAffiliationMirror(sb, orgId, contact.id)
-    } else if (role === "program_participant") {
+    } else if (role === "customer") {
       await applyProgramParticipantAffiliationMirror(sb, orgId, contact.id)
-    } else if (role === "event_attendee") {
       await applyEventAttendeeAffiliationMirror(sb, orgId, contact.id)
     }
   }

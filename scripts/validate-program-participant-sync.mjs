@@ -75,7 +75,7 @@ async function cleanup(ids) {
         .from("contact_roles")
         .delete()
         .eq("contact_id", entry.contactId)
-        .eq("role", "program_participant")
+        .eq("role", "customer")
     }
   }
 
@@ -135,15 +135,15 @@ record(
 
 record(
   "program-participant-is-sticky",
-  assertStickyRoleInRules("program_participant"),
-  "program_participant listed in STICKY_DERIVED_ROLES"
+  assertStickyRoleInRules("customer"),
+  "customer listed in STICKY_DERIVED_ROLES"
 )
 
 const schemaCheck = await assertParticipationRolesSchema(sb)
 record(
   "schema-participation-roles",
   schemaCheck.ok,
-  schemaCheck.message || "program_participant allowed in contact_roles"
+  schemaCheck.message || "customer allowed in contact_roles"
 )
 if (!schemaCheck.ok) {
   process.exit(1)
@@ -284,7 +284,7 @@ try {
   )
 
   await applyProgramParticipantAffiliationMirror(sb, orgId, ensured.contactId)
-  const roleAfterEnroll = await hasRole(sb, orgId, ensured.contactId, "program_participant")
+  const roleAfterEnroll = await hasRole(sb, orgId, ensured.contactId, "customer")
   record(
     "enrollment-assigns-program-participant",
     roleAfterEnroll.ok && roleAfterEnroll.hasRole,
@@ -292,7 +292,7 @@ try {
   )
 
   await applyProgramParticipantAffiliationMirror(sb, orgId, ensured.contactId)
-  const duplicateRoleCount = await countRoleRows(sb, orgId, ensured.contactId, "program_participant")
+  const duplicateRoleCount = await countRoleRows(sb, orgId, ensured.contactId, "customer")
   record(
     "duplicate-sync-no-duplicate-role-rows",
     duplicateRoleCount.ok && duplicateRoleCount.count === 1,
@@ -305,7 +305,7 @@ try {
     .eq("id", enrollment.id)
 
   await applyProgramParticipantAffiliationMirror(sb, orgId, ensured.contactId)
-  const roleAfterWithdraw = await hasRole(sb, orgId, ensured.contactId, "program_participant")
+  const roleAfterWithdraw = await hasRole(sb, orgId, ensured.contactId, "customer")
   record(
     "withdrawal-retains-program-participant",
     roleAfterWithdraw.ok && roleAfterWithdraw.hasRole,
@@ -318,7 +318,7 @@ try {
     .eq("id", enrollment.id)
 
   await applyProgramParticipantAffiliationMirror(sb, orgId, ensured.contactId)
-  const roleAfterComplete = await hasRole(sb, orgId, ensured.contactId, "program_participant")
+  const roleAfterComplete = await hasRole(sb, orgId, ensured.contactId, "customer")
   record(
     "completion-retains-program-participant",
     roleAfterComplete.ok && roleAfterComplete.hasRole,

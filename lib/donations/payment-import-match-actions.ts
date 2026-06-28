@@ -1,5 +1,6 @@
 "use server"
 
+import { findOrCreateContact } from "@/lib/contacts/contact-actions"
 import { handleDonationAffiliationSync } from "@/lib/contacts/contact-affiliation-sync"
 import { requireDonationStaffAccess } from "@/lib/donations/donation-action-auth"
 import { ensureDonorExtensionForContact } from "@/lib/donations/donor-contact-bridge"
@@ -7,8 +8,11 @@ import {
   buildContactLookupIndex,
   buildContactSearchFilter,
   buildManualSearchFilter,
+  canAutoCreateContactFromPaymentHints,
   findAutoMatchForPayment,
   getNameParts,
+  guessImportContactType,
+  normalizeName,
   rankContactMatches,
   resolvePaymentMatchHints,
   type ContactLookupIndex,
@@ -889,7 +893,10 @@ async function bulkEnsureDonorExtensions(
       email: contact.email as string | null,
       phone: contact.phone as string | null,
       donor_type:
-        (contact.contact_type as string | null) === "organization" ? "organization" : "individual",
+        (contact.contact_type as string | null) === "organization" ||
+        (contact.contact_type as string | null) === "group"
+          ? "organization"
+          : "individual",
       status: "active",
     }))
 
@@ -922,6 +929,7 @@ export type BulkAutoMatchInput = {
   importBatchId?: string | null
   limit?: number
   autoAllocatePledge?: boolean
+  autoCreateContacts?: boolean
 }
 
 export async function bulkAutoMatchImportPaymentsAction(input: BulkAutoMatchInput = {}) {
@@ -931,6 +939,7 @@ export async function bulkAutoMatchImportPaymentsAction(input: BulkAutoMatchInpu
   const minScore = input.minScore ?? 85
   const limit = Math.min(input.limit ?? BULK_AUTO_MATCH_PAYMENT_BATCH, BULK_AUTO_MATCH_PAYMENT_BATCH)
   const autoAllocatePledge = input.autoAllocatePledge !== false
+  const autoCreateContacts = input.autoCreateContacts !== false
 
   try {
     let contactIndex: ContactLookupIndex | null = null
@@ -967,6 +976,8 @@ export async function bulkAutoMatchImportPaymentsAction(input: BulkAutoMatchInpu
 
     const toMatch: Array<{ paymentId: string; contactId: string }> = []
     let skipped = 0
+    let contactsCreated = 0
+    const autoCreatedContactByName = new Map<string, string>()
 
     for (const payment of pendingPayments || []) {
       const hints = resolvePaymentMatchHints({
@@ -982,12 +993,45 @@ export async function bulkAutoMatchImportPaymentsAction(input: BulkAutoMatchInpu
         minScore
       )
 
-      if (!match) {
+      let contactId = match?.contactId ?? null
+
+      if (
+        !contactId &&
+        autoCreateContacts &&
+        canAutoCreateContactFromPaymentHints(hints)
+      ) {
+        const nameKey = normalizeName(hints.senderName)
+        const cachedContactId = autoCreatedContactByName.get(nameKey)
+
+        if (cachedContactId) {
+          contactId = cachedContactId
+        } else {
+          try {
+            const created = await findOrCreateContact({
+              organizationId: access.orgId,
+              fullName: hints.senderName,
+              contactType: guessImportContactType(hints.senderName),
+            })
+
+            contactId = created.contactId
+            autoCreatedContactByName.set(nameKey, created.contactId)
+
+            if (created.created) {
+              contactsCreated += 1
+            }
+          } catch (error) {
+            skipped += 1
+            continue
+          }
+        }
+      }
+
+      if (!contactId) {
         skipped += 1
         continue
       }
 
-      toMatch.push({ paymentId: payment.id as string, contactId: match.contactId })
+      toMatch.push({ paymentId: payment.id as string, contactId })
     }
 
     if (toMatch.length === 0) {
@@ -1002,6 +1046,7 @@ export async function bulkAutoMatchImportPaymentsAction(input: BulkAutoMatchInpu
         allocated: 0,
         matchedUnallocated: 0,
         skipped,
+        contactsCreated,
         remaining,
         errors: [] as string[],
       }
@@ -1011,7 +1056,7 @@ export async function bulkAutoMatchImportPaymentsAction(input: BulkAutoMatchInpu
     donorsByContactId = await bulkEnsureDonorExtensions(
       access.supabase,
       access.orgId,
-      contactIds,
+      [...new Set([...contactIds, ...autoCreatedContactByName.values()])],
       donorsByContactId!
     )
 
@@ -1107,6 +1152,7 @@ export async function bulkAutoMatchImportPaymentsAction(input: BulkAutoMatchInpu
       allocated,
       matchedUnallocated,
       skipped,
+      contactsCreated,
       remaining,
       errors: [] as string[],
     }

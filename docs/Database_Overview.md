@@ -83,6 +83,8 @@ organization_modules.module_id → modules.id
 * contacts
 * contact_notes
 * contact_roles
+* contact_group_members
+* contact_payment_methods
 * organization_affiliation_settings
 * person_relationships
 * person_tags
@@ -98,6 +100,11 @@ contact_notes.contact_id → contacts.id
 contact_notes.organization_id → organizations.id
 contact_roles.contact_id → contacts.id
 contact_roles.organization_id → organizations.id
+contact_group_members.group_contact_id → contacts.id
+contact_group_members.member_contact_id → contacts.id
+contact_group_members.organization_id → organizations.id
+contact_payment_methods.contact_id → contacts.id
+contact_payment_methods.organization_id → organizations.id
 organization_affiliation_settings.organization_id → organizations.id
 person_relationships.organization_id → organizations.id
 person_relationships.person_id → people.id
@@ -107,17 +114,26 @@ person_tags.tag_id → discount_tags.id
 discount_tags.organization_id → organizations.id
 ```
 
-**Participation roles (migration `101_contact_participation_roles.sql`):** `contact_roles.role` CHECK includes `program_participant`, `event_attendee`, `venue_rental_customer` (alongside donor, customer, volunteer, employee, member, vendor, service_provider, childcare_provider). Run after `100_stripe_recurring_donations.sql`.
+**Customer role (migration `137_customer_role_merge.sql`):** Unified `customer` role replaces legacy `program_participant`, `event_attendee`, and `venue_rental_customer`. Derivation: non-terminal program enrollment, completed ticket order, or venue rental with `billing_contact_id`. Sticky once earned. Org auto-sync settings for the old roles migrate to `customer`. Run after `136_payment_attributed_group.sql`.
+
+**Participation roles (superseded by `137`):** Migration `101_contact_participation_roles.sql` originally added separate participation roles; `137` consolidates them into `customer`.
+
+**Contact record types (migration `132_contact_type_group.sql`):** `contacts.contact_type` CHECK — `individual` (person), `organization` (external entity), `group` (internal collective: halaqa, committee) with optional `primary_contact_name`. Group donor rows use `donors.donor_type = 'organization'`. Patch `sync_contact_affiliations` for groups: migration `133_sync_contact_affiliations_group.sql`.
+
+**Group membership (migration `135_contact_group_members.sql`):** `contact_group_members` links individuals to group contacts (`group_contact_id`, `member_contact_id`, `status`). Group gifts on group Financial tab; member gifts attributed via `payments.attributed_group_contact_id` (migration **`136_payment_attributed_group.sql`**) roll up for group competition; auto-membership when a group is selected on a gift. UI: group **Overview → Group Members**; person **Overview → Groups**; optional group picker on **Record Payment**. Server: `lib/contacts/group-members-load-action.ts`, `lib/contacts/group-membership-data.ts`, `lib/contacts/group-member-actions.ts`, `lib/contacts/group-giving-actions.ts`.
+
+**Contact payment methods (migration `138_contact_payment_methods.sql`):** `contact_payment_methods` stores cards on file for a contact (brand, last4, expiry, cardholder, default flag). Staff add cards from contact profile **Financial → Payment methods** via **Add Card** (full PAN and CVV collected at save only; only last 4 + MM/YYYY expiration persist). Server: `lib/contacts/contact-payment-method-actions.ts`, `lib/contacts/contact-payment-method-validation.ts`, `components/contacts/contact-payment-methods-panel.tsx`. Run after `137_customer_role_merge.sql`.
 
 **Phase 1 identity linkage (June 2026):**
 
 | Table / column | Purpose |
 |----------------|---------|
 | `contacts.person_id` | Canonical person ↔ contact link (family, participants) |
-| `program_enrollments.participant_contact_id` | Program participant identity + `program_participant` derivation |
+| `program_enrollments.participant_contact_id` | Program participant identity + **Customer** derivation |
 | `program_enrollments.registrant_contact_id` | Guardian/registrant (preserved separately from participant) |
 | `program_enrollments.payer_contact_id` | Payer (preserved separately from participant) |
-| `ticket_orders.contact_id` | Ticketing purchaser identity + `event_attendee` derivation |
+| `ticket_orders.contact_id` | Ticketing purchaser identity + **Customer** derivation |
+| `venue_rentals.billing_contact_id` | Venue rental billing contact + **Customer** derivation |
 | `donors.contact_id` | Donor extension (pledges/payments FK); `donor` affiliation requires a payment |
 | `volunteers.contact_id` | Volunteer roster + `volunteer` derivation |
 
@@ -249,9 +265,9 @@ program_financial_assistance_status_history.financial_assistance_id → program_
 
 **Dev seed:** `scripts/seed-donations-dev.mjs` inserts test data into canonical tables only (see `docs/Features.md` Donations section). Does not migrate `backup_*` or legacy `donation_*` rows.
 
-**`payments.source` constraint:** lowercase channel keys only (`cash`, `check`, `zelle`, `venmo`, `paypal`, `stripe`, `import`, `manual`). Customer portal normalizes configured payment method display names via `lib/donations/payment-source-channel.ts` before insert.
+**`payments.source` constraint (patch `131_payments_source_square.sql`):** lowercase channel keys (`cash`, `check`, **`square`**, `zelle`, `venmo`, `paypal`, `stripe`, `import`, `manual`). **`square`** = Square terminal batch deposit on a campaign (no donor/contact). Campaign overview classifies via memo `|batch|square|` or `source = square`. Customer portal normalizes configured payment method display names via `lib/donations/payment-source-channel.ts` before insert.
 
-* campaigns (`goal_amount`, `description`, `start_date`, `end_date`, `status`, `code`)
+* campaigns (`goal_amount`, `description`, `start_date`, `end_date`, `status`, `code`, `overview_metric_keys` — migration `134`)
 * donors
 * donation_categories
 * donation_subcategories
@@ -293,6 +309,10 @@ npm run validate:donations-security
 **Pilot blocker view fixes (migration `119_donations_pilot_blocker_views.sql`):** `pledge_status_view` excludes voided payments from pledge balances; cancelled pledges expose `calculated_status = cancelled` and `balance_remaining = 0`. `donor_summary_view` excludes voided from `total_donations`.
 
 **Outstanding pledge flag (migration `124_donor_summary_outstanding_pledge.sql`):** `donor_summary_view.has_open_pledge` is true only when `pledge_status_view.balance_remaining > 0`. Backfills `pledges.status` from payment totals; trigger `sync_pledge_status_after_payment_change` keeps status in sync on payment changes.
+
+**Donor giving report RPCs (migration `127_donor_giving_report.sql`, patch `128_donor_giving_report_contact_id.sql`):** `donation_donor_giving_report` (paginated rows with optional payment date range, donor type, lapsed-only, pledge filters, outstanding pledge balance, **contact_id**) and `donation_donor_giving_report_summary` (aggregate donor count / total given / gift count). Used by Reports → Donors (`/donations/reports/donors`).
+
+**People donor filter (migration `129_donor_giving_contact_search.sql`, grants `130_donor_giving_rpc_grants.sql`):** `search_donor_giving_contact_ids` — contacts with at least one non-voided payment (direct or via `donors.contact_id`). Run **`130`** so authenticated app users can call the RPC (without it, People falls back to ~95 affiliation tags). **Link orphan donors to People:** `node scripts/link-orphan-donors-to-contacts.mjs --execute` then `node scripts/sync-donor-affiliations.mjs --execute`.
 
 **Payment refunds / net totals (migration `125_payment_refunds_net_amounts.sql`):** `payment_net_amount(amount, refunded_amount)` helper. Views and dashboard RPCs use net amounts. `refresh_pledge_status` and payment trigger include `refunded_amount`. Status values `partially_refunded` and `refunded` on `payments`.
 

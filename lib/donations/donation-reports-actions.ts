@@ -1,11 +1,16 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import type { SupabaseClient } from "@supabase/supabase-js"
 
 import { requireDonationStaffAccess } from "@/lib/donations/donation-action-auth"
 import {
+  buildPledgeCampaignMap,
+  computeCampaignSourceBreakdown,
+  fetchCampaignAnalyticsData,
   fetchCampaignAnalyticsEntries,
   fetchCampaignDonorInsights,
+  fetchCampaignOutstandingPledges,
   fetchDonorTaxYearTotals,
   fetchOrgReportsOverview,
   fetchRecurringReportSummary,
@@ -13,12 +18,54 @@ import {
   type CampaignRow,
 } from "@/lib/donations/campaign-analytics"
 import {
+  normalizeCampaignOverviewMetricKeys,
+  parseCampaignOverviewMetricKeys,
+  type CampaignOverviewMetricKey,
+} from "@/lib/donations/campaign-overview-metrics"
+import {
   fetchDonorSummaryPageAction,
   fetchPaymentsPageAction,
 } from "@/lib/donations/donation-list-actions"
 import { DONATIONS_PAGE_SIZE } from "@/lib/donations/donation-pagination"
 import { getPledgeCollectionReportAction } from "@/lib/donations/pledge-reminder-actions"
 import { getReceiptReportingSummaryAction } from "@/lib/donations/receipt-actions"
+
+const CAMPAIGN_SELECT =
+  "id, organization_id, name, code, description, goal_amount, start_date, end_date, status, created_at, overview_metric_keys"
+
+const CAMPAIGN_SELECT_LEGACY =
+  "id, organization_id, name, code, description, goal_amount, start_date, end_date, status, created_at"
+
+async function fetchCampaignRow(
+  supabase: SupabaseClient,
+  orgId: string,
+  campaignId: string
+) {
+  const withMetrics = await supabase
+    .from("campaigns")
+    .select(CAMPAIGN_SELECT)
+    .eq("organization_id", orgId)
+    .eq("id", campaignId)
+    .maybeSingle()
+
+  if (!withMetrics.error) {
+    return withMetrics
+  }
+
+  if (
+    withMetrics.error.code === "42703" ||
+    /overview_metric_keys/i.test(withMetrics.error.message || "")
+  ) {
+    return supabase
+      .from("campaigns")
+      .select(CAMPAIGN_SELECT_LEGACY)
+      .eq("organization_id", orgId)
+      .eq("id", campaignId)
+      .maybeSingle()
+  }
+
+  return withMetrics
+}
 
 export async function getCampaignAnalyticsAction() {
   const access = await requireDonationStaffAccess("view")
@@ -37,14 +84,11 @@ export async function getCampaignDetailAction(campaignId: string) {
   if (!access.ok) return { success: false as const, error: access.error }
 
   try {
-    const { data: campaign, error } = await access.supabase
-      .from("campaigns")
-      .select(
-        "id, organization_id, name, code, description, goal_amount, start_date, end_date, status, created_at"
-      )
-      .eq("organization_id", access.orgId)
-      .eq("id", campaignId)
-      .maybeSingle()
+    const { data: campaign, error } = await fetchCampaignRow(
+      access.supabase,
+      access.orgId,
+      campaignId
+    )
 
     if (error || !campaign) {
       return { success: false as const, error: error?.message || "Campaign not found" }
@@ -75,11 +119,35 @@ export async function getCampaignDetailAction(campaignId: string) {
       campaignId
     )
 
+    const analyticsData = await fetchCampaignAnalyticsData(access.supabase, access.orgId)
+    if (analyticsData.error) {
+      return { success: false as const, error: analyticsData.error }
+    }
+
+    const sourceBreakdown = computeCampaignSourceBreakdown(
+      campaignId,
+      campaign.goal_amount,
+      analyticsData.pledges,
+      analyticsData.payments,
+      buildPledgeCampaignMap(analyticsData.pledges)
+    )
+
+    const outstandingPledges = await fetchCampaignOutstandingPledges(
+      access.supabase,
+      access.orgId,
+      campaignId
+    )
+
     return {
       success: true as const,
       campaign: campaign as CampaignRow,
+      overviewMetricKeys: parseCampaignOverviewMetricKeys(
+        "overview_metric_keys" in campaign ? campaign.overview_metric_keys : null
+      ),
       entry,
       insights,
+      sourceBreakdown,
+      outstandingPledges,
       canManage: access.canManage,
     }
   } catch (error) {
@@ -132,9 +200,7 @@ export async function updateCampaignAction(
       })
       .eq("organization_id", access.orgId)
       .eq("id", campaignId)
-      .select(
-        "id, organization_id, name, code, description, goal_amount, start_date, end_date, status, created_at"
-      )
+      .select(CAMPAIGN_SELECT)
       .maybeSingle()
 
     if (error || !campaign) {
@@ -146,6 +212,48 @@ export async function updateCampaignAction(
     revalidatePath("/donations/settings")
 
     return { success: true as const, campaign: campaign as CampaignRow }
+  } catch (error) {
+    return { success: false as const, error: (error as Error).message }
+  }
+}
+
+export async function updateCampaignOverviewMetricsAction(
+  campaignId: string,
+  overviewMetricKeys: CampaignOverviewMetricKey[] | null
+) {
+  const access = await requireDonationStaffAccess("manage")
+  if (!access.ok) return { success: false as const, error: access.error }
+
+  const normalized =
+    overviewMetricKeys == null ? null : normalizeCampaignOverviewMetricKeys(overviewMetricKeys)
+
+  if (normalized != null && normalized.length === 0) {
+    return { success: false as const, error: "Select at least one metric or use automatic mode." }
+  }
+
+  try {
+    const { data: campaign, error } = await access.supabase
+      .from("campaigns")
+      .update({ overview_metric_keys: normalized })
+      .eq("organization_id", access.orgId)
+      .eq("id", campaignId)
+      .select(CAMPAIGN_SELECT)
+      .maybeSingle()
+
+    if (error || !campaign) {
+      return {
+        success: false as const,
+        error: error?.message || "Failed to update campaign overview metrics",
+      }
+    }
+
+    revalidatePath("/donations/campaigns")
+    revalidatePath(`/donations/campaigns/${campaignId}`)
+
+    return {
+      success: true as const,
+      overviewMetricKeys: parseCampaignOverviewMetricKeys(campaign.overview_metric_keys),
+    }
   } catch (error) {
     return { success: false as const, error: (error as Error).message }
   }

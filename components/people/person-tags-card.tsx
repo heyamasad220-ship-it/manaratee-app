@@ -2,11 +2,11 @@
 
 import * as React from "react"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { createClient } from "@/lib/supabase/client"
-import { addPersonTag, removePersonTag } from "@/lib/people/person-tag-actions"
+import { type ContactRoleValue } from "@/lib/contacts/contact-constants"
+import { matchDiscountTagsForRoles } from "@/lib/contacts/contact-discount-tag-mapping"
 import { CONTACTS_MODULE_LABEL } from "@/lib/contacts/contact-module-label"
+import { createClient } from "@/lib/supabase/client"
 import { Loader2, Tags } from "lucide-react"
 
 type DiscountTag = {
@@ -17,79 +17,50 @@ type DiscountTag = {
 }
 
 type PersonTagsCardProps = {
-  contactId: string
-  personId?: string | null
+  roles: ContactRoleValue[]
 }
 
-export function PersonTagsCard({ contactId, personId }: PersonTagsCardProps) {
+export function PersonTagsCard({ roles }: PersonTagsCardProps) {
   const supabase = React.useMemo(() => createClient(), [])
 
   const [loading, setLoading] = React.useState(true)
-  const [savingTagId, setSavingTagId] = React.useState<string | null>(null)
   const [tags, setTags] = React.useState<DiscountTag[]>([])
-  const [selectedTagIds, setSelectedTagIds] = React.useState<string[]>([])
-
-  const loadTags = React.useCallback(async () => {
-    setLoading(true)
-
-    const { data: tagData, error: tagError } = await supabase
-      .from("discount_tags")
-      .select("id, name, description, active")
-      .eq("active", true)
-      .order("name", { ascending: true })
-
-    if (tagError) {
-      console.error("Error loading discount tags:", tagError)
-      setTags([])
-      setSelectedTagIds([])
-      setLoading(false)
-      return
-    }
-
-    setTags(tagData || [])
-
-    if (!personId) {
-      setSelectedTagIds([])
-      setLoading(false)
-      return
-    }
-
-    const { data: selectedData, error: selectedError } = await supabase
-      .from("person_tags")
-      .select("tag_id")
-      .eq("person_id", personId)
-
-    if (selectedError) {
-      console.error("Error loading person tags:", selectedError)
-      setSelectedTagIds([])
-    } else {
-      setSelectedTagIds((selectedData || []).map((row) => row.tag_id))
-    }
-
-    setLoading(false)
-  }, [personId, supabase])
 
   React.useEffect(() => {
-    loadTags()
-  }, [loadTags])
+    let cancelled = false
 
-  async function toggleTag(tagId: string) {
-    const isSelected = selectedTagIds.includes(tagId)
+    async function loadTags() {
+      setLoading(true)
 
-    setSavingTagId(tagId)
+      const { data: tagData, error: tagError } = await supabase
+        .from("discount_tags")
+        .select("id, name, description, active")
+        .eq("active", true)
+        .order("name", { ascending: true })
 
-    try {
-      if (isSelected) {
-        await removePersonTag(contactId, tagId)
-        setSelectedTagIds((current) => current.filter((id) => id !== tagId))
+      if (cancelled) return
+
+      if (tagError) {
+        console.error("Error loading discount tags:", tagError)
+        setTags([])
       } else {
-        await addPersonTag(contactId, tagId)
-        setSelectedTagIds((current) => [...current, tagId])
+        setTags(tagData || [])
       }
-    } finally {
-      setSavingTagId(null)
+
+      setLoading(false)
     }
-  }
+
+    void loadTags()
+
+    return () => {
+      cancelled = true
+    }
+  }, [supabase])
+
+  const appliedTags = React.useMemo(
+    () => matchDiscountTagsForRoles(roles, tags),
+    [roles, tags]
+  )
 
   return (
     <Card>
@@ -99,7 +70,8 @@ export function PersonTagsCard({ contactId, personId }: PersonTagsCardProps) {
           <CardTitle>Discount Tags</CardTitle>
         </div>
         <CardDescription>
-          Assign eligibility tags such as Staff, Member, Volunteer, or Scholarship.
+          Applied automatically from contact roles and activity (Staff, Member, Volunteer, Donor,
+          etc.).
         </CardDescription>
       </CardHeader>
 
@@ -111,45 +83,22 @@ export function PersonTagsCard({ contactId, personId }: PersonTagsCardProps) {
           </div>
         ) : tags.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No active discount tags found. Create tags under {CONTACTS_MODULE_LABEL} → Settings → Discount Tags.
+            No active discount tags found. Create tags under {CONTACTS_MODULE_LABEL} → Settings →
+            Discount Tags.
+          </p>
+        ) : appliedTags.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No discount tags apply yet. Tags appear when matching roles are earned from activity.
           </p>
         ) : (
           <div className="flex flex-wrap gap-2">
-            {tags.map((tag) => {
-              const isSelected = selectedTagIds.includes(tag.id)
-              const isSaving = savingTagId === tag.id
-
-              return (
-                <Button
-                  key={tag.id}
-                  type="button"
-                  variant={isSelected ? "default" : "outline"}
-                  size="sm"
-                  disabled={isSaving}
-                  onClick={() => toggleTag(tag.id)}
-                  className="gap-2"
-                >
-                  {isSaving ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : null}
-                  {tag.name}
-                </Button>
-              )
-            })}
+            {appliedTags.map((tag) => (
+              <Badge key={tag.id} variant="secondary">
+                {tag.name}
+              </Badge>
+            ))}
           </div>
         )}
-
-        {selectedTagIds.length > 0 ? (
-          <div className="mt-4 flex flex-wrap gap-2">
-            {tags
-              .filter((tag) => selectedTagIds.includes(tag.id))
-              .map((tag) => (
-                <Badge key={tag.id} variant="secondary">
-                  {tag.name}
-                </Badge>
-              ))}
-          </div>
-        ) : null}
       </CardContent>
     </Card>
   )

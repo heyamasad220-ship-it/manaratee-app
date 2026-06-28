@@ -140,7 +140,7 @@ export function QuickAddContactDialog({
         <DialogHeader>
           <DialogTitle>Add Contact</DialogTitle>
           <DialogDescription>
-            Create a person or organization for this pledge. The Donor affiliation is added after
+            Create a person or organization for this pledge. The Donor role is added after
             the first payment, not when the pledge is saved.
           </DialogDescription>
         </DialogHeader>

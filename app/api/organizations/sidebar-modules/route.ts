@@ -2,6 +2,7 @@ import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 
 import { loadOrganizationSidebarModules } from "@/lib/organizations/load-organization-sidebar-modules"
+import { buildSidebarPermissionContext } from "@/lib/organizations/sidebar-nav-context"
 import { isCurrentUserPlatformAdmin } from "@/lib/platform/is-platform-admin-user"
 import { getPlatformAdminOrgAccessOrganizationId } from "@/lib/platform/platform-org-access"
 import { getServiceRoleClient } from "@/lib/platform/require-platform-admin"
@@ -38,13 +39,24 @@ export async function GET() {
   const { organizationId, platformSupportMode } = await resolveOrganizationId()
 
   if (!organizationId) {
-    return NextResponse.json({ modules: [], platformSupportMode: false })
+    return NextResponse.json({
+      modules: [],
+      platformSupportMode: false,
+      permissionContext: {
+        isOwner: false,
+        isSuperAdmin: false,
+        enabledPermissions: [],
+      },
+    })
   }
+
+  let membershipRole: string | null = null
+  let membershipRoleId: string | null = null
 
   if (!platformSupportMode) {
     const { data: membership, error } = await supabase
       .from("organization_members")
-      .select("organization_id")
+      .select("organization_id, role, role_id")
       .eq("organization_id", organizationId)
       .eq("user_id", user.id)
       .eq("status", "active")
@@ -53,13 +65,26 @@ export async function GET() {
     if (error || !membership) {
       return NextResponse.json({ error: "Forbidden." }, { status: 403 })
     }
+
+    membershipRole = (membership.role as string | null) ?? null
+    membershipRoleId = (membership.role_id as string | null) ?? null
   }
 
   try {
     const admin = getServiceRoleClient()
-    const modules = await loadOrganizationSidebarModules(admin, organizationId)
+    const [modules, permissionContext] = await Promise.all([
+      loadOrganizationSidebarModules(admin, organizationId),
+      buildSidebarPermissionContext({
+        supabase,
+        organizationId,
+        userId: user.id,
+        membershipRole,
+        membershipRoleId,
+        platformSupportMode,
+      }),
+    ])
 
-    return NextResponse.json({ modules, platformSupportMode })
+    return NextResponse.json({ modules, platformSupportMode, permissionContext })
   } catch (error) {
     console.error("sidebar-modules GET failed:", error)
     return NextResponse.json(

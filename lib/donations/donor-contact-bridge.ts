@@ -48,7 +48,9 @@ export async function ensureDonorExtensionForContact(
 
   const row = contact as ContactRow
   const donorType =
-    row.contact_type === "organization" ? "organization" : "individual"
+    row.contact_type === "organization" || row.contact_type === "group"
+      ? "organization"
+      : "individual"
 
   const { data: created, error: insertError } = await supabase
     .from("donors")

@@ -11,12 +11,12 @@ export default function DashboardLayout({
   return (
     <SidebarProvider>
       <DashboardAccessGuard />
-      <div className="flex h-screen overflow-hidden">
+      <div className="fixed inset-0 flex overflow-hidden">
         <Sidebar />
         <ModuleSubNav />
         <MobileSidebar />
 
-        <main className="flex flex-1 flex-col overflow-auto bg-background">
+        <main className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain bg-background">
           <PlatformSupportBanner />
           <OrgUserSupportBanner />
           {children}

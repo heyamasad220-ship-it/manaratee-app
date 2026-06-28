@@ -8,11 +8,17 @@ export type DonationReportsTab = {
   label: string
   href: string
   matchPrefix: string
+  extraMatchPrefixes?: string[]
   exact?: boolean
 }
 
 export const DONATION_REPORTS_TABS: DonationReportsTab[] = [
-  { label: "Donors", href: "/donations/donors", matchPrefix: "/donations/donors" },
+  {
+    label: "Donors",
+    href: "/donations/reports/donors",
+    matchPrefix: "/donations/reports/donors",
+    extraMatchPrefixes: ["/donations/donors/individuals", "/donations/donors/organizations"],
+  },
   {
     label: "Receipts",
     href: "/donations/reports/receipts",
@@ -20,18 +26,26 @@ export const DONATION_REPORTS_TABS: DonationReportsTab[] = [
   },
 ]
 
+function tabPathMatches(tab: DonationReportsTab, pathname: string) {
+  if (tab.exact) return pathname === tab.href
+
+  if (pathname === tab.href || pathname.startsWith(`${tab.matchPrefix}/`)) {
+    return true
+  }
+
+  return (tab.extraMatchPrefixes ?? []).some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  )
+}
+
 function isTabActive(tab: DonationReportsTab, pathname: string, tabs: DonationReportsTab[]) {
-  const matches = tab.exact
-    ? pathname === tab.href
-    : pathname === tab.href || pathname.startsWith(`${tab.matchPrefix}/`)
+  const matches = tabPathMatches(tab, pathname)
 
   if (!matches) return false
 
   const overridden = tabs.some((other) => {
     if (other.href === tab.href) return false
-    const otherMatches = other.exact
-      ? pathname === other.href
-      : pathname === other.href || pathname.startsWith(`${other.matchPrefix}/`)
+    const otherMatches = tabPathMatches(other, pathname)
     return otherMatches && other.matchPrefix.length > tab.matchPrefix.length
   })
 

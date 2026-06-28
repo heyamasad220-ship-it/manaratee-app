@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Calendar, DollarSign, Heart, Mail } from "lucide-react"
+import { Calendar, DollarSign, Heart } from "lucide-react"
 import {
   DonationMetricCard,
   DonationMetricCardGrid,
@@ -28,15 +28,6 @@ function formatCurrency(amount: number) {
   }).format(amount)
 }
 
-function formatDate(value: string | null) {
-  if (!value) return "—"
-  return new Date(value).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  })
-}
-
 export function DonorProfileMetrics({
   donorId,
   totalDonations,
@@ -48,8 +39,6 @@ export function DonorProfileMetrics({
   const [pledgeLoading, setPledgeLoading] = useState(true)
   const [pledgeCount, setPledgeCount] = useState(0)
   const [outstandingBalance, setOutstandingBalance] = useState(0)
-  const [lastReminderAt, setLastReminderAt] = useState<string | null>(null)
-  const [lastContactedAt, setLastContactedAt] = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -61,8 +50,6 @@ export function DonorProfileMetrics({
 
       if (summaryResult.success) {
         setOutstandingBalance(summaryResult.summary.outstandingBalance)
-        setLastReminderAt(summaryResult.summary.lastReminderAt)
-        setLastContactedAt(summaryResult.summary.lastContactedAt)
       }
 
       if (pledgesResult.success) {
@@ -75,7 +62,7 @@ export function DonorProfileMetrics({
   }, [donorId])
 
   return (
-    <DonationMetricCardGrid colorful columns={3} className="mb-6">
+    <DonationMetricCardGrid colorful columns={5} className="mb-6">
       <DonationMetricCard
         title="Total Donations"
         value={formatCurrency(totalDonations)}
@@ -120,15 +107,6 @@ export function DonorProfileMetrics({
         icon={DollarSign}
         accent="amber"
         description="Yet to be collected"
-      />
-      <DonationMetricCard
-        title="Last Reminder"
-        value={pledgeLoading ? "—" : formatDate(lastReminderAt)}
-        icon={Mail}
-        accent="rose"
-        description={
-          pledgeLoading ? "" : `Last contacted: ${formatDate(lastContactedAt)}`
-        }
       />
     </DonationMetricCardGrid>
   )

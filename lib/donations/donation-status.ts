@@ -26,6 +26,30 @@ export function formatPaymentStatusLabel(status: string | null | undefined): str
   return normalized.replaceAll("_", " ")
 }
 
+/** Staff-facing label for the payments list pledge column (Yes / No). */
+export function formatPaymentPledgeColumnLabel(status: string | null | undefined): string {
+  const normalized = normalizePaymentStatus(status)
+
+  switch (normalized) {
+    case "allocated":
+      return "Yes"
+    case "unallocated":
+      return "No"
+    case "pending_review":
+      return "Pending review"
+    case "unresolved":
+      return "Unresolved"
+    case "voided":
+      return "Voided"
+    case "refunded":
+      return "Refunded"
+    case "partially_refunded":
+      return "Partially refunded"
+    default:
+      return formatPaymentStatusLabel(status)
+  }
+}
+
 export function pledgeDisplayStatus(
   status: string | null | undefined,
   amountPledged: number,

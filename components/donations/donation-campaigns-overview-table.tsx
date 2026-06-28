@@ -34,8 +34,13 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { CampaignProgressBar } from "@/components/donations/campaign-progress-bar"
 import {
+  PledgeSummaryMetricCards,
+  type PledgeSummaryMetrics,
+} from "@/components/donations/pledge-summary-metric-cards"
+import {
   formatDonationCurrency,
 } from "@/lib/donations/campaign-analytics"
+import { fetchPledgeSummaryMetricsAction } from "@/lib/donations/donation-list-actions"
 import { getCampaignAnalyticsAction } from "@/lib/donations/donation-reports-actions"
 import { createClient } from "@/lib/supabase/client"
 
@@ -116,6 +121,14 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
     endDate: "",
     status: "Draft" as CampaignStatus,
   })
+  const [summaryMetrics, setSummaryMetrics] = useState<PledgeSummaryMetrics>({
+    totalPledged: 0,
+    totalCollected: 0,
+    outstandingBalance: 0,
+    activePledgeCount: 0,
+    pledgeCount: 0,
+  })
+  const [metricsLoading, setMetricsLoading] = useState(true)
 
   async function getOrganizationId() {
     const {
@@ -136,6 +149,19 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
     }
 
     return data?.organization_id || null
+  }
+
+  async function loadSummaryMetrics() {
+    setMetricsLoading(true)
+    const result = await fetchPledgeSummaryMetricsAction()
+
+    if (result.success) {
+      setSummaryMetrics(result.metrics)
+    } else {
+      setErrorMessage(result.error)
+    }
+
+    setMetricsLoading(false)
   }
 
   async function loadCampaigns() {
@@ -167,6 +193,7 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
 
   useEffect(() => {
     void loadCampaigns()
+    void loadSummaryMetrics()
   }, [])
 
   useEffect(() => {
@@ -261,6 +288,7 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
     setShowCampaignDialog(false)
     setEditingCampaign(null)
     await loadCampaigns()
+    await loadSummaryMetrics()
   }
 
   async function handleDeleteCampaign(campaignId: string) {
@@ -277,6 +305,7 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
     }
 
     await loadCampaigns()
+    await loadSummaryMetrics()
   }
 
   function openCreateDialog() {
@@ -289,7 +318,7 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-base font-semibold text-foreground">Donation Campaigns</h3>
+            <h3 className="text-base font-semibold text-foreground">Fundraising Campaigns</h3>
             <p className="text-sm text-muted-foreground">Create and manage fundraising campaigns</p>
             {errorMessage ? <p className="mt-2 text-sm text-red-600">{errorMessage}</p> : null}
           </div>
@@ -300,6 +329,12 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
             </Button>
           ) : null}
         </div>
+
+        {metricsLoading ? (
+          <p className="text-sm text-muted-foreground">Loading pledge summary...</p>
+        ) : (
+          <PledgeSummaryMetricCards metrics={summaryMetrics} />
+        )}
 
         <Card className="border border-border shadow-sm">
           <CardHeader className="sr-only">

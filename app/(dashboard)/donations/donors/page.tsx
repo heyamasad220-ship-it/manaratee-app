@@ -1,11 +1,5 @@
-import { Header } from "@/components/layout/header"
-import { DonorsPaginatedList } from "@/components/donations/donors-paginated-list"
+import { redirect } from "next/navigation"
 
 export default function DonationsDonorsPage() {
-  return (
-    <>
-      <Header title="Donors" />
-      <DonorsPaginatedList />
-    </>
-  )
+  redirect("/donations/reports/donors")
 }

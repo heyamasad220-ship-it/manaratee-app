@@ -11,10 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import {
-  formatSubscriptionPrice,
-  type OrganizationSubscriptionSummary,
-} from "@/lib/organizations/organization-subscription-types"
+import { type OrganizationSubscriptionSummary } from "@/lib/organizations/organization-subscription-types"
 import { CreditCard, Layers, Mail, Package } from "lucide-react"
 
 export function SubscriptionSettingsClient({
@@ -24,11 +21,6 @@ export function SubscriptionSettingsClient({
   summary: OrganizationSubscriptionSummary
   title?: string
 }) {
-  const yearlySavings =
-    summary.plan && summary.plan.monthlyPrice > 0 && summary.plan.yearlyPrice > 0
-      ? summary.plan.monthlyPrice * 12 - summary.plan.yearlyPrice
-      : 0
-
   return (
     <>
       <Header title={title} />
@@ -74,14 +66,6 @@ export function SubscriptionSettingsClient({
             </CardHeader>
             <CardContent>
               <p className="text-2xl font-bold">{summary.billingLabel}</p>
-              {summary.plan && summary.plan.yearlyPrice > 0 ? (
-                <p className="mt-2 text-sm text-muted-foreground">
-                  or {formatSubscriptionPrice(summary.plan.yearlyPrice)}/year
-                  {yearlySavings > 0
-                    ? ` (save ${formatSubscriptionPrice(yearlySavings)} vs monthly)`
-                    : ""}
-                </p>
-              ) : null}
             </CardContent>
           </Card>
 

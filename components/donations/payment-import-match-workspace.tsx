@@ -32,6 +32,7 @@ import {
   DonationMetricCard,
   DonationMetricCardGrid,
 } from "@/components/donations/donation-metric-card"
+import { formatDonationCurrency } from "@/lib/donations/campaign-analytics"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -49,6 +50,7 @@ import {
 } from "@/components/ui/dialog"
 import { getCurrentOrganizationId } from "@/lib/current-organization"
 import type { ContactMatchResult } from "@/lib/donations/payment-contact-matching"
+import { filterStrongContactMatches } from "@/lib/donations/payment-contact-matching"
 import type { PaymentMatchQueueItem } from "@/lib/donations/payment-import-match-types"
 import {
   allocatePaymentToPledgeAction,
@@ -144,7 +146,7 @@ export function PaymentImportMatchWorkspace({ mode }: { mode: "import" | "match"
   const [loadingQueue, setLoadingQueue] = useState(false)
   const [loadingMatches, setLoadingMatches] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
-  const [statusFilter, setStatusFilter] = useState("pending_review")
+  const [statusFilter, setStatusFilter] = useState(mode === "match" ? "all" : "pending_review")
   const [manualSearch, setManualSearch] = useState("")
   const [manualMatches, setManualMatches] = useState<ContactMatchResult[]>([])
   const [searchingManual, setSearchingManual] = useState(false)
@@ -171,20 +173,33 @@ export function PaymentImportMatchWorkspace({ mode }: { mode: "import" | "match"
     [parsedRows]
   )
 
-  const filteredPayments = payments.filter((payment) => {
-    const matchesSearch =
-      payment.senderName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      payment.memo.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (payment.importEmail || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (payment.importPhone || "").includes(searchQuery)
+  const filteredPayments = useMemo(
+    () =>
+      payments.filter((payment) => {
+        const matchesSearch =
+          payment.senderName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          payment.memo.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (payment.importEmail || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (payment.importPhone || "").includes(searchQuery)
 
-    const matchesStatus = statusFilter === "all" || payment.status === statusFilter
-    return matchesSearch && matchesStatus
-  })
+        const matchesStatus = statusFilter === "all" || payment.status === statusFilter
+        return matchesSearch && matchesStatus
+      }),
+    [payments, searchQuery, statusFilter]
+  )
 
   const pendingCount = payments.filter((payment) => payment.status === "pending_review").length
   const matchedCount = payments.filter((payment) => payment.status === "unallocated").length
   const unresolvedCount = payments.filter((payment) => payment.status === "unresolved").length
+  const queueAmount = useMemo(
+    () => payments.reduce((sum, payment) => sum + payment.amount, 0),
+    [payments]
+  )
+
+  const strongSuggestedMatches = useMemo(
+    () => filterStrongContactMatches(matches, 85),
+    [matches]
+  )
 
   const currentIndex = selectedPayment
     ? filteredPayments.findIndex((payment) => payment.id === selectedPayment.id)
@@ -225,8 +240,8 @@ export function PaymentImportMatchWorkspace({ mode }: { mode: "import" | "match"
     setPayments(result.payments)
     setSelectedPayment((current) => {
       if (result.payments.length === 0) return null
-      if (!current) return result.payments[0]
-      return result.payments.find((payment) => payment.id === current.id) || result.payments[0]
+      if (current && result.payments.some((payment) => payment.id === current.id)) return current
+      return result.payments[0]
     })
   }, [])
 
@@ -275,6 +290,16 @@ export function PaymentImportMatchWorkspace({ mode }: { mode: "import" | "match"
   }, [mode, loadQueue, loadAllPledges, loadHistory])
 
   useEffect(() => {
+    if (mode !== "match") return
+
+    setSelectedPayment((current) => {
+      if (filteredPayments.length === 0) return null
+      if (current && filteredPayments.some((payment) => payment.id === current.id)) return current
+      return filteredPayments[0]
+    })
+  }, [filteredPayments, mode])
+
+  useEffect(() => {
     if (selectedPayment) {
       loadMatches(selectedPayment)
       setManualSearch("")
@@ -312,6 +337,7 @@ export function PaymentImportMatchWorkspace({ mode }: { mode: "import" | "match"
     let totalAllocated = 0
     let totalMatchedUnallocated = 0
     let totalSkipped = 0
+    let totalContactsCreated = 0
     let remaining = 1
     let rounds = 0
 
@@ -345,14 +371,16 @@ export function PaymentImportMatchWorkspace({ mode }: { mode: "import" | "match"
       totalAllocated += result.allocated
       totalMatchedUnallocated += result.matchedUnallocated
       totalSkipped += result.skipped
+      totalContactsCreated += result.contactsCreated
       remaining = result.remaining
 
-      if (result.matched === 0) break
+      if (result.matched === 0 && result.contactsCreated === 0) break
     }
 
     if (options?.showAlert) {
       alert(
-        `Auto-matched ${totalMatched} payment(s).` +
+        `Processed ${totalMatched} payment(s).` +
+          (totalContactsCreated > 0 ? ` Created ${totalContactsCreated} new contact(s).` : "") +
           (totalAllocated > 0 ? ` ${totalAllocated} allocated to pledges.` : "") +
           (totalMatchedUnallocated > 0
             ? ` ${totalMatchedUnallocated} matched but need pledge selection.`
@@ -369,6 +397,7 @@ export function PaymentImportMatchWorkspace({ mode }: { mode: "import" | "match"
       totalAllocated,
       totalMatchedUnallocated,
       totalSkipped,
+      totalContactsCreated,
       remaining,
     }
   }
@@ -434,7 +463,7 @@ export function PaymentImportMatchWorkspace({ mode }: { mode: "import" | "match"
     const duplicates = fileDuplicates + dbDuplicates
 
     if (autoMatchAfterImport && imported > 0) {
-      setImportProgress("Auto-matching high-confidence contacts...")
+      setImportProgress("Auto-matching and creating contacts...")
       const autoMatch = await runBulkAutoMatch({ importBatchId: begin.batchId })
 
       setImporting(false)
@@ -450,7 +479,10 @@ export function PaymentImportMatchWorkspace({ mode }: { mode: "import" | "match"
           `Imported ${imported} payment(s).` +
             (duplicates > 0 ? ` Skipped ${duplicates} duplicate(s).` : "") +
             (invalidRows.length > 0 ? ` ${invalidRows.length} row(s) were invalid.` : "") +
-            ` Auto-matched ${autoMatch.totalMatched}.` +
+            ` Processed ${autoMatch.totalMatched} payment(s).` +
+            (autoMatch.totalContactsCreated > 0
+              ? ` Created ${autoMatch.totalContactsCreated} new contact(s).`
+              : "") +
             (autoMatch.totalAllocated > 0
               ? ` ${autoMatch.totalAllocated} allocated to pledges.`
               : "") +
@@ -459,7 +491,7 @@ export function PaymentImportMatchWorkspace({ mode }: { mode: "import" | "match"
               : "") +
             (autoMatch.remaining > 0
               ? ` ${autoMatch.remaining} still need manual review.`
-              : " All high-confidence payments matched.")
+              : " Queue fully processed.")
         )
       }
     } else {
@@ -481,10 +513,12 @@ export function PaymentImportMatchWorkspace({ mode }: { mode: "import" | "match"
 
   async function handleBulkAutoMatch() {
     const confirmed = window.confirm(
-      `Auto-match all pending payments with a single high-confidence contact match (≥85%)?` +
+      "Process all pending payments?\n\n" +
+        "• Link to an existing contact when match confidence is ≥85% (email, phone, or name).\n" +
+        "• Otherwise create a new contact from the payment name when there is no email or phone on the import." +
         (autoAllocatePledge
-          ? " Clear lump-sum pledges are preferred over installment schedules."
-          : " Pledges will not be auto-allocated.")
+          ? "\n\nClear lump-sum pledges are preferred over installment schedules."
+          : "\n\nPledges will not be auto-allocated.")
     )
     if (!confirmed) return
 
@@ -719,8 +753,8 @@ export function PaymentImportMatchWorkspace({ mode }: { mode: "import" | "match"
                     Auto-match after import (recommended)
                   </Label>
                   <p className="text-xs text-muted-foreground">
-                    Links payments to contacts automatically when email, phone, or name match is
-                    high confidence (≥85%). Unmatched rows stay in the queue for manual review.
+                    Links to existing contacts at ≥85% confidence, or creates a new contact from the
+                    payment name when the import has no email or phone and no strong name match.
                   </p>
                   {autoMatchAfterImport && (
                     <div className="mt-3 flex items-start gap-3 rounded-md border bg-muted/30 p-3">
@@ -848,7 +882,7 @@ export function PaymentImportMatchWorkspace({ mode }: { mode: "import" | "match"
     <div className="space-y-6">
           <div className="mb-4 flex flex-wrap items-center gap-3">
             <Button variant="outline" onClick={handleBulkAutoMatch} disabled={bulkMatching || pendingCount === 0}>
-              {bulkMatching ? "Auto-matching..." : "Auto-match high confidence"}
+              {bulkMatching ? "Processing..." : "Auto-match & create contacts"}
             </Button>
             <div className="flex items-center gap-2">
               <Checkbox
@@ -861,19 +895,39 @@ export function PaymentImportMatchWorkspace({ mode }: { mode: "import" | "match"
               </Label>
             </div>
             <p className="text-sm text-muted-foreground">
-              Review payments that could not be auto-matched. Quick Apply prefers lump-sum pledges
-              over installment schedules.
+              High-confidence matches link to existing contacts. Name-only imports with no match create
+              a new contact automatically when you run Auto-match.
             </p>
           </div>
 
-          <DonationMetricCardGrid className="mb-6">
-            <DonationMetricCard title="Needs match" value={pendingCount} icon={Clock} />
-            <DonationMetricCard title="Matched, not allocated" value={matchedCount} icon={Link2} />
-            <DonationMetricCard title="Unresolved" value={unresolvedCount} icon={AlertCircle} />
+          <DonationMetricCardGrid colorful className="mb-6 lg:grid-cols-4">
+            <DonationMetricCard
+              title="Needs match"
+              value={pendingCount}
+              icon={Clock}
+              accent="amber"
+              onValueClick={() => setStatusFilter("pending_review")}
+            />
+            <DonationMetricCard
+              title="Matched, not allocated"
+              value={matchedCount}
+              icon={Link2}
+              accent="emerald"
+              onValueClick={() => setStatusFilter("unallocated")}
+            />
+            <DonationMetricCard
+              title="Unresolved"
+              value={unresolvedCount}
+              icon={AlertCircle}
+              accent="rose"
+              onValueClick={() => setStatusFilter("unresolved")}
+            />
             <DonationMetricCard
               title="Queue amount"
-              value={`$${payments.reduce((sum, payment) => sum + payment.amount, 0).toLocaleString()}`}
+              value={formatDonationCurrency(queueAmount)}
               icon={DollarSign}
+              accent="purple"
+              onValueClick={() => setStatusFilter("all")}
             />
           </DonationMetricCardGrid>
 
@@ -887,10 +941,10 @@ export function PaymentImportMatchWorkspace({ mode }: { mode: "import" | "match"
                     value={statusFilter}
                     onChange={(event) => setStatusFilter(event.target.value)}
                   >
-                    <option value="pending_review">Needs match</option>
-                    <option value="unallocated">Matched</option>
-                    <option value="unresolved">Unresolved</option>
                     <option value="all">All</option>
+                    <option value="pending_review">Needs match</option>
+                    <option value="unallocated">Matched, not allocated</option>
+                    <option value="unresolved">Unresolved</option>
                   </select>
                 </div>
                 <div className="relative mt-2">
@@ -1036,14 +1090,19 @@ export function PaymentImportMatchWorkspace({ mode }: { mode: "import" | "match"
                       </h4>
                       {loadingMatches ? (
                         <p className="text-sm text-muted-foreground">Finding matches...</p>
-                      ) : matches.length > 0 ? (
+                      ) : strongSuggestedMatches.length > 0 ? (
                         <div className="flex flex-col gap-3">
-                          {matches.map((match, index) => renderMatchCard(match, index, "suggested"))}
+                          {strongSuggestedMatches.map((match, index) =>
+                            renderMatchCard(match, index, "suggested")
+                          )}
                         </div>
                       ) : (
                         <div className="rounded-lg border border-dashed p-4 text-center">
                           <AlertCircle className="mx-auto h-8 w-8 text-muted-foreground/50" />
-                          <p className="mt-2 text-sm text-muted-foreground">No matching contacts found</p>
+                          <p className="mt-2 text-sm text-muted-foreground">
+                            No high-confidence matches (≥85%). Search for the contact, add a new one,
+                            or use Auto-match &amp; create contacts to process the queue in bulk.
+                          </p>
                         </div>
                       )}
                     </div>

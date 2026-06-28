@@ -25,6 +25,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Plus, Pencil, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { DonationReceiptSettingsForm } from "@/components/donations/donation-receipt-settings-form"
@@ -38,6 +45,13 @@ interface Category {
   name: string
   description: string
   taxDeductible: boolean
+}
+
+interface DonationFund {
+  id: string
+  name: string
+  categoryId: string
+  categoryName: string
 }
 
 interface PaymentMethod {
@@ -77,7 +91,12 @@ export default function DonationsSettingsPage() {
 const [categoryDescription, setCategoryDescription] = useState("")
 const [editingCategory, setEditingCategory] = useState<Category | null>(null)
 const [categoryTaxDeductible, setCategoryTaxDeductible] = useState(true)
-const [editingPaymentMethod, setEditingPaymentMethod] = useState<PaymentMethod | null>(null)
+  const [funds, setFunds] = useState<DonationFund[]>([])
+  const [showFundDialog, setShowFundDialog] = useState(false)
+  const [fundName, setFundName] = useState("")
+  const [fundCategoryId, setFundCategoryId] = useState("")
+  const [editingFund, setEditingFund] = useState<DonationFund | null>(null)
+  const [editingPaymentMethod, setEditingPaymentMethod] = useState<PaymentMethod | null>(null)
 const [paymentMethodName, setPaymentMethodName] = useState("")
 const [paymentMethodFee, setPaymentMethodFee] = useState("")
 const [paymentMethodEnabled, setPaymentMethodEnabled] = useState(true)
@@ -144,6 +163,121 @@ async function loadCategories() {
     }))
   )
 }
+
+async function loadFunds() {
+  const orgId = await getOrganizationId()
+
+  if (!orgId) {
+    setFunds([])
+    return
+  }
+
+  const { data, error } = await supabase
+    .from("donation_subcategories")
+    .select("id, name, category_id")
+    .eq("organization_id", orgId)
+    .order("name", { ascending: true })
+
+  if (error) {
+    console.error("Error loading donation funds:", error)
+    setFunds([])
+    return
+  }
+
+  const categoryNameById = new Map(categories.map((category) => [category.id, category.name]))
+
+  setFunds(
+    (data || []).map((fund: any) => ({
+      id: fund.id,
+      name: fund.name,
+      categoryId: fund.category_id,
+      categoryName: categoryNameById.get(fund.category_id) || "Unknown category",
+    }))
+  )
+}
+
+async function handleSaveFund() {
+  const orgId = await getOrganizationId()
+
+  if (!orgId) {
+    alert("No organization found.")
+    return
+  }
+
+  if (!fundName.trim()) {
+    alert("Fund name is required.")
+    return
+  }
+
+  if (!fundCategoryId) {
+    alert("Select a category for this fund.")
+    return
+  }
+
+  const payload = {
+    organization_id: orgId,
+    category_id: fundCategoryId,
+    name: fundName.trim(),
+  }
+
+  const { error } = editingFund
+    ? await supabase
+        .from("donation_subcategories")
+        .update({ category_id: fundCategoryId, name: fundName.trim() })
+        .eq("id", editingFund.id)
+        .eq("organization_id", orgId)
+    : await supabase.from("donation_subcategories").insert(payload)
+
+  if (error) {
+    alert(error.message)
+    return
+  }
+
+  resetFundForm()
+  await loadFunds()
+}
+
+function resetFundForm() {
+  setEditingFund(null)
+  setFundName("")
+  setFundCategoryId("")
+  setShowFundDialog(false)
+}
+
+function openAddFundDialog(categoryId?: string) {
+  resetFundForm()
+  if (categoryId) {
+    setFundCategoryId(categoryId)
+  }
+  setShowFundDialog(true)
+}
+
+async function handleDeleteFund(fundId: string) {
+  if (!confirm("Delete this fund? Existing pledges and payments keep their records.")) {
+    return
+  }
+
+  const orgId = await getOrganizationId()
+
+  if (!orgId) {
+    alert("No organization found.")
+    return
+  }
+
+  const { error } = await supabase
+    .from("donation_subcategories")
+    .delete()
+    .eq("id", fundId)
+    .eq("organization_id", orgId)
+
+  if (error) {
+    alert(error.message)
+    return
+  }
+
+  await loadFunds()
+}
+
 async function handleSavePaymentMethod() {
   const orgId = await getOrganizationId()
 
@@ -259,9 +393,13 @@ async function loadPaymentMethods() {
 }
 
 useEffect(() => {
-  loadCategories()
-  loadPaymentMethods()
+  void loadCategories()
+  void loadPaymentMethods()
 }, [])
+
+useEffect(() => {
+  void loadFunds()
+}, [categories])
 
 async function handleTogglePaymentMethod(methodId: string, enabled: boolean) {
   const orgId = await getOrganizationId()
@@ -381,69 +519,153 @@ async function handleSaveCategory() {
         )}
 
         {activeTab === "Categories" && (
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-semibold text-foreground">Donation Categories</h3>
-                <p className="text-sm text-muted-foreground">
-                  Manage categories for organizing donations
-                </p>
+          <div className="flex flex-col gap-8">
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-base font-semibold text-foreground">Donation Categories</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Top-level gift types for accounting and tax treatment (not campaigns)
+                  </p>
+                </div>
+                <Button onClick={() => setShowAddCategoryDialog(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Category
+                </Button>
               </div>
-             <Button onClick={() => setShowAddCategoryDialog(true)}>
-  <Plus className="mr-2 h-4 w-4" />
-  Add Category
-</Button>
+
+              <Card>
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Category</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead>Tax Deductible</TableHead>
+                        <TableHead className="w-[100px]"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {categories.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
+                            No categories yet. Add a category before creating funds.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        categories.map((category) => (
+                          <TableRow key={category.id}>
+                            <TableCell className="font-medium">{category.name}</TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {category.description}
+                            </TableCell>
+                            <TableCell>{category.taxDeductible ? "Yes" : "No"}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => {
+                                    setEditingCategory(category)
+                                    setCategoryName(category.name)
+                                    setCategoryDescription(category.description)
+                                    setCategoryTaxDeductible(category.taxDeductible)
+                                    setShowAddCategoryDialog(true)
+                                  }}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-muted-foreground hover:text-red-600"
+                                  onClick={() => handleDeleteCategory(category.id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
             </div>
 
-            <Card>
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Category</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead>Tax Deductible</TableHead>
-                      <TableHead className="w-[100px]"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {categories.map((category) => (
-                      <TableRow key={category.id}>
-                        <TableCell className="font-medium">{category.name}</TableCell>
-                        <TableCell className="text-muted-foreground">{category.description}</TableCell>
-                        <TableCell>{category.taxDeductible ? "Yes" : "No"}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            <Button
-  variant="ghost"
-  size="icon"
-  className="h-8 w-8"
-  onClick={() => {
-    setEditingCategory(category)
-    setCategoryName(category.name)
-    setCategoryDescription(category.description)
-    setCategoryTaxDeductible(category.taxDeductible)
-    setShowAddCategoryDialog(true)
-  }}
->
-  <Pencil className="h-4 w-4" />
-</Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-muted-foreground hover:text-red-600"
-                              onClick={() => handleDeleteCategory(category.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-base font-semibold text-foreground">Funds</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Specific designations under a category (e.g. Operations → Bathroom Renovation)
+                  </p>
+                </div>
+                <Button onClick={() => openAddFundDialog()} disabled={categories.length === 0}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Fund
+                </Button>
+              </div>
+
+              <Card>
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Category</TableHead>
+                        <TableHead>Fund</TableHead>
+                        <TableHead className="w-[100px]"></TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+                    </TableHeader>
+                    <TableBody>
+                      {funds.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={3} className="py-8 text-center text-muted-foreground">
+                            {categories.length === 0
+                              ? "Create a category first, then add funds under it."
+                              : "No funds yet. Add funds like Bathroom Renovation under Operations."}
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        funds.map((fund) => (
+                          <TableRow key={fund.id}>
+                            <TableCell className="text-muted-foreground">{fund.categoryName}</TableCell>
+                            <TableCell className="font-medium">{fund.name}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => {
+                                    setEditingFund(fund)
+                                    setFundName(fund.name)
+                                    setFundCategoryId(fund.categoryId)
+                                    setShowFundDialog(true)
+                                  }}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-muted-foreground hover:text-red-600"
+                                  onClick={() => void handleDeleteFund(fund.id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         )}
 
@@ -681,7 +903,7 @@ async function handleSaveCategory() {
         <Label htmlFor="cat-name">Category Name</Label>
         <Input
           id="cat-name"
-          placeholder="e.g., Education Fund"
+          placeholder="e.g., Operations"
           value={categoryName}
           onChange={(event) => setCategoryName(event.target.value)}
         />
@@ -728,6 +950,55 @@ async function handleSaveCategory() {
     </DialogFooter>
   </DialogContent>
 </Dialog>
+
+        <Dialog open={showFundDialog} onOpenChange={setShowFundDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{editingFund ? "Edit Fund" : "Add Fund"}</DialogTitle>
+              <DialogDescription>
+                Funds are subcategories under a donation category. They appear in the Fund dropdown
+                on pledges and payments.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="flex flex-col gap-4 py-4">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="fund-category">Category</Label>
+                <Select value={fundCategoryId} onValueChange={setFundCategoryId}>
+                  <SelectTrigger id="fund-category">
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((category) => (
+                      <SelectItem key={category.id} value={category.id}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="fund-name">Fund Name</Label>
+                <Input
+                  id="fund-name"
+                  placeholder="e.g., Bathroom Renovation"
+                  value={fundName}
+                  onChange={(event) => setFundName(event.target.value)}
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={resetFundForm}>
+                Cancel
+              </Button>
+              <Button onClick={() => void handleSaveFund()}>
+                {editingFund ? "Save Changes" : "Add Fund"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
     </>
   )

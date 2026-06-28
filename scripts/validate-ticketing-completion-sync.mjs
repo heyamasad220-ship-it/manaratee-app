@@ -1,5 +1,5 @@
 /**
- * Validates S-08 ticketing completion → event_attendee affiliation sync behavior.
+ * Validates S-08 ticketing completion → customer affiliation sync behavior.
  * Usage: node scripts/validate-ticketing-completion-sync.mjs
  */
 import { readFileSync } from "node:fs"
@@ -37,7 +37,7 @@ async function cleanup(ids) {
       .from("contact_roles")
       .delete()
       .in("contact_id", contacts)
-      .eq("role", "event_attendee")
+      .eq("role", "customer")
     await sb.from("contacts").delete().in("id", contacts)
   }
   if (ticketTypes?.length) {
@@ -77,7 +77,7 @@ const schemaCheck = await assertParticipationRolesSchema(sb)
 record(
   "schema-participation-roles",
   schemaCheck.ok,
-  schemaCheck.message || "event_attendee allowed in contact_roles"
+  schemaCheck.message || "customer allowed in contact_roles"
 )
 if (!schemaCheck.ok) {
   process.exit(1)
@@ -156,7 +156,7 @@ try {
   )
 
   await applyEventAttendeeAffiliationMirror(sb, orgId, contactA.id)
-  const roleAfterComplete = await hasRole(sb, orgId, contactA.id, "event_attendee")
+  const roleAfterComplete = await hasRole(sb, orgId, contactA.id, "customer")
   record(
     "completed-order-event-attendee",
     roleAfterComplete.ok && roleAfterComplete.hasRole,
@@ -209,7 +209,7 @@ try {
     .eq("id", pendingOrder.id)
 
   await applyEventAttendeeAffiliationMirror(sb, orgId, contactB.id)
-  const roleAfterTransition = await hasRole(sb, orgId, contactB.id, "event_attendee")
+  const roleAfterTransition = await hasRole(sb, orgId, contactB.id, "customer")
   record(
     "pending-to-completed-event-attendee",
     roleAfterTransition.ok && roleAfterTransition.hasRole,
@@ -250,7 +250,7 @@ try {
     .eq("id", completedOrder.id)
 
   await applyEventAttendeeAffiliationMirror(sb, orgId, contactA.id)
-  const roleAfterRefund = await hasRole(sb, orgId, contactA.id, "event_attendee")
+  const roleAfterRefund = await hasRole(sb, orgId, contactA.id, "customer")
   record(
     "refunded-order-retains-event-attendee",
     roleAfterRefund.ok && roleAfterRefund.hasRole,
@@ -297,8 +297,8 @@ try {
 
   record(
     "event-attendee-is-sticky",
-    assertStickyRoleInRules("event_attendee"),
-    "event_attendee listed in STICKY_DERIVED_ROLES"
+    assertStickyRoleInRules("customer"),
+    "customer listed in STICKY_DERIVED_ROLES"
   )
 } finally {
   await cleanup(created)

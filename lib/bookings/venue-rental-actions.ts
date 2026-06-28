@@ -14,6 +14,7 @@
 import { revalidatePath } from "next/cache"
 
 import { createClient } from "@/lib/supabase/server"
+import { syncContactAffiliations } from "@/lib/contacts/contact-affiliation-sync"
 import { resolveCustomerPortalSession } from "@/lib/auth/customer-portal-session"
 import { resolveOrganizationId } from "@/lib/organizations/resolve-organization-id"
 import { hasAnyPermission, PERMISSIONS } from "@/lib/permissions/permissions"
@@ -336,6 +337,10 @@ export async function updateVenueRentalBillingContact(input: {
     throw new Error(error.message || "Failed to update billing contact.")
   }
 
+  if (input.billingContactId) {
+    await syncContactAffiliations(input.billingContactId, organizationId, supabase)
+  }
+
   await syncOperationalBriefForVenueRental(input.venueRentalId, organizationId, user?.id ?? null)
   revalidateVenueRentalPaths()
   revalidatePath(`/bookings/rentals/${input.venueRentalId}`)
@@ -456,6 +461,10 @@ export async function submitVenueRentalRequest(input: SubmitVenueRentalInput) {
       metadata: { venueRentalId: rental.id, customerUserId },
     },
   ])
+
+  if (billingContactId) {
+    await syncContactAffiliations(billingContactId, organizationId, supabase)
+  }
 
   revalidateVenueRentalPaths()
   return rental.id as string

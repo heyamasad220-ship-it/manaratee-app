@@ -1,15 +1,27 @@
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 
+type NormalizeDateOfBirthOptions = {
+  /** When false, blank input returns null instead of throwing. Default true (signup flows). */
+  required?: boolean
+}
+
 export function todayIsoDate(): string {
   return new Date().toISOString().slice(0, 10)
 }
 
 /** Validates and normalizes YYYY-MM-DD for date of birth fields. */
-export function normalizeDateOfBirth(value: string | null | undefined): string {
+export function normalizeDateOfBirth(
+  value: string | null | undefined,
+  options: NormalizeDateOfBirthOptions = {}
+): string | null {
+  const { required = true } = options
   const trimmed = String(value || "").trim()
 
   if (!trimmed) {
-    throw new Error("Date of birth is required.")
+    if (required) {
+      throw new Error("Date of birth is required.")
+    }
+    return null
   }
 
   if (!ISO_DATE_PATTERN.test(trimmed)) {

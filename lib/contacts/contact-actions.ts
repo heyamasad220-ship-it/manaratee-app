@@ -11,6 +11,7 @@ import {
   splitFullName,
   CONTACT_MANUAL_AFFILIATION_ROLES,
   CONTACT_ORGANIZATION_AFFILIATION_ROLES,
+  usesPrimaryContactField,
 } from "@/lib/contacts/contact-constants"
 import { syncContactAffiliations } from "@/lib/contacts/contact-affiliation-sync"
 
@@ -20,7 +21,7 @@ type FindOrCreateContactInput = {
   email?: string | null
   phone?: string | null
   primaryContactName?: string | null
-  contactType?: "individual" | "organization"
+  contactType?: ContactRecordType
   notes?: string | null
 }
 
@@ -92,8 +93,8 @@ export async function findOrCreateContact(input: FindOrCreateContactInput) {
     throw new Error(rpcError?.message || "Could not create contact")
   }
 
-  const isOrganization = input.contactType === "organization"
-  const primaryContactName = isOrganization
+  const contactType = input.contactType || "individual"
+  const primaryContactName = usesPrimaryContactField(contactType)
     ? input.primaryContactName?.trim() || null
     : null
   const notes = input.notes?.trim() || null
@@ -426,7 +427,7 @@ export async function addContactWithRoles(input: {
   email?: string
   phone?: string
   primaryContactName?: string
-  contactType?: "individual" | "organization"
+  contactType?: ContactRecordType
   notes?: string
   roles: ContactRoleValue[]
 }) {
@@ -470,6 +471,7 @@ function revalidateContactPaths() {
   revalidatePath("/contacts")
   revalidatePath("/contacts/people")
   revalidatePath("/contacts/organizations")
+  revalidatePath("/contacts/groups")
   revalidatePath("/contacts/members")
   revalidatePath("/membership")
   revalidatePath("/membership/members")
@@ -529,6 +531,12 @@ export async function updateContactBasics(input: {
   primaryContactName?: string | null
   contactType?: ContactRecordType
   status: string
+  address?: string | null
+  city?: string | null
+  state?: string | null
+  zip?: string | null
+  country?: string | null
+  notes?: string | null
 }) {
   const supabase = await createClient()
   const organizationId = await getSelectedOrganizationId()
@@ -553,22 +561,33 @@ export async function updateContactBasics(input: {
     throw new Error("Contact not found")
   }
 
-  const isOrganization =
-    (input.contactType ?? existing.contact_type) === "organization"
+  const recordType = (input.contactType ?? existing.contact_type) as ContactRecordType
+  const primaryContactName = usesPrimaryContactField(recordType)
+    ? input.primaryContactName?.trim() || null
+    : null
+
+  const updatePayload: Record<string, unknown> = {
+    full_name: cleanName,
+    email: input.email?.trim().toLowerCase() || null,
+    phone: normalizePhone(input.phone) || null,
+    contact_type: recordType,
+    primary_contact_name: primaryContactName,
+    status: input.status,
+    notes: input.notes?.trim() || null,
+    updated_at: new Date().toISOString(),
+  }
+
+  if (recordType !== "group") {
+    updatePayload.address = input.address?.trim() || null
+    updatePayload.city = input.city?.trim() || null
+    updatePayload.state = input.state?.trim() || null
+    updatePayload.zip = input.zip?.trim() || null
+    updatePayload.country = input.country?.trim() || null
+  }
 
   const { error } = await supabase
     .from("contacts")
-    .update({
-      full_name: cleanName,
-      email: input.email?.trim().toLowerCase() || null,
-      phone: normalizePhone(input.phone) || null,
-      contact_type: input.contactType ?? existing.contact_type,
-      primary_contact_name: isOrganization
-        ? input.primaryContactName?.trim() || null
-        : null,
-      status: input.status,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updatePayload)
     .eq("organization_id", organizationId)
     .eq("id", input.contactId)
 

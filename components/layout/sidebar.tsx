@@ -3,7 +3,7 @@
 import { useState, useEffect, createContext, useContext } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { usePathname } from "next/navigation"
+import { usePathname, useSearchParams } from "next/navigation"
 import {
   Calendar,
   Building2,
@@ -28,14 +28,9 @@ import {
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { isContactsListSegment, type ContactsListSegment } from "@/lib/contacts/contact-module-label"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
-import { createClient } from "@/lib/supabase/client"
-import { getCurrentOrganizationContext, clearSelectedOrganizationIdCache } from "@/lib/current-organization"
-import {
-  canViewOrganizationBilling,
-  isOrganizationSystemAdmin,
-} from "@/lib/organizations/organization-system-admin"
 import { WORKFORCE_MODULE_LABEL } from "@/lib/hr/hr-module-label"
 import { isFacilitiesOnlyAccess } from "@/lib/permissions/facilities-access"
 import {
@@ -47,11 +42,47 @@ interface SubItem {
   href: string
   matchPrefix: string
   alsoMatchPrefixes?: string[]
+  contactListSegment?: ContactsListSegment
   permissionKey?: string
 }
 
-function subItemMatchesPath(child: SubItem, pathname: string) {
+const CONTACTS_LIST_SEGMENTS = new Set([
+  "people",
+  "families",
+  "organizations",
+  "groups",
+  "settings",
+  "members",
+])
+
+function isContactProfilePath(pathname: string) {
+  const match = pathname.match(/^\/contacts\/([^/]+)$/)
+  if (!match) return false
+  return !CONTACTS_LIST_SEGMENTS.has(match[1])
+}
+
+function resolveContactProfileListSegment(
+  pathname: string,
+  searchParams: Pick<URLSearchParams, "get">
+): ContactsListSegment | null {
+  if (!isContactProfilePath(pathname)) return null
+  const list = searchParams.get("list")
+  return isContactsListSegment(list) ? list : null
+}
+
+function subItemMatchesPath(
+  child: SubItem,
+  pathname: string,
+  profileListSegment: ContactsListSegment | null
+) {
   if (pathname === child.href || pathname.startsWith(`${child.matchPrefix}/`)) {
+    return true
+  }
+  if (
+    profileListSegment &&
+    child.contactListSegment === profileListSegment &&
+    isContactProfilePath(pathname)
+  ) {
     return true
   }
   return child.alsoMatchPrefixes?.some(
@@ -163,6 +194,22 @@ interface UserPermissionContext {
   enabledPermissions: Set<string>
 }
 
+const DEFAULT_NAV_ITEMS: NavItem[] = [
+  { label: "Dashboard", href: "/dashboard", icon: Home, matchPrefix: "/dashboard" },
+]
+
+function parseSidebarPermissionContext(payload: {
+  isOwner?: boolean
+  isSuperAdmin?: boolean
+  enabledPermissions?: string[]
+}): UserPermissionContext {
+  return {
+    isOwner: payload.isOwner === true,
+    isSuperAdmin: payload.isSuperAdmin === true,
+    enabledPermissions: new Set(payload.enabledPermissions || []),
+  }
+}
+
 const iconMap: Record<string, LucideIcon> = {
   Calendar,
   Building2,
@@ -240,6 +287,7 @@ const moduleGroupOverride: Record<string, string> = {
 }
 
 const moduleDefaultRouteOverride: Record<string, string> = {
+  contacts: "/contacts/people",
   spaces: "/facilities/reservation-center",
   workforce: "/workforce",
   hr: "/workforce",
@@ -283,10 +331,10 @@ const moduleChildren: Record<string, SubItem[]> = {
     { label: "Settings", href: "/vendor-hub/settings", matchPrefix: "/vendor-hub/settings", permissionKey: "vendor_hub.manage" },
   ],
   contacts: [
-    { label: "All Contacts", href: "/contacts", matchPrefix: "/contacts", permissionKey: "contacts.view" },
-    { label: "People", href: "/contacts/people", matchPrefix: "/contacts/people", permissionKey: "contacts.view" },
-    { label: "Families", href: "/contacts/families", matchPrefix: "/contacts/families", permissionKey: "contacts.view" },
-    { label: "Organizations", href: "/contacts/organizations", matchPrefix: "/contacts/organizations", permissionKey: "contacts.view" },
+    { label: "People", href: "/contacts/people", matchPrefix: "/contacts/people", contactListSegment: "people", permissionKey: "contacts.view" },
+    { label: "Families", href: "/contacts/families", matchPrefix: "/contacts/families", contactListSegment: "families", permissionKey: "contacts.view" },
+    { label: "Organizations", href: "/contacts/organizations", matchPrefix: "/contacts/organizations", contactListSegment: "organizations", permissionKey: "contacts.view" },
+    { label: "Groups", href: "/contacts/groups", matchPrefix: "/contacts/groups", contactListSegment: "groups", permissionKey: "contacts.view" },
     { label: "Settings", href: "/contacts/settings", matchPrefix: "/contacts/settings", permissionKey: "contacts.view" },
   ],
   membership: [
@@ -315,7 +363,7 @@ const moduleChildren: Record<string, SubItem[]> = {
       label: "Reports",
       href: "/donations/reports",
       matchPrefix: "/donations/reports",
-      alsoMatchPrefixes: ["/donations/donors"],
+      alsoMatchPrefixes: ["/donations/donors", "/donations/reports/donors"],
       permissionKey: "donations.view",
     },
     { label: "Settings", href: "/donations/settings", matchPrefix: "/donations/settings", permissionKey: "donations.manage" },
@@ -540,10 +588,16 @@ function buildNavItems(rows: SidebarModuleRow[], permissionContext: UserPermissi
   return filterNavItemsByPermissions(allItems, permissionContext)
 }
 
-function isItemActive(item: NavItem, pathname: string, navItems: NavItem[]) {
+function isItemActive(
+  item: NavItem,
+  pathname: string,
+  navItems: NavItem[],
+  profileListSegment: ContactsListSegment | null
+) {
   const matchesSelf = pathname.startsWith(item.matchPrefix)
   const matchesChild =
-    item.children?.some((child) => subItemMatchesPath(child, pathname)) ?? false
+    item.children?.some((child) => subItemMatchesPath(child, pathname, profileListSegment)) ??
+    false
   const isOverridden = navItems.some(
     (other) =>
       other.label !== item.label &&
@@ -554,23 +608,36 @@ function isItemActive(item: NavItem, pathname: string, navItems: NavItem[]) {
   return (matchesSelf && !isOverridden) || matchesChild
 }
 
-function findActiveModuleWithChildren(navItems: NavItem[], pathname: string): NavItem | null {
+function findActiveModuleWithChildren(
+  navItems: NavItem[],
+  pathname: string,
+  profileListSegment: ContactsListSegment | null
+): NavItem | null {
   for (const item of navItems) {
-    if (item.children && item.children.length > 0 && isItemActive(item, pathname, navItems)) {
+    if (
+      item.children &&
+      item.children.length > 0 &&
+      isItemActive(item, pathname, navItems, profileListSegment)
+    ) {
       return item
     }
   }
   return null
 }
 
-function isChildActive(child: SubItem, siblings: SubItem[], pathname: string) {
-  const selfMatches = subItemMatchesPath(child, pathname)
+function isChildActive(
+  child: SubItem,
+  siblings: SubItem[],
+  pathname: string,
+  profileListSegment: ContactsListSegment | null
+) {
+  const selfMatches = subItemMatchesPath(child, pathname, profileListSegment)
   if (!selfMatches) return false
 
   const isChildOverridden = siblings.some(
     (other) =>
       other.label !== child.label &&
-      subItemMatchesPath(other, pathname) &&
+      subItemMatchesPath(other, pathname, profileListSegment) &&
       (other.matchPrefix.length > child.matchPrefix.length ||
         Boolean(other.alsoMatchPrefixes?.length))
   )
@@ -595,110 +662,64 @@ export function useSidebarContext() {
 }
 
 export function SidebarProvider({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname()
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [navItems, setNavItems] = useState<NavItem[]>([
-    { label: "Dashboard", href: "/dashboard", icon: Home, matchPrefix: "/dashboard" },
-  ])
+  const [navItems, setNavItems] = useState<NavItem[]>(DEFAULT_NAV_ITEMS)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let cancelled = false
+
     async function loadSidebarModules() {
       setLoading(true)
-      clearSelectedOrganizationIdCache()
-      const supabase = createClient()
 
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (!user) {
-        setNavItems([{ label: "Dashboard", href: "/dashboard", icon: Home, matchPrefix: "/dashboard" }])
-        setLoading(false)
-        return
-      }
+      try {
+        const modulesResponse = await fetch("/api/organizations/sidebar-modules", {
+          cache: "no-store",
+        })
 
-      const { organizationId, platformSupportMode } = await getCurrentOrganizationContext()
-      if (!organizationId) {
-        console.error("Error loading organization membership: no selected organization")
-        setNavItems([{ label: "Dashboard", href: "/dashboard", icon: Home, matchPrefix: "/dashboard" }])
-        setLoading(false)
-        return
-      }
+        if (cancelled) return
 
-      const { data: membership, error: membershipError } = await supabase
-        .from("organization_members")
-        .select("organization_id, role, role_id")
-        .eq("user_id", user.id)
-        .eq("organization_id", organizationId)
-        .maybeSingle()
+        if (modulesResponse.status === 401) {
+          setNavItems(DEFAULT_NAV_ITEMS)
+          setLoading(false)
+          return
+        }
 
-      if (membershipError || !membership) {
-        console.error("Error loading organization membership:", membershipError)
-        setNavItems([{ label: "Dashboard", href: "/dashboard", icon: Home, matchPrefix: "/dashboard" }])
-        setLoading(false)
-        return
-      }
+        const modulesPayload = modulesResponse.ok
+          ? await modulesResponse.json()
+          : { modules: [] as SidebarModuleRow[], permissionContext: {} }
 
-      let organizationRoleName: string | null = null
-      if (membership.role_id) {
-        const { data: organizationRole } = await supabase
-          .from("organization_roles")
-          .select("name")
-          .eq("organization_id", membership.organization_id)
-          .eq("id", membership.role_id)
-          .maybeSingle()
-        organizationRoleName = (organizationRole?.name as string | null) ?? null
-      }
+        if (!modulesResponse.ok) {
+          console.error("Error loading sidebar modules:", modulesPayload.error)
+          setNavItems(DEFAULT_NAV_ITEMS)
+          setLoading(false)
+          return
+        }
 
-      let permissionContext: UserPermissionContext = {
-        isOwner: platformSupportMode || isOrganizationSystemAdmin(membership.role),
-        isSuperAdmin:
-          platformSupportMode ||
-          canViewOrganizationBilling({
-            systemRole: membership.role,
-            organizationRoleName,
-            platformSupport: platformSupportMode,
-          }),
-        enabledPermissions: new Set<string>(),
-      }
+        const moduleRows = (modulesPayload.modules || []) as SidebarModuleRow[]
+        const permissionContext = parseSidebarPermissionContext(
+          modulesPayload.permissionContext || {}
+        )
 
-      if (membership.role_id) {
-        const { data: permissionRows, error: permissionsError } = await supabase
-          .from("role_permissions")
-          .select("permission_key, enabled")
-          .eq("organization_id", membership.organization_id)
-          .eq("role_id", membership.role_id)
-          .eq("enabled", true)
-
-        if (permissionsError) {
-          console.error("Error loading sidebar permissions:", permissionsError)
-        } else {
-          permissionContext = {
-            ...permissionContext,
-            enabledPermissions: new Set((permissionRows || []).map((row) => row.permission_key)),
-          }
+        setNavItems(buildNavItems(mergeSidebarModules(moduleRows), permissionContext))
+      } catch (error) {
+        if (!cancelled) {
+          console.error("Error loading sidebar modules:", error)
+          setNavItems(DEFAULT_NAV_ITEMS)
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false)
         }
       }
-
-      const modulesResponse = await fetch("/api/organizations/sidebar-modules", {
-        cache: "no-store",
-      })
-      const modulesPayload = modulesResponse.ok
-        ? await modulesResponse.json()
-        : { modules: [] as SidebarModuleRow[] }
-
-      const moduleRows = (modulesPayload.modules || []) as SidebarModuleRow[]
-
-      if (!modulesResponse.ok) {
-        console.error("Error loading sidebar modules:", modulesPayload.error)
-      }
-
-      setNavItems(buildNavItems(mergeSidebarModules(moduleRows), permissionContext))
-      setLoading(false)
     }
 
-    loadSidebarModules()
-  }, [pathname])
+    void loadSidebarModules()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   return (
     <SidebarContext.Provider value={{ mobileOpen, setMobileOpen, navItems, loading }}>
@@ -752,6 +773,8 @@ function PrimaryNavLink({
 
 function SidebarPrimaryNav({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const profileListSegment = resolveContactProfileListSegment(pathname, searchParams)
   const { navItems, loading } = useSidebarContext()
 
   const groupedItems = groupNavItemsForDisplay(navItems)
@@ -780,7 +803,7 @@ function SidebarPrimaryNav({ onNavigate }: { onNavigate?: () => void }) {
             <PrimaryNavLink
               key={item.label}
               item={item}
-              isActive={isItemActive(item, pathname, navItems)}
+              isActive={isItemActive(item, pathname, navItems, profileListSegment)}
               onNavigate={onNavigate}
               showChevron={Boolean(item.children && item.children.length > 0)}
             />
@@ -799,12 +822,14 @@ function SidebarSubNavLinks({
   onNavigate?: () => void
 }) {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const profileListSegment = resolveContactProfileListSegment(pathname, searchParams)
   const children = module.children ?? []
 
   return (
     <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 pt-3 pb-4">
       {children.map((child) => {
-        const active = isChildActive(child, children, pathname)
+        const active = isChildActive(child, children, pathname, profileListSegment)
         return (
           <Link
             key={child.label}
@@ -826,8 +851,10 @@ function SidebarSubNavLinks({
 
 export function ModuleSubNav() {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const profileListSegment = resolveContactProfileListSegment(pathname, searchParams)
   const { navItems, loading } = useSidebarContext()
-  const activeModule = findActiveModuleWithChildren(navItems, pathname)
+  const activeModule = findActiveModuleWithChildren(navItems, pathname, profileListSegment)
 
   if (loading || !activeModule?.children?.length) {
     return null
@@ -870,6 +897,8 @@ export function Sidebar() {
 export function MobileSidebar() {
   const { mobileOpen, setMobileOpen, navItems, loading } = useSidebarContext()
   const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const profileListSegment = resolveContactProfileListSegment(pathname, searchParams)
   const [mobileModule, setMobileModule] = useState<NavItem | null>(null)
 
   useEffect(() => {
@@ -880,7 +909,7 @@ export function MobileSidebar() {
 
   useEffect(() => {
     if (mobileOpen) {
-      const active = findActiveModuleWithChildren(navItems, pathname)
+      const active = findActiveModuleWithChildren(navItems, pathname, profileListSegment)
       setMobileModule(active)
     }
   }, [mobileOpen, navItems, pathname])
@@ -972,12 +1001,12 @@ export function MobileSidebar() {
                         onClick={() => handlePrimaryClick(item)}
                         className={cn(
                           "relative flex min-h-[44px] w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                          isItemActive(item, pathname, navItems)
+                          isItemActive(item, pathname, navItems, profileListSegment)
                             ? "bg-amber-50 text-amber-700"
                             : "text-zinc-700 hover:bg-amber-50 hover:text-amber-700",
                         )}
                       >
-                        {isItemActive(item, pathname, navItems) ? (
+                        {isItemActive(item, pathname, navItems, profileListSegment) ? (
                           <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-r-full bg-amber-600" />
                         ) : null}
                         <item.icon className="h-[18px] w-[18px] shrink-0" />
@@ -994,12 +1023,12 @@ export function MobileSidebar() {
                       onClick={closeMobile}
                       className={cn(
                         "relative flex min-h-[44px] items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                        isItemActive(item, pathname, navItems)
+                        isItemActive(item, pathname, navItems, profileListSegment)
                           ? "bg-amber-50 text-amber-700"
                           : "text-zinc-700 hover:bg-amber-50 hover:text-amber-700",
                       )}
                     >
-                      {isItemActive(item, pathname, navItems) ? (
+                      {isItemActive(item, pathname, navItems, profileListSegment) ? (
                         <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-r-full bg-amber-600" />
                       ) : null}
                       <item.icon className="h-[18px] w-[18px] shrink-0" />

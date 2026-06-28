@@ -700,8 +700,6 @@ export default function CustomerProfilePage() {
                   <SelectContent>
                     <SelectItem value="Male">Male</SelectItem>
                     <SelectItem value="Female">Female</SelectItem>
-                    <SelectItem value="Non-binary">Non-binary</SelectItem>
-                    <SelectItem value="Prefer not to say">Prefer not to say</SelectItem>
                   </SelectContent>
                 </Select>
               ) : <span className="text-sm font-medium text-foreground">{profile.gender || "—"}</span>}
@@ -985,7 +983,7 @@ export default function CustomerProfilePage() {
             </div>
             <div className="flex flex-col gap-2"><Label htmlFor="fm-dob">Date of Birth</Label><BirthDateInput id="fm-dob" value={newFamilyMember.dateOfBirth} onChange={(dateOfBirth) => setNewFamilyMember((prev) => ({ ...prev, dateOfBirth }))} /></div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="flex flex-col gap-2"><Label htmlFor="fm-gender">Gender</Label><Select value={newFamilyMember.gender} onValueChange={(val) => setNewFamilyMember((prev) => ({ ...prev, gender: val }))}><SelectTrigger id="fm-gender"><SelectValue placeholder="Select gender" /></SelectTrigger><SelectContent><SelectItem value="Male">Male</SelectItem><SelectItem value="Female">Female</SelectItem><SelectItem value="Non-binary">Non-binary</SelectItem><SelectItem value="Prefer not to say">Prefer not to say</SelectItem></SelectContent></Select></div>
+              <div className="flex flex-col gap-2"><Label htmlFor="fm-gender">Gender</Label><Select value={newFamilyMember.gender} onValueChange={(val) => setNewFamilyMember((prev) => ({ ...prev, gender: val }))}><SelectTrigger id="fm-gender"><SelectValue placeholder="Select gender" /></SelectTrigger><SelectContent><SelectItem value="Male">Male</SelectItem><SelectItem value="Female">Female</SelectItem></SelectContent></Select></div>
               <div className="flex flex-col gap-2"><Label htmlFor="fm-relationship">Relationship</Label><Select value={newFamilyMember.relationship} onValueChange={(val) => setNewFamilyMember((prev) => ({ ...prev, relationship: val }))}><SelectTrigger id="fm-relationship"><SelectValue placeholder="Select relationship" /></SelectTrigger><SelectContent><SelectItem value="child">Child / Grandchild</SelectItem><SelectItem value="guardian">Guardian</SelectItem><SelectItem value="spouse">Spouse</SelectItem><SelectItem value="parent">Parent</SelectItem><SelectItem value="sibling">Sibling</SelectItem><SelectItem value="other">Other</SelectItem></SelectContent></Select></div>
             </div>
           </div>

@@ -162,7 +162,7 @@ export function PaymentReceiptActions({
   )
 }
 
-function ReceiptPreviewDialog({
+export function ReceiptPreviewDialog({
   open,
   onOpenChange,
   payload,

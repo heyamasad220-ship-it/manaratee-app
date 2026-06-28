@@ -44,6 +44,8 @@ import {
   searchContactsForDonationPickerAction,
 } from "@/lib/donations/donation-list-actions";
 import { ensureDonorExtensionForContact } from "@/lib/donations/donor-contact-bridge";
+import { ensureGroupMembershipForDonationAction } from "@/lib/contacts/group-giving-actions";
+import { DonationGroupPicker } from "@/components/donations/donation-group-picker";
 import { DONATIONS_PAGE_SIZE } from "@/lib/donations/donation-pagination";
 import {
   Pagination,
@@ -63,6 +65,8 @@ import {
   fetchPledgeAttribution,
   toPaymentAttributionColumns,
 } from "@/lib/donations/payment-attribution";
+import { canAllocatePayment } from "@/lib/donations/payment-net-amount";
+import { formatPaymentPledgeColumnLabel } from "@/lib/donations/donation-status";
 import { getDonorProfilePath } from "@/lib/donations/donor-profile-path";
 
 type Payment = {
@@ -113,11 +117,17 @@ function formatDate(date: string | null) {
   });
 }
 
-function formatStatus(status: string | null) {
-  if (!status) return "—";
-  return status.replaceAll("_", " ");
+function getPaymentDonorName(payment: Payment) {
+  return payment.sender_name || "—";
 }
 
+function canLinkPaymentToPledge(payment: Payment) {
+  return canAllocatePayment({
+    pledge_id: payment.pledge_id,
+    status: payment.status,
+    amount: Number(payment.amount || 0),
+  });
+}
 
 export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean }) {
   const supabase = createClient();
@@ -148,6 +158,8 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
   const [attribution, setAttribution] = useState<DonationAttributionValue>(
     EMPTY_DONATION_ATTRIBUTION_VALUE
   );
+  const [selectedGroupContactId, setSelectedGroupContactId] = useState<string | null>(null);
+  const [selectedGroupLabel, setSelectedGroupLabel] = useState("");
 
   const [showAllocateDialog, setShowAllocateDialog] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
@@ -272,6 +284,8 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
     setSource("cash");
     setMemo("");
     setAttribution(EMPTY_DONATION_ATTRIBUTION_VALUE);
+    setSelectedGroupContactId(null);
+    setSelectedGroupLabel("");
   }
 
   async function handleAddPayment() {
@@ -291,7 +305,25 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
       ? contacts.find((contact) => contact.contactId === selectedContactId)
       : null;
 
+    if (selectedGroupContactId && !selectedContactId) {
+      alert("Select a contact when counting a gift toward a group.");
+      return;
+    }
+
     setSaving(true);
+
+    if (selectedGroupContactId && selectedContactId) {
+      const groupResult = await ensureGroupMembershipForDonationAction({
+        memberContactId: selectedContactId,
+        groupContactId: selectedGroupContactId,
+      });
+
+      if (!groupResult.success) {
+        setSaving(false);
+        alert(groupResult.error);
+        return;
+      }
+    }
 
     let resolvedDonorId: string | null = null;
 
@@ -308,6 +340,8 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
     const { error } = await supabase.from("payments").insert({
       organization_id: orgId,
       donor_id: resolvedDonorId,
+      contact_id: selectedContactId,
+      attributed_group_contact_id: selectedGroupContactId,
       pledge_id: null,
       sender_name: selectedContact?.full_name || selectedContact?.email || null,
       amount: Number(amount),
@@ -390,10 +424,6 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
     await loadPayments();
   }
 
-  function getPaymentDonorName(payment: Payment) {
-    return payment.sender_name || "—";
-  }
-
   return (
     <>
       {!embedded ? <Header title="Payments" /> : null}
@@ -421,16 +451,18 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
             className="max-w-sm"
           />
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Status" />
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Pledge" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All statuses</SelectItem>
-              <SelectItem value="allocated">Allocated</SelectItem>
-              <SelectItem value="unallocated">Unallocated</SelectItem>
+              <SelectItem value="all">All payments</SelectItem>
+              <SelectItem value="unallocated">No</SelectItem>
+              <SelectItem value="allocated">Yes</SelectItem>
               <SelectItem value="pending_review">Pending review</SelectItem>
               <SelectItem value="unresolved">Unresolved</SelectItem>
               <SelectItem value="voided">Voided</SelectItem>
+              <SelectItem value="refunded">Refunded</SelectItem>
+              <SelectItem value="partially_refunded">Partially refunded</SelectItem>
             </SelectContent>
           </Select>
           <span className="text-sm text-muted-foreground">
@@ -455,8 +487,6 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
                     <th className="text-left p-3">Amount</th>
                     <th className="text-left p-3">Method</th>
                     <th className="text-left p-3">Pledge</th>
-                    <th className="text-left p-3">Status</th>
-                    <th className="text-left p-3">Memo</th>
                     <th className="text-left p-3">Action</th>
                   </tr>
                 </thead>
@@ -487,14 +517,10 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
                         {payment.source || "—"}
                       </td>
 
-                      <td className="p-3">{payment.pledge_id ? "Linked" : "Unlinked"}</td>
-
-                      <td className="p-3 capitalize">{formatStatus(payment.status)}</td>
-
-                      <td className="p-3">{payment.memo || "—"}</td>
+                      <td className="p-3">{formatPaymentPledgeColumnLabel(payment.status)}</td>
 
                       <td className="p-3">
-                        {!payment.pledge_id ? (
+                        {canLinkPaymentToPledge(payment) ? (
                           <Button
                             size="sm"
                             variant="outline"
@@ -504,7 +530,7 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
                               setShowAllocateDialog(true);
                             }}
                           >
-                            Allocate
+                            Link to pledge
                           </Button>
                         ) : (
                           <span className="text-muted-foreground">—</span>
@@ -641,6 +667,16 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
               </Popover>
             </div>
 
+            <DonationGroupPicker
+              groupContactId={selectedGroupContactId}
+              groupLabel={selectedGroupLabel}
+              onChange={(groupContactId, label) => {
+                setSelectedGroupContactId(groupContactId);
+                setSelectedGroupLabel(label);
+              }}
+              disabled={saving}
+            />
+
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-2">
                 <Label>Amount</Label>
@@ -717,8 +753,10 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
       <Dialog open={showAllocateDialog} onOpenChange={setShowAllocateDialog}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Allocate Payment</DialogTitle>
-            <DialogDescription>Link this standalone payment to a pledge.</DialogDescription>
+            <DialogTitle>Link to pledge</DialogTitle>
+            <DialogDescription>
+              Apply this payment toward an existing pledge.
+            </DialogDescription>
           </DialogHeader>
 
           {selectedPayment && (
@@ -739,7 +777,7 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
                     </span>
                   </div>
 
-                  <div>
+                  <div className="sm:col-span-2">
                     <span className="text-muted-foreground">Donor / Sender:</span>{" "}
                     {selectedPayment.donor_id ? (
                       <Link
@@ -755,11 +793,13 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
                       <span className="font-medium">{getPaymentDonorName(selectedPayment)}</span>
                     )}
                   </div>
+                </div>
 
-                  <div>
-                    <span className="text-muted-foreground">Memo:</span>{" "}
-                    <span className="font-medium">{selectedPayment.memo || "—"}</span>
-                  </div>
+                <div className="mt-3 border-t border-border pt-3">
+                  <p className="text-sm font-semibold text-foreground">Memo</p>
+                  <p className="mt-1.5 break-all text-muted-foreground">
+                    {selectedPayment.memo || "—"}
+                  </p>
                 </div>
               </div>
 
@@ -804,7 +844,7 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
             </Button>
 
             <Button onClick={handleAllocatePayment} disabled={allocating}>
-              {allocating ? "Allocating..." : "Allocate Payment"}
+              {allocating ? "Linking..." : "Link to pledge"}
             </Button>
           </DialogFooter>
         </DialogContent>

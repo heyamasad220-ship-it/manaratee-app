@@ -79,6 +79,11 @@ function normalizeText(value) {
 }
 
 const LEDGER_SUMMARY_ROW_NAMES = new Set(["total", "subtotal", "grand total"])
+const LEDGER_BATCH_DEPOSIT_NAMES = new Set(["square"])
+
+function isLedgerBatchDepositName(name) {
+  return LEDGER_BATCH_DEPOSIT_NAMES.has(normalizeName(name))
+}
 
 function isLedgerSummaryRowName(name) {
   return LEDGER_SUMMARY_ROW_NAMES.has(normalizeName(name))
@@ -109,6 +114,58 @@ function parseMoney(value) {
   const cleaned = normalizeText(value).replace(/[$,]/g, "")
   const parsed = Number(cleaned)
   return Number.isFinite(parsed) ? parsed : 0
+}
+
+/** Read the first positive amount from a row across possible column headers. */
+function firstPositiveAmount(row, keys) {
+  for (const key of keys) {
+    if (row[key] === undefined || row[key] === "") continue
+    const amount = parseMoney(row[key])
+    if (amount > 0) return amount
+  }
+  return 0
+}
+
+/**
+ * Ledger column semantics (MAS spreadsheet):
+ * - Pledge: explicit commitment (may be paid down over time)
+ * - Cash / Checks: direct payments
+ * - One-time / CC: one-time card payment toward a pledge
+ * - Recurring / CC+: installment payments toward a pledge
+ *
+ * If Pledge is blank but a payment column has value, treat as an implicit
+ * fulfilled pledge equal to total payments on the row (no outstanding balance).
+ */
+function getLedgerAmounts(row) {
+  const pledge = parseMoney(row.Pledge)
+  const cash = parseMoney(row.Cash)
+  const checks = parseMoney(row.Checks)
+  const oneTime = firstPositiveAmount(row, ["One-time", "One Time", "CC", "One-Time"])
+  const recurring = firstPositiveAmount(row, ["Recurring", "CC+", "CC +"])
+  const totalPaid = cash + checks + oneTime + recurring
+  const effectivePledge = pledge > 0 ? pledge : totalPaid
+
+  return {
+    pledge,
+    cash,
+    checks,
+    oneTime,
+    recurring,
+    totalPaid,
+    effectivePledge,
+  }
+}
+
+function resolvePledgeFrequency(amounts) {
+  if (amounts.pledge > 0 && amounts.recurring > 0) return "monthly"
+  return "one_time"
+}
+
+function resolvePledgeStatus(amounts) {
+  if (amounts.effectivePledge <= 0) return "open"
+  if (amounts.totalPaid >= amounts.effectivePledge) return "fulfilled"
+  if (amounts.totalPaid > 0) return "partial"
+  return "open"
 }
 
 function parsePaymentDate(value) {
@@ -147,10 +204,36 @@ function normalizePaymentSource(displayName, columnKind) {
   return "manual"
 }
 
+function isLedgerGroupName(name) {
+  const normalized = normalizeName(name)
+  if (!normalized) return false
+
+  const patterns = [
+    "halaqa",
+    "halqa",
+    "halaqah",
+    "committee",
+    " circle",
+    "youth group",
+    "sisters group",
+    "brothers group",
+  ]
+
+  if (patterns.some((pattern) => normalized.includes(pattern))) {
+    return true
+  }
+
+  return /\bgroup\b/.test(normalized) && !/\b(inc|llc|corp|ltd|market)\b/.test(normalized)
+}
+
 function detectContactType(row) {
   const name = normalizeText(row.Name)
   const primary = normalizeText(row["Primary Contact"])
   const primaryName = primary.split(/[?,]/)[0].trim()
+
+  if (isLedgerGroupName(name)) {
+    return "group"
+  }
 
   if (
     primaryName &&
@@ -172,16 +255,17 @@ function buildRowKey(rowIndex, row) {
   const campaign = normalizeText(row.Campaign)
   const name = normalizeNameForMatch(row.Name)
   const phone = normalizePhone(row.phone)
+  const amounts = getLedgerAmounts(row)
   const payload = [
     rowIndex,
     campaign,
     name,
     phone,
-    parseMoney(row.Pledge).toFixed(2),
-    parseMoney(row.Cash).toFixed(2),
-    parseMoney(row.Checks).toFixed(2),
-    parseMoney(row["One-time"]).toFixed(2),
-    parseMoney(row.Recurring).toFixed(2),
+    amounts.pledge.toFixed(2),
+    amounts.cash.toFixed(2),
+    amounts.checks.toFixed(2),
+    amounts.oneTime.toFixed(2),
+    amounts.recurring.toFixed(2),
   ].join("|")
 
   const hash = createHash("sha1").update(payload).digest("hex").slice(0, 12)
@@ -533,12 +617,16 @@ async function main() {
     const row = rows[index]
     const rowKey = buildRowKey(index + 2, row)
     const campaignName = normalizeText(row.Campaign)
-    const pledgeAmount = parseMoney(row.Pledge)
-    const cashAmount = parseMoney(row.Cash)
-    const checksAmount = parseMoney(row.Checks)
-    const oneTimeAmount = parseMoney(row["One-time"])
-    const recurringAmount = parseMoney(row.Recurring)
-    const totalPaid = cashAmount + checksAmount + oneTimeAmount + recurringAmount
+    const amounts = getLedgerAmounts(row)
+    const {
+      pledge: pledgeAmount,
+      cash: cashAmount,
+      checks: checksAmount,
+      oneTime: oneTimeAmount,
+      recurring: recurringAmount,
+      totalPaid,
+      effectivePledge: effectivePledgeAmount,
+    } = amounts
     const paymentDate = parsePaymentDate(row.payment_date) || "2023-12-31"
 
     if (!campaignName || !normalizeText(row.Name)) {
@@ -551,7 +639,7 @@ async function main() {
       continue
     }
 
-    if (pledgeAmount <= 0 && totalPaid <= 0) {
+    if (effectivePledgeAmount <= 0 && totalPaid <= 0) {
       report.skippedEmpty += 1
       continue
     }
@@ -563,14 +651,81 @@ async function main() {
 
     try {
       const campaign = await resolveCampaign(campaignName)
+      const displayName = normalizeText(row.Name)
+
+      if (isLedgerBatchDepositName(row.Name)) {
+        const batchKey = normalizeName(row.Name)
+        const paymentSpecs = []
+        if (cashAmount > 0) {
+          paymentSpecs.push({ kind: "cash", amount: cashAmount, source: "cash" })
+        }
+        if (checksAmount > 0) {
+          paymentSpecs.push({
+            kind: "checks",
+            amount: checksAmount,
+            source: normalizePaymentSource(row.Source, "checks"),
+          })
+        }
+        if (oneTimeAmount > 0) {
+          paymentSpecs.push({
+            kind: "one-time",
+            amount: oneTimeAmount,
+            source: "manual",
+          })
+        }
+        if (recurringAmount > 0) {
+          paymentSpecs.push({
+            kind: "recurring",
+            amount: recurringAmount,
+            source: normalizePaymentSource(row.Source, "recurring"),
+          })
+        }
+
+        for (const spec of paymentSpecs) {
+          const memo = `${rowKey}|batch|${batchKey}|${campaignName}`
+          if (args.execute) {
+            const { error } = await sb.from("payments").insert({
+              organization_id: orgId,
+              donor_id: null,
+              contact_id: null,
+              pledge_id: null,
+              campaign_id: campaign.id,
+              sender_name: null,
+              amount: spec.amount,
+              payment_date: `${paymentDate}T12:00:00`,
+              source: spec.source,
+              source_type: "import",
+              status: "unallocated",
+              memo,
+              is_verified: false,
+            })
+            if (error) throw new Error(error.message)
+          }
+          report.paymentsCreated += 1
+        }
+
+        report.batchDepositsCreated = (report.batchDepositsCreated || 0) + 1
+        if (report.samples.length < 8) {
+          report.samples.push({
+            rowKey,
+            name: displayName,
+            campaign: campaignName,
+            batchDeposit: batchKey,
+            payments: paymentSpecs.map((spec) => spec.amount),
+          })
+        }
+        continue
+      }
+
       const contact = await ensureContact(row)
       const donor = await ensureDonor(contact)
       const notes = buildNotes(row)
-      const displayName = normalizeText(row.Name)
 
       let pledgeId = null
-      if (pledgeAmount > 0) {
+      if (effectivePledgeAmount > 0) {
         const pledgeNotes = [rowKey, notes].filter(Boolean).join(" | ")
+        const pledgeFrequency = resolvePledgeFrequency(amounts)
+        const pledgeStatus = resolvePledgeStatus(amounts)
 
         if (args.execute) {
           const { data: pledge, error } = await sb
@@ -579,11 +734,11 @@ async function main() {
               organization_id: orgId,
               donor_id: donor.id,
               campaign_id: campaign.id,
-              amount_pledged: pledgeAmount,
+              amount_pledged: effectivePledgeAmount,
               pledge_date: paymentDate,
-              pledge_type: "one_time",
-              frequency: "one_time",
-              status: "open",
+              pledge_type: pledgeFrequency,
+              frequency: pledgeFrequency,
+              status: pledgeStatus,
               notes: pledgeNotes,
             })
             .select("id")
@@ -626,6 +781,17 @@ async function main() {
         const memo = `${rowKey}|${spec.kind}|${campaignName}`
         const status = pledgeId ? "allocated" : "unallocated"
 
+        if (!pledgeId && totalPaid > 0) {
+          report.warnings = report.warnings || []
+          if (report.warnings.length < 20) {
+            report.warnings.push({
+              rowKey,
+              name: displayName,
+              message: "Payment row without pledge link (dry-run or insert failure)",
+            })
+          }
+        }
+
         if (args.execute) {
           const { error } = await sb.from("payments").insert({
             organization_id: orgId,
@@ -655,6 +821,7 @@ async function main() {
           name: displayName,
           campaign: campaignName,
           pledge: pledgeAmount,
+          effectivePledge: effectivePledgeAmount,
           payments: paymentSpecs.map((spec) => spec.amount),
         })
       }

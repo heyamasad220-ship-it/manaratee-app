@@ -72,8 +72,8 @@ export function DiscountPoliciesPanel({ tags }: { tags: DiscountTag[] }) {
             <p className="text-sm font-medium text-blue-800">Discount tags</p>
             <p className="text-sm text-blue-700">
               Discount tags identify groups such as members, staff, volunteers, or scholarship
-              recipients. Assign tags on contact profiles or wire them to active memberships.
-              Program discount rules use these tags at checkout.
+              recipients. Tags are applied automatically on contact profiles when matching roles
+              are earned from activity. Program discount rules use these tags at checkout.
             </p>
           </div>
         </CardContent>

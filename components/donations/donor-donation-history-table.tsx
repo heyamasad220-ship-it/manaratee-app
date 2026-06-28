@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Link2, MoreHorizontal, Pencil, Ban, RotateCcw } from "lucide-react"
+import { Link2, MoreHorizontal, Pencil, Ban, RotateCcw, FileText } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -30,8 +30,13 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { PaymentReceiptActions } from "@/components/donations/payment-receipt-actions"
+import { ReceiptPreviewDialog } from "@/components/donations/payment-receipt-actions"
 import { formatPaymentStatusLabel } from "@/lib/donations/donation-status"
+import type { PaymentReceiptPayload } from "@/lib/donations/receipt-types"
+import {
+  generatePaymentReceiptAction,
+  getPaymentReceiptAction,
+} from "@/lib/donations/receipt-actions"
 import type { PaymentAdminRecord } from "@/lib/donations/payment-admin-types"
 import {
   allocatePaymentToOpenPledgeAction,
@@ -105,6 +110,11 @@ export function DonorDonationHistoryTable({
   const [refundAmount, setRefundAmount] = useState("")
   const [refundReason, setRefundReason] = useState("")
   const [refundFull, setRefundFull] = useState(true)
+
+  const [receiptPreviewOpen, setReceiptPreviewOpen] = useState(false)
+  const [receiptPreviewPayload, setReceiptPreviewPayload] =
+    useState<PaymentReceiptPayload | null>(null)
+  const [receiptLoading, setReceiptLoading] = useState(false)
 
   function openDialog(row: DonationHistoryRow, next: "edit" | "void" | "refund") {
     setActive(row)
@@ -216,6 +226,31 @@ export function DonorDonationHistoryTable({
     onUpdated?.()
   }
 
+  async function handleGenerateReceipt(paymentId: string) {
+    setReceiptLoading(true)
+    setError(null)
+
+    const existing = await getPaymentReceiptAction(paymentId)
+    let payload: PaymentReceiptPayload | null = null
+
+    if (existing.success) {
+      payload = existing.payload
+    } else {
+      const generated = await generatePaymentReceiptAction(paymentId)
+      if (!generated.success) {
+        setReceiptLoading(false)
+        alert(generated.error || "Could not generate receipt")
+        return
+      }
+      payload = generated.payload
+      onUpdated?.()
+    }
+
+    setReceiptLoading(false)
+    setReceiptPreviewPayload(payload)
+    setReceiptPreviewOpen(true)
+  }
+
   async function handleRefund() {
     if (!active) return
     setSaving(true)
@@ -261,13 +296,12 @@ export function DonorDonationHistoryTable({
     <>
       <TableWrapper>
         <colgroup>
-          <col style={{ width: "9%" }} />
+          <col style={{ width: "12%" }} />
+          <col style={{ width: "16%" }} />
+          <col style={{ width: "22%" }} />
           <col style={{ width: "14%" }} />
           <col style={{ width: "18%" }} />
           <col style={{ width: "10%" }} />
-          <col style={{ width: "14%" }} />
-          <col style={{ width: "18%" }} />
-          <col style={{ width: "7%" }} />
         </colgroup>
         <thead>
           <tr className="border-b">
@@ -276,7 +310,6 @@ export function DonorDonationHistoryTable({
             <th className="px-3 py-2 text-left font-medium">Category</th>
             <th className="px-3 py-2 text-left font-medium">Method</th>
             <th className="px-3 py-2 text-left font-medium">Status</th>
-            <th className="px-3 py-2 text-left font-medium">Receipt</th>
             <th className="px-3 py-2 text-right font-medium">Actions</th>
           </tr>
         </thead>
@@ -303,16 +336,15 @@ export function DonorDonationHistoryTable({
                   {formatPaymentStatusLabel(donation.status)}
                 </Badge>
               </td>
-              <td className="px-3 py-2">
-                <PaymentReceiptActions paymentId={donation.id} compact onUpdated={onUpdated} />
+              <td className="px-3 py-2 text-right">
+                <PaymentRowMenu
+                  donation={donation}
+                  receiptLoading={receiptLoading}
+                  onAction={openDialog}
+                  onAllocate={() => void openAllocateDialog(donation)}
+                  onGenerateReceipt={() => void handleGenerateReceipt(donation.id)}
+                />
               </td>
-                    <td className="px-3 py-2 text-right">
-                      <PaymentRowMenu
-                        donation={donation}
-                        onAction={openDialog}
-                        onAllocate={() => void openAllocateDialog(donation)}
-                      />
-                    </td>
             </tr>
           ))}
         </tbody>
@@ -554,6 +586,12 @@ export function DonorDonationHistoryTable({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ReceiptPreviewDialog
+        open={receiptPreviewOpen}
+        onOpenChange={setReceiptPreviewOpen}
+        payload={receiptPreviewPayload}
+      />
     </>
   )
 }
@@ -568,22 +606,20 @@ function TableWrapper({ children }: { children: React.ReactNode }) {
 
 function PaymentRowMenu({
   donation,
+  receiptLoading = false,
   onAction,
   onAllocate,
+  onGenerateReceipt,
 }: {
   donation: DonationHistoryRow
+  receiptLoading?: boolean
   onAction: (row: DonationHistoryRow, action: "edit" | "void" | "refund") => void
   onAllocate: () => void
+  onGenerateReceipt: () => void
 }) {
   const { capabilities } = donation
   const hasRefund =
     capabilities.canStripeRefund || capabilities.canRecordRefund
-  const hasAnyAction =
-    capabilities.canEdit || capabilities.canVoid || hasRefund || capabilities.canAllocate
-
-  if (!hasAnyAction) {
-    return <span className="text-xs text-muted-foreground">—</span>
-  }
 
   return (
     <DropdownMenu>
@@ -606,6 +642,10 @@ function PaymentRowMenu({
             Edit
           </DropdownMenuItem>
         ) : null}
+        <DropdownMenuItem onClick={onGenerateReceipt} disabled={receiptLoading}>
+          <FileText className="mr-2 size-4" />
+          Generate Receipt
+        </DropdownMenuItem>
         {hasRefund ? (
           <DropdownMenuItem onClick={() => onAction(donation, "refund")}>
             <RotateCcw className="mr-2 size-4" />

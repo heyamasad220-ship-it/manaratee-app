@@ -15,7 +15,7 @@ export const DONATION_METRIC_ACCENTS = [
 
 export type DonationMetricAccent = (typeof DONATION_METRIC_ACCENTS)[number]
 
-const ACCENT_STYLES: Record<
+export const ACCENT_STYLES: Record<
   DonationMetricAccent,
   { card: string; iconWrap: string; icon: string; value?: string }
 > = {
@@ -175,7 +175,7 @@ export function DonationMetricCard({
 type DonationMetricCardGridProps = {
   children: ReactNode
   className?: string
-  columns?: 2 | 3 | 4
+  columns?: 2 | 3 | 4 | 5
   colorful?: boolean
 }
 
@@ -190,7 +190,9 @@ export function DonationMetricCardGrid({
       ? "sm:grid-cols-2"
       : columns === 3
         ? "sm:grid-cols-2 lg:grid-cols-3"
-        : "sm:grid-cols-2 lg:grid-cols-4"
+        : columns === 5
+          ? "sm:grid-cols-2 lg:grid-cols-5"
+          : "sm:grid-cols-2 lg:grid-cols-4"
 
   if (colorful) {
     return (

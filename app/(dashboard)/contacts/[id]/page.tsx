@@ -4,7 +4,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 
-import { useParams, useRouter } from "next/navigation"
+import { useParams, useRouter, useSearchParams } from "next/navigation"
 
 import { Header } from "@/components/layout/header"
 
@@ -27,9 +27,8 @@ import { getCurrentOrganizationId } from "@/lib/current-organization"
 import {
 
   type ContactRoleValue,
-
   filterContactRoles,
-
+  normalizeContactRecordType,
 } from "@/lib/contacts/contact-constants"
 
 import {
@@ -39,6 +38,18 @@ import {
   type ContactProfileData,
 
 } from "@/lib/contacts/contact-profile-data"
+
+import {
+  loadContactProfileExtendedData,
+  type ContactProfileExtendedData,
+} from "@/lib/contacts/contact-profile-admin-actions"
+
+import {
+  CONTACTS_BASE_PATH,
+  contactsListSegmentForRecordType,
+  isContactsListSegment,
+} from "@/lib/contacts/contact-module-label"
+import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
 
 import { refreshContactAffiliations } from "@/lib/contacts/contact-affiliation-sync"
 
@@ -92,6 +103,8 @@ const CONTACT_DETAIL_SELECT_PLANS = [
 
     country,
 
+    notes,
+
     contact_type,
 
     status,
@@ -123,6 +136,8 @@ const CONTACT_DETAIL_SELECT_PLANS = [
     zip,
 
     country,
+
+    notes,
 
     contact_type,
 
@@ -163,6 +178,7 @@ export default function ContactDetailPage() {
   const params = useParams()
 
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   const contactId = params.id as string
 
@@ -173,6 +189,9 @@ export default function ContactDetailPage() {
   const [contact, setContact] = useState<any>(null)
 
   const [profileData, setProfileData] = useState<ContactProfileData | null>(null)
+
+  const [profileExtendedData, setProfileExtendedData] =
+    useState<ContactProfileExtendedData | null>(null)
 
   const [programAssignments, setProgramAssignments] = useState<
 
@@ -192,6 +211,8 @@ export default function ContactDetailPage() {
   const [loading, setLoading] = useState(true)
 
   const [profileLoading, setProfileLoading] = useState(true)
+
+  const [profileExtendedLoading, setProfileExtendedLoading] = useState(true)
 
   const [errorMessage, setErrorMessage] = useState("")
 
@@ -251,7 +272,19 @@ export default function ContactDetailPage() {
 
   )
 
+  const loadExtendedData = useCallback(async () => {
+    setProfileExtendedLoading(true)
 
+    try {
+      const data = await loadContactProfileExtendedData(contactId)
+      setProfileExtendedData(data)
+    } catch (error) {
+      console.error("Error loading extended contact profile data:", error)
+      setProfileExtendedData(null)
+    } finally {
+      setProfileExtendedLoading(false)
+    }
+  }, [contactId])
 
   const loadContact = useCallback(async () => {
 
@@ -397,7 +430,7 @@ export default function ContactDetailPage() {
 
     await loadProfileData(data, roles)
 
-
+    await loadExtendedData()
 
     const staffSummaryResult = await fetchStaffSummaryForContact(supabase, orgId, contactId)
     setStaffSummary(staffSummaryResult)
@@ -447,7 +480,7 @@ export default function ContactDetailPage() {
 
     setLoading(false)
 
-  }, [contactId, loadProfileData, supabase])
+  }, [contactId, loadExtendedData, loadProfileData, supabase])
 
 
 
@@ -494,10 +527,19 @@ export default function ContactDetailPage() {
 
 
   const handleContactUpdated = useCallback(async () => {
+    await loadContact()
+    const fromQuery = searchParams.get("list")
+    const list = isContactsListSegment(fromQuery)
+      ? fromQuery
+      : contact
+        ? contactsListSegmentForRecordType(normalizeContactRecordType(contact.contact_type))
+        : undefined
+    router.replace(contactProfileHref(contactId, { edit: false, list }), { scroll: false })
+  }, [contact, contactId, loadContact, router, searchParams])
 
-    router.push("/contacts")
-
-  }, [router])
+  const handleExtendedDataChanged = useCallback(async () => {
+    await loadExtendedData()
+  }, [loadExtendedData])
 
 
 
@@ -545,7 +587,7 @@ export default function ContactDetailPage() {
 
               </p>
 
-              <Button variant="outline" className="mt-4" onClick={() => router.push("/contacts")}>
+              <Button variant="outline" className="mt-4" onClick={() => router.push(CONTACTS_BASE_PATH)}>
 
                 <ArrowLeft className="mr-2 h-4 w-4" />
 
@@ -579,6 +621,10 @@ export default function ContactDetailPage() {
 
         profileData={profileData}
 
+        profileExtendedData={profileExtendedData}
+
+        profileExtendedLoading={profileExtendedLoading}
+
         profileLoading={profileLoading}
 
         programAssignments={programAssignments}
@@ -593,6 +639,8 @@ export default function ContactDetailPage() {
 
         onRolesUpdated={handleRolesUpdated}
         onContactUpdated={handleContactUpdated}
+
+        onExtendedDataChanged={handleExtendedDataChanged}
       />
 
     </>

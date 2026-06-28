@@ -173,17 +173,25 @@ Removed **255** legacy imported rows from `public.vendors` (May 2026 CSV import)
 
 **MAS Dallas contacts cleaned (June 2026):** Removed `DONATIONS_DEV_SEED_V1` test contacts; only pilot contact Heyam Asad retained. Removed erroneous `member` membership/role from Heyam (kept `employee` via active staff record). Tool: `node scripts/clean-mas-contacts-pilot.mjs`.
 
-**Contacts list UI (June 2026):** Removed Teams column and team filter from `ContactsCrmList` (`/contacts`, `/contacts/people`, `/contacts/organizations`). Team assignment remains on individual contact profiles where HR teams are enabled.
+**Contacts list UI (June 2026):** Removed **All Contacts** (`/contacts` redirects to `/contacts/people`). Sidebar lists **People**, **Families**, **Organizations**, **Groups**, and **Settings** only. User-facing **Affiliation** terminology replaced with **Roles** in Contacts → Settings automatic-role rules (contact profiles no longer show an editable Roles card — roles sync from activity only). Discount tags still sync automatically from roles in the background (`person_tags` on affiliation sync); the Discount Tags card was removed from contact profile Overview. **Contact profile Overview (June 2026):** Compact header with name, record type, status, and group badges (**Assign** opens searchable group picker via `addGroupMemberAction`); sub-tabs **General** (name, phone, DOB, gender, address, notes) and **Family** (family members). People/Organizations/Groups lists: search + add only (role/status dropdown filters removed); table columns **Contact** (name styled as link), **Email**, **Phone**, **Created by** (not stored yet — shows —), **Last modified**, **Status** (Active/Inactive only). No **Actions** column — edit, merge, and delete live on the contact profile **Overview** tab. Removed intro banners and stat cards on type-specific list pages. Removed Teams column and team filter from `ContactsCrmList`. Team assignment remains on individual contact profiles where HR teams are enabled.
+
+**Group giving attribution (June 2026):** When recording a payment (Donations → Payments or pledge payment), staff can optionally pick a **Group** from `/contacts/groups`. The gift stays on the individual contact; `payments.attributed_group_contact_id` counts it toward the group total and **auto-adds the donor to `contact_group_members`**. Group Financial tab rollups: **Group Gifts** (payments on the group donor) + **Member Gifts for Group** (attributed individual gifts) = **Combined Total**. Pooled group checks should still be recorded on the group contact directly. Apply **`scripts/136_payment_attributed_group.sql`** (after `135`). Key files: `lib/contacts/group-giving-actions.ts`, `components/donations/donation-group-picker.tsx`, `components/donations/donation-payments-panel.tsx`.
+
+**Contacts Groups record type (June 2026):** New **Groups** list at `/contacts/groups` for internal collectives (halaqas, committees, pooled giving). **Groups are the primary name** for collectives: add **members** on the group profile (**Overview → Group Members**); group gifts stay on the group Financial tab; each member’s individual gifts stay on their own profile. Group **Overview** hides address (organizations still show address). Payment methods are on the **Financial** tab for people and organizations, not groups. Group Financial tab shows **Group Gifts**, **Member Individual Gifts**, and **Combined Total** rollups. Individuals see linked groups on **Overview → Groups**. Table: `contact_group_members` (migration `135`). `contact_type = 'group'` with optional `primary_contact_name`. Group donor rows use `donor_type = 'organization'`. HR **Teams** remain optional for membership programs; use **Groups** for donation rollups. Apply: `scripts/132_contact_type_group.sql`, `scripts/133_sync_contact_affiliations_group.sql`, **`scripts/135_contact_group_members.sql`**. Key files: `lib/contacts/group-members-load-action.ts`, `lib/contacts/group-membership-data.ts`, `lib/contacts/group-member-actions.ts`, `components/contacts/contact-group-members-panel.tsx`, `components/contacts/contact-group-financial-panel.tsx`.
 
 **Settings → Users list fix (June 2026):** `/settings/users` now loads members via `fetchOrganizationUsersForSettings()` (service role + `settings.users.view`) instead of browser Supabase queries limited by RLS — admins see all org members (e.g. invited Super Admins), not only their own row. Key file: `lib/organizations/organization-users-actions.ts`.
 
 **Contacts add form (June 2026):** Add Contact no longer requires affiliations at create time; donor and other tags sync from activity or can be set on the contact profile.
 
-**Donor affiliation after first payment (June 2026):** Pledge-only or `donors` extension rows do **not** assign the Donor affiliation. The tag is added on the first linked `payments` row (staff, portal, or Stripe). Migration `scripts/114_donor_affiliation_requires_payment.sql` patches `sync_contact_affiliations` and removes incorrect auto-assigned donor roles with no payments. Key files: `lib/contacts/contact-affiliation-sync.ts`, `lib/contacts/contact-affiliation-rules.ts`.
+**Merge duplicate donor contacts (June 2026):** When the same entity was imported twice (e.g. `MSAADA` and `MSAADA Educational Foundation`), merge into one canonical contact. **Individuals only** — groups and organizations cannot be merged (UI hidden; server rejects). **UI:** contact profile **Merge duplicate** (keep this record, search for the duplicate) or list row **⋯ → Merge into another contact** (remove this row, search for the record to keep). Preview shows payments/pledges moved before confirm. Requires `contacts.manage`; merge actions use the service-role client after that gate so payment/pledge counts and relinks work without separate `donations.view`. **CLI:** `node scripts/merge-donor-contacts.mjs` (`--search`, `--target-id`, `--source-id`, `--execute`). Logic: `lib/contacts/contact-merge.ts`, `lib/contacts/contact-merge-actions.ts`, `components/contacts/contact-merge-dialog.tsx`. Keeps the richer contact as **target**; reassigns pledges/payments/donor rows, notes, roles; deletes source; syncs affiliations.
+
+**Donor affiliation after first payment (June 2026):** … **People → Donor filter** lists contacts with at least one non-voided payment (`search_donor_giving_contact_ids`, migrations `129` + **`130` grants**), not only stored affiliation tags. **Orphan donors** (missing or stale `contact_id`) are excluded from People until linked — repair: `node scripts/link-orphan-donors-to-contacts.mjs --execute` (creates/matches contacts, merges duplicate donor rows, backfills payment `contact_id`), then `node scripts/sync-donor-affiliations.mjs --execute`. Key files: `lib/contacts/contact-list-actions.ts`, `scripts/link-orphan-donors-to-contacts.mjs`.
 
 **Contacts search fix (June 2026):** Contact list search no longer references `primary_contact_name` when that column is absent in the database — fixes production search errors after bulk import.
 
 **Contact profile module gating (June 2026):** Contact detail tabs and panels respect org-enabled modules from `/api/organizations/sidebar-modules` — e.g. MAS Dallas (donations-only) hides Workforce, venue rentals, programs/membership participation, and applications sections. Key files: `lib/contacts/contact-profile-module-access.ts`, `components/contacts/contact-profile-client.tsx`.
+
+**Contact profile admin parity (June 2026):** Staff contact profile **Overview** mirrors the customer portal profile: editable address, bio/notes, date of birth, gender, and family members (add/remove). **Payment methods** (stored credit/debit cards on the contact profile) are on the **Financial** tab with **Add Card** (full card number and security code at entry; only last 4, expiration, and cardholder name persist). Apply migration `138_contact_payment_methods.sql`. **Date of birth** is optional on staff contact edit; it remains required on customer signup. Key files: `components/contacts/contact-basics-panel.tsx`, `components/contacts/contact-family-panel.tsx`, `components/contacts/contact-payment-methods-panel.tsx`, `lib/contacts/contact-payment-method-actions.ts`, `lib/contacts/contact-profile-admin-actions.ts`.
 
 **Configurable automatic affiliations (June 2026):** Contacts → Settings → **Affiliations** lets each org turn activity-based affiliations on/off. Defaults follow subscribed modules (e.g. venue-only orgs have Donor off when Donations is not enabled). Stored in `organization_affiliation_settings`; enforced by `sync_contact_affiliations` (migration `115`). Manual affiliations on contact profiles are unchanged. Files: `lib/contacts/contact-affiliation-settings.ts`, `components/contacts/affiliation-rules-panel.tsx`, `scripts/115_organization_affiliation_settings.sql`.
 
@@ -191,15 +199,21 @@ Removed **255** legacy imported rows from `public.vendors` (May 2026 CSV import)
 
 **Donation contact picker (June 2026):** Add Pledge and Record Payment search **org contacts** (name, email, phone), not only existing `donors` rows. On save, `ensureDonorExtensionForContact` creates the donor extension when needed. Add Pledge shows an **Add contact** button when search returns no matches; quick-add dialog supports **Person / Organization**, primary contact name for organizations, and auto-suggests Organization when the name looks like a company (LLC, Inc, etc.). Donor affiliation syncs on **first payment**, not pledge creation. Key files: `lib/donations/donation-list-actions.ts`, `components/contacts/quick-add-contact-dialog.tsx`.
 
-**Payment import & match (June 2026 — unified flow):** Under **Payments** → **Import** (`/donations/payments/import`; Upload + History sub-tabs) and **Match Payments** (`/donations/payments/match`). Upload CSV → payments are created immediately in the match queue (`pending_review`) in **100-row server chunks**. **Auto-match after import** is on by default: high-confidence contact matches (≥85%, email/phone/exact name) link automatically; remainder stays in Match Queue for manual review. **Auto-allocate to best pledge** (default on with auto-match) uses `lib/donations/payment-pledge-allocation.ts`: prefers **lump-sum** (`one_time`) open pledges over **installment** schedules (`monthly`, `quarterly`, `yearly`); skips installment pledges when donor has an active `recurring_donation_plans` row and a lump-sum pledge exists; leaves payment **unallocated** when two pledges tie on top balance. Bulk auto-match and **Quick Apply** share the same picker. Migrations `116`–`118`. Key files: `components/donations/payment-import-match-workspace.tsx`, `lib/donations/payment-import-match-actions.ts`, `lib/donations/payment-contact-matching.ts`, `lib/donations/payment-pledge-allocation.ts`. Legacy `/donations/import` and `/donations/reconcile` redirect to the new Payments routes.
+**Pledge reassignment (June 2026):** **Edit Pledge** on **Campaigns → Pledges** (`/donations/pledges`) and contact profile **Financial → Pledges** includes an **Assigned to** picker (person, organization, or group). Saving reassigns the pledge to the selected contact’s donor record and moves linked **payments** and **pledge reminders** with it; affiliation sync runs on both old and new contacts. Use this to move historical pledges from an individual to a group (e.g. Quran Institute). Key files: `lib/donations/pledge-admin-actions.ts` (`updatePledgeAction`, `reassignPledgeContact`), `components/donations/pledge-contact-picker.tsx`, `components/donations/donor-pledges-tab.tsx`, `app/(dashboard)/donations/(operations)/pledges/page.tsx`.
+
+**Contact Financial → Pledges + reminders (June 2026):** Contact profile **Financial** tab shows a single **Pledges** card (above Donation History) with edit/pay/cancel actions plus **Remind** and **Mark Contacted** on open pledges with a balance. Collapsible **Reminder history** appears at the bottom when activity exists. The separate **Pledge reminders** card was removed. **Donation History** no longer includes a Receipt column — receipts are emailed automatically when org receipt settings enable it (`auto_generate_receipts`, `email_receipts_automatically` in Donations Settings → Receipts). Staff can still use **Actions → Generate Receipt** when a donor requests one manually. Key files: `components/contacts/contact-donor-financial-panel.tsx`, `components/donations/donor-donation-history-table.tsx`, `components/donations/donor-pledges-tab.tsx`, `components/donations/pledge-reminder-actions.tsx`.
+
+**Payment import & match (June 2026 — unified flow):** Under **Payments** → **Import** (`/donations/payments/import`; Upload + History sub-tabs) and **Match Payments** (`/donations/payments/match`). Upload CSV → payments are created immediately in the match queue (`pending_review`) in **100-row server chunks**. **Auto-match after import** is on by default: high-confidence contact matches (≥85%, email/phone/exact name) link automatically; **name-only imports with no ≥85% match auto-create a new contact** from the payment sender name (no email/phone on the row). Weak partial matches (e.g. shared “Dr.”) are not shown as suggestions. Remainder with email/phone but no match stays for manual review. **Auto-allocate to best pledge** (default on with auto-match) uses `lib/donations/payment-pledge-allocation.ts`: prefers **lump-sum** (`one_time`) open pledges over **installment** schedules (`monthly`, `quarterly`, `yearly`); skips installment pledges when donor has an active `recurring_donation_plans` row and a lump-sum pledge exists; leaves payment **unallocated** when two pledges tie on top balance. Bulk auto-match and **Quick Apply** share the same picker. Migrations `116`–`118`. Key files: `components/donations/payment-import-match-workspace.tsx`, `lib/donations/payment-import-match-actions.ts`, `lib/donations/payment-contact-matching.ts`, `lib/donations/payment-pledge-allocation.ts`. Legacy `/donations/import` and `/donations/reconcile` redirect to the new Payments routes.
 
 **Payment reconcile matching (June 2026):** Superseded by unified Import & Match flow above. Legacy `/donations/reconcile` redirects to `/donations/payments/match`.
 
 **Campaign progress gauge (June 2026):** Speedometer-style fundraising gauge on `/donations/campaigns` (card grid for campaigns with goals) and campaign detail **Goal Progress**. Red/orange/green arc, needle, and total raised; supports exceeding 100% of goal. Component: `components/donations/campaign-progress-gauge.tsx`.
 
+**Campaign source breakdown (June 2026):** Campaign detail (`/donations/campaigns/[id]`) shows fundraising metrics in a **colorful table** (Cash, Checks, Square, One-Time, Recurring, Ticket Sales, Donors, Largest Gift, Pledges last with highlight) plus **Goal Progress** gauge on the right. **Per-campaign metric customization:** **Customize** on the overview table toggles visible rows and order; **Automatic** mode (default) hides empty source rows such as Ticket Sales or Square until they have activity. Stored in `campaigns.overview_metric_keys` (migration `134`). Below metrics: **Outstanding Pledges** table for the campaign (donor, pledged/paid/balance, status, date). Donor names open **Contact profile in a modal** (`ContactProfileDialog`) from outstanding pledges, campaign donors list, and largest-gift row. Logic: `computeCampaignSourceBreakdown`, `fetchCampaignOutstandingPledges` in `lib/donations/campaign-analytics.ts`; metric config: `lib/donations/campaign-overview-metrics.ts`; UI: `campaign-source-breakdown-cards.tsx`, `campaign-overview-metrics-editor.tsx` (`CampaignOverviewMetricsTable`), `campaign-outstanding-pledges-table.tsx`.
+
 **Donations payment methods add (June 2026):** Donations Settings → Payment Methods now supports **Add Payment Method** (custom name, processing fee label, enabled toggle) in addition to edit/delete/toggle. File: `app/(dashboard)/donations/settings/page.tsx`.
 
-**MAS campaign ledger import (June 2026):** Historical pledge/payment spreadsheet import via `node scripts/import-mas-campaign-ledger.mjs --file <csv> [--campaign <name>] [--execute] [--create-campaigns]`. Dry-run by default. Maps Pledge → `pledges`, Cash/Checks/One-time/Recurring → `payments`, normalizes names for contact matching. Tag: `MAS_CAMPAIGN_LEDGER_V1`. Skips spreadsheet summary rows (`Total`, `Subtotal`, `Grand Total`). If CSV campaign spelling differs from an existing record (e.g. `Ramadan2025` vs `Ramadan 2025`), merge with `node scripts/merge-mas-ramadan2025-campaign.mjs --execute`. Erroneous summary donor cleanup: `node scripts/clean-mas-ledger-total-donor.mjs --execute`. Placeholder donor cleanup (names that are only `?`, start with `?`, or high `?` ratio without a real Latin name): `node scripts/merge-mas-anonymous-placeholder-donors.mjs [--target "Anonymous"] [--target-id <uuid>] [--execute]` — reassigns pledges/payments to the canonical Anonymous donor and deletes source donors/orphan contacts. Report: `scripts/reports/mas-anonymous-placeholder-donor-merge-<date>.json`.
+**MAS campaign ledger import (June 2026):** Historical pledge/payment spreadsheet import via `node scripts/import-mas-campaign-ledger.mjs --file <csv> [--campaign <name>] [--execute] [--create-campaigns]`. Dry-run by default. **Ledger semantics:** `Pledge` = explicit commitment; `Cash`/`Checks` = direct payments; `One-time`/`CC` = one-time card payment toward a pledge; `Recurring`/`CC+` = installment payments toward a pledge. **Blank Pledge + payment(s)** → implicit fulfilled pledge equal to total payments on the row (no outstanding balance). Tag: `MAS_CAMPAIGN_LEDGER_V1`. Skips spreadsheet summary rows (`Total`, `Subtotal`, `Grand Total`). **Group names** (e.g. `Wednesday Halaqa`) import as `contact_type = group`, not People. **Square terminal batches:** ledger rows named `Square` import as campaign batch deposits (`source: square`, no People contact) and appear on the campaign overview **Square** line alongside Cash/Checks. **Repair existing Square donor:** `node scripts/clean-mas-ledger-square-batch.mjs --execute`. **Reclassify group mis-imports:** `node scripts/reclassify-mas-ledger-group-contacts.mjs --execute` (after migration `132`). **Repair existing imports:** `node scripts/repair-mas-ledger-implicit-pledges.mjs [--execute]` — creates missing implicit pledges and links unallocated MAS-tagged payments without re-importing. If CSV campaign spelling differs from an existing record (e.g. `Ramadan2025` vs `Ramadan 2025`), merge with `node scripts/merge-mas-ramadan2025-campaign.mjs --execute`. Erroneous summary donor cleanup: `node scripts/clean-mas-ledger-total-donor.mjs --execute`. Placeholder donor cleanup (names that are only `?`, start with `?`, or high `?` ratio without a real Latin name): `node scripts/merge-mas-anonymous-placeholder-donors.mjs [--target "Anonymous"] [--target-id <uuid>] [--execute]` — reassigns pledges/payments to the canonical Anonymous donor and deletes source donors/orphan contacts. Report: `scripts/reports/mas-anonymous-placeholder-donor-merge-<date>.json`.
 
 **Donations pilot blockers (June 2026):** Migrations `119`–`120` — voided payments excluded from `pledge_status_view` balances and headline totals; cancelled pledges emit `calculated_status = cancelled` (excluded from Collect/allocation); portal pledge pay saves `status = allocated`. Validation: `lib/donations/pilot-blocker-validation.test.ts`. Apply: `119_donations_pilot_blocker_views.sql`, `120_donations_pilot_blocker_totals.sql`.
 
@@ -207,13 +221,15 @@ Removed **255** legacy imported rows from `public.vendors` (May 2026 CSV import)
 
 **Pledge collection merged into Pledges (June 2026):** Collect tab removed; collection reminders, last-contacted dates, and inline reminder actions live on **Campaigns → Pledges** (`/donations/pledges#collection-queue`). Legacy `/donations/collect` redirects to the same anchor.
 
+**Donors giving report (June 2026):** Reports → **Donors** (`/donations/reports/donors`) … Donor names link to the **canonical contact profile** Financial tab (`/contacts/[contactId]?tab=financial`), not a separate donor page. Full giving tools (metrics, history, pledges, statements, recurring) live on that tab via `ContactDonorFinancialPanel`. Legacy `/donations/donors/individuals/[id]` and `/donations/donors/organizations/[id]` redirect to the contact profile when `donors.contact_id` is set. Contact basics and notes remain on the profile **Overview** tab. Apply `scripts/127_donor_giving_report.sql` and `scripts/128_donor_giving_report_contact_id.sql`.
+
 **Receipts tab merged (June 2026):** Reports **Receipts** (`/donations/reports/receipts`) combines receipt summary metrics + year-end giving statements table. Per-donor **⋯** menu: View statement, Download PDF, Send statement email. `/donations/reports/tax-receipts` redirects to Receipts. Per-payment receipt actions remain on Payments (`PaymentReceiptActions`).
 
 **Tax Receipts duplicate donor rows (June 2026):** `donation_donor_tax_year_totals` now groups by `donor_id` only (not `sender_name`). App merges RPC rows defensively in `mergeDonorTaxYearTotals`. Apply: `scripts/126_donation_tax_year_totals_group_by_donor.sql` (or re-run updated `125` on fresh installs).
 
 **Pledges summary cards (June 2026):** Pledges page stat cards match Donations Overview styling (colored left border, rounded icon badges). File: `app/(dashboard)/donations/(operations)/pledges/page.tsx`.
 
-**Donation attribution fields (June 2026):** Add Pledge / Record Payment forms pick **Fund** first (enabled); **Category** auto-fills from the fund and is read-only when funds exist in settings. File: `components/donations/donation-attribution-fields.tsx`.
+**Donation attribution fields (June 2026):** Add Pledge / Record Payment forms pick **Fund** first (enabled); **Category** auto-fills from the fund and is read-only when funds exist. Manage categories and funds under **Donations → Settings → Categories** (`donation_categories`, `donation_subcategories`). File: `components/donations/donation-attribution-fields.tsx`, `app/(dashboard)/donations/settings/page.tsx`.
 
 **The Asad Realty org removed (June 2026):** Deleted dev/stress org `95c4eb7d-b151-4aa1-a489-a3c1e1289c7e` and org-scoped data (~7.5k payments, 1k donors, campaigns, contacts, etc.). **MAS Dallas pilot org preserved.** Backup: `scripts/backups/organization-delete/organization-delete-95c4eb7d-...json`. Tools: `node scripts/delete-organization.mjs` (dry run / `--execute --confirm-name=...`), `node scripts/cleanup-organization-orphans.mjs` for leftover rows. Auth users with **only** Asad membership were removed; `heyamasad220@gmail.com` kept (MAS membership).
 
@@ -726,7 +742,7 @@ Every canonical `payments` and `pledges` write path stores `campaign_id`, `categ
 | Path | File | Behavior |
 |------|------|----------|
 | Staff one-time payment | `components/donations/donation-payments-panel.tsx` (`/donations/payments/one-time`) | Contact picker searches all contacts; attribution pickers on insert; pledge allocate copies FKs from pledge |
-| Staff pledge create/edit | `app/(dashboard)/donations/pledges/page.tsx` | Contact picker searches all contacts; full FK pickers; **fixed** edit pledge writing campaign UUID (was display name) |
+| Staff pledge create/edit | `app/(dashboard)/donations/pledges/page.tsx` | Contact picker searches all contacts; full FK pickers; edit pledge supports **Assigned to** reassignment (person/org/group) via `updatePledgeAction` |
 | Staff pledge payment | `app/(dashboard)/donations/pledges/page.tsx` | Copies pledge FKs onto payment |
 | Portal one-time / pledge / pledge pay | `app/(customer)/customer/donation/page.tsx` | FKs on insert; optional campaign picker |
 | Portal data | `lib/customer/customer-portal-data-actions.ts` | Payments select includes attribution columns; loads campaigns |
@@ -1078,9 +1094,9 @@ npm run validate:donations-production
 
 * `lib/donations/donation-list-actions.ts` — paginated payments, pledges, donor summary queries (50/page)
 * `/donations/payments/one-time` — summary metric cards + server-paginated payments table + search/status filters
-* `/donations/pledges` — server-paginated table; filters: status, campaign, minimum pledged amount; summary cards via `donation_org_pledge_summary` RPC
-* `/donations/donors` — `DonorsPaginatedList` on `donor_summary_view` (replaces full contact scan). Search by name, email, or phone; filter by open pledge status. Donor profile **Pledges** dialog supports edit, record payment, mark as paid, and cancel (`lib/donations/pledge-admin-actions.ts`, `components/donations/donor-pledges-tab.tsx`). **Open pledge** badge and donor profile **Active Pledge** use `has_open_pledge` from `balance_remaining > 0` (migration `124_donor_summary_outstanding_pledge.sql`), not stale `pledges.status = open`.
-* `/donations` dashboard — KPI summary cards, Goal Achievement, recent payments (5 rows), quick links
+* `/donations/pledges` — server-paginated table; filters: status, campaign, minimum pledged amount; pledge summary cards reflect the same filters; donor name opens contact profile in a modal (`ContactProfileDialog`)
+* `/donations/reports/donors` — `DonorsReportPanel` via `donation_donor_giving_report` RPC: period (lifetime / calendar year / custom), donor type, lapsed-only, pledge filters, outstanding pledge column, CSV + PDF export. Donor profiles at `/donations/donors/individuals/[id]`, `/donations/donors/organizations/[id]`. Apply `scripts/127_donor_giving_report.sql`.
+* `/donations` dashboard — KPI summary cards (active campaigns, collected, outstanding, payments this month)
 
 ### Operational visibility
 
@@ -1102,14 +1118,14 @@ npm run validate:donations-production
 Status: Implemented (June 2026)
 
 * Sidebar: **Overview**, **Payments**, **Campaigns**, **Reports**, **Settings** (`components/layout/sidebar.tsx`)
-* **Payments** — tabs: **One-Time Donations** (`/donations/payments/one-time`), **Recurring Donations** (`/donations/payments/recurring`), **Import** (`/donations/payments/import`; Upload + History), **Match Payments** (`/donations/payments/match`; manage permission; operational health panel); shell: `components/donations/donation-payments-shell.tsx`
+* **Payments** — tabs: **One-Time Donations** (`/donations/payments/one-time`), **Recurring Donations** (`/donations/payments/recurring`), **Import** (`/donations/payments/import`; Upload + History), **Match Payments** (`/donations/payments/match`; manage permission; operational health panel; colorful KPI cards for needs match / matched-not-allocated / unresolved / queue amount; default queue filter **All**); shell: `components/donations/donation-payments-shell.tsx`
 * **Reports** — tab bar (`components/donations/donation-reports-nav.tsx`):
-  * **Donors** — `/donations/donors` (donor list + profiles under `/donations/donors/individuals/[id]`, `/donations/donors/organizations/[id]`)
+  * **Donors** — `/donations/reports/donors` (giving report + CSV export; profiles under `/donations/donors/individuals/[id]`, `/donations/donors/organizations/[id]`)
   * **Receipts** — `/donations/reports/receipts`
-* **Campaigns** — tabs: **Overview** (`/donations/campaigns`; campaign list with add/edit/delete), **Pledges** (`/donations/pledges`; pledge management, filters, collection reminders at `#collection-queue`). Campaign detail: `/donations/campaigns/[id]`
+* **Campaigns** — tabs: **Overview** (`/donations/campaigns`; org-wide pledge summary cards + campaign list with add/edit/delete), **Pledges** (`/donations/pledges`; campaign-filtered pledge summary cards, pledge table, filters, collection reminders at `#collection-queue`). Campaign detail: `/donations/campaigns/[id]`
 * Former **Donation Manager** sidebar item removed; Collect merged into Pledges; Import & Match moved under Payments
 * Former **Records** sidebar item removed; duplicate read-only tabs (Donations, Donors, Campaigns, Recurring) removed from monolithic reports page
-* `/donations/reports` redirects to **Donors** (`/donations/donors`)
+* `/donations/reports` redirects to **Donors** (`/donations/reports/donors`)
 * Record payment / add pledge remain on donor profile pages; **+ Record Payment** on One-Time Donations list preserved
 
 ## Campaign goals & fundraising analytics (Priority 3)
@@ -1132,10 +1148,10 @@ Status: Implemented (June 2026)
 
 | Route | Purpose |
 |-------|---------|
-| `/donations/campaigns` | Campaigns Overview — all campaigns table (most recent first) |
-| `/donations/campaigns/[id]` | Campaign detail — clickable name (edit), colorful summary/donor metric cards, donor list dialog, largest-gift donor link |
-| `/donations` | Dashboard widgets: pledge/payment summary cards, Goal Achievement, recent payments, quick links |
-| `/donations/settings` | Categories and Payment Methods support add/edit/delete; receipt and pledge reminder settings (June 2026). Campaign CRUD moved to **Campaigns → Overview** (`/donations/campaigns`). |
+| `/donations/campaigns` | Campaigns Overview — org-wide pledge summary cards; fundraising campaigns table (most recent first) |
+| `/donations/campaigns/[id]` | Campaign detail — source breakdown + donor metrics (left), goal gauge (right) |
+| `/donations` | Dashboard KPI summary cards |
+| `/donations/settings` | Categories, **Funds** (subcategories under categories), Payment Methods, receipt and pledge reminder settings. Campaign CRUD is under **Campaigns → Overview**. |
 
 ### Validation
 
@@ -1221,7 +1237,8 @@ Migration `scripts/091_pledge_reminders.sql`:
 | `/donations/settings` → Pledge Reminders | Enable reminders, message templates, schedule options |
 | `/donations/pledges` | Pledge list (filters: campaign, status, min amount), add/edit/pay, last reminder/contacted columns, inline reminder actions, detail dialog |
 | `/donations/collect` | Redirects to `/donations/pledges#collection-queue` |
-| `/donations/donors/*/[id]` | Active pledges, outstanding balance, reminder history |
+| `/donations/donors/*/[id]` | Redirects to contact profile Financial tab when linked |
+| `/contacts/[id]?tab=financial` | Pledges (with Remind / Mark Contacted), reminder history, donation history |
 | `/donations/reports/collection` | Redirects to `/donations/pledges#collection-queue` |
 
 ### Workflow
@@ -1352,11 +1369,11 @@ Activity write (donation, enrollment, ticket order, volunteer roster)
 |--------|-------|
 | **S-01** | `handleDonationAffiliationSync` accepts optional `organizationId` + `supabaseClient` for webhook/service-role callers |
 | **S-02/S-03** | Stripe webhook donation affiliation sync via `syncDonationAffiliationFromWebhook` |
-| **S-04A/B** | Participation roles `program_participant`, `event_attendee` (+ schema slot `venue_rental_customer`); derivation in `computeDerivedAffiliations` |
+| **S-04A/B** | Unified **Customer** role (`customer`) replaces `program_participant`, `event_attendee`, `venue_rental_customer`; derivation in `computeDerivedAffiliations` + RPC (migration `137_customer_role_merge.sql`) |
 | **S-05/S-06** | Portal/staff pledge **payment** → `handleDonationAffiliationSync`; pledge create does not sync donor |
 | **S-07** | `createTicketOrder` → `findOrCreateContact` + `ticket_orders.contact_id` |
 | **S-08** | Ticketing completion → `syncContactAffiliations` on completed orders |
-| **S-09/S-10** | Program `participant_contact_id` via `ensureContactForPerson`; enrollment → `syncContactAffiliations` for `program_participant` |
+| **S-09/S-10** | Program `participant_contact_id` via `ensureContactForPerson`; enrollment → `syncContactAffiliations` for **Customer** |
 | **S-11** | `ensureVolunteerForContact` fixed — roster + `syncContactAffiliations` only |
 | **S-12** | Unified validation runner + shared lib + cross-module role accumulation |
 | **S-13** | Documentation closeout — `Features.md`, `Project_Context.md`, `Database_Overview.md`, `Module_Inventory.md` |
@@ -1367,11 +1384,10 @@ Activity write (donation, enrollment, ticket order, volunteer roster)
 |------|------------------|-------------|------------|
 | `donor` | Linked `payments` for contact (direct or via `donor_id`) | Never (sticky) | `handleDonationAffiliationSync` / webhook helper |
 | `volunteer` | `volunteers` row for contact | Never (sticky) | `syncContactAffiliations` |
-| `program_participant` | `program_enrollments.participant_contact_id`, status ∉ `cancelled`, `withdrawn`, `transferred` | Never (sticky) | `syncContactAffiliations` |
-| `event_attendee` | `ticket_orders.contact_id` with `status = completed` | Never (sticky) | `syncContactAffiliations` |
+| `customer` | Program enrollment (non-terminal), completed ticket order, or venue rental with `billing_contact_id` (status not declined/cancelled/draft) | Never (sticky) | `syncContactAffiliations` |
 | `member` | Active `memberships` row | Yes when membership lapses | `syncContactAffiliations` |
 
-`venue_rental_customer` is in the CHECK constraint only; derivation deferred until venue rental linkage lands.
+Migration **`137_customer_role_merge.sql`** backfills legacy `program_participant`, `event_attendee`, and `venue_rental_customer` rows into `customer` and merges org auto-sync settings.
 
 ### Module write paths
 
@@ -1413,7 +1429,7 @@ Unified runner executes policy checks, six module suites, and cross-module role 
 | Program participant | `validate:program-participant-sync` | S-09/S-10 |
 | Volunteer identity | `validate:volunteer-identity-sync` | S-11 |
 
-**Matrix covered:** donations (one-time, recurring, pledge create/pay), ticketing (complete, pending→complete, contact reuse), programs (enroll, contact create/reuse, sticky terminal), volunteers (create, reuse, dedupe), cross-module accumulation (donor + volunteer + program_participant + event_attendee on one contact), policy (sticky roles, member auto-removable, sync primary path, no profile-refresh dependency).
+**Matrix covered:** donations (one-time, recurring, pledge create/pay), ticketing (complete, pending→complete, contact reuse), programs (enroll, contact create/reuse, sticky terminal), volunteers (create, reuse, dedupe), cross-module accumulation (donor + volunteer + customer on one contact), policy (sticky roles, member auto-removable, sync primary path, no profile-refresh dependency).
 
 **Last validated:** June 2026 — policy 8/8, suites 7/7, checks 75/75 (`validate:contacts-phase1:report`).
 
@@ -1421,7 +1437,6 @@ Unified runner executes policy checks, six module suites, and cross-module role 
 
 * Historical enrollment/ticket `contact_id` backfill
 * Participant merge UI and dedupe tooling
-* `venue_rental_customer` activity linkage
 * Contact segmentation / advanced CRM panels
 * Volunteer application approval → automatic roster (approval UX unchanged in Phase 1)
 * Staff enrollment paths outside `register_for_program` / `promote_waitlist`

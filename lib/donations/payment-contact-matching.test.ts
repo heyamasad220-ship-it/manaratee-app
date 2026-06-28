@@ -2,6 +2,8 @@ import assert from "node:assert/strict"
 import { describe, it } from "node:test"
 
 import {
+  canAutoCreateContactFromPaymentHints,
+  filterStrongContactMatches,
   isAutoMatchEligible,
   rankContactMatches,
   resolvePaymentMatchHints,
@@ -84,5 +86,64 @@ describe("payment contact matching", () => {
     })
 
     assert.equal(hints.email, "donor@example.com")
+  })
+
+  it("allows auto-create only for name-only imports", () => {
+    assert.equal(
+      canAutoCreateContactFromPaymentHints({
+        senderName: "Dr. Ahmed Abdel Rahman",
+        email: null,
+        phone: null,
+      }),
+      true
+    )
+
+    assert.equal(
+      canAutoCreateContactFromPaymentHints({
+        senderName: "Dr. Ahmed Abdel Rahman",
+        email: "ahmed@example.com",
+        phone: null,
+      }),
+      false
+    )
+
+    assert.equal(
+      canAutoCreateContactFromPaymentHints({
+        senderName: "Unknown",
+        email: null,
+        phone: null,
+      }),
+      false
+    )
+  })
+
+  it("filters weak suggested matches from staff review", () => {
+    const strong = filterStrongContactMatches([
+      {
+        contactId: "c1",
+        donorId: null,
+        name: "Weak",
+        email: "",
+        phone: "",
+        totalDonations: 0,
+        lastDonation: "",
+        confidenceScore: 58,
+        matchReason: "Single-word match (dr)",
+      },
+      {
+        contactId: "c2",
+        donorId: null,
+        name: "Strong",
+        email: "",
+        phone: "",
+        totalDonations: 0,
+        lastDonation: "",
+        confidenceScore: 95,
+        matchReason: "Exact name match",
+      },
+    ])
+
+    assert.equal(strong.length, 1)
+    assert.equal(strong[0]?.contactId, "c2")
   })
 })

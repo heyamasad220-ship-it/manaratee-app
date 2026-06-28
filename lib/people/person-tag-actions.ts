@@ -5,9 +5,12 @@ import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 
-export async function ensurePersonForContact(contactId: string) {
+export async function ensurePersonForContact(
+  contactId: string,
+  organizationIdInput?: string | null
+) {
   const supabase = await createClient()
-  const organizationId = await getSelectedOrganizationId()
+  const organizationId = organizationIdInput ?? (await getSelectedOrganizationId())
 
   if (!organizationId) {
     throw new Error("No organization selected")

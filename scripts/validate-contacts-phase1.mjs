@@ -68,7 +68,7 @@ const schemaCheck = await assertParticipationRolesSchema(sb)
 recordPolicy(
   "schema-participation-roles",
   schemaCheck.ok,
-  schemaCheck.message || "program_participant + event_attendee allowed"
+  schemaCheck.message || "customer role allowed in contact_roles"
 )
 
 for (const role of PHASE1_PARTICIPATION_ROLES) {
@@ -322,7 +322,7 @@ function computeReadinessScores(input) {
       "Member remains auto-removable (unchanged)",
     ]),
     crossModuleParticipation: score(crossPass, [
-      "Donor + volunteer + program_participant + event_attendee on one contact",
+      "Donor + volunteer + customer on one contact",
       "Role accumulation and idempotent sync verified",
     ]),
     crmReadiness: score(suitesPass && policyPass, [

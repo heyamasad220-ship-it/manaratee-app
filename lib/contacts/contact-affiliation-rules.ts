@@ -1,10 +1,19 @@
 import type { ContactRoleValue } from "@/lib/contacts/contact-constants"
 
-/** Terminal program enrollment statuses — do not confer program_participant. */
+/** Terminal program enrollment statuses — do not confer customer from programs. */
 export const PROGRAM_PARTICIPANT_TERMINAL_STATUSES = [
   "cancelled",
   "withdrawn",
   "transferred",
+] as const
+
+/** Venue rental statuses that do not confer customer. */
+export const VENUE_RENTAL_CUSTOMER_EXCLUDED_STATUSES = [
+  "draft",
+  "declined",
+  "hold_expired",
+  "cancelled_before_payment",
+  "cancelled_after_payment",
 ] as const
 
 /** Affiliation roles computed automatically from activity (not manually assigned). */
@@ -15,8 +24,7 @@ export const DERIVED_AFFILIATION_ROLES = [
   "member",
   "vendor",
   "childcare_provider",
-  "program_participant",
-  "event_attendee",
+  "customer",
 ] as const satisfies readonly ContactRoleValue[]
 
 export type DerivedAffiliationRole = (typeof DERIVED_AFFILIATION_ROLES)[number]
@@ -33,8 +41,7 @@ export const STICKY_DERIVED_ROLES: DerivedAffiliationRole[] = [
   "donor",
   "volunteer",
   "vendor",
-  "program_participant",
-  "event_attendee",
+  "customer",
 ]
 
 /** Application types that trigger affiliation sync on submit or status change. */
@@ -62,8 +69,7 @@ export const AFFILIATION_ROLE_MODULE_SLUGS: Record<
   volunteer: ["workforce", "hr"],
   employee: ["workforce", "hr"],
   member: ["membership"],
-  program_participant: ["programs"],
-  event_attendee: ["event-management", "ticketing"],
+  customer: ["programs", "event-management", "ticketing", "bookings"],
 }
 
 function normalizeAffiliationModuleSlug(slug: string): string {
@@ -148,21 +154,13 @@ export const AFFILIATION_RULE_DEFINITIONS: AffiliationRuleDefinition[] = [
     moduleSlugs: AFFILIATION_ROLE_MODULE_SLUGS.member,
   },
   {
-    role: "program_participant",
-    label: "Program Participant",
-    trigger: "Non-terminal program enrollment for participant_contact_id",
-    autoAdd: "Yes — on registration",
-    autoRemove: "Never — alumni/history retained",
-    moduleList: "Programs → Registrations",
-    moduleSlugs: AFFILIATION_ROLE_MODULE_SLUGS.program_participant,
-  },
-  {
-    role: "event_attendee",
-    label: "Event Attendee",
-    trigger: "Completed ticket order linked to contact",
-    autoAdd: "Yes — on completed ticket purchase",
-    autoRemove: "Never — attendance history retained",
-    moduleList: "Events → Ticketing",
-    moduleSlugs: AFFILIATION_ROLE_MODULE_SLUGS.event_attendee,
+    role: "customer",
+    label: "Customer",
+    trigger:
+      "Program enrollment, completed ticket purchase, or linked venue rental (billing contact)",
+    autoAdd: "Yes — on registration, purchase, or rental request",
+    autoRemove: "Never — customer history retained",
+    moduleList: "Programs, Events → Ticketing, Bookings → Venue Rentals",
+    moduleSlugs: AFFILIATION_ROLE_MODULE_SLUGS.customer,
   },
 ]

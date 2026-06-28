@@ -1,3 +1,5 @@
+import { Fragment } from "react"
+
 type Payment = {
   id: string
   amount: number | string
@@ -43,41 +45,47 @@ export function PaymentHistory({ payments }: { payments: Payment[] }) {
       <div className="flex items-start justify-between">
         <div>
           <h3 className="text-base font-semibold">Payment History</h3>
-          <p className="text-sm text-muted-foreground">
-            All payments recorded for this pledge.
-          </p>
+          <p className="text-sm text-muted-foreground">All payments recorded for this pledge.</p>
         </div>
 
         <div className="text-right text-sm">
-  <div className="font-medium">
-    {formatCurrency(totalPaid)}
-  </div>
-  <div className="text-muted-foreground text-xs">
-    {payments.length} payments
-  </div>
-</div>
+          <div className="font-medium">{formatCurrency(totalPaid)}</div>
+          <div className="text-xs text-muted-foreground">
+            {payments.length} payments
+          </div>
+        </div>
       </div>
 
-      <div className="rounded-md border overflow-hidden">
+      <div className="overflow-hidden rounded-md border">
         <table className="w-full text-sm">
           <thead className="bg-muted/50">
             <tr className="border-b">
-              <th className="text-left p-3 font-medium">Date</th>
-              <th className="text-left p-3 font-medium">Amount</th>
-              <th className="text-left p-3 font-medium">Method</th>
-              <th className="text-left p-3 font-medium">Memo</th>
+              <th className="p-3 text-left font-medium">Date</th>
+              <th className="p-3 text-left font-medium">Amount</th>
+              <th className="p-3 text-left font-medium">Method</th>
             </tr>
           </thead>
           <tbody>
             {payments.map((payment) => (
-              <tr key={payment.id} className="border-b last:border-b-0">
-                <td className="p-3">{formatDate(payment.payment_date)}</td>
-                <td className="p-3 font-medium">
-                  {formatCurrency(payment.amount)}
-                </td>
-                <td className="p-3 capitalize">{payment.source || "—"}</td>
-                <td className="p-3">{payment.memo || "—"}</td>
-              </tr>
+              <Fragment key={payment.id}>
+                <tr className="border-b-0">
+                  <td className="p-3 pb-2 align-top">{formatDate(payment.payment_date)}</td>
+                  <td className="p-3 pb-2 align-top font-medium">
+                    {formatCurrency(payment.amount)}
+                  </td>
+                  <td className="p-3 pb-2 align-top capitalize">{payment.source || "—"}</td>
+                </tr>
+                <tr className="border-b last:border-b-0">
+                  <td colSpan={3} className="px-3 pb-3 pt-0">
+                    <div className="border-t border-border pt-3">
+                      <p className="text-sm font-semibold text-foreground">Memo</p>
+                      <p className="mt-1.5 break-all text-sm text-muted-foreground">
+                        {payment.memo || "—"}
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              </Fragment>
             ))}
           </tbody>
         </table>

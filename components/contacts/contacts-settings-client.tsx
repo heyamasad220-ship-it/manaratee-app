@@ -14,6 +14,7 @@ type ContactsSettingsTab = (typeof settingsTabs)[number]
 
 function normalizeTab(tab?: string | null): ContactsSettingsTab {
   if (tab === "benefits") return "discount-tags"
+  if (tab === "roles") return "affiliations"
   if (tab && settingsTabs.includes(tab as ContactsSettingsTab)) {
     return tab as ContactsSettingsTab
   }
@@ -54,7 +55,7 @@ export function ContactsSettingsClient({
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
         <p className="text-sm text-muted-foreground">
-          Affiliation policies, eligibility tags, and related configuration.
+          Role auto-tagging rules, eligibility tags, and related configuration.
         </p>
       </div>
 
@@ -62,7 +63,7 @@ export function ContactsSettingsClient({
         <TabsList>
           <TabsTrigger value="affiliations" className="gap-2">
             <Users className="size-4" />
-            Affiliations
+            Roles
           </TabsTrigger>
           <TabsTrigger value="discount-tags" className="gap-2">
             <Tags className="size-4" />

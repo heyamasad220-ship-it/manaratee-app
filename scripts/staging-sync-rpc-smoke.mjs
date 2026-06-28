@@ -126,7 +126,7 @@ if (event?.id && tickContactId) {
     .from("contact_roles")
     .select("id")
     .eq("contact_id", tickContactId)
-    .eq("role", "event_attendee")
+    .eq("role", "customer")
     .maybeSingle()
   pass("ticketing-event-attendee-role", !!attendeeRole?.id, attendeeRole?.id || "missing")
 

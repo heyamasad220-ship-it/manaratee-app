@@ -1,3 +1,5 @@
+import type { ContactsListSegment } from "@/lib/contacts/contact-module-label"
+
 export type ContactProfileTab =
   | "overview"
   | "participation"
@@ -8,6 +10,7 @@ export type ContactProfileTab =
 type ContactProfileHrefOptions = {
   tab?: ContactProfileTab
   edit?: boolean
+  list?: ContactsListSegment
 }
 
 export function contactProfileHref(
@@ -16,15 +19,20 @@ export function contactProfileHref(
 ): string {
   let tab: ContactProfileTab | undefined
   let edit = false
+  let list: ContactsListSegment | undefined
 
   if (typeof tabOrOptions === "string") {
     tab = tabOrOptions
   } else if (tabOrOptions) {
     tab = tabOrOptions.tab
     edit = tabOrOptions.edit ?? false
+    list = tabOrOptions.list
   }
 
   const params = new URLSearchParams()
+  if (list) {
+    params.set("list", list)
+  }
   if (tab && tab !== "overview") {
     params.set("tab", tab)
   }

@@ -56,8 +56,7 @@ export const PHASE1_SUITES = [
 export const PHASE1_PARTICIPATION_ROLES = [
   "donor",
   "volunteer",
-  "program_participant",
-  "event_attendee",
+  "customer",
 ]
 
 export const PROGRAM_PARTICIPANT_TERMINAL_STATUSES = [
@@ -153,7 +152,7 @@ export async function hasRole(sb, organizationId, contactId, role) {
  * Probe whether a role value is allowed by contact_roles_role_check (migration 101 for participation roles).
  */
 export async function assertRoleAllowedInSchema(sb, role, migrationHint) {
-  const probeContactId = `00000000-0000-0000-0000-${role === "donor" ? "000000000097" : role === "volunteer" ? "000000000096" : role === "program_participant" ? "000000000098" : "000000000099"}`
+  const probeContactId = `00000000-0000-0000-0000-${role === "donor" ? "000000000097" : role === "volunteer" ? "000000000096" : role === "customer" ? "000000000098" : "000000000099"}`
   const { error } = await sb.from("contact_roles").insert({
     organization_id: "00000000-0000-0000-0000-000000000001",
     contact_id: probeContactId,
@@ -182,19 +181,11 @@ export async function assertRoleAllowedInSchema(sb, role, migrationHint) {
 }
 
 export async function assertParticipationRolesSchema(sb) {
-  const results = []
-  for (const role of ["program_participant", "event_attendee"]) {
-    results.push(
-      await assertRoleAllowedInSchema(
-        sb,
-        role,
-        "Run scripts/101_contact_participation_roles.sql before Contacts Phase 1 validation"
-      )
-    )
-  }
-  const failed = results.find((result) => !result.ok)
-  if (failed) return failed
-  return { ok: true }
+  return assertRoleAllowedInSchema(
+    sb,
+    "customer",
+    "Run scripts/137_customer_role_merge.sql before Contacts Phase 1 validation"
+  )
 }
 
 export function assertStickyRoleInRules(role) {
@@ -290,7 +281,7 @@ export async function applyVolunteerAffiliationMirror(sb, organizationId, contac
   await upsertDerivedRoleMirror(sb, organizationId, contactId, "volunteer")
 }
 
-/** Mirrors computeDerivedAffiliations program_participant derivation. */
+/** Mirrors computeDerivedAffiliations customer derivation from programs. */
 export async function applyProgramParticipantAffiliationMirror(sb, organizationId, contactId) {
   const terminalFilter = PROGRAM_PARTICIPANT_TERMINAL_STATUSES.join(",")
   const { count, error } = await sb
@@ -305,10 +296,10 @@ export async function applyProgramParticipantAffiliationMirror(sb, organizationI
   }
 
   if ((count ?? 0) === 0) return
-  await upsertDerivedRoleMirror(sb, organizationId, contactId, "program_participant")
+  await upsertDerivedRoleMirror(sb, organizationId, contactId, "customer")
 }
 
-/** Mirrors computeDerivedAffiliations event_attendee derivation. */
+/** Mirrors computeDerivedAffiliations customer derivation from ticketing. */
 export async function applyEventAttendeeAffiliationMirror(sb, organizationId, contactId) {
   const { count, error } = await sb
     .from("ticket_orders")
@@ -322,7 +313,7 @@ export async function applyEventAttendeeAffiliationMirror(sb, organizationId, co
   }
 
   if ((count ?? 0) === 0) return
-  await upsertDerivedRoleMirror(sb, organizationId, contactId, "event_attendee")
+  await upsertDerivedRoleMirror(sb, organizationId, contactId, "customer")
 }
 
 export function assertPhase1PathsAvoidProfileRefresh() {

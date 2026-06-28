@@ -95,6 +95,8 @@ const listActions = fileIncludes("lib/donations/donation-list-actions.ts", [
   "fetchPaymentsPageAction",
   "fetchPledgesPageAction",
   "fetchDonorSummaryPageAction",
+  "fetchDonorSummaryExportAction",
+  "donation_donor_giving_report",
   ".range(",
 ])
 record("server_pagination_actions", listActions.ok, listActions.missing.join(", ") || "ok")
@@ -117,8 +119,8 @@ const pledgesPage = fileIncludes("app/(dashboard)/donations/pledges/page.tsx", [
 ])
 record("pledges_page_pagination", pledgesPage.ok, pledgesPage.missing.join(", ") || "ok")
 
-const donorsPage = fileIncludes("app/(dashboard)/donations/donors/page.tsx", [
-  "DonorsPaginatedList",
+const donorsPage = fileIncludes("app/(dashboard)/donations/reports/donors/page.tsx", [
+  "DonorsReportPanel",
 ])
 record("donors_page_pagination", donorsPage.ok, donorsPage.missing.join(", ") || "ok")
 

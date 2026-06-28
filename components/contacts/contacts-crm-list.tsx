@@ -1,7 +1,6 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
   fetchContactListStats,
@@ -14,17 +13,17 @@ import {
 } from "@/lib/contacts/contact-actions"
 import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
 import {
+  contactsListSegmentForRecordType,
+  type ContactsListSegment,
+} from "@/lib/contacts/contact-module-label"
+import {
   type ContactRecordType,
   type ContactRoleValue,
-  type ContactStatus,
-  ROLE_COLORS,
-  ROLE_ICONS,
-  getRoleOptionsForRecordType,
+  getContactRecordTypeLabel,
   STATUS_COLORS,
-  STATUS_OPTIONS,
+  usesPrimaryContactField,
 } from "@/lib/contacts/contact-constants"
 import { createClient } from "@/lib/supabase/client"
-import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -38,12 +37,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -67,12 +60,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
-  MoreHorizontal,
-  Pencil,
-  Phone,
   Plus,
   Search,
-  Trash2,
   User,
 } from "lucide-react"
 
@@ -83,7 +72,7 @@ export type ContactsCrmListProps = {
   lockedRecordType?: ContactRecordType
   /** Show dashboard metric cards. Defaults to true. */
   showStats?: boolean
-  /** Pre-selected affiliations when adding a contact. */
+  /** Pre-selected roles when adding a contact. */
   defaultAddRoles?: ContactRoleValue[]
   /** Optional intro copy above filters. */
   intro?: ReactNode
@@ -99,11 +88,15 @@ function getInitials(name: string) {
     .slice(0, 2)
 }
 
-function formatDate(value?: string | null) {
-  if (!value) return "-"
+function formatDateTime(value?: string | null) {
+  if (!value) return "—"
   const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return "-"
-  return date.toLocaleDateString()
+  if (Number.isNaN(date.getTime())) return "—"
+  return date.toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  })
 }
 
 export function ContactsCrmList({
@@ -118,29 +111,42 @@ export function ContactsCrmList({
   const entityLabel =
     lockedRecordType === "organization"
       ? "Organizations"
-      : lockedRecordType === "individual"
-        ? "People"
-        : "Contacts"
+      : lockedRecordType === "group"
+        ? "Groups"
+        : lockedRecordType === "individual"
+          ? "People"
+          : "Contacts"
   const entitySingular =
     lockedRecordType === "organization"
       ? "organization"
-      : lockedRecordType === "individual"
-        ? "person"
-        : "contact"
+      : lockedRecordType === "group"
+        ? "group"
+        : lockedRecordType === "individual"
+          ? "person"
+          : "contact"
   const searchPlaceholder =
     lockedRecordType === "organization"
       ? "Search organizations by name, email, or phone..."
-      : lockedRecordType === "individual"
-        ? "Search people by name, email, or phone..."
-        : "Search contacts by name, email, phone, or organization..."
+      : lockedRecordType === "group"
+        ? "Search groups by name, primary contact, email, or phone..."
+        : lockedRecordType === "individual"
+          ? "Search people by name, email, or phone..."
+          : "Search contacts by name, email, phone, or organization..."
   const addButtonLabel =
     lockedRecordType === "organization"
       ? "Add Organization"
-      : lockedRecordType === "individual"
-        ? "Add Person"
-        : "Add Contact"
+      : lockedRecordType === "group"
+        ? "Add Group"
+        : lockedRecordType === "individual"
+          ? "Add Person"
+          : "Add Contact"
 
-  const [stats, setStats] = useState<ContactListStats>({ total: 0, people: 0, organizations: 0 })
+  const [stats, setStats] = useState<ContactListStats>({
+    total: 0,
+    people: 0,
+    organizations: 0,
+    groups: 0,
+  })
   const [contacts, setContacts] = useState<ContactListRow[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -151,13 +157,9 @@ export function ContactsCrmList({
 
   const [searchQuery, setSearchQuery] = useState("")
   const [debouncedSearch, setDebouncedSearch] = useState("")
-  const [roleFilter, setRoleFilter] = useState<ContactRoleValue | "all">("all")
   const [recordTypeFilter, setRecordTypeFilter] = useState<ContactRecordType | "all">("all")
-  const [statusFilter, setStatusFilter] = useState<ContactStatus | "all">("all")
 
   const [showAddDialog, setShowAddDialog] = useState(false)
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
-  const [selectedContact, setSelectedContact] = useState<ContactListRow | null>(null)
 
   const [contactName, setContactName] = useState("")
   const [contactEmail, setContactEmail] = useState("")
@@ -176,7 +178,7 @@ export function ContactsCrmList({
 
   useEffect(() => {
     setPage(1)
-  }, [debouncedSearch, roleFilter, recordTypeFilter, statusFilter])
+  }, [debouncedSearch, recordTypeFilter])
 
   const loadStats = useCallback(async () => {
     try {
@@ -195,10 +197,8 @@ export function ContactsCrmList({
     try {
       const result = await fetchContactsList({
         search: debouncedSearch || undefined,
-        role: roleFilter,
         recordType: lockedRecordType ? "all" : recordTypeFilter,
         lockedRecordType,
-        status: statusFilter,
         page,
         pageSize: PAGE_SIZE,
       })
@@ -213,7 +213,7 @@ export function ContactsCrmList({
     } finally {
       setLoading(false)
     }
-  }, [debouncedSearch, lockedRecordType, page, recordTypeFilter, roleFilter, statusFilter])
+  }, [debouncedSearch, lockedRecordType, page, recordTypeFilter])
 
   useEffect(() => {
     if (showStats) {
@@ -227,34 +227,20 @@ export function ContactsCrmList({
 
   const hasActiveFilters = useMemo(() => {
     const recordTypeFiltered = !lockedRecordType && recordTypeFilter !== "all"
-    return Boolean(
-      debouncedSearch ||
-        roleFilter !== "all" ||
-        recordTypeFiltered ||
-        statusFilter !== "all"
-    )
-  }, [debouncedSearch, lockedRecordType, recordTypeFilter, roleFilter, statusFilter])
+    return Boolean(debouncedSearch || recordTypeFiltered)
+  }, [debouncedSearch, lockedRecordType, recordTypeFilter])
 
   const listTitle = isRecentView ? `Recent ${entityLabel}` : entityLabel
   const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
   const rangeEnd = Math.min(page * PAGE_SIZE, total)
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
-  const catalogTotal = isRecentView
-    ? lockedRecordType === "individual"
-      ? stats.people
-      : lockedRecordType === "organization"
-        ? stats.organizations
-        : stats.total
-    : total
 
   function clearFilters() {
     setSearchQuery("")
     setDebouncedSearch("")
-    setRoleFilter("all")
     if (!lockedRecordType) {
       setRecordTypeFilter("all")
     }
-    setStatusFilter("all")
     setPage(1)
   }
 
@@ -268,13 +254,22 @@ export function ContactsCrmList({
     setContactNotes("")
   }
 
-  function isOrganizationType(type: ContactRecordType) {
-    return type === "organization"
+  function usesPrimaryContact(type: ContactRecordType) {
+    return usesPrimaryContactField(type)
   }
 
-  function openDeleteDialog(contact: ContactListRow) {
-    setSelectedContact(contact)
-    setShowDeleteDialog(true)
+  function profileListSegmentForContact(contact: ContactListRow): ContactsListSegment {
+    if (lockedRecordType === "organization") return "organizations"
+    if (lockedRecordType === "group") return "groups"
+    if (lockedRecordType === "individual") return "people"
+    return contactsListSegmentForRecordType(contact.recordType)
+  }
+
+  function profileHrefForContact(contact: ContactListRow, options?: { edit?: boolean }) {
+    return contactProfileHref(contact.id, {
+      list: profileListSegmentForContact(contact),
+      edit: options?.edit,
+    })
   }
 
   async function refreshAfterMutation() {
@@ -297,7 +292,7 @@ export function ContactsCrmList({
         fullName: cleanName,
         email: contactEmail.trim() || undefined,
         phone: contactPhone.trim() || undefined,
-        primaryContactName: isOrganizationType(contactType)
+        primaryContactName: usesPrimaryContact(contactType)
           ? contactPrimaryContactName.trim() || undefined
           : undefined,
         contactType,
@@ -314,79 +309,24 @@ export function ContactsCrmList({
     }
   }
 
-  async function handleDeleteContact() {
-    if (!selectedContact) return
-
-    setSaving(true)
-
-    const { error: notesError } = await supabase
-      .from("contact_notes")
-      .delete()
-      .eq("contact_id", selectedContact.id)
-
-    if (notesError) {
-      alert(notesError.message || "Could not delete contact notes")
-      setSaving(false)
-      return
-    }
-
-    const { error: rolesError } = await supabase
-      .from("contact_roles")
-      .delete()
-      .eq("contact_id", selectedContact.id)
-
-    if (rolesError) {
-      alert(rolesError.message || "Could not delete contact affiliations")
-      setSaving(false)
-      return
-    }
-
-    const { error: contactError } = await supabase
-      .from("contacts")
-      .delete()
-      .eq("id", selectedContact.id)
-
-    if (contactError) {
-      alert(contactError.message || "Could not delete contact")
-      setSaving(false)
-      return
-    }
-
-    setShowDeleteDialog(false)
-    setSelectedContact(null)
-    await refreshAfterMutation()
-    setSaving(false)
-  }
-
-  const affiliationRoleOptions = getRoleOptionsForRecordType(
-    lockedRecordType || "all"
-  )
-
-  const statCards = lockedRecordType === "individual"
-    ? [
-        { label: "Total People", value: stats.people, icon: User },
+  const statCards = lockedRecordType
+    ? []
+    : [
         { label: "Total Contacts", value: stats.total, icon: User },
+        { label: "People", value: stats.people, icon: User },
         { label: "Organizations", value: stats.organizations, icon: Building2 },
       ]
-    : lockedRecordType === "organization"
-      ? [
-          { label: "Total Organizations", value: stats.organizations, icon: Building2 },
-          { label: "Total Contacts", value: stats.total, icon: User },
-          { label: "People", value: stats.people, icon: User },
-        ]
-      : [
-          { label: "Total Contacts", value: stats.total, icon: User },
-          { label: "People", value: stats.people, icon: User },
-          { label: "Organizations", value: stats.organizations, icon: Building2 },
-        ]
 
-  const tableColumnCount =
-    lockedRecordType === "organization" ? 7 : lockedRecordType === "individual" ? 6 : 7
+  const tableColumnCount = !lockedRecordType
+    ? 7
+    : lockedRecordType === "organization" || lockedRecordType === "group"
+      ? 7
+      : 6
 
   return (
     <div className="flex flex-col gap-6 p-6">
       {intro}
-      {showStats && (
+      {showStats && statCards.length > 0 && (
         <StatCardsRow>
           {statCards.map((stat) => (
             <StatCard
@@ -410,67 +350,16 @@ export function ContactsCrmList({
         />
       </div>
 
-      <div className="flex flex-col gap-2">
-        <div className="flex flex-wrap items-center gap-3">
-        <Select
-          value={roleFilter}
-          onValueChange={(value) => setRoleFilter(value as ContactRoleValue | "all")}
-        >
-          <SelectTrigger className="h-9 w-full sm:w-[210px]">
-            <SelectValue placeholder="Affiliation" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All affiliations</SelectItem>
-            {affiliationRoleOptions.map((role) => (
-              <SelectItem key={role.value} value={role.value}>
-                {role.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        {!lockedRecordType && (
-          <Select
-            value={recordTypeFilter}
-            onValueChange={(value) => setRecordTypeFilter(value as ContactRecordType | "all")}
-          >
-            <SelectTrigger className="h-9 w-full sm:w-[165px]">
-              <SelectValue placeholder="Record type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Records</SelectItem>
-              <SelectItem value="individual">Person</SelectItem>
-              <SelectItem value="organization">Organization</SelectItem>
-            </SelectContent>
-          </Select>
-        )}
-
-        <Select
-          value={statusFilter}
-          onValueChange={(value) => setStatusFilter(value as ContactStatus | "all")}
-        >
-          <SelectTrigger className="h-9 w-full sm:w-[150px]">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            {STATUS_OPTIONS.map((status) => (
-              <SelectItem key={status.value} value={status.label}>
-                {status.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
+      <div className="flex flex-wrap items-center gap-3">
         {hasActiveFilters && (
           <Button type="button" variant="ghost" size="sm" onClick={clearFilters}>
-            Clear Filters
+            Clear search
           </Button>
         )}
 
         <Button
           size="sm"
-          className="shrink-0"
+          className="ml-auto shrink-0"
           onClick={() => {
             resetAddForm()
             setShowAddDialog(true)
@@ -479,23 +368,19 @@ export function ContactsCrmList({
           <Plus className="mr-1.5 h-4 w-4" />
           {addButtonLabel}
         </Button>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          {lockedRecordType === "organization"
-            ? "Organization affiliations: Donor, Customer (Venue Renter), or Service Provider. Rental history also appears when a rental is linked to the org contact."
-            : "Affiliation filters use stored contact relationships (member, donor, volunteer, etc.). A contact may have several. Program participants, rental customers, and parents appear on contact profiles from Programs, Rentals, and Families — not as separate contact types."}
-        </p>
       </div>
 
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-lg font-semibold">{listTitle}</h2>
           <p className="text-sm text-muted-foreground">
-            {catalogTotal === 0
-              ? `No ${entityLabel.toLowerCase()} yet`
-              : isRecentView
-                ? `Showing ${rangeEnd.toLocaleString()} of ${catalogTotal.toLocaleString()} ${entityLabel.toLowerCase()}`
-                : `Showing ${rangeStart.toLocaleString()}–${rangeEnd.toLocaleString()} of ${total.toLocaleString()} ${entityLabel.toLowerCase()}`}
+            {loading
+              ? `Loading ${entityLabel.toLowerCase()}...`
+              : total === 0
+                ? `No ${entityLabel.toLowerCase()} yet`
+                : isRecentView
+                  ? `Showing ${rangeEnd.toLocaleString()} of ${total.toLocaleString()} ${entityLabel.toLowerCase()}`
+                  : `Showing ${rangeStart.toLocaleString()}–${rangeEnd.toLocaleString()} of ${total.toLocaleString()} ${entityLabel.toLowerCase()}`}
           </p>
         </div>
       </div>
@@ -512,17 +397,17 @@ export function ContactsCrmList({
             <TableHeader>
               <TableRow>
                 <TableHead>Contact</TableHead>
-                <TableHead>Affiliations</TableHead>
-                {lockedRecordType === "organization" ? (
-                  <TableHead className="hidden md:table-cell">Primary Contact</TableHead>
-                ) : null}
+                <TableHead className="hidden md:table-cell">Email</TableHead>
                 <TableHead className="hidden md:table-cell">Phone</TableHead>
+                <TableHead className="hidden lg:table-cell">Created by</TableHead>
+                <TableHead className="hidden sm:table-cell">Last modified</TableHead>
+                {lockedRecordType === "organization" || lockedRecordType === "group" ? (
+                  <TableHead className="hidden xl:table-cell">Primary Contact</TableHead>
+                ) : null}
                 {!lockedRecordType && (
-                  <TableHead className="hidden xl:table-cell">Record Type</TableHead>
+                  <TableHead className="hidden xl:table-cell">Type</TableHead>
                 )}
                 <TableHead>Status</TableHead>
-                <TableHead className="hidden sm:table-cell">Last Activity</TableHead>
-                <TableHead className="w-[80px] text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -542,7 +427,7 @@ export function ContactsCrmList({
                       <div className="flex flex-col items-center gap-2">
                         <span>No {entityLabel.toLowerCase()} found.</span>
                         <Button type="button" variant="outline" size="sm" onClick={clearFilters}>
-                          Clear Filters
+                          Clear search
                         </Button>
                       </div>
                     ) : (
@@ -555,7 +440,7 @@ export function ContactsCrmList({
                   <TableRow
                     key={contact.id}
                     onClick={() =>
-                      router.push(contactProfileHref(contact.id, { edit: true }))
+                      router.push(profileHrefForContact(contact, { edit: true }))
                     }
                     className="cursor-pointer hover:bg-muted/50"
                   >
@@ -567,53 +452,42 @@ export function ContactsCrmList({
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex flex-col">
-                          <span className="font-medium">{contact.name}</span>
-                          <span className="text-sm text-muted-foreground">
-                            {contact.email || "—"}
+                          <span className="font-medium text-primary hover:underline">
+                            {contact.name}
+                          </span>
+                          <span className="text-sm text-muted-foreground md:hidden">
+                            {contact.email || contact.phone || "—"}
                           </span>
                         </div>
                       </div>
                     </TableCell>
 
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {contact.roles.length === 0 ? (
-                          <span className="text-sm text-muted-foreground">—</span>
-                        ) : (
-                          contact.roles.map((role) => {
-                            const RoleIcon = ROLE_ICONS[role]
-                            return (
-                              <Badge
-                                key={role}
-                                variant="secondary"
-                                className={cn("gap-1", ROLE_COLORS[role])}
-                              >
-                                <RoleIcon className="h-3 w-3" />
-                                {role}
-                              </Badge>
-                            )
-                          })
-                        )}
-                      </div>
+                    <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
+                      {contact.email || "—"}
                     </TableCell>
 
-                    {lockedRecordType === "organization" ? (
-                      <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
+                    <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
+                      {contact.phone || "—"}
+                    </TableCell>
+
+                    <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
+                      —
+                    </TableCell>
+
+                    <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">
+                      {formatDateTime(contact.updatedAt || contact.createdAt)}
+                    </TableCell>
+
+                    {lockedRecordType === "organization" || lockedRecordType === "group" ? (
+                      <TableCell className="hidden xl:table-cell text-sm text-muted-foreground">
                         {contact.primaryContactName || "—"}
                       </TableCell>
                     ) : null}
 
-                    <TableCell className="hidden md:table-cell">
-                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                        <Phone className="h-3 w-3" />
-                        {contact.phone || "—"}
-                      </div>
-                    </TableCell>
-
                     {!lockedRecordType && (
                       <TableCell className="hidden xl:table-cell">
                         <Badge variant="outline">
-                          {contact.recordType === "organization" ? "Organization" : "Person"}
+                          {getContactRecordTypeLabel(contact.recordType)}
                         </Badge>
                       </TableCell>
                     )}
@@ -622,35 +496,6 @@ export function ContactsCrmList({
                       <Badge variant="secondary" className={STATUS_COLORS[contact.status]}>
                         {contact.status}
                       </Badge>
-                    </TableCell>
-
-                    <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">
-                      {formatDate(contact.lastActivity || contact.createdAt)}
-                    </TableCell>
-
-                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem asChild>
-                            <Link href={contactProfileHref(contact.id, { edit: true })}>
-                              <Pencil className="mr-2 h-4 w-4" />
-                              View & edit profile
-                            </Link>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => openDeleteDialog(contact)}
-                            className="text-red-600 focus:text-red-600"
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))
@@ -664,7 +509,7 @@ export function ContactsCrmList({
         <p className="text-sm text-muted-foreground">
           {total === 0
             ? "Page 1 of 1"
-            : `Showing ${rangeStart.toLocaleString()}–${rangeEnd.toLocaleString()} of ${(isRecentView ? catalogTotal : total).toLocaleString()}`}
+            : `Showing ${rangeStart.toLocaleString()}–${rangeEnd.toLocaleString()} of ${total.toLocaleString()}`}
         </p>
         <div className="flex items-center gap-2">
           <Button
@@ -698,15 +543,19 @@ export function ContactsCrmList({
           <DialogHeader>
             <DialogTitle>Add New {entitySingular === "contact" ? "Contact" : entitySingular === "person" ? "Person" : "Organization"}</DialogTitle>
             <DialogDescription>
-              Create a {entitySingular} with basic details. Affiliations such as donor sync
-              automatically from activity; add manual affiliations later on the contact profile if
-              needed. Existing records are matched by email, phone, or name — never duplicated.
+              Create a {entitySingular} with basic details. Roles such as Donor are added automatically
+              from activity; you can edit roles later on the contact profile. Existing records are
+              matched by email, phone, or name — never duplicated.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-4 py-4">
             <div className="flex flex-col gap-2">
               <Label htmlFor="crm-name">
-                {contactType === "organization" ? "Organization Name" : "Full Name"}
+                {contactType === "organization"
+                  ? "Organization Name"
+                  : contactType === "group"
+                    ? "Group Name"
+                    : "Full Name"}
               </Label>
               <Input
                 id="crm-name"
@@ -734,12 +583,16 @@ export function ContactsCrmList({
                 />
               </div>
             </div>
-            {isOrganizationType(contactType) ? (
+            {usesPrimaryContact(contactType) ? (
               <div className="flex flex-col gap-2">
                 <Label htmlFor="crm-primary-contact">Primary Contact Name</Label>
                 <Input
                   id="crm-primary-contact"
-                  placeholder="Person we reach at this organization"
+                  placeholder={
+                    contactType === "group"
+                      ? "Leader or coordinator for this group"
+                      : "Person we reach at this organization"
+                  }
                   value={contactPrimaryContactName}
                   onChange={(e) => setContactPrimaryContactName(e.target.value)}
                 />
@@ -758,6 +611,7 @@ export function ContactsCrmList({
                   <SelectContent>
                     <SelectItem value="individual">Person</SelectItem>
                     <SelectItem value="organization">Organization</SelectItem>
+                    <SelectItem value="group">Group</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -783,24 +637,6 @@ export function ContactsCrmList({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete Contact</DialogTitle>
-            <DialogDescription>
-              Delete {selectedContact?.name}? This cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDeleteDialog(false)} disabled={saving}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={handleDeleteContact} disabled={saving}>
-              {saving ? "Deleting..." : "Delete Contact"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

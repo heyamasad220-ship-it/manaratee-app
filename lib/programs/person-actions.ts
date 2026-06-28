@@ -7,7 +7,7 @@ import { verifyContactInOrganization } from "@/lib/programs/registration-contact
 
 /**
  * Resolve or create a CRM contact for a program participant person record.
- * Does not assign roles — program_participant is derived via syncContactAffiliations.
+ * Does not assign roles — customer is derived via syncContactAffiliations.
  */
 export async function ensureParticipantContactForPerson(input: {
   organizationId: string

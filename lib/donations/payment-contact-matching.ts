@@ -186,6 +186,38 @@ export function resolvePaymentMatchHints(input: {
   }
 }
 
+export function canAutoCreateContactFromPaymentHints(hints: PaymentMatchHints): boolean {
+  const senderName = normalizeText(hints.senderName)
+  if (!senderName || senderName.toLowerCase() === "unknown") return false
+
+  const email = normalizeEmail(hints.email)
+  if (email) return false
+
+  const phone = normalizePhone(hints.phone)
+  if (phone.length >= 7) return false
+
+  return true
+}
+
+export function guessImportContactType(senderName: string): "individual" | "organization" {
+  const trimmed = senderName.trim()
+  if (!trimmed) return "individual"
+
+  if (
+    /\b(LLC|L\.L\.C\.|Inc\.?|Corp\.?|Corporation|Company|Co\.|Foundation|Trust|Association|University)\b/i.test(
+      trimmed
+    )
+  ) {
+    return "organization"
+  }
+
+  return "individual"
+}
+
+export function filterStrongContactMatches(matches: ContactMatchResult[], minScore = 85) {
+  return matches.filter((match) => match.confidenceScore >= minScore)
+}
+
 export function buildContactLookupIndex(contacts: ContactMatchInput[]): ContactLookupIndex {
   const byEmail = new Map<string, ContactMatchInput[]>()
   const byPhone = new Map<string, ContactMatchInput[]>()

@@ -79,6 +79,7 @@ export type ContactProfileData = {
   summary: ContactRelationshipSummary
   activity: ContactActivitySummary
   timeline: ContactTimelineItem[]
+  donorId: string | null
   donorStats: ContactDonorStats
   donationRecords: ContactDonationRecord[]
   rentalStats: ContactRentalStats
@@ -154,8 +155,8 @@ export async function fetchContactProfileData(
     timeline.push({
       id: `role-${roleRow.id}`,
       date: roleRow.created_at || contactCreatedAt || new Date().toISOString(),
-      title: `${roleLabel} affiliation added`,
-      module: "Affiliations",
+      title: `${roleLabel} role added`,
+      module: "Roles",
     })
   }
 
@@ -575,6 +576,7 @@ export async function fetchContactProfileData(
     summary: relationshipSummary,
     activity,
     timeline,
+    donorId: donorIds[0] ?? null,
     donorStats,
     donationRecords,
     rentalStats,

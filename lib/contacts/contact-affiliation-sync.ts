@@ -6,9 +6,11 @@ import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import {
   PROGRAM_PARTICIPANT_TERMINAL_STATUSES,
+  VENUE_RENTAL_CUSTOMER_EXCLUDED_STATUSES,
   type DerivedAffiliationRole,
 } from "@/lib/contacts/contact-affiliation-rules"
 import { loadAffiliationAutoSyncFlags } from "@/lib/contacts/contact-affiliation-settings"
+import { syncContactDiscountTags } from "@/lib/contacts/contact-discount-tag-sync"
 
 export async function computeDerivedAffiliations(
   organizationId: string,
@@ -132,10 +134,6 @@ export async function computeDerivedAffiliations(
     .eq("participant_contact_id", contactId)
     .not("status", "in", `(${terminalStatuses})`)
 
-  if ((programEnrollmentCount ?? 0) > 0) {
-    derived.add("program_participant")
-  }
-
   const { count: completedTicketOrderCount } = await supabase
     .from("ticket_orders")
     .select("id", { count: "exact", head: true })
@@ -143,8 +141,20 @@ export async function computeDerivedAffiliations(
     .eq("contact_id", contactId)
     .eq("status", "completed")
 
-  if ((completedTicketOrderCount ?? 0) > 0) {
-    derived.add("event_attendee")
+  const excludedRentalStatuses = VENUE_RENTAL_CUSTOMER_EXCLUDED_STATUSES.join(",")
+  const { count: venueRentalCount } = await supabase
+    .from("venue_rentals")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", organizationId)
+    .eq("billing_contact_id", contactId)
+    .not("status", "in", `(${excludedRentalStatuses})`)
+
+  if (
+    (programEnrollmentCount ?? 0) > 0 ||
+    (completedTicketOrderCount ?? 0) > 0 ||
+    (venueRentalCount ?? 0) > 0
+  ) {
+    derived.add("customer")
   }
 
   const autoSyncFlags = await loadAffiliationAutoSyncFlags(organizationId, supabase)
@@ -193,6 +203,8 @@ export async function syncContactAffiliations(
   if (error) {
     throw new Error(error.message || "Could not sync contact affiliations")
   }
+
+  await syncContactDiscountTags(contactId, organizationId, supabase)
 
   revalidateAffiliationPaths()
   revalidatePath(`/contacts/${contactId}`)

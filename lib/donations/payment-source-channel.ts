@@ -2,6 +2,7 @@
 export const PAYMENT_SOURCE_CHANNELS = [
   "cash",
   "check",
+  "square",
   "zelle",
   "venmo",
   "paypal",
@@ -43,6 +44,7 @@ export function normalizePaymentSourceChannel(
 export function formatPaymentSourceLabel(channel: string | null | undefined): string {
   const normalized = normalizePaymentSourceChannel(channel)
   if (normalized === "paypal") return "PayPal"
+  if (normalized === "square") return "Square"
   return normalized.charAt(0).toUpperCase() + normalized.slice(1)
 }
 

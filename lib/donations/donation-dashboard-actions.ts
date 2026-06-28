@@ -3,7 +3,6 @@
 import {
   fetchCampaignAnalyticsEntries,
   type CampaignAnalyticsEntry,
-  type CampaignPaymentRow,
 } from "@/lib/donations/campaign-analytics"
 import { countsTowardGivingTotals, paymentNetAmount } from "@/lib/donations/payment-net-amount"
 import { requireDonationStaffAccess } from "@/lib/donations/donation-action-auth"
@@ -16,6 +15,7 @@ export type DonationDashboardSummary = {
   pledgeCollected: number
   outstandingBalance: number
   activePledgeCount: number
+  activeCampaignCount: number
 }
 
 export type DonationMonthlyTotal = {
@@ -43,7 +43,8 @@ export async function getDonationDashboardSummaryAction(
   const access = await requireDonationStaffAccess("view")
   if (!access.ok) return { success: false, error: access.error }
 
-  const [paymentSummary, pledgeSummary, monthlyResult, sourceResult] = await Promise.all([
+  const [paymentSummary, pledgeSummary, monthlyResult, sourceResult, activeCampaignsResult] =
+    await Promise.all([
     access.supabase.rpc("donation_org_payment_summary", { p_org_id: access.orgId }),
     access.supabase.rpc("donation_org_pledge_summary", { p_org_id: access.orgId }),
     access.supabase.rpc("donation_monthly_payment_totals", {
@@ -54,12 +55,20 @@ export async function getDonationDashboardSummaryAction(
       p_org_id: access.orgId,
       p_date_from: timeRangeStart ?? null,
     }),
+    access.supabase
+      .from("campaigns")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", access.orgId)
+      .eq("status", "active"),
   ])
 
   if (paymentSummary.error) return { success: false, error: paymentSummary.error.message }
   if (pledgeSummary.error) return { success: false, error: pledgeSummary.error.message }
   if (monthlyResult.error) return { success: false, error: monthlyResult.error.message }
   if (sourceResult.error) return { success: false, error: sourceResult.error.message }
+  if (activeCampaignsResult.error) {
+    return { success: false, error: activeCampaignsResult.error.message }
+  }
 
   const paymentRow = Array.isArray(paymentSummary.data)
     ? paymentSummary.data[0]
@@ -114,6 +123,7 @@ export async function getDonationDashboardSummaryAction(
       pledgeCollected: Number(pledgeRow?.total_collected || 0),
       outstandingBalance: Number(pledgeRow?.outstanding_balance || 0),
       activePledgeCount: Number(pledgeRow?.active_pledge_count || 0),
+      activeCampaignCount: activeCampaignsResult.count ?? 0,
     },
     monthlyTotals,
     sourceTotals,
@@ -124,34 +134,19 @@ export async function getDonationDashboardCampaignsAction(): Promise<
   | {
       success: true
       campaignEntries: CampaignAnalyticsEntry[]
-      recentPayments: CampaignPaymentRow[]
     }
   | { success: false; error: string }
 > {
   const access = await requireDonationStaffAccess("view")
   if (!access.ok) return { success: false, error: access.error }
 
-  let campaignEntries: CampaignAnalyticsEntry[]
   try {
-    campaignEntries = await fetchCampaignAnalyticsEntries(access.supabase, access.orgId)
+    const campaignEntries = await fetchCampaignAnalyticsEntries(
+      access.supabase,
+      access.orgId
+    )
+    return { success: true, campaignEntries }
   } catch (error) {
     return { success: false, error: (error as Error).message }
-  }
-
-  const { data: recentPayments, error } = await access.supabase
-    .from("payments")
-    .select(
-      "id, sender_name, amount, payment_date, source, status, pledge_id, campaign_id, donor_id, contact_id"
-    )
-    .eq("organization_id", access.orgId)
-    .order("payment_date", { ascending: false })
-    .limit(5)
-
-  if (error) return { success: false, error: error.message }
-
-  return {
-    success: true,
-    campaignEntries,
-    recentPayments: (recentPayments || []) as CampaignPaymentRow[],
   }
 }

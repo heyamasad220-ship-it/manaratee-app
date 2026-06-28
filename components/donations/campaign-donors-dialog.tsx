@@ -1,7 +1,5 @@
 "use client"
 
-import Link from "next/link"
-
 import {
   Dialog,
   DialogContent,
@@ -19,13 +17,13 @@ import {
 } from "@/components/ui/table"
 import type { CampaignDonorSummary } from "@/lib/donations/campaign-analytics"
 import { formatDonationCurrency } from "@/lib/donations/campaign-analytics"
-import { getDonorProfilePath } from "@/lib/donations/donor-profile-path"
 
 type CampaignDonorsDialogProps = {
   campaignName: string
   donors: CampaignDonorSummary[]
   open: boolean
   onOpenChange: (open: boolean) => void
+  onDonorClick?: (donor: CampaignDonorSummary) => void
 }
 
 export function CampaignDonorsDialog({
@@ -33,6 +31,7 @@ export function CampaignDonorsDialog({
   donors,
   open,
   onOpenChange,
+  onDonorClick,
 }: CampaignDonorsDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -63,13 +62,14 @@ export function CampaignDonorsDialog({
                 donors.map((donor, index) => (
                   <TableRow key={donor.donorId || `${donor.displayName}-${index}`}>
                     <TableCell className="font-medium">
-                      {donor.donorId ? (
-                        <Link
-                          href={getDonorProfilePath(donor.donorId, donor.donorType)}
+                      {onDonorClick && (donor.contactId || donor.donorId) ? (
+                        <button
+                          type="button"
+                          onClick={() => onDonorClick(donor)}
                           className="text-primary hover:underline"
                         >
                           {donor.displayName}
-                        </Link>
+                        </button>
                       ) : (
                         donor.displayName
                       )}

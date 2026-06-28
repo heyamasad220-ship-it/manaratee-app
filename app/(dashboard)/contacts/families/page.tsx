@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { Header } from "@/components/layout/header"
 import { Button } from "@/components/ui/button"
+import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
 import { Card, CardContent } from "@/components/ui/card"
 import {
   Table,
@@ -68,7 +69,11 @@ export default async function ContactsFamiliesPage() {
                       <TableCell className="text-right">
                         {household.primaryContactId ? (
                           <Button variant="outline" size="sm" asChild>
-                            <Link href={`/contacts/${household.primaryContactId}`}>
+                            <Link
+                              href={contactProfileHref(household.primaryContactId, {
+                                list: "families",
+                              })}
+                            >
                               Open profile
                             </Link>
                           </Button>

@@ -2,15 +2,27 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
-import { Ban, CheckCircle2, DollarSign, MoreHorizontal, Pencil } from "lucide-react"
+import { Ban, CheckCircle2, ChevronDown, DollarSign, MoreHorizontal, Pencil } from "lucide-react"
 
 import {
   DonationAttributionFields,
   EMPTY_DONATION_ATTRIBUTION_VALUE,
   type DonationAttributionValue,
 } from "@/components/donations/donation-attribution-fields"
+import { PledgeContactPicker } from "@/components/donations/pledge-contact-picker"
+import { DonationGroupPicker } from "@/components/donations/donation-group-picker"
+import {
+  PledgeReminderDialogs,
+  PledgeReminderDropdownItems,
+  usePledgeReminderControls,
+} from "@/components/donations/pledge-reminder-actions"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
 import {
   Dialog,
   DialogContent,
@@ -37,7 +49,11 @@ import {
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { formatPledgeStatusLabel, type PledgeDisplayStatus } from "@/lib/donations/donation-status"
-import { getDonorPledgesAction } from "@/lib/donations/pledge-reminder-actions"
+import {
+  getDonorPledgeCollectionSummaryAction,
+  getDonorPledgesAction,
+} from "@/lib/donations/pledge-reminder-actions"
+import { isPledgeEligibleForReminder, type PledgeReminderRecord } from "@/lib/donations/pledge-reminder-types"
 import {
   cancelPledgeAction,
   getPledgeForEditAction,
@@ -113,6 +129,8 @@ export function DonorPledgesTab({
   const [editFrequency, setEditFrequency] = useState("One-Time")
   const [editStatus, setEditStatus] = useState<PledgeDisplayStatus>("Open")
   const [editNotes, setEditNotes] = useState("")
+  const [editContactId, setEditContactId] = useState("")
+  const [editContactLabel, setEditContactLabel] = useState("")
   const [editAttribution, setEditAttribution] = useState<DonationAttributionValue>(
     EMPTY_DONATION_ATTRIBUTION_VALUE
   )
@@ -121,6 +139,21 @@ export function DonorPledgesTab({
   const [paymentDate, setPaymentDate] = useState(getTodayPlainDate())
   const [paymentSource, setPaymentSource] = useState("check")
   const [paymentMemo, setPaymentMemo] = useState("")
+
+  const [paymentGroupContactId, setPaymentGroupContactId] = useState<string | null>(null)
+  const [paymentGroupLabel, setPaymentGroupLabel] = useState("")
+
+  const [reminderHistory, setReminderHistory] = useState<PledgeReminderRecord[]>([])
+  const [reminderHistoryOpen, setReminderHistoryOpen] = useState(false)
+
+  const loadReminderHistory = useCallback(async () => {
+    if (!embedded) return
+
+    const result = await getDonorPledgeCollectionSummaryAction(donorId)
+    if (result.success) {
+      setReminderHistory(result.summary.reminderHistory)
+    }
+  }, [donorId, embedded])
 
   const loadPledges = useCallback(async () => {
     setLoading(true)
@@ -133,7 +166,11 @@ export function DonorPledgesTab({
       setPledges(result.pledges)
     }
     setLoading(false)
-  }, [donorId])
+
+    if (embedded) {
+      await loadReminderHistory()
+    }
+  }, [donorId, embedded, loadReminderHistory])
 
   useEffect(() => {
     void loadPledges()
@@ -163,6 +200,8 @@ export function DonorPledgesTab({
     setEditFrequency(result.pledge.frequency)
     setEditStatus(result.pledge.status)
     setEditNotes(result.pledge.notes)
+    setEditContactId(result.pledge.contactId || "")
+    setEditContactLabel(result.pledge.donorName || "")
     setEditAttribution({
       campaignId: result.pledge.campaignId,
       categoryId: result.pledge.categoryId,
@@ -178,6 +217,8 @@ export function DonorPledgesTab({
     setPaymentDate(getTodayPlainDate())
     setPaymentSource("check")
     setPaymentMemo(markPaid ? "Marked as paid" : "")
+    setPaymentGroupContactId(null)
+    setPaymentGroupLabel("")
   }
 
   async function handleSaveEdit() {
@@ -195,6 +236,7 @@ export function DonorPledgesTab({
       categoryId: editAttribution.categoryId || null,
       subcategoryId: editAttribution.subcategoryId || null,
       notes: editNotes,
+      contactId: editContactId || null,
     })
 
     setSaving(false)
@@ -219,6 +261,7 @@ export function DonorPledgesTab({
       paymentDate,
       source: paymentSource,
       memo: paymentMemo,
+      attributedGroupContactId: paymentGroupContactId,
     }
 
     const result = markPaid
@@ -321,12 +364,14 @@ export function DonorPledgesTab({
                     <td className="px-3 py-2 text-right">
                       <PledgeRowMenu
                         pledge={pledge}
+                        donorName={donorName}
                         canPay={canPay}
                         cancelled={cancelled}
                         onEdit={() => void openEditDialog(pledge)}
                         onRecordPayment={() => openPaymentDialog(pledge)}
                         onMarkPaid={() => openPaymentDialog(pledge, true)}
                         onCancel={() => void handleCancelPledge(pledge)}
+                        onReminderUpdated={() => void loadPledges()}
                       />
                     </td>
                   </tr>
@@ -343,6 +388,45 @@ export function DonorPledgesTab({
             View all pledges
           </Link>
         </div>
+      ) : null}
+
+      {embedded && reminderHistory.length > 0 ? (
+        <Collapsible
+          open={reminderHistoryOpen}
+          onOpenChange={setReminderHistoryOpen}
+          className="mt-4 border-t pt-4"
+        >
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" size="sm" className="gap-2 px-0 hover:bg-transparent">
+              <ChevronDown
+                className={`size-4 transition-transform ${
+                  reminderHistoryOpen ? "rotate-180" : ""
+                }`}
+              />
+              Reminder history ({reminderHistory.length})
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="pt-2">
+            <div className="space-y-2">
+              {reminderHistory.slice(0, 10).map((row) => (
+                <div key={row.id} className="rounded-md border p-3 text-sm">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-medium capitalize">{row.reminder_type}</span>
+                    <span className="text-muted-foreground">
+                      {formatDate(row.sent_at || row.created_at)}
+                    </span>
+                  </div>
+                  {row.contact_notes ? (
+                    <p className="mt-1 text-muted-foreground">{row.contact_notes}</p>
+                  ) : null}
+                  {!row.delivered_externally && row.reminder_type !== "contacted" ? (
+                    <p className="mt-1 text-xs text-amber-700">Recorded only — not emailed</p>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
       ) : null}
     </>
   )
@@ -378,10 +462,21 @@ export function DonorPledgesTab({
           <DialogHeader>
             <DialogTitle>Edit Pledge</DialogTitle>
             <DialogDescription>
-              Update pledge details for {donorName || "this donor"}.
+              Update pledge details. Change the assigned contact to move this pledge to a person,
+              organization, or group.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
+            <PledgeContactPicker
+              organizationId={organizationId}
+              contactId={editContactId}
+              contactLabel={editContactLabel}
+              onChange={(contactId, label) => {
+                setEditContactId(contactId)
+                setEditContactLabel(label)
+              }}
+              disabled={saving}
+            />
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="pledge-edit-amount">Total Amount</Label>
@@ -525,6 +620,15 @@ export function DonorPledgesTab({
                 onChange={(e) => setPaymentMemo(e.target.value)}
               />
             </div>
+            <DonationGroupPicker
+              groupContactId={paymentGroupContactId}
+              groupLabel={paymentGroupLabel}
+              onChange={(groupContactId, label) => {
+                setPaymentGroupContactId(groupContactId)
+                setPaymentGroupLabel(label)
+              }}
+              disabled={saving}
+            />
             {actionError ? <p className="text-sm text-destructive">{actionError}</p> : null}
           </div>
           <DialogFooter>
@@ -546,56 +650,106 @@ export function DonorPledgesTab({
 
 function PledgeRowMenu({
   pledge,
+  donorName,
   canPay,
   cancelled,
   onEdit,
   onRecordPayment,
   onMarkPaid,
   onCancel,
+  onReminderUpdated,
 }: {
   pledge: DonorPledgeRow
+  donorName?: string
   canPay: boolean
   cancelled: boolean
   onEdit: () => void
   onRecordPayment: () => void
   onMarkPaid: () => void
   onCancel: () => void
+  onReminderUpdated?: () => void
 }) {
   if (cancelled) {
     return <span className="text-xs text-muted-foreground">—</span>
   }
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="size-8">
-          <MoreHorizontal className="size-4" />
-          <span className="sr-only">Pledge actions</span>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={onEdit}>
-          <Pencil className="mr-2 size-4" />
-          Edit
-        </DropdownMenuItem>
-        {canPay ? (
-          <>
-            <DropdownMenuItem onClick={onRecordPayment}>
-              <DollarSign className="mr-2 size-4" />
-              Record Payment
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={onMarkPaid}>
-              <CheckCircle2 className="mr-2 size-4" />
-              Mark as Paid
-            </DropdownMenuItem>
-          </>
-        ) : null}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={onCancel}>
-          <Ban className="mr-2 size-4" />
-          Cancel Pledge
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <PledgeRowMenuInner
+      pledge={pledge}
+      donorName={donorName}
+      canPay={canPay}
+      onEdit={onEdit}
+      onRecordPayment={onRecordPayment}
+      onMarkPaid={onMarkPaid}
+      onCancel={onCancel}
+      onReminderUpdated={onReminderUpdated}
+    />
+  )
+}
+
+function PledgeRowMenuInner({
+  pledge,
+  donorName,
+  canPay,
+  onEdit,
+  onRecordPayment,
+  onMarkPaid,
+  onCancel,
+  onReminderUpdated,
+}: {
+  pledge: DonorPledgeRow
+  donorName?: string
+  canPay: boolean
+  onEdit: () => void
+  onRecordPayment: () => void
+  onMarkPaid: () => void
+  onCancel: () => void
+  onReminderUpdated?: () => void
+}) {
+  const canRemind =
+    !!donorName && isPledgeEligibleForReminder(pledge.status, pledge.balanceRemaining)
+  const reminderControls = usePledgeReminderControls(
+    pledge.id,
+    canRemind ? onReminderUpdated : undefined
+  )
+
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" className="size-8">
+            <MoreHorizontal className="size-4" />
+            <span className="sr-only">Pledge actions</span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={onEdit}>
+            <Pencil className="mr-2 size-4" />
+            Edit
+          </DropdownMenuItem>
+          {canPay ? (
+            <>
+              <DropdownMenuItem onClick={onRecordPayment}>
+                <DollarSign className="mr-2 size-4" />
+                Record Payment
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onMarkPaid}>
+                <CheckCircle2 className="mr-2 size-4" />
+                Mark as Paid
+              </DropdownMenuItem>
+            </>
+          ) : null}
+          {canRemind ? <PledgeReminderDropdownItems controls={reminderControls} /> : null}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={onCancel}>
+            <Ban className="mr-2 size-4" />
+            Cancel Pledge
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {canRemind && donorName ? (
+        <PledgeReminderDialogs controls={reminderControls} donorName={donorName} />
+      ) : null}
+    </>
   )
 }

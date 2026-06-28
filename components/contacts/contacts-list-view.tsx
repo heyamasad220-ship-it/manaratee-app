@@ -35,6 +35,7 @@ import {
   mapRoleValue,
   mapStatus,
   MEMBERSHIP_DERIVED_ROLE,
+  normalizeContactRecordType,
 } from "@/lib/contacts/contact-constants"
 import {
   Table,
@@ -248,8 +249,7 @@ export function ContactsListView({
         const roles = visibleRoleValues
           .map((value) => mapRoleValue(value))
           .filter(Boolean) as ContactRoleLabel[]
-        const recordType: ContactRecordType =
-          c.contact_type === "organization" ? "organization" : "individual"
+        const recordType = normalizeContactRecordType(c.contact_type)
 
         return {
           id: c.id,
@@ -620,7 +620,7 @@ export function ContactsListView({
 
   const roleFilterLabel =
     roleFilters.length === 0
-      ? "All affiliations"
+      ? "All roles"
       : roleFilters.map((role) => ROLE_VALUE_TO_LABEL[role]).join(", ")
 
   const statCards = [
@@ -671,7 +671,7 @@ export function ContactsListView({
               </PopoverTrigger>
               <PopoverContent className="w-72" align="start">
                 <div className="space-y-3">
-                  <p className="text-sm font-medium">Filter by affiliations</p>
+                  <p className="text-sm font-medium">Filter by role</p>
                   <RoleCheckboxGroup
                     idPrefix="filter"
                     selected={roleFilters}
@@ -684,7 +684,7 @@ export function ContactsListView({
                     className="w-full"
                     onClick={() => setRoleFilters([])}
                   >
-                    Clear affiliation filters
+                    Clear role filters
                   </Button>
                 </div>
               </PopoverContent>
@@ -936,9 +936,9 @@ export function ContactsListView({
           <DialogHeader>
             <DialogTitle>Add New Contact</DialogTitle>
             <DialogDescription>
-              Create a person or organization with basic details. Affiliations sync automatically
-              from donations and other activity; add manual affiliations on the contact profile if
-              needed. Existing contacts are matched by email, phone, or name — never duplicated.
+              Create a person or organization with basic details. Roles sync automatically from
+              donations and other activity; add manual roles on the contact profile if needed.
+              Existing contacts are matched by email, phone, or name — never duplicated.
             </DialogDescription>
           </DialogHeader>
 

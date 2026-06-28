@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation"
 
 export default function DonationsReportsPage() {
-  redirect("/donations/donors")
+  redirect("/donations/reports/donors")
 }

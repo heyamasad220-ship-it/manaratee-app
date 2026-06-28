@@ -3,7 +3,6 @@
 import { PaymentHistory } from "@/components/donations/payment-history";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Header } from "@/components/layout/header";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   DonationMetricCard,
@@ -14,7 +13,6 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Label } from "@/components/ui/label";
-import Link from "next/link";
 import {
   Table,
   TableBody,
@@ -49,16 +47,19 @@ import {
   Search,
   Plus,
   MoreHorizontal,
-  DollarSign,
-  Heart,
-  AlertCircle,
-  ArrowUpRight,
-  CheckCircle2,
   ArrowUpDown,
+  Heart,
+  DollarSign,
+  AlertCircle,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { ensureDonorExtensionForContact } from "@/lib/donations/donor-contact-bridge";
 import { PledgeReminderActions } from "@/components/donations/pledge-reminder-actions";
+import { ContactProfileDialog } from "@/components/contacts/contact-profile-dialog";
+import {
+  PledgeSummaryMetricCards,
+  type PledgeSummaryMetrics,
+} from "@/components/donations/pledge-summary-metric-cards";
 import { formatPledgeReminderStatusLabel } from "@/lib/donations/pledge-reminder-types";
 import {
   QuickAddContactDialog,
@@ -70,6 +71,8 @@ import {
   toAttributionIds,
   type DonationAttributionValue,
 } from "@/components/donations/donation-attribution-fields";
+import { PledgeContactPicker } from "@/components/donations/pledge-contact-picker";
+import { updatePledgeAction } from "@/lib/donations/pledge-admin-actions";
 import {
   fetchPledgeAttribution,
   toPaymentAttributionColumns,
@@ -264,11 +267,12 @@ export default function PledgesPage() {
   const [debouncedMinAmount, setDebouncedMinAmount] = useState<number | undefined>(undefined);
   const [page, setPage] = useState(1);
   const [totalPledges, setTotalPledges] = useState(0);
-  const [summaryMetrics, setSummaryMetrics] = useState({
+  const [summaryMetrics, setSummaryMetrics] = useState<PledgeSummaryMetrics>({
     totalPledged: 0,
     totalCollected: 0,
     outstandingBalance: 0,
     activePledgeCount: 0,
+    pledgeCount: 0,
   });
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
@@ -305,6 +309,8 @@ export default function PledgesPage() {
   const [editPledgeDate, setEditPledgeDate] = useState("");
   const [editFrequency, setEditFrequency] = useState("One-Time");
   const [editStatus, setEditStatus] = useState<PledgeDisplayStatus>("Open");
+  const [editContactId, setEditContactId] = useState("");
+  const [editContactLabel, setEditContactLabel] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
 
   const [paymentAmount, setPaymentAmount] = useState("");
@@ -314,6 +320,34 @@ export default function PledgesPage() {
   const [savingPayment, setSavingPayment] = useState(false);
 
   const [donorSearch, setDonorSearch] = useState("");
+  const [contactProfileId, setContactProfileId] = useState<string | null>(null);
+  const [showContactProfile, setShowContactProfile] = useState(false);
+
+  async function openContactProfile(pledge: Pledge) {
+    let contactId = pledge.contactId;
+
+    if (!contactId && pledge.donorId) {
+      const orgId = organizationId || (await getOrgIdForCurrentUser());
+      if (orgId) {
+        const { data: donorRow } = await supabase
+          .from("donors")
+          .select("contact_id")
+          .eq("id", pledge.donorId)
+          .eq("organization_id", orgId)
+          .maybeSingle();
+
+        contactId = (donorRow?.contact_id as string | null) ?? null;
+      }
+    }
+
+    if (!contactId) {
+      alert("No contact profile is linked to this donor yet.");
+      return;
+    }
+
+    setContactProfileId(contactId);
+    setShowContactProfile(true);
+  }
 
   async function getOrgIdForCurrentUser() {
     const {
@@ -431,17 +465,21 @@ export default function PledgesPage() {
       Fulfilled: "fulfilled",
     };
 
-    const [pageResult, metricsResult] = await Promise.all([
-      fetchPledgesPageAction({
+    const pageResult = await fetchPledgesPageAction({
         page: nextPage,
         pageSize: DONATIONS_PAGE_SIZE,
         search: debouncedSearch || undefined,
         status: statusFilter === "all" ? undefined : statusMap[statusFilter],
         campaignId: campaignFilter === "all" ? undefined : campaignFilter,
         minAmountPledged: debouncedMinAmount,
-      }),
-      fetchPledgeSummaryMetricsAction(),
-    ]);
+      });
+
+    const metricsResult = await fetchPledgeSummaryMetricsAction({
+      search: debouncedSearch || undefined,
+      status: statusFilter === "all" ? undefined : statusMap[statusFilter],
+      campaignId: campaignFilter === "all" ? undefined : campaignFilter,
+      minAmountPledged: debouncedMinAmount,
+    });
 
     if (!pageResult.success) {
       console.error("Error loading donation pledges:", pageResult.error);
@@ -629,6 +667,8 @@ export default function PledgesPage() {
     setEditPledgeDate(pledge.startDate || "");
     setEditFrequency(pledge.frequency || "One-Time");
     setEditStatus(pledge.status || "Open");
+    setEditContactId(pledge.contactId || "");
+    setEditContactLabel(pledge.donorName || "");
   };
 
   const handleAddPledge = async () => {
@@ -704,43 +744,42 @@ export default function PledgesPage() {
   const handleUpdatePledge = async () => {
     if (!editingPledge) return;
 
-    const orgId = organizationId || (await getOrgIdForCurrentUser());
-
-    if (!orgId) {
-      alert("No organization found for this admin user.");
-      return;
-    }
-
     if (!editAmount || Number(editAmount) <= 0) {
       alert("Please enter a valid amount.");
       return;
     }
 
+    if (!editContactId) {
+      alert("Please select a contact for this pledge.");
+      return;
+    }
+
     setSavingEdit(true);
 
-    const { error } = await supabase
-      .from("pledges")
-      .update({
-        amount_pledged: Number(editAmount),
-        ...toAttributionIds(editAttribution),
-        pledge_date: normalizeDateInput(editPledgeDate) || getTodayPlainDate(),
-        frequency: editFrequency.toLowerCase().replace("-", "_"),
-        status: pledgeStatusToDb(editStatus),
-      })
-      .eq("id", editingPledge.id)
-      .eq("organization_id", orgId);
+    const result = await updatePledgeAction({
+      pledgeId: editingPledge.id,
+      amountPledged: Number(editAmount),
+      pledgeDate: editPledgeDate,
+      frequency: editFrequency,
+      status: editStatus,
+      campaignId: editAttribution.campaignId || null,
+      categoryId: editAttribution.categoryId || null,
+      subcategoryId: editAttribution.subcategoryId || null,
+      contactId: editContactId,
+    });
 
     setSavingEdit(false);
 
-    if (error) {
-      alert(error.message);
+    if (!result.success) {
+      alert(result.error);
       return;
     }
 
     setEditingPledge(null);
     await fetchPledges();
 
-    if (selectedPledge?.id === editingPledge.id) {
+    const orgId = organizationId || (await getOrgIdForCurrentUser());
+    if (orgId && selectedPledge?.id === editingPledge.id) {
       await refreshSelectedPledge(editingPledge.id, orgId);
     }
   };
@@ -825,11 +864,6 @@ export default function PledgesPage() {
     await refreshSelectedPledge(paymentPledge.id, orgId);
   };
 
-  const totalPledged = summaryMetrics.totalPledged;
-  const totalCollected = summaryMetrics.totalCollected;
-  const totalRemaining = summaryMetrics.outstandingBalance;
-  const activePledges = summaryMetrics.activePledgeCount;
-
   const getStatusBadge = (status: PledgeDisplayStatus) => {
     switch (status) {
       case "Open":
@@ -847,45 +881,7 @@ export default function PledgesPage() {
 
   return (
     <>
-      <Header title="Pledges" />
-
       <div className="p-6">
-        <DonationMetricCardGrid colorful className="mb-6">
-          <DonationMetricCard
-            title="Total Pledged"
-            value={formatCurrency(totalPledged)}
-            icon={Heart}
-            accent="blue"
-            description={`Across ${totalPledges} pledges`}
-          />
-          <DonationMetricCard
-            title="Collected"
-            value={formatCurrency(totalCollected)}
-            icon={DollarSign}
-            accent="emerald"
-            description={
-              <span className="inline-flex items-center">
-                <ArrowUpRight className="mr-1 h-3 w-3" />
-                {totalPledged > 0 ? Math.round((totalCollected / totalPledged) * 100) : 0}% of total
-              </span>
-            }
-          />
-          <DonationMetricCard
-            title="Remaining"
-            value={formatCurrency(totalRemaining)}
-            icon={AlertCircle}
-            accent="amber"
-            description="Yet to be collected"
-          />
-          <DonationMetricCard
-            title="Active Pledges"
-            value={activePledges}
-            icon={CheckCircle2}
-            accent="violet"
-            description="Not yet fulfilled"
-          />
-        </DonationMetricCardGrid>
-
         <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-1 flex-col gap-2 sm:flex-row sm:items-center">
             <div className="relative max-w-sm flex-1">
@@ -942,6 +938,12 @@ export default function PledgesPage() {
           </Button>
         </div>
 
+        <PledgeSummaryMetricCards
+          metrics={summaryMetrics}
+          statusFilter={statusFilter}
+          className="mb-6"
+        />
+
         <Card id="collection-queue" className="scroll-mt-6">
           <CardContent className="p-0">
             <Table>
@@ -984,9 +986,15 @@ export default function PledgesPage() {
                       className="cursor-pointer hover:bg-muted/50"
                       onClick={() => setSelectedPledge(pledge)}
                     >
-                      <TableCell>
+                      <TableCell onClick={(event) => event.stopPropagation()}>
                         <div>
-                          <span className="font-medium">{pledge.donorName}</span>
+                          <button
+                            type="button"
+                            className="font-medium text-primary hover:underline"
+                            onClick={() => void openContactProfile(pledge)}
+                          >
+                            {pledge.donorName}
+                          </button>
                           <p className="text-sm text-muted-foreground">{pledge.donorType}</p>
                         </div>
                       </TableCell>
@@ -1303,15 +1311,24 @@ export default function PledgesPage() {
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Edit Pledge</DialogTitle>
-            <DialogDescription>Update pledge details without changing the donor.</DialogDescription>
+            <DialogDescription>
+              Update pledge details. Change the assigned contact to move this pledge to a person,
+              organization, or group.
+            </DialogDescription>
           </DialogHeader>
 
           {editingPledge && (
             <div className="flex flex-col gap-4 py-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Donor</p>
-                <p className="font-medium">{editingPledge.donorName}</p>
-              </div>
+              <PledgeContactPicker
+                organizationId={organizationId}
+                contactId={editContactId}
+                contactLabel={editContactLabel}
+                onChange={(contactId, label) => {
+                  setEditContactId(contactId);
+                  setEditContactLabel(label);
+                }}
+                disabled={savingEdit}
+              />
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="flex flex-col gap-2">
@@ -1473,32 +1490,38 @@ export default function PledgesPage() {
       </Dialog>
 
       <Dialog open={!!selectedPledge} onOpenChange={(open) => !open && setSelectedPledge(null)}>
-        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+        <DialogContent className="flex w-[min(96vw,56rem)] max-w-4xl flex-col gap-0 overflow-visible sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle>Pledge Details</DialogTitle>
             <DialogDescription>View and manage pledge information</DialogDescription>
           </DialogHeader>
 
           {selectedPledge && (
-            <div className="flex-1 overflow-y-auto flex flex-col gap-6 py-4 pr-2">
+            <div className="flex flex-col gap-6 py-4">
               <div className="flex flex-wrap gap-2">
                 {getStatusBadge(selectedPledge.status)}
                 <Badge variant="outline">{selectedPledge.campaignName}</Badge>
                 <Badge variant="secondary">{selectedPledge.frequency}</Badge>
               </div>
 
-              <DonationMetricCardGrid>
+              <DonationMetricCardGrid colorful columns={3} className="grid-cols-1 sm:grid-cols-3">
                 <DonationMetricCard
                   title="Amount Pledged"
                   value={formatCurrency(selectedPledge.amount_pledged)}
+                  icon={Heart}
+                  accent="blue"
                 />
                 <DonationMetricCard
                   title="Amount Paid"
                   value={formatCurrency(selectedPledge.amount_paid)}
+                  icon={DollarSign}
+                  accent="emerald"
                 />
                 <DonationMetricCard
                   title="Balance"
                   value={formatCurrency(selectedPledge.balance_remaining)}
+                  icon={AlertCircle}
+                  accent="amber"
                 />
               </DonationMetricCardGrid>
 
@@ -1525,7 +1548,13 @@ export default function PledgesPage() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="flex flex-col gap-1">
                   <span className="text-xs text-muted-foreground">Donor</span>
-                  <span className="font-medium">{selectedPledge.donorName}</span>
+                  <button
+                    type="button"
+                    className="w-fit font-medium text-primary hover:underline"
+                    onClick={() => void openContactProfile(selectedPledge)}
+                  >
+                    {selectedPledge.donorName}
+                  </button>
                   <span className="text-sm text-muted-foreground">{selectedPledge.donorType}</span>
                 </div>
 
@@ -1581,17 +1610,15 @@ export default function PledgesPage() {
           )}
 
           <DialogFooter className="border-t pt-4 flex-col gap-2 sm:flex-row">
-  <Button variant="outline" asChild>
-  <Link
-    href={
-      selectedPledge?.contactId
-        ? `/contacts/${selectedPledge.contactId}`
-        : "/contacts"
-    }
-  >
-    View Donor
-  </Link>
-</Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (!selectedPledge) return;
+                void openContactProfile(selectedPledge);
+              }}
+            >
+              View Contact
+            </Button>
 
   <Button
     variant="outline"
@@ -1615,6 +1642,13 @@ export default function PledgesPage() {
 </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ContactProfileDialog
+        contactId={contactProfileId}
+        open={showContactProfile}
+        onOpenChange={setShowContactProfile}
+        onContactUpdated={() => void fetchPledges()}
+      />
     </>
   );
 }

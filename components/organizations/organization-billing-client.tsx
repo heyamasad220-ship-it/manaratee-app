@@ -103,10 +103,6 @@ export function OrganizationBillingClient({
   const [expYear, setExpYear] = useState("")
   const [cardholderName, setCardholderName] = useState("")
 
-  const yearlySavings =
-    summary.plan && summary.plan.monthlyPrice > 0 && summary.plan.yearlyPrice > 0
-      ? summary.plan.monthlyPrice * 12 - summary.plan.yearlyPrice
-      : 0
   const terms = summary.subscriptionTerms
 
   async function handleAddPaymentMethod() {
@@ -250,14 +246,6 @@ export function OrganizationBillingClient({
                 <p className="mt-2 text-sm text-muted-foreground">
                   Standard rate after first year:{" "}
                   {formatSubscriptionPrice(terms.standardMonthlyRate)}/month
-                </p>
-              ) : null}
-              {summary.plan && summary.plan.yearlyPrice > 0 ? (
-                <p className="mt-2 text-sm text-muted-foreground">
-                  or {formatSubscriptionPrice(summary.plan.yearlyPrice)}/year
-                  {yearlySavings > 0
-                    ? ` (save ${formatSubscriptionPrice(yearlySavings)} vs monthly)`
-                    : ""}
                 </p>
               ) : null}
             </CardContent>
