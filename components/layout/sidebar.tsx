@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, createContext, useContext } from "react"
+import { useState, useEffect, createContext, useContext, Suspense } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { usePathname, useSearchParams } from "next/navigation"
@@ -849,7 +849,7 @@ function SidebarSubNavLinks({
   )
 }
 
-export function ModuleSubNav() {
+function ModuleSubNavContent() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const profileListSegment = resolveContactProfileListSegment(pathname, searchParams)
@@ -885,7 +885,7 @@ function SidebarHeader() {
   )
 }
 
-export function Sidebar() {
+function SidebarContent() {
   return (
     <aside className="hidden h-screen w-[220px] shrink-0 flex-col border-r border-zinc-200 bg-white text-zinc-900 lg:flex">
       <SidebarHeader />
@@ -894,7 +894,36 @@ export function Sidebar() {
   )
 }
 
-export function MobileSidebar() {
+function SidebarFallback() {
+  return (
+    <aside className="hidden h-screen w-[220px] shrink-0 flex-col border-r border-zinc-200 bg-white text-zinc-900 lg:flex">
+      <SidebarHeader />
+      <nav className="flex flex-1 flex-col gap-2 px-3 pt-3">
+        {Array.from({ length: 7 }).map((_, index) => (
+          <div key={index} className="h-11 animate-pulse rounded-lg bg-amber-50" />
+        ))}
+      </nav>
+    </aside>
+  )
+}
+
+export function Sidebar() {
+  return (
+    <Suspense fallback={<SidebarFallback />}>
+      <SidebarContent />
+    </Suspense>
+  )
+}
+
+export function ModuleSubNav() {
+  return (
+    <Suspense fallback={null}>
+      <ModuleSubNavContent />
+    </Suspense>
+  )
+}
+
+function MobileSidebarContent() {
   const { mobileOpen, setMobileOpen, navItems, loading } = useSidebarContext()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -1042,5 +1071,13 @@ export function MobileSidebar() {
         )}
       </SheetContent>
     </Sheet>
+  )
+}
+
+export function MobileSidebar() {
+  return (
+    <Suspense fallback={null}>
+      <MobileSidebarContent />
+    </Suspense>
   )
 }
