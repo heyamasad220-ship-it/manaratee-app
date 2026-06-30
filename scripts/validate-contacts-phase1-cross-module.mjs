@@ -163,7 +163,7 @@ try {
       amount: 5,
       payment_date: `${paymentDate}T12:00:00`,
       source: "cash",
-      source_type: "validation",
+      source_type: "manual",
       status: "unallocated",
       is_verified: false,
       memo: TAG,

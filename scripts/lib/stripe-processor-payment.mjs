@@ -3,6 +3,11 @@
  */
 import { createClient } from "@supabase/supabase-js"
 
+function optionalUuid(value) {
+  const trimmed = String(value ?? "").trim()
+  return trimmed || null
+}
+
 function parseMetadata(metadata) {
   if (!metadata?.organization_id || !metadata?.donor_id || !metadata?.contact_id) {
     return null
@@ -11,9 +16,9 @@ function parseMetadata(metadata) {
     organization_id: metadata.organization_id,
     donor_id: metadata.donor_id,
     contact_id: metadata.contact_id,
-    campaign_id: metadata.campaign_id ?? null,
-    category_id: metadata.category_id ?? null,
-    subcategory_id: metadata.subcategory_id ?? null,
+    campaign_id: optionalUuid(metadata.campaign_id),
+    category_id: optionalUuid(metadata.category_id),
+    subcategory_id: optionalUuid(metadata.subcategory_id),
     checkout_type: metadata.checkout_type,
     manaratee_checkout_id: metadata.manaratee_checkout_id,
   }

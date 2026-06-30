@@ -88,10 +88,23 @@ record(
     portalSource.includes("affiliation sync failed"),
   "portal sync wrapped with error logging"
 )
+function sliceFunction(source, functionName) {
+  const marker = `const ${functionName} = async`
+  const start = source.indexOf(marker)
+  if (start === -1) return ""
+
+  const candidates = ["\n  const handle", "\n  const refresh", "\n  const getStatus"]
+    .map((nextMarker) => source.indexOf(nextMarker, start + marker.length))
+    .filter((index) => index !== -1)
+
+  const end = candidates.length ? Math.min(...candidates) : source.length
+  return source.slice(start, end)
+}
+
 record(
   "staff-pledge-creation-no-affiliation-sync",
   pledgesSource.includes("handleAddPledge") &&
-    !/handleAddPledge[\s\S]*handleDonationAffiliationSync/.test(pledgesSource),
+    !sliceFunction(pledgesSource, "handleAddPledge").includes("handleDonationAffiliationSync"),
   "handleAddPledge does not sync donor affiliation on pledge-only save"
 )
 record(
@@ -118,29 +131,52 @@ async function applyDonorAffiliationMirrorForOrg(organizationId, contactId) {
   await applyDonorAffiliationMirror(sb, organizationId, contactId)
 }
 
-let { data: donor } = await sb
-  .from("donors")
-  .select("id, contact_id, organization_id")
-  .ilike("email", "donations-seed-individual%")
-  .maybeSingle()
+let { data: org } = await sb.from("organizations").select("id").limit(1).maybeSingle()
 
-if (!donor?.contact_id) {
-  const { data: fallbackDonor } = await sb
-    .from("donors")
-    .select("id, contact_id, organization_id")
-    .not("contact_id", "is", null)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle()
-  donor = fallbackDonor
-}
-
-if (!donor?.contact_id || !donor.organization_id) {
-  console.error("No donor with contact_id found for affiliation simulation")
+if (!org?.id) {
+  console.error("No organization found for affiliation simulation")
   process.exit(2)
 }
 
-const orgId = donor.organization_id
+const orgId = org.id
+const testEmail = `portal-pledge-sync-${Date.now()}@security.test`
+
+const { data: contact, error: contactError } = await sb
+  .from("contacts")
+  .insert({
+    organization_id: orgId,
+    full_name: "Portal Pledge Sync Test",
+    email: testEmail,
+    contact_type: "individual",
+    status: "active",
+  })
+  .select("id")
+  .single()
+
+if (contactError || !contact?.id) {
+  console.error("Could not create test contact:", contactError?.message)
+  process.exit(2)
+}
+
+const { data: donor, error: donorError } = await sb
+  .from("donors")
+  .insert({
+    organization_id: orgId,
+    contact_id: contact.id,
+    donor_type: "individual",
+    full_name: "Portal Pledge Sync Test",
+    email: testEmail,
+    status: "active",
+  })
+  .select("id, contact_id, organization_id")
+  .single()
+
+if (donorError || !donor?.id) {
+  await sb.from("contacts").delete().eq("id", contact.id)
+  console.error("Could not create test donor:", donorError?.message)
+  process.exit(2)
+}
+
 const contactId = donor.contact_id
 const pledgeDate = new Date().toISOString().slice(0, 10)
 
@@ -215,6 +251,10 @@ if (pledge?.id) {
   await sb.from("payments").delete().eq("id", payment?.id).eq("memo", TAG)
   await sb.from("pledges").delete().eq("id", pledge.id)
 }
+
+await sb.from("contact_roles").delete().eq("contact_id", contactId)
+await sb.from("donors").delete().eq("id", donor.id)
+await sb.from("contacts").delete().eq("id", contactId)
 
 const failed = checks.filter((check) => !check.pass)
 console.log(`\n${checks.length - failed.length}/${checks.length} checks passed`)

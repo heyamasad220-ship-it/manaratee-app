@@ -62,9 +62,9 @@ export function parseDonationCheckoutMetadata(
     contact_id: contactId,
     checkout_type: checkoutType,
     manaratee_checkout_id: manarateeCheckoutId,
-    campaign_id: metadata.campaign_id || undefined,
-    category_id: metadata.category_id || undefined,
-    subcategory_id: metadata.subcategory_id || undefined,
-    recurring_donation_plan_id: metadata.recurring_donation_plan_id || undefined,
+    campaign_id: cleanMetadataValue(metadata.campaign_id),
+    category_id: cleanMetadataValue(metadata.category_id),
+    subcategory_id: cleanMetadataValue(metadata.subcategory_id),
+    recurring_donation_plan_id: cleanMetadataValue(metadata.recurring_donation_plan_id),
   }
 }

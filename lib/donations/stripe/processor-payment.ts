@@ -49,10 +49,20 @@ function resolveAttribution(
   metadata: DonationCheckoutMetadata,
   checkoutSession: CheckoutSessionRow | null
 ) {
+  const optionalUuid = (value: string | null | undefined) => {
+    const trimmed = String(value ?? "").trim()
+    return trimmed || null
+  }
+
   return {
-    campaign_id: metadata.campaign_id ?? checkoutSession?.campaign_id ?? null,
-    category_id: metadata.category_id ?? checkoutSession?.category_id ?? null,
-    subcategory_id: metadata.subcategory_id ?? checkoutSession?.subcategory_id ?? null,
+    campaign_id:
+      optionalUuid(metadata.campaign_id) ?? optionalUuid(checkoutSession?.campaign_id) ?? null,
+    category_id:
+      optionalUuid(metadata.category_id) ?? optionalUuid(checkoutSession?.category_id) ?? null,
+    subcategory_id:
+      optionalUuid(metadata.subcategory_id) ??
+      optionalUuid(checkoutSession?.subcategory_id) ??
+      null,
   }
 }
 

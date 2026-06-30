@@ -279,8 +279,8 @@ const metadata = {
   donor_id: donor.id,
   contact_id: donor.contact_id,
   campaign_id: campaign.id,
-  category_id: category?.id ?? "",
-  subcategory_id: fund?.id ?? "",
+  category_id: category?.id ?? null,
+  subcategory_id: fund?.id ?? null,
   recurring_donation_plan_id: planRow.id,
   checkout_type: "recurring_setup",
   manaratee_checkout_id: checkoutRow.id,
@@ -432,8 +432,8 @@ record(
   "payment_attribution_fks",
   payment?.donor_id === donor.id &&
     payment?.campaign_id === campaign.id &&
-    payment?.category_id === category?.id &&
-    payment?.subcategory_id === fund?.id,
+    (payment?.category_id ?? null) === (category?.id ?? null) &&
+    (payment?.subcategory_id ?? null) === (fund?.id ?? null),
   JSON.stringify({
     donor: payment?.donor_id === donor.id,
     campaign: payment?.campaign_id === campaign.id,
