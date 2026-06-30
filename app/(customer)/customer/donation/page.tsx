@@ -289,6 +289,22 @@ export default function CustomerDonationsPage() {
   }, [])
 
   useEffect(() => {
+    if (loading || typeof window === "undefined") return
+
+    const params = new URLSearchParams(window.location.search)
+    const give = params.get("give")
+    if (give === "one-time") {
+      setShowOneTimeDonationDialog(true)
+    } else if (give === "recurring") {
+      setShowRecurringDonationDialog(true)
+    }
+
+    if (give === "one-time" || give === "recurring") {
+      window.history.replaceState({}, "", "/customer/donation")
+    }
+  }, [loading])
+
+  useEffect(() => {
     if (typeof window === "undefined") return
 
     const params = new URLSearchParams(window.location.search)

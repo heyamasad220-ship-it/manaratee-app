@@ -1,3 +1,4 @@
+import { sanitizeCustomerPortalRedirectPath } from "@/lib/auth/sanitize-customer-redirect-path"
 import { createClient } from "@/lib/supabase/client"
 import {
   ORG_ADMIN_DASHBOARD_ROLES,
@@ -15,8 +16,10 @@ function isOrgAdminDashboardRole(role: string | null | undefined) {
 
 export async function routeUserByRole(
   userId: string,
-  router: { push: (path: string) => void; refresh?: () => void }
+  router: { push: (path: string) => void; refresh?: () => void },
+  options?: { customerPath?: string | null }
 ) {
+  const preferredCustomerPath = sanitizeCustomerPortalRedirectPath(options?.customerPath)
   const supabase = createClient()
 
   /**
@@ -98,7 +101,7 @@ export async function routeUserByRole(
 
     await setActiveOrganization(customerOrgId)
     router.refresh?.()
-    router.push("/customer/dashboard")
+    router.push(preferredCustomerPath ?? "/customer/dashboard")
     return
   }
 
@@ -134,14 +137,14 @@ export async function routeUserByRole(
   if (customerProfile?.organization_id) {
     await setActiveOrganization(customerProfile.organization_id)
     router.refresh?.()
-    router.push("/customer/dashboard")
+    router.push(preferredCustomerPath ?? "/customer/dashboard")
     return
   }
 
   /**
    * 4. Fallback
    */
-  router.push("/customer/dashboard")
+  router.push(preferredCustomerPath ?? "/customer/dashboard")
 }
 
 /** Paths that should not bypass role-based routing after OAuth / magic links. */

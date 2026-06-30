@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { authCallbackUrl } from "@/lib/auth/auth-redirect"
+import { sanitizeCustomerPortalRedirectPath } from "@/lib/auth/sanitize-customer-redirect-path"
 import { routeUserByRole } from "@/lib/auth/route-user"
 import {
   joinOrganizationAsCustomer,
@@ -18,6 +19,15 @@ import {
 import { createClient } from "@/lib/supabase/client"
 
 type AuthMode = "signup" | "login"
+
+function buildCompleteJoinPath(orgSlug: string, postJoinNext: string | null) {
+  const params = new URLSearchParams()
+  params.set("step", "complete")
+  if (postJoinNext) {
+    params.set("next", postJoinNext)
+  }
+  return `/join/${orgSlug}?${params.toString()}`
+}
 
 export function OrganizationJoinClient({
   organization,
@@ -39,7 +49,9 @@ export function OrganizationJoinClient({
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
 
-  const completeJoinPath = `/join/${organization.slug}?step=complete`
+  const postJoinNext = sanitizeCustomerPortalRedirectPath(searchParams.get("next"))
+  const isDonationJoin = postJoinNext?.startsWith("/customer/donation") ?? false
+  const completeJoinPath = buildCompleteJoinPath(organization.slug, postJoinNext)
 
   const finishJoin = useCallback(async () => {
     const {
@@ -71,9 +83,9 @@ export function OrganizationJoinClient({
       return false
     }
 
-    await routeUserByRole(user.id, router)
+    await routeUserByRole(user.id, router, { customerPath: postJoinNext })
     return true
-  }, [firstName, lastName, organization.id, organization.slug, router, supabase.auth])
+  }, [firstName, lastName, organization.id, organization.slug, postJoinNext, router, supabase.auth])
 
   useEffect(() => {
     if (searchParams.get("step") !== "complete") {
@@ -113,7 +125,9 @@ export function OrganizationJoinClient({
 
     if (!data.session) {
       setInfo(
-        "Check your email to confirm your account. After confirming, you'll return here to finish joining."
+        isDonationJoin
+          ? "Check your email to confirm your account. After confirming, you'll return here and can make your donation."
+          : "Check your email to confirm your account. After confirming, you'll return here to finish joining."
       )
       return
     }
@@ -173,8 +187,12 @@ export function OrganizationJoinClient({
 
   return (
     <AuthLayout
-      heading={`Join ${organization.name}`}
-      subheading="Create an account or sign in to access programs, registrations, and your customer portal."
+      heading={isDonationJoin ? `Donate to ${organization.name}` : `Join ${organization.name}`}
+      subheading={
+        isDonationJoin
+          ? "Create an account or sign in to make a one-time or recurring gift."
+          : "Create an account or sign in to access programs, registrations, and your customer portal."
+      }
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-5">
         {mode === "signup" && (
@@ -266,7 +284,13 @@ export function OrganizationJoinClient({
               {mode === "signup" ? "Creating account..." : "Signing in..."}
             </>
           ) : mode === "signup" ? (
-            "Create account and join"
+            isDonationJoin ? (
+              "Create account and donate"
+            ) : (
+              "Create account and join"
+            )
+          ) : isDonationJoin ? (
+            "Sign in and donate"
           ) : (
             "Sign in and join"
           )}

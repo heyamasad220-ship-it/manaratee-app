@@ -72,9 +72,9 @@ Invite / reset flow:
 
 Customer self-join (no staff invite):
 
-1. Admin shares **Settings → Users → Customer join link** (`https://app.manaratee.com/join/{org-slug}`)
+1. Admin shares **Settings → Users → Customer join link** (`https://app.manaratee.com/join/{org-slug}`) or the **Donor signup and give** link (`…/join/{org-slug}?next=/customer/donation%3Fgive%3Done-time`)
 2. User creates an account or signs in on that page
-3. App links them to the org (viewer membership + contact record) and opens the customer portal
+3. App links them to the org (viewer membership + contact record) and opens the customer portal (dashboard, or donations page when using the donor link)
 
 Required permission to invite: **Manage Users** (`settings.users.manage`) on the inviter's organization role, or system roles `super_admin`, `admin`, `coordinator`, `owner` on `organization_members.role`.
 
