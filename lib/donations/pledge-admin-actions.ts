@@ -16,6 +16,11 @@ import {
   fetchPledgeAttribution,
   toPaymentAttributionColumns,
 } from "@/lib/donations/payment-attribution"
+import {
+  ORGANIZATION_AUDIT_ACTIONS,
+  formatMoney,
+  writeOrganizationAuditLog,
+} from "@/lib/audit/organization-audit-log"
 
 function normalizeDateInput(date?: string | null) {
   if (!date) return null
@@ -44,6 +49,14 @@ function frequencyToDisplay(value: string | null | undefined) {
   return value
     .replace(/_/g, " ")
     .replace(/\b\w/g, (char) => char.toUpperCase())
+}
+
+function pledgeLabel(pledge: {
+  id: string
+  donor_name?: string | null
+  campaign_name?: string | null
+}) {
+  return [pledge.donor_name, pledge.campaign_name].filter(Boolean).join(" — ") || pledge.id
 }
 
 function revalidatePledgePaths(
@@ -294,6 +307,27 @@ export async function updatePledgeAction(input: {
 
   if (error) return { success: false as const, error: error.message }
 
+  const { access, pledge } = loaded
+  const label = pledgeLabel(pledge)
+
+  await writeOrganizationAuditLog({
+    organizationId: access.orgId,
+    category: "financial",
+    action: ORGANIZATION_AUDIT_ACTIONS.PLEDGE_UPDATED,
+    actorUserId: access.userId,
+    actorEmail: access.userEmail,
+    targetType: "pledge",
+    targetId: input.pledgeId,
+    targetLabel: label,
+    summary: `Updated pledge ${label} (${formatMoney(amount)})`,
+    metadata: {
+      amount,
+      frequency: input.frequency,
+      status: input.status,
+      contactReassigned: Boolean(reassignment?.ok && reassignment.changed),
+    },
+  })
+
   revalidatePledgePaths(activeDonorId, [
     reassignment && reassignment.ok ? reassignment.oldContactId : null,
     reassignment && reassignment.ok ? reassignment.newContactId : null,
@@ -309,6 +343,9 @@ export async function recordPledgePaymentAction(input: {
   source?: string
   memo?: string | null
   attributedGroupContactId?: string | null
+  auditAction?:
+    | typeof ORGANIZATION_AUDIT_ACTIONS.PLEDGE_PAYMENT_RECORDED
+    | typeof ORGANIZATION_AUDIT_ACTIONS.PLEDGE_MARKED_PAID
 }) {
   const loaded = await loadOrgPledge(input.pledgeId)
   if (!loaded.ok) return { success: false as const, error: loaded.error }
@@ -375,6 +412,27 @@ export async function recordPledgePaymentAction(input: {
 
   if (paymentError) return { success: false as const, error: paymentError.message }
 
+  const label = pledgeLabel(pledge)
+  const auditAction =
+    input.auditAction ?? ORGANIZATION_AUDIT_ACTIONS.PLEDGE_PAYMENT_RECORDED
+  const summary =
+    auditAction === ORGANIZATION_AUDIT_ACTIONS.PLEDGE_MARKED_PAID
+      ? `Marked pledge ${label} as paid (${formatMoney(amount)})`
+      : `Recorded ${formatMoney(amount)} payment on pledge ${label}`
+
+  await writeOrganizationAuditLog({
+    organizationId: orgId,
+    category: "financial",
+    action: auditAction,
+    actorUserId: loaded.access.userId,
+    actorEmail: loaded.access.userEmail,
+    targetType: "pledge",
+    targetId: input.pledgeId,
+    targetLabel: label,
+    summary,
+    metadata: { amount, source: input.source?.trim() || "manual" },
+  })
+
   if (contactId || pledge.donor_id) {
     try {
       await handleDonationAffiliationSync({
@@ -417,6 +475,7 @@ export async function markPledgePaidAction(input: {
     source: input.source,
     memo: input.memo || "Marked as paid",
     attributedGroupContactId: input.attributedGroupContactId,
+    auditAction: ORGANIZATION_AUDIT_ACTIONS.PLEDGE_MARKED_PAID,
   })
 }
 
@@ -431,6 +490,21 @@ export async function cancelPledgeAction(pledgeId: string) {
     .eq("organization_id", loaded.access.orgId)
 
   if (error) return { success: false as const, error: error.message }
+
+  const { access, pledge } = loaded
+  const label = pledgeLabel(pledge)
+
+  await writeOrganizationAuditLog({
+    organizationId: access.orgId,
+    category: "financial",
+    action: ORGANIZATION_AUDIT_ACTIONS.PLEDGE_CANCELLED,
+    actorUserId: access.userId,
+    actorEmail: access.userEmail,
+    targetType: "pledge",
+    targetId: pledgeId,
+    targetLabel: label,
+    summary: `Cancelled pledge ${label}`,
+  })
 
   revalidatePledgePaths(loaded.pledge.donor_id)
   return { success: true as const }

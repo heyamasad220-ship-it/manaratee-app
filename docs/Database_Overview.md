@@ -29,6 +29,7 @@ Every organization-specific table should either include `organization_id` direct
 * organization_members
 * organization_roles
 * role_permissions
+* organization_audit_logs (migration `142` — append-only financial + permission audit trail)
 * profiles
 * customer_profiles
 * platform_admins
@@ -44,6 +45,7 @@ organization_members.role_id → organization_roles.id
 organization_roles.organization_id → organizations.id
 role_permissions.organization_id → organizations.id
 role_permissions.role_id → organization_roles.id
+organization_audit_logs.organization_id → organizations.id
 customer_profiles.organization_id → organizations.id
 ```
 

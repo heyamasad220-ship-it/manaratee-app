@@ -38,6 +38,7 @@ import {
   type PermissionDefinition,
 } from "@/lib/permissions/permission-definitions"
 import { filterOrganizationRolesForOrganization } from "@/lib/permissions/facilities-access"
+import { setOrganizationRolePermissionAction } from "@/lib/organizations/role-permission-actions"
 
 type OrganizationRole = {
   id: string
@@ -303,33 +304,16 @@ export function RolesPermissionsClient({
     setSavingPermissionKey(saveKey)
     setError(null)
 
-    const existingPermission = permissionsByRoleAndKey.get(saveKey)
+    const result = await setOrganizationRolePermissionAction({
+      roleId: role.id,
+      permissionKey,
+      enabled,
+    })
 
-    if (existingPermission) {
-      const { error } = await supabase
-        .from("role_permissions")
-        .update({ enabled })
-        .eq("id", existingPermission.id)
-        .eq("organization_id", organizationId)
-
-      if (error) {
-        setError(error.message)
-        setSavingPermissionKey(null)
-        return
-      }
-    } else {
-      const { error } = await supabase.from("role_permissions").insert({
-        organization_id: organizationId,
-        role_id: role.id,
-        permission_key: permissionKey,
-        enabled,
-      })
-
-      if (error) {
-        setError(error.message)
-        setSavingPermissionKey(null)
-        return
-      }
+    if (!result.success) {
+      setError(result.error)
+      setSavingPermissionKey(null)
+      return
     }
 
     setPermissions((current) => {

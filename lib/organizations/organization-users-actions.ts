@@ -1,5 +1,11 @@
 "use server"
 
+import { revalidatePath } from "next/cache"
+
+import {
+  ORGANIZATION_AUDIT_ACTIONS,
+  writeOrganizationAuditLog,
+} from "@/lib/audit/organization-audit-log"
 import { createClient } from "@/lib/supabase/server"
 import { createServiceRoleClient } from "@/lib/supabase/service-role"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
@@ -134,6 +140,47 @@ export async function updateOrganizationMemberRole(input: {
     throw new Error("Membership and role are required")
   }
 
+  const { data: targetMembership, error: targetMembershipError } = await admin
+    .from("organization_members")
+    .select("id, user_id, role_id")
+    .eq("id", membershipId)
+    .eq("organization_id", organizationId)
+    .maybeSingle()
+
+  if (targetMembershipError || !targetMembership) {
+    throw new Error("Membership not found")
+  }
+
+  if (targetMembership.role_id === roleId) {
+    return
+  }
+
+  const roleIds = [roleId, targetMembership.role_id].filter(Boolean) as string[]
+  const { data: roleRows } = await admin
+    .from("organization_roles")
+    .select("id, name")
+    .eq("organization_id", organizationId)
+    .in("id", roleIds)
+
+  const roleNameById = new Map(
+    (roleRows ?? []).map((role) => [role.id as string, role.name as string])
+  )
+  const previousRoleName = targetMembership.role_id
+    ? roleNameById.get(targetMembership.role_id) ?? "Unknown role"
+    : "No role"
+  const newRoleName = roleNameById.get(roleId) ?? "Unknown role"
+
+  const { data: targetProfile } = await admin
+    .from("profiles")
+    .select("first_name, last_name, email")
+    .eq("id", targetMembership.user_id as string)
+    .maybeSingle()
+
+  const memberLabel =
+    `${targetProfile?.first_name ?? ""} ${targetProfile?.last_name ?? ""}`.trim() ||
+    (targetProfile?.email as string | undefined) ||
+    (targetMembership.user_id as string)
+
   const { error } = await admin
     .from("organization_members")
     .update({ role_id: roleId })
@@ -143,4 +190,26 @@ export async function updateOrganizationMemberRole(input: {
   if (error) {
     throw new Error(error.message || "Could not update user role")
   }
+
+  await writeOrganizationAuditLog({
+    organizationId,
+    category: "permission",
+    action: ORGANIZATION_AUDIT_ACTIONS.MEMBER_ROLE_CHANGED,
+    actorUserId: user.id,
+    actorEmail: user.email ?? null,
+    targetType: "member",
+    targetId: targetMembership.user_id as string,
+    targetLabel: memberLabel,
+    summary: `Changed role for ${memberLabel} from ${previousRoleName} to ${newRoleName}`,
+    metadata: {
+      membership_id: membershipId,
+      previous_role_id: targetMembership.role_id,
+      previous_role_name: previousRoleName,
+      new_role_id: roleId,
+      new_role_name: newRoleName,
+    },
+  })
+
+  revalidatePath("/settings/users")
+  revalidatePath("/settings/audit-log")
 }

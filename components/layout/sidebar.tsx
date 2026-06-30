@@ -44,6 +44,7 @@ interface SubItem {
   alsoMatchPrefixes?: string[]
   contactListSegment?: ContactsListSegment
   permissionKey?: string
+  permissionKeys?: string[]
 }
 
 const CONTACTS_LIST_SEGMENTS = new Set([
@@ -512,7 +513,12 @@ function filterNavItemsByPermissions(items: NavItem[], permissionContext: UserPe
     })
     .map((item) => ({
       ...item,
-      children: item.children?.filter((child) => userCanAccess(permissionContext, child.permissionKey)),
+      children: item.children?.filter((child) => {
+        if (child.permissionKeys?.length) {
+          return child.permissionKeys.some((key) => userCanAccess(permissionContext, key))
+        }
+        return userCanAccess(permissionContext, child.permissionKey)
+      }),
     }))
     .filter((item) => !(item.children && item.children.length === 0 && item.href === "#"))
 
@@ -581,6 +587,17 @@ function buildNavItems(rows: SidebarModuleRow[], permissionContext: UserPermissi
       children: [
         { label: "Users", href: "/settings/users", matchPrefix: "/settings/users", permissionKey: "settings.users.view" },
         { label: "Roles & Permissions", href: "/settings/roles-permissions", matchPrefix: "/settings/roles-permissions", permissionKey: "settings.roles.view" },
+        {
+          label: "Audit Log",
+          href: "/settings/audit-log",
+          matchPrefix: "/settings/audit-log",
+          permissionKeys: [
+            "settings.users.view",
+            "settings.roles.view",
+            "donations.view",
+            "donations.manage",
+          ],
+        },
       ],
     },
   ]

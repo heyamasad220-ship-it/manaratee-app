@@ -26,6 +26,11 @@ import {
   paymentNetAmount,
   remainingRefundableAmount,
 } from "@/lib/donations/payment-net-amount"
+import {
+  ORGANIZATION_AUDIT_ACTIONS,
+  formatMoney,
+  writeOrganizationAuditLog,
+} from "@/lib/audit/organization-audit-log"
 
 import type { PaymentAdminCapabilities, PaymentAdminRecord } from "@/lib/donations/payment-admin-types"
 
@@ -210,6 +215,19 @@ export async function updatePaymentAction(input: {
 
   if (error) return { success: false as const, error: error.message }
 
+  await writeOrganizationAuditLog({
+    organizationId: access.orgId,
+    category: "financial",
+    action: ORGANIZATION_AUDIT_ACTIONS.PAYMENT_UPDATED,
+    actorUserId: access.userId,
+    actorEmail: access.userEmail,
+    targetType: "payment",
+    targetId: payment.id,
+    targetLabel: formatMoney(Number(payment.amount || 0)),
+    summary: `Updated payment ${formatMoney(Number(payment.amount || 0))}`,
+    metadata: { updates },
+  })
+
   revalidateDonationPaths(payment.donor_id)
   return { success: true as const }
 }
@@ -250,6 +268,19 @@ export async function voidPaymentAction(input: {
     .eq("organization_id", access.orgId)
 
   if (error) return { success: false as const, error: error.message }
+
+  await writeOrganizationAuditLog({
+    organizationId: access.orgId,
+    category: "financial",
+    action: ORGANIZATION_AUDIT_ACTIONS.PAYMENT_VOIDED,
+    actorUserId: access.userId,
+    actorEmail: access.userEmail,
+    targetType: "payment",
+    targetId: payment.id,
+    targetLabel: formatMoney(Number(payment.amount || 0)),
+    summary: `Voided payment ${formatMoney(Number(payment.amount || 0))}`,
+    metadata: { reason: input.reason?.trim() || null },
+  })
 
   revalidateDonationPaths(payment.donor_id)
   return { success: true as const }
@@ -298,6 +329,19 @@ export async function recordPaymentRefundAction(input: {
       currentStatus: payment.status,
       refundNote: input.reason,
       existingMemo: payment.memo,
+    })
+
+    await writeOrganizationAuditLog({
+      organizationId: access.orgId,
+      category: "financial",
+      action: ORGANIZATION_AUDIT_ACTIONS.PAYMENT_REFUNDED,
+      actorUserId: access.userId,
+      actorEmail: access.userEmail,
+      targetType: "payment",
+      targetId: payment.id,
+      targetLabel: formatMoney(refundAmount),
+      summary: `Recorded refund of ${formatMoney(refundAmount)} on payment ${formatMoney(Number(payment.amount || 0))}`,
+      metadata: { refundAmount, reason: input.reason?.trim() || null },
     })
 
     revalidateDonationPaths(payment.donor_id)
@@ -382,6 +426,23 @@ export async function stripeRefundPaymentAction(input: {
       existingMemo: payment.memo,
     })
 
+    await writeOrganizationAuditLog({
+      organizationId: access.orgId,
+      category: "financial",
+      action: ORGANIZATION_AUDIT_ACTIONS.PAYMENT_STRIPE_REFUNDED,
+      actorUserId: access.userId,
+      actorEmail: access.userEmail,
+      targetType: "payment",
+      targetId: payment.id,
+      targetLabel: formatMoney(stripeRefund.amount / 100),
+      summary: `Stripe refund of ${formatMoney(stripeRefund.amount / 100)} on payment ${formatMoney(Number(payment.amount || 0))}`,
+      metadata: {
+        stripeRefundId: stripeRefund.id,
+        refundAmount: stripeRefund.amount / 100,
+        reason: input.reason?.trim() || null,
+      },
+    })
+
     revalidateDonationPaths(payment.donor_id)
     return {
       success: true as const,
@@ -454,6 +515,23 @@ export async function allocatePaymentToOpenPledgeAction(input: {
     .eq("organization_id", access.orgId)
 
   if (error) return { success: false as const, error: error.message }
+
+  const pledgeLabel =
+    [pledge.donor_name, pledge.campaign_name].filter(Boolean).join(" — ") ||
+    input.pledgeId
+
+  await writeOrganizationAuditLog({
+    organizationId: access.orgId,
+    category: "financial",
+    action: ORGANIZATION_AUDIT_ACTIONS.PAYMENT_ALLOCATED,
+    actorUserId: access.userId,
+    actorEmail: access.userEmail,
+    targetType: "payment",
+    targetId: payment.id,
+    targetLabel: formatMoney(Number(payment.amount || 0)),
+    summary: `Allocated payment ${formatMoney(Number(payment.amount || 0))} to pledge ${pledgeLabel}`,
+    metadata: { pledgeId: input.pledgeId, pledgeLabel },
+  })
 
   const donorId = payment.donor_id || pledge.donor_id
   if (donorId) {

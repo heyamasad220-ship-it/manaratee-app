@@ -13,6 +13,7 @@ export type DonationStaffContext = {
   supabase: SupabaseClient
   orgId: string
   userId: string
+  userEmail: string | null
   canManage: boolean
 }
 
@@ -109,6 +110,7 @@ export async function requireDonationStaffAccess(
     supabase,
     orgId: organizationId,
     userId: user.id,
+    userEmail: user.email ?? null,
     canManage,
   }
 }

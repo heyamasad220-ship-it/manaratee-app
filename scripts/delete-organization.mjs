@@ -112,6 +112,7 @@ const ORG_DATA_TABLES = [
   "organization_invites",
   "platform_admin_org_access_log",
   "role_permissions",
+  "organization_audit_logs",
   "organization_roles",
   "customer_profiles",
 ]
