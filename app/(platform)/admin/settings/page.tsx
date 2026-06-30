@@ -96,7 +96,7 @@ function SettingsPageContent() {
 
   const [trialDays, setTrialDays] = useState("14")
   const [defaultPlan, setDefaultPlan] = useState("free")
-  const [stripeConnected, setStripeConnected] = useState(false)
+  const [stripeFormOpen, setStripeFormOpen] = useState(false)
   const [stripePublishableKey, setStripePublishableKey] = useState("")
   const [stripeSecretKey, setStripeSecretKey] = useState("")
   const [stripeWebhookSecret, setStripeWebhookSecret] = useState("")
@@ -188,7 +188,6 @@ The Manaratee Team`)
 
       setStripeWebhookUrl(result.webhookUrl)
       setStripeEnvConfigured(result.platformStripeConfigured)
-      setStripeConnected(result.platformStripeConfigured)
     }
 
     void loadStripeStatus()
@@ -363,40 +362,42 @@ The Manaratee Team`)
                       {stripeStatusLoading
                         ? "Checking configuration..."
                         : stripeEnvConfigured
-                          ? "Environment configured"
-                          : stripeConnected
-                            ? "Ready to validate keys"
-                            : "Not connected"}
+                          ? "Platform Stripe keys are configured in this environment"
+                          : stripeFormOpen
+                            ? "Enter your API keys below, then save to validate"
+                            : "Not configured in this environment"}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  {stripeConnected ? (
-                    <>
-                      <Badge variant="secondary" className="bg-emerald-100 text-emerald-700">
-                        {stripeEnvConfigured ? "Env configured" : "Connected"}
-                      </Badge>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setStripeConnected(false)
-                          setStripePublishableKey("")
-                          setStripeSecretKey("")
-                          setStripeWebhookSecret("")
-                          setStripeError(null)
-                        }}
-                      >
-                        Clear form
-                      </Button>
-                    </>
-                  ) : (
+                  {stripeEnvConfigured ? (
+                    <Badge variant="secondary" className="bg-emerald-100 text-emerald-700">
+                      Configured
+                    </Badge>
+                  ) : stripeFormOpen ? (
+                    <Badge variant="outline">Setup in progress</Badge>
+                  ) : null}
+                  {!stripeFormOpen ? (
                     <Button
                       className="bg-[#635BFF] text-white hover:bg-[#5851db] gap-2"
-                      onClick={() => setStripeConnected(true)}
+                      onClick={() => setStripeFormOpen(true)}
                     >
                       Enter API keys
                       <ExternalLink className="h-4 w-4" />
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setStripeFormOpen(false)
+                        setStripePublishableKey("")
+                        setStripeSecretKey("")
+                        setStripeWebhookSecret("")
+                        setStripeError(null)
+                      }}
+                    >
+                      Cancel setup
                     </Button>
                   )}
                 </div>
@@ -412,7 +413,7 @@ The Manaratee Team`)
                     <Input
                       id="stripe-pk"
                       placeholder="pk_live_..."
-                      disabled={!stripeConnected || stripeSaving}
+                      disabled={!stripeFormOpen || stripeSaving}
                       className="font-mono text-sm"
                       value={stripePublishableKey}
                       onChange={(event) => setStripePublishableKey(event.target.value)}
@@ -424,7 +425,7 @@ The Manaratee Team`)
                       id="stripe-sk"
                       type="password"
                       placeholder="sk_live_..."
-                      disabled={!stripeConnected || stripeSaving}
+                      disabled={!stripeFormOpen || stripeSaving}
                       className="font-mono text-sm"
                       value={stripeSecretKey}
                       onChange={(event) => setStripeSecretKey(event.target.value)}
@@ -439,7 +440,7 @@ The Manaratee Team`)
                       id="stripe-webhook"
                       type="password"
                       placeholder="whsec_..."
-                      disabled={!stripeConnected || stripeSaving}
+                      disabled={!stripeFormOpen || stripeSaving}
                       className="font-mono text-sm"
                       value={stripeWebhookSecret}
                       onChange={(event) => setStripeWebhookSecret(event.target.value)}
@@ -481,7 +482,7 @@ The Manaratee Team`)
                 </Button>
                 <Button
                   className="bg-emerald-600 text-white hover:bg-emerald-700 gap-2"
-                  disabled={!stripeConnected || stripeSaving}
+                  disabled={!stripeFormOpen || stripeSaving}
                   onClick={() => void handleSaveStripeConfiguration()}
                 >
                   <Save className="h-4 w-4" />
