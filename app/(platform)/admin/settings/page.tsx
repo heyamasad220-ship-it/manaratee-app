@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { Suspense, useEffect, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Settings, Building2, CreditCard, Mail, Save, ExternalLink } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -18,6 +19,10 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
+import {
+  getPlatformStripeConfigStatusAction,
+  savePlatformStripeConfigAction,
+} from "@/lib/platform/platform-stripe-config-actions"
 
 interface DefaultSetting {
   id: string
@@ -34,6 +39,22 @@ interface EmailTemplate {
 }
 
 export default function SettingsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="p-6 text-sm text-muted-foreground">Loading platform settings...</div>
+      }
+    >
+      <SettingsPageContent />
+    </Suspense>
+  )
+}
+
+function SettingsPageContent() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const initialTab = searchParams.get("tab") === "stripe" ? "stripe" : "organization"
+
   const [defaultSettings, setDefaultSettings] = useState<DefaultSetting[]>([
     {
       id: "auto-approve-bookings",
@@ -76,6 +97,17 @@ export default function SettingsPage() {
   const [trialDays, setTrialDays] = useState("14")
   const [defaultPlan, setDefaultPlan] = useState("free")
   const [stripeConnected, setStripeConnected] = useState(false)
+  const [stripePublishableKey, setStripePublishableKey] = useState("")
+  const [stripeSecretKey, setStripeSecretKey] = useState("")
+  const [stripeWebhookSecret, setStripeWebhookSecret] = useState("")
+  const [stripeWebhookUrl, setStripeWebhookUrl] = useState(
+    "https://your-domain.com/api/webhooks/stripe/donations"
+  )
+  const [stripeEnvConfigured, setStripeEnvConfigured] = useState(false)
+  const [stripeSaving, setStripeSaving] = useState(false)
+  const [stripeError, setStripeError] = useState<string | null>(null)
+  const [stripeStatusLoading, setStripeStatusLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState(initialTab)
 
   const [emailTemplates] = useState<EmailTemplate[]>([
     {
@@ -139,6 +171,67 @@ Best regards,
 The Manaratee Team`)
   }
 
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadStripeStatus() {
+      setStripeStatusLoading(true)
+      const result = await getPlatformStripeConfigStatusAction()
+      if (cancelled) return
+
+      setStripeStatusLoading(false)
+
+      if (!result.success) {
+        setStripeError(result.error)
+        return
+      }
+
+      setStripeWebhookUrl(result.webhookUrl)
+      setStripeEnvConfigured(result.platformStripeConfigured)
+      setStripeConnected(result.platformStripeConfigured)
+    }
+
+    void loadStripeStatus()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  async function handleSaveStripeConfiguration() {
+    setStripeSaving(true)
+    setStripeError(null)
+
+    const result = await savePlatformStripeConfigAction({
+      publishableKey: stripePublishableKey,
+      secretKey: stripeSecretKey,
+      webhookSecret: stripeWebhookSecret,
+    })
+
+    setStripeSaving(false)
+
+    if (!result.success) {
+      setStripeError(result.error)
+      return
+    }
+
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back()
+      return
+    }
+
+    router.push("/admin/dashboard")
+  }
+
+  function handleLeaveStripeConfiguration() {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back()
+      return
+    }
+
+    router.push("/admin/dashboard")
+  }
+
   return (
     <>
       <div className="mb-6">
@@ -148,7 +241,7 @@ The Manaratee Team`)
         </p>
       </div>
 
-      <Tabs defaultValue="organization" className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="bg-muted/50 p-1">
           <TabsTrigger value="organization" className="gap-2">
             <Building2 className="h-4 w-4" />
@@ -252,7 +345,8 @@ The Manaratee Team`)
                 Stripe Configuration
               </CardTitle>
               <CardDescription>
-                Connect your Stripe account to enable payment processing
+                Validate platform Stripe keys for Connect and webhooks. Keys are stored in Vercel
+                environment variables, not in the database.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -266,7 +360,13 @@ The Manaratee Team`)
                   <div>
                     <p className="font-medium">Stripe Account</p>
                     <p className="text-sm text-muted-foreground">
-                      {stripeConnected ? "Connected" : "Not connected"}
+                      {stripeStatusLoading
+                        ? "Checking configuration..."
+                        : stripeEnvConfigured
+                          ? "Environment configured"
+                          : stripeConnected
+                            ? "Ready to validate keys"
+                            : "Not connected"}
                     </p>
                   </div>
                 </div>
@@ -274,10 +374,20 @@ The Manaratee Team`)
                   {stripeConnected ? (
                     <>
                       <Badge variant="secondary" className="bg-emerald-100 text-emerald-700">
-                        Connected
+                        {stripeEnvConfigured ? "Env configured" : "Connected"}
                       </Badge>
-                      <Button variant="outline" size="sm">
-                        Disconnect
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setStripeConnected(false)
+                          setStripePublishableKey("")
+                          setStripeSecretKey("")
+                          setStripeWebhookSecret("")
+                          setStripeError(null)
+                        }}
+                      >
+                        Clear form
                       </Button>
                     </>
                   ) : (
@@ -285,7 +395,7 @@ The Manaratee Team`)
                       className="bg-[#635BFF] text-white hover:bg-[#5851db] gap-2"
                       onClick={() => setStripeConnected(true)}
                     >
-                      Connect Stripe
+                      Enter API keys
                       <ExternalLink className="h-4 w-4" />
                     </Button>
                   )}
@@ -302,8 +412,10 @@ The Manaratee Team`)
                     <Input
                       id="stripe-pk"
                       placeholder="pk_live_..."
-                      disabled={!stripeConnected}
+                      disabled={!stripeConnected || stripeSaving}
                       className="font-mono text-sm"
+                      value={stripePublishableKey}
+                      onChange={(event) => setStripePublishableKey(event.target.value)}
                     />
                   </div>
                   <div className="space-y-2">
@@ -312,11 +424,13 @@ The Manaratee Team`)
                       id="stripe-sk"
                       type="password"
                       placeholder="sk_live_..."
-                      disabled={!stripeConnected}
+                      disabled={!stripeConnected || stripeSaving}
                       className="font-mono text-sm"
+                      value={stripeSecretKey}
+                      onChange={(event) => setStripeSecretKey(event.target.value)}
                     />
                     <p className="text-xs text-muted-foreground">
-                      Your secret key is encrypted and stored securely
+                      Set as STRIPE_SECRET_KEY in Vercel after validation
                     </p>
                   </div>
                   <div className="space-y-2">
@@ -325,9 +439,14 @@ The Manaratee Team`)
                       id="stripe-webhook"
                       type="password"
                       placeholder="whsec_..."
-                      disabled={!stripeConnected}
+                      disabled={!stripeConnected || stripeSaving}
                       className="font-mono text-sm"
+                      value={stripeWebhookSecret}
+                      onChange={(event) => setStripeWebhookSecret(event.target.value)}
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Set as STRIPE_WEBHOOK_SECRET in Vercel after validation
+                    </p>
                   </div>
                 </div>
               </div>
@@ -338,21 +457,35 @@ The Manaratee Team`)
                 <h3 className="font-medium">Webhook Endpoint</h3>
                 <div className="p-4 rounded-lg border bg-muted/50">
                   <p className="text-sm font-mono text-muted-foreground break-all">
-                    https://your-domain.com/api/webhooks/stripe
+                    {stripeWebhookUrl}
                   </p>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Add this URL to your Stripe webhook settings to receive payment events
+                  Add this URL in Stripe Dashboard and enable events on connected accounts
                 </p>
               </div>
 
-              <div className="flex justify-end">
+              {stripeError ? (
+                <p className="text-sm text-destructive" role="alert">
+                  {stripeError}
+                </p>
+              ) : null}
+
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={handleLeaveStripeConfiguration}
+                  disabled={stripeSaving}
+                >
+                  Cancel
+                </Button>
                 <Button
                   className="bg-emerald-600 text-white hover:bg-emerald-700 gap-2"
-                  disabled={!stripeConnected}
+                  disabled={!stripeConnected || stripeSaving}
+                  onClick={() => void handleSaveStripeConfiguration()}
                 >
                   <Save className="h-4 w-4" />
-                  Save Configuration
+                  {stripeSaving ? "Validating..." : "Save Configuration"}
                 </Button>
               </div>
             </CardContent>
