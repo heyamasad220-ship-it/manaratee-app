@@ -48,7 +48,10 @@ async function count(table) {
   const { count, error } = await sb
     .from(table)
     .select("*", { count: "exact", head: true })
-  return { count: count ?? 0, error: error?.message ?? null }
+  if (error) {
+    return { count: null, error: error.message, missing: error.message.includes("does not exist") }
+  }
+  return { count: count ?? 0, error: null }
 }
 
 async function sumColumn(table, column) {
@@ -110,6 +113,15 @@ async function orphanPaymentPledgeIds() {
   return { orphanCount: orphans.length, linkedPayments: payments?.length ?? 0, sample: orphans.slice(0, 5) }
 }
 
+async function paymentsMissingDonorId() {
+  const { count, error } = await sb
+    .from("payments")
+    .select("id", { count: "exact", head: true })
+    .is("donor_id", null)
+  if (error) return { error: error.message }
+  return { count: count ?? 0 }
+}
+
 async function pledgeBalanceSample() {
   const { data: viewRows, error: vErr } = await sb
     .from("pledge_status_view")
@@ -151,18 +163,7 @@ const report = {
   integrity: {},
 }
 
-for (const table of [
-  "donation_payments",
-  "donation_pledges",
-  "payments",
-  "pledges",
-  "donors",
-  "backup_donation_payments_2026_05_24",
-  "backup_donation_pledges_2026_05_24",
-  "backup_payments_2026_05_24",
-  "backup_pledges_2026_05_24",
-  "payment_import_rows",
-]) {
+for (const table of ["payments", "pledges", "donors", "payment_import_batches"]) {
   report.counts[table] = await count(table)
 }
 
@@ -176,21 +177,14 @@ for (const view of ["pledge_status_view", "donor_summary_view"]) {
   }
 }
 
-report.sums.donation_payments_amount = await sumColumn("donation_payments", "amount")
-report.sums.donation_pledges_amount = await sumColumn("donation_pledges", "amount")
-report.sums.donation_pledges_pledged_amount = await sumColumn(
-  "donation_pledges",
-  "pledged_amount"
-)
 report.sums.payments_amount = await sumColumn("payments", "amount")
 report.sums.pledges_amount_pledged = await sumColumn("pledges", "amount_pledged")
 
 report.status.payments = await statusDistribution("payments")
-report.status.donation_payments = await statusDistribution("donation_payments")
-report.status.donation_pledges = await statusDistribution("donation_pledges")
 
 report.integrity.orphan_pledge_donor_id = await orphanPledgeDonorIds()
 report.integrity.orphan_payment_pledge_id = await orphanPaymentPledgeIds()
+report.integrity.payments_missing_donor_id = await paymentsMissingDonorId()
 report.integrity.pledge_balance_sample = await pledgeBalanceSample()
 
 console.log(JSON.stringify(report, null, 2))

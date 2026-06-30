@@ -677,9 +677,9 @@ Status: In progress (June 2026)
 
 All new payments → `payments`. All new pledges → `pledges`. Donor identity → `donors` (via `ensureDonorExtensionForContact`).
 
-### Legacy tables (no new writes)
+### Legacy tables (removed June 2026)
 
-`donation_payments` and `donation_pledges` are **not deleted** but are **no longer written** by the app. Historical data in those tables is **not shown** on stabilized screens until a migration is run.
+Migrations `140`–`141` drop superseded tables after export via `scripts/cleanup-legacy-donation-staging-tables.mjs`: `donation_payments`, `donation_pledges`, `donation_amount_options`, `donor_import_*`, `contact_import_staging`, `organization_settings`, `payment_import_rows`, and `backup_*_2026_05_24` snapshots.
 
 ### Key files changed
 
@@ -692,13 +692,26 @@ All new payments → `payments`. All new pledges → `pledges`. Donor identity �
 
 ### Pending (not in this phase)
 
-* SQL migration script for historical `donation_*` → canonical tables
-* Committed DDL for `pledge_status_view` / `donor_summary_view` definitions
-* Data migration / backfill
+* Committed DDL for `pledge_status_view` / `donor_summary_view` definitions (now in migrations `097`, `116`, `119`, `124`)
+* Data migration / backfill from pre-2026 imports (canonical ledger is source of truth)
+
+### Legacy cleanup (June 2026)
+
+```bash
+# 1. Export Tier 2 archives + inventory (dry run)
+node scripts/cleanup-legacy-donation-staging-tables.mjs
+
+# 2. Delete Tier 2 rows + repair payments missing donor_id
+node scripts/cleanup-legacy-donation-staging-tables.mjs --execute
+
+# 3. Apply SQL on linked Supabase
+npx supabase db query --linked -f scripts/140_drop_legacy_donation_and_staging_tables.sql
+npx supabase db query --linked -f scripts/141_drop_payment_import_rows_and_backup_tables.sql
+```
 
 ### Dev seed + validation (canonical only)
 
-Dev-only scripts to populate and verify the stabilized ledger **without** touching `donation_payments`, `donation_pledges`, or `backup_*` tables.
+Dev-only scripts to populate and verify the stabilized ledger.
 
 | Script | Purpose |
 |--------|---------|

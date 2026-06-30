@@ -514,12 +514,19 @@ record(
   `raised=${metricsAfter.raised}`
 )
 
-const { count: legacyDonationPayments } = await sb
+const { count: legacyDonationPayments, error: legacyDonationPaymentsError } = await sb
   .from("donation_payments")
   .select("id", { count: "exact", head: true })
   .eq("organization_id", orgId)
 
-record("legacy_donation_payments_untouched", true, `count=${legacyDonationPayments ?? 0}`)
+record(
+  "legacy_donation_payments_untouched",
+  legacyDonationPaymentsError?.message?.includes("does not exist") ||
+    (legacyDonationPayments ?? 0) === 0,
+  legacyDonationPaymentsError?.message?.includes("does not exist")
+    ? "table dropped (migration 140)"
+    : `count=${legacyDonationPayments ?? 0}`
+)
 
 const { data: settings } = await sb
   .from("donation_settings")

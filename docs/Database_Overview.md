@@ -33,7 +33,6 @@ Every organization-specific table should either include `organization_id` direct
 * customer_profiles
 * platform_admins
 * platform_settings
-* organization_settings
 * organization_payment_methods (migration `121` — platform subscription cards on file)
 * organization_billing_invoices (migration `121` — platform subscription invoice history)
 
@@ -46,7 +45,6 @@ organization_roles.organization_id → organizations.id
 role_permissions.organization_id → organizations.id
 role_permissions.role_id → organization_roles.id
 customer_profiles.organization_id → organizations.id
-organization_settings.organization_id → organizations.id
 ```
 
 ---
@@ -265,7 +263,14 @@ program_financial_assistance_status_history.financial_assistance_id → program_
 
 **Canonical ledger (active writes, June 2026 stabilization):** `payments`, `pledges`, `donors` (+ `contacts` for identity). Staff and customer portal now insert only into these tables.
 
-**Dev seed:** `scripts/seed-donations-dev.mjs` inserts test data into canonical tables only (see `docs/Features.md` Donations section). Does not migrate `backup_*` or legacy `donation_*` rows.
+**Legacy table cleanup (migrations `140`–`141`, June 2026):** Dropped superseded tables after JSON export via `scripts/cleanup-legacy-donation-staging-tables.mjs`:
+
+* Tier 1 (`140`): `donation_payments`, `donation_pledges`, `donation_amount_options`, `donor_import_*`, `contact_import_staging`, `organization_settings`
+* Tier 2 (`141`): `payment_import_rows`, `backup_*_2026_05_24` snapshot tables
+
+Import CSV flow writes directly to `payments` + `payment_import_batches` (no row staging table).
+
+**Dev seed:** `scripts/seed-donations-dev.mjs` inserts test data into canonical tables only (see `docs/Features.md` Donations section). Does not use dropped legacy tables.
 
 **`payments.source` constraint (patch `131_payments_source_square.sql`):** lowercase channel keys (`cash`, `check`, **`square`**, `zelle`, `venmo`, `paypal`, `stripe`, `import`, `manual`). **`square`** = Square terminal batch deposit on a campaign (no donor/contact). Campaign overview classifies via memo `|batch|square|` or `source = square`. Customer portal normalizes configured payment method display names via `lib/donations/payment-source-channel.ts` before insert.
 
@@ -273,9 +278,6 @@ program_financial_assistance_status_history.financial_assistance_id → program_
 * donors
 * donation_categories
 * donation_subcategories
-* donation_amount_options
-* donation_pledges
-* donation_payments
 * pledges
 * payments
 * payment_methods
@@ -318,7 +320,7 @@ npm run validate:donations-security
 
 **Payment refunds / net totals (migration `125_payment_refunds_net_amounts.sql`):** `payment_net_amount(amount, refunded_amount)` helper. Views and dashboard RPCs use net amounts. `refresh_pledge_status` and payment trigger include `refunded_amount`. Status values `partially_refunded` and `refunded` on `payments`.
 
-**Import columns on `payments` (migration `117`):** `import_email`, `import_phone`, `import_batch_id` — CSV match hints and batch audit link. Staff import flow no longer uses `payment_import_rows` staging in the UI.
+**Import columns on `payments` (migration `117`):** `import_email`, `import_phone`, `import_batch_id` — CSV match hints and batch audit link. Legacy `payment_import_rows` staging removed in migration `141`.
 
 **Chunked CSV import (migration `118`):** `payment_import_batches.import_seen_keys` holds duplicate keys while a file imports in 100-row server-action chunks; cleared when import completes.
 
@@ -335,14 +337,6 @@ donors.organization_id → organizations.id
 donors.contact_id → contacts.id
 
 donation_subcategories.category_id → donation_categories.id
-donation_amount_options.category_id → donation_categories.id
-donation_amount_options.subcategory_id → donation_subcategories.id
-
-donation_pledges.organization_id → organizations.id
-donation_pledges.contact_id → contacts.id
-donation_payments.organization_id → organizations.id
-donation_payments.contact_id → contacts.id
-donation_payments.pledge_id → donation_pledges.id
 
 pledges.organization_id → organizations.id
 pledges.donor_id → donors.id
@@ -506,23 +500,13 @@ These should be reviewed later.
 
 ## Import and Backup Tables
 
-Import tables:
+**Cleanup (June 2026):** `payment_import_rows` and `backup_*_2026_05_24` tables dropped after export (`scripts/cleanup-legacy-donation-staging-tables.mjs`, migrations `140`–`141`).
 
-* contact_import_staging
-* donor_import_batches
-* donor_import_rows
-* payment_import_batches
-* payment_import_rows
+Active import metadata:
 
-Backup tables:
+* `payment_import_batches` — CSV upload history (linked from `payments.import_batch_id`)
 
-* backup_donation_payments_2026_05_24
-* backup_donation_pledges_2026_05_24
-* backup_donors_2026_05_24
-* backup_payments_2026_05_24
-* backup_pledges_2026_05_24
-
-These appear to be operational or historical tables and should not be modified without review.
+Archived exports live under `scripts/backups/legacy-cleanup/` when cleanup script is run.
 
 ---
 

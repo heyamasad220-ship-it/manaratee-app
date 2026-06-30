@@ -32,15 +32,11 @@ const ORG_DATA_TABLES = [
   "donation_checkout_sessions",
   "pledge_reminders",
   "donation_receipts",
-  "payment_import_rows",
   "payments",
-  "donation_payments",
   "pledges",
-  "donation_pledges",
   "recurring_donation_plans",
   "donors",
   "payment_import_batches",
-  "contact_import_staging",
   "ticket_order_items",
   "ticket_orders",
   "program_financial_assistance_documents",
@@ -94,13 +90,11 @@ const ORG_DATA_TABLES = [
   "employees",
   "contacts",
   "people",
-  "donation_amount_options",
   "donation_subcategories",
   "donation_categories",
   "payment_methods",
   "campaigns",
   "donation_settings",
-  "organization_settings",
   "module_notification_settings",
   "venues",
   "spaces",
@@ -193,36 +187,6 @@ async function deleteByOrg(sb, table, orgId) {
   }
 
   return { table, deleted: count ?? 0, skipped: false, error: null }
-}
-
-async function deletePaymentImportRows(sb, orgId) {
-  const { data: batches, error: batchError } = await sb
-    .from("payment_import_batches")
-    .select("id")
-    .eq("organization_id", orgId)
-
-  if (batchError) {
-    if (isSkippableTableError(batchError.message)) {
-      return { table: "payment_import_rows", deleted: 0, skipped: true, error: null }
-    }
-    return { table: "payment_import_rows", deleted: 0, skipped: false, error: batchError.message }
-  }
-
-  const batchIds = (batches || []).map((row) => row.id)
-  if (batchIds.length === 0) {
-    return { table: "payment_import_rows", deleted: 0, skipped: false, error: null }
-  }
-
-  const { error, count } = await sb
-    .from("payment_import_rows")
-    .delete({ count: "exact" })
-    .in("batch_id", batchIds)
-
-  if (error) {
-    return { table: "payment_import_rows", deleted: 0, skipped: false, error: error.message }
-  }
-
-  return { table: "payment_import_rows", deleted: count ?? 0, skipped: false, error: null }
 }
 
 async function exportOrgSnapshot(sb, orgId, orgName, outDir) {
@@ -458,17 +422,7 @@ async function main() {
 
   console.log("\n--- Deleting org data ---")
 
-  const importRowResult = await deletePaymentImportRows(sb, orgId)
-  report.steps.push(importRowResult)
-  console.log(
-    `${importRowResult.table}: deleted ${importRowResult.deleted}${
-      importRowResult.error ? ` ERROR ${importRowResult.error}` : ""
-    }`
-  )
-
   for (const table of ORG_DATA_TABLES) {
-    if (table === "payment_import_rows") continue
-
     const result = await deleteByOrg(sb, table, orgId)
     if (result.skipped) continue
     if (result.deleted > 0 || result.error) {

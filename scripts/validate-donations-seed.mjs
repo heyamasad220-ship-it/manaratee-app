@@ -81,10 +81,11 @@ async function countLegacyWrites() {
   const legacy = ["donation_payments", "donation_pledges"]
   for (const table of legacy) {
     const { count, error } = await sb.from(table).select("*", { count: "exact", head: true })
+    const missing = error?.message?.includes("does not exist")
     record(
-      `legacy_table_untouched:${table}`,
-      !error,
-      error ? error.message : `${count ?? 0} rows (seed must not write here)`
+      `legacy_table_dropped:${table}`,
+      missing || (!error && (count ?? 0) === 0),
+      missing ? "dropped (migration 140)" : error ? error.message : `${count ?? 0} rows`
     )
   }
 }
@@ -100,7 +101,6 @@ async function verifySeedPresence(orgId) {
     "pledges",
     "payments",
     "payment_import_batches",
-    "payment_import_rows",
   ]
 
   for (const table of tables) {
@@ -416,21 +416,16 @@ async function verifyImportReconcileFlow(orgId) {
     .like("file_name", "donations-import-test%")
     .maybeSingle()
 
-  const { data: rows } = batch?.id
-    ? await sb
-        .from("payment_import_rows")
-        .select("id, sender_name, amount, import_status")
-        .eq("batch_id", batch.id)
-    : { data: [] }
-
   const { data: pendingPayments } = await sb
     .from("payments")
-    .select("id, sender_name, amount, status, source_type")
+    .select("id, sender_name, amount, status, source_type, import_batch_id")
     .eq("organization_id", orgId)
     .eq("status", "pending_review")
 
   const hasBatch = Boolean(batch?.id)
-  const hasRows = (rows || []).length >= 2
+  const batchLinkedPayments = (pendingPayments || []).filter(
+    (p) => p.import_batch_id === batch?.id
+  )
   const hasPendingReview = (pendingPayments || []).some(
     (p) =>
       p.sender_name === "Seed Import Donor" &&
@@ -440,11 +435,11 @@ async function verifyImportReconcileFlow(orgId) {
 
   record(
     "import_reconcile_flow",
-    hasBatch && hasRows && hasPendingReview,
-    `batch=${batch?.file_name ?? "none"} rows=${rows?.length ?? 0} pending_review=${pendingPayments?.length ?? 0}`,
+    hasBatch && batchLinkedPayments.length >= 1 && hasPendingReview,
+    `batch=${batch?.file_name ?? "none"} batch_linked_pending=${batchLinkedPayments.length} pending_review=${pendingPayments?.length ?? 0}`,
     {
       batch,
-      importRows: rows,
+      batchLinkedPayments,
       pendingPayments,
       fixturePath: "scripts/fixtures/donations-import-test.csv",
     }

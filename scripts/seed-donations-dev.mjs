@@ -149,7 +149,6 @@ async function cleanSeed(orgId) {
 
   const batchIds = (batches || []).map((b) => b.id)
   if (batchIds.length) {
-    await sb.from("payment_import_rows").delete().in("batch_id", batchIds)
     await sb.from("payment_import_batches").delete().in("id", batchIds)
   }
 
@@ -507,38 +506,45 @@ async function seed(orgId) {
     },
   ]
 
-  for (const row of importRows) {
-    const { error } = await sb.from("payment_import_rows").insert({
-      batch_id: importBatch.id,
-      organization_id: orgId,
-      sender_name: row.sender_name,
-      amount: row.amount,
-      payment_date: row.payment_date,
-      reference: row.reference,
-      raw_row: row,
-      import_status: row.import_status,
-    })
-    if (error) throw new Error(`payment_import_rows insert: ${error.message}`)
-  }
-
   const { error: importedPaymentError } = await sb.from("payments").insert({
     organization_id: orgId,
     donor_id: null,
     contact_id: null,
     pledge_id: null,
-    sender_name: "Seed Import Donor",
-    amount: 75,
+    sender_name: importRows[0].sender_name,
+    amount: importRows[0].amount,
     payment_date: "2026-06-10T12:00:00",
     source: "import",
     source_type: "import",
-    memo: "ZELLE-SEED-001",
+    memo: importRows[0].reference,
     status: "pending_review",
     is_verified: false,
+    import_batch_id: importBatch.id,
     ...seedAttribution,
   })
 
   if (importedPaymentError) {
     throw new Error(`payments insert (import queue): ${importedPaymentError.message}`)
+  }
+
+  const { error: secondImportPaymentError } = await sb.from("payments").insert({
+    organization_id: orgId,
+    donor_id: null,
+    contact_id: null,
+    pledge_id: null,
+    sender_name: importRows[1].sender_name,
+    amount: importRows[1].amount,
+    payment_date: "2026-06-11T12:00:00",
+    source: "import",
+    source_type: "import",
+    memo: importRows[1].reference,
+    status: "pending_review",
+    is_verified: false,
+    import_batch_id: importBatch.id,
+  })
+
+  if (secondImportPaymentError) {
+    throw new Error(`payments insert (import queue 2): ${secondImportPaymentError.message}`)
   }
 
   return {

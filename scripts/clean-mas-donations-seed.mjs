@@ -139,9 +139,20 @@ async function main() {
     { op: "like", col: "file_name", val: "donations-import-test%" },
   ])
   const importBatchIds = importBatches.map((b) => b.id)
-  const importRows = importBatchIds.length
-    ? await fetchAll("payment_import_rows", [{ op: "in", col: "batch_id", val: importBatchIds }])
-    : []
+  const importRows = []
+
+  if (importBatchIds.length) {
+    const { data: rowProbe, error: rowProbeError } = await sb
+      .from("payment_import_rows")
+      .select("id")
+      .limit(1)
+    if (!rowProbeError) {
+      const fetched = await fetchAll("payment_import_rows", [
+        { op: "in", col: "batch_id", val: importBatchIds },
+      ])
+      importRows.push(...fetched)
+    }
+  }
 
   const seedCategories = await fetchAll("donation_categories", [
     ...orgFilter,
