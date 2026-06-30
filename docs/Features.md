@@ -781,10 +781,11 @@ One-time online donations via Stripe Checkout write **only** to canonical `payme
 
 ### Environment
 
-* `STRIPE_SECRET_KEY`
-* `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
+* `STRIPE_SECRET_KEY` — Manaratee **platform** Connect key (not per-org)
 * `STRIPE_WEBHOOK_SECRET`
 * `NEXT_PUBLIC_APP_URL`
+
+Per-org payout accounts use **Stripe Connect Express** (see below). `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` is not used (hosted Checkout).
 
 Stripe secrets are env-only — never stored in the database.
 
@@ -840,7 +841,56 @@ stripe listen --forward-to localhost:3000/api/webhooks/stripe/donations
 
 ### Out of scope (P11)
 
-Pledge-via-Stripe, per-org Stripe Connect onboarding. (Stripe **subscriptions** moved to Priority 16.) **Refunds** implemented separately — see Payment admin actions below.
+Pledge-via-Stripe. (Stripe **subscriptions** moved to Priority 16.) **Refunds** implemented separately — see Payment admin actions below. Per-org Connect moved to **Stripe Connect Express (June 2026)** below.
+
+## Stripe Connect Express — org donation accounts (June 2026)
+
+Status: Implemented
+
+### Goal
+
+Each organization connects its own Stripe Express account. One-time and recurring donation Checkout sessions run on the connected account (direct charges). **No Manaratee platform fee** on donations — 100% to the org minus Stripe processing.
+
+### Schema (migration `139_stripe_connect_donations.sql`)
+
+On `organizations`:
+
+* `stripe_connect_account_id` (unique partial index)
+* `stripe_connect_charges_enabled`, `stripe_connect_payouts_enabled`, `stripe_connect_details_submitted`
+* `stripe_connect_onboarded_at`
+
+### Staff UI
+
+* `/donations/settings` → **Online Payments** tab — `DonationStripeConnectPanel`
+* Connect / continue onboarding via Stripe Account Links
+* Refresh status + open Express dashboard (login link)
+
+### Checkout + refunds
+
+* `createOneTimeDonationCheckout` / `createRecurringDonationCheckout` require a ready connected account (`charges_enabled` + `details_submitted`)
+* Stripe API calls pass `{ stripeAccount: acct_… }`
+* Staff Stripe refunds use the org connected account
+
+### Webhook
+
+Same endpoint: `POST /api/webhooks/stripe/donations`. In Stripe Dashboard, enable **Listen to events on Connected accounts**. Handles existing donation events plus `account.updated` to sync org Connect status.
+
+### Key files
+
+| Area | Path |
+|------|------|
+| Connect actions | `lib/stripe/stripe-connect-actions.ts` |
+| Connect queries / request options | `lib/stripe/stripe-connect-queries.ts` |
+| Account sync | `lib/stripe/stripe-connect-sync.ts` |
+| Settings UI | `components/donations/donation-stripe-connect-panel.tsx` |
+
+```bash
+npx supabase db query --linked -f scripts/139_stripe_connect_donations.sql
+```
+
+### Pending
+
+Platform subscription billing (orgs paying Manaratee monthly) — separate from Connect donations; schema stub in `121_organization_billing.sql`, not Stripe-charged yet.
 
 ### Payment edit, void, and refunds (June 2026)
 

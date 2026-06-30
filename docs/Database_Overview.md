@@ -75,6 +75,8 @@ organization_modules.module_id → modules.id
 
 **Organization subscription terms (migration `123`):** on `organizations` — `subscription_start_date`, `complimentary_months` (e.g. 3 for three months free), `first_year_special_monthly_rate` (optional promotional rate for year one; standard `plans.monthly_price` after). Platform admin: `PATCH /api/platform/organizations/[organizationId]/billing-terms`. Display: `lib/organizations/organization-subscription-terms.ts`.
 
+**Stripe Connect Express for donations (migration `139_stripe_connect_donations.sql`):** `organizations.stripe_connect_account_id`, `stripe_connect_charges_enabled`, `stripe_connect_payouts_enabled`, `stripe_connect_details_submitted`, `stripe_connect_onboarded_at`. Donation Checkout runs on the connected account; platform `STRIPE_SECRET_KEY` is for Connect only. Separate from `organizations.stripe_customer_id` (future platform subscription billing, migration `121`).
+
 ---
 
 ## CRM / Contacts / People

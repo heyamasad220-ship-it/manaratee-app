@@ -7,7 +7,28 @@ import { createOneTimeDonationCheckout } from "@/lib/donations/stripe/checkout"
 import { createRecurringDonationCheckout } from "@/lib/donations/stripe/recurring-checkout"
 import type { RecurringStripeFrequency } from "@/lib/donations/stripe/types"
 import { isStripeConfigured } from "@/lib/stripe/stripe-server"
+import { loadOrganizationStripeConnect } from "@/lib/stripe/stripe-connect-queries"
+import { isOrganizationStripeConnectReady } from "@/lib/stripe/stripe-connect-types"
 import { createServiceRoleClient } from "@/lib/supabase/service-role"
+
+async function ensureOrganizationOnlineDonationsReady(organizationId: string) {
+  if (!isStripeConfigured()) {
+    return { ok: false as const, error: "Online payments are not configured" }
+  }
+
+  const serviceSupabase = createServiceRoleClient()
+  const connectStatus = await loadOrganizationStripeConnect(serviceSupabase, organizationId)
+
+  if (!isOrganizationStripeConnectReady(connectStatus)) {
+    return {
+      ok: false as const,
+      error:
+        "Online donations are not enabled yet. Ask your organization to connect Stripe in Donations Settings.",
+    }
+  }
+
+  return { ok: true as const, serviceSupabase }
+}
 
 export async function createOneTimeDonationCheckoutAction(input: {
   amount: number
@@ -15,10 +36,6 @@ export async function createOneTimeDonationCheckoutAction(input: {
   categoryId?: string | null
   subcategoryId?: string | null
 }) {
-  if (!isStripeConfigured()) {
-    return { success: false as const, error: "Online payments are not configured" }
-  }
-
   const { supabase, session } = await getCustomerPortalSupabase()
   const { activeOrganization } = await getActiveOrganization()
 
@@ -27,6 +44,10 @@ export async function createOneTimeDonationCheckoutAction(input: {
   }
 
   const organizationId = activeOrganization.organization_id
+  const readiness = await ensureOrganizationOnlineDonationsReady(organizationId)
+  if (!readiness.ok) {
+    return { success: false as const, error: readiness.error }
+  }
 
   const { data: contact, error: contactError } = await supabase
     .from("contacts")
@@ -45,8 +66,7 @@ export async function createOneTimeDonationCheckoutAction(input: {
   }
 
   try {
-    const serviceSupabase = createServiceRoleClient()
-    const checkout = await createOneTimeDonationCheckout(serviceSupabase, {
+    const checkout = await createOneTimeDonationCheckout(readiness.serviceSupabase, {
       organizationId,
       donorId,
       contactId: contact.id,
@@ -74,10 +94,6 @@ export async function createRecurringDonationCheckoutAction(input: {
   categoryId?: string | null
   subcategoryId?: string | null
 }) {
-  if (!isStripeConfigured()) {
-    return { success: false as const, error: "Online payments are not configured" }
-  }
-
   const { supabase, session } = await getCustomerPortalSupabase()
   const { activeOrganization } = await getActiveOrganization()
 
@@ -86,6 +102,10 @@ export async function createRecurringDonationCheckoutAction(input: {
   }
 
   const organizationId = activeOrganization.organization_id
+  const readiness = await ensureOrganizationOnlineDonationsReady(organizationId)
+  if (!readiness.ok) {
+    return { success: false as const, error: readiness.error }
+  }
 
   const { data: contact, error: contactError } = await supabase
     .from("contacts")
@@ -104,8 +124,7 @@ export async function createRecurringDonationCheckoutAction(input: {
   }
 
   try {
-    const serviceSupabase = createServiceRoleClient()
-    const checkout = await createRecurringDonationCheckout(serviceSupabase, {
+    const checkout = await createRecurringDonationCheckout(readiness.serviceSupabase, {
       organizationId,
       donorId,
       contactId: contact.id,

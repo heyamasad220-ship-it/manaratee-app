@@ -5,6 +5,10 @@ import { buildDonationCheckoutMetadata } from "@/lib/donations/stripe/metadata"
 import { stripeRecurringInterval } from "@/lib/donations/stripe/recurring-stripe-utils"
 import type { CreateRecurringDonationCheckoutInput } from "@/lib/donations/stripe/types"
 import { initialNextPaymentDate } from "@/lib/donations/recurring-donation-schedule"
+import {
+  requireOrganizationStripeConnectAccountId,
+  stripeConnectRequestOptions,
+} from "@/lib/stripe/stripe-connect-queries"
 import { getAppBaseUrl, getStripeServerClient } from "@/lib/stripe/stripe-server"
 
 export async function createRecurringDonationCheckout(
@@ -93,33 +97,41 @@ export async function createRecurringDonationCheckout(
     manarateeCheckoutId: checkoutRow.id,
   })
 
+  const connectedAccountId = await requireOrganizationStripeConnectAccountId(
+    supabase,
+    input.organizationId
+  )
+
   const recurring = stripeRecurringInterval(input.frequency)
   const stripe = getStripeServerClient()
-  const session = await stripe.checkout.sessions.create({
-    mode: "subscription",
-    payment_method_types: ["card"],
-    customer_email: input.donorEmail?.trim() || undefined,
-    line_items: [
-      {
-        price_data: {
-          currency: "usd",
-          unit_amount: amountCents,
-          recurring,
-          product_data: {
-            name: "Recurring Donation",
-            description: `${input.frequency} online donation`,
+  const session = await stripe.checkout.sessions.create(
+    {
+      mode: "subscription",
+      payment_method_types: ["card"],
+      customer_email: input.donorEmail?.trim() || undefined,
+      line_items: [
+        {
+          price_data: {
+            currency: "usd",
+            unit_amount: amountCents,
+            recurring,
+            product_data: {
+              name: "Recurring Donation",
+              description: `${input.frequency} online donation`,
+            },
           },
+          quantity: 1,
         },
-        quantity: 1,
-      },
-    ],
-    success_url: successUrl,
-    cancel_url: cancelUrl,
-    metadata: metadata as unknown as Stripe.MetadataParam,
-    subscription_data: {
+      ],
+      success_url: successUrl,
+      cancel_url: cancelUrl,
       metadata: metadata as unknown as Stripe.MetadataParam,
+      subscription_data: {
+        metadata: metadata as unknown as Stripe.MetadataParam,
+      },
     },
-  })
+    stripeConnectRequestOptions(connectedAccountId)
+  )
 
   if (!session.url || !session.id) {
     await supabase.from("recurring_donation_plans").delete().eq("id", planRow.id)

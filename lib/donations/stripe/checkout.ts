@@ -17,6 +17,11 @@ import {
   handleSubscriptionUpdated,
 } from "@/lib/donations/stripe/processor-subscription"
 import type { CreateOneTimeDonationCheckoutInput } from "@/lib/donations/stripe/types"
+import {
+  requireOrganizationStripeConnectAccountId,
+  stripeConnectRequestOptions,
+} from "@/lib/stripe/stripe-connect-queries"
+import { syncOrganizationStripeConnectFromAccount } from "@/lib/stripe/stripe-connect-sync"
 import { getAppBaseUrl, getStripeServerClient } from "@/lib/stripe/stripe-server"
 
 export async function createOneTimeDonationCheckout(
@@ -74,31 +79,39 @@ export async function createOneTimeDonationCheckout(
     manarateeCheckoutId: checkoutRow.id,
   })
 
+  const connectedAccountId = await requireOrganizationStripeConnectAccountId(
+    supabase,
+    input.organizationId
+  )
+
   const stripe = getStripeServerClient()
-  const session = await stripe.checkout.sessions.create({
-    mode: "payment",
-    payment_method_types: ["card"],
-    customer_email: input.donorEmail?.trim() || undefined,
-    line_items: [
-      {
-        price_data: {
-          currency: "usd",
-          unit_amount: amountCents,
-          product_data: {
-            name: "Donation",
-            description: "One-time online donation",
+  const session = await stripe.checkout.sessions.create(
+    {
+      mode: "payment",
+      payment_method_types: ["card"],
+      customer_email: input.donorEmail?.trim() || undefined,
+      line_items: [
+        {
+          price_data: {
+            currency: "usd",
+            unit_amount: amountCents,
+            product_data: {
+              name: "Donation",
+              description: "One-time online donation",
+            },
           },
+          quantity: 1,
         },
-        quantity: 1,
-      },
-    ],
-    success_url: successUrl,
-    cancel_url: cancelUrl,
-    metadata: metadata as unknown as Stripe.MetadataParam,
-    payment_intent_data: {
+      ],
+      success_url: successUrl,
+      cancel_url: cancelUrl,
       metadata: metadata as unknown as Stripe.MetadataParam,
+      payment_intent_data: {
+        metadata: metadata as unknown as Stripe.MetadataParam,
+      },
     },
-  })
+    stripeConnectRequestOptions(connectedAccountId)
+  )
 
   if (!session.url || !session.id) {
     throw new Error("Stripe did not return a checkout URL")
@@ -254,6 +267,13 @@ export async function processStripeDonationWebhookEvent(
           event.data.object as Stripe.Charge
         )
         return { ok: true as const, duplicate: false as const, result }
+      }
+      case "account.updated": {
+        const result = await syncOrganizationStripeConnectFromAccount(
+          supabase,
+          event.data.object as Stripe.Account
+        )
+        return { ok: true as const, duplicate: false as const, result: { handled: true, result } }
       }
       default: {
         await supabase

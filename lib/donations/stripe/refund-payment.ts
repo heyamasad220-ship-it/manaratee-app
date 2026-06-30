@@ -139,6 +139,7 @@ export async function createStripeDonationRefund(
     payment: PaymentRefundRow
     refundAmount: number
     organizationId: string
+    connectedAccountId: string
     reason?: string | null
   }
 ) {
@@ -153,22 +154,30 @@ export async function createStripeDonationRefund(
     manaratee_refund: "donation",
   }
 
+  const requestOptions = { stripeAccount: input.connectedAccountId }
+
   if (input.payment.stripe_payment_intent_id) {
-    return stripe.refunds.create({
-      payment_intent: input.payment.stripe_payment_intent_id,
-      amount: amountCents,
-      reason: "requested_by_customer",
-      metadata,
-    })
+    return stripe.refunds.create(
+      {
+        payment_intent: input.payment.stripe_payment_intent_id,
+        amount: amountCents,
+        reason: "requested_by_customer",
+        metadata,
+      },
+      requestOptions
+    )
   }
 
   if (input.payment.stripe_charge_id) {
-    return stripe.refunds.create({
-      charge: input.payment.stripe_charge_id,
-      amount: amountCents,
-      reason: "requested_by_customer",
-      metadata,
-    })
+    return stripe.refunds.create(
+      {
+        charge: input.payment.stripe_charge_id,
+        amount: amountCents,
+        reason: "requested_by_customer",
+        metadata,
+      },
+      requestOptions
+    )
   }
 
   throw new Error("Payment is missing Stripe charge identifiers")

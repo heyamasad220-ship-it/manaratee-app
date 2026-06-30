@@ -1,6 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { Suspense, useEffect, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Header } from "@/components/layout/header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -36,9 +37,26 @@ import { Plus, Pencil, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { DonationReceiptSettingsForm } from "@/components/donations/donation-receipt-settings-form"
 import { PledgeReminderSettingsForm } from "@/components/donations/pledge-reminder-settings-form"
+import { DonationStripeConnectPanel } from "@/components/donations/donation-stripe-connect-panel"
 
-const settingsTabs = ["General", "Categories", "Payment Methods", "Receipts", "Pledge Reminders", "Notifications"] as const
+const settingsTabs = ["General", "Categories", "Payment Methods", "Online Payments", "Receipts", "Pledge Reminders", "Notifications"] as const
 type SettingsTab = (typeof settingsTabs)[number]
+
+function DonationSettingsTabSync({
+  onSelectTab,
+}: {
+  onSelectTab: (tab: SettingsTab) => void
+}) {
+  const searchParams = useSearchParams()
+
+  useEffect(() => {
+    if (searchParams.get("tab") === "online-payments") {
+      onSelectTab("Online Payments")
+    }
+  }, [onSelectTab, searchParams])
+
+  return null
+}
 
 interface Category {
   id: string
@@ -62,6 +80,23 @@ interface PaymentMethod {
 }
 
 export default function DonationsSettingsPage() {
+  return (
+    <Suspense fallback={<DonationsSettingsPageFallback />}>
+      <DonationsSettingsPageContent />
+    </Suspense>
+  )
+}
+
+function DonationsSettingsPageFallback() {
+  return (
+    <>
+      <Header title="Donations Settings" />
+      <div className="p-6 text-sm text-muted-foreground">Loading settings...</div>
+    </>
+  )
+}
+
+function DonationsSettingsPageContent() {
   const supabase = createClient()
   async function getOrganizationId() {
   const {
@@ -490,6 +525,7 @@ async function handleSaveCategory() {
 
   return (
     <>
+      <DonationSettingsTabSync onSelectTab={setActiveTab} />
       <Header title="Donations Settings" />
       <div className="p-6">
         <div className="mb-6 flex gap-0 border-b border-border">
@@ -747,6 +783,12 @@ async function handleSaveCategory() {
               </CardContent>
             </Card>
           </div>
+        )}
+
+        {activeTab === "Online Payments" && (
+          <Suspense fallback={<p className="text-sm text-muted-foreground">Loading Stripe Connect...</p>}>
+            <DonationStripeConnectPanel />
+          </Suspense>
         )}
 
         {activeTab === "Receipts" && <DonationReceiptSettingsForm mode="receipts" />}

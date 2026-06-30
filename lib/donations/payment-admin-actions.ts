@@ -14,6 +14,10 @@ import {
   loadPaymentForRefund,
 } from "@/lib/donations/stripe/refund-payment"
 import { getStripeServerClient, isStripeConfigured } from "@/lib/stripe/stripe-server"
+import {
+  requireOrganizationStripeConnectAccountId,
+  stripeConnectRequestOptions,
+} from "@/lib/stripe/stripe-connect-queries"
 import { handleDonationAffiliationSync } from "@/lib/contacts/contact-affiliation-sync"
 import {
   canAllocatePayment,
@@ -344,10 +348,15 @@ export async function stripeRefundPaymentAction(input: {
 
   try {
     const stripe = getStripeServerClient()
+    const connectedAccountId = await requireOrganizationStripeConnectAccountId(
+      access.supabase,
+      access.orgId
+    )
     const stripeRefund = await createStripeDonationRefund(stripe, {
       payment: refundRow,
       refundAmount,
       organizationId: access.orgId,
+      connectedAccountId,
       reason: input.reason,
     })
 
@@ -357,7 +366,10 @@ export async function stripeRefundPaymentAction(input: {
       typeof stripeRefund.charge === "string" ? stripeRefund.charge : stripeRefund.charge?.id
 
     if (chargeId) {
-      const charge = await stripe.charges.retrieve(chargeId)
+      const charge = await stripe.charges.retrieve(
+        chargeId,
+        stripeConnectRequestOptions(connectedAccountId)
+      )
       nextRefundedAmount = charge.amount_refunded / 100
     }
 

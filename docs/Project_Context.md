@@ -152,6 +152,8 @@ Unified Applications engine
 Programs Module
 Registrations
 Financial Assistance
+**Stripe Connect Express** for org donation payouts (implemented June 2026)
+**Platform subscription billing via Stripe** (orgs paying Manaratee — pending)
 Customer Experience
 User Invitations
 **Contacts Phase 1 — identity linkage + affiliation sync** — **Complete** (S-01–S-13, June 2026). Validation gate: `npm run validate:contacts-phase1`. Deferred: merge UI, historical backfill, venue rental derivation, segmentation.
