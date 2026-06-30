@@ -2,7 +2,8 @@
 
 import { Suspense, useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Settings, Building2, CreditCard, Mail, Save, ExternalLink } from "lucide-react"
+import Link from "next/link"
+import { Settings, Building2, CreditCard, Mail, Save, CheckCircle2, Circle } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Label } from "@/components/ui/label"
@@ -22,6 +23,7 @@ import { Separator } from "@/components/ui/separator"
 import {
   getPlatformStripeConfigStatusAction,
   savePlatformStripeConfigAction,
+  testPlatformStripeConnectionAction,
 } from "@/lib/platform/platform-stripe-config-actions"
 
 interface DefaultSetting {
@@ -104,6 +106,11 @@ function SettingsPageContent() {
     "https://your-domain.com/api/webhooks/stripe/donations"
   )
   const [stripeEnvConfigured, setStripeEnvConfigured] = useState(false)
+  const [stripeWebhookSecretConfigured, setStripeWebhookSecretConfigured] = useState(false)
+  const [stripeAppUrlConfigured, setStripeAppUrlConfigured] = useState(false)
+  const [stripeShowValidationForm, setStripeShowValidationForm] = useState(false)
+  const [stripeTesting, setStripeTesting] = useState(false)
+  const [stripeTestMessage, setStripeTestMessage] = useState<string | null>(null)
   const [stripeSaving, setStripeSaving] = useState(false)
   const [stripeError, setStripeError] = useState<string | null>(null)
   const [stripeStatusLoading, setStripeStatusLoading] = useState(true)
@@ -188,6 +195,9 @@ The Manaratee Team`)
 
       setStripeWebhookUrl(result.webhookUrl)
       setStripeEnvConfigured(result.platformStripeConfigured)
+      setStripeWebhookSecretConfigured(result.webhookSecretConfigured)
+      setStripeAppUrlConfigured(result.appUrlConfigured)
+      setStripeShowValidationForm(!result.platformStripeConfigured)
     }
 
     void loadStripeStatus()
@@ -230,6 +240,25 @@ The Manaratee Team`)
 
     router.push("/admin/dashboard")
   }
+
+  async function handleTestStripeConnection() {
+    setStripeTesting(true)
+    setStripeError(null)
+    setStripeTestMessage(null)
+
+    const result = await testPlatformStripeConnectionAction()
+    setStripeTesting(false)
+
+    if (!result.success) {
+      setStripeError(result.error)
+      return
+    }
+
+    setStripeTestMessage(`Connected to Stripe account ${result.accountId}.`)
+  }
+
+  const stripeProductionReady =
+    stripeEnvConfigured && stripeWebhookSecretConfigured && stripeAppUrlConfigured
 
   return (
     <>
@@ -341,14 +370,26 @@ The Manaratee Team`)
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <CreditCard className="h-5 w-5 text-emerald-600" />
-                Stripe Configuration
+                Platform Stripe (Connect)
               </CardTitle>
               <CardDescription>
-                Validate platform Stripe keys for Connect and webhooks. Keys are stored in Vercel
-                environment variables, not in the database.
+                Manaratee&apos;s platform Stripe account powers Connect for organizations. Keys are
+                read from Vercel environment variables — this page does not store API keys.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+                <p className="font-medium">Connecting MAS Dallas for donations?</p>
+                <p className="mt-1 text-amber-900">
+                  That is a separate step. After platform Stripe is set up here, MAS Dallas staff
+                  should go to{" "}
+                  <Link href="/donations/settings?tab=online-payments" className="underline">
+                    Donations → Settings → Online Payments
+                  </Link>{" "}
+                  and connect their organization&apos;s Stripe Express account.
+                </p>
+              </div>
+
               <div className="flex items-center justify-between p-4 rounded-lg border bg-card">
                 <div className="flex items-center gap-4">
                   <div className="h-12 w-12 rounded-lg bg-[#635BFF] flex items-center justify-center">
@@ -357,114 +398,227 @@ The Manaratee Team`)
                     </svg>
                   </div>
                   <div>
-                    <p className="font-medium">Stripe Account</p>
+                    <p className="font-medium">Production environment</p>
                     <p className="text-sm text-muted-foreground">
                       {stripeStatusLoading
-                        ? "Checking configuration..."
-                        : stripeEnvConfigured
-                          ? "Platform Stripe keys are configured in this environment"
-                          : stripeFormOpen
-                            ? "Enter your API keys below, then save to validate"
-                            : "Not configured in this environment"}
+                        ? "Checking Vercel environment variables..."
+                        : stripeProductionReady
+                          ? "Platform Stripe is configured on app.manaratee.com"
+                          : stripeEnvConfigured
+                            ? "Partially configured — check missing variables below"
+                            : "STRIPE_SECRET_KEY is not set on this deployment"}
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  {stripeEnvConfigured ? (
-                    <Badge variant="secondary" className="bg-emerald-100 text-emerald-700">
-                      Configured
-                    </Badge>
-                  ) : stripeFormOpen ? (
-                    <Badge variant="outline">Setup in progress</Badge>
-                  ) : null}
-                  {!stripeFormOpen ? (
-                    <Button
-                      className="bg-[#635BFF] text-white hover:bg-[#5851db] gap-2"
-                      onClick={() => setStripeFormOpen(true)}
-                    >
-                      Enter API keys
-                      <ExternalLink className="h-4 w-4" />
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setStripeFormOpen(false)
-                        setStripePublishableKey("")
-                        setStripeSecretKey("")
-                        setStripeWebhookSecret("")
-                        setStripeError(null)
-                      }}
-                    >
-                      Cancel setup
-                    </Button>
-                  )}
-                </div>
+                {stripeStatusLoading ? null : stripeProductionReady ? (
+                  <Badge variant="secondary" className="bg-emerald-100 text-emerald-700">
+                    Ready
+                  </Badge>
+                ) : stripeEnvConfigured ? (
+                  <Badge variant="outline">Partial</Badge>
+                ) : (
+                  <Badge variant="outline">Not configured</Badge>
+                )}
               </div>
 
-              <Separator />
-
-              <div className="space-y-4">
-                <h3 className="font-medium">API Keys</h3>
-                <div className="grid gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="stripe-pk">Publishable Key</Label>
-                    <Input
-                      id="stripe-pk"
-                      placeholder="pk_live_..."
-                      disabled={!stripeFormOpen || stripeSaving}
-                      className="font-mono text-sm"
-                      value={stripePublishableKey}
-                      onChange={(event) => setStripePublishableKey(event.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="stripe-sk">Secret Key</Label>
-                    <Input
-                      id="stripe-sk"
-                      type="password"
-                      placeholder="sk_live_..."
-                      disabled={!stripeFormOpen || stripeSaving}
-                      className="font-mono text-sm"
-                      value={stripeSecretKey}
-                      onChange={(event) => setStripeSecretKey(event.target.value)}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Set as STRIPE_SECRET_KEY in Vercel after validation
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="stripe-webhook">Webhook Secret</Label>
-                    <Input
-                      id="stripe-webhook"
-                      type="password"
-                      placeholder="whsec_..."
-                      disabled={!stripeFormOpen || stripeSaving}
-                      className="font-mono text-sm"
-                      value={stripeWebhookSecret}
-                      onChange={(event) => setStripeWebhookSecret(event.target.value)}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Set as STRIPE_WEBHOOK_SECRET in Vercel after validation
-                    </p>
-                  </div>
-                </div>
+              <div className="space-y-3">
+                <h3 className="font-medium">Vercel environment checklist</h3>
+                <ul className="space-y-2 text-sm">
+                  <li className="flex items-center gap-2">
+                    {stripeEnvConfigured ? (
+                      <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                    ) : (
+                      <Circle className="h-4 w-4 text-muted-foreground" />
+                    )}
+                    <span>
+                      <code className="text-xs">STRIPE_SECRET_KEY</code> — platform Connect secret
+                      key
+                    </span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    {stripeWebhookSecretConfigured ? (
+                      <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                    ) : (
+                      <Circle className="h-4 w-4 text-muted-foreground" />
+                    )}
+                    <span>
+                      <code className="text-xs">STRIPE_WEBHOOK_SECRET</code> — from Stripe webhook
+                      endpoint
+                    </span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    {stripeAppUrlConfigured ? (
+                      <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                    ) : (
+                      <Circle className="h-4 w-4 text-muted-foreground" />
+                    )}
+                    <span>
+                      <code className="text-xs">NEXT_PUBLIC_APP_URL</code> —{" "}
+                      https://app.manaratee.com
+                    </span>
+                  </li>
+                </ul>
+                <p className="text-xs text-muted-foreground">
+                  Set these in Vercel → Project → Settings → Environment Variables, then redeploy.
+                  Do not paste keys into browser forms on this page unless validating before
+                  updating Vercel.
+                </p>
               </div>
 
-              <Separator />
-
               <div className="space-y-4">
-                <h3 className="font-medium">Webhook Endpoint</h3>
+                <h3 className="font-medium">Webhook endpoint (Stripe Dashboard)</h3>
                 <div className="p-4 rounded-lg border bg-muted/50">
                   <p className="text-sm font-mono text-muted-foreground break-all">
                     {stripeWebhookUrl}
                   </p>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Add this URL in Stripe Dashboard and enable events on connected accounts
+                  Enable &quot;Listen to events on Connected accounts&quot; for organization
+                  donation payouts.
                 </p>
               </div>
+
+              {stripeEnvConfigured ? (
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => void handleTestStripeConnection()}
+                    disabled={stripeTesting || stripeStatusLoading}
+                  >
+                    {stripeTesting ? "Testing..." : "Test live Stripe connection"}
+                  </Button>
+                  {!stripeShowValidationForm ? (
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        setStripeShowValidationForm(true)
+                        setStripeFormOpen(true)
+                        setStripePublishableKey("")
+                        setStripeSecretKey("")
+                        setStripeWebhookSecret("")
+                        setStripeError(null)
+                      }}
+                    >
+                      Validate different keys (optional)
+                    </Button>
+                  ) : null}
+                </div>
+              ) : (
+                <Button
+                  className="bg-[#635BFF] text-white hover:bg-[#5851db]"
+                  onClick={() => {
+                    setStripeShowValidationForm(true)
+                    setStripeFormOpen(true)
+                  }}
+                >
+                  Validate keys before adding to Vercel
+                </Button>
+              )}
+
+              {stripeTestMessage ? (
+                <p className="text-sm text-emerald-700" role="status">
+                  {stripeTestMessage}
+                </p>
+              ) : null}
+
+              {stripeShowValidationForm ? (
+                <>
+                  <Separator />
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="font-medium">Optional key validation</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Paste keys from Stripe Dashboard to verify they work. This does not save them
+                        to Manaratee — add validated keys to Vercel manually.
+                      </p>
+                    </div>
+                    <form
+                      autoComplete="off"
+                      onSubmit={(event) => {
+                        event.preventDefault()
+                        void handleSaveStripeConfiguration()
+                      }}
+                      className="grid gap-4"
+                    >
+                      <div className="space-y-2">
+                        <Label htmlFor="manaratee-stripe-pk">Publishable key</Label>
+                        <Input
+                          id="manaratee-stripe-pk"
+                          name="manaratee-stripe-pk"
+                          placeholder="pk_live_..."
+                          disabled={stripeSaving}
+                          className="font-mono text-sm"
+                          autoComplete="off"
+                          autoCorrect="off"
+                          autoCapitalize="off"
+                          spellCheck={false}
+                          data-1p-ignore
+                          data-lpignore="true"
+                          value={stripePublishableKey}
+                          onChange={(event) => setStripePublishableKey(event.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="manaratee-stripe-sk">Secret key</Label>
+                        <Input
+                          id="manaratee-stripe-sk"
+                          name="manaratee-stripe-sk"
+                          type="password"
+                          placeholder="sk_live_..."
+                          disabled={stripeSaving}
+                          className="font-mono text-sm"
+                          autoComplete="new-password"
+                          data-1p-ignore
+                          data-lpignore="true"
+                          value={stripeSecretKey}
+                          onChange={(event) => setStripeSecretKey(event.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="manaratee-stripe-whsec">Webhook signing secret</Label>
+                        <Input
+                          id="manaratee-stripe-whsec"
+                          name="manaratee-stripe-whsec"
+                          type="password"
+                          placeholder="whsec_..."
+                          disabled={stripeSaving}
+                          className="font-mono text-sm"
+                          autoComplete="new-password"
+                          data-1p-ignore
+                          data-lpignore="true"
+                          value={stripeWebhookSecret}
+                          onChange={(event) => setStripeWebhookSecret(event.target.value)}
+                        />
+                      </div>
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            setStripeShowValidationForm(false)
+                            setStripeFormOpen(false)
+                            setStripePublishableKey("")
+                            setStripeSecretKey("")
+                            setStripeWebhookSecret("")
+                            setStripeError(null)
+                          }}
+                          disabled={stripeSaving}
+                        >
+                          Close
+                        </Button>
+                        <Button
+                          type="submit"
+                          className="bg-emerald-600 text-white hover:bg-emerald-700 gap-2"
+                          disabled={stripeSaving}
+                        >
+                          <Save className="h-4 w-4" />
+                          {stripeSaving ? "Validating..." : "Validate keys"}
+                        </Button>
+                      </div>
+                    </form>
+                  </div>
+                </>
+              ) : null}
 
               {stripeError ? (
                 <p className="text-sm text-destructive" role="alert">
@@ -472,21 +626,9 @@ The Manaratee Team`)
                 </p>
               ) : null}
 
-              <div className="flex justify-end gap-2">
-                <Button
-                  variant="outline"
-                  onClick={handleLeaveStripeConfiguration}
-                  disabled={stripeSaving}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  className="bg-emerald-600 text-white hover:bg-emerald-700 gap-2"
-                  disabled={!stripeFormOpen || stripeSaving}
-                  onClick={() => void handleSaveStripeConfiguration()}
-                >
-                  <Save className="h-4 w-4" />
-                  {stripeSaving ? "Validating..." : "Save Configuration"}
+              <div className="flex justify-end">
+                <Button variant="outline" onClick={handleLeaveStripeConfiguration}>
+                  Back
                 </Button>
               </div>
             </CardContent>

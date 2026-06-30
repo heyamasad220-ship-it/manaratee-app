@@ -24,8 +24,41 @@ export async function getPlatformStripeConfigStatusAction() {
   return {
     success: true as const,
     platformStripeConfigured: isStripeConfigured(),
-    webhookUrl,
+    webhookSecretConfigured: Boolean(process.env.STRIPE_WEBHOOK_SECRET?.trim()),
     appUrlConfigured,
+    webhookUrl,
+  }
+}
+
+export async function testPlatformStripeConnectionAction() {
+  const auth = await requirePlatformAdmin()
+  if (!auth.ok) {
+    return { success: false as const, error: auth.error }
+  }
+
+  if (!isStripeConfigured()) {
+    return {
+      success: false as const,
+      error: "STRIPE_SECRET_KEY is not set in this environment (Vercel).",
+    }
+  }
+
+  try {
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!.trim(), { typescript: true })
+    const account = await stripe.accounts.retrieve()
+    return {
+      success: true as const,
+      accountId: account.id,
+      chargesEnabled: Boolean(account.charges_enabled),
+    }
+  } catch (error) {
+    return {
+      success: false as const,
+      error:
+        error instanceof Error
+          ? `Stripe connection failed: ${error.message}`
+          : "Stripe connection failed.",
+    }
   }
 }
 
