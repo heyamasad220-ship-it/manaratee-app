@@ -47,7 +47,7 @@ export function DonorGivingSummary({
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Annual Giving Statement</CardTitle>
+          <CardTitle className="text-base">Giving Statements</CardTitle>
         </CardHeader>
         <CardContent>
           <GivingStatementActions donorId={donorId} donorName={donorName} />
@@ -87,7 +87,7 @@ export function DonorGivingSummary({
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Annual Giving Statement</CardTitle>
+          <CardTitle className="text-base">Giving Statements</CardTitle>
         </CardHeader>
         <CardContent>
           <GivingStatementActions donorId={donorId} donorName={donorName} />

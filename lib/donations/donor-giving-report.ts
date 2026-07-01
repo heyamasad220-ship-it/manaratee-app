@@ -1,7 +1,5 @@
 export type DonorDateRangeMode = "lifetime" | "year" | "custom"
 
-export type DonorTypeFilter = "all" | "individual" | "organization"
-
 export type DonorReportSortBy =
   | "full_name"
   | "total_donations"
@@ -64,10 +62,4 @@ function formatShortDate(value: string) {
     month: "short",
     day: "numeric",
   })
-}
-
-export function formatDonorTypeLabel(value: string | null | undefined) {
-  if (value === "organization") return "Organization"
-  if (value === "individual") return "Individual"
-  return value || "—"
 }

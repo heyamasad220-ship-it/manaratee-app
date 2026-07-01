@@ -833,9 +833,7 @@ export function ContactsListView({
                 filteredContacts.map((contact) => (
                   <TableRow
                     key={contact.id}
-                    onClick={() =>
-                      router.push(contactProfileHref(contact.id, { edit: true }))
-                    }
+                    onClick={() => router.push(contactProfileHref(contact.id))}
                     className="cursor-pointer hover:bg-muted/50"
                   >
                     <TableCell>
@@ -910,7 +908,7 @@ export function ContactsListView({
                           <DropdownMenuItem asChild>
                             <Link href={contactProfileHref(contact.id, { edit: true })}>
                               <Pencil className="mr-2 h-4 w-4" />
-                              View & edit profile
+                              Edit profile
                             </Link>
                           </DropdownMenuItem>
                           <DropdownMenuItem

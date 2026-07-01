@@ -36,6 +36,7 @@ import {
   removeCustomerFamilyMember,
 } from "@/lib/customer/customer-family-actions"
 import { loadCustomerProfilePortalData } from "@/lib/customer/customer-portal-data-actions"
+import { CONTACT_PAYMENT_METHODS_CUSTOMER_HELP } from "@/components/contacts/contact-payment-methods-panel"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -756,7 +757,7 @@ export default function CustomerProfilePage() {
 
       <Card className="border border-border shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between">
-          <div><CardTitle className="flex items-center gap-2 text-base font-semibold"><CreditCard className="h-4 w-4" />Payment Methods</CardTitle><CardDescription>Manage your saved payment methods for quick checkout.</CardDescription></div>
+          <div><CardTitle className="flex items-center gap-2 text-base font-semibold"><CreditCard className="h-4 w-4" />Payment Methods</CardTitle><CardDescription>{CONTACT_PAYMENT_METHODS_CUSTOMER_HELP}</CardDescription></div>
           <Button variant="outline" size="sm" onClick={() => setIsAddPaymentDialogOpen(true)}><Plus className="mr-1.5 h-4 w-4" />Add Card</Button>
         </CardHeader>
         <CardContent>

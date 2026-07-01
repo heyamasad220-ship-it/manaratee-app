@@ -1,5 +1,4 @@
 import type { DonorSummaryReportRow } from "@/lib/donations/donation-list-actions"
-import { formatDonorTypeLabel } from "@/lib/donations/donor-giving-report"
 
 function escapeCsvValue(value: unknown) {
   return `"${String(value ?? "").replaceAll('"', '""')}"`
@@ -18,7 +17,6 @@ export function buildDonorGivingReportCsvRows(donors: DonorSummaryReportRow[]) {
   return donors.map((donor) => ({
     Name: donor.full_name ?? "",
     Phone: donor.phone ?? "",
-    Type: formatDonorTypeLabel(donor.donor_type),
     "Total Given": Number(donor.total_donations || 0).toFixed(2),
     Gifts: donor.donation_count ?? 0,
     "Last Gift": formatReportDate(donor.last_donation_date),

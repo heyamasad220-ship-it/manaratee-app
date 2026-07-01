@@ -18,3 +18,11 @@ export function isDonationPaymentsRecurringPath(pathname: string) {
     pathname.startsWith("/donations/payments/recurring/")
   )
 }
+
+export function donationPaymentDetailHref(paymentId: string) {
+  return `/donations/payments/${paymentId}`
+}
+
+export function isDonationPaymentDetailPath(pathname: string) {
+  return /^\/donations\/payments\/[0-9a-f-]{36}$/i.test(pathname)
+}

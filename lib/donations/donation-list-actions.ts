@@ -258,15 +258,13 @@ export async function fetchPledgeSummaryMetricsAction(input: PledgeSummaryMetric
 
 export type DonorPledgeFilter = "all" | "open_pledge" | "no_open_pledge"
 
-export type DonorTypeFilter = "all" | "individual" | "organization"
-
 export type DonorsPageInput = {
   page?: number
   pageSize?: number
   search?: string
   pledgeFilter?: DonorPledgeFilter
-  donorTypeFilter?: DonorTypeFilter
   lapsedOnly?: boolean
+  minTotalGiven?: number
   dateFrom?: string
   dateTo?: string
   sortBy?: "full_name" | "total_donations" | "last_donation_date" | "outstanding_pledge_balance"
@@ -291,8 +289,8 @@ export type DonorSummaryReportFilters = Pick<
   DonorsPageInput,
   | "search"
   | "pledgeFilter"
-  | "donorTypeFilter"
   | "lapsedOnly"
+  | "minTotalGiven"
   | "dateFrom"
   | "dateTo"
   | "sortBy"
@@ -334,7 +332,7 @@ function buildDonorGivingReportFilterParams(
   orgId: string,
   input: Pick<
     DonorSummaryReportFilters,
-    "search" | "pledgeFilter" | "donorTypeFilter" | "lapsedOnly" | "dateFrom" | "dateTo"
+    "search" | "pledgeFilter" | "lapsedOnly" | "minTotalGiven" | "dateFrom" | "dateTo"
   >
 ) {
   return {
@@ -343,11 +341,10 @@ function buildDonorGivingReportFilterParams(
     p_date_to: input.dateTo || null,
     p_search: input.search?.trim() || null,
     p_pledge_filter: input.pledgeFilter || "all",
-    p_donor_type:
-      input.donorTypeFilter && input.donorTypeFilter !== "all"
-        ? input.donorTypeFilter
-        : null,
+    p_donor_type: null,
     p_lapsed_only: Boolean(input.lapsedOnly),
+    p_min_total_given:
+      input.minTotalGiven != null && input.minTotalGiven > 0 ? input.minTotalGiven : null,
   }
 }
 
@@ -450,7 +447,7 @@ export async function fetchDonorSummaryPageAction(input: DonorsPageInput = {}) {
 export async function fetchDonorSummaryReportSummaryAction(
   input: Pick<
     DonorsPageInput,
-    "search" | "pledgeFilter" | "donorTypeFilter" | "lapsedOnly" | "dateFrom" | "dateTo"
+    "search" | "pledgeFilter" | "lapsedOnly" | "minTotalGiven" | "dateFrom" | "dateTo"
   > = {}
 ) {
   const access = await requireDonationStaffAccess("view")

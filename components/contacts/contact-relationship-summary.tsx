@@ -1,5 +1,6 @@
 "use client"
 
+import type { ReactNode } from "react"
 import Link from "next/link"
 import type { LucideIcon } from "lucide-react"
 import {
@@ -13,9 +14,13 @@ import {
 import type { ContactActivityRecord, ContactActivitySummary } from "@/lib/contacts/contact-activities"
 import type { ContactRelationshipSummary } from "@/lib/contacts/contact-profile-data"
 import { formatContactMoney } from "@/lib/contacts/contact-profile-data"
-import { Badge } from "@/components/ui/badge"
+import {
+  ACCENT_STYLES,
+  type DonationMetricAccent,
+} from "@/components/donations/donation-metric-card"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { cn } from "@/lib/utils"
 
 type ContactRelationshipSummaryCardProps = {
   contactId: string
@@ -32,28 +37,54 @@ type ModuleCardConfig = {
   records: ContactActivityRecord[]
   href?: string
   viewLabel: string
+  accent: DonationMetricAccent
 }
 
 function isPaymentDonation(record: ContactActivityRecord) {
   return record.activityType === "donation_made" || record.activityType === "donation"
 }
 
-function ModuleMetricCard({ label, value, icon: Icon, records, href, viewLabel }: ModuleCardConfig) {
+function activitySubtitle(records: ContactActivityRecord[]) {
+  if (records.length === 0) return null
+  const first = records[0]?.title?.trim()
+  if (!first) return null
+  return records.length > 1 ? `${first} and ${records.length - 1} more` : first
+}
+
+function ActivityMetricCardGrid({ children }: { children: ReactNode }) {
+  return <div className="flex flex-wrap items-stretch gap-3">{children}</div>
+}
+
+function ModuleMetricCard({
+  label,
+  value,
+  icon: Icon,
+  records,
+  href,
+  viewLabel,
+  accent,
+}: ModuleCardConfig) {
+  const styles = ACCENT_STYLES[accent]
+  const subtitle = activitySubtitle(records)
+
   return (
-    <Card className="flex w-fit flex-col">
+    <Card className={cn("flex w-[240px] flex-col", styles.card)}>
       <CardContent className="flex flex-1 flex-col p-4">
-        <div className="flex items-center gap-2">
-          <Icon className="h-4 w-4 text-muted-foreground" />
-          <div className="text-2xl font-bold tabular-nums">{value}</div>
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-medium text-muted-foreground">{label}</p>
+            <div className={cn("mt-0.5 text-xl font-bold tabular-nums", styles.value)}>{value}</div>
+            <p className="mt-1.5 min-h-8 text-[11px] leading-4 text-muted-foreground line-clamp-2">
+              {subtitle ?? "\u00A0"}
+            </p>
+          </div>
+          <div className={cn(styles.iconWrap, "shrink-0 p-2")}>
+            <Icon className={cn("h-4 w-4", styles.icon)} />
+          </div>
         </div>
-        <div className="text-sm text-muted-foreground">{label}</div>
-        <p className="mt-2 text-xs text-muted-foreground">
-          {records[0]?.title}
-          {records.length > 1 ? ` and ${records.length - 1} more` : ""}
-        </p>
         {href ? (
           <div className="mt-auto pt-3">
-            <Button variant="outline" size="sm" asChild className="w-full">
+            <Button variant="outline" size="sm" asChild className="h-8 w-full text-xs">
               <Link href={href}>{viewLabel}</Link>
             </Button>
           </div>
@@ -64,14 +95,20 @@ function ModuleMetricCard({ label, value, icon: Icon, records, href, viewLabel }
 }
 
 function TeamsMetricCard({ count }: { count: number }) {
+  const styles = ACCENT_STYLES.blue
+
   return (
-    <Card className="w-fit">
-      <CardContent className="p-4">
-        <div className="flex items-center gap-2">
-          <UsersRound className="h-4 w-4 text-muted-foreground" />
-          <div className="text-2xl font-bold tabular-nums">{count}</div>
+    <Card className={cn("flex w-[240px] flex-col", styles.card)}>
+      <CardContent className="flex flex-1 flex-col p-4">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-medium text-muted-foreground">Teams</p>
+            <div className="mt-0.5 text-xl font-bold tabular-nums">{count}</div>
+          </div>
+          <div className={cn(styles.iconWrap, "shrink-0 p-2")}>
+            <UsersRound className={cn("h-4 w-4", styles.icon)} />
+          </div>
         </div>
-        <div className="text-sm text-muted-foreground">Teams</div>
       </CardContent>
     </Card>
   )
@@ -79,13 +116,17 @@ function TeamsMetricCard({ count }: { count: number }) {
 
 function MetricCardSkeleton() {
   return (
-    <Card className="w-fit">
-      <CardContent className="p-4">
-        <div className="flex items-center gap-2">
-          <div className="h-4 w-4 rounded bg-muted" />
-          <div className="h-8 w-16 rounded bg-muted" />
+    <Card className="h-[132px] w-[240px] border-l-4 border-l-muted">
+      <CardContent className="flex h-full flex-col p-4">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1 space-y-2">
+            <div className="h-3 w-20 rounded bg-muted" />
+            <div className="h-6 w-12 rounded bg-muted" />
+            <div className="h-6 w-full rounded bg-muted" />
+          </div>
+          <div className="h-8 w-8 shrink-0 rounded-full bg-muted" />
         </div>
-        <div className="mt-1 h-4 w-24 rounded bg-muted" />
+        <div className="mt-auto h-8 w-full rounded bg-muted" />
       </CardContent>
     </Card>
   )
@@ -132,11 +173,11 @@ export function ContactRelationshipSummaryCard({
             Cross-module participation for this contact.
           </p>
         </div>
-        <div className="flex flex-wrap gap-4 [&>*]:w-fit">
+        <ActivityMetricCardGrid>
           {Array.from({ length: 3 }).map((_, index) => (
             <MetricCardSkeleton key={index} />
           ))}
-        </div>
+        </ActivityMetricCardGrid>
       </section>
     )
   }
@@ -153,6 +194,7 @@ export function ContactRelationshipSummaryCard({
       records: activity.programs,
       href: "/programs/registrations",
       viewLabel: "View enrollments",
+      accent: "purple",
     })
   }
 
@@ -164,6 +206,7 @@ export function ContactRelationshipSummaryCard({
       records: activity.ticketing,
       href: "/event-management/ticketing",
       viewLabel: "View purchases",
+      accent: "cyan",
     })
   }
 
@@ -175,6 +218,7 @@ export function ContactRelationshipSummaryCard({
       records: activity.spaces,
       href: "/bookings/overview",
       viewLabel: "View bookings",
+      accent: "amber",
     })
   }
 
@@ -186,6 +230,7 @@ export function ContactRelationshipSummaryCard({
       records: donationPayments,
       href: "/donations/payments/one-time",
       viewLabel: "View giving history",
+      accent: "rose",
     })
   }
 
@@ -197,6 +242,7 @@ export function ContactRelationshipSummaryCard({
       records: activity.vendorHub,
       href: `/vendor-hub/network/history?contact=${contactId}`,
       viewLabel: "View vendor activity",
+      accent: "violet",
     })
   }
 
@@ -216,26 +262,19 @@ export function ContactRelationshipSummaryCard({
 
   return (
     <section className="flex flex-col gap-4">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h2 className="text-lg font-semibold">Activity at a glance</h2>
-          <p className="text-sm text-muted-foreground">
-            Cross-module participation for this contact.
-          </p>
-        </div>
-        {activity.hasTransactionalActivity ? (
-          <Badge variant="outline" className="w-fit shrink-0">
-            Active participant
-          </Badge>
-        ) : null}
+      <div>
+        <h2 className="text-lg font-semibold">Activity at a glance</h2>
+        <p className="text-sm text-muted-foreground">
+          Cross-module participation for this contact.
+        </p>
       </div>
 
-      <div className="flex flex-wrap gap-4 [&>*]:w-fit">
+      <ActivityMetricCardGrid>
         {showTeams ? <TeamsMetricCard count={summary.teamsCount} /> : null}
         {moduleMetrics.map((metric) => (
           <ModuleMetricCard key={metric.label} {...metric} />
         ))}
-      </div>
+      </ActivityMetricCardGrid>
     </section>
   )
 }

@@ -6,6 +6,7 @@
  *   node scripts/import-mas-campaign-ledger.mjs --file "..." --campaign "December 2023"
  *   node scripts/import-mas-campaign-ledger.mjs --file "..." --execute
  *   node scripts/import-mas-campaign-ledger.mjs --file "..." --execute --create-campaigns
+ *   node scripts/import-mas-campaign-ledger.mjs --file "..." --payments-only --execute --create-campaigns
  *
  * Requires SUPABASE_SERVICE_ROLE_KEY in .env.local
  */
@@ -58,6 +59,7 @@ function parseArgs(argv) {
     file: null,
     execute: false,
     createCampaigns: false,
+    paymentsOnly: false,
     campaign: null,
     limit: null,
   }
@@ -66,6 +68,7 @@ function parseArgs(argv) {
     const arg = argv[index]
     if (arg === "--execute") args.execute = true
     else if (arg === "--create-campaigns") args.createCampaigns = true
+    else if (arg === "--payments-only") args.paymentsOnly = true
     else if (arg === "--file") args.file = argv[++index]
     else if (arg === "--campaign") args.campaign = argv[++index]
     else if (arg === "--limit") args.limit = Number(argv[++index])
@@ -126,6 +129,17 @@ function firstPositiveAmount(row, keys) {
   return 0
 }
 
+function normalizeImportRow(row) {
+  const normalized = { ...row }
+  if (!normalizeText(normalized.Name) && normalizeText(normalized["Donor Name"])) {
+    normalized.Name = normalizeText(normalized["Donor Name"])
+  }
+  if (!normalizeText(normalized.Group) && normalizeText(normalized["Group Name"])) {
+    normalized.Group = normalizeText(normalized["Group Name"])
+  }
+  return normalized
+}
+
 /**
  * Ledger column semantics (MAS spreadsheet):
  * - Pledge: explicit commitment (may be paid down over time)
@@ -136,14 +150,20 @@ function firstPositiveAmount(row, keys) {
  * If Pledge is blank but a payment column has value, treat as an implicit
  * fulfilled pledge equal to total payments on the row (no outstanding balance).
  */
-function getLedgerAmounts(row) {
+function getLedgerAmounts(row, options = {}) {
+  const paymentsOnly = Boolean(options.paymentsOnly)
   const pledge = parseMoney(row.Pledge)
   const cash = parseMoney(row.Cash)
   const checks = parseMoney(row.Checks)
-  const oneTime = firstPositiveAmount(row, ["One-time", "One Time", "CC", "One-Time"])
+  let oneTime = firstPositiveAmount(row, ["One-time", "One Time", "CC", "One-Time"])
   const recurring = firstPositiveAmount(row, ["Recurring", "CC+", "CC +"])
-  const totalPaid = cash + checks + oneTime + recurring
-  const effectivePledge = pledge > 0 ? pledge : totalPaid
+  const totalColumn = parseMoney(row.Total)
+  let totalPaid = cash + checks + oneTime + recurring
+  if (totalPaid <= 0 && totalColumn > 0) {
+    oneTime = totalColumn
+    totalPaid = totalColumn
+  }
+  const effectivePledge = paymentsOnly ? 0 : pledge > 0 ? pledge : totalPaid
 
   return {
     pledge,
@@ -254,12 +274,14 @@ function detectContactType(row) {
 function buildRowKey(rowIndex, row) {
   const campaign = normalizeText(row.Campaign)
   const name = normalizeNameForMatch(row.Name)
+  const group = normalizeNameForMatch(row.Group)
   const phone = normalizePhone(row.phone)
-  const amounts = getLedgerAmounts(row)
+  const amounts = getLedgerAmounts(row, { paymentsOnly: args.paymentsOnly })
   const payload = [
     rowIndex,
     campaign,
     name,
+    group,
     phone,
     amounts.pledge.toFixed(2),
     amounts.cash.toFixed(2),
@@ -308,7 +330,9 @@ loadEnvLocal()
 const args = parseArgs(process.argv.slice(2))
 
 if (!args.file) {
-  console.error("Usage: node scripts/import-mas-campaign-ledger.mjs --file <path> [--campaign <name>] [--execute] [--create-campaigns]")
+  console.error(
+    "Usage: node scripts/import-mas-campaign-ledger.mjs --file <path> [--campaign <name>] [--payments-only] [--execute] [--create-campaigns]"
+  )
   process.exit(1)
 }
 
@@ -373,20 +397,34 @@ function buildContactIndexes(contacts) {
   return { byEmail, byPhone, byName }
 }
 
-function findContactMatch(row, indexes) {
+function findContactMatch(row, indexes, options = {}) {
+  const allowedTypes = options.individualsOnly
+    ? new Set(["individual"])
+    : null
+
+  function isAllowed(contact) {
+    return !allowedTypes || allowedTypes.has(contact.contact_type)
+  }
+
   const email = normalizeEmail(row.Email)
   const phone = normalizePhone(row.phone)
   const nameKey = normalizeNameForMatch(row.Name)
 
   if (email && indexes.byEmail.has(email)) {
-    return { contact: indexes.byEmail.get(email), reason: "email" }
+    const contact = indexes.byEmail.get(email)
+    if (isAllowed(contact)) {
+      return { contact, reason: "email" }
+    }
   }
 
   if (phone && indexes.byPhone.has(phone)) {
-    return { contact: indexes.byPhone.get(phone), reason: "phone" }
+    const contact = indexes.byPhone.get(phone)
+    if (isAllowed(contact)) {
+      return { contact, reason: "phone" }
+    }
   }
 
-  const exactNameMatches = indexes.byName.get(nameKey) || []
+  const exactNameMatches = (indexes.byName.get(nameKey) || []).filter(isAllowed)
   if (exactNameMatches.length === 1) {
     return { contact: exactNameMatches[0], reason: "exact_name" }
   }
@@ -400,6 +438,7 @@ function findContactMatch(row, indexes) {
   let bestScore = 0
   for (const candidates of indexes.byName.values()) {
     for (const contact of candidates) {
+      if (!isAllowed(contact)) continue
       const score = scoreNameMatch(row.Name, contact.full_name)
       if (score > bestScore) {
         bestScore = score
@@ -427,7 +466,7 @@ async function main() {
     process.exit(1)
   }
 
-  let rows = parsed.data
+  let rows = parsed.data.map((row) => normalizeImportRow(row))
   if (args.campaign) {
     rows = rows.filter((row) => normalizeText(row.Campaign) === args.campaign)
   }
@@ -437,6 +476,7 @@ async function main() {
 
   const report = {
     mode: args.execute ? "execute" : "dry-run",
+    paymentsOnly: args.paymentsOnly,
     file: args.file,
     campaignFilter: args.campaign,
     rowCount: rows.length,
@@ -445,6 +485,9 @@ async function main() {
     skippedDuplicate: 0,
     contactsMatched: 0,
     contactsCreated: 0,
+    groupsMatched: 0,
+    groupsCreated: 0,
+    groupMembersLinked: 0,
     donorsCreated: 0,
     campaignsCreated: 0,
     pledgesCreated: 0,
@@ -479,16 +522,29 @@ async function main() {
     .eq("organization_id", orgId)
     .like("notes", `${IMPORT_TAG}|%`)
 
+  const { data: existingTaggedPayments } = await sb
+    .from("payments")
+    .select("id, memo")
+    .eq("organization_id", orgId)
+    .like("memo", `${IMPORT_TAG}|%`)
+
   const importedRowKeys = new Set(
-    (existingTaggedPledges || [])
-      .map((pledge) => {
-        const match = String(pledge.notes || "").match(new RegExp(`${IMPORT_TAG}\\|[a-f0-9]{12}`))
+    [...(existingTaggedPledges || []), ...(existingTaggedPayments || [])]
+      .map((row) => {
+        const text = String(row.notes || row.memo || "")
+        const match = text.match(new RegExp(`${IMPORT_TAG}\\|[a-f0-9]{12}`))
         return match?.[0] || null
       })
       .filter(Boolean)
   )
 
   const pendingContacts = new Map()
+  const pendingGroups = new Map()
+  const groupByName = new Map(
+    contacts
+      .filter((contact) => contact.contact_type === "group")
+      .map((contact) => [normalizeName(contact.full_name), contact])
+  )
 
   function rememberContact(contact) {
     contacts.push(contact)
@@ -561,7 +617,7 @@ async function main() {
     return data
   }
 
-  async function ensureContact(row) {
+  async function ensureContact(row, options = {}) {
     const displayName = normalizeText(row.Name)
     const pendingKey = [
       normalizeNameForMatch(displayName),
@@ -573,7 +629,9 @@ async function main() {
       return pendingContacts.get(pendingKey)
     }
 
-    const match = findContactMatch(row, contactIndexes)
+    const match = findContactMatch(row, contactIndexes, {
+      individualsOnly: Boolean(options.forceIndividual),
+    })
     if (match) {
       report.contactsMatched += 1
       if (match.reason.startsWith("fuzzy_name")) {
@@ -587,7 +645,7 @@ async function main() {
       return match.contact
     }
 
-    const contactType = detectContactType(row)
+    const contactType = options.forceIndividual ? "individual" : detectContactType(row)
     const payload = {
       organization_id: orgId,
       full_name: displayName,
@@ -613,11 +671,74 @@ async function main() {
     return data
   }
 
+  async function ensureGroupContact(groupName) {
+    const displayName = normalizeText(groupName)
+    const key = normalizeName(displayName)
+    if (!displayName) {
+      throw new Error("Group Name is required for payments-only import rows")
+    }
+
+    if (pendingGroups.has(key)) {
+      return pendingGroups.get(key)
+    }
+
+    if (groupByName.has(key)) {
+      const existing = groupByName.get(key)
+      report.groupsMatched += 1
+      pendingGroups.set(key, existing)
+      return existing
+    }
+
+    const payload = {
+      organization_id: orgId,
+      full_name: displayName,
+      contact_type: "group",
+      status: "active",
+    }
+
+    if (!args.execute) {
+      report.groupsCreated += 1
+      const placeholder = { id: `dry-run:group:${key}`, ...payload }
+      groupByName.set(key, placeholder)
+      rememberContact(placeholder)
+      pendingGroups.set(key, placeholder)
+      return placeholder
+    }
+
+    const { data, error } = await sb.from("contacts").insert(payload).select("*").single()
+    if (error) throw new Error(`group contact insert (${displayName}): ${error.message}`)
+    groupByName.set(key, data)
+    rememberContact(data)
+    pendingGroups.set(key, data)
+    report.groupsCreated += 1
+    return data
+  }
+
+  async function linkGroupMember(groupContactId, memberContactId) {
+    if (!args.execute) {
+      report.groupMembersLinked += 1
+      return
+    }
+
+    const { error } = await sb.from("contact_group_members").upsert(
+      {
+        organization_id: orgId,
+        group_contact_id: groupContactId,
+        member_contact_id: memberContactId,
+        status: "active",
+      },
+      { onConflict: "group_contact_id,member_contact_id" }
+    )
+
+    if (error) throw new Error(`group member link: ${error.message}`)
+    report.groupMembersLinked += 1
+  }
+
   for (let index = 0; index < rows.length; index += 1) {
     const row = rows[index]
     const rowKey = buildRowKey(index + 2, row)
     const campaignName = normalizeText(row.Campaign)
-    const amounts = getLedgerAmounts(row)
+    const amounts = getLedgerAmounts(row, { paymentsOnly: args.paymentsOnly })
     const {
       pledge: pledgeAmount,
       cash: cashAmount,
@@ -634,12 +755,22 @@ async function main() {
       continue
     }
 
+    if (args.paymentsOnly && !normalizeText(row.Group)) {
+      report.skippedEmpty += 1
+      continue
+    }
+
     if (isLedgerSummaryRowName(row.Name)) {
       report.skippedSummary += 1
       continue
     }
 
-    if (effectivePledgeAmount <= 0 && totalPaid <= 0) {
+    if (args.paymentsOnly) {
+      if (totalPaid <= 0) {
+        report.skippedEmpty += 1
+        continue
+      }
+    } else if (effectivePledgeAmount <= 0 && totalPaid <= 0) {
       report.skippedEmpty += 1
       continue
     }
@@ -717,12 +848,19 @@ async function main() {
         continue
       }
 
-      const contact = await ensureContact(row)
+      const contact = await ensureContact(row, { forceIndividual: args.paymentsOnly })
       const donor = await ensureDonor(contact)
       const notes = buildNotes(row)
+      const groupContact = args.paymentsOnly
+        ? await ensureGroupContact(normalizeText(row.Group))
+        : null
+
+      if (args.paymentsOnly && groupContact) {
+        await linkGroupMember(groupContact.id, contact.id)
+      }
 
       let pledgeId = null
-      if (effectivePledgeAmount > 0) {
+      if (!args.paymentsOnly && effectivePledgeAmount > 0) {
         const pledgeNotes = [rowKey, notes].filter(Boolean).join(" | ")
         const pledgeFrequency = resolvePledgeFrequency(amounts)
         const pledgeStatus = resolvePledgeStatus(amounts)
@@ -752,36 +890,44 @@ async function main() {
       }
 
       const paymentSpecs = []
-      if (cashAmount > 0) {
-        paymentSpecs.push({ kind: "cash", amount: cashAmount, source: "cash" })
-      }
-      if (checksAmount > 0) {
-        paymentSpecs.push({
-          kind: "checks",
-          amount: checksAmount,
-          source: normalizePaymentSource(row.Source, "checks"),
-        })
-      }
-      if (oneTimeAmount > 0) {
+      if (args.paymentsOnly) {
         paymentSpecs.push({
           kind: "one-time",
-          amount: oneTimeAmount,
+          amount: totalPaid,
           source: normalizePaymentSource(row.Source, "one-time"),
         })
-      }
-      if (recurringAmount > 0) {
-        paymentSpecs.push({
-          kind: "recurring",
-          amount: recurringAmount,
-          source: normalizePaymentSource(row.Source, "recurring"),
-        })
+      } else {
+        if (cashAmount > 0) {
+          paymentSpecs.push({ kind: "cash", amount: cashAmount, source: "cash" })
+        }
+        if (checksAmount > 0) {
+          paymentSpecs.push({
+            kind: "checks",
+            amount: checksAmount,
+            source: normalizePaymentSource(row.Source, "checks"),
+          })
+        }
+        if (oneTimeAmount > 0) {
+          paymentSpecs.push({
+            kind: "one-time",
+            amount: oneTimeAmount,
+            source: normalizePaymentSource(row.Source, "one-time"),
+          })
+        }
+        if (recurringAmount > 0) {
+          paymentSpecs.push({
+            kind: "recurring",
+            amount: recurringAmount,
+            source: normalizePaymentSource(row.Source, "recurring"),
+          })
+        }
       }
 
       for (const spec of paymentSpecs) {
         const memo = `${rowKey}|${spec.kind}|${campaignName}`
         const status = pledgeId ? "allocated" : "unallocated"
 
-        if (!pledgeId && totalPaid > 0) {
+        if (!args.paymentsOnly && !pledgeId && totalPaid > 0) {
           report.warnings = report.warnings || []
           if (report.warnings.length < 20) {
             report.warnings.push({
@@ -799,6 +945,7 @@ async function main() {
             contact_id: contact.id,
             pledge_id: pledgeId,
             campaign_id: campaign.id,
+            attributed_group_contact_id: groupContact?.id ?? null,
             sender_name: displayName,
             amount: spec.amount,
             payment_date: `${paymentDate}T12:00:00`,
@@ -819,9 +966,10 @@ async function main() {
         report.samples.push({
           rowKey,
           name: displayName,
+          group: args.paymentsOnly ? normalizeText(row.Group) : undefined,
           campaign: campaignName,
-          pledge: pledgeAmount,
-          effectivePledge: effectivePledgeAmount,
+          pledge: args.paymentsOnly ? undefined : pledgeAmount,
+          effectivePledge: args.paymentsOnly ? undefined : effectivePledgeAmount,
           payments: paymentSpecs.map((spec) => spec.amount),
         })
       }
@@ -838,7 +986,11 @@ async function main() {
   const reportsDir = resolve(root, "scripts", "reports")
   mkdirSync(reportsDir, { recursive: true })
   const stamp = new Date().toISOString().slice(0, 10)
-  const suffix = args.campaign ? args.campaign.replace(/\s+/g, "-").toLowerCase() : "all"
+  const suffix = args.paymentsOnly
+    ? "group-donations"
+    : args.campaign
+      ? args.campaign.replace(/\s+/g, "-").toLowerCase()
+      : "all"
   const reportPath = resolve(reportsDir, `mas-campaign-ledger-import-${suffix}-${stamp}.json`)
   writeFileSync(reportPath, JSON.stringify(report, null, 2))
 

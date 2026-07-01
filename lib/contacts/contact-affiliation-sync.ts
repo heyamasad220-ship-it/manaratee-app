@@ -12,6 +12,16 @@ import {
 import { loadAffiliationAutoSyncFlags } from "@/lib/contacts/contact-affiliation-settings"
 import { syncContactDiscountTags } from "@/lib/contacts/contact-discount-tag-sync"
 
+function isMissingDbColumnError(
+  error: { code?: string; message?: string } | null,
+  columnName: string
+) {
+  if (!error) return false
+  if (error.code === "42703" || error.code === "PGRST204") return true
+  const message = (error.message || "").toLowerCase()
+  return message.includes(columnName.toLowerCase()) && message.includes("does not exist")
+}
+
 export async function computeDerivedAffiliations(
   organizationId: string,
   contactId: string,
@@ -142,17 +152,27 @@ export async function computeDerivedAffiliations(
     .eq("status", "completed")
 
   const excludedRentalStatuses = VENUE_RENTAL_CUSTOMER_EXCLUDED_STATUSES.join(",")
-  const { count: venueRentalCount } = await supabase
+  let venueRentalCount = 0
+  const venueRentalResult = await supabase
     .from("venue_rentals")
     .select("id", { count: "exact", head: true })
     .eq("organization_id", organizationId)
     .eq("billing_contact_id", contactId)
     .not("status", "in", `(${excludedRentalStatuses})`)
 
+  if (isMissingDbColumnError(venueRentalResult.error, "billing_contact_id")) {
+    venueRentalCount = 0
+  } else if (venueRentalResult.error) {
+    console.warn("Could not load venue rental customer affiliations:", venueRentalResult.error.message)
+    venueRentalCount = 0
+  } else {
+    venueRentalCount = venueRentalResult.count ?? 0
+  }
+
   if (
     (programEnrollmentCount ?? 0) > 0 ||
     (completedTicketOrderCount ?? 0) > 0 ||
-    (venueRentalCount ?? 0) > 0
+    venueRentalCount > 0
   ) {
     derived.add("customer")
   }
@@ -188,7 +208,8 @@ function revalidateAffiliationPaths() {
 export async function syncContactAffiliations(
   contactId: string,
   organizationIdInput?: string | null,
-  supabaseClient?: SupabaseClient
+  supabaseClient?: SupabaseClient,
+  revalidate = true
 ): Promise<void> {
   const supabase = supabaseClient || (await createClient())
   const organizationId = organizationIdInput ?? (await getSelectedOrganizationId())
@@ -201,13 +222,21 @@ export async function syncContactAffiliations(
   })
 
   if (error) {
+    if (isMissingDbColumnError(error, "billing_contact_id")) {
+      console.warn(
+        "sync_contact_affiliations skipped: venue_rentals.billing_contact_id is missing. Run scripts/147_venue_rentals_billing_contact_id.sql."
+      )
+      return
+    }
     throw new Error(error.message || "Could not sync contact affiliations")
   }
 
   await syncContactDiscountTags(contactId, organizationId, supabase)
 
-  revalidateAffiliationPaths()
-  revalidatePath(`/contacts/${contactId}`)
+  if (revalidate) {
+    revalidateAffiliationPaths()
+    revalidatePath(`/contacts/${contactId}`)
+  }
 }
 
 export type HandleDonationAffiliationSyncInput = {
@@ -302,5 +331,5 @@ export async function syncContactAffiliationsForStaff(staffId: string) {
 
 /** Refresh affiliations when opening a contact profile. */
 export async function refreshContactAffiliations(contactId: string) {
-  await syncContactAffiliations(contactId)
+  await syncContactAffiliations(contactId, undefined, undefined, false)
 }

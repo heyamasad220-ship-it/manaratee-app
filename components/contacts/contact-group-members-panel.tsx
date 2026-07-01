@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { Loader2, Plus, Search, UserMinus, Users } from "lucide-react"
 
@@ -30,7 +30,15 @@ import {
   removeGroupMemberAction,
   searchIndividualsForGroupMemberAction,
 } from "@/lib/contacts/group-member-actions"
-import { fetchGroupMembersAction } from "@/lib/contacts/group-members-load-action"
+import {
+  clearCachedGroupMembers,
+  getCachedGroupMembers,
+  setCachedGroupMembers,
+} from "@/lib/contacts/group-members-client-cache"
+import {
+  fetchGroupMemberGivingStatsAction,
+  fetchGroupMembersAction,
+} from "@/lib/contacts/group-members-load-action"
 import type { GroupMemberRow } from "@/lib/contacts/group-member-types"
 import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
 
@@ -56,12 +64,33 @@ function formatDate(value: string | null) {
   })
 }
 
+function mergeMemberGivingStats(
+  members: GroupMemberRow[],
+  givingByMemberId: Record<
+    string,
+    { totalDonations: number; donationCount: number; lastDonationDate: string | null }
+  >
+) {
+  return members.map((member) => {
+    const stat = givingByMemberId[member.memberContactId]
+    if (!stat) return member
+    return {
+      ...member,
+      totalDonations: stat.totalDonations,
+      donationCount: stat.donationCount,
+      lastDonationDate: stat.lastDonationDate,
+    }
+  })
+}
+
 export function ContactGroupMembersPanel({
   groupContactId,
   groupName,
 }: ContactGroupMembersPanelProps) {
-  const [loading, setLoading] = useState(true)
-  const [members, setMembers] = useState<GroupMemberRow[]>([])
+  const cachedMembers = getCachedGroupMembers(groupContactId)
+  const [members, setMembers] = useState<GroupMemberRow[]>(cachedMembers ?? [])
+  const [loading, setLoading] = useState(!cachedMembers)
+  const [statsLoading, setStatsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [search, setSearch] = useState("")
@@ -70,62 +99,68 @@ export function ContactGroupMembersPanel({
     Array<{ contactId: string; full_name: string | null; email: string | null; phone: string | null }>
   >([])
   const [saving, setSaving] = useState(false)
+  const loadRequestRef = useRef(0)
 
-  useEffect(() => {
-    let cancelled = false
+  const loadMembers = useCallback(async () => {
+    const requestId = ++loadRequestRef.current
+    const hasCachedMembers = Boolean(getCachedGroupMembers(groupContactId))
 
-    async function loadMembers() {
+    if (!hasCachedMembers) {
       setLoading(true)
-      setError(null)
-
-      try {
-        const result = await fetchGroupMembersAction(groupContactId)
-        if (cancelled) return
-
-        if (!result?.success) {
-          setError(result?.error || "Could not load group members.")
-          setMembers([])
-          return
-        }
-
-        setMembers(result.members)
-      } catch (loadError) {
-        if (cancelled) return
-        setError(loadError instanceof Error ? loadError.message : "Could not load group members.")
-        setMembers([])
-      } finally {
-        if (!cancelled) {
-          setLoading(false)
-        }
-      }
     }
-
-    void loadMembers()
-
-    return () => {
-      cancelled = true
-    }
-  }, [groupContactId])
-
-  const reloadMembers = useCallback(async () => {
-    setLoading(true)
     setError(null)
 
     try {
-      const result = await fetchGroupMembersAction(groupContactId)
-      if (!result?.success) {
-        setError(result?.error || "Could not load group members.")
-        setMembers([])
+      const listResult = await fetchGroupMembersAction(groupContactId)
+      if (requestId !== loadRequestRef.current) return
+
+      if (!listResult?.success) {
+        setError(listResult?.error || "Could not load group members.")
+        if (!hasCachedMembers) {
+          setMembers([])
+        }
         return
       }
-      setMembers(result.members)
+
+      setMembers(listResult.members)
+      setCachedGroupMembers(groupContactId, listResult.members)
     } catch (loadError) {
+      if (requestId !== loadRequestRef.current) return
       setError(loadError instanceof Error ? loadError.message : "Could not load group members.")
-      setMembers([])
+      if (!getCachedGroupMembers(groupContactId)) {
+        setMembers([])
+      }
     } finally {
-      setLoading(false)
+      if (requestId === loadRequestRef.current) {
+        setLoading(false)
+      }
+    }
+
+    if (requestId !== loadRequestRef.current) return
+
+    setStatsLoading(true)
+    try {
+      const statsResult = await fetchGroupMemberGivingStatsAction(groupContactId)
+      if (requestId !== loadRequestRef.current) return
+      if (!statsResult?.success) return
+
+      setMembers((current) => {
+        const merged = mergeMemberGivingStats(current, statsResult.givingByMemberId)
+        setCachedGroupMembers(groupContactId, merged)
+        return merged
+      })
+    } catch {
+      // Giving totals are optional on overview; member list is already shown.
+    } finally {
+      if (requestId === loadRequestRef.current) {
+        setStatsLoading(false)
+      }
     }
   }, [groupContactId])
+
+  useEffect(() => {
+    void loadMembers()
+  }, [loadMembers])
 
   useEffect(() => {
     if (!dialogOpen) return
@@ -162,10 +197,11 @@ export function ContactGroupMembersPanel({
       return
     }
 
+    clearCachedGroupMembers(groupContactId)
     setDialogOpen(false)
     setSearch("")
     setResults([])
-    await reloadMembers()
+    await loadMembers()
   }
 
   async function handleRemoveMember(membershipId: string, memberName: string | null) {
@@ -176,8 +212,12 @@ export function ContactGroupMembersPanel({
       alert(result.error)
       return
     }
-    await reloadMembers()
+
+    clearCachedGroupMembers(groupContactId)
+    await loadMembers()
   }
+
+  const showInitialSpinner = loading && members.length === 0
 
   return (
     <Card>
@@ -186,6 +226,7 @@ export function ContactGroupMembersPanel({
           <CardTitle className="flex items-center gap-2">
             <Users className="h-5 w-5" />
             Group Members
+            {statsLoading ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : null}
           </CardTitle>
           <CardDescription>
             People who belong to {groupName}. When a member selects this group on a gift, they are
@@ -198,7 +239,7 @@ export function ContactGroupMembersPanel({
         </Button>
       </CardHeader>
       <CardContent>
-        {loading ? (
+        {showInitialSpinner ? (
           <p className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
             Loading members...
@@ -235,14 +276,22 @@ export function ContactGroupMembersPanel({
                       ) : null}
                     </TableCell>
                     <TableCell className="text-right">
-                      {formatCurrency(member.totalDonations)}
-                      {member.donationCount > 0 ? (
-                        <Badge variant="secondary" className="ml-2">
-                          {member.donationCount}
-                        </Badge>
-                      ) : null}
+                      {statsLoading && member.donationCount === 0 && member.totalDonations === 0 ? (
+                        <span className="text-muted-foreground">…</span>
+                      ) : (
+                        <>
+                          {formatCurrency(member.totalDonations)}
+                          {member.donationCount > 0 ? (
+                            <Badge variant="secondary" className="ml-2">
+                              {member.donationCount}
+                            </Badge>
+                          ) : null}
+                        </>
+                      )}
                     </TableCell>
-                    <TableCell>{formatDate(member.lastDonationDate)}</TableCell>
+                    <TableCell>
+                      {statsLoading && !member.lastDonationDate ? "…" : formatDate(member.lastDonationDate)}
+                    </TableCell>
                     <TableCell className="text-right">
                       <Button
                         variant="ghost"

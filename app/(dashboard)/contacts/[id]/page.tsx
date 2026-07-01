@@ -325,11 +325,9 @@ export default function ContactDetailPage() {
 
     let lastError: { message?: string; code?: string } | null = null
 
-    try {
-      await refreshContactAffiliations(contactId)
-    } catch (syncError) {
+    void refreshContactAffiliations(contactId).catch((syncError) => {
       console.warn("Contact affiliation sync failed:", syncError)
-    }
+    })
 
     for (const select of CONTACT_DETAIL_SELECT_PLANS) {
 

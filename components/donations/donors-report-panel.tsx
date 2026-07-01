@@ -12,13 +12,11 @@ import {
   fetchDonorSummaryReportSummaryAction,
   type DonorPledgeFilter,
   type DonorSummaryReportRow,
-  type DonorTypeFilter,
 } from "@/lib/donations/donation-list-actions"
 import { downloadDonorGivingReportCsv } from "@/lib/donations/donor-report-csv"
 import { downloadDonorGivingReportPdf } from "@/lib/donations/donor-report-pdf"
 import {
   formatDonorReportPeriodLabel,
-  formatDonorTypeLabel,
   resolveDonorReportDateRange,
   type DonorDateRangeMode,
   type DonorReportSortBy,
@@ -74,9 +72,9 @@ function formatDate(value: string | null) {
 
 function buildFilterSummary(input: {
   pledgeFilter: DonorPledgeFilter
-  donorTypeFilter: DonorTypeFilter
   lapsedOnly: boolean
   search: string
+  minTotalGiven?: number
 }) {
   const parts: string[] = []
 
@@ -84,8 +82,8 @@ function buildFilterSummary(input: {
     parts.push(`Search: "${input.search.trim()}"`)
   }
 
-  if (input.donorTypeFilter !== "all") {
-    parts.push(`Type: ${formatDonorTypeLabel(input.donorTypeFilter)}`)
+  if (input.minTotalGiven != null && input.minTotalGiven > 0) {
+    parts.push(`Min total given: $${input.minTotalGiven.toLocaleString()}`)
   }
 
   if (input.pledgeFilter === "open_pledge") {
@@ -108,8 +106,11 @@ export function DonorsReportPanel() {
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState("")
   const [debouncedSearch, setDebouncedSearch] = useState("")
+  const [minTotalGivenFilter, setMinTotalGivenFilter] = useState("")
+  const [debouncedMinTotalGiven, setDebouncedMinTotalGiven] = useState<number | undefined>(
+    undefined
+  )
   const [pledgeFilter, setPledgeFilter] = useState<DonorPledgeFilter>("all")
-  const [donorTypeFilter, setDonorTypeFilter] = useState<DonorTypeFilter>("all")
   const [lapsedOnly, setLapsedOnly] = useState(false)
   const [dateRangeMode, setDateRangeMode] = useState<DonorDateRangeMode>("lifetime")
   const [taxYear, setTaxYear] = useState(String(new Date().getFullYear()))
@@ -153,12 +154,12 @@ export function DonorsReportPanel() {
     () => ({
       search: debouncedSearch || undefined,
       pledgeFilter: pledgeFilter === "all" ? undefined : pledgeFilter,
-      donorTypeFilter: donorTypeFilter === "all" ? undefined : donorTypeFilter,
       lapsedOnly: lapsedOnly || undefined,
+      minTotalGiven: debouncedMinTotalGiven,
       dateFrom: dateRange.dateFrom,
       dateTo: dateRange.dateTo,
     }),
-    [debouncedSearch, pledgeFilter, donorTypeFilter, lapsedOnly, dateRange]
+    [debouncedSearch, pledgeFilter, lapsedOnly, debouncedMinTotalGiven, dateRange]
   )
 
   const sortAsc = sortBy === "full_name"
@@ -169,8 +170,33 @@ export function DonorsReportPanel() {
   }, [search])
 
   useEffect(() => {
+    const timer = setTimeout(() => {
+      const trimmed = minTotalGivenFilter.trim()
+      if (!trimmed) {
+        setDebouncedMinTotalGiven(undefined)
+        return
+      }
+      const parsed = Number(trimmed)
+      setDebouncedMinTotalGiven(
+        Number.isFinite(parsed) && parsed > 0 ? parsed : undefined
+      )
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [minTotalGivenFilter])
+
+  useEffect(() => {
     setPage(1)
-  }, [debouncedSearch, pledgeFilter, donorTypeFilter, lapsedOnly, dateRangeMode, taxYear, customDateFrom, customDateTo, sortBy])
+  }, [
+    debouncedSearch,
+    pledgeFilter,
+    lapsedOnly,
+    debouncedMinTotalGiven,
+    dateRangeMode,
+    taxYear,
+    customDateFrom,
+    customDateTo,
+    sortBy,
+  ])
 
   const loadDonors = useCallback(async () => {
     clearSelectedOrganizationIdCache()
@@ -203,7 +229,10 @@ export function DonorsReportPanel() {
 
     const result = await fetchDonorSummaryReportSummaryAction(filterInput)
 
-    if (result.success) {
+    if (!result.success) {
+      setError((current) => current || result.error)
+      setSummary({ donorCount: 0, totalGiven: 0, giftCount: 0 })
+    } else {
       setSummary(result.summary)
     }
 
@@ -279,9 +308,9 @@ export function DonorsReportPanel() {
       generatedAt: exportResult.generatedAt,
       filterSummary: buildFilterSummary({
         pledgeFilter,
-        donorTypeFilter,
         lapsedOnly,
         search: debouncedSearch,
+        minTotalGiven: debouncedMinTotalGiven,
       }),
       summary: exportResult.summary,
       donors: exportResult.donors,
@@ -399,28 +428,25 @@ export function DonorsReportPanel() {
               ) : null}
 
               <Input
-                placeholder="Search by name or phone..."
+                placeholder="Search donor name, email, or phone..."
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 className="max-w-sm"
               />
+
+              <Input
+                type="number"
+                min={0}
+                step={1}
+                placeholder="Min total given ($)"
+                value={minTotalGivenFilter}
+                onChange={(event) => setMinTotalGivenFilter(event.target.value)}
+                className="w-[170px]"
+                aria-label="Minimum total given"
+              />
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
-              <Select
-                value={donorTypeFilter}
-                onValueChange={(value) => setDonorTypeFilter(value as DonorTypeFilter)}
-              >
-                <SelectTrigger className="w-[160px]">
-                  <SelectValue placeholder="Donor type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All types</SelectItem>
-                  <SelectItem value="individual">Individual</SelectItem>
-                  <SelectItem value="organization">Organization</SelectItem>
-                </SelectContent>
-              </Select>
-
               <Select
                 value={pledgeFilter}
                 onValueChange={(value) => setPledgeFilter(value as DonorPledgeFilter)}
@@ -472,7 +498,6 @@ export function DonorsReportPanel() {
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
-                <TableHead>Type</TableHead>
                 <TableHead>Total Given</TableHead>
                 <TableHead>Gifts</TableHead>
                 <TableHead>{lastGiftHeader}</TableHead>
@@ -482,21 +507,21 @@ export function DonorsReportPanel() {
             <TableBody>
               {loading && (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                  <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
                     Loading report...
                   </TableCell>
                 </TableRow>
               )}
               {!loading && error && (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-8 text-center text-destructive">
+                  <TableCell colSpan={5} className="py-8 text-center text-destructive">
                     {error}
                   </TableCell>
                 </TableRow>
               )}
               {!loading && !error && donors.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                  <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
                     No donors match the current filters.
                   </TableCell>
                 </TableRow>
@@ -522,7 +547,6 @@ export function DonorsReportPanel() {
                         </div>
                       ) : null}
                     </TableCell>
-                    <TableCell>{formatDonorTypeLabel(donor.donor_type)}</TableCell>
                     <TableCell>
                       {formatDonationCurrency(Number(donor.total_donations || 0))}
                     </TableCell>
@@ -535,7 +559,7 @@ export function DonorsReportPanel() {
                             {formatDonationCurrency(Number(donor.outstanding_pledge_balance || 0))}
                           </span>
                           {donor.has_open_pledge ? (
-                            <Badge variant="secondary" className="text-xs">
+                            <Badge className="border-transparent bg-orange-100 text-xs text-orange-700 hover:bg-orange-100">
                               Open
                             </Badge>
                           ) : null}

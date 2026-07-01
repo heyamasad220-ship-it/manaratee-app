@@ -21,18 +21,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ContactMergeDialog } from "@/components/contacts/contact-merge-dialog"
 import { ContactBasicsPanel, type ContactBasicsHeaderMeta } from "@/components/contacts/contact-basics-panel"
 import { ContactOverviewGroupsBar } from "@/components/contacts/contact-overview-groups-bar"
 import { ContactFamilyPanel } from "@/components/contacts/contact-family-panel"
-import { ContactPaymentMethodsPanel } from "@/components/contacts/contact-payment-methods-panel"
 import { ContactEmployeePanel } from "@/components/contacts/contact-employee-panel"
-import { ContactDonorFinancialPanel } from "@/components/contacts/contact-donor-financial-panel"
-import { ContactGroupFinancialPanel } from "@/components/contacts/contact-group-financial-panel"
+import { ContactFinancialPanel } from "@/components/contacts/contact-financial-panel"
+import { ContactGroupGivingOverview } from "@/components/contacts/contact-group-giving-overview"
 import { ContactGroupMembersPanel } from "@/components/contacts/contact-group-members-panel"
-import { ContactDonorPanel } from "@/components/contacts/contact-donor-panel"
-import { ContactRentalsPanel } from "@/components/contacts/contact-rentals-panel"
 import { ContactMembershipPanel } from "@/components/contacts/contact-membership-panel"
 import { ContactProgramEnrollmentsPanel } from "@/components/contacts/contact-program-enrollments-panel"
 import { ContactNotesPanel } from "@/components/contacts/contact-notes-panel"
@@ -53,10 +57,14 @@ import {
   isEntityContactType,
   mapStatus,
   normalizeContactRecordType,
+  ROLE_COLORS,
+  ROLE_ICONS,
+  ROLE_VALUE_TO_LABEL,
   STATUS_COLORS,
   STATUS_OPTIONS,
   type ContactRecordType,
 } from "@/lib/contacts/contact-constants"
+import { cn } from "@/lib/utils"
 import type { ContactProfileData } from "@/lib/contacts/contact-profile-data"
 import type { ContactProfileExtendedData } from "@/lib/contacts/contact-profile-admin-actions"
 import type { ProgramStaffAssignmentWithDetails } from "@/lib/programs/program-staff-assignment-types"
@@ -81,8 +89,10 @@ import {
   History,
   Loader2,
   Mail,
+  MoreVertical,
   Pencil,
   Phone,
+  Plus,
   Store,
   Trash2,
   User,
@@ -205,6 +215,14 @@ export function ContactProfileClient({
     [roles]
   )
 
+  const roleLabels = useMemo(
+    () =>
+      roles
+        .map((role) => ROLE_VALUE_TO_LABEL[role])
+        .sort((a, b) => a.localeCompare(b)),
+    [roles]
+  )
+
   const isEntity = isEntityContactType(contact.contact_type)
   const isOrganization = contact.contact_type === "organization"
   const isGroup = contact.contact_type === "group"
@@ -221,19 +239,13 @@ export function ContactProfileClient({
     )
   }, [hasRole, isEntity, modules.donations, profileData])
 
-  const showRentalsPanel = useMemo(() => {
-    if (!modules.bookings) return false
-    if (isEntity) return true
-    if (!profileData) return false
-    return profileData.rentalStats.rentalCount > 0
-  }, [isEntity, modules.bookings, profileData])
-
   const showParticipationTab =
     !isEntity && (modules.programs || modules.membership)
 
   const showWorkforceTab = modules.workforce || modules.vendorHub
 
-  const showFinancialTab = modules.donations || modules.bookings
+  const showFinancialTab =
+    modules.donations || modules.bookings || modules.programs || modules.membership
 
   const showProgramAssignments = useMemo(() => {
     if (!modules.programs) return false
@@ -259,6 +271,7 @@ export function ContactProfileClient({
   )
   const [showMergeDialog, setShowMergeDialog] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [showAssignGroupDialog, setShowAssignGroupDialog] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [overviewSubTab, setOverviewSubTab] = useState<"general" | "family">("general")
   const [basicsHeaderMeta, setBasicsHeaderMeta] = useState<ContactBasicsHeaderMeta | null>(
@@ -488,9 +501,25 @@ export function ContactProfileClient({
                   </>
                 ) : (
                   <>
-                    <Badge variant="outline" className="font-normal">
-                      {getContactRecordTypeLabel(recordType)}
-                    </Badge>
+                    {roleLabels.length > 0 ? (
+                      roleLabels.map((label) => {
+                        const RoleIcon = ROLE_ICONS[label]
+                        return (
+                          <Badge
+                            key={label}
+                            variant="secondary"
+                            className={cn("gap-1 font-normal", ROLE_COLORS[label])}
+                          >
+                            <RoleIcon className="h-3 w-3" />
+                            {label}
+                          </Badge>
+                        )
+                      })
+                    ) : isEntity ? (
+                      <Badge variant="outline" className="font-normal">
+                        {getContactRecordTypeLabel(recordType)}
+                      </Badge>
+                    ) : null}
                     <Badge
                       variant="secondary"
                       className={STATUS_COLORS[mapStatus(contact.status)]}
@@ -499,32 +528,51 @@ export function ContactProfileClient({
                     </Badge>
                   </>
                 )}
-                {!isEntity ? <ContactOverviewGroupsBar contactId={contact.id} /> : null}
+                {!isEntity ? (
+                  <ContactOverviewGroupsBar
+                    contactId={contact.id}
+                    assignDialogOpen={showAssignGroupDialog}
+                    onAssignDialogOpenChange={setShowAssignGroupDialog}
+                  />
+                ) : null}
+                {!isEditMode ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button size="sm" className="h-7 w-7 shrink-0 p-0">
+                        <span className="sr-only">Contact actions</span>
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start">
+                      <DropdownMenuItem onClick={() => setContactEditMode(true)}>
+                        <Pencil className="mr-2 h-4 w-4" />
+                        Edit
+                      </DropdownMenuItem>
+                      {!isEntity ? (
+                        <>
+                          <DropdownMenuItem onClick={() => setShowMergeDialog(true)}>
+                            <GitMerge className="mr-2 h-4 w-4" />
+                            Merge duplicate
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setShowAssignGroupDialog(true)}>
+                            <Plus className="mr-2 h-4 w-4" />
+                            Assign to a group
+                          </DropdownMenuItem>
+                        </>
+                      ) : null}
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        className="text-red-600 focus:text-red-600"
+                        onClick={() => setShowDeleteDialog(true)}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : null}
               </div>
             </div>
-            {!isEditMode ? (
-              <div className="flex flex-wrap gap-2">
-                {!isEntity ? (
-                  <Button variant="outline" size="sm" onClick={() => setShowMergeDialog(true)}>
-                    <GitMerge className="mr-2 h-4 w-4" />
-                    Merge duplicate
-                  </Button>
-                ) : null}
-                <Button variant="outline" size="sm" onClick={() => setContactEditMode(true)}>
-                  <Pencil className="mr-2 h-4 w-4" />
-                  Edit contact
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-red-600 hover:text-red-600"
-                  onClick={() => setShowDeleteDialog(true)}
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete
-                </Button>
-              </div>
-            ) : null}
           </div>
 
           {!isEntity ? (
@@ -716,73 +764,23 @@ export function ContactProfileClient({
 
         {showFinancialTab ? (
         <TabsContent value="financial" className="mt-0 space-y-6">
-            {showDonorPanel && profileData?.donorId && !profileLoading ? (
-              isGroup ? (
-                <ContactGroupFinancialPanel
-                  groupContactId={contact.id}
-                  donorId={profileData.donorId}
-                  groupName={contact.full_name || "Group"}
-                />
-              ) : (
-                <ContactDonorFinancialPanel
-                  donorId={profileData.donorId}
-                  donorName={contact.full_name || "Donor"}
-                  contactId={contact.id}
-                  paymentMethods={profileExtendedData?.paymentMethods ?? []}
-                  paymentMethodsLoading={profileExtendedLoading}
-                  showPaymentMethods
-                />
-              )
-            ) : (
-              <ContactDonorPanel
-                donorStats={
-                  profileData?.donorStats ?? {
-                    totalDonated: 0,
-                    donationCount: 0,
-                    lastDonationDate: null,
-                    pledgeCount: 0,
-                  }
-                }
-                donations={profileData?.donationRecords ?? []}
-                showPanel={showDonorPanel && !profileLoading}
-                title={isGroup ? "Group Giving" : isOrganization ? "Donations" : "Donor Details"}
+            {isGroup && showDonorPanel && profileData?.donorId && !profileLoading ? (
+              <ContactGroupGivingOverview
+                groupContactId={contact.id}
+                groupName={contact.full_name || "Group"}
               />
-            )}
-            <ContactRentalsPanel
-              rentalStats={
-                profileData?.rentalStats ?? {
-                  rentalCount: 0,
-                  lastRentalDate: null,
-                }
-              }
-              rentals={profileData?.rentalRecords ?? []}
-              showPanel={showRentalsPanel && !profileLoading}
+            ) : null}
+            <ContactFinancialPanel
+              contactId={contact.id}
+              contactName={contact.full_name || "Contact"}
+              donorId={profileData?.donorId}
+              personId={contact.person_id ?? null}
+              isGroup={isGroup}
+              modules={modules}
+              paymentMethods={profileExtendedData?.paymentMethods ?? []}
+              paymentMethodsLoading={profileExtendedLoading}
+              showPaymentMethods
             />
-            {!isGroup && !(showDonorPanel && profileData?.donorId) ? (
-              profileExtendedLoading ? (
-                <Card>
-                  <CardContent className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Loading payment methods...
-                  </CardContent>
-                </Card>
-              ) : (
-                <div className="lg:ml-auto lg:max-w-sm">
-                  <ContactPaymentMethodsPanel
-                    contactId={contact.id}
-                    paymentMethods={profileExtendedData?.paymentMethods ?? []}
-                    compact
-                  />
-                </div>
-              )
-            ) : null}
-            {!showDonorPanel && !showRentalsPanel && isGroup && !profileLoading ? (
-              <Card>
-                <CardContent className="p-6 text-sm text-muted-foreground">
-                  No financial activity for this contact in enabled modules yet.
-                </CardContent>
-              </Card>
-            ) : null}
           </TabsContent>
         ) : null}
 

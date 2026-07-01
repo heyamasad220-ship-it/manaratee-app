@@ -1,5 +1,4 @@
 import type { DonorSummaryReportRow } from "@/lib/donations/donation-list-actions"
-import { formatDonorTypeLabel } from "@/lib/donations/donor-giving-report"
 import { downloadReceiptPdf } from "@/lib/donations/receipt-pdf"
 
 function formatMoney(amount: number) {
@@ -46,7 +45,6 @@ export function buildDonorGivingReportHtml(input: DonorGivingReportPdfInput): st
     .map(
       (donor) => `<tr>
         <td>${escapeHtml(donor.full_name || "Unnamed")}</td>
-        <td>${escapeHtml(formatDonorTypeLabel(donor.donor_type))}</td>
         <td style="text-align:right">${formatMoney(Number(donor.total_donations || 0))}</td>
         <td style="text-align:right">${donor.donation_count ?? 0}</td>
         <td>${escapeHtml(formatReportDate(donor.last_donation_date))}</td>
@@ -98,7 +96,6 @@ export function buildDonorGivingReportHtml(input: DonorGivingReportPdfInput): st
     <thead>
       <tr>
         <th>Donor</th>
-        <th>Type</th>
         <th class="num">Total Given</th>
         <th class="num">Gifts</th>
         <th>Last Gift</th>

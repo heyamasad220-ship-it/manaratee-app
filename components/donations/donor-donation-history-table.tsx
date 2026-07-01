@@ -73,6 +73,8 @@ type DonorDonationHistoryTableProps = {
   donorId: string
   donations: DonationHistoryRow[]
   onUpdated?: () => void
+  /** When true, render only the action menu and dialogs (no table). */
+  actionsOnly?: boolean
 }
 
 function formatMoney(value: number) {
@@ -91,6 +93,7 @@ export function DonorDonationHistoryTable({
   donorId,
   donations,
   onUpdated,
+  actionsOnly = false,
 }: DonorDonationHistoryTableProps) {
   const [active, setActive] = useState<DonationHistoryRow | null>(null)
   const [dialog, setDialog] = useState<"edit" | "void" | "refund" | "allocate" | null>(null)
@@ -292,64 +295,8 @@ export function DonorDonationHistoryTable({
     ? "Refund via Stripe"
     : "Record Refund"
 
-  return (
+  const actionDialogs = (
     <>
-      <TableWrapper>
-        <colgroup>
-          <col style={{ width: "12%" }} />
-          <col style={{ width: "16%" }} />
-          <col style={{ width: "22%" }} />
-          <col style={{ width: "14%" }} />
-          <col style={{ width: "18%" }} />
-          <col style={{ width: "10%" }} />
-        </colgroup>
-        <thead>
-          <tr className="border-b">
-            <th className="px-3 py-2 text-left font-medium">Date</th>
-            <th className="px-3 py-2 text-left font-medium">Amount</th>
-            <th className="px-3 py-2 text-left font-medium">Category</th>
-            <th className="px-3 py-2 text-left font-medium">Method</th>
-            <th className="px-3 py-2 text-left font-medium">Status</th>
-            <th className="px-3 py-2 text-right font-medium">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {donations.map((donation) => (
-            <tr key={donation.id} className="border-b last:border-0">
-              <td className="px-3 py-2 whitespace-nowrap">{new Date(donation.date).toLocaleDateString()}</td>
-              <td className="px-3 py-2 font-medium">
-                <div>{formatMoney(donation.netAmount)}</div>
-                {donation.refundedAmount > 0 ? (
-                  <div className="truncate text-xs text-muted-foreground">
-                    {formatMoney(donation.amount)} − {formatMoney(donation.refundedAmount)} refunded
-                  </div>
-                ) : null}
-              </td>
-              <td className="px-3 py-2">
-                <Badge variant="secondary" className="max-w-full truncate">
-                  {donation.category}
-                </Badge>
-              </td>
-              <td className="px-3 py-2 capitalize">{donation.method}</td>
-              <td className="px-3 py-2">
-                <Badge variant="outline" className="whitespace-nowrap">
-                  {formatPaymentStatusLabel(donation.status)}
-                </Badge>
-              </td>
-              <td className="px-3 py-2 text-right">
-                <PaymentRowMenu
-                  donation={donation}
-                  receiptLoading={receiptLoading}
-                  onAction={openDialog}
-                  onAllocate={() => void openAllocateDialog(donation)}
-                  onGenerateReceipt={() => void handleGenerateReceipt(donation.id)}
-                />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </TableWrapper>
-
       <Dialog open={dialog === "edit"} onOpenChange={(open) => !open && closeDialog()}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -592,6 +539,83 @@ export function DonorDonationHistoryTable({
         onOpenChange={setReceiptPreviewOpen}
         payload={receiptPreviewPayload}
       />
+    </>
+  )
+
+  if (actionsOnly && donations.length === 1) {
+    const donation = donations[0]
+    return (
+      <>
+        <PaymentRowMenu
+          donation={donation}
+          receiptLoading={receiptLoading}
+          onAction={openDialog}
+          onAllocate={() => void openAllocateDialog(donation)}
+          onGenerateReceipt={() => void handleGenerateReceipt(donation.id)}
+        />
+        {actionDialogs}
+      </>
+    )
+  }
+
+  return (
+    <>
+      <TableWrapper>
+        <colgroup>
+          <col style={{ width: "12%" }} />
+          <col style={{ width: "16%" }} />
+          <col style={{ width: "22%" }} />
+          <col style={{ width: "14%" }} />
+          <col style={{ width: "18%" }} />
+          <col style={{ width: "10%" }} />
+        </colgroup>
+        <thead>
+          <tr className="border-b">
+            <th className="px-3 py-2 text-left font-medium">Date</th>
+            <th className="px-3 py-2 text-left font-medium">Amount</th>
+            <th className="px-3 py-2 text-left font-medium">Category</th>
+            <th className="px-3 py-2 text-left font-medium">Method</th>
+            <th className="px-3 py-2 text-left font-medium">Status</th>
+            <th className="px-3 py-2 text-right font-medium">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {donations.map((donation) => (
+            <tr key={donation.id} className="border-b last:border-0">
+              <td className="px-3 py-2 whitespace-nowrap">{new Date(donation.date).toLocaleDateString()}</td>
+              <td className="px-3 py-2 font-medium">
+                <div>{formatMoney(donation.netAmount)}</div>
+                {donation.refundedAmount > 0 ? (
+                  <div className="truncate text-xs text-muted-foreground">
+                    {formatMoney(donation.amount)} − {formatMoney(donation.refundedAmount)} refunded
+                  </div>
+                ) : null}
+              </td>
+              <td className="px-3 py-2">
+                <Badge variant="secondary" className="max-w-full truncate">
+                  {donation.category}
+                </Badge>
+              </td>
+              <td className="px-3 py-2 capitalize">{donation.method}</td>
+              <td className="px-3 py-2">
+                <Badge variant="outline" className="whitespace-nowrap">
+                  {formatPaymentStatusLabel(donation.status)}
+                </Badge>
+              </td>
+              <td className="px-3 py-2 text-right">
+                <PaymentRowMenu
+                  donation={donation}
+                  receiptLoading={receiptLoading}
+                  onAction={openDialog}
+                  onAllocate={() => void openAllocateDialog(donation)}
+                  onGenerateReceipt={() => void handleGenerateReceipt(donation.id)}
+                />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </TableWrapper>
+      {actionDialogs}
     </>
   )
 }

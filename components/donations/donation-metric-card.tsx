@@ -67,6 +67,7 @@ type DonationMetricCardProps = {
   className?: string
   valueClassName?: string
   onValueClick?: () => void
+  onClick?: () => void
 }
 
 function MetricValue({
@@ -107,12 +108,34 @@ export function DonationMetricCard({
   className,
   valueClassName,
   onValueClick,
+  onClick,
 }: DonationMetricCardProps) {
   const styles = accent ? ACCENT_STYLES[accent] : null
+  const interactive = Boolean(onClick)
 
   if (styles) {
     return (
-      <Card className={cn("h-full", styles.card, className)}>
+      <Card
+        className={cn(
+          "h-full",
+          styles.card,
+          className,
+          interactive && "cursor-pointer transition-shadow hover:shadow-md"
+        )}
+        onClick={onClick}
+        onKeyDown={
+          interactive
+            ? (event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault()
+                  onClick?.()
+                }
+              }
+            : undefined
+        }
+        role={interactive ? "button" : undefined}
+        tabIndex={interactive ? 0 : undefined}
+      >
         <CardContent className="flex h-full flex-col justify-center pt-6">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">

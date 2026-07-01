@@ -439,9 +439,7 @@ export function ContactsCrmList({
                 contacts.map((contact) => (
                   <TableRow
                     key={contact.id}
-                    onClick={() =>
-                      router.push(profileHrefForContact(contact, { edit: true }))
-                    }
+                    onClick={() => router.push(profileHrefForContact(contact))}
                     className="cursor-pointer hover:bg-muted/50"
                   >
                     <TableCell>

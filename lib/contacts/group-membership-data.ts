@@ -2,6 +2,17 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 
 import type { GroupMemberRow } from "@/lib/contacts/group-member-types"
 
+export type GroupMemberGivingStat = {
+  totalDonations: number
+  donationCount: number
+  lastDonationDate: string | null
+}
+
+export type FetchGroupMembersOptions = {
+  includeGivingStats?: boolean
+  skipGroupValidation?: boolean
+}
+
 export function isMissingGroupMembersTable(error: { code?: string; message?: string } | null) {
   if (!error) return false
   if (error.code === "42P01" || error.code === "PGRST204" || error.code === "PGRST205") {
@@ -63,26 +74,15 @@ async function loadMemberContactsByIds(
 async function loadAttributedMemberGivingForGroup(
   supabase: SupabaseClient,
   organizationId: string,
-  groupContactId: string,
-  memberContactIds: string[]
+  groupContactId: string
 ) {
-  const stats = new Map<
-    string,
-    { totalDonations: number; donationCount: number; lastDonationDate: string | null }
-  >()
-
-  for (const contactId of memberContactIds) {
-    stats.set(contactId, { totalDonations: 0, donationCount: 0, lastDonationDate: null })
-  }
-
-  if (memberContactIds.length === 0) return stats
+  const stats = new Map<string, GroupMemberGivingStat>()
 
   const { data, error } = await supabase
     .from("payments")
     .select("contact_id, amount, refunded_amount, payment_date, status")
     .eq("organization_id", organizationId)
     .eq("attributed_group_contact_id", groupContactId)
-    .in("contact_id", memberContactIds)
 
   if (error) {
     if (error.code === "42703") return stats
@@ -113,6 +113,14 @@ async function loadAttributedMemberGivingForGroup(
   }
 
   return stats
+}
+
+export async function loadGroupMemberGivingStats(
+  supabase: SupabaseClient,
+  organizationId: string,
+  groupContactId: string
+) {
+  return loadAttributedMemberGivingForGroup(supabase, organizationId, groupContactId)
 }
 
 export async function loadGroupContactRecord(
@@ -169,12 +177,17 @@ export async function upsertActiveGroupMember(
 export async function fetchGroupMembers(
   supabase: SupabaseClient,
   organizationId: string,
-  groupContactId: string
+  groupContactId: string,
+  options: FetchGroupMembersOptions = {}
 ): Promise<
   { success: true; members: GroupMemberRow[] } | { success: false; error: string }
 > {
-  const group = await loadGroupContactRecord(supabase, organizationId, groupContactId)
-  if (!group.ok) return { success: false, error: group.error }
+  const includeGivingStats = options.includeGivingStats ?? true
+
+  if (!options.skipGroupValidation) {
+    const group = await loadGroupContactRecord(supabase, organizationId, groupContactId)
+    if (!group.ok) return { success: false, error: group.error }
+  }
 
   const { data, error } = await supabase
     .from("contact_group_members")
@@ -195,20 +208,20 @@ export async function fetchGroupMembers(
   }
 
   const memberContactIds = (data || []).map((row) => row.member_contact_id as string)
-  const [givingStats, memberContacts] = await Promise.all([
-    loadAttributedMemberGivingForGroup(
-      supabase,
-      organizationId,
-      groupContactId,
-      memberContactIds
-    ),
-    loadMemberContactsByIds(supabase, organizationId, memberContactIds),
-  ])
+  const memberContacts = await loadMemberContactsByIds(
+    supabase,
+    organizationId,
+    memberContactIds
+  )
+
+  const givingStats = includeGivingStats
+    ? await loadAttributedMemberGivingForGroup(supabase, organizationId, groupContactId)
+    : null
 
   const members: GroupMemberRow[] = (data || []).map((row) => {
     const contactId = row.member_contact_id as string
     const memberRecord = memberContacts.get(contactId)
-    const stat = givingStats.get(contactId)
+    const stat = givingStats?.get(contactId)
 
     return {
       id: row.id as string,

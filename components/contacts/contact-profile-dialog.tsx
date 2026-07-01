@@ -190,11 +190,9 @@ export function ContactProfileDialog({
     let data: any = null
     let lastError: { message?: string; code?: string } | null = null
 
-    try {
-      await refreshContactAffiliations(contactId)
-    } catch (syncError) {
+    void refreshContactAffiliations(contactId).catch((syncError) => {
       console.warn("Contact affiliation sync failed:", syncError)
-    }
+    })
 
     for (const select of CONTACT_DETAIL_SELECT_PLANS) {
       const result = await supabase

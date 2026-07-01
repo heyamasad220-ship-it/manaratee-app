@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
-import { Loader2, Plus, Search } from "lucide-react"
+import { Loader2, Search } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -34,14 +34,27 @@ function formatGroupLabel(group: GroupSearchResult) {
   return group.full_name || group.primary_contact_name || "Unnamed group"
 }
 
-export function ContactOverviewGroupsBar({ contactId }: { contactId: string }) {
+type ContactOverviewGroupsBarProps = {
+  contactId: string
+  assignDialogOpen?: boolean
+  onAssignDialogOpenChange?: (open: boolean) => void
+}
+
+export function ContactOverviewGroupsBar({
+  contactId,
+  assignDialogOpen,
+  onAssignDialogOpenChange,
+}: ContactOverviewGroupsBarProps) {
   const [loaded, setLoaded] = useState(false)
   const [groups, setGroups] = useState<ContactGroupSummary[]>([])
-  const [dialogOpen, setDialogOpen] = useState(false)
+  const [internalDialogOpen, setInternalDialogOpen] = useState(false)
   const [search, setSearch] = useState("")
   const [searching, setSearching] = useState(false)
   const [results, setResults] = useState<GroupSearchResult[]>([])
   const [saving, setSaving] = useState(false)
+
+  const dialogOpen = assignDialogOpen ?? internalDialogOpen
+  const setDialogOpen = onAssignDialogOpenChange ?? setInternalDialogOpen
 
   const loadGroups = useCallback(async () => {
     setLoaded(false)
@@ -116,15 +129,6 @@ export function ContactOverviewGroupsBar({ contactId }: { contactId: string }) {
               </Badge>
             ))
           : null}
-        <Button
-          type="button"
-          size="sm"
-          className="h-7 gap-1.5 text-xs"
-          onClick={() => setDialogOpen(true)}
-        >
-          <Plus className="h-3.5 w-3.5" />
-          Assign to a group
-        </Button>
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

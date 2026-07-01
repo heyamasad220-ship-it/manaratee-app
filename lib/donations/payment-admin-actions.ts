@@ -119,11 +119,17 @@ async function loadOrgPayment(paymentId: string) {
   return { ok: true as const, access, payment: data as PaymentRow }
 }
 
-function revalidateDonationPaths(donorId: string | null | undefined) {
+function revalidateDonationPaths(
+  donorId: string | null | undefined,
+  paymentId?: string | null
+) {
   revalidatePath("/donations/payments")
   revalidatePath("/donations/payments/one-time")
   revalidatePath("/donations/payments/recurring")
   revalidatePath("/donations/donors")
+  if (paymentId) {
+    revalidatePath(`/donations/payments/${paymentId}`)
+  }
   if (donorId) {
     revalidatePath(`/donations/donors/individuals/${donorId}`)
     revalidatePath(`/donations/donors/organizations/${donorId}`)
@@ -136,6 +142,66 @@ export async function getPaymentAdminRecordAction(paymentId: string) {
   return {
     success: true as const,
     payment: toPaymentAdminRecord(loaded.payment),
+  }
+}
+
+export async function getPaymentDetailPageDataAction(paymentId: string) {
+  const access = await requireDonationStaffAccess("view")
+  if (!access.ok) return { success: false as const, error: access.error }
+
+  const { data, error } = await access.supabase
+    .from("payments")
+    .select(
+      `
+      id,
+      organization_id,
+      donor_id,
+      contact_id,
+      sender_name,
+      amount,
+      refunded_amount,
+      payment_date,
+      source,
+      source_type,
+      status,
+      memo,
+      pledge_id,
+      import_batch_id,
+      stripe_payment_intent_id,
+      stripe_charge_id,
+      category_id,
+      donation_categories ( name )
+    `
+    )
+    .eq("id", paymentId)
+    .eq("organization_id", access.orgId)
+    .maybeSingle()
+
+  if (error) return { success: false as const, error: error.message }
+  if (!data) return { success: false as const, error: "Payment not found" }
+
+  const paymentRow = data as PaymentRow & {
+    contact_id: string | null
+    sender_name: string | null
+  }
+
+  let donorDisplayName = paymentRow.sender_name?.trim() || null
+  if (paymentRow.donor_id) {
+    const { data: donorRow } = await access.supabase
+      .from("donor_summary_view")
+      .select("full_name")
+      .eq("id", paymentRow.donor_id)
+      .maybeSingle()
+    donorDisplayName = donorRow?.full_name?.trim() || donorDisplayName
+  }
+
+  return {
+    success: true as const,
+    canManage: access.canManage,
+    payment: toPaymentAdminRecord(paymentRow),
+    donorId: paymentRow.donor_id,
+    contactId: paymentRow.contact_id,
+    donorDisplayName,
   }
 }
 
@@ -228,7 +294,7 @@ export async function updatePaymentAction(input: {
     metadata: { updates },
   })
 
-  revalidateDonationPaths(payment.donor_id)
+  revalidateDonationPaths(payment.donor_id, payment.id)
   return { success: true as const }
 }
 
@@ -282,7 +348,7 @@ export async function voidPaymentAction(input: {
     metadata: { reason: input.reason?.trim() || null },
   })
 
-  revalidateDonationPaths(payment.donor_id)
+  revalidateDonationPaths(payment.donor_id, payment.id)
   return { success: true as const }
 }
 
@@ -344,7 +410,7 @@ export async function recordPaymentRefundAction(input: {
       metadata: { refundAmount, reason: input.reason?.trim() || null },
     })
 
-    revalidateDonationPaths(payment.donor_id)
+    revalidateDonationPaths(payment.donor_id, payment.id)
     return { success: true as const, ...result }
   } catch (error) {
     return {
@@ -443,7 +509,7 @@ export async function stripeRefundPaymentAction(input: {
       },
     })
 
-    revalidateDonationPaths(payment.donor_id)
+    revalidateDonationPaths(payment.donor_id, payment.id)
     return {
       success: true as const,
       stripeRefundId: stripeRefund.id,
@@ -558,7 +624,7 @@ export async function allocatePaymentToOpenPledgeAction(input: {
     }
   }
 
-  revalidateDonationPaths(donorId)
+  revalidateDonationPaths(donorId, payment.id)
   revalidatePath("/donations/payments")
   return { success: true as const }
 }
