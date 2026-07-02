@@ -214,7 +214,9 @@ North star: **One Contact · Many Roles · Many Activities · No Duplicate Ident
 | Programs | `participant_contact_id` via `ensureContactForPerson` | Enrollment + waitlist promote (S-09/S-10) |
 | Volunteers | `volunteers.contact_id` | `createVolunteer`, `ensureVolunteerForContact` (S-11) |
 
-Routes: `/contacts/people` (default; `/contacts` redirects here), `/contacts/[id]`, `/contacts/families`, `/contacts/organizations`, `/contacts/groups`, `/contacts/settings`
+Routes: `/contacts/people` (default; `/contacts` redirects here), `/contacts/[id]`, `/contacts/families`, `/contacts/organizations`, `/contacts/groups`, `/contacts/reports`, `/contacts/reports/directory`, `/contacts/settings`
+
+**Reports (Phase 1):** Contact Directory report with filters + CSV export (`lib/contacts/contact-report-actions.ts`, `components/contacts/contacts-directory-report-panel.tsx`). Donor giving reports stay under Donations.
 
 **Contact record types:** `individual`, `organization`, `group` (migration `132`). Groups = internal collectives (halaqas, committees); Organizations = external entities.
 

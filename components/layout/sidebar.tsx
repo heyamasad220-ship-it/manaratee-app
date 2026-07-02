@@ -336,6 +336,7 @@ const moduleChildren: Record<string, SubItem[]> = {
     { label: "Families", href: "/contacts/families", matchPrefix: "/contacts/families", contactListSegment: "families", permissionKey: "contacts.view" },
     { label: "Organizations", href: "/contacts/organizations", matchPrefix: "/contacts/organizations", contactListSegment: "organizations", permissionKey: "contacts.view" },
     { label: "Groups", href: "/contacts/groups", matchPrefix: "/contacts/groups", contactListSegment: "groups", permissionKey: "contacts.view" },
+    { label: "Reports", href: "/contacts/reports/directory", matchPrefix: "/contacts/reports", permissionKey: "contacts.view" },
     { label: "Settings", href: "/contacts/settings", matchPrefix: "/contacts/settings", permissionKey: "contacts.view" },
   ],
   membership: [
