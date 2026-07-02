@@ -80,6 +80,12 @@ import {
 } from "@/lib/contacts/contact-module-label"
 import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
 import {
+  formatReturnToBackLabel,
+  isSafeReturnToPath,
+  readStoredReturnToPath,
+  RETURN_TO_QUERY_PARAM,
+} from "@/lib/navigation/return-to"
+import {
   ArrowLeft,
   Briefcase,
   Building2,
@@ -195,12 +201,35 @@ export function ContactProfileClient({
     return contactsListSegmentForRecordType(recordType)
   }, [recordType, searchParams])
 
-  const backPath = getContactsListPathForSegment(profileListSegment)
-  const backLabel = `Back to ${getContactsListLabelForSegment(profileListSegment)}`
+  const [storedReturnTo, setStoredReturnTo] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (isDialog) return
+    const fromQuery = searchParams.get(RETURN_TO_QUERY_PARAM)
+    if (fromQuery && isSafeReturnToPath(fromQuery)) return
+    setStoredReturnTo(readStoredReturnToPath())
+  }, [isDialog, searchParams])
+
+  const resolvedReturnTo = useMemo(() => {
+    const fromQuery = searchParams.get(RETURN_TO_QUERY_PARAM)
+    if (fromQuery && isSafeReturnToPath(fromQuery)) {
+      return fromQuery
+    }
+    return storedReturnTo
+  }, [searchParams, storedReturnTo])
+
+  const backPath =
+    resolvedReturnTo ?? getContactsListPathForSegment(profileListSegment)
+  const backLabel = resolvedReturnTo
+    ? formatReturnToBackLabel(resolvedReturnTo)
+    : `Back to ${getContactsListLabelForSegment(profileListSegment)}`
 
   const profileHrefOptions = useMemo(
-    () => ({ list: profileListSegment }),
-    [profileListSegment]
+    () => ({
+      list: profileListSegment,
+      ...(resolvedReturnTo ? { returnTo: resolvedReturnTo } : {}),
+    }),
+    [profileListSegment, resolvedReturnTo]
   )
 
   const roles = useMemo(() => {
@@ -764,7 +793,7 @@ export function ContactProfileClient({
 
         {showFinancialTab ? (
         <TabsContent value="financial" className="mt-0 space-y-6">
-            {isGroup && showDonorPanel && profileData?.donorId && !profileLoading ? (
+            {isGroup && showDonorPanel && !profileLoading ? (
               <ContactGroupGivingOverview
                 groupContactId={contact.id}
                 groupName={contact.full_name || "Group"}
@@ -779,7 +808,7 @@ export function ContactProfileClient({
               modules={modules}
               paymentMethods={profileExtendedData?.paymentMethods ?? []}
               paymentMethodsLoading={profileExtendedLoading}
-              showPaymentMethods
+              showPaymentMethods={!isGroup}
             />
           </TabsContent>
         ) : null}

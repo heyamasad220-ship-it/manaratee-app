@@ -1,13 +1,5 @@
-import { Suspense } from "react"
+import { redirect } from "next/navigation"
 
-import { PaymentImportMatchWorkspace } from "@/components/donations/payment-import-match-workspace"
-
-export default function DonationPaymentsImportPage() {
-  return (
-    <Suspense
-      fallback={<div className="text-sm text-muted-foreground">Loading import workspace...</div>}
-    >
-      <PaymentImportMatchWorkspace mode="import" />
-    </Suspense>
-  )
+export default function DonationPaymentsImportRedirectPage() {
+  redirect("/donations/reports/import")
 }

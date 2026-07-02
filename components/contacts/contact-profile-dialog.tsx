@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import Link from "next/link"
 
 import {
   ContactProfileClient,
@@ -32,7 +33,9 @@ import { loadContactProgramAssignments } from "@/lib/programs/program-staff-assi
 import { canHaveProgramStaffAssignments } from "@/lib/hr/staff-role-utils"
 import type { StaffSummaryForContact } from "@/lib/hr/staff-summary"
 import type { ProgramStaffAssignmentWithDetails } from "@/lib/programs/program-staff-assignment-types"
-import { Loader2 } from "lucide-react"
+import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
+import { useCurrentReturnTo } from "@/hooks/use-current-return-to"
+import { ExternalLink, Loader2 } from "lucide-react"
 
 function isMissingColumnError(error: { code?: string; message?: string } | null) {
   if (!error) return false
@@ -104,6 +107,7 @@ export function ContactProfileDialog({
   defaultEdit = false,
   onContactUpdated,
 }: ContactProfileDialogProps) {
+  const currentReturnTo = useCurrentReturnTo()
   const supabase = useMemo(() => createClient(), [])
   const [contact, setContact] = useState<any>(null)
   const [profileData, setProfileData] = useState<ContactProfileData | null>(null)
@@ -327,10 +331,23 @@ export function ContactProfileDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[92vh] w-[min(96vw,72rem)] max-w-[72rem] flex-col gap-0 overflow-hidden p-0 sm:max-w-[72rem]">
         <DialogHeader className="shrink-0 border-b px-6 py-4">
-          <DialogTitle>{contact?.full_name || "Contact profile"}</DialogTitle>
-          <DialogDescription>
-            View and edit contact details without leaving this page.
-          </DialogDescription>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="space-y-1">
+              <DialogTitle>{contact?.full_name || "Contact profile"}</DialogTitle>
+              <DialogDescription>
+                View and edit contact details without leaving this page.
+              </DialogDescription>
+            </div>
+            {contactId && contact ? (
+              <Link
+                href={contactProfileHref(contactId, { returnTo: currentReturnTo })}
+                className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+              >
+                Open full profile
+                <ExternalLink className="h-3.5 w-3.5" />
+              </Link>
+            ) : null}
+          </div>
         </DialogHeader>
 
         <div className="min-h-0 flex-1 overflow-y-auto">

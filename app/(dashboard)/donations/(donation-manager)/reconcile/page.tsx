@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation"
 
 export default function DonationsReconcileRedirectPage() {
-  redirect("/donations/payments/match")
+  redirect("/donations/reports/match")
 }

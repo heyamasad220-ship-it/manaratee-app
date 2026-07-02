@@ -89,9 +89,9 @@ export function PaymentDetailPageClient({
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Button variant="ghost" size="sm" className="-ml-2 gap-2" asChild>
-          <Link href="/donations/payments/one-time">
+          <Link href="/donations/reports/one-time">
             <ArrowLeft className="h-4 w-4" />
-            Back to payments
+            Back to one-time donations
           </Link>
         </Button>
         {contactId ? (

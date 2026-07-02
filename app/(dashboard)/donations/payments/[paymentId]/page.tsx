@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation"
 
 import { PaymentDetailPageClient } from "@/components/donations/payment-detail-page-client"
+import { Header } from "@/components/layout/header"
 import { mapPaymentToDonationHistoryRow } from "@/lib/donations/payment-admin-capabilities"
 import { getPaymentDetailPageDataAction } from "@/lib/donations/payment-admin-actions"
 
@@ -35,14 +36,19 @@ export default async function DonationPaymentDetailPage({ params }: PageProps) {
   })
 
   return (
-    <PaymentDetailPageClient
-      paymentId={paymentId}
-      initialPayment={result.payment}
-      initialDonationRow={donationRow}
-      donorId={result.donorId}
-      contactId={result.contactId}
-      donorDisplayName={result.donorDisplayName}
-      canManage={result.canManage}
-    />
+    <>
+      <Header title="Payment" />
+      <div className="p-6">
+        <PaymentDetailPageClient
+          paymentId={paymentId}
+          initialPayment={result.payment}
+          initialDonationRow={donationRow}
+          donorId={result.donorId}
+          contactId={result.contactId}
+          donorDisplayName={result.donorDisplayName}
+          canManage={result.canManage}
+        />
+      </div>
+    </>
   )
 }

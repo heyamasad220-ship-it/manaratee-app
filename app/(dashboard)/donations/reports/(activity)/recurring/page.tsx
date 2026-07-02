@@ -1,5 +1,9 @@
-import { redirect } from "next/navigation"
+import { DonationRecurringPanel } from "@/components/donations/donation-recurring-panel"
 
-export default function DonationReportsRecurringRedirectPage() {
-  redirect("/donations/payments/recurring")
+export default function DonationReportsRecurringPage() {
+  return (
+    <div className="p-6">
+      <DonationRecurringPanel embedded />
+    </div>
+  )
 }

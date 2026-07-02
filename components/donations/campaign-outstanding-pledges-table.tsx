@@ -8,6 +8,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { CampaignOutstandingPledgeActions } from "@/components/donations/campaign-outstanding-pledge-actions"
+import { PledgeDonorSubline } from "@/components/donations/pledge-donor-subline"
 import {
   formatDonationCurrency,
   type CampaignOutstandingPledgeRow,
@@ -27,16 +29,32 @@ function formatPledgeDate(value: string | null) {
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
 }
 
-function statusBadgeVariant(status: string) {
+function renderStatusBadge(status: string) {
   const normalized = status.toLowerCase()
-  if (normalized === "partial") return "secondary" as const
-  if (normalized === "fulfilled" || normalized === "paid") return "default" as const
-  return "outline" as const
+  const label = formatPledgeStatusLabel(status)
+
+  if (normalized === "open") {
+    return (
+      <Badge className="border-transparent bg-orange-100 text-orange-700 hover:bg-orange-100">
+        {label}
+      </Badge>
+    )
+  }
+
+  if (normalized === "partial") {
+    return <Badge variant="secondary">{label}</Badge>
+  }
+
+  if (normalized === "fulfilled" || normalized === "paid") {
+    return <Badge variant="default">{label}</Badge>
+  }
+
+  return <Badge variant="outline">{label}</Badge>
 }
 
 export function CampaignOutstandingPledgesTable({
   pledges,
-  pledgesPageHref = "/donations/pledges",
+  pledgesPageHref = "/donations/reports/pledges",
   onDonorClick,
 }: CampaignOutstandingPledgesTableProps) {
   return (
@@ -57,12 +75,13 @@ export function CampaignOutstandingPledgesTable({
               <TableHead>Balance</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Pledge Date</TableHead>
+              <TableHead className="w-[52px] text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {pledges.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
                   No outstanding pledges for this campaign.
                 </TableCell>
               </TableRow>
@@ -70,17 +89,24 @@ export function CampaignOutstandingPledgesTable({
               pledges.map((pledge) => (
                 <TableRow key={pledge.id}>
                   <TableCell>
-                    {onDonorClick && (pledge.contactId || pledge.donorId) ? (
-                      <button
-                        type="button"
-                        onClick={() => onDonorClick(pledge)}
-                        className="font-medium text-primary hover:underline"
-                      >
-                        {pledge.donorName}
-                      </button>
-                    ) : (
-                      <span className="font-medium">{pledge.donorName}</span>
-                    )}
+                    <div>
+                      {onDonorClick && (pledge.contactId || pledge.donorId) ? (
+                        <button
+                          type="button"
+                          onClick={() => onDonorClick(pledge)}
+                          className="font-medium text-primary hover:underline"
+                        >
+                          {pledge.donorName}
+                        </button>
+                      ) : (
+                        <span className="font-medium">{pledge.donorName}</span>
+                      )}
+                      <PledgeDonorSubline
+                        contactType={pledge.contactType}
+                        primaryContactName={pledge.primaryContactName}
+                        memberGroups={pledge.memberGroups}
+                      />
+                    </div>
                   </TableCell>
                   <TableCell className="font-medium tabular-nums">
                     {formatDonationCurrency(pledge.amountPledged)}
@@ -88,16 +114,15 @@ export function CampaignOutstandingPledgesTable({
                   <TableCell className="font-medium tabular-nums text-emerald-600">
                     {formatDonationCurrency(pledge.amountPaid)}
                   </TableCell>
-                  <TableCell className="font-medium tabular-nums text-amber-600">
+                  <TableCell className="font-medium tabular-nums text-red-600">
                     {formatDonationCurrency(pledge.balanceRemaining)}
                   </TableCell>
-                  <TableCell>
-                    <Badge variant={statusBadgeVariant(pledge.status)}>
-                      {formatPledgeStatusLabel(pledge.status)}
-                    </Badge>
-                  </TableCell>
+                  <TableCell>{renderStatusBadge(pledge.status)}</TableCell>
                   <TableCell className="text-muted-foreground">
                     {formatPledgeDate(pledge.pledgeDate)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <CampaignOutstandingPledgeActions pledgeId={pledge.id} />
                   </TableCell>
                 </TableRow>
               ))

@@ -348,24 +348,22 @@ const moduleChildren: Record<string, SubItem[]> = {
   donations: [
     { label: "Overview", href: "/donations", matchPrefix: "/donations", permissionKey: "donations.view" },
     {
-      label: "Payments",
-      href: "/donations/payments/one-time",
-      matchPrefix: "/donations/payments",
-      alsoMatchPrefixes: ["/donations/import", "/donations/reconcile"],
-      permissionKey: "donations.view",
-    },
-    {
       label: "Campaigns",
       href: "/donations/campaigns",
       matchPrefix: "/donations/campaigns",
-      alsoMatchPrefixes: ["/donations/pledges"],
       permissionKey: "donations.view",
     },
     {
       label: "Reports",
-      href: "/donations/reports",
+      href: "/donations/reports/one-time",
       matchPrefix: "/donations/reports",
-      alsoMatchPrefixes: ["/donations/donors", "/donations/reports/donors"],
+      alsoMatchPrefixes: [
+        "/donations/payments",
+        "/donations/donors",
+        "/donations/import",
+        "/donations/reconcile",
+        "/donations/pledges",
+      ],
       permissionKey: "donations.view",
     },
     { label: "Settings", href: "/donations/settings", matchPrefix: "/donations/settings", permissionKey: "donations.manage" },

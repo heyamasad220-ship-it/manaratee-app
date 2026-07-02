@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation"
 
 export default function DonationsRecurringRedirectPage() {
-  redirect("/donations/payments/recurring")
+  redirect("/donations/reports/recurring")
 }

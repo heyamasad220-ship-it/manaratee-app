@@ -1,5 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 
+import {
+  attachPledgeDonorContext,
+  emptyPledgeDonorContext,
+  type PledgeDonorContextFields,
+} from "@/lib/donations/pledge-donor-context"
 import { countsTowardGivingTotals, paymentNetAmount } from "@/lib/donations/payment-net-amount"
 import { normalizePaymentSourceChannel } from "@/lib/donations/payment-source-channel"
 
@@ -39,7 +44,7 @@ export type CampaignOutstandingPledgeRow = {
   balanceRemaining: number
   status: string
   pledgeDate: string | null
-}
+} & PledgeDonorContextFields
 
 export type CampaignPaymentRow = {
   id: string
@@ -638,6 +643,7 @@ export async function fetchCampaignOutstandingPledges(
         balanceRemaining: Number(row.balance_remaining || 0),
         status: row.calculated_status || "open",
         pledgeDate: row.pledge_date ?? null,
+        ...emptyPledgeDonorContext(),
       })
     }
 
@@ -667,7 +673,7 @@ export async function fetchCampaignOutstandingPledges(
     }
   }
 
-  return pledges
+  return attachPledgeDonorContext(supabase, organizationId, pledges)
 }
 
 export function formatCampaignStatusLabel(status: string | null | undefined): string {

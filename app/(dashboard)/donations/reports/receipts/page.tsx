@@ -4,7 +4,6 @@ import { useEffect, useState } from "react"
 import { usePathname } from "next/navigation"
 import { AlertCircle, FileText, Mail, Send } from "lucide-react"
 
-import { Header } from "@/components/layout/header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import {
@@ -137,7 +136,6 @@ export default function DonationsReceiptsReportPage() {
 
   return (
     <>
-      <Header title="Receipts" />
       <div className="flex flex-col gap-6 p-6">
         <div>
           <h3 className="mb-3 text-base font-semibold">Receipt Summary</h3>
@@ -173,8 +171,8 @@ export default function DonationsReceiptsReportPage() {
             </DonationMetricCardGrid>
           )}
           <p className="mt-2 text-xs text-muted-foreground">
-            Per-payment receipts are available on the Payments list. Year-end giving statements
-            for donors are below.
+            Per-payment receipts are available on the One-Time Donations report. Year-end giving
+            statements for donors are below.
           </p>
         </div>
 

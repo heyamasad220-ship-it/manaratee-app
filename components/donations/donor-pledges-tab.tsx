@@ -384,7 +384,7 @@ export function DonorPledgesTab({
 
       {pledges.length > 0 && !embedded ? (
         <div className="border-t px-1 pt-3 text-right">
-          <Link href="/donations/pledges" className="text-sm text-primary hover:underline">
+          <Link href="/donations/reports/pledges" className="text-sm text-primary hover:underline">
             View all pledges
           </Link>
         </div>

@@ -228,7 +228,7 @@ export function ContactRelationshipSummaryCard({
       value: formatContactMoney(summary.donationsTotal),
       icon: Heart,
       records: donationPayments,
-      href: "/donations/payments/one-time",
+      href: "/donations/reports/one-time",
       viewLabel: "View giving history",
       accent: "rose",
     })

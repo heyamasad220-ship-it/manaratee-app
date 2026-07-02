@@ -74,7 +74,7 @@ export function DonationOpsPanel() {
 
         {paymentsNeedingMatch > 0 ? (
           <p>
-            <Link href="/donations/payments/match" className="text-primary hover:underline">
+            <Link href="/donations/reports/match" className="text-primary hover:underline">
               Open import &amp; match queue
             </Link>
           </p>

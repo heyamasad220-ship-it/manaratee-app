@@ -124,6 +124,9 @@ function revalidateDonationPaths(
   paymentId?: string | null
 ) {
   revalidatePath("/donations/payments")
+  revalidatePath("/donations/reports")
+  revalidatePath("/donations/reports/one-time")
+  revalidatePath("/donations/reports/recurring")
   revalidatePath("/donations/payments/one-time")
   revalidatePath("/donations/payments/recurring")
   revalidatePath("/donations/donors")

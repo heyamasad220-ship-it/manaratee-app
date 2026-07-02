@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Link2, MoreHorizontal, Pencil, Ban, RotateCcw, FileText } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -75,6 +75,9 @@ type DonorDonationHistoryTableProps = {
   onUpdated?: () => void
   /** When true, render only the action menu and dialogs (no table). */
   actionsOnly?: boolean
+  /** Open a dialog immediately (actions-only mode). */
+  initialDialog?: "edit" | "void" | "refund" | "allocate"
+  onDialogClosed?: () => void
 }
 
 function formatMoney(value: number) {
@@ -94,6 +97,8 @@ export function DonorDonationHistoryTable({
   donations,
   onUpdated,
   actionsOnly = false,
+  initialDialog,
+  onDialogClosed,
 }: DonorDonationHistoryTableProps) {
   const [active, setActive] = useState<DonationHistoryRow | null>(null)
   const [dialog, setDialog] = useState<"edit" | "void" | "refund" | "allocate" | null>(null)
@@ -140,7 +145,18 @@ export function DonorDonationHistoryTable({
     setSaving(false)
     setSelectedPledgeId("")
     setAllocationPledges([])
+    onDialogClosed?.()
   }
+
+  useEffect(() => {
+    if (!actionsOnly || !initialDialog || donations.length !== 1) return
+    if (initialDialog === "allocate") {
+      void openAllocateDialog(donations[0])
+      return
+    }
+    openDialog(donations[0], initialDialog)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [actionsOnly, initialDialog, donations])
 
   async function openAllocateDialog(row: DonationHistoryRow) {
     setActive(row)
@@ -543,6 +559,10 @@ export function DonorDonationHistoryTable({
   )
 
   if (actionsOnly && donations.length === 1) {
+    if (initialDialog) {
+      return actionDialogs
+    }
+
     const donation = donations[0]
     return (
       <>

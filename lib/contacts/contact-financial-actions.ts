@@ -1,8 +1,11 @@
 "use server"
 
-import { formatPledgeStatusLabel } from "@/lib/donations/donation-status"
+import { normalizePaymentStatus, pledgeDisplayStatus } from "@/lib/donations/donation-status"
 import { donationPaymentDetailHref } from "@/lib/donations/donation-payment-paths"
+import { donationPledgesHref } from "@/lib/donations/donation-pledge-paths"
+import { formatPaymentSourceLabel } from "@/lib/donations/payment-source-channel"
 import {
+  canAllocatePayment,
   countsTowardGivingTotals,
   paymentNetAmount,
 } from "@/lib/donations/payment-net-amount"
@@ -20,6 +23,8 @@ import type {
   ContactFinancialTimelineEvent,
   ContactOpenBalanceRow,
 } from "@/lib/contacts/contact-financial-types"
+import { ensureDonorExtensionForContact } from "@/lib/donations/donor-contact-bridge"
+import { loadMemberContactsByIds } from "@/lib/contacts/group-membership-data"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { PERMISSIONS } from "@/lib/permissions/permission-keys"
 import { hasPermission } from "@/lib/permissions/permissions"
@@ -57,27 +62,26 @@ function rentalPaymentLabel(paymentType: string) {
 
 function formatPaymentMethod(source: string | null | undefined) {
   if (!source) return null
-  return source.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase())
+  return formatPaymentSourceLabel(source)
 }
 
-const MODULE_TYPE_LABELS = {
-  donations: "Donations",
+const ACTIVITY_TYPE_LABELS = {
+  donation: "Donation",
+  pledge: "Pledge",
   programs: "Programs",
   venue_rentals: "Venue Rental",
   membership: "Membership",
   other: "Other",
 } as const
 
-function moduleTypeLabel(module: keyof typeof MODULE_TYPE_LABELS) {
-  return MODULE_TYPE_LABELS[module]
+function activityTypeLabel(kind: keyof typeof ACTIVITY_TYPE_LABELS) {
+  return ACTIVITY_TYPE_LABELS[kind]
 }
 
 function describeDonationPayment(payment: {
-  pledge_id?: string | null
   recurring_donation_plan_id?: string | null
   memo?: string | null
 }) {
-  if (payment.pledge_id) return "Pledge Payment"
   const memo = String(payment.memo || "")
   if (payment.recurring_donation_plan_id || memo.includes("|recurring|")) {
     return "Recurring Donation"
@@ -85,21 +89,73 @@ function describeDonationPayment(payment: {
   return "One-Time Donation"
 }
 
-function formatPledgeFrequencyLabel(frequency: string | null | undefined) {
-  if (!frequency) return null
-  const normalized = frequency.trim().toLowerCase().replace(/_/g, "-")
-  if (normalized === "one-time" || normalized === "one time") return "One-Time"
-  if (normalized === "monthly") return "Monthly"
-  if (normalized === "quarterly") return "Quarterly"
-  if (normalized === "yearly" || normalized === "annual") return "Yearly"
-  return frequency.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase())
+function paymentTimelineStatus(
+  payment: {
+    status?: string | null
+    pledge_id?: string | null
+    amount?: number | null
+    refunded_amount?: number | null
+  },
+  donorHasOpenPledge: boolean
+): Pick<ContactFinancialTimelineEvent, "status" | "statusAction"> {
+  const normalized = normalizePaymentStatus(payment.status)
+
+  if (
+    donorHasOpenPledge &&
+    canAllocatePayment({
+      pledge_id: payment.pledge_id,
+      status: payment.status,
+      amount: Number(payment.amount || 0),
+      refunded_amount: payment.refunded_amount,
+    })
+  ) {
+    return { status: null, statusAction: "link_to_pledge" }
+  }
+
+  if (normalized === "allocated") {
+    return { status: "Linked to Pledge", statusAction: null }
+  }
+
+  if (normalized === "pending_review") {
+    return { status: "Pending review", statusAction: null }
+  }
+
+  if (normalized === "unresolved") {
+    return { status: "Unresolved", statusAction: null }
+  }
+
+  if (normalized === "voided") {
+    return { status: "Voided", statusAction: null }
+  }
+
+  if (normalized === "refunded") {
+    return { status: "Refunded", statusAction: null }
+  }
+
+  if (normalized === "partially_refunded") {
+    return { status: "Partially refunded", statusAction: null }
+  }
+
+  return { status: normalized.replaceAll("_", " "), statusAction: null }
 }
 
-function describePledge(campaignName: string, frequency: string | null | undefined) {
+function formatPledgeTimelineStatusLabel(
+  status: string | null | undefined,
+  amountPledged: number,
+  amountPaid: number
+) {
+  const normalized = status?.toLowerCase()
+  if (normalized === "cancelled") return "Cancelled"
+
+  const display = pledgeDisplayStatus(status, amountPledged, amountPaid)
+  if (display === "Fulfilled") return "Paid"
+  if (display === "Partial") return "Partially paid"
+  return "Open"
+}
+
+function describePledge(campaignName: string) {
   const campaign = campaignName.trim()
-  if (campaign && campaign.toLowerCase() !== "pledge") return campaign
-  const frequencyLabel = formatPledgeFrequencyLabel(frequency)
-  return frequencyLabel ? `${frequencyLabel} Pledge` : "Pledge"
+  return campaign || "Pledge"
 }
 
 function isMissingTableError(error: { code?: string; message?: string } | null) {
@@ -138,19 +194,32 @@ export async function loadContactFinancialSummaryAction(
   let rentalsReady = false
   const membershipReady = false
 
-  if (modules.donations && donorId && !isGroup) {
+  let resolvedDonorId = donorId ?? null
+  if (modules.donations) {
     availableFilters.add("donations")
     availableFilters.add("pledges")
 
+    if (!resolvedDonorId) {
+      resolvedDonorId = await ensureDonorExtensionForContact(
+        organizationId,
+        contactId,
+        supabase
+      )
+    }
+  }
+
+  if (modules.donations && resolvedDonorId) {
+    const activeDonorId = resolvedDonorId
+
     const [{ data: donorRow }, { data: payments }, { data: pledges }] = await Promise.all([
-      supabase.from("donor_summary_view").select("*").eq("id", donorId).maybeSingle(),
+      supabase.from("donor_summary_view").select("*").eq("id", activeDonorId).maybeSingle(),
       supabase
         .from("payments")
         .select(
-          "id, amount, refunded_amount, payment_date, source, source_type, status, pledge_id, memo, recurring_donation_plan_id"
+          "id, amount, refunded_amount, payment_date, source, source_type, status, pledge_id, memo, recurring_donation_plan_id, attributed_group_contact_id"
         )
         .eq("organization_id", organizationId)
-        .eq("donor_id", donorId)
+        .eq("donor_id", activeDonorId)
         .order("payment_date", { ascending: false })
         .limit(200),
       supabase
@@ -159,11 +228,30 @@ export async function loadContactFinancialSummaryAction(
           "id, campaign_name, amount_pledged, amount_paid, balance_remaining, calculated_status, pledge_date, frequency"
         )
         .eq("organization_id", organizationId)
-        .eq("donor_id", donorId)
+        .eq("donor_id", activeDonorId)
         .order("pledge_date", { ascending: false }),
     ])
 
     lifetimeContributions = Number(donorRow?.total_donations || 0)
+
+    const attributedGroupIds = [
+      ...new Set(
+        (payments || [])
+          .map((payment) => payment.attributed_group_contact_id as string | null)
+          .filter((id): id is string => Boolean(id))
+      ),
+    ]
+
+    const attributedGroupContacts =
+      !isGroup && attributedGroupIds.length > 0
+        ? await loadMemberContactsByIds(supabase, organizationId, attributedGroupIds)
+        : new Map<string, { full_name: string | null; email: string | null; phone: string | null }>()
+
+    const donorHasOpenPledge = (pledges || []).some((pledge) => {
+      const balance = Number(pledge.balance_remaining || 0)
+      const status = String(pledge.calculated_status || "").toLowerCase()
+      return balance > 0 && status !== "cancelled"
+    })
 
     for (const payment of payments || []) {
       if (!countsTowardGivingTotals(payment)) continue
@@ -172,18 +260,32 @@ export async function loadContactFinancialSummaryAction(
       donationPaidTotal += net
       activityDates.push(payment.payment_date)
 
-      const isPledgePayment = Boolean(payment.pledge_id)
+      const description = isGroup
+        ? payment.memo?.trim() || "Group Gift"
+        : describeDonationPayment(payment)
+
+      const attributedGroupContactId =
+        (payment.attributed_group_contact_id as string | null) ?? null
+      const attributedGroupName = attributedGroupContactId
+        ? attributedGroupContacts.get(attributedGroupContactId)?.full_name ?? null
+        : null
+
+      const paymentStatus = paymentTimelineStatus(payment, donorHasOpenPledge)
+
       timeline.push({
         id: `payment-${payment.id}`,
         date: payment.payment_date,
-        eventType: moduleTypeLabel("donations"),
-        description: describeDonationPayment(payment),
+        eventType: activityTypeLabel("donation"),
+        description,
         amount: net,
         method: formatPaymentMethod(payment.source),
-        status: payment.status,
+        status: paymentStatus.status,
+        statusAction: paymentStatus.statusAction,
         sourceModule: "donations",
-        filterCategory: isPledgePayment ? "pledges" : "donations",
+        filterCategory: "donations",
         href: donationPaymentDetailHref(payment.id),
+        attributedGroupContactId,
+        attributedGroupName,
       })
     }
 
@@ -200,14 +302,14 @@ export async function loadContactFinancialSummaryAction(
       timeline.push({
         id: `pledge-${pledge.id}`,
         date: pledgeDate,
-        eventType: moduleTypeLabel("donations"),
-        description: describePledge(campaign, pledge.frequency as string | null),
+        eventType: activityTypeLabel("pledge"),
+        description: describePledge(campaign),
         amount: pledged,
-        method: formatPledgeFrequencyLabel(pledge.frequency as string | null),
-        status: formatPledgeStatusLabel(status),
+        method: null,
+        status: formatPledgeTimelineStatusLabel(status, pledged, paid),
         sourceModule: "donations",
         filterCategory: "pledges",
-        href: null,
+        href: donationPledgesHref({ pledgeId: pledge.id, action: "edit" }),
       })
 
       if (balance > 0 && status.toLowerCase() !== "cancelled") {
@@ -219,43 +321,11 @@ export async function loadContactFinancialSummaryAction(
           originalAmount: pledged,
           paidAmount: paid,
           balanceRemaining: balance,
-          status: formatPledgeStatusLabel(status),
+          status: formatPledgeTimelineStatusLabel(status, pledged, paid),
           sourceModule: "donations",
-          href: null,
+          href: donationPledgesHref({ pledgeId: pledge.id, action: "edit" }),
         })
       }
-    }
-  } else if (modules.donations && donorId && isGroup) {
-    availableFilters.add("donations")
-
-    const { data: payments } = await supabase
-      .from("payments")
-      .select(
-        "id, amount, refunded_amount, payment_date, source, source_type, status, memo"
-      )
-      .eq("organization_id", organizationId)
-      .eq("donor_id", donorId)
-      .order("payment_date", { ascending: false })
-      .limit(200)
-
-    for (const payment of payments || []) {
-      if (!countsTowardGivingTotals(payment)) continue
-      const net = paymentNetAmount(payment.amount, payment.refunded_amount)
-      donationPaidTotal += net
-      lifetimeContributions += net
-      activityDates.push(payment.payment_date)
-      timeline.push({
-        id: `payment-${payment.id}`,
-        date: payment.payment_date,
-        eventType: moduleTypeLabel("donations"),
-        description: payment.memo?.trim() || "Group Gift",
-        amount: net,
-        method: formatPaymentMethod(payment.source),
-        status: payment.status,
-        sourceModule: "donations",
-        filterCategory: "donations",
-        href: donationPaymentDetailHref(payment.id),
-      })
     }
   }
 
@@ -314,7 +384,7 @@ export async function loadContactFinancialSummaryAction(
             timeline.push({
               id: `rental-payment-${payment.id}`,
               date: eventDate,
-              eventType: moduleTypeLabel("venue_rentals"),
+              eventType: activityTypeLabel("venue_rentals"),
               description: `${rentalPaymentLabel(payment.payment_type)} — ${eventLabel}`,
               amount,
               method: payment.status.replace(/_/g, " "),
@@ -348,7 +418,7 @@ export async function loadContactFinancialSummaryAction(
           timeline.push({
             id: `rental-${rental.id}`,
             date: rental.created_at,
-            eventType: moduleTypeLabel("venue_rentals"),
+            eventType: activityTypeLabel("venue_rentals"),
             description:
               (Array.isArray(rental.venue_rental_event_types)
                 ? rental.venue_rental_event_types[0]?.name
@@ -419,7 +489,7 @@ export async function loadContactFinancialSummaryAction(
           timeline.push({
             id: `program-charge-${enrollment.id}`,
             date: eventDate,
-            eventType: moduleTypeLabel("programs"),
+            eventType: activityTypeLabel("programs"),
             description: programName,
             amount: total,
             method: null,
@@ -432,7 +502,7 @@ export async function loadContactFinancialSummaryAction(
           timeline.push({
             id: `program-enrollment-${enrollment.id}`,
             date: eventDate,
-            eventType: moduleTypeLabel("programs"),
+            eventType: activityTypeLabel("programs"),
             description: programName,
             amount: null,
             method: null,
@@ -448,7 +518,7 @@ export async function loadContactFinancialSummaryAction(
           timeline.push({
             id: `program-payment-${enrollment.id}`,
             date: eventDate,
-            eventType: moduleTypeLabel("programs"),
+            eventType: activityTypeLabel("programs"),
             description: `${programName} — Payment`,
             amount: paid,
             method: null,

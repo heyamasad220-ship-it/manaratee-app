@@ -63,6 +63,7 @@ function revalidatePledgePaths(
   donorId: string | null | undefined,
   contactIds: Array<string | null | undefined> = []
 ) {
+  revalidatePath("/donations/reports/pledges")
   revalidatePath("/donations/pledges")
   revalidatePath("/donations/campaigns")
   if (donorId) {

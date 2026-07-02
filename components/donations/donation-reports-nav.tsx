@@ -10,9 +10,28 @@ export type DonationReportsTab = {
   matchPrefix: string
   extraMatchPrefixes?: string[]
   exact?: boolean
+  requiresManage?: boolean
 }
 
 export const DONATION_REPORTS_TABS: DonationReportsTab[] = [
+  {
+    label: "One-Time Donations",
+    href: "/donations/reports/one-time",
+    matchPrefix: "/donations/reports/one-time",
+    extraMatchPrefixes: ["/donations/payments/one-time"],
+  },
+  {
+    label: "Recurring Donations",
+    href: "/donations/reports/recurring",
+    matchPrefix: "/donations/reports/recurring",
+    extraMatchPrefixes: ["/donations/payments/recurring"],
+  },
+  {
+    label: "Pledges",
+    href: "/donations/reports/pledges",
+    matchPrefix: "/donations/reports/pledges",
+    extraMatchPrefixes: ["/donations/pledges"],
+  },
   {
     label: "Donors",
     href: "/donations/reports/donors",
@@ -20,9 +39,24 @@ export const DONATION_REPORTS_TABS: DonationReportsTab[] = [
     extraMatchPrefixes: ["/donations/donors/individuals", "/donations/donors/organizations"],
   },
   {
+    label: "Import",
+    href: "/donations/reports/import",
+    matchPrefix: "/donations/reports/import",
+    extraMatchPrefixes: ["/donations/payments/import", "/donations/import"],
+    requiresManage: true,
+  },
+  {
+    label: "Match Payments",
+    href: "/donations/reports/match",
+    matchPrefix: "/donations/reports/match",
+    extraMatchPrefixes: ["/donations/payments/match", "/donations/reconcile"],
+    requiresManage: true,
+  },
+  {
     label: "Receipts",
     href: "/donations/reports/receipts",
     matchPrefix: "/donations/reports/receipts",
+    extraMatchPrefixes: ["/donations/reports/tax-receipts"],
   },
 ]
 
@@ -52,14 +86,15 @@ function isTabActive(tab: DonationReportsTab, pathname: string, tabs: DonationRe
   return !overridden
 }
 
-export function DonationReportsNav() {
+export function DonationReportsNav({ canManage }: { canManage: boolean }) {
   const pathname = usePathname()
+  const visibleTabs = DONATION_REPORTS_TABS.filter((tab) => !tab.requiresManage || canManage)
 
   return (
     <div className="border-b border-border bg-background px-6">
       <nav className="-mb-px flex gap-0 overflow-x-auto">
-        {DONATION_REPORTS_TABS.map((tab) => {
-          const active = isTabActive(tab, pathname, DONATION_REPORTS_TABS)
+        {visibleTabs.map((tab) => {
+          const active = isTabActive(tab, pathname, visibleTabs)
           return (
             <Link
               key={tab.href}

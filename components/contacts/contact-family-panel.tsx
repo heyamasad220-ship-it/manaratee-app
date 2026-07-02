@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useTransition } from "react"
+import Link from "next/link"
 import { Loader2, Trash2, UserPlus, Users } from "lucide-react"
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -30,6 +31,8 @@ import {
   removeContactFamilyMember,
   type ContactFamilyMemberRow,
 } from "@/lib/contacts/contact-profile-admin-actions"
+import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
+import { useCurrentReturnTo } from "@/hooks/use-current-return-to"
 
 type ContactFamilyPanelProps = {
   contactId: string
@@ -71,6 +74,7 @@ export function ContactFamilyPanel({
   onChanged,
   embedded = false,
 }: ContactFamilyPanelProps) {
+  const currentReturnTo = useCurrentReturnTo()
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -79,6 +83,8 @@ export function ContactFamilyPanel({
     lastName: "",
     gender: "",
     dateOfBirth: "",
+    email: "",
+    phone: "",
     relationship: "",
   })
 
@@ -92,6 +98,8 @@ export function ContactFamilyPanel({
           lastName: newMember.lastName,
           gender: newMember.gender || null,
           dateOfBirth: newMember.dateOfBirth || null,
+          email: newMember.email || null,
+          phone: newMember.phone || null,
           relationship: newMember.relationship,
         })
         setNewMember({
@@ -99,6 +107,8 @@ export function ContactFamilyPanel({
           lastName: "",
           gender: "",
           dateOfBirth: "",
+          email: "",
+          phone: "",
           relationship: "",
         })
         setIsAddDialogOpen(false)
@@ -199,9 +209,20 @@ export function ContactFamilyPanel({
                       </Avatar>
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium">
-                            {member.firstName} {member.lastName}
-                          </span>
+                          {member.contactId ? (
+                            <Link
+                              href={contactProfileHref(member.contactId, {
+                                returnTo: currentReturnTo,
+                              })}
+                              className="text-sm font-medium text-primary hover:underline"
+                            >
+                              {member.firstName} {member.lastName}
+                            </Link>
+                          ) : (
+                            <span className="text-sm font-medium">
+                              {member.firstName} {member.lastName}
+                            </span>
+                          )}
                           {isMinor ? (
                             <Badge variant="secondary" className="text-xs">
                               Minor
@@ -220,6 +241,18 @@ export function ContactFamilyPanel({
                             <>
                               <span className="text-muted-foreground/50">|</span>
                               <span>{age} years old</span>
+                            </>
+                          ) : null}
+                          {member.email ? (
+                            <>
+                              <span className="text-muted-foreground/50">|</span>
+                              <span>{member.email}</span>
+                            </>
+                          ) : null}
+                          {member.phone ? (
+                            <>
+                              <span className="text-muted-foreground/50">|</span>
+                              <span>{member.phone}</span>
                             </>
                           ) : null}
                         </div>
@@ -269,6 +302,32 @@ export function ContactFamilyPanel({
                   value={newMember.lastName}
                   onChange={(event) =>
                     setNewMember((current) => ({ ...current, lastName: event.target.value }))
+                  }
+                />
+              </div>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="family-email">Email</Label>
+                <Input
+                  id="family-email"
+                  type="email"
+                  placeholder="Optional"
+                  value={newMember.email}
+                  onChange={(event) =>
+                    setNewMember((current) => ({ ...current, email: event.target.value }))
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="family-phone">Phone</Label>
+                <Input
+                  id="family-phone"
+                  type="tel"
+                  placeholder="Optional"
+                  value={newMember.phone}
+                  onChange={(event) =>
+                    setNewMember((current) => ({ ...current, phone: event.target.value }))
                   }
                 />
               </div>

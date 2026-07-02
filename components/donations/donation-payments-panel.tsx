@@ -68,6 +68,7 @@ import {
 import { canAllocatePayment } from "@/lib/donations/payment-net-amount";
 import { formatPaymentPledgeColumnLabel } from "@/lib/donations/donation-status";
 import { getDonorProfilePath } from "@/lib/donations/donor-profile-path";
+import { resolvePaymentDonorDisplayName } from "@/lib/donations/payment-donor-display";
 
 type Payment = {
   id: string;
@@ -77,9 +78,12 @@ type Payment = {
   memo: string | null;
   pledge_id: string | null;
   donor_id: string | null;
+  contact_id: string | null;
   donor_type: string | null;
   status: string | null;
   sender_name: string | null;
+  donor_display_name?: string | null;
+  donor_contact_id?: string | null;
 };
 
 type ContactPickerOption = {
@@ -118,7 +122,21 @@ function formatDate(date: string | null) {
 }
 
 function getPaymentDonorName(payment: Payment) {
-  return payment.sender_name || "—";
+  return (
+    payment.donor_display_name ||
+    resolvePaymentDonorDisplayName({
+      senderName: payment.sender_name,
+    })
+  );
+}
+
+function getPaymentDonorProfilePath(payment: Payment) {
+  if (!payment.donor_id) return null;
+  return getDonorProfilePath(
+    payment.donor_id,
+    payment.donor_type,
+    payment.donor_contact_id ?? payment.contact_id
+  );
 }
 
 function canLinkPaymentToPledge(payment: Payment) {
@@ -499,7 +517,7 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
                       <td className="p-3">
                         {payment.donor_id ? (
                           <Link
-                            href={getDonorProfilePath(payment.donor_id, payment.donor_type)}
+                            href={getPaymentDonorProfilePath(payment) || "#"}
                             className="font-medium text-primary hover:underline"
                           >
                             {getPaymentDonorName(payment)}
@@ -781,10 +799,7 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
                     <span className="text-muted-foreground">Donor / Sender:</span>{" "}
                     {selectedPayment.donor_id ? (
                       <Link
-                        href={getDonorProfilePath(
-                          selectedPayment.donor_id,
-                          selectedPayment.donor_type
-                        )}
+                        href={getPaymentDonorProfilePath(selectedPayment) || "#"}
                         className="font-medium text-primary hover:underline"
                       >
                         {getPaymentDonorName(selectedPayment)}

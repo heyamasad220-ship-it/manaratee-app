@@ -3,18 +3,24 @@
 import { revalidatePath } from "next/cache"
 
 import { ensureContactForPerson } from "@/lib/contacts/contact-actions"
-import { isEntityContactType } from "@/lib/contacts/contact-constants"
+import {
+  isEntityContactType,
+  normalizePhone,
+} from "@/lib/contacts/contact-constants"
 import { normalizeDateOfBirth } from "@/lib/dates/date-input-utils"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { createClient } from "@/lib/supabase/server"
 
 export type ContactFamilyMemberRow = {
   id: string
+  contactId: string | null
   firstName: string
   lastName: string
   gender: string
   dateOfBirth: string
   relationship: string
+  email: string
+  phone: string
 }
 
 export type ContactPersonDetails = {
@@ -111,6 +117,8 @@ function mapFamilyMembers(
       last_name: string | null
       gender: string | null
       date_of_birth: string | null
+      email: string | null
+      phone: string | null
     } | null
   }>
 ): ContactFamilyMemberRow[] {
@@ -121,14 +129,64 @@ function mapFamilyMembers(
 
       return {
         id: person.id,
+        contactId: null,
         firstName: person.first_name || "",
         lastName: person.last_name || "",
         gender: person.gender || "",
         dateOfBirth: person.date_of_birth || "",
         relationship: (row.relationship_type as string) || "",
+        email: person.email || "",
+        phone: person.phone || "",
       }
     })
     .filter((member): member is ContactFamilyMemberRow => member !== null)
+}
+
+async function attachFamilyMemberContactIds(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  organizationId: string,
+  members: ContactFamilyMemberRow[]
+): Promise<ContactFamilyMemberRow[]> {
+  if (members.length === 0) {
+    return members
+  }
+
+  const personIds = members.map((member) => member.id)
+  const { data: contactRows, error } = await supabase
+    .from("contacts")
+    .select("id, person_id")
+    .eq("organization_id", organizationId)
+    .in("person_id", personIds)
+
+  if (error) {
+    console.warn("attachFamilyMemberContactIds:", error.message)
+  }
+
+  const contactIdByPersonId = new Map<string, string>()
+  for (const row of contactRows || []) {
+    if (row.person_id) {
+      contactIdByPersonId.set(row.person_id as string, row.id as string)
+    }
+  }
+
+  return Promise.all(
+    members.map(async (member) => {
+      let contactId = contactIdByPersonId.get(member.id) ?? null
+
+      if (!contactId) {
+        const ensured = await ensureContactForPerson({
+          organizationId,
+          personId: member.id,
+        })
+        contactId = ensured.contactId
+      }
+
+      return {
+        ...member,
+        contactId,
+      }
+    })
+  )
 }
 
 export async function loadContactProfileExtendedData(
@@ -158,7 +216,9 @@ export async function loadContactProfileExtendedData(
             first_name,
             last_name,
             gender,
-            date_of_birth
+            date_of_birth,
+            email,
+            phone
           )
         `)
         .eq("organization_id", organizationId)
@@ -173,7 +233,11 @@ export async function loadContactProfileExtendedData(
     }
 
     if (!familyResult.error) {
-      familyMembers = mapFamilyMembers((familyResult.data || []) as any[])
+      familyMembers = await attachFamilyMemberContactIds(
+        supabase,
+        organizationId,
+        mapFamilyMembers((familyResult.data || []) as any[])
+      )
     }
   }
 
@@ -241,11 +305,15 @@ export async function addContactFamilyMember(input: {
   lastName: string
   gender?: string | null
   dateOfBirth?: string | null
+  email?: string | null
+  phone?: string | null
   relationship: string
 }) {
   const firstName = input.firstName.trim()
   const lastName = input.lastName.trim()
   const relationship = input.relationship.trim()
+  const email = input.email?.trim().toLowerCase() || null
+  const phone = normalizePhone(input.phone) || null
 
   if (!firstName || !lastName) {
     throw new Error("First and last name are required.")
@@ -262,7 +330,7 @@ export async function addContactFamilyMember(input: {
   }
 
   const parentPersonId = await ensureContactPersonId(supabase, organizationId, contact)
-  const dateOfBirth = normalizeDateOfBirth(input.dateOfBirth)
+  const dateOfBirth = normalizeDateOfBirth(input.dateOfBirth, { required: false })
 
   const { data: createdPerson, error: personError } = await supabase
     .from("people")
@@ -272,6 +340,8 @@ export async function addContactFamilyMember(input: {
       last_name: lastName,
       gender: input.gender?.trim() || null,
       date_of_birth: dateOfBirth,
+      email,
+      phone,
       person_type: "participant",
     })
     .select("id")
@@ -292,12 +362,28 @@ export async function addContactFamilyMember(input: {
     throw new Error(relationshipError.message || "Could not save family relationship.")
   }
 
-  await ensureContactForPerson({
+  const { contactId: familyMemberContactId } = await ensureContactForPerson({
     organizationId,
     personId: createdPerson.id as string,
   })
 
+  if (email || phone) {
+    const { error: contactUpdateError } = await supabase
+      .from("contacts")
+      .update({
+        email,
+        phone,
+      })
+      .eq("organization_id", organizationId)
+      .eq("id", familyMemberContactId)
+
+    if (contactUpdateError) {
+      throw new Error(contactUpdateError.message || "Could not save family member contact details.")
+    }
+  }
+
   revalidatePath(`/contacts/${input.contactId}`)
+  revalidatePath(`/contacts/${familyMemberContactId}`)
   revalidatePath("/customer/profile")
 
   return { personId: createdPerson.id as string }

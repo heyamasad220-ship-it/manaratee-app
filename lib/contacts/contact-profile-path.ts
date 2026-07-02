@@ -1,4 +1,5 @@
 import type { ContactsListSegment } from "@/lib/contacts/contact-module-label"
+import { isSafeReturnToPath, RETURN_TO_QUERY_PARAM } from "@/lib/navigation/return-to"
 
 export type ContactProfileTab =
   | "overview"
@@ -11,6 +12,7 @@ type ContactProfileHrefOptions = {
   tab?: ContactProfileTab
   edit?: boolean
   list?: ContactsListSegment
+  returnTo?: string
 }
 
 export function contactProfileHref(
@@ -20,6 +22,7 @@ export function contactProfileHref(
   let tab: ContactProfileTab | undefined
   let edit = false
   let list: ContactsListSegment | undefined
+  let returnTo: string | undefined
 
   if (typeof tabOrOptions === "string") {
     tab = tabOrOptions
@@ -27,6 +30,7 @@ export function contactProfileHref(
     tab = tabOrOptions.tab
     edit = tabOrOptions.edit ?? false
     list = tabOrOptions.list
+    returnTo = tabOrOptions.returnTo
   }
 
   const params = new URLSearchParams()
@@ -38,6 +42,9 @@ export function contactProfileHref(
   }
   if (edit) {
     params.set("edit", "1")
+  }
+  if (returnTo && isSafeReturnToPath(returnTo)) {
+    params.set(RETURN_TO_QUERY_PARAM, returnTo)
   }
 
   const query = params.toString()

@@ -20,7 +20,6 @@ export const DONATION_CAMPAIGNS_TABS: DonationCampaignsTab[] = [
     matchPrefix: "/donations/campaigns",
     overviewOnly: true,
   },
-  { label: "Pledges", href: "/donations/pledges", matchPrefix: "/donations/pledges" },
 ]
 
 function isTabActive(tab: DonationCampaignsTab, pathname: string, tabs: DonationCampaignsTab[]) {

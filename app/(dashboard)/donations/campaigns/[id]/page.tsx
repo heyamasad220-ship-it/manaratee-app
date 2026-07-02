@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
-import { ArrowLeft, Pencil, Target } from "lucide-react"
+import { ArrowLeft, Pencil, Plus, Target } from "lucide-react"
 
 import { ContactProfileDialog } from "@/components/contacts/contact-profile-dialog"
 import { Button } from "@/components/ui/button"
@@ -26,6 +26,7 @@ import {
 import { getCampaignDetailAction } from "@/lib/donations/donation-reports-actions"
 import type { CampaignOverviewMetricKey } from "@/lib/donations/campaign-overview-metrics"
 import { createClient } from "@/lib/supabase/client"
+import { donationPledgesHref } from "@/lib/donations/donation-pledge-paths"
 
 type ContactProfileTarget = {
   contactId?: string | null
@@ -136,26 +137,37 @@ export default function CampaignDetailPage() {
     <>
       <div className="p-6">
         <div className="flex flex-col gap-6">
-          <div className="flex flex-wrap items-center gap-3">
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/donations/campaigns">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Campaigns
-              </Link>
-            </Button>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/donations/campaigns">
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Campaigns
+                </Link>
+              </Button>
+
+              {canManage ? (
+                <button
+                  type="button"
+                  onClick={() => setShowEditDialog(true)}
+                  className="group inline-flex items-center gap-2 text-2xl font-semibold text-foreground transition hover:text-primary"
+                >
+                  {campaign.name}
+                  <Pencil className="h-4 w-4 text-muted-foreground opacity-0 transition group-hover:opacity-100" />
+                </button>
+              ) : (
+                <h1 className="text-2xl font-semibold text-foreground">{campaign.name}</h1>
+              )}
+            </div>
 
             {canManage ? (
-              <button
-                type="button"
-                onClick={() => setShowEditDialog(true)}
-                className="group inline-flex items-center gap-2 text-2xl font-semibold text-foreground transition hover:text-primary"
-              >
-                {campaign.name}
-                <Pencil className="h-4 w-4 text-muted-foreground opacity-0 transition group-hover:opacity-100" />
-              </button>
-            ) : (
-              <h1 className="text-2xl font-semibold text-foreground">{campaign.name}</h1>
-            )}
+              <Button asChild>
+                <Link href={donationPledgesHref({ action: "add", campaignId: campaign.id })}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Pledge
+                </Link>
+              </Button>
+            ) : null}
           </div>
 
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,0.9fr)] xl:items-start">
@@ -215,6 +227,7 @@ export default function CampaignDetailPage() {
 
           <CampaignOutstandingPledgesTable
             pledges={outstandingPledges}
+            pledgesPageHref={donationPledgesHref({ campaignId: campaign.id })}
             onDonorClick={(pledge) =>
               void openContactProfile({
                 contactId: pledge.contactId,

@@ -2,17 +2,27 @@ import {
   isDonationPaymentsOneTimePath,
   isDonationPaymentsPath,
   isDonationPaymentsRecurringPath,
+  isDonationReportsOneTimePath,
+  isDonationReportsPath,
+  isDonationReportsRecurringPath,
 } from "@/lib/donations/donation-payment-paths"
 
-/** @deprecated Use isDonationPaymentsPath helpers; kept for legacy report URL redirects. */
 export function isDonationOverviewActivityPath(pathname: string) {
   return (
+    isDonationReportsPath(pathname) ||
+    isDonationReportsOneTimePath(pathname) ||
+    isDonationReportsRecurringPath(pathname) ||
     isDonationPaymentsPath(pathname) ||
-    pathname === "/donations/reports/one-time" ||
-    pathname.startsWith("/donations/reports/one-time/") ||
-    pathname === "/donations/reports/recurring" ||
-    pathname.startsWith("/donations/reports/recurring/")
+    isDonationPaymentsOneTimePath(pathname) ||
+    isDonationPaymentsRecurringPath(pathname)
   )
 }
 
-export { isDonationPaymentsPath, isDonationPaymentsOneTimePath, isDonationPaymentsRecurringPath }
+export {
+  isDonationPaymentsPath,
+  isDonationPaymentsOneTimePath,
+  isDonationPaymentsRecurringPath,
+  isDonationReportsPath,
+  isDonationReportsOneTimePath,
+  isDonationReportsRecurringPath,
+}

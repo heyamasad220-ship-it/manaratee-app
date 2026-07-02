@@ -9,8 +9,6 @@ export function isDonationCampaignsDetailPath(pathname: string) {
 export function isDonationCampaignsSectionPath(pathname: string) {
   return (
     isDonationCampaignsOverviewPath(pathname) ||
-    isDonationCampaignsDetailPath(pathname) ||
-    pathname === "/donations/pledges" ||
-    pathname.startsWith("/donations/pledges/")
+    isDonationCampaignsDetailPath(pathname)
   )
 }

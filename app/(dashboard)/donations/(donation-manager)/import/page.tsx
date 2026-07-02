@@ -8,9 +8,9 @@ export default async function DonationsImportRedirectPage({
   const params = await searchParams
 
   if (params.tab === "match") {
-    redirect("/donations/payments/match")
+    redirect("/donations/reports/match")
   }
 
   const query = params.tab === "history" ? "?tab=history" : ""
-  redirect(`/donations/payments/import${query}`)
+  redirect(`/donations/reports/import${query}`)
 }

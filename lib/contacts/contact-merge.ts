@@ -5,6 +5,10 @@ import {
   isEntityContactType,
   normalizeContactRecordType,
 } from "@/lib/contacts/contact-constants"
+import {
+  resolveCanonicalDonorSenderName,
+  syncPaymentSenderNamesForDonor,
+} from "@/lib/donations/payment-donor-display"
 
 export type ContactMergeRow = {
   id: string
@@ -246,9 +250,14 @@ async function mergeDonorIntoTarget(
   sourceDonorId: string,
   targetDonorId: string,
   targetContactId: string,
-  execute: boolean
+  execute: boolean,
+  canonicalSenderName?: string | null
 ): Promise<ContactMergeStep[]> {
-  const paymentPatch = { donor_id: targetDonorId, contact_id: targetContactId }
+  const paymentPatch = {
+    donor_id: targetDonorId,
+    contact_id: targetContactId,
+    ...(canonicalSenderName ? { sender_name: canonicalSenderName } : {}),
+  }
   const donorPatch = { donor_id: targetDonorId, contact_id: targetContactId }
   const pledgePatch = { donor_id: targetDonorId }
 
@@ -433,6 +442,13 @@ export async function executeContactMerge(
     findDonorForContact(supabase, orgId, source.id),
   ])
 
+  const canonicalSenderName = await resolveCanonicalDonorSenderName(
+    supabase,
+    orgId,
+    target.id,
+    targetDonor?.id ?? sourceDonor?.id ?? null
+  )
+
   if (targetDonor && sourceDonor) {
     if (targetDonor.id !== sourceDonor.id) {
       await mergeDonorIntoTarget(
@@ -441,7 +457,8 @@ export async function executeContactMerge(
         sourceDonor.id,
         targetDonor.id,
         target.id,
-        true
+        true,
+        canonicalSenderName
       )
     }
   } else if (sourceDonor) {
@@ -471,6 +488,21 @@ export async function executeContactMerge(
     .eq("id", source.id)
 
   if (deleteError) throw new Error(`source contact delete: ${deleteError.message}`)
+
+  const survivingDonorId =
+    targetDonor?.id ??
+    sourceDonor?.id ??
+    (await findDonorForContact(supabase, orgId, target.id))?.id ??
+    null
+
+  if (survivingDonorId && canonicalSenderName) {
+    await syncPaymentSenderNamesForDonor(
+      supabase,
+      orgId,
+      survivingDonorId,
+      canonicalSenderName
+    )
+  }
 
   return preview
 }

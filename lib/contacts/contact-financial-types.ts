@@ -40,9 +40,9 @@ export type ContactOpenBalanceRow = {
 export type ContactFinancialTimelineEvent = {
   id: string
   date: string
-  /** Module label shown in the Type column (e.g. Donations, Programs). */
+  /** Activity type shown in the Type column (Donation, Pledge, Programs, …). */
   eventType: string
-  /** Specific activity label shown in the Description column (e.g. One-Time Donation). */
+  /** Specific activity label shown in the Description column. */
   description: string
   amount: number | null
   method: string | null
@@ -50,6 +50,11 @@ export type ContactFinancialTimelineEvent = {
   sourceModule: ContactFinancialSourceModule
   filterCategory: Exclude<ContactFinancialFilter, "all">
   href: string | null
+  /** When set, Status column shows a link-to-pledge action instead of a badge. */
+  statusAction?: "link_to_pledge" | null
+  /** Set when a gift was counted toward a group (individual donors only). */
+  attributedGroupContactId?: string | null
+  attributedGroupName?: string | null
 }
 
 export type ContactFinancialSummaryPayload = {

@@ -25,9 +25,10 @@ export function ContactGroupFinancialPanel({
 
       <Card>
         <CardHeader>
-          <CardTitle>Group Gifts</CardTitle>
+          <CardTitle>Group Gifts &amp; Pledges</CardTitle>
           <CardDescription>
-            Checks and pooled gifts recorded directly on {groupName}. Groups do not take pledges.
+            Pooled gifts and campaign pledges recorded on {groupName}. Member payoffs may appear on
+            individual member profiles or as pledge payments here when recorded on the group.
           </CardDescription>
         </CardHeader>
       </Card>

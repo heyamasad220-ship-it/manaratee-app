@@ -527,12 +527,20 @@ export default function ContactDetailPage() {
   const handleContactUpdated = useCallback(async () => {
     await loadContact()
     const fromQuery = searchParams.get("list")
+    const returnTo = searchParams.get(RETURN_TO_QUERY_PARAM)
     const list = isContactsListSegment(fromQuery)
       ? fromQuery
       : contact
         ? contactsListSegmentForRecordType(normalizeContactRecordType(contact.contact_type))
         : undefined
-    router.replace(contactProfileHref(contactId, { edit: false, list }), { scroll: false })
+    router.replace(
+      contactProfileHref(contactId, {
+        edit: false,
+        list,
+        ...(returnTo && isSafeReturnToPath(returnTo) ? { returnTo } : {}),
+      }),
+      { scroll: false }
+    )
   }, [contact, contactId, loadContact, router, searchParams])
 
   const handleExtendedDataChanged = useCallback(async () => {

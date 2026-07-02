@@ -84,6 +84,16 @@ function normalizeText(value) {
 const LEDGER_SUMMARY_ROW_NAMES = new Set(["total", "subtotal", "grand total"])
 const LEDGER_BATCH_DEPOSIT_NAMES = new Set(["square"])
 
+/** CSV spellings → canonical campaign name in the database */
+const CAMPAIGN_NAME_ALIASES = new Map([["ramadan2025", "Ramadan 2025"]])
+
+function resolveCampaignDisplayName(name) {
+  const text = normalizeText(name)
+  if (!text) return text
+  const compact = normalizeName(text).replace(/\s/g, "")
+  return CAMPAIGN_NAME_ALIASES.get(compact) || text
+}
+
 function isLedgerBatchDepositName(name) {
   return LEDGER_BATCH_DEPOSIT_NAMES.has(normalizeName(name))
 }
@@ -157,9 +167,13 @@ function getLedgerAmounts(row, options = {}) {
   const checks = parseMoney(row.Checks)
   let oneTime = firstPositiveAmount(row, ["One-time", "One Time", "CC", "One-Time"])
   const recurring = firstPositiveAmount(row, ["Recurring", "CC+", "CC +"])
+  const totalReceived = parseMoney(row["Total Received"])
   const totalColumn = parseMoney(row.Total)
   let totalPaid = cash + checks + oneTime + recurring
-  if (totalPaid <= 0 && totalColumn > 0) {
+  if (totalPaid <= 0 && totalReceived > 0) {
+    oneTime = totalReceived
+    totalPaid = totalReceived
+  } else if (totalPaid <= 0 && totalColumn > 0) {
     oneTime = totalColumn
     totalPaid = totalColumn
   }
@@ -557,7 +571,8 @@ async function main() {
   }
 
   async function resolveCampaign(campaignName) {
-    const key = normalizeName(campaignName)
+    const displayName = resolveCampaignDisplayName(campaignName)
+    const key = normalizeName(displayName)
     if (campaignByName.has(key)) return campaignByName.get(key)
 
     if (!args.createCampaigns) {
@@ -566,7 +581,7 @@ async function main() {
 
     if (!args.execute) {
       report.campaignsCreated += 1
-      const placeholder = { id: `dry-run:${campaignName}`, name: campaignName }
+      const placeholder = { id: `dry-run:${displayName}`, name: displayName }
       campaignByName.set(key, placeholder)
       return placeholder
     }
@@ -575,7 +590,7 @@ async function main() {
       .from("campaigns")
       .insert({
         organization_id: orgId,
-        name: campaignName,
+        name: displayName,
         status: "active",
       })
       .select("id, name")
@@ -737,7 +752,7 @@ async function main() {
   for (let index = 0; index < rows.length; index += 1) {
     const row = rows[index]
     const rowKey = buildRowKey(index + 2, row)
-    const campaignName = normalizeText(row.Campaign)
+    const campaignName = resolveCampaignDisplayName(normalizeText(row.Campaign))
     const amounts = getLedgerAmounts(row, { paymentsOnly: args.paymentsOnly })
     const {
       pledge: pledgeAmount,
@@ -751,11 +766,6 @@ async function main() {
     const paymentDate = parsePaymentDate(row.payment_date) || "2023-12-31"
 
     if (!campaignName || !normalizeText(row.Name)) {
-      report.skippedEmpty += 1
-      continue
-    }
-
-    if (args.paymentsOnly && !normalizeText(row.Group)) {
       report.skippedEmpty += 1
       continue
     }
@@ -851,11 +861,9 @@ async function main() {
       const contact = await ensureContact(row, { forceIndividual: args.paymentsOnly })
       const donor = await ensureDonor(contact)
       const notes = buildNotes(row)
-      const groupContact = args.paymentsOnly
-        ? await ensureGroupContact(normalizeText(row.Group))
-        : null
-
-      if (args.paymentsOnly && groupContact) {
+      let groupContact = null
+      if (args.paymentsOnly && normalizeText(row.Group)) {
+        groupContact = await ensureGroupContact(normalizeText(row.Group))
         await linkGroupMember(groupContact.id, contact.id)
       }
 
@@ -986,8 +994,11 @@ async function main() {
   const reportsDir = resolve(root, "scripts", "reports")
   mkdirSync(reportsDir, { recursive: true })
   const stamp = new Date().toISOString().slice(0, 10)
+  const hasGroupColumn = rows.some((row) => normalizeText(row.Group))
   const suffix = args.paymentsOnly
-    ? "group-donations"
+    ? hasGroupColumn
+      ? "group-donations"
+      : "one-time-donations"
     : args.campaign
       ? args.campaign.replace(/\s+/g, "-").toLowerCase()
       : "all"

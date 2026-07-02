@@ -13,5 +13,5 @@ export default async function DonationsReportsLayout({
     redirect("/dashboard")
   }
 
-  return <DonationReportsChrome>{children}</DonationReportsChrome>
+  return <DonationReportsChrome canManage={access.canManage}>{children}</DonationReportsChrome>
 }

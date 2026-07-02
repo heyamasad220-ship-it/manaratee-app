@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 
 import { requireDonationStaffAccess } from "@/lib/donations/donation-action-auth"
 import { DONATIONS_PAGE_SIZE } from "@/lib/donations/donation-pagination"
+import { attachPaymentDonorDisplayNames } from "@/lib/donations/payment-donor-display"
 
 function escapeIlike(value: string) {
   return value.replace(/[%_\\,]/g, "\\$&")
@@ -30,7 +31,7 @@ export async function fetchPaymentsPageAction(input: PaymentsPageInput = {}) {
   let query = access.supabase
     .from("payments")
     .select(
-      "id, amount, payment_date, source, memo, pledge_id, donor_id, status, sender_name, donors ( donor_type )",
+      "id, amount, payment_date, source, memo, pledge_id, donor_id, contact_id, status, sender_name, donors ( donor_type )",
       { count: "exact" }
     )
     .eq("organization_id", access.orgId)
@@ -47,25 +48,45 @@ export async function fetchPaymentsPageAction(input: PaymentsPageInput = {}) {
   }
   if (input.search?.trim()) {
     const term = `%${escapeIlike(input.search.trim())}%`
-    query = query.or(`sender_name.ilike.${term},memo.ilike.${term},source.ilike.${term}`)
+    const searchParts = [`sender_name.ilike.${term}`, `memo.ilike.${term}`, `source.ilike.${term}`]
+
+    const { data: matchingDonors } = await access.supabase
+      .from("donor_summary_view")
+      .select("id")
+      .eq("organization_id", access.orgId)
+      .ilike("full_name", term)
+
+    const matchingDonorIds = (matchingDonors || [])
+      .map((row) => row.id as string)
+      .filter(Boolean)
+
+    if (matchingDonorIds.length > 0) {
+      searchParts.push(`donor_id.in.(${matchingDonorIds.join(",")})`)
+    }
+
+    query = query.or(searchParts.join(","))
   }
 
   const { data, error, count } = await query.range(from, to)
 
   if (error) return { success: false as const, error: error.message }
 
+  const payments = (data || []).map((row) => {
+    const donor = Array.isArray(row.donors) ? row.donors[0] : row.donors
+    const { donors: _donors, ...payment } = row as Record<string, unknown> & {
+      donors?: { donor_type?: string | null } | { donor_type?: string | null }[] | null
+    }
+    return {
+      ...payment,
+      donor_type: (donor?.donor_type as string | null) ?? null,
+    }
+  })
+
+  await attachPaymentDonorDisplayNames(access.supabase, access.orgId, payments)
+
   return {
     success: true as const,
-    payments: (data || []).map((row) => {
-      const donor = Array.isArray(row.donors) ? row.donors[0] : row.donors
-      const { donors: _donors, ...payment } = row as Record<string, unknown> & {
-        donors?: { donor_type?: string | null } | { donor_type?: string | null }[] | null
-      }
-      return {
-        ...payment,
-        donor_type: (donor?.donor_type as string | null) ?? null,
-      }
-    }),
+    payments,
     total: count ?? 0,
     page,
     pageSize,

@@ -1,7 +1,7 @@
 "use client"
 
 import Papa from "papaparse"
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
   AlertCircle,
@@ -108,9 +108,16 @@ const sourceColors: Record<string, string> = {
 
 const statusConfig = {
   pending_review: { label: "Needs match", color: "bg-amber-100 text-amber-700", icon: Clock },
-  unallocated: { label: "Matched", color: "bg-emerald-100 text-emerald-700", icon: CheckCircle2 },
+  unallocated: { label: "Recorded", color: "bg-emerald-100 text-emerald-700", icon: CheckCircle2 },
   unresolved: { label: "Unresolved", color: "bg-red-100 text-red-700", icon: XCircle },
 } as const
+
+type MatchQueueFilter =
+  | "all"
+  | "pending_review"
+  | "unallocated"
+  | "linkable_pledge"
+  | "unresolved"
 
 function getConfidenceColor(score: number) {
   if (score >= 85) return "bg-emerald-100 text-emerald-700 border-emerald-200"
@@ -146,7 +153,10 @@ export function PaymentImportMatchWorkspace({ mode }: { mode: "import" | "match"
   const [loadingQueue, setLoadingQueue] = useState(false)
   const [loadingMatches, setLoadingMatches] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
-  const [statusFilter, setStatusFilter] = useState(mode === "match" ? "all" : "pending_review")
+  const [statusFilter, setStatusFilter] = useState<MatchQueueFilter>(
+    mode === "match" ? "pending_review" : "pending_review"
+  )
+  const hasSetInitialMatchFilter = useRef(false)
   const [manualSearch, setManualSearch] = useState("")
   const [manualMatches, setManualMatches] = useState<ContactMatchResult[]>([])
   const [searchingManual, setSearchingManual] = useState(false)
@@ -173,6 +183,24 @@ export function PaymentImportMatchWorkspace({ mode }: { mode: "import" | "match"
     [parsedRows]
   )
 
+  const donorIdsWithOpenPledges = useMemo(
+    () =>
+      new Set(
+        allPledges
+          .map((pledge) => pledge.donorId)
+          .filter((donorId): donorId is string => Boolean(donorId))
+      ),
+    [allPledges]
+  )
+
+  const paymentMayLinkToPledge = useCallback(
+    (payment: PaymentMatchQueueItem) =>
+      payment.status === "unallocated" &&
+      Boolean(payment.donorId) &&
+      donorIdsWithOpenPledges.has(payment.donorId as string),
+    [donorIdsWithOpenPledges]
+  )
+
   const filteredPayments = useMemo(
     () =>
       payments.filter((payment) => {
@@ -182,18 +210,32 @@ export function PaymentImportMatchWorkspace({ mode }: { mode: "import" | "match"
           (payment.importEmail || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
           (payment.importPhone || "").includes(searchQuery)
 
-        const matchesStatus = statusFilter === "all" || payment.status === statusFilter
+        const matchesStatus =
+          statusFilter === "all" ||
+          (statusFilter === "linkable_pledge"
+            ? paymentMayLinkToPledge(payment)
+            : payment.status === statusFilter)
+
         return matchesSearch && matchesStatus
       }),
-    [payments, searchQuery, statusFilter]
+    [payments, paymentMayLinkToPledge, searchQuery, statusFilter]
   )
 
   const pendingCount = payments.filter((payment) => payment.status === "pending_review").length
-  const matchedCount = payments.filter((payment) => payment.status === "unallocated").length
+  const standaloneGiftCount = payments.filter((payment) => payment.status === "unallocated").length
+  const linkablePledgeCount = payments.filter((payment) => paymentMayLinkToPledge(payment)).length
   const unresolvedCount = payments.filter((payment) => payment.status === "unresolved").length
-  const queueAmount = useMemo(
-    () => payments.reduce((sum, payment) => sum + payment.amount, 0),
-    [payments]
+  const actionableQueueAmount = useMemo(
+    () =>
+      payments
+        .filter(
+          (payment) =>
+            payment.status === "pending_review" ||
+            payment.status === "unresolved" ||
+            paymentMayLinkToPledge(payment)
+        )
+        .reduce((sum, payment) => sum + payment.amount, 0),
+    [paymentMayLinkToPledge, payments]
   )
 
   const strongSuggestedMatches = useMemo(
@@ -290,6 +332,21 @@ export function PaymentImportMatchWorkspace({ mode }: { mode: "import" | "match"
   }, [mode, loadQueue, loadAllPledges, loadHistory])
 
   useEffect(() => {
+    if (mode !== "match" || loadingQueue || hasSetInitialMatchFilter.current) return
+
+    hasSetInitialMatchFilter.current = true
+    if (pendingCount > 0) {
+      setStatusFilter("pending_review")
+      return
+    }
+    if (linkablePledgeCount > 0) {
+      setStatusFilter("linkable_pledge")
+      return
+    }
+    setStatusFilter("pending_review")
+  }, [linkablePledgeCount, loadingQueue, mode, pendingCount])
+
+  useEffect(() => {
     if (mode !== "match") return
 
     setSelectedPayment((current) => {
@@ -301,7 +358,11 @@ export function PaymentImportMatchWorkspace({ mode }: { mode: "import" | "match"
 
   useEffect(() => {
     if (selectedPayment) {
-      loadMatches(selectedPayment)
+      if (selectedPayment.status === "pending_review") {
+        void loadMatches(selectedPayment)
+      } else {
+        setMatches([])
+      }
       setManualSearch("")
       setManualMatches([])
     } else {
@@ -508,7 +569,7 @@ export function PaymentImportMatchWorkspace({ mode }: { mode: "import" | "match"
     setParsedRows([])
     setFileName("")
     await loadHistory()
-    router.push("/donations/payments/match")
+    router.push("/donations/reports/match")
   }
 
   async function handleBulkAutoMatch() {
@@ -586,6 +647,53 @@ export function PaymentImportMatchWorkspace({ mode }: { mode: "import" | "match"
     }
 
     setShowPledgeDialog(true)
+  }
+
+  async function handleLinkExistingPaymentToPledge() {
+    if (!selectedPayment?.donorId) return
+
+    const contactId = selectedPayment.contactId
+    if (!contactId) {
+      alert("This payment is linked to a donor but has no contact profile.")
+      return
+    }
+
+    setSelectedMatch({
+      contactId,
+      donorId: selectedPayment.donorId,
+      name: selectedPayment.senderName,
+      email: selectedPayment.importEmail || "",
+      phone: selectedPayment.importPhone || "",
+      totalDonations: 0,
+      lastDonation: "",
+      confidenceScore: 100,
+      matchReason: "Already linked to this donor",
+    })
+    setSelectedPledgeId("")
+
+    const result = await fetchOpenPledgesForDonorAction(selectedPayment.donorId)
+    setDonorPledges(result.success ? result.pledges : [])
+    setShowPledgeDialog(true)
+  }
+
+  function getDetailPanelTitle(payment: PaymentMatchQueueItem) {
+    if (payment.status === "pending_review") return "Match payment"
+    if (payment.status === "unresolved") return "Resolve payment"
+    if (paymentMayLinkToPledge(payment)) return "Link to pledge (optional)"
+    return "Recorded gift"
+  }
+
+  function getDetailPanelDescription(payment: PaymentMatchQueueItem) {
+    if (payment.status === "pending_review") {
+      return "Link this payment to the correct donor contact."
+    }
+    if (payment.status === "unresolved") {
+      return "Review this payment and match it or leave it unresolved."
+    }
+    if (paymentMayLinkToPledge(payment)) {
+      return "This gift is already recorded. Link it only if it should count toward an open pledge."
+    }
+    return "This gift is already matched to a donor and counts as a standalone donation. No action required."
   }
 
   async function handleApplyPledgePayment() {
@@ -880,6 +988,22 @@ export function PaymentImportMatchWorkspace({ mode }: { mode: "import" | "match"
 
   const matchView = (
     <div className="space-y-6">
+          {pendingCount === 0 ? (
+            <Card className="border-sky-200 bg-sky-50/60">
+              <CardContent className="py-4 text-sm">
+                <p className="font-medium text-foreground">No payments need donor matching.</p>
+                <p className="mt-1 text-muted-foreground">
+                  {standaloneGiftCount > 0
+                    ? `${standaloneGiftCount.toLocaleString()} gift(s) are already recorded as standalone donations and do not need to be matched or linked to a pledge.`
+                    : "New imported payments that need a donor match will appear here."}
+                  {linkablePledgeCount > 0
+                    ? ` ${linkablePledgeCount.toLocaleString()} gift(s) may optionally be linked to an open pledge — use the filter below or click the “May link to pledge” card.`
+                    : ""}
+                </p>
+              </CardContent>
+            </Card>
+          ) : null}
+
           <div className="mb-4 flex flex-wrap items-center gap-3">
             <Button variant="outline" onClick={handleBulkAutoMatch} disabled={bulkMatching || pendingCount === 0}>
               {bulkMatching ? "Processing..." : "Auto-match & create contacts"}
@@ -909,11 +1033,12 @@ export function PaymentImportMatchWorkspace({ mode }: { mode: "import" | "match"
               onValueClick={() => setStatusFilter("pending_review")}
             />
             <DonationMetricCard
-              title="Matched, not allocated"
-              value={matchedCount}
+              title="May link to pledge"
+              value={linkablePledgeCount}
               icon={Link2}
               accent="emerald"
-              onValueClick={() => setStatusFilter("unallocated")}
+              description="Optional — donor has an open pledge"
+              onValueClick={() => setStatusFilter("linkable_pledge")}
             />
             <DonationMetricCard
               title="Unresolved"
@@ -923,11 +1048,24 @@ export function PaymentImportMatchWorkspace({ mode }: { mode: "import" | "match"
               onValueClick={() => setStatusFilter("unresolved")}
             />
             <DonationMetricCard
-              title="Queue amount"
-              value={formatDonationCurrency(queueAmount)}
+              title="Action queue amount"
+              value={formatDonationCurrency(actionableQueueAmount)}
               icon={DollarSign}
               accent="purple"
-              onValueClick={() => setStatusFilter("all")}
+              description={
+                standaloneGiftCount > 0
+                  ? `${standaloneGiftCount.toLocaleString()} standalone gifts excluded`
+                  : "Needs match, pledge link, or review"
+              }
+              onValueClick={() =>
+                setStatusFilter(
+                  linkablePledgeCount > 0
+                    ? "linkable_pledge"
+                    : pendingCount > 0
+                      ? "pending_review"
+                      : "unresolved"
+                )
+              }
             />
           </DonationMetricCardGrid>
 
@@ -939,12 +1077,13 @@ export function PaymentImportMatchWorkspace({ mode }: { mode: "import" | "match"
                   <select
                     className="h-9 rounded-md border bg-background px-3 text-sm"
                     value={statusFilter}
-                    onChange={(event) => setStatusFilter(event.target.value)}
+                    onChange={(event) => setStatusFilter(event.target.value as MatchQueueFilter)}
                   >
-                    <option value="all">All</option>
                     <option value="pending_review">Needs match</option>
-                    <option value="unallocated">Matched, not allocated</option>
+                    <option value="linkable_pledge">May link to pledge</option>
                     <option value="unresolved">Unresolved</option>
+                    <option value="unallocated">All recorded gifts</option>
+                    <option value="all">All queue items</option>
                   </select>
                 </div>
                 <div className="relative mt-2">
@@ -1009,9 +1148,22 @@ export function PaymentImportMatchWorkspace({ mode }: { mode: "import" | "match"
                       )
                     })}
                     {filteredPayments.length === 0 && (
-                      <div className="flex flex-col items-center justify-center py-12 text-center">
+                      <div className="flex flex-col items-center justify-center px-4 py-12 text-center">
                         <CheckCircle2 className="h-12 w-12 text-muted-foreground/30" />
-                        <p className="mt-2 text-sm text-muted-foreground">No payments in this queue</p>
+                        <p className="mt-2 text-sm font-medium text-foreground">
+                          {statusFilter === "pending_review"
+                            ? "No payments need donor matching."
+                            : statusFilter === "linkable_pledge"
+                              ? "No gifts need to be linked to a pledge."
+                              : statusFilter === "unresolved"
+                                ? "No unresolved payments."
+                                : "No payments in this view."}
+                        </p>
+                        {statusFilter === "pending_review" && standaloneGiftCount > 0 ? (
+                          <p className="mt-2 max-w-sm text-xs text-muted-foreground">
+                            {standaloneGiftCount.toLocaleString()} standalone gifts are already recorded.
+                          </p>
+                        ) : null}
                       </div>
                     )}
                   </div>
@@ -1025,9 +1177,15 @@ export function PaymentImportMatchWorkspace({ mode }: { mode: "import" | "match"
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
                       <div>
-                        <CardTitle className="text-base">Match payment</CardTitle>
+                        <CardTitle className="text-base">
+                          {getDetailPanelTitle(selectedPayment)}
+                        </CardTitle>
                         <CardDescription>
-                          {currentIndex + 1} of {filteredPayments.length}
+                          {filteredPayments.length > 0
+                            ? `${currentIndex + 1} of ${filteredPayments.length}`
+                            : "—"}
+                          {" · "}
+                          {getDetailPanelDescription(selectedPayment)}
                         </CardDescription>
                       </div>
                       <div className="flex items-center gap-1">
@@ -1083,6 +1241,8 @@ export function PaymentImportMatchWorkspace({ mode }: { mode: "import" | "match"
                       )}
                     </div>
 
+                    {selectedPayment.status === "pending_review" || selectedPayment.status === "unresolved" ? (
+                      <>
                     <div className="mb-4">
                       <h4 className="mb-3 flex items-center gap-2 text-sm font-medium">
                         <Zap className="h-4 w-4 text-amber-500" />
@@ -1143,6 +1303,30 @@ export function PaymentImportMatchWorkspace({ mode }: { mode: "import" | "match"
                         </Button>
                       </div>
                     </div>
+                      </>
+                    ) : paymentMayLinkToPledge(selectedPayment) ? (
+                      <div className="rounded-lg border border-dashed p-6 text-center">
+                        <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-600" />
+                        <p className="mt-3 text-sm font-medium">Gift already recorded</p>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          Link to a pledge only if this payment should count toward an open pledge
+                          balance.
+                        </p>
+                        <Button className="mt-4" onClick={() => void handleLinkExistingPaymentToPledge()}>
+                          <DollarSign className="mr-1.5 h-4 w-4" />
+                          Choose pledge
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="rounded-lg border border-dashed p-6 text-center">
+                        <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-600" />
+                        <p className="mt-3 text-sm font-medium">No action required</p>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          This standalone donation is matched to a donor and does not need to be linked
+                          to a pledge.
+                        </p>
+                      </div>
+                    )}
                   </CardContent>
                 </>
               ) : (
