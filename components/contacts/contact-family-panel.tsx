@@ -1,9 +1,10 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useEffect, useState, useTransition } from "react"
 import Link from "next/link"
-import { Loader2, Trash2, UserPlus, Users } from "lucide-react"
+import { ExternalLink, Loader2, Trash2, UserPlus, Users } from "lucide-react"
 
+import { FamilyContactPicker } from "@/components/contacts/family-contact-picker"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { BirthDateInput } from "@/components/ui/birth-date-input"
@@ -26,11 +27,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   addContactFamilyMember,
   removeContactFamilyMember,
   type ContactFamilyMemberRow,
 } from "@/lib/contacts/contact-profile-admin-actions"
+import {
+  getFamilyForContactAction,
+  linkExistingContactToFamilyAction,
+} from "@/lib/contacts/family-management-actions"
 import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
 import { useCurrentReturnTo } from "@/hooks/use-current-return-to"
 
@@ -68,6 +74,15 @@ function formatRelationship(value: string) {
   return labels[value] || value
 }
 
+const relationshipOptions = [
+  { value: "child", label: "Child / Grandchild" },
+  { value: "guardian", label: "Guardian" },
+  { value: "spouse", label: "Spouse" },
+  { value: "parent", label: "Parent" },
+  { value: "sibling", label: "Sibling" },
+  { value: "other", label: "Other" },
+]
+
 export function ContactFamilyPanel({
   contactId,
   familyMembers,
@@ -76,8 +91,14 @@ export function ContactFamilyPanel({
 }: ContactFamilyPanelProps) {
   const currentReturnTo = useCurrentReturnTo()
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+  const [addMode, setAddMode] = useState<"create" | "link">("link")
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const [household, setHousehold] = useState<{
+    id: string
+    name: string
+    isPrimary: boolean
+  } | null>(null)
   const [newMember, setNewMember] = useState({
     firstName: "",
     lastName: "",
@@ -87,6 +108,46 @@ export function ContactFamilyPanel({
     phone: "",
     relationship: "",
   })
+  const [linkMember, setLinkMember] = useState({
+    contactId: "",
+    contactLabel: "",
+    relationship: "spouse",
+  })
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadHousehold() {
+      const result = await getFamilyForContactAction(contactId)
+      if (cancelled || !result.success) return
+      setHousehold(result.family)
+    }
+
+    void loadHousehold()
+
+    return () => {
+      cancelled = true
+    }
+  }, [contactId, familyMembers.length])
+
+  function resetDialogState() {
+    setNewMember({
+      firstName: "",
+      lastName: "",
+      gender: "",
+      dateOfBirth: "",
+      email: "",
+      phone: "",
+      relationship: "",
+    })
+    setLinkMember({
+      contactId: "",
+      contactLabel: "",
+      relationship: "spouse",
+    })
+    setAddMode("link")
+    setError(null)
+  }
 
   function handleAddMember() {
     setError(null)
@@ -102,17 +163,13 @@ export function ContactFamilyPanel({
           phone: newMember.phone || null,
           relationship: newMember.relationship,
         })
-        setNewMember({
-          firstName: "",
-          lastName: "",
-          gender: "",
-          dateOfBirth: "",
-          email: "",
-          phone: "",
-          relationship: "",
-        })
+        resetDialogState()
         setIsAddDialogOpen(false)
         await onChanged()
+        const familyResult = await getFamilyForContactAction(contactId)
+        if (familyResult.success) {
+          setHousehold(familyResult.family)
+        }
       } catch (addError) {
         setError(
           addError instanceof Error ? addError.message : "Could not add family member."
@@ -121,15 +178,52 @@ export function ContactFamilyPanel({
     })
   }
 
-  function handleRemoveMember(relatedPersonId: string) {
-    if (!window.confirm("Remove this family member from the contact profile?")) {
+  function handleLinkExistingMember() {
+    if (!linkMember.contactId) {
+      setError("Select an existing contact to link.")
+      return
+    }
+
+    setError(null)
+    startTransition(async () => {
+      const result = await linkExistingContactToFamilyAction({
+        anchorContactId: contactId,
+        memberContactId: linkMember.contactId,
+        relationship: linkMember.relationship,
+      })
+
+      if (!result.success) {
+        setError(result.error)
+        return
+      }
+
+      resetDialogState()
+      setIsAddDialogOpen(false)
+      await onChanged()
+      const familyResult = await getFamilyForContactAction(contactId)
+      if (familyResult.success) {
+        setHousehold(familyResult.family)
+      }
+    })
+  }
+
+  function handleRemoveMember(member: ContactFamilyMemberRow) {
+    const memberName = `${member.firstName} ${member.lastName}`.trim() || "this family member"
+    const message = [
+      `Remove ${memberName} from this household?`,
+      "",
+      "Their individual contact profile and all donations will stay on their record.",
+      "They will no longer appear in this household's giving totals.",
+    ].join("\n")
+
+    if (!window.confirm(message)) {
       return
     }
 
     setError(null)
     startTransition(async () => {
       try {
-        await removeContactFamilyMember({ contactId, relatedPersonId })
+        await removeContactFamilyMember({ contactId, relatedPersonId: member.id })
         await onChanged()
       } catch (removeError) {
         setError(
@@ -156,16 +250,41 @@ export function ContactFamilyPanel({
                 Family members
               </CardTitle>
               <CardDescription>
-                Linked family members for registrations and program enrollments.
+                Link spouses and dependents for registrations, enrollments, and household giving.
               </CardDescription>
             </div>
           ) : null}
-          <Button variant="outline" size="sm" onClick={() => setIsAddDialogOpen(true)}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              resetDialogState()
+              setIsAddDialogOpen(true)
+            }}
+          >
             <UserPlus className="mr-2 h-4 w-4" />
             Add member
           </Button>
         </CardHeader>
         <CardContent className={embedded ? "pt-0" : undefined}>
+          {household ? (
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-muted/20 px-3 py-2 text-sm">
+              <div>
+                <span className="text-muted-foreground">Household: </span>
+                <span className="font-medium">{household.name}</span>
+                {!household.isPrimary ? (
+                  <span className="ml-2 text-xs text-muted-foreground">(member)</span>
+                ) : null}
+              </div>
+              <Button variant="ghost" size="sm" asChild className="h-8 px-2">
+                <Link href={`/contacts/families/${household.id}`}>
+                  View household giving
+                  <ExternalLink className="ml-2 h-3.5 w-3.5" />
+                </Link>
+              </Button>
+            </div>
+          ) : null}
+
           {error ? (
             <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
               {error}
@@ -176,14 +295,18 @@ export function ContactFamilyPanel({
             <div className="flex flex-col items-center justify-center py-6 text-center">
               <Users className="mb-2 h-8 w-8 text-muted-foreground/50" />
               <p className="text-sm font-medium">No family members added</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Add family members to register them for events and activities.
+              <p className="mt-1 max-w-md text-xs text-muted-foreground">
+                Link an existing donor or spouse contact, or create a new person for program
+                registration.
               </p>
               <Button
                 variant="outline"
                 size="sm"
                 className="mt-3"
-                onClick={() => setIsAddDialogOpen(true)}
+                onClick={() => {
+                  resetDialogState()
+                  setIsAddDialogOpen(true)
+                }}
               >
                 <UserPlus className="mr-2 h-4 w-4" />
                 Add family member
@@ -262,7 +385,7 @@ export function ContactFamilyPanel({
                       variant="ghost"
                       size="icon"
                       className="text-muted-foreground hover:text-destructive"
-                      onClick={() => handleRemoveMember(member.id)}
+                      onClick={() => handleRemoveMember(member)}
                       disabled={isPending}
                     >
                       <Trash2 className="h-4 w-4" />
@@ -275,128 +398,206 @@ export function ContactFamilyPanel({
         </CardContent>
       </Card>
 
-      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent>
+      <Dialog
+        open={isAddDialogOpen}
+        onOpenChange={(open) => {
+          setIsAddDialogOpen(open)
+          if (!open) resetDialogState()
+        }}
+      >
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Add family member</DialogTitle>
             <DialogDescription>
-              Creates a linked person record and contact for program registration.
+              Link an existing contact (for example an imported spouse donor) or create a new
+              person record.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4">
-            <div className="grid gap-4 sm:grid-cols-2">
+
+          <Tabs value={addMode} onValueChange={(value) => setAddMode(value as "create" | "link")}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="link">Link existing contact</TabsTrigger>
+              <TabsTrigger value="create">Create new person</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="link" className="mt-4 space-y-4">
+              <FamilyContactPicker
+                selectedContactId={linkMember.contactId || null}
+                selectedLabel={linkMember.contactLabel}
+                excludeContactId={contactId}
+                disabled={isPending}
+                onChange={(memberContactId, label) =>
+                  setLinkMember((current) => ({
+                    ...current,
+                    contactId: memberContactId,
+                    contactLabel: label,
+                  }))
+                }
+              />
               <div className="space-y-2">
-                <Label htmlFor="family-first-name">First name</Label>
-                <Input
-                  id="family-first-name"
-                  value={newMember.firstName}
-                  onChange={(event) =>
-                    setNewMember((current) => ({ ...current, firstName: event.target.value }))
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="family-last-name">Last name</Label>
-                <Input
-                  id="family-last-name"
-                  value={newMember.lastName}
-                  onChange={(event) =>
-                    setNewMember((current) => ({ ...current, lastName: event.target.value }))
-                  }
-                />
-              </div>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="family-email">Email</Label>
-                <Input
-                  id="family-email"
-                  type="email"
-                  placeholder="Optional"
-                  value={newMember.email}
-                  onChange={(event) =>
-                    setNewMember((current) => ({ ...current, email: event.target.value }))
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="family-phone">Phone</Label>
-                <Input
-                  id="family-phone"
-                  type="tel"
-                  placeholder="Optional"
-                  value={newMember.phone}
-                  onChange={(event) =>
-                    setNewMember((current) => ({ ...current, phone: event.target.value }))
-                  }
-                />
-              </div>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="family-dob">Date of birth</Label>
-                <BirthDateInput
-                  id="family-dob"
-                  value={newMember.dateOfBirth}
-                  onChange={(value) =>
-                    setNewMember((current) => ({ ...current, dateOfBirth: value }))
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="family-gender">Gender</Label>
+                <Label htmlFor="link-family-relationship">Relationship</Label>
                 <Select
-                  value={newMember.gender}
+                  value={linkMember.relationship}
                   onValueChange={(value) =>
-                    setNewMember((current) => ({ ...current, gender: value }))
+                    setLinkMember((current) => ({ ...current, relationship: value }))
                   }
                 >
-                  <SelectTrigger id="family-gender">
-                    <SelectValue placeholder="Select gender" />
+                  <SelectTrigger id="link-family-relationship">
+                    <SelectValue placeholder="Select relationship" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Male">Male</SelectItem>
-                    <SelectItem value="Female">Female</SelectItem>
+                    {relationshipOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
+              <p className="text-xs text-muted-foreground">
+                Use this to join spouses who were imported as separate donors into one household.
+                Their donations stay on each contact; household giving rolls up both.
+              </p>
+            </TabsContent>
+
+            <TabsContent value="create" className="mt-4 space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="family-first-name">First name</Label>
+                  <Input
+                    id="family-first-name"
+                    value={newMember.firstName}
+                    onChange={(event) =>
+                      setNewMember((current) => ({ ...current, firstName: event.target.value }))
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="family-last-name">Last name</Label>
+                  <Input
+                    id="family-last-name"
+                    value={newMember.lastName}
+                    onChange={(event) =>
+                      setNewMember((current) => ({ ...current, lastName: event.target.value }))
+                    }
+                  />
+                </div>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="family-email">Email</Label>
+                  <Input
+                    id="family-email"
+                    type="email"
+                    placeholder="Optional"
+                    value={newMember.email}
+                    onChange={(event) =>
+                      setNewMember((current) => ({ ...current, email: event.target.value }))
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="family-phone">Phone</Label>
+                  <Input
+                    id="family-phone"
+                    type="tel"
+                    placeholder="Optional"
+                    value={newMember.phone}
+                    onChange={(event) =>
+                      setNewMember((current) => ({ ...current, phone: event.target.value }))
+                    }
+                  />
+                </div>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="family-dob">Date of birth</Label>
+                  <BirthDateInput
+                    id="family-dob"
+                    value={newMember.dateOfBirth}
+                    onChange={(value) =>
+                      setNewMember((current) => ({ ...current, dateOfBirth: value }))
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="family-gender">Gender</Label>
+                  <Select
+                    value={newMember.gender}
+                    onValueChange={(value) =>
+                      setNewMember((current) => ({ ...current, gender: value }))
+                    }
+                  >
+                    <SelectTrigger id="family-gender">
+                      <SelectValue placeholder="Select gender" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Male">Male</SelectItem>
+                      <SelectItem value="Female">Female</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="family-relationship">Relationship</Label>
+                <Select
+                  value={newMember.relationship}
+                  onValueChange={(value) =>
+                    setNewMember((current) => ({ ...current, relationship: value }))
+                  }
+                >
+                  <SelectTrigger id="family-relationship">
+                    <SelectValue placeholder="Select relationship" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {relationshipOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </TabsContent>
+          </Tabs>
+
+          {error ? (
+            <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {error}
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="family-relationship">Relationship</Label>
-              <Select
-                value={newMember.relationship}
-                onValueChange={(value) =>
-                  setNewMember((current) => ({ ...current, relationship: value }))
-                }
-              >
-                <SelectTrigger id="family-relationship">
-                  <SelectValue placeholder="Select relationship" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="child">Child / Grandchild</SelectItem>
-                  <SelectItem value="guardian">Guardian</SelectItem>
-                  <SelectItem value="spouse">Spouse</SelectItem>
-                  <SelectItem value="parent">Parent</SelectItem>
-                  <SelectItem value="sibling">Sibling</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+          ) : null}
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)} disabled={isPending}>
+            <Button
+              variant="outline"
+              onClick={() => setIsAddDialogOpen(false)}
+              disabled={isPending}
+            >
               Cancel
             </Button>
-            <Button onClick={handleAddMember} disabled={isPending}>
-              {isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Adding...
-                </>
-              ) : (
-                "Add member"
-              )}
-            </Button>
+            {addMode === "link" ? (
+              <Button onClick={handleLinkExistingMember} disabled={isPending}>
+                {isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Linking...
+                  </>
+                ) : (
+                  "Link contact"
+                )}
+              </Button>
+            ) : (
+              <Button onClick={handleAddMember} disabled={isPending}>
+                {isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Adding...
+                  </>
+                ) : (
+                  "Create member"
+                )}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

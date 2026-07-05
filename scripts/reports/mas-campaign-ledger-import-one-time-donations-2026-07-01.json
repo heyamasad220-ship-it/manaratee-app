@@ -1,0 +1,131 @@
+{
+  "mode": "execute",
+  "paymentsOnly": true,
+  "file": "C:\\Users\\danan\\Downloads\\One-Time-Donations.csv",
+  "campaignFilter": null,
+  "rowCount": 437,
+  "skippedEmpty": 3,
+  "skippedSummary": 0,
+  "skippedDuplicate": 0,
+  "contactsMatched": 119,
+  "contactsCreated": 266,
+  "groupsMatched": 0,
+  "groupsCreated": 0,
+  "groupMembersLinked": 0,
+  "donorsCreated": 266,
+  "campaignsCreated": 1,
+  "pledgesCreated": 0,
+  "paymentsCreated": 434,
+  "ambiguousMatches": [
+    {
+      "csvName": "ANGIE HASAN HASAN",
+      "matchedName": "Angie Hasan",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "Mohammad Ghassan Farra",
+      "matchedName": "Ghassan Farra",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "Muhammad Ahmed",
+      "matchedName": "Muhammad Nauman Ahmed",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "RAED O SBEIT",
+      "matchedName": "Raed Sbeit",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "Samer Al-Hashmi",
+      "matchedName": "Dr. Samer Hashmi",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "SYED MANSOOR",
+      "matchedName": "Mansoor Syed",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "Yaman & Mahmoud Khanshour",
+      "matchedName": "Mahmoud Khanshour",
+      "reason": "fuzzy_name:85"
+    }
+  ],
+  "errors": [],
+  "samples": [
+    {
+      "rowKey": "MAS_CAMPAIGN_LEDGER_V1|60f0cb0a5fb5",
+      "name": "Abadir Yimam",
+      "group": "",
+      "campaign": "Ramadan 2026",
+      "payments": [
+        600
+      ]
+    },
+    {
+      "rowKey": "MAS_CAMPAIGN_LEDGER_V1|c681ea5b90cf",
+      "name": "Abdallah Emran",
+      "group": "",
+      "campaign": "Ramadan 2026",
+      "payments": [
+        511
+      ]
+    },
+    {
+      "rowKey": "MAS_CAMPAIGN_LEDGER_V1|9f6d07ccb574",
+      "name": "Abdallah Emran",
+      "group": "",
+      "campaign": "Ramadan 2025",
+      "payments": [
+        250
+      ]
+    },
+    {
+      "rowKey": "MAS_CAMPAIGN_LEDGER_V1|9e9a436be4a1",
+      "name": "Abdallah Emran",
+      "group": "",
+      "campaign": "September 2025",
+      "payments": [
+        21
+      ]
+    },
+    {
+      "rowKey": "MAS_CAMPAIGN_LEDGER_V1|1227460eb59e",
+      "name": "Abdelhamid Abualrob",
+      "group": "",
+      "campaign": "January 2023",
+      "payments": [
+        100
+      ]
+    },
+    {
+      "rowKey": "MAS_CAMPAIGN_LEDGER_V1|b0491622e820",
+      "name": "Abdelmohsen Hussein",
+      "group": "",
+      "campaign": "March 2023",
+      "payments": [
+        500
+      ]
+    },
+    {
+      "rowKey": "MAS_CAMPAIGN_LEDGER_V1|01750f4183df",
+      "name": "Abdelmohsen Hussien",
+      "group": "",
+      "campaign": "January 2023",
+      "payments": [
+        300
+      ]
+    },
+    {
+      "rowKey": "MAS_CAMPAIGN_LEDGER_V1|be1779630135",
+      "name": "Abdelrahman Abdelazim",
+      "group": "",
+      "campaign": "January 2023",
+      "payments": [
+        200
+      ]
+    }
+  ]
+}

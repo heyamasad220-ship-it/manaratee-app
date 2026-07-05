@@ -38,6 +38,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { loadContactFinancialSummaryAction } from "@/lib/contacts/contact-financial-actions"
+import { financialActivityStatusBadgeClass } from "@/lib/donations/donation-status"
 import type {
   ContactFinancialFilter,
   ContactFinancialSummaryPayload,
@@ -55,6 +56,7 @@ import {
   readStoredReturnToPath,
   RETURN_TO_QUERY_PARAM,
 } from "@/lib/navigation/return-to"
+import { cn } from "@/lib/utils"
 
 const ContactFinancialPaymentEditDialog = dynamic(
   () =>
@@ -667,17 +669,13 @@ function FinancialActivityCard({
                         {event.method || "—"}
                       </TableCell>
                       <TableCell>
-                        {event.statusAction === "link_to_pledge" && paymentId ? (
-                          <button
-                            type="button"
-                            className="text-sm text-primary hover:underline disabled:opacity-50"
-                            disabled={isOpening}
-                            onClick={() => void openPaymentEditor(paymentId, "allocate")}
+                        {event.status ? (
+                          <Badge
+                            variant="outline"
+                            className={cn(financialActivityStatusBadgeClass(event.status))}
                           >
-                            Link to Pledge
-                          </button>
-                        ) : event.status ? (
-                          <Badge variant="outline">{event.status}</Badge>
+                            {event.status}
+                          </Badge>
                         ) : (
                           "—"
                         )}

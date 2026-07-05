@@ -16,13 +16,14 @@ function formatReportDate(value: string | null) {
 export function buildDonorGivingReportCsvRows(donors: DonorSummaryReportRow[]) {
   return donors.map((donor) => ({
     Name: donor.full_name ?? "",
+    Email: donor.email ?? "",
     Phone: donor.phone ?? "",
     "Total Given": Number(donor.total_donations || 0).toFixed(2),
     Gifts: donor.donation_count ?? 0,
     "Last Gift": formatReportDate(donor.last_donation_date),
     "Lifetime Last Gift": formatReportDate(donor.lifetime_last_donation_date),
-    "Outstanding Pledge": Number(donor.outstanding_pledge_balance || 0).toFixed(2),
-    "Open Pledge": donor.has_open_pledge ? "Yes" : "No",
+    Pledge: donor.pledge_status ?? "",
+    "Outstanding Balance": Number(donor.outstanding_pledge_balance || 0).toFixed(2),
   }))
 }
 

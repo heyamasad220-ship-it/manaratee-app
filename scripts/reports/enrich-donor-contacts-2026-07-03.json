@@ -1,0 +1,508 @@
+{
+  "mode": "execute",
+  "file": "C:\\Users\\danan\\Downloads\\MadinaDonors061826.csv",
+  "organizationId": "e057e00a-e4e3-4adf-9af5-f465db1894be",
+  "rowCount": 856,
+  "matched": 337,
+  "created": 519,
+  "enriched": 292,
+  "unchanged": 45,
+  "donorsCreated": 519,
+  "donorsEnriched": 337,
+  "conflicts": [
+    {
+      "csvName": "Abdelrahman Abdelrahman",
+      "contactId": "064e6088-44eb-4f7e-bf04-70236288f4c1",
+      "contactName": "Osama Abdelrahman",
+      "conflicts": [
+        "phone (5053196154 vs 2145375277)"
+      ]
+    },
+    {
+      "csvName": "Abdullah Shikalgar",
+      "contactId": "4369a687-6b1a-4f30-bb12-0f4f4745f19b",
+      "contactName": "Abdullah Shikalgar",
+      "conflicts": [
+        "email (abdullah.ms975@gmail.com vs firdaus.shikalgar@yahoo.com)",
+        "phone (8329290806 vs 8326438120)"
+      ]
+    },
+    {
+      "csvName": "Abu Zahra Nabil",
+      "contactId": "97fb0e34-e10e-4635-9683-f55ef6803276",
+      "contactName": "Nabil Zahra",
+      "conflicts": [
+        "phone (8315886512 vs 9723756949)"
+      ]
+    },
+    {
+      "csvName": "Ahmad Kamal",
+      "contactId": "592c9c58-79f0-4479-9351-06162722a1ec",
+      "contactName": "Ali Chaaban/Ahmad Kamal (Hi 5)",
+      "conflicts": [
+        "phone (9726328813 vs 2144173355)"
+      ]
+    },
+    {
+      "csvName": "Ahmed Mohamed",
+      "contactId": "65fe2b81-26df-478b-a8cc-3ae34ca5e556",
+      "contactName": "Ahmed Mohamed",
+      "conflicts": [
+        "email (ahmedmohamedabbas82@gmail.com vs akm919@gmail.com)",
+        "phone (3479386198 vs 2144505708)"
+      ]
+    },
+    {
+      "csvName": "Ahmed Mostafa",
+      "contactId": "0dc77ff7-5d4b-45a5-b8fb-edad6a18c657",
+      "contactName": "Mostafa Ahmed",
+      "conflicts": [
+        "phone (6127476885 vs 4695063137)"
+      ]
+    },
+    {
+      "csvName": "Ahmed Reda Ahmed",
+      "contactId": "9368a7f9-9e49-4af8-b3e3-80d5eb12c770",
+      "contactName": "Aisha Ahmed",
+      "conflicts": [
+        "phone (8439000092 vs 6784396565)"
+      ]
+    },
+    {
+      "csvName": "Aisha Ahmed",
+      "contactId": "9368a7f9-9e49-4af8-b3e3-80d5eb12c770",
+      "contactName": "Aisha Ahmed",
+      "conflicts": [
+        "phone (8439000092 vs 6123852583)"
+      ]
+    },
+    {
+      "csvName": "Aisha Ahmed",
+      "contactId": "9368a7f9-9e49-4af8-b3e3-80d5eb12c770",
+      "contactName": "Aisha Ahmed",
+      "conflicts": [
+        "phone (8439000092 vs 5124154167)"
+      ]
+    },
+    {
+      "csvName": "Amal Aldurra",
+      "contactId": "b3e0e858-dc15-4c4e-8a2c-6ebeac60d63a",
+      "contactName": "Amal Aldurra",
+      "conflicts": [
+        "email (aldurramd@yahoo.com vs mabrookamal100@yahoo.com)"
+      ]
+    },
+    {
+      "csvName": "Amir Shuaib",
+      "contactId": "6d5b29f7-b055-474f-b445-bb778a890493",
+      "contactName": "Amir Shuaib",
+      "conflicts": [
+        "email (amir0823@hotmail.com vs amir0826@hotmail.com)",
+        "phone (4693853850 vs 4693583850)"
+      ]
+    },
+    {
+      "csvName": "Ashraf Omar Omar",
+      "contactId": "026260bc-bf39-46c5-8aa8-b7c5f64ec797",
+      "contactName": "Omar Gharbieh",
+      "conflicts": [
+        "phone (2147170626 vs 9729032772)"
+      ]
+    },
+    {
+      "csvName": "Babaa Amjad S",
+      "contactId": "3092d236-ebab-4923-9208-e4f99e9a9bb1",
+      "contactName": "Amjad Babaa",
+      "conflicts": [
+        "email (amjad_babaa@hotmail.com vs mohammadbabaa@icloud.com)",
+        "phone (4696849362 vs 9729000103)"
+      ]
+    },
+    {
+      "csvName": "Basem Gharbieh",
+      "contactId": "650431b2-83eb-48f9-9a7c-1a0da62b5746",
+      "contactName": "Basem Gharbieh",
+      "conflicts": [
+        "email (basemag01@yahoo.com vs basemag1@gmail.com)"
+      ]
+    },
+    {
+      "csvName": "Fatima",
+      "contactId": "c3f97dda-a308-48c0-b8d7-dc7e9f75189d",
+      "contactName": "Fatima",
+      "conflicts": [
+        "phone (7738227941 vs 4692356526)"
+      ]
+    },
+    {
+      "csvName": "Fatima Sarsour",
+      "contactId": "811d7cba-5f61-424f-a412-8af7f4ce9ee1",
+      "contactName": "Fatima Sarsour",
+      "conflicts": [
+        "phone (4699396755 vs 4693288282)"
+      ]
+    },
+    {
+      "csvName": "Fuad",
+      "contactId": "15d9696a-2fe6-406e-8856-ad0bd7f3a469",
+      "contactName": "Fuad",
+      "conflicts": [
+        "email (ferejfuad@gmail.com vs qualitywholesale3@hotmail.com)",
+        "phone (4159108037 vs 2254451232)"
+      ]
+    },
+    {
+      "csvName": "Hala Halabi",
+      "contactId": "3fff739f-9b01-4136-83e9-08ea31cf67d7",
+      "contactName": "Hala Halabi",
+      "conflicts": [
+        "phone (9729776304 vs 2142429975)"
+      ]
+    },
+    {
+      "csvName": "Huda Elbawwab",
+      "contactId": "d161a232-43b1-41cc-a8f2-1daf43403473",
+      "contactName": "Huda Elbawwab",
+      "conflicts": [
+        "phone (8178082573 vs 8177603554)"
+      ]
+    },
+    {
+      "csvName": "Husam Barham: Barham",
+      "contactId": "bd995ea3-ab24-472d-b730-897ef67447fd",
+      "contactName": "Husam Barham",
+      "conflicts": [
+        "email (husam_barham@yahoo.com vs husam.a.barham@gmail.com)"
+      ]
+    },
+    {
+      "csvName": "Ismail Wafa",
+      "contactId": "7684c63d-0181-4382-9732-4b3288235e0e",
+      "contactName": "Wafa Manasrah",
+      "conflicts": [
+        "email (wafa.manasrah@gmail.com vs aymanandwafaa@gmail.com)"
+      ]
+    },
+    {
+      "csvName": "Jehad Alzyoud",
+      "contactId": "fd1410f7-e82c-4f60-9cae-aef361515eb6",
+      "contactName": "Jehad Alzyoud",
+      "conflicts": [
+        "email (jzyuod_pt@hotmail.com vs jzyuod-pt@hotmail.com)"
+      ]
+    },
+    {
+      "csvName": "Khadiga Alyhabib",
+      "contactId": "3ed53518-9e43-4330-b4f9-c41977be88e5",
+      "contactName": "Waleed Yousry",
+      "conflicts": [
+        "phone (7736001522 vs 7086295525)"
+      ]
+    },
+    {
+      "csvName": "Khalid",
+      "contactId": "e3bf53ea-cfb9-4caf-9d40-2d275d4818f9",
+      "contactName": "Khalid",
+      "conflicts": [
+        "email (clerics-argyles-0l@icloud.com vs khaliddweik@outlook.com)",
+        "phone (7735101911 vs 9725236069)"
+      ]
+    },
+    {
+      "csvName": "Mahdi Al Hallaq",
+      "contactId": "bf27f803-30fa-4f0a-8981-f110ee963293",
+      "contactName": "Mahdi Hallaq",
+      "conflicts": [
+        "phone (5028020245 vs 5028028927)"
+      ]
+    },
+    {
+      "csvName": "Mahmoud Khanshour",
+      "contactId": "de7e5ffd-2e6c-44f5-8c0d-e097d7c469a5",
+      "contactName": "Mahmoud Khanshour",
+      "conflicts": [
+        "phone (4694109518 vs 4699109518)"
+      ]
+    },
+    {
+      "csvName": "Muhammad Ahmed",
+      "contactId": "b1446e01-63d1-4c02-9ff9-8a8bf41b0b9e",
+      "contactName": "Muhammad Nauman Ahmed",
+      "conflicts": [
+        "email (engrnauman@gmail.com vs muhammad.swilam.2010@gmail.com)",
+        "phone (9728355018 vs 6143703638)"
+      ]
+    },
+    {
+      "csvName": "Mustafa Amil",
+      "contactId": "865055b5-85bc-4010-9b64-9fd32210f234",
+      "contactName": "Mustafa Amil",
+      "conflicts": [
+        "phone (4054135380 vs 9729220040)"
+      ]
+    },
+    {
+      "csvName": "Nadia Takieddine",
+      "contactId": "0363d863-0f31-47e5-8f14-8057b35fa6a7",
+      "contactName": "Nadia Takieddine",
+      "conflicts": [
+        "phone (9728355262 vs 9728352621)"
+      ]
+    },
+    {
+      "csvName": "Neveen Nofal",
+      "contactId": "091503f6-6b61-4138-ac0b-0c2c183e2126",
+      "contactName": "Neveen Nofal",
+      "conflicts": [
+        "email (neveen.nofalorph@gmail.com vs neveen.nofal.rph@gmail.com)"
+      ]
+    },
+    {
+      "csvName": "Omar Said",
+      "contactId": "df195212-e6df-4139-bfd1-e9d6d5a1522b",
+      "contactName": "Omar Said",
+      "conflicts": [
+        "phone (6283587650 vs 6283587659)"
+      ]
+    },
+    {
+      "csvName": "Rana",
+      "contactId": "dc795113-ac69-44c0-bb74-e98a610226bf",
+      "contactName": "Rana",
+      "conflicts": [
+        "phone (2149917680 vs 2127299597)"
+      ]
+    },
+    {
+      "csvName": "Saja Awad",
+      "contactId": "516ed4ae-7736-4e13-b1a1-b749a3dbb866",
+      "contactName": "Saja Awad",
+      "conflicts": [
+        "phone (2145295367 vs 9739681209)"
+      ]
+    },
+    {
+      "csvName": "Sunia Khatri",
+      "contactId": "7f0f513f-c0b5-4d2b-a5c4-3f6431a57c61",
+      "contactName": "Sunia Khatri",
+      "conflicts": [
+        "phone (7733307932 vs 3124794405)"
+      ]
+    },
+    {
+      "csvName": "Syed J. Haq",
+      "contactId": "72a0e7df-5c32-4bfe-a39d-b61ab3056ff7",
+      "contactName": "Syed Haq",
+      "conflicts": [
+        "email (shaq_dee@yahoo.com vs jawwad_1992@yahoo.com)",
+        "phone (2142001380 vs 2146038424)"
+      ]
+    },
+    {
+      "csvName": "Tamalli Omar",
+      "contactId": "5190de6c-b8e1-4bfd-abbe-5a6e7c9743b3",
+      "contactName": "Omar Tamalli",
+      "conflicts": [
+        "phone (9727406496 vs 2145774195)"
+      ]
+    },
+    {
+      "csvName": "Umar Latif",
+      "contactId": "83739cea-e367-4648-b748-18ab15fd122e",
+      "contactName": "Umar Latif",
+      "conflicts": [
+        "phone (2147734055 vs 4693253722)"
+      ]
+    },
+    {
+      "csvName": "Usamah Ali &",
+      "contactId": "2ddbd25b-8f8d-41af-8255-1b1a4b541771",
+      "contactName": "Usamah Ali",
+      "conflicts": [
+        "phone (2146803869 vs 4692316684)"
+      ]
+    },
+    {
+      "csvName": "Waleed Yousry",
+      "contactId": "3ed53518-9e43-4330-b4f9-c41977be88e5",
+      "contactName": "Waleed Yousry",
+      "conflicts": [
+        "email (kalyha1@yahoo.com vs walid.you@gmail.com)"
+      ]
+    },
+    {
+      "csvName": "Zaid Hammad",
+      "contactId": "d46157d2-20a3-4866-8a13-d3ac64d2f6f4",
+      "contactName": "Green Vine Market",
+      "conflicts": [
+        "email (contact@greenvinemarket.com vs zaidhammad@gmail.com)"
+      ]
+    }
+  ],
+  "fuzzyMatches": [
+    {
+      "csvName": "Abdelrahman Abdelrahman",
+      "matchedName": "Osama Abdelrahman",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "Abu Zahra Nabil",
+      "matchedName": "Nabil Zahra",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "Ahmad Kamal",
+      "matchedName": "Ali Chaaban/Ahmad Kamal (Hi 5)",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "Ahmed Mostafa",
+      "matchedName": "Mostafa Ahmed",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "Ahmed Reda Ahmed",
+      "matchedName": "Aisha Ahmed",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "Ashraf Omar Omar",
+      "matchedName": "Omar Gharbieh",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "Babaa Amjad S",
+      "matchedName": "Amjad Babaa",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "Mahdi Al Hallaq",
+      "matchedName": "Mahdi Hallaq",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "Mohammed Amin",
+      "matchedName": "Mohammed Al-Amin",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "Muhammad Ahmed",
+      "matchedName": "Muhammad Nauman Ahmed",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "Shaania Sakhia",
+      "matchedName": "SHAANIA NAIM SAKHIA",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "Syed J. Haq",
+      "matchedName": "Syed Haq",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "Tamalli Omar",
+      "matchedName": "Omar Tamalli",
+      "reason": "fuzzy_name:85"
+    }
+  ],
+  "errors": [],
+  "samples": [
+    {
+      "csvName": "Aadil Sabeeh",
+      "contactId": "3e4ef429-dd2f-4fcd-b9d3-ffc338341823",
+      "contactName": "Aadil Sabeeh",
+      "matchReason": "created",
+      "email": "aadilsabeeh@icloud.com",
+      "phone": "3612447110"
+    },
+    {
+      "csvName": "Abdalla Eltayeb",
+      "contactId": "a2065442-585c-4973-9c54-0bd97c8861d3",
+      "contactName": "Abdalla Eltayeb",
+      "matchReason": "created",
+      "email": "abdallalol42@gmail.com",
+      "phone": "7622167277"
+    },
+    {
+      "csvName": "Abdallah Emran",
+      "contactId": "2adb2c8e-7e76-4c7f-839e-69939e7d99d0",
+      "contactName": "Abdallah Emran",
+      "matchReason": "phone",
+      "email": "abdallahemran99@gmail.com",
+      "phone": "(469) 267-7996"
+    },
+    {
+      "csvName": "Abdallah Idir",
+      "contactId": "56c84f51-e88b-432e-9101-8bd8c0478023",
+      "contactName": "Abdallah Idir",
+      "matchReason": "created",
+      "email": "idirabd1@yahoo.fr",
+      "phone": "9193491231"
+    },
+    {
+      "csvName": "Abdallah Maazaoui",
+      "contactId": "a8f72680-accc-43b2-8b09-f337b846ce78",
+      "contactName": "Abdallah Maazaoui",
+      "matchReason": "created",
+      "email": "abdallahmaazaoui@me.com",
+      "phone": "8179884465"
+    },
+    {
+      "csvName": "Abdel Karim Tayiem",
+      "contactId": "ef85cd30-a109-4647-8d31-b6761483a749",
+      "contactName": "Abdel Karim Tayiem",
+      "matchReason": "created",
+      "email": "atayiem@yahoo.com",
+      "phone": "9136832483"
+    },
+    {
+      "csvName": "Abdelkebir Hachlafi",
+      "contactId": "83b23cea-96c7-43ef-b2e6-78fb61716f02",
+      "contactName": "Abdelkebir Hachlafi",
+      "matchReason": "created",
+      "email": "gkebir70@yahoo.com",
+      "phone": "6175962186"
+    },
+    {
+      "csvName": "Abdelmajid Attili",
+      "contactId": "e8e75db3-ab80-4a4a-9386-95d18a3f2b7b",
+      "contactName": "AbdulMajeed Attili",
+      "matchReason": "email",
+      "email": "majidattili@gmail.com",
+      "phone": "(972) 898-1579"
+    },
+    {
+      "csvName": "Abdelouahed Manaa",
+      "contactId": "626ee431-4738-4367-a0f5-20851201d0e1",
+      "contactName": "Abdelouahed Manaa",
+      "matchReason": "created",
+      "email": "manaa.abdelouahed@gmail.com",
+      "phone": "8177249265"
+    },
+    {
+      "csvName": "Abdelrahman Abdelrahman",
+      "contactId": "064e6088-44eb-4f7e-bf04-70236288f4c1",
+      "contactName": "Osama Abdelrahman",
+      "matchReason": "fuzzy_name:85",
+      "email": "abdel.clipz@gmail.com",
+      "phone": "(505) 319-6154"
+    },
+    {
+      "csvName": "Abdelrahman Elarja",
+      "contactId": "d44310d8-690d-464b-a64d-160a12cda613",
+      "contactName": "Abdelrahman Elarja",
+      "matchReason": "phone",
+      "email": "abdeler@gmail.com",
+      "phone": "(702) 587-5562"
+    },
+    {
+      "csvName": "Abdul Syed",
+      "contactId": "50527078-953f-472b-beff-26caf2af2fd5",
+      "contactName": "Abdul Syed",
+      "matchReason": "created",
+      "email": "junaid453@gmail.com",
+      "phone": "8163434364"
+    }
+  ]
+}

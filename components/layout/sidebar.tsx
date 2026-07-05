@@ -878,7 +878,7 @@ function ModuleSubNavContent() {
 
   return (
     <aside className="hidden h-screen w-[200px] shrink-0 flex-col border-r border-zinc-200 bg-zinc-50/80 text-zinc-900 lg:flex">
-      <div className="flex h-[88px] items-end border-b border-zinc-200 px-4 pb-3">
+      <div className="flex h-[220px] items-end border-b border-zinc-200 px-4 pb-3">
         <p className="text-sm font-semibold text-zinc-900">{activeModule.label}</p>
       </div>
       <SidebarSubNavLinks module={activeModule} />
@@ -888,15 +888,17 @@ function ModuleSubNavContent() {
 
 function SidebarHeader() {
   return (
-    <div className="flex h-[88px] items-center justify-center overflow-hidden border-b border-zinc-200 px-2">
-      <Image
-        src="/logo.png"
-        alt="Manaratee"
-        width={240}
-        height={120}
-        className="h-auto w-full origin-center scale-[1.45] object-contain"
-        priority
-      />
+    <div className="border-b border-zinc-200 p-2">
+      <div className="relative aspect-square w-full">
+        <Image
+          src="/Logo2.png"
+          alt="Manaratee"
+          fill
+          sizes="220px"
+          className="object-contain"
+          priority
+        />
+      </div>
     </div>
   )
 }
@@ -979,26 +981,28 @@ function MobileSidebarContent() {
       <SheetContent side="left" className="w-[280px] border-r border-zinc-200 bg-white p-0 text-zinc-900">
         <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
 
-        <div className="flex items-center justify-between border-b border-zinc-200 px-3 py-3">
-          <div className="flex h-[72px] min-w-0 flex-1 items-center overflow-hidden pr-2">
+        <div className="flex items-center justify-between border-b border-zinc-200 p-2">
+          <div className="relative min-w-0 flex-1 pr-2">
             {mobileModule ? (
               <button
                 type="button"
                 onClick={() => setMobileModule(null)}
-                className="flex items-center gap-2 text-sm font-medium text-zinc-700 hover:text-amber-700"
+                className="flex h-[72px] items-center gap-2 text-sm font-medium text-zinc-700 hover:text-amber-700"
               >
                 <ChevronLeft className="h-4 w-4" />
                 Back
               </button>
             ) : (
-              <Image
-                src="/logo.png"
-                alt="Manaratee"
-                width={220}
-                height={100}
-                className="h-auto w-full origin-center scale-[1.35] object-contain"
-                priority
-              />
+              <div className="relative mx-auto aspect-square w-full max-w-[180px]">
+                <Image
+                  src="/Logo2.png"
+                  alt="Manaratee"
+                  fill
+                  sizes="180px"
+                  className="object-contain"
+                  priority
+                />
+              </div>
             )}
           </div>
 

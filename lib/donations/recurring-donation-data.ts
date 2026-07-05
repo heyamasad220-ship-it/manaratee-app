@@ -21,7 +21,7 @@ export async function fetchRecurringPlans(
   let query = supabase
     .from("recurring_donation_plans")
     .select(
-      "*, donors(full_name, email), campaigns(name)"
+      "*, donors(full_name, email), contacts(phone), donation_categories(name), donation_subcategories(name), campaigns(name)"
     )
     .eq("organization_id", organizationId)
     .order("next_payment_date", { ascending: true })
@@ -31,6 +31,30 @@ export async function fetchRecurringPlans(
 
   const { data, error } = await query
   if (error) throw new Error(error.message)
+
+  const linkedPaymentCountByPlanId = new Map<string, number>()
+  let paymentFrom = 0
+
+  while (true) {
+    const { data: paymentRows, error: paymentError } = await supabase
+      .from("payments")
+      .select("recurring_donation_plan_id, status")
+      .eq("organization_id", organizationId)
+      .not("recurring_donation_plan_id", "is", null)
+      .range(paymentFrom, paymentFrom + 999)
+
+    if (paymentError) throw new Error(paymentError.message)
+    if (!paymentRows?.length) break
+
+    for (const payment of paymentRows) {
+      if (isVoidedPayment(payment.status)) continue
+      const planId = payment.recurring_donation_plan_id as string
+      linkedPaymentCountByPlanId.set(planId, (linkedPaymentCountByPlanId.get(planId) || 0) + 1)
+    }
+
+    if (paymentRows.length < 1000) break
+    paymentFrom += 1000
+  }
 
   return (data || []).map((row: any) => ({
     id: row.id,
@@ -47,6 +71,8 @@ export async function fetchRecurringPlans(
     start_date: row.start_date,
     next_payment_date: row.next_payment_date,
     end_date: row.end_date,
+    total_payments: row.total_payments == null ? null : Number(row.total_payments),
+    payments_made: row.payments_made == null ? null : Number(row.payments_made),
     notes: row.notes,
     external_processor: row.external_processor,
     external_processor_id: row.external_processor_id,
@@ -55,7 +81,11 @@ export async function fetchRecurringPlans(
     updated_at: row.updated_at,
     donor_name: row.donors?.full_name ?? null,
     donor_email: row.donors?.email ?? null,
+    donor_phone: row.contacts?.phone ?? null,
+    category_name: row.donation_categories?.name ?? null,
+    fund_name: row.donation_subcategories?.name ?? null,
     campaign_name: row.campaigns?.name ?? null,
+    linked_payment_count: linkedPaymentCountByPlanId.get(row.id) || 0,
   }))
 }
 

@@ -38,7 +38,6 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Search,
   Plus,
   ArrowUpDown,
   Heart,
@@ -98,6 +97,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import { TableColumnHeaderFilter } from "@/components/ui/table-column-header-filter";
 
 interface Pledge {
   id: string;
@@ -292,12 +292,10 @@ export default function PledgesPage() {
   const [showDonorList, setShowDonorList] = useState(false);
   const [showQuickAddContact, setShowQuickAddContact] = useState(false);
   const [organizationId, setOrganizationId] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [donorNameFilter, setDonorNameFilter] = useState("");
+  const [donorNameFilterInput, setDonorNameFilterInput] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [campaignFilter, setCampaignFilter] = useState<string>("all");
-  const [minAmountFilter, setMinAmountFilter] = useState("");
-  const [debouncedMinAmount, setDebouncedMinAmount] = useState<number | undefined>(undefined);
   const [page, setPage] = useState(1);
   const [totalPledges, setTotalPledges] = useState(0);
   const [summaryMetrics, setSummaryMetrics] = useState<PledgeSummaryMetrics>({
@@ -503,17 +501,15 @@ export default function PledgesPage() {
     const pageResult = await fetchPledgesPageAction({
         page: nextPage,
         pageSize: DONATIONS_PAGE_SIZE,
-        search: debouncedSearch || undefined,
+        search: donorNameFilter || undefined,
         status: statusFilter === "all" ? undefined : statusMap[statusFilter],
         campaignId: campaignFilter === "all" ? undefined : campaignFilter,
-        minAmountPledged: debouncedMinAmount,
       });
 
     const metricsResult = await fetchPledgeSummaryMetricsAction({
-      search: debouncedSearch || undefined,
+      search: donorNameFilter || undefined,
       status: statusFilter === "all" ? undefined : statusMap[statusFilter],
       campaignId: campaignFilter === "all" ? undefined : campaignFilter,
-      minAmountPledged: debouncedMinAmount,
     });
 
     if (!pageResult.success) {
@@ -613,27 +609,18 @@ export default function PledgesPage() {
   };
 
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    const timer = setTimeout(() => setDonorNameFilter(donorNameFilterInput), 300);
     return () => clearTimeout(timer);
-  }, [search]);
-
-  useEffect(() => {
-    const trimmed = minAmountFilter.trim();
-    const parsed = trimmed ? Number(trimmed.replace(/,/g, "")) : NaN;
-    const timer = setTimeout(() => {
-      setDebouncedMinAmount(Number.isFinite(parsed) && parsed > 0 ? parsed : undefined);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [minAmountFilter]);
+  }, [donorNameFilterInput]);
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, statusFilter, campaignFilter, debouncedMinAmount]);
+  }, [donorNameFilter, statusFilter, campaignFilter]);
 
   useEffect(() => {
     fetchPledges(page);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, statusFilter, campaignFilter, debouncedMinAmount, page]);
+  }, [donorNameFilter, statusFilter, campaignFilter, page]);
 
   useEffect(() => {
     if (window.location.hash === "#collection-queue") {
@@ -1007,56 +994,7 @@ export default function PledgesPage() {
   return (
     <>
       <div className="p-6">
-        <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-1 flex-col gap-2 sm:flex-row sm:items-center">
-            <div className="relative max-w-sm flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search pledges..."
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                className="pl-9"
-              />
-            </div>
-
-            <Select value={campaignFilter} onValueChange={setCampaignFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Campaign" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Campaigns</SelectItem>
-                <SelectItem value="__none__">Unassigned</SelectItem>
-                {campaignOptions.map((campaign) => (
-                  <SelectItem key={campaign.id} value={campaign.id}>
-                    {campaign.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="Open">Open</SelectItem>
-                <SelectItem value="Partial">Partial</SelectItem>
-                <SelectItem value="Fulfilled">Fulfilled</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Input
-              type="number"
-              min={0}
-              step={1}
-              placeholder="Min amount ($)"
-              value={minAmountFilter}
-              onChange={(event) => setMinAmountFilter(event.target.value)}
-              className="w-[150px]"
-            />
-          </div>
-
+        <div className="mb-4 flex justify-end">
           <Button onClick={() => setShowAddDialog(true)}>
             <Plus className="mr-2 h-4 w-4" />
             Add Pledge
@@ -1075,16 +1013,91 @@ export default function PledgesPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>
-                    <Button variant="ghost" className="h-auto p-0 font-medium hover:bg-transparent">
-                      Donor
-                      <ArrowUpDown className="ml-2 h-4 w-4" />
-                    </Button>
+                    <TableColumnHeaderFilter
+                      label="Donor Name"
+                      active={Boolean(donorNameFilter.trim())}
+                      trailing={
+                        <Button
+                          variant="ghost"
+                          className="h-auto p-0 font-medium hover:bg-transparent"
+                        >
+                          <ArrowUpDown className="h-4 w-4" />
+                        </Button>
+                      }
+                    >
+                      {({ close }) => (
+                        <Input
+                          placeholder="Search by name"
+                          value={donorNameFilterInput}
+                          onChange={(event) => setDonorNameFilterInput(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                              setDonorNameFilter(donorNameFilterInput)
+                              close()
+                            }
+                          }}
+                        />
+                      )}
+                    </TableColumnHeaderFilter>
                   </TableHead>
                   <TableHead>Amount Pledged</TableHead>
                   <TableHead>Amount Paid</TableHead>
                   <TableHead>Balance</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Campaign</TableHead>
+                  <TableHead>
+                    <TableColumnHeaderFilter
+                      label="Status"
+                      active={statusFilter !== "all"}
+                    >
+                      {({ close }) => (
+                        <Select
+                          value={statusFilter}
+                          onValueChange={(value) => {
+                            setStatusFilter(value)
+                            close()
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select Status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All Status</SelectItem>
+                            <SelectItem value="Open">Open</SelectItem>
+                            <SelectItem value="Partial">Partial</SelectItem>
+                            <SelectItem value="Fulfilled">Fulfilled</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </TableColumnHeaderFilter>
+                  </TableHead>
+                  <TableHead>
+                    <TableColumnHeaderFilter
+                      label="Campaign"
+                      active={campaignFilter !== "all"}
+                    >
+                      {({ close }) => (
+                        <Select
+                          value={campaignFilter}
+                          onValueChange={(value) => {
+                            setCampaignFilter(value)
+                            close()
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select Campaign" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All Campaigns</SelectItem>
+                            <SelectItem value="__none__">Unassigned</SelectItem>
+                            {campaignOptions.map((campaign) => (
+                              <SelectItem key={campaign.id} value={campaign.id}>
+                                {campaign.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </TableColumnHeaderFilter>
+                  </TableHead>
                   <TableHead>Last Reminder</TableHead>
                   <TableHead>Last Contacted</TableHead>
                   <TableHead className="text-right">Actions</TableHead>

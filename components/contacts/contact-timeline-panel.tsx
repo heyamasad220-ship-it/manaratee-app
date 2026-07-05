@@ -29,7 +29,8 @@ export function ContactTimelinePanel({ items, loading = false }: ContactTimeline
         <div className="mb-4">
           <h2 className="text-lg font-semibold">Timeline</h2>
           <p className="text-sm text-muted-foreground">
-            Important events across contacts, teams, programs, and other modules.
+            Staff and module activity from the reset date forward. Import history and older events
+            are hidden here but remain in Financial and other tabs.
           </p>
         </div>
 

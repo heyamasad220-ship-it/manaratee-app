@@ -22,6 +22,9 @@ export function calculateNextPaymentDate(
   const next = new Date(base)
 
   switch (frequency) {
+    case "daily":
+      next.setDate(next.getDate() + 1)
+      break
     case "weekly":
       next.setDate(next.getDate() + 7)
       break
@@ -50,7 +53,7 @@ export function initialNextPaymentDate(
 
   let cursor = formatDateOnly(start)
   let guard = 0
-  while (toDateOnly(cursor) < today && guard < 500) {
+  while (toDateOnly(cursor) < today && guard < 2000) {
     cursor = calculateNextPaymentDate(cursor, frequency)
     guard += 1
   }

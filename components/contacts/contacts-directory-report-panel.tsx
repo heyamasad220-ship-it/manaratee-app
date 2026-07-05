@@ -27,9 +27,8 @@ import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
 import { clearSelectedOrganizationIdCache } from "@/lib/current-organization"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import {
   Select,
   SelectContent,
@@ -45,6 +44,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { TableColumnHeaderFilter } from "@/components/ui/table-column-header-filter"
 import {
   DonationMetricCard,
   DonationMetricCardGrid,
@@ -255,6 +255,23 @@ export function ContactsDirectoryReportPanel() {
   const rangeStart = total === 0 ? 0 : (page - 1) * PREVIEW_PAGE_SIZE + 1
   const rangeEnd = Math.min(page * PREVIEW_PAGE_SIZE, total)
 
+  const hasActiveFilters =
+    Boolean(debouncedSearch.trim()) ||
+    recordType !== "all" ||
+    role !== "all" ||
+    status !== "all" ||
+    teamId !== "all"
+
+  function clearFilters() {
+    setSearch("")
+    setDebouncedSearch("")
+    setRecordType("all")
+    setRole("all")
+    setStatus("all")
+    setTeamId("all")
+    setPage(1)
+  }
+
   return (
     <div className="flex flex-col gap-6 p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -269,100 +286,6 @@ export function ContactsDirectoryReportPanel() {
           {exportingCsv ? "Exporting..." : "Export CSV"}
         </Button>
       </div>
-
-      <Card>
-        <CardHeader className="pb-4">
-          <CardTitle className="text-base">Filters</CardTitle>
-          <CardDescription>
-            Same filters that were removed from list pages — use reports for filtered exports.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-            <div className="space-y-2 xl:col-span-2">
-              <Label htmlFor="contact-report-search">Search</Label>
-              <Input
-                id="contact-report-search"
-                placeholder="Name, email, or phone"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Record type</Label>
-              <Select
-                value={recordType}
-                onValueChange={(value) => setRecordType(value as ContactRecordType | "all")}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {RECORD_TYPE_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Role</Label>
-              <Select
-                value={role}
-                onValueChange={(value) => setRole(value as ContactRoleValue | "all")}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="All roles" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All roles</SelectItem>
-                  {roleOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Status</Label>
-              <Select
-                value={status}
-                onValueChange={(value) => setStatus(value as ContactStatus | "all")}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All statuses</SelectItem>
-                  {STATUS_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2 md:col-span-2 xl:col-span-1">
-              <Label>Team</Label>
-              <Select value={teamId} onValueChange={setTeamId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All teams" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All teams</SelectItem>
-                  {teams.map((team) => (
-                    <SelectItem key={team.id} value={team.id}>
-                      {team.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
       {summaryLoading ? (
         <p className="text-sm text-muted-foreground">Loading summary...</p>
@@ -401,26 +324,147 @@ export function ContactsDirectoryReportPanel() {
         <CardHeader className="pb-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <CardTitle className="text-base">Preview</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              {loading
-                ? "Loading..."
-                : total === 0
-                  ? "No contacts match"
-                  : `Showing ${rangeStart}–${rangeEnd} of ${total.toLocaleString()}`}
-            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              {hasActiveFilters ? (
+                <Button type="button" variant="ghost" size="sm" onClick={clearFilters}>
+                  Clear filters
+                </Button>
+              ) : null}
+              <p className="text-sm text-muted-foreground">
+                {loading
+                  ? "Loading..."
+                  : total === 0
+                    ? "No contacts match"
+                    : `Showing ${rangeStart}–${rangeEnd} of ${total.toLocaleString()}`}
+              </p>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Contact</TableHead>
+                <TableHead>
+                  <TableColumnHeaderFilter
+                    label="Contact"
+                    active={Boolean(debouncedSearch.trim())}
+                  >
+                    {({ close }) => (
+                      <Input
+                        placeholder="Name, email, or phone"
+                        value={search}
+                        onChange={(event) => setSearch(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            setDebouncedSearch(search.trim())
+                            close()
+                          }
+                        }}
+                      />
+                    )}
+                  </TableColumnHeaderFilter>
+                </TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Phone</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Roles</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Teams</TableHead>
+                <TableHead>
+                  <TableColumnHeaderFilter label="Type" active={recordType !== "all"}>
+                    {({ close }) => (
+                      <Select
+                        value={recordType}
+                        onValueChange={(value) => {
+                          setRecordType(value as ContactRecordType | "all")
+                          close()
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {RECORD_TYPE_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </TableColumnHeaderFilter>
+                </TableHead>
+                <TableHead>
+                  <TableColumnHeaderFilter label="Roles" active={role !== "all"}>
+                    {({ close }) => (
+                      <Select
+                        value={role}
+                        onValueChange={(value) => {
+                          setRole(value as ContactRoleValue | "all")
+                          close()
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="All roles" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All roles</SelectItem>
+                          {roleOptions.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </TableColumnHeaderFilter>
+                </TableHead>
+                <TableHead>
+                  <TableColumnHeaderFilter label="Status" active={status !== "all"}>
+                    {({ close }) => (
+                      <Select
+                        value={status}
+                        onValueChange={(value) => {
+                          setStatus(value as ContactStatus | "all")
+                          close()
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All statuses</SelectItem>
+                          {STATUS_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </TableColumnHeaderFilter>
+                </TableHead>
+                <TableHead>
+                  <TableColumnHeaderFilter label="Teams" active={teamId !== "all"}>
+                    {({ close }) => (
+                      <Select
+                        value={teamId}
+                        onValueChange={(value) => {
+                          setTeamId(value)
+                          close()
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="All teams" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All teams</SelectItem>
+                          {teams.map((team) => (
+                            <SelectItem key={team.id} value={team.id}>
+                              {team.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </TableColumnHeaderFilter>
+                </TableHead>
                 <TableHead>Last activity</TableHead>
               </TableRow>
             </TableHeader>
@@ -434,7 +478,16 @@ export function ContactsDirectoryReportPanel() {
               ) : contacts.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
-                    No contacts match the current filters.
+                    {hasActiveFilters ? (
+                      <div className="flex flex-col items-center gap-2">
+                        <span>No contacts match the current filters.</span>
+                        <Button type="button" variant="outline" size="sm" onClick={clearFilters}>
+                          Clear filters
+                        </Button>
+                      </div>
+                    ) : (
+                      "No contacts yet."
+                    )}
                   </TableCell>
                 </TableRow>
               ) : (

@@ -1,0 +1,136 @@
+{
+  "mode": "execute",
+  "paymentsOnly": false,
+  "file": "C:\\Users\\danan\\Downloads\\All CampaignsPledges.csv",
+  "campaignFilter": null,
+  "rowCount": 373,
+  "skippedEmpty": 2,
+  "skippedSummary": 0,
+  "skippedDuplicate": 0,
+  "contactsMatched": 183,
+  "contactsCreated": 129,
+  "groupsMatched": 0,
+  "groupsCreated": 0,
+  "groupMembersLinked": 0,
+  "donorsCreated": 130,
+  "campaignsCreated": 0,
+  "pledgesCreated": 370,
+  "paymentsCreated": 316,
+  "ambiguousMatches": [
+    {
+      "csvName": "Manal Elkarmi & Musa Wadi",
+      "matchedName": "Manal Elkarmi",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "Mounzer Taleb",
+      "matchedName": "Abdur-Rahman Mounzer Taleb",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "Noor Wadi & Mohammed Hassan",
+      "matchedName": "Dr. Mohammed Hassan",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "Mohammed Hassan & Noor Wadi",
+      "matchedName": "Dr. Mohammed Hassan",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "Samer Al-hashmi",
+      "matchedName": "Dr. Samer Hashmi",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "Ehab Faheid/Nahla Hosny",
+      "matchedName": "Dr. Nahla Hosny",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "Dr. Amal Durra",
+      "matchedName": "Dr. Amal Al-Durra",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "Shaania Sakhia",
+      "matchedName": "SHAANIA NAIM SAKHIA",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "Abu Bashar Sharif Ammus",
+      "matchedName": "Abu Bashar",
+      "reason": "fuzzy_name:85"
+    }
+  ],
+  "errors": [],
+  "samples": [
+    {
+      "rowKey": "MAS_CAMPAIGN_LEDGER_V1|32a1bd8ed4c3",
+      "name": "Dr. Ahmad Zankar",
+      "campaign": "September 2025",
+      "pledge": 25000,
+      "effectivePledge": 25000,
+      "payments": []
+    },
+    {
+      "rowKey": "MAS_CAMPAIGN_LEDGER_V1|3e3785b963c4",
+      "name": "Manal Elkarmi & Musa Wadi",
+      "campaign": "October 2024",
+      "pledge": 20000,
+      "effectivePledge": 20000,
+      "payments": []
+    },
+    {
+      "rowKey": "MAS_CAMPAIGN_LEDGER_V1|e6f91293639a",
+      "name": "Mohamad Eido",
+      "campaign": "December 2023",
+      "pledge": 15000,
+      "effectivePledge": 15000,
+      "payments": []
+    },
+    {
+      "rowKey": "MAS_CAMPAIGN_LEDGER_V1|beebd3b33d24",
+      "name": "Dr. Haroon Rasheed",
+      "campaign": "Ramadan 2026",
+      "pledge": 15000,
+      "effectivePledge": 15000,
+      "payments": []
+    },
+    {
+      "rowKey": "MAS_CAMPAIGN_LEDGER_V1|0e0f291f9570",
+      "name": "Mohammed Ashi",
+      "campaign": "September 2025",
+      "pledge": 12500,
+      "effectivePledge": 12500,
+      "payments": []
+    },
+    {
+      "rowKey": "MAS_CAMPAIGN_LEDGER_V1|790b372342b5",
+      "name": "Dr. Musa Wadi",
+      "campaign": "Ramadan 2026",
+      "pledge": 20000,
+      "effectivePledge": 20000,
+      "payments": [
+        10000
+      ]
+    },
+    {
+      "rowKey": "MAS_CAMPAIGN_LEDGER_V1|0cd49eec8d0e",
+      "name": "Elgouhari Family",
+      "campaign": "October 2024",
+      "pledge": 10000,
+      "effectivePledge": 10000,
+      "payments": []
+    },
+    {
+      "rowKey": "MAS_CAMPAIGN_LEDGER_V1|c72a00caaae9",
+      "name": "Hesham Algawhari",
+      "campaign": "March 2023",
+      "pledge": 10000,
+      "effectivePledge": 10000,
+      "payments": []
+    }
+  ],
+  "batchDepositsCreated": 1
+}

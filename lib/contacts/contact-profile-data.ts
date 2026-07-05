@@ -6,6 +6,12 @@ import {
 } from "@/lib/contacts/contact-activities"
 import type { ContactRoleValue } from "@/lib/contacts/contact-constants"
 import { ROLE_VALUE_TO_LABEL } from "@/lib/contacts/contact-constants"
+import {
+  isImportTimelinePayment,
+  isImportTimelinePledge,
+  parseContactTimelineResetAt,
+  shouldIncludeInContactTimeline,
+} from "@/lib/contacts/contact-timeline-rules"
 import { getVenueRentalStatusLabel } from "@/lib/bookings/venue-rental-status"
 import type { VenueRentalStatus } from "@/lib/bookings/venue-rental-types"
 
@@ -133,8 +139,29 @@ export async function fetchContactProfileData(
   let activeTeamsCount = 0
   const notes: ContactNoteRecord[] = []
 
+  let timelineResetAt: string | null = null
+  const { data: orgRow, error: orgRowError } = await supabase
+    .from("organizations")
+    .select("contact_timeline_reset_at")
+    .eq("id", orgId)
+    .maybeSingle()
+
+  if (!orgRowError) {
+    timelineResetAt = parseContactTimelineResetAt(
+      orgRow?.contact_timeline_reset_at as string | null | undefined
+    )
+  }
+
+  function pushTimeline(
+    item: ContactTimelineItem,
+    options: { imported?: boolean } = {}
+  ) {
+    if (!shouldIncludeInContactTimeline(item.date, timelineResetAt, options)) return
+    timeline.push(item)
+  }
+
   if (contactCreatedAt) {
-    timeline.push({
+    pushTimeline({
       id: `contact-created-${contactId}`,
       date: contactCreatedAt,
       title: "Contact created",
@@ -152,7 +179,7 @@ export async function fetchContactProfileData(
     const roleLabel =
       ROLE_VALUE_TO_LABEL[roleRow.role as ContactRoleValue] ||
       roleRow.role.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())
-    timeline.push({
+    pushTimeline({
       id: `role-${roleRow.id}`,
       date: roleRow.created_at || contactCreatedAt || new Date().toISOString(),
       title: `${roleLabel} role added`,
@@ -178,7 +205,7 @@ export async function fetchContactProfileData(
     if (row.status === "active") activeTeamsCount += 1
     const teamName = (row as any).hr_teams?.name || "Team"
     const positionName = (row as any).hr_team_positions?.name
-    timeline.push({
+    pushTimeline({
       id: `team-${row.id}`,
       date: row.start_date || row.created_at,
       title: `Assigned to ${teamName}`,
@@ -214,7 +241,7 @@ export async function fetchContactProfileData(
       else if (row.module === "donations") activity.donations.push(record)
       else if (row.module === "vendorHub") activity.vendorHub.push(record)
 
-      timeline.push({
+      pushTimeline({
         id: `ledger-${row.id}`,
         date: row.activity_date || row.created_at,
         title: row.title,
@@ -228,7 +255,7 @@ export async function fetchContactProfileData(
 
   const { data: payments } = await supabase
     .from("payments")
-    .select("id, amount, payment_date, source, status, memo")
+    .select("id, amount, payment_date, source, source_type, import_batch_id, status, memo")
     .eq("organization_id", orgId)
     .eq("contact_id", contactId)
     .order("payment_date", { ascending: false })
@@ -253,14 +280,17 @@ export async function fetchContactProfileData(
       memo: payment.memo,
       status: payment.status,
     })
-    timeline.push({
-      id: `payment-${payment.id}`,
-      date: payment.payment_date,
-      title: payment.memo || "Donation made",
-      module: "Donations",
-      amount: Number(payment.amount) || 0,
-      status: payment.status,
-    })
+    pushTimeline(
+      {
+        id: `payment-${payment.id}`,
+        date: payment.payment_date,
+        title: payment.memo || "Donation made",
+        module: "Donations",
+        amount: Number(payment.amount) || 0,
+        status: payment.status,
+      },
+      { imported: isImportTimelinePayment(payment) }
+    )
   }
 
   const { data: donorRows } = await supabase
@@ -283,7 +313,7 @@ export async function fetchContactProfileData(
   if (donorIds.length > 0) {
     const { data: pledgeRows } = await supabase
       .from("pledge_status_view")
-      .select("id, amount_pledged, pledge_date, calculated_status, campaign_name, amount_paid")
+      .select("id, amount_pledged, pledge_date, calculated_status, campaign_name, amount_paid, notes")
       .eq("organization_id", orgId)
       .in("donor_id", donorIds)
       .order("pledge_date", { ascending: false })
@@ -304,14 +334,17 @@ export async function fetchContactProfileData(
       amount: Number(pledge.amount_pledged) || 0,
       status: pledge.calculated_status,
     })
-    timeline.push({
-      id: `pledge-${pledge.id}`,
-      date: pledgeDate,
-      title: `Pledge: ${pledgeTitle}`,
-      module: "Donations",
-      amount: Number(pledge.amount_pledged) || 0,
-      status: pledge.calculated_status,
-    })
+    pushTimeline(
+      {
+        id: `pledge-${pledge.id}`,
+        date: pledgeDate,
+        title: `Pledge: ${pledgeTitle}`,
+        module: "Donations",
+        amount: Number(pledge.amount_pledged) || 0,
+        status: pledge.calculated_status,
+      },
+      { imported: isImportTimelinePledge(pledge) }
+    )
   }
 
   async function appendEnrollmentActivity(
@@ -340,7 +373,7 @@ export async function fetchContactProfileData(
         date: enrollment.enrollment_date || enrollment.created_at,
         status: enrollment.status || enrollment.payment_status,
       })
-      timeline.push({
+      pushTimeline({
         id: `enrollment-${enrollment.id}`,
         date: enrollment.enrollment_date || enrollment.created_at || new Date().toISOString(),
         title: `Registered for ${programName}`,
@@ -401,7 +434,7 @@ export async function fetchContactProfileData(
         amount: booking.total_amount != null ? Number(booking.total_amount) : null,
         status: booking.status,
       })
-      timeline.push({
+      pushTimeline({
         id: `booking-${booking.id}`,
         date: booking.event_date || booking.created_at,
         title: booking.event_name ? `Booked ${booking.event_name}` : "Venue booked",
@@ -469,7 +502,7 @@ export async function fetchContactProfileData(
         status: rental.status,
       })
 
-      timeline.push({
+      pushTimeline({
         id: `venue-rental-${rental.id}`,
         date: primaryDate || rental.created_at,
         title: eventTypeName ? `Venue rental: ${eventTypeName}` : "Venue rental",
@@ -496,7 +529,7 @@ export async function fetchContactProfileData(
       date: vendor.created_at,
       status: vendor.status,
     })
-    timeline.push({
+    pushTimeline({
       id: `vendor-${vendor.id}`,
       date: vendor.created_at,
       title: vendor.business_name
@@ -522,7 +555,7 @@ export async function fetchContactProfileData(
         author_id: (note as any).author_id ?? null,
         note_type: (note as any).note_type ?? null,
       })
-      timeline.push({
+      pushTimeline({
         id: `note-${note.id}`,
         date: note.created_at,
         title: "Note added",

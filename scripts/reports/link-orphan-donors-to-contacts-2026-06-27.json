@@ -1,0 +1,19 @@
+{
+  "generatedAt": "2026-06-27T18:00:56.516Z",
+  "orgId": "e057e00a-e4e3-4adf-9af5-f465db1894be",
+  "execute": true,
+  "orphanDonorsScanned": 0,
+  "brokenContactLinks": 0,
+  "linked": 0,
+  "merged": 0,
+  "contactsCreated": 0,
+  "matchedExistingContact": 0,
+  "skippedNoPayments": 0,
+  "affiliationsSynced": 0,
+  "paymentContactBackfill": {
+    "wouldBackfill": 0,
+    "backfilled": 0
+  },
+  "errors": [],
+  "samples": []
+}

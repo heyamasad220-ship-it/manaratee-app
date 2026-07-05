@@ -41,11 +41,71 @@ export function normalizePaymentSourceChannel(
   return "manual"
 }
 
+const PAYMENT_SOURCE_LABELS: Record<PaymentSourceChannel, string> = {
+  cash: "Cash",
+  check: "Check",
+  square: "Square",
+  zelle: "Zelle",
+  venmo: "Venmo",
+  paypal: "PayPal",
+  stripe: "Stripe",
+  import: "Import",
+  manual: "Manual",
+}
+
 export function formatPaymentSourceLabel(channel: string | null | undefined): string {
   const normalized = normalizePaymentSourceChannel(channel)
-  if (normalized === "paypal") return "PayPal"
-  if (normalized === "square") return "Square"
-  return normalized.charAt(0).toUpperCase() + normalized.slice(1)
+  return PAYMENT_SOURCE_LABELS[normalized]
+}
+
+/** Financial activity Method column: hide generic manual/import labels; show card last4 for Stripe. */
+export function formatFinancialTimelinePaymentMethod(input: {
+  source?: string | null
+  stripeCardLast4?: string | null
+}): string | null {
+  const channel = normalizePaymentSourceChannel(input.source)
+  if (channel === "manual" || channel === "import") return null
+
+  if (channel === "stripe") {
+    const last4 = String(input.stripeCardLast4 ?? "")
+      .replace(/\D/g, "")
+      .slice(-4)
+    return last4.length === 4 ? `•••• ${last4}` : "Stripe"
+  }
+
+  return formatPaymentSourceLabel(channel)
+}
+
+export function extractStripeCardLast4FromProcessorPayload(payload: unknown): string | null {
+  if (!payload || typeof payload !== "object") return null
+
+  const last4FromCard = (card: unknown): string | null => {
+    if (!card || typeof card !== "object") return null
+    const raw = String((card as Record<string, unknown>).last4 ?? "").replace(/\D/g, "")
+    return raw.length === 4 ? raw : null
+  }
+
+  const root = payload as Record<string, unknown>
+  const charges = root.charges as { data?: unknown[] } | undefined
+  if (Array.isArray(charges?.data)) {
+    for (const charge of charges.data) {
+      if (!charge || typeof charge !== "object") continue
+      const paymentMethodDetails = (charge as Record<string, unknown>)
+        .payment_method_details as Record<string, unknown> | undefined
+      const fromCharge = last4FromCard(paymentMethodDetails?.card)
+      if (fromCharge) return fromCharge
+    }
+  }
+
+  const paymentMethodDetails = root.payment_method_details as Record<string, unknown> | undefined
+  const fromDetails = last4FromCard(paymentMethodDetails?.card)
+  if (fromDetails) return fromDetails
+
+  const paymentMethod = root.payment_method as Record<string, unknown> | undefined
+  const fromPaymentMethod = last4FromCard(paymentMethod?.card)
+  if (fromPaymentMethod) return fromPaymentMethod
+
+  return null
 }
 
 /** True when the configured payment method should use Stripe Checkout (card), not a portal DB insert. */

@@ -6,6 +6,7 @@ import {
   fetchContactListStats,
   fetchContactsList,
   type ContactListRow,
+  type ContactListSortBy,
   type ContactListStats,
 } from "@/lib/contacts/contact-list-actions"
 import {
@@ -54,6 +55,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import {
+  TableColumnHeaderFilter,
+  TableColumnHeaderSort,
+} from "@/components/ui/table-column-header-filter"
 import { Textarea } from "@/components/ui/textarea"
 import {
   Building2,
@@ -66,6 +71,33 @@ import {
 } from "lucide-react"
 
 const PAGE_SIZE = 50
+
+const ENTITY_SORT_OPTIONS = (entityLabel: string) =>
+  [
+    { value: "recent", label: "Recently active" },
+    { value: "full_name_asc", label: `${entityLabel} name (A–Z)` },
+    { value: "full_name_desc", label: `${entityLabel} name (Z–A)` },
+    { value: "updated_at_desc", label: "Last modified (newest)" },
+    { value: "updated_at_asc", label: "Last modified (oldest)" },
+  ] as const
+
+function parseEntitySortKey(value: string): {
+  sortBy?: ContactListSortBy
+  sortAsc?: boolean
+} {
+  switch (value) {
+    case "full_name_asc":
+      return { sortBy: "full_name", sortAsc: true }
+    case "full_name_desc":
+      return { sortBy: "full_name", sortAsc: false }
+    case "updated_at_desc":
+      return { sortBy: "updated_at", sortAsc: false }
+    case "updated_at_asc":
+      return { sortBy: "updated_at", sortAsc: true }
+    default:
+      return {}
+  }
+}
 
 export type ContactsCrmListProps = {
   /** Lock the list to people or organizations. */
@@ -157,7 +189,13 @@ export function ContactsCrmList({
 
   const [searchQuery, setSearchQuery] = useState("")
   const [debouncedSearch, setDebouncedSearch] = useState("")
+  const [entityNameFilterInput, setEntityNameFilterInput] = useState("")
+  const [entityNameFilter, setEntityNameFilter] = useState("")
+  const [entitySortKey, setEntitySortKey] = useState("recent")
   const [recordTypeFilter, setRecordTypeFilter] = useState<ContactRecordType | "all">("all")
+
+  const usesEntityColumnControls =
+    lockedRecordType === "organization" || lockedRecordType === "group"
 
   const [showAddDialog, setShowAddDialog] = useState(false)
 
@@ -177,8 +215,13 @@ export function ContactsCrmList({
   }, [searchQuery])
 
   useEffect(() => {
+    const timer = window.setTimeout(() => setEntityNameFilter(entityNameFilterInput.trim()), 350)
+    return () => window.clearTimeout(timer)
+  }, [entityNameFilterInput])
+
+  useEffect(() => {
     setPage(1)
-  }, [debouncedSearch, recordTypeFilter])
+  }, [debouncedSearch, recordTypeFilter, entityNameFilter, entitySortKey])
 
   const loadStats = useCallback(async () => {
     try {
@@ -195,10 +238,14 @@ export function ContactsCrmList({
     setLoading(true)
     setErrorMessage("")
     try {
+      const sort = parseEntitySortKey(entitySortKey)
       const result = await fetchContactsList({
-        search: debouncedSearch || undefined,
+        search: usesEntityColumnControls ? undefined : debouncedSearch || undefined,
+        nameFilter: usesEntityColumnControls ? entityNameFilter || undefined : undefined,
         recordType: lockedRecordType ? "all" : recordTypeFilter,
         lockedRecordType,
+        sortBy: usesEntityColumnControls ? sort.sortBy : undefined,
+        sortAsc: usesEntityColumnControls ? sort.sortAsc : undefined,
         page,
         pageSize: PAGE_SIZE,
       })
@@ -213,7 +260,15 @@ export function ContactsCrmList({
     } finally {
       setLoading(false)
     }
-  }, [debouncedSearch, lockedRecordType, page, recordTypeFilter])
+  }, [
+    debouncedSearch,
+    lockedRecordType,
+    entityNameFilter,
+    entitySortKey,
+    page,
+    recordTypeFilter,
+    usesEntityColumnControls,
+  ])
 
   useEffect(() => {
     if (showStats) {
@@ -227,8 +282,22 @@ export function ContactsCrmList({
 
   const hasActiveFilters = useMemo(() => {
     const recordTypeFiltered = !lockedRecordType && recordTypeFilter !== "all"
-    return Boolean(debouncedSearch || recordTypeFiltered)
-  }, [debouncedSearch, lockedRecordType, recordTypeFilter])
+    const entityNameFiltered = usesEntityColumnControls && Boolean(entityNameFilter)
+    const entitySortActive = usesEntityColumnControls && entitySortKey !== "recent"
+    return Boolean(
+      (!usesEntityColumnControls && debouncedSearch) ||
+        recordTypeFiltered ||
+        entityNameFiltered ||
+        entitySortActive
+    )
+  }, [
+    debouncedSearch,
+    entityNameFilter,
+    entitySortKey,
+    lockedRecordType,
+    recordTypeFilter,
+    usesEntityColumnControls,
+  ])
 
   const listTitle = isRecentView ? `Recent ${entityLabel}` : entityLabel
   const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
@@ -238,11 +307,32 @@ export function ContactsCrmList({
   function clearFilters() {
     setSearchQuery("")
     setDebouncedSearch("")
+    setEntityNameFilterInput("")
+    setEntityNameFilter("")
+    setEntitySortKey("recent")
     if (!lockedRecordType) {
       setRecordTypeFilter("all")
     }
     setPage(1)
   }
+
+  const nameColumnLabel =
+    lockedRecordType === "organization"
+      ? "Organization"
+      : lockedRecordType === "group"
+        ? "Group"
+        : lockedRecordType === "individual"
+          ? "Person"
+          : "Contact"
+
+  const nameColumnFilterPlaceholder =
+    lockedRecordType === "organization"
+      ? "Search by organization name"
+      : lockedRecordType === "group"
+        ? "Search by group name"
+        : "Search by name"
+
+  const showEntityPrimaryContactColumn = usesEntityColumnControls
 
   function resetAddForm() {
     setContactName("")
@@ -340,20 +430,22 @@ export function ContactsCrmList({
         </StatCardsRow>
       )}
 
-      <div className="relative">
-        <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder={searchPlaceholder}
-          className="h-12 pl-12 text-base"
-        />
-      </div>
+      {!usesEntityColumnControls ? (
+        <div className="relative">
+          <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={searchPlaceholder}
+            className="h-12 pl-12 text-base"
+          />
+        </div>
+      ) : null}
 
       <div className="flex flex-wrap items-center gap-3">
         {hasActiveFilters && (
           <Button type="button" variant="ghost" size="sm" onClick={clearFilters}>
-            Clear search
+            Clear filters
           </Button>
         )}
 
@@ -396,14 +488,46 @@ export function ContactsCrmList({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Contact</TableHead>
+                <TableHead>
+                  {usesEntityColumnControls ? (
+                    <TableColumnHeaderFilter
+                      label={nameColumnLabel}
+                      active={Boolean(entityNameFilter)}
+                      trailing={
+                        <TableColumnHeaderSort
+                          label={nameColumnLabel}
+                          value={entitySortKey}
+                          active={entitySortKey !== "recent"}
+                          options={[...ENTITY_SORT_OPTIONS(nameColumnLabel)]}
+                          onChange={setEntitySortKey}
+                        />
+                      }
+                    >
+                      {({ close }) => (
+                        <Input
+                          placeholder={nameColumnFilterPlaceholder}
+                          value={entityNameFilterInput}
+                          onChange={(event) => setEntityNameFilterInput(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                              setEntityNameFilter(entityNameFilterInput.trim())
+                              close()
+                            }
+                          }}
+                        />
+                      )}
+                    </TableColumnHeaderFilter>
+                  ) : (
+                    nameColumnLabel
+                  )}
+                </TableHead>
+                {showEntityPrimaryContactColumn ? (
+                  <TableHead className="hidden md:table-cell">Primary Contact</TableHead>
+                ) : null}
                 <TableHead className="hidden md:table-cell">Email</TableHead>
                 <TableHead className="hidden md:table-cell">Phone</TableHead>
                 <TableHead className="hidden lg:table-cell">Created by</TableHead>
                 <TableHead className="hidden sm:table-cell">Last modified</TableHead>
-                {lockedRecordType === "organization" || lockedRecordType === "group" ? (
-                  <TableHead className="hidden xl:table-cell">Primary Contact</TableHead>
-                ) : null}
                 {!lockedRecordType && (
                   <TableHead className="hidden xl:table-cell">Type</TableHead>
                 )}
@@ -427,7 +551,7 @@ export function ContactsCrmList({
                       <div className="flex flex-col items-center gap-2">
                         <span>No {entityLabel.toLowerCase()} found.</span>
                         <Button type="button" variant="outline" size="sm" onClick={clearFilters}>
-                          Clear search
+                          Clear filters
                         </Button>
                       </div>
                     ) : (
@@ -460,6 +584,12 @@ export function ContactsCrmList({
                       </div>
                     </TableCell>
 
+                    {showEntityPrimaryContactColumn ? (
+                      <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
+                        {contact.primaryContactName || "—"}
+                      </TableCell>
+                    ) : null}
+
                     <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
                       {contact.email || "—"}
                     </TableCell>
@@ -475,12 +605,6 @@ export function ContactsCrmList({
                     <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">
                       {formatDateTime(contact.updatedAt || contact.createdAt)}
                     </TableCell>
-
-                    {lockedRecordType === "organization" || lockedRecordType === "group" ? (
-                      <TableCell className="hidden xl:table-cell text-sm text-muted-foreground">
-                        {contact.primaryContactName || "—"}
-                      </TableCell>
-                    ) : null}
 
                     {!lockedRecordType && (
                       <TableCell className="hidden xl:table-cell">

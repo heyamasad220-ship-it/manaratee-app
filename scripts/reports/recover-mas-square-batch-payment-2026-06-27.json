@@ -1,0 +1,13 @@
+{
+  "execute": true,
+  "campaign": {
+    "id": "e60e8b35-1248-4ccb-8be0-85c8a397b3ed",
+    "name": "September 2025"
+  },
+  "existingBatchPayments": [],
+  "created": {
+    "id": "5a54a54d-e020-4033-9fe3-23d7c2014d81",
+    "amount": 4515,
+    "memo": "MAS_CAMPAIGN_LEDGER_V1|batch|square|September 2025"
+  }
+}

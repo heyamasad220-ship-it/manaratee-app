@@ -45,9 +45,12 @@ export function buildDonorGivingReportHtml(input: DonorGivingReportPdfInput): st
     .map(
       (donor) => `<tr>
         <td>${escapeHtml(donor.full_name || "Unnamed")}</td>
+        <td>${escapeHtml(donor.email || "—")}</td>
+        <td>${escapeHtml(donor.phone || "—")}</td>
         <td style="text-align:right">${formatMoney(Number(donor.total_donations || 0))}</td>
         <td style="text-align:right">${donor.donation_count ?? 0}</td>
         <td>${escapeHtml(formatReportDate(donor.last_donation_date))}</td>
+        <td>${escapeHtml(donor.pledge_status || "—")}</td>
         <td style="text-align:right">${formatMoney(Number(donor.outstanding_pledge_balance || 0))}</td>
       </tr>`
     )
@@ -96,10 +99,13 @@ export function buildDonorGivingReportHtml(input: DonorGivingReportPdfInput): st
     <thead>
       <tr>
         <th>Donor</th>
+        <th>Email</th>
+        <th>Phone</th>
         <th class="num">Total Given</th>
         <th class="num">Gifts</th>
         <th>Last Gift</th>
-        <th class="num">Outstanding Pledge</th>
+        <th>Pledge</th>
+        <th class="num">Outstanding Balance</th>
       </tr>
     </thead>
     <tbody>${rows}</tbody>

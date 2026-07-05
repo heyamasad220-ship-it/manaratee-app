@@ -1,0 +1,110 @@
+{
+  "capturedAt": "2026-06-30T14:21:25.855Z",
+  "mode": "dry-run",
+  "tier1Inventory": {
+    "donation_payments": {
+      "exists": true,
+      "count": 0
+    },
+    "donation_pledges": {
+      "exists": true,
+      "count": 0
+    },
+    "donation_amount_options": {
+      "exists": true,
+      "count": 0
+    },
+    "donor_import_rows": {
+      "exists": true,
+      "count": 0
+    },
+    "donor_import_batches": {
+      "exists": true,
+      "count": 0
+    },
+    "contact_import_staging": {
+      "exists": true,
+      "count": 0
+    },
+    "organization_settings": {
+      "exists": true,
+      "count": 0
+    }
+  },
+  "tier2Inventory": {
+    "payment_import_rows": {
+      "exists": true,
+      "count": 3629
+    },
+    "backup_donation_payments_2026_05_24": {
+      "exists": true,
+      "count": 0
+    },
+    "backup_donation_pledges_2026_05_24": {
+      "exists": true,
+      "count": 5
+    },
+    "backup_donors_2026_05_24": {
+      "exists": true,
+      "count": 0
+    },
+    "backup_payments_2026_05_24": {
+      "exists": true,
+      "count": 95
+    },
+    "backup_pledges_2026_05_24": {
+      "exists": true,
+      "count": 0
+    }
+  },
+  "exports": [
+    {
+      "table": "payment_import_rows",
+      "rowCount": 3629,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\legacy-cleanup\\payment_import_rows-2026-06-30.json"
+    },
+    {
+      "table": "backup_donation_payments_2026_05_24",
+      "rowCount": 0,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\legacy-cleanup\\backup_donation_payments_2026_05_24-2026-06-30.json"
+    },
+    {
+      "table": "backup_donation_pledges_2026_05_24",
+      "rowCount": 5,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\legacy-cleanup\\backup_donation_pledges_2026_05_24-2026-06-30.json"
+    },
+    {
+      "table": "backup_donors_2026_05_24",
+      "skipped": true,
+      "reason": "backup_donors_2026_05_24 fetch: Could not find the table 'public.backup_donors_2026_05_24' in the schema cache"
+    },
+    {
+      "table": "backup_payments_2026_05_24",
+      "rowCount": 95,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\legacy-cleanup\\backup_payments_2026_05_24-2026-06-30.json"
+    },
+    {
+      "table": "backup_pledges_2026_05_24",
+      "rowCount": 0,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\legacy-cleanup\\backup_pledges_2026_05_24-2026-06-30.json"
+    }
+  ],
+  "deletions": [],
+  "repair": {
+    "repaired": [
+      {
+        "payment_id": "5a54a54d-e020-4033-9fe3-23d7c2014d81",
+        "status": "skipped",
+        "reason": "no contact_id to derive donor"
+      }
+    ],
+    "count": 1
+  },
+  "nextSteps": [
+    "Review exports in scripts/backups/legacy-cleanup/",
+    "Apply Tier 1: npx supabase db query --linked -f scripts/140_drop_legacy_donation_and_staging_tables.sql",
+    "Run with --execute to delete Tier 2 rows and repair orphan payments",
+    "Apply Tier 2: npx supabase db query --linked -f scripts/141_drop_payment_import_rows_and_backup_tables.sql"
+  ],
+  "manifestPath": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\legacy-cleanup\\legacy-cleanup-manifest-2026-06-30.json"
+}

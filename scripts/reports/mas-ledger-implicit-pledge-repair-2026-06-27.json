@@ -1,0 +1,83 @@
+{
+  "mode": "execute",
+  "orgId": "e057e00a-e4e3-4adf-9af5-f465db1894be",
+  "paymentGroups": 1082,
+  "pledgesCreated": 28,
+  "pledgesUpdated": 0,
+  "paymentsAllocated": 41,
+  "alreadyCorrect": 1054,
+  "skippedNoDonor": 0,
+  "warnings": [],
+  "samples": [
+    {
+      "action": "create_pledge",
+      "rowTag": "MAS_CAMPAIGN_LEDGER_V1|22271c00db17",
+      "donor": "Susan Almasri",
+      "amountPledged": 4000,
+      "payments": 2
+    },
+    {
+      "action": "create_pledge",
+      "rowTag": "MAS_CAMPAIGN_LEDGER_V1|2be72bf6e36c",
+      "donor": "Mohammad Alordy",
+      "amountPledged": 600,
+      "payments": 2
+    },
+    {
+      "action": "create_pledge",
+      "rowTag": "MAS_CAMPAIGN_LEDGER_V1|31bc77129fe6",
+      "donor": "Abdulrahman Selim",
+      "amountPledged": 4000,
+      "payments": 2
+    },
+    {
+      "action": "create_pledge",
+      "rowTag": "MAS_CAMPAIGN_LEDGER_V1|79d3baedb30c",
+      "donor": "Luay Abdeljaber",
+      "amountPledged": 2880,
+      "payments": 2
+    },
+    {
+      "action": "create_pledge",
+      "rowTag": "MAS_CAMPAIGN_LEDGER_V1|683b571bde91",
+      "donor": "Jehad Alzyoud",
+      "amountPledged": 2000,
+      "payments": 2
+    },
+    {
+      "action": "create_pledge",
+      "rowTag": "MAS_CAMPAIGN_LEDGER_V1|5c7ca5cd425b",
+      "donor": "Mohammad Aladra",
+      "amountPledged": 4000,
+      "payments": 2
+    },
+    {
+      "action": "create_pledge",
+      "rowTag": "MAS_CAMPAIGN_LEDGER_V1|e4cb6e3ca870",
+      "donor": "Fadi Jaber",
+      "amountPledged": 2400,
+      "payments": 2
+    },
+    {
+      "action": "create_pledge",
+      "rowTag": "MAS_CAMPAIGN_LEDGER_V1|7a699292d97d",
+      "donor": "Neveen Nofal",
+      "amountPledged": 2000,
+      "payments": 2
+    },
+    {
+      "action": "create_pledge",
+      "rowTag": "MAS_CAMPAIGN_LEDGER_V1|33ce8897a4e3",
+      "donor": "Tariq Alsmadi",
+      "amountPledged": 10000,
+      "payments": 2
+    },
+    {
+      "action": "create_pledge",
+      "rowTag": "MAS_CAMPAIGN_LEDGER_V1|00c46cb31a41",
+      "donor": "Sunia Khatri (Cub Scouts !!)",
+      "amountPledged": 2400,
+      "payments": 2
+    }
+  ]
+}

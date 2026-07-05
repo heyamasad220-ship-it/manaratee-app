@@ -264,13 +264,13 @@ export function DonationsOverviewDashboard() {
             <CardDescription>Jump to common donation workflows</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-2 sm:grid-cols-2">
+            <div className="grid w-fit grid-cols-2 gap-2">
               {QUICK_ACTIONS.map((action) => {
                 const Icon = action.icon
                 return (
                   <Button
                     key={action.href}
-                    className="h-auto justify-start bg-primary py-3 text-primary-foreground hover:bg-primary/90"
+                    className="h-auto w-[11.75rem] justify-start bg-primary px-4 py-3 text-primary-foreground hover:bg-primary/90"
                     asChild
                   >
                     <Link href={action.href}>

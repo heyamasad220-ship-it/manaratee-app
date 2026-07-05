@@ -7,6 +7,7 @@ import {
   isEntityContactType,
   normalizePhone,
 } from "@/lib/contacts/contact-constants"
+import { removeMemberFromHousehold, syncFamilyMemberAdded } from "@/lib/contacts/family-sync"
 import { normalizeDateOfBirth } from "@/lib/dates/date-input-utils"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { createClient } from "@/lib/supabase/server"
@@ -351,15 +352,19 @@ export async function addContactFamilyMember(input: {
     throw new Error(personError?.message || "Could not create family member.")
   }
 
-  const { error: relationshipError } = await supabase.from("person_relationships").insert({
-    organization_id: organizationId,
-    person_id: parentPersonId,
-    related_person_id: createdPerson.id,
-    relationship_type: relationship,
-  })
+  const { data: createdRelationship, error: relationshipError } = await supabase
+    .from("person_relationships")
+    .insert({
+      organization_id: organizationId,
+      person_id: parentPersonId,
+      related_person_id: createdPerson.id,
+      relationship_type: relationship,
+    })
+    .select("id")
+    .single()
 
-  if (relationshipError) {
-    throw new Error(relationshipError.message || "Could not save family relationship.")
+  if (relationshipError || !createdRelationship) {
+    throw new Error(relationshipError?.message || "Could not save family relationship.")
   }
 
   const { contactId: familyMemberContactId } = await ensureContactForPerson({
@@ -382,9 +387,24 @@ export async function addContactFamilyMember(input: {
     }
   }
 
+  try {
+    await syncFamilyMemberAdded({
+      supabase,
+      organizationId,
+      primaryContactId: input.contactId,
+      primaryName: (contact.full_name as string | null) || `${firstName} ${lastName}`.trim(),
+      memberContactId: familyMemberContactId,
+      relationshipType: relationship,
+      personRelationshipId: createdRelationship.id as string,
+    })
+  } catch (syncError) {
+    console.warn("Family membership sync failed:", syncError)
+  }
+
   revalidatePath(`/contacts/${input.contactId}`)
   revalidatePath(`/contacts/${familyMemberContactId}`)
   revalidatePath("/customer/profile")
+  revalidatePath("/contacts/families")
 
   return { personId: createdPerson.id as string }
 }
@@ -400,6 +420,42 @@ export async function removeContactFamilyMember(input: {
     throw new Error("Contact has no linked person record.")
   }
 
+  const { data: memberContact } = await supabase
+    .from("contacts")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("person_id", relatedPersonId)
+    .maybeSingle()
+
+  const memberContactId = (memberContact?.id as string | null) ?? null
+
+  if (memberContactId) {
+    const { data: membership } = await supabase
+      .from("family_members")
+      .select("family_id")
+      .eq("organization_id", organizationId)
+      .eq("contact_id", memberContactId)
+      .is("end_date", null)
+      .maybeSingle()
+
+    if (membership?.family_id) {
+      const result = await removeMemberFromHousehold({
+        supabase,
+        organizationId,
+        familyId: membership.family_id as string,
+        memberContactId,
+      })
+
+      revalidatePath(`/contacts/${input.contactId}`)
+      revalidatePath(`/contacts/${memberContactId}`)
+      revalidatePath(`/contacts/families/${result.familyId}`)
+      revalidatePath("/contacts/families")
+      revalidatePath("/customer/profile")
+
+      return { success: true }
+    }
+  }
+
   const { error } = await supabase
     .from("person_relationships")
     .delete()
@@ -411,8 +467,21 @@ export async function removeContactFamilyMember(input: {
     throw new Error(error.message || "Could not remove family member.")
   }
 
+  if (memberContactId && contact.person_id) {
+    await supabase
+      .from("person_relationships")
+      .delete()
+      .eq("organization_id", organizationId)
+      .eq("person_id", relatedPersonId)
+      .eq("related_person_id", contact.person_id as string)
+  }
+
   revalidatePath(`/contacts/${input.contactId}`)
+  if (memberContactId) {
+    revalidatePath(`/contacts/${memberContactId}`)
+  }
   revalidatePath("/customer/profile")
+  revalidatePath("/contacts/families")
 
   return { success: true }
 }

@@ -2,23 +2,44 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { resolveOrganizationId } from "@/lib/organizations/resolve-organization-id"
+import { fetchFamilyListSummaries } from "@/lib/contacts/family-giving-data"
 
 export type FamilyHouseholdSummary = {
   id: string
-  primaryPersonId: string
+  primaryPersonId: string | null
   primaryContactId: string | null
   primaryName: string
   primaryEmail: string | null
   memberCount: number
+  lifetimeTotal: number
+  giftCount: number
+  lastGiftDate: string | null
   relationshipTypes: string[]
 }
 
+/** @deprecated Use fetchFamilyListSummariesAction for new code. Kept for legacy callers during migration. */
 export async function fetchFamilyHouseholdSummaries(): Promise<FamilyHouseholdSummary[]> {
   const supabase = await createClient()
   const organizationId = await resolveOrganizationId()
 
   if (!organizationId) {
     return []
+  }
+
+  const familiesResult = await fetchFamilyListSummaries(supabase, organizationId)
+  if (familiesResult.ok) {
+    return familiesResult.families.map((family) => ({
+      id: family.id,
+      primaryPersonId: null,
+      primaryContactId: family.primaryContactId,
+      primaryName: family.primaryName || family.name.replace(/ Family$/, ""),
+      primaryEmail: family.primaryEmail,
+      memberCount: family.memberCount,
+      lifetimeTotal: family.lifetimeTotal,
+      giftCount: family.giftCount,
+      lastGiftDate: family.lastGiftDate,
+      relationshipTypes: [],
+    }))
   }
 
   const { data: relationships, error } = await supabase
@@ -109,6 +130,9 @@ export async function fetchFamilyHouseholdSummaries(): Promise<FamilyHouseholdSu
         primaryName: household.primaryName,
         primaryEmail: (contact?.email as string | null) ?? null,
         memberCount: household.memberCount,
+        lifetimeTotal: 0,
+        giftCount: 0,
+        lastGiftDate: null,
         relationshipTypes: Array.from(household.relationshipTypes),
       }
     })

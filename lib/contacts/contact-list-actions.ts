@@ -42,12 +42,17 @@ export type ContactListStats = {
   groups: number
 }
 
+export type ContactListSortBy = "full_name" | "updated_at" | "created_at"
+
 export type FetchContactsListInput = {
   search?: string
+  nameFilter?: string
   role?: ContactRoleValue | "all"
   recordType?: ContactRecordType | "all"
   status?: ContactStatus | "all"
   teamId?: string | "all"
+  sortBy?: ContactListSortBy
+  sortAsc?: boolean
   page?: number
   pageSize?: number
   /** Page-scoped record type (e.g. People) — not treated as an active user filter. */
@@ -170,11 +175,39 @@ function hasListFilters(input: FetchContactsListInput) {
 
   return Boolean(
     input.search?.trim() ||
+      input.nameFilter?.trim() ||
       (input.role && input.role !== "all") ||
       recordTypeFiltered ||
       (input.status && input.status !== "all") ||
-      (input.teamId && input.teamId !== "all")
+      (input.teamId && input.teamId !== "all") ||
+      input.sortBy
   )
+}
+
+function applyContactListSort(query: any, input: FetchContactsListInput, options: QueryOptions) {
+  if (input.sortBy === "full_name") {
+    return query.order("full_name", { ascending: input.sortAsc ?? true })
+  }
+
+  if (input.sortBy === "updated_at") {
+    return query.order("updated_at", {
+      ascending: input.sortAsc ?? false,
+      nullsFirst: false,
+    })
+  }
+
+  if (input.sortBy === "created_at") {
+    return query.order("created_at", { ascending: input.sortAsc ?? false })
+  }
+
+  if (options.includeActivityColumns) {
+    return query
+      .order("last_activity_at", { ascending: false, nullsFirst: false })
+      .order("updated_at", { ascending: false })
+      .order("created_at", { ascending: false })
+  }
+
+  return query.order("created_at", { ascending: false })
 }
 
 function statusToFilterValue(status: ContactStatus | "all") {
@@ -339,14 +372,12 @@ async function runContactsQueryWithRoleFilter(
     query = query.or(searchFields.join(","))
   }
 
-  if (options.includeActivityColumns) {
-    query = query
-      .order("last_activity_at", { ascending: false, nullsFirst: false })
-      .order("updated_at", { ascending: false })
-      .order("created_at", { ascending: false })
-  } else {
-    query = query.order("created_at", { ascending: false })
+  const trimmedNameFilter = input.nameFilter?.trim()
+  if (trimmedNameFilter) {
+    query = query.ilike("full_name", `%${escapeIlike(trimmedNameFilter)}%`)
   }
+
+  query = applyContactListSort(query, input, options)
 
   return query.range(from, to)
 }
@@ -413,14 +444,12 @@ async function runContactsQuery(
     query = query.or(searchFields.join(","))
   }
 
-  if (options.includeActivityColumns) {
-    query = query
-      .order("last_activity_at", { ascending: false, nullsFirst: false })
-      .order("updated_at", { ascending: false })
-      .order("created_at", { ascending: false })
-  } else {
-    query = query.order("created_at", { ascending: false })
+  const trimmedNameFilter = input.nameFilter?.trim()
+  if (trimmedNameFilter) {
+    query = query.ilike("full_name", `%${escapeIlike(trimmedNameFilter)}%`)
   }
+
+  query = applyContactListSort(query, input, options)
 
   return query.range(from, to)
 }

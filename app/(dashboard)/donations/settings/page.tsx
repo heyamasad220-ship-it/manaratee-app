@@ -39,7 +39,7 @@ import { DonationReceiptSettingsForm } from "@/components/donations/donation-rec
 import { PledgeReminderSettingsForm } from "@/components/donations/pledge-reminder-settings-form"
 import { DonationStripeConnectPanel } from "@/components/donations/donation-stripe-connect-panel"
 
-const settingsTabs = ["General", "Categories", "Payment Methods", "Online Payments", "Receipts", "Pledge Reminders", "Notifications"] as const
+const settingsTabs = ["General", "Categories", "Online Payments", "Receipts", "Pledge Reminders", "Notifications"] as const
 type SettingsTab = (typeof settingsTabs)[number]
 
 function DonationSettingsTabSync({
@@ -70,13 +70,6 @@ interface DonationFund {
   name: string
   categoryId: string
   categoryName: string
-}
-
-interface PaymentMethod {
-  id: string
-  name: string
-  enabled: boolean
-  fee: string
 }
 
 export default function DonationsSettingsPage() {
@@ -120,7 +113,6 @@ function DonationsSettingsPageContent() {
 }
   const [activeTab, setActiveTab] = useState<SettingsTab>("General")
   const [categories, setCategories] = useState<Category[]>([])
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([])
   const [showAddCategoryDialog, setShowAddCategoryDialog] = useState(false)
   const [categoryName, setCategoryName] = useState("")
 const [categoryDescription, setCategoryDescription] = useState("")
@@ -131,11 +123,6 @@ const [categoryTaxDeductible, setCategoryTaxDeductible] = useState(true)
   const [fundName, setFundName] = useState("")
   const [fundCategoryId, setFundCategoryId] = useState("")
   const [editingFund, setEditingFund] = useState<DonationFund | null>(null)
-  const [editingPaymentMethod, setEditingPaymentMethod] = useState<PaymentMethod | null>(null)
-const [paymentMethodName, setPaymentMethodName] = useState("")
-const [paymentMethodFee, setPaymentMethodFee] = useState("")
-const [paymentMethodEnabled, setPaymentMethodEnabled] = useState(true)
-const [showPaymentMethodDialog, setShowPaymentMethodDialog] = useState(false)
 async function handleAddCategory() {
   const orgId = await getOrganizationId()
 
@@ -313,150 +300,14 @@ async function handleDeleteFund(fundId: string) {
   await loadFunds()
 }
 
-async function handleSavePaymentMethod() {
-  const orgId = await getOrganizationId()
-
-  if (!orgId) {
-    alert("No organization found.")
-    return
-  }
-
-  if (!paymentMethodName.trim()) {
-    alert("Payment method name is required.")
-    return
-  }
-
-  const payload = {
-    name: paymentMethodName.trim(),
-    fee: paymentMethodFee.trim() || "None",
-    enabled: paymentMethodEnabled,
-  }
-
-  const { error } = editingPaymentMethod
-    ? await supabase
-        .from("payment_methods")
-        .update(payload)
-        .eq("id", editingPaymentMethod.id)
-        .eq("organization_id", orgId)
-    : await supabase.from("payment_methods").insert({
-        organization_id: orgId,
-        ...payload,
-      })
-
-  if (error) {
-    alert(error.message)
-    return
-  }
-
-  setEditingPaymentMethod(null)
-  setPaymentMethodName("")
-  setPaymentMethodFee("")
-  setPaymentMethodEnabled(true)
-  setShowPaymentMethodDialog(false)
-
-  await loadPaymentMethods()
-}
-
-function resetPaymentMethodForm() {
-  setEditingPaymentMethod(null)
-  setPaymentMethodName("")
-  setPaymentMethodFee("")
-  setPaymentMethodEnabled(true)
-}
-
-function openAddPaymentMethodDialog() {
-  resetPaymentMethodForm()
-  setShowPaymentMethodDialog(true)
-}
-async function handleDeletePaymentMethod(methodId: string) {
-  if (
-    !confirm(
-      "Delete this payment method? Existing donation records are kept; their payment method link will be cleared."
-    )
-  ) {
-    return
-  }
-
-  const orgId = await getOrganizationId()
-
-  if (!orgId) {
-    alert("No organization found.")
-    return
-  }
-
-  const { error } = await supabase
-    .from("payment_methods")
-    .delete()
-    .eq("id", methodId)
-    .eq("organization_id", orgId)
-
-  if (error) {
-    alert(error.message)
-    return
-  }
-
-  await loadPaymentMethods()
-}
-async function loadPaymentMethods() {
-  const orgId = await getOrganizationId()
-
-  if (!orgId) {
-    setPaymentMethods([])
-    return
-  }
-
-  const { data, error } = await supabase
-    .from("payment_methods")
-    .select("*")
-    .eq("organization_id", orgId)
-    .order("created_at", { ascending: false })
-
-  if (error) {
-    console.error("Error loading payment methods:", error)
-    setPaymentMethods([])
-    return
-  }
-
-  setPaymentMethods(
-    (data || []).map((pm: any) => ({
-      id: pm.id,
-      name: pm.name,
-      enabled: pm.enabled || false,
-      fee: pm.fee || "None",
-    }))
-  )
-}
-
 useEffect(() => {
   void loadCategories()
-  void loadPaymentMethods()
 }, [])
 
 useEffect(() => {
   void loadFunds()
 }, [categories])
 
-async function handleTogglePaymentMethod(methodId: string, enabled: boolean) {
-  const orgId = await getOrganizationId()
-
-  if (!orgId) {
-    alert("No organization found.")
-    return
-  }
-
-  const { error } = await supabase
-    .from("payment_methods")
-    .update({ enabled })
-    .eq("id", methodId)
-    .eq("organization_id", orgId)
-
-  if (error) {
-    alert(error.message)
-    return
-  }
-
-  await loadPaymentMethods()
-}
 async function handleDeleteCategory(categoryId: string) {
   if (!confirm("Delete this category?")) return
 
@@ -705,86 +556,6 @@ async function handleSaveCategory() {
           </div>
         )}
 
-        {activeTab === "Payment Methods" && (
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-semibold text-foreground">Payment Methods</h3>
-                <p className="text-sm text-muted-foreground">
-                  Configure accepted payment methods for donations
-                </p>
-              </div>
-              <Button onClick={openAddPaymentMethodDialog}>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Payment Method
-              </Button>
-            </div>
-
-            <Card>
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Method</TableHead>
-                      <TableHead>Processing Fee</TableHead>
-                      <TableHead>Enabled</TableHead>
-                      <TableHead className="w-[100px]"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {paymentMethods.length === 0 && (
-                      <TableRow>
-                        <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
-                          No payment methods yet. Add one to accept donations through your portal and
-                          staff forms.
-                        </TableCell>
-                      </TableRow>
-                    )}
-                    {paymentMethods.map((method) => (
-                      <TableRow key={method.id}>
-                        <TableCell className="font-medium">{method.name}</TableCell>
-                        <TableCell className="text-muted-foreground">{method.fee}</TableCell>
-                        <TableCell>
-                          <Switch
-                            checked={method.enabled}
-                            onCheckedChange={(checked) => handleTogglePaymentMethod(method.id, checked)}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => {
-                                setEditingPaymentMethod(method)
-                                setPaymentMethodName(method.name)
-                                setPaymentMethodFee(method.fee)
-                                setPaymentMethodEnabled(method.enabled)
-                                setShowPaymentMethodDialog(true)
-                              }}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-muted-foreground hover:text-red-600"
-                              onClick={() => handleDeletePaymentMethod(method.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
         {activeTab === "Online Payments" && (
           <Suspense fallback={<p className="text-sm text-muted-foreground">Loading Stripe Connect...</p>}>
             <DonationStripeConnectPanel />
@@ -855,77 +626,6 @@ async function handleSaveCategory() {
           </div>
         )}
       </div>
-      {/* Add/Edit Payment Method Dialog */}
-<Dialog
-  open={showPaymentMethodDialog}
-  onOpenChange={(open) => {
-    setShowPaymentMethodDialog(open)
-    if (!open) resetPaymentMethodForm()
-  }}
->
-  <DialogContent>
-    <DialogHeader>
-      <DialogTitle>
-        {editingPaymentMethod ? "Edit Payment Method" : "Add Payment Method"}
-      </DialogTitle>
-      <DialogDescription>
-        {editingPaymentMethod
-          ? "Update this accepted payment method"
-          : "Create a custom payment method for donations"}
-      </DialogDescription>
-    </DialogHeader>
-
-    <div className="flex flex-col gap-4 py-4">
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="payment-method-name">Method Name</Label>
-        <Input
-          id="payment-method-name"
-          placeholder="e.g. Venmo, Wire Transfer, In-kind"
-          value={paymentMethodName}
-          onChange={(event) => setPaymentMethodName(event.target.value)}
-        />
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="payment-method-fee">Processing Fee</Label>
-        <Input
-          id="payment-method-fee"
-          placeholder="None"
-          value={paymentMethodFee}
-          onChange={(event) => setPaymentMethodFee(event.target.value)}
-        />
-        <p className="text-xs text-muted-foreground">
-          Shown to staff only — e.g. &quot;None&quot; or &quot;Processing fee applies&quot;
-        </p>
-      </div>
-
-      <div className="flex items-center gap-2">
-        <Switch
-          id="payment-method-enabled"
-          checked={paymentMethodEnabled}
-          onCheckedChange={setPaymentMethodEnabled}
-        />
-        <Label htmlFor="payment-method-enabled">Enabled</Label>
-      </div>
-    </div>
-
-    <DialogFooter>
-      <Button
-        variant="outline"
-        onClick={() => {
-          resetPaymentMethodForm()
-          setShowPaymentMethodDialog(false)
-        }}
-      >
-        Cancel
-      </Button>
-
-      <Button onClick={handleSavePaymentMethod}>
-        {editingPaymentMethod ? "Save Changes" : "Add Payment Method"}
-      </Button>
-    </DialogFooter>
-  </DialogContent>
-</Dialog>
         {/* Add/Edit Category Dialog */}
 <Dialog open={showAddCategoryDialog} onOpenChange={setShowAddCategoryDialog}>
   <DialogContent>

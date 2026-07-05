@@ -1,4 +1,4 @@
-export const RECURRING_FREQUENCIES = ["weekly", "monthly", "quarterly", "annually"] as const
+export const RECURRING_FREQUENCIES = ["daily", "weekly", "monthly", "quarterly", "annually"] as const
 export type RecurringFrequency = (typeof RECURRING_FREQUENCIES)[number]
 
 export const RECURRING_STATUSES = [
@@ -26,6 +26,8 @@ export type RecurringDonationPlan = {
   start_date: string
   next_payment_date: string
   end_date: string | null
+  total_payments: number | null
+  payments_made: number | null
   notes: string | null
   external_processor: string | null
   external_processor_id: string | null
@@ -37,7 +39,11 @@ export type RecurringDonationPlan = {
 export type RecurringPlanWithDonor = RecurringDonationPlan & {
   donor_name: string | null
   donor_email: string | null
+  donor_phone: string | null
+  category_name: string | null
+  fund_name: string | null
   campaign_name: string | null
+  linked_payment_count: number
 }
 
 export type RecurringDashboardMetrics = {
@@ -73,6 +79,8 @@ export type RecurringReportingSummary = {
 
 export function formatRecurringFrequencyLabel(frequency: string): string {
   switch (frequency) {
+    case "daily":
+      return "Daily"
     case "weekly":
       return "Weekly"
     case "monthly":
@@ -99,6 +107,8 @@ export function formatRecurringStatusLabel(status: string): string {
 
 export function monthlyEquivalentAmount(amount: number, frequency: RecurringFrequency): number {
   switch (frequency) {
+    case "daily":
+      return (amount * 365) / 12
     case "weekly":
       return (amount * 52) / 12
     case "monthly":

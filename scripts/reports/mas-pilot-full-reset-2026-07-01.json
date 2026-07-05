@@ -1,0 +1,845 @@
+{
+  "capturedAt": "2026-07-01T00:06:54.921Z",
+  "execute": true,
+  "organizationId": "e057e00a-e4e3-4adf-9af5-f465db1894be",
+  "organizationName": "MAS Dallas",
+  "before": {
+    "transactional_email_log": {
+      "count": 6,
+      "skipped": false,
+      "error": null
+    },
+    "payment_processor_events": {
+      "count": 3,
+      "skipped": false,
+      "error": null
+    },
+    "donation_checkout_sessions": {
+      "count": 2,
+      "skipped": false,
+      "error": null
+    },
+    "pledge_reminders": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "donation_receipts": {
+      "count": 3,
+      "skipped": false,
+      "error": null
+    },
+    "payments": {
+      "count": 1149,
+      "skipped": false,
+      "error": null
+    },
+    "pledges": {
+      "count": 1256,
+      "skipped": false,
+      "error": null
+    },
+    "recurring_donation_plans": {
+      "count": 8,
+      "skipped": false,
+      "error": null
+    },
+    "donors": {
+      "count": 895,
+      "skipped": false,
+      "error": null
+    },
+    "payment_import_batches": {
+      "count": 1,
+      "skipped": false,
+      "error": null
+    },
+    "application_documents": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "application_history": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "applications": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "service_participations": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "volunteer_assignments": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "volunteers": {
+      "count": 1,
+      "skipped": false,
+      "error": null
+    },
+    "membership_status_history": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "memberships": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "employees": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "customer_profiles": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "contact_activities": {
+      "count": 5,
+      "skipped": false,
+      "error": null
+    },
+    "contact_notes": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "contact_roles": {
+      "count": 671,
+      "skipped": false,
+      "error": null
+    },
+    "contact_group_members": {
+      "count": 2,
+      "skipped": false,
+      "error": null
+    },
+    "contact_payment_methods": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "person_tags": {
+      "count": 1,
+      "skipped": false,
+      "error": null
+    },
+    "person_relationships": {
+      "count": 3,
+      "skipped": false,
+      "error": null
+    },
+    "contact_import_staging": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "contacts": {
+      "count": 2510,
+      "skipped": false,
+      "error": null
+    },
+    "people": {
+      "count": 9,
+      "skipped": false,
+      "error": null
+    },
+    "donation_subcategories": {
+      "count": 1,
+      "skipped": false,
+      "error": null
+    },
+    "donation_categories": {
+      "count": 5,
+      "skipped": false,
+      "error": null
+    },
+    "payment_methods": {
+      "count": 6,
+      "skipped": false,
+      "error": null
+    },
+    "campaigns": {
+      "count": 8,
+      "skipped": false,
+      "error": null
+    },
+    "organizations": {
+      "count": 1,
+      "skipped": false,
+      "error": null
+    },
+    "organization_members": {
+      "count": 7,
+      "skipped": false,
+      "error": null
+    },
+    "organization_roles": {
+      "count": 4,
+      "skipped": false,
+      "error": null
+    },
+    "role_permissions": {
+      "count": 116,
+      "skipped": false,
+      "error": null
+    },
+    "profiles": {
+      "count": 7,
+      "skipped": false,
+      "error": null
+    },
+    "organization_modules": {
+      "count": 2,
+      "skipped": false,
+      "error": null
+    },
+    "donation_settings": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "organization_audit_logs": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "programs": {
+      "count": 2,
+      "skipped": false,
+      "error": null
+    },
+    "program_sessions": {
+      "count": 4,
+      "skipped": false,
+      "error": null
+    },
+    "program_offerings": {
+      "count": 6,
+      "skipped": false,
+      "error": null
+    },
+    "reportsOverview": {
+      "error": null,
+      "data": {
+        "total_donations": 2936040,
+        "payment_count": 1149,
+        "average_donation": 2555.300261096606,
+        "donor_count": 895
+      }
+    }
+  },
+  "after": {
+    "transactional_email_log": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "payment_processor_events": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "donation_checkout_sessions": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "pledge_reminders": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "donation_receipts": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "payments": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "pledges": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "recurring_donation_plans": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "donors": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "payment_import_batches": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "application_documents": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "application_history": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "applications": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "service_participations": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "volunteer_assignments": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "volunteers": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "membership_status_history": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "memberships": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "employees": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "customer_profiles": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "contact_activities": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "contact_notes": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "contact_roles": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "contact_group_members": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "contact_payment_methods": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "person_tags": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "person_relationships": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "contact_import_staging": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "contacts": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "people": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "donation_subcategories": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "donation_categories": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "payment_methods": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "campaigns": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "organizations": {
+      "count": 1,
+      "skipped": false,
+      "error": null
+    },
+    "organization_members": {
+      "count": 7,
+      "skipped": false,
+      "error": null
+    },
+    "organization_roles": {
+      "count": 4,
+      "skipped": false,
+      "error": null
+    },
+    "role_permissions": {
+      "count": 116,
+      "skipped": false,
+      "error": null
+    },
+    "profiles": {
+      "count": 7,
+      "skipped": false,
+      "error": null
+    },
+    "organization_modules": {
+      "count": 2,
+      "skipped": false,
+      "error": null
+    },
+    "donation_settings": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "organization_audit_logs": {
+      "count": 0,
+      "skipped": false,
+      "error": null
+    },
+    "programs": {
+      "count": 2,
+      "skipped": false,
+      "error": null
+    },
+    "program_sessions": {
+      "count": 4,
+      "skipped": false,
+      "error": null
+    },
+    "program_offerings": {
+      "count": 6,
+      "skipped": false,
+      "error": null
+    },
+    "reportsOverview": {
+      "error": null,
+      "data": {
+        "total_donations": 0,
+        "payment_count": 0,
+        "average_donation": 0,
+        "donor_count": 0
+      }
+    }
+  },
+  "exports": [
+    {
+      "table": "transactional_email_log",
+      "rowCount": 6,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\mas-pilot-full-reset\\transactional_email_log-mas-dallas-2026-07-01.json"
+    },
+    {
+      "table": "payment_processor_events",
+      "rowCount": 3,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\mas-pilot-full-reset\\payment_processor_events-mas-dallas-2026-07-01.json"
+    },
+    {
+      "table": "donation_checkout_sessions",
+      "rowCount": 2,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\mas-pilot-full-reset\\donation_checkout_sessions-mas-dallas-2026-07-01.json"
+    },
+    {
+      "table": "pledge_reminders",
+      "rowCount": 0
+    },
+    {
+      "table": "donation_receipts",
+      "rowCount": 3,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\mas-pilot-full-reset\\donation_receipts-mas-dallas-2026-07-01.json"
+    },
+    {
+      "table": "payments",
+      "rowCount": 1149,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\mas-pilot-full-reset\\payments-mas-dallas-2026-07-01.json"
+    },
+    {
+      "table": "pledges",
+      "rowCount": 1256,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\mas-pilot-full-reset\\pledges-mas-dallas-2026-07-01.json"
+    },
+    {
+      "table": "recurring_donation_plans",
+      "rowCount": 8,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\mas-pilot-full-reset\\recurring_donation_plans-mas-dallas-2026-07-01.json"
+    },
+    {
+      "table": "donors",
+      "rowCount": 895,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\mas-pilot-full-reset\\donors-mas-dallas-2026-07-01.json"
+    },
+    {
+      "table": "payment_import_batches",
+      "rowCount": 1,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\mas-pilot-full-reset\\payment_import_batches-mas-dallas-2026-07-01.json"
+    },
+    {
+      "table": "application_documents",
+      "rowCount": 0
+    },
+    {
+      "table": "application_history",
+      "rowCount": 0
+    },
+    {
+      "table": "applications",
+      "rowCount": 0
+    },
+    {
+      "table": "service_participations",
+      "rowCount": 0
+    },
+    {
+      "table": "volunteer_assignments",
+      "skipped": true
+    },
+    {
+      "table": "volunteers",
+      "rowCount": 1,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\mas-pilot-full-reset\\volunteers-mas-dallas-2026-07-01.json"
+    },
+    {
+      "table": "membership_status_history",
+      "skipped": true
+    },
+    {
+      "table": "memberships",
+      "rowCount": 0
+    },
+    {
+      "table": "employees",
+      "skipped": true
+    },
+    {
+      "table": "customer_profiles",
+      "rowCount": 0
+    },
+    {
+      "table": "contact_activities",
+      "rowCount": 5,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\mas-pilot-full-reset\\contact_activities-mas-dallas-2026-07-01.json"
+    },
+    {
+      "table": "contact_notes",
+      "rowCount": 0
+    },
+    {
+      "table": "contact_roles",
+      "rowCount": 671,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\mas-pilot-full-reset\\contact_roles-mas-dallas-2026-07-01.json"
+    },
+    {
+      "table": "contact_group_members",
+      "rowCount": 2,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\mas-pilot-full-reset\\contact_group_members-mas-dallas-2026-07-01.json"
+    },
+    {
+      "table": "contact_payment_methods",
+      "rowCount": 0
+    },
+    {
+      "table": "person_tags",
+      "rowCount": 1,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\mas-pilot-full-reset\\person_tags-mas-dallas-2026-07-01.json"
+    },
+    {
+      "table": "person_relationships",
+      "rowCount": 3,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\mas-pilot-full-reset\\person_relationships-mas-dallas-2026-07-01.json"
+    },
+    {
+      "table": "contact_import_staging",
+      "skipped": true
+    },
+    {
+      "table": "contacts",
+      "rowCount": 2510,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\mas-pilot-full-reset\\contacts-mas-dallas-2026-07-01.json"
+    },
+    {
+      "table": "people",
+      "rowCount": 9,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\mas-pilot-full-reset\\people-mas-dallas-2026-07-01.json"
+    },
+    {
+      "table": "donation_subcategories",
+      "rowCount": 1,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\mas-pilot-full-reset\\donation_subcategories-mas-dallas-2026-07-01.json"
+    },
+    {
+      "table": "donation_categories",
+      "rowCount": 5,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\mas-pilot-full-reset\\donation_categories-mas-dallas-2026-07-01.json"
+    },
+    {
+      "table": "payment_methods",
+      "rowCount": 6,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\mas-pilot-full-reset\\payment_methods-mas-dallas-2026-07-01.json"
+    },
+    {
+      "table": "campaigns",
+      "rowCount": 8,
+      "file": "C:\\Users\\danan\\Downloads\\ManarateeApp\\scripts\\backups\\mas-pilot-full-reset\\campaigns-mas-dallas-2026-07-01.json"
+    }
+  ],
+  "deletionSteps": [
+    {
+      "table": "transactional_email_log",
+      "deleted": 6,
+      "skipped": false,
+      "error": null
+    },
+    {
+      "table": "payment_processor_events",
+      "deleted": 3,
+      "skipped": false,
+      "error": null
+    },
+    {
+      "table": "donation_checkout_sessions",
+      "deleted": 2,
+      "skipped": false,
+      "error": null
+    },
+    {
+      "table": "pledge_reminders",
+      "deleted": 0,
+      "skipped": false,
+      "error": null
+    },
+    {
+      "table": "donation_receipts",
+      "deleted": 3,
+      "skipped": false,
+      "error": null
+    },
+    {
+      "table": "payments",
+      "deleted": 1149,
+      "skipped": false,
+      "error": null
+    },
+    {
+      "table": "pledges",
+      "deleted": 1256,
+      "skipped": false,
+      "error": null
+    },
+    {
+      "table": "recurring_donation_plans",
+      "deleted": 8,
+      "skipped": false,
+      "error": null
+    },
+    {
+      "table": "donors",
+      "deleted": 895,
+      "skipped": false,
+      "error": null
+    },
+    {
+      "table": "payment_import_batches",
+      "deleted": 1,
+      "skipped": false,
+      "error": null
+    },
+    {
+      "table": "application_documents",
+      "deleted": 0,
+      "skipped": false,
+      "error": null
+    },
+    {
+      "table": "application_history",
+      "deleted": 0,
+      "skipped": false,
+      "error": null
+    },
+    {
+      "table": "applications",
+      "deleted": 0,
+      "skipped": false,
+      "error": null
+    },
+    {
+      "table": "service_participations",
+      "deleted": 0,
+      "skipped": false,
+      "error": null
+    },
+    {
+      "table": "volunteer_assignments",
+      "deleted": 0,
+      "skipped": true,
+      "error": null
+    },
+    {
+      "table": "volunteers",
+      "deleted": 1,
+      "skipped": false,
+      "error": null
+    },
+    {
+      "table": "membership_status_history",
+      "deleted": 0,
+      "skipped": true,
+      "error": null
+    },
+    {
+      "table": "memberships",
+      "deleted": 0,
+      "skipped": false,
+      "error": null
+    },
+    {
+      "table": "employees",
+      "deleted": 0,
+      "skipped": true,
+      "error": null
+    },
+    {
+      "table": "customer_profiles",
+      "deleted": 0,
+      "skipped": false,
+      "error": null
+    },
+    {
+      "table": "contact_activities",
+      "deleted": 5,
+      "skipped": false,
+      "error": null
+    },
+    {
+      "table": "contact_notes",
+      "deleted": 0,
+      "skipped": false,
+      "error": null
+    },
+    {
+      "table": "contact_roles",
+      "deleted": 671,
+      "skipped": false,
+      "error": null
+    },
+    {
+      "table": "contact_group_members",
+      "deleted": 2,
+      "skipped": false,
+      "error": null
+    },
+    {
+      "table": "contact_payment_methods",
+      "deleted": 0,
+      "skipped": false,
+      "error": null
+    },
+    {
+      "table": "person_tags",
+      "deleted": 1,
+      "skipped": false,
+      "error": null
+    },
+    {
+      "table": "person_relationships",
+      "deleted": 3,
+      "skipped": false,
+      "error": null
+    },
+    {
+      "table": "contact_import_staging",
+      "deleted": 0,
+      "skipped": true,
+      "error": null
+    },
+    {
+      "table": "contacts",
+      "deleted": 2510,
+      "skipped": false,
+      "error": null
+    },
+    {
+      "table": "people",
+      "deleted": 9,
+      "skipped": false,
+      "error": null
+    },
+    {
+      "table": "donation_subcategories",
+      "deleted": 1,
+      "skipped": false,
+      "error": null
+    },
+    {
+      "table": "donation_categories",
+      "deleted": 5,
+      "skipped": false,
+      "error": null
+    },
+    {
+      "table": "payment_methods",
+      "deleted": 6,
+      "skipped": false,
+      "error": null
+    },
+    {
+      "table": "campaigns",
+      "deleted": 8,
+      "skipped": false,
+      "error": null
+    }
+  ],
+  "preserveOk": true,
+  "wipeOk": true
+}

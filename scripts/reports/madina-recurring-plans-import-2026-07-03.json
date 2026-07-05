@@ -1,0 +1,112 @@
+{
+  "execute": true,
+  "file": "C:/Users/danan/Downloads/RecurringDonations07032026.csv",
+  "orgId": "e057e00a-e4e3-4adf-9af5-f465db1894be",
+  "csvRows": 205,
+  "skippedQaysHawwar": 1,
+  "skippedNoDonor": 7,
+  "skippedInvalid": 0,
+  "plansCreated": 17,
+  "plansUpdated": 180,
+  "categoriesCreated": 1,
+  "fundsCreated": 1,
+  "errors": [],
+  "samples": [
+    {
+      "action": "created",
+      "name": "ZAHRA NABIL M",
+      "amount": 1022.3,
+      "frequency": "monthly",
+      "categoryFund": "Sadaqah/Donation",
+      "status": "COMPLETED"
+    },
+    {
+      "action": "created",
+      "name": "Waleed Gabr",
+      "amount": 100,
+      "frequency": "monthly",
+      "categoryFund": "Sadaqah/Donation",
+      "status": "CANCELLED"
+    },
+    {
+      "action": "created",
+      "name": "musaab zaid",
+      "amount": 102.5,
+      "frequency": "daily",
+      "categoryFund": "Sadaqah/Donation",
+      "status": "COMPLETED"
+    },
+    {
+      "action": "created",
+      "name": "Zayd Hammous",
+      "amount": 100,
+      "frequency": "monthly",
+      "categoryFund": "Sustainers Campaign",
+      "status": "ACTIVE"
+    },
+    {
+      "action": "created",
+      "name": "niana mahrouq",
+      "amount": 85.13,
+      "frequency": "monthly",
+      "categoryFund": "Zakat",
+      "status": "CANCELLED"
+    },
+    {
+      "action": "created",
+      "name": "Khaled Hashem",
+      "amount": 100,
+      "frequency": "monthly",
+      "categoryFund": "Sustainers Campaign",
+      "status": "ACTIVE"
+    },
+    {
+      "action": "created",
+      "name": "ISMAEL MOHAMMAD",
+      "amount": 100,
+      "frequency": "monthly",
+      "categoryFund": "Sustainers Campaign",
+      "status": "ACTIVE"
+    },
+    {
+      "action": "created",
+      "name": "Hamzah Abdullah",
+      "amount": 100,
+      "frequency": "monthly",
+      "categoryFund": "Sustainers Campaign",
+      "status": "ACTIVE"
+    },
+    {
+      "action": "created",
+      "name": "Ynakiebalias@gmail.com",
+      "amount": 10,
+      "frequency": "monthly",
+      "categoryFund": "Sustainers Campaign",
+      "status": "ACTIVE"
+    },
+    {
+      "action": "created",
+      "name": "Mohammad Zahra",
+      "amount": 41.18,
+      "frequency": "daily",
+      "categoryFund": "Zakat",
+      "status": "COMPLETED"
+    },
+    {
+      "action": "created",
+      "name": "Mohammed Al Bazz",
+      "amount": 10.52,
+      "frequency": "daily",
+      "categoryFund": "Masjid Operations",
+      "status": "COMPLETED"
+    },
+    {
+      "action": "created",
+      "name": "Malik Marouf",
+      "amount": 5.41,
+      "frequency": "daily",
+      "categoryFund": "Masjid Operations",
+      "status": "CANCELLED"
+    }
+  ]
+}

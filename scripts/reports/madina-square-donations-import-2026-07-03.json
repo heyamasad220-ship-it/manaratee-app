@@ -1,0 +1,29 @@
+{
+  "execute": true,
+  "file": "C:/Users/danan/Downloads/MadinaDonationsActive07032026.csv",
+  "organizationId": "e057e00a-e4e3-4adf-9af5-f465db1894be",
+  "csvRowsParsed": 9921,
+  "eligibleRows": 9821,
+  "skippedZeroOrInvalid": 100,
+  "skippedCsvDuplicates": 231,
+  "skippedCampaignOverlap": 491,
+  "skippedAlreadyImported": 9098,
+  "categoriesCreated": 0,
+  "fundsCreated": 0,
+  "contactsMatched": 0,
+  "contactsCreated": 1,
+  "donorsCreated": 1,
+  "paymentsCreated": 1,
+  "affiliationsSynced": 1,
+  "errors": [],
+  "samples": [
+    {
+      "name": "Fatima Azaimy",
+      "amount": 50,
+      "date": "2023-02-28",
+      "category": "General Donation",
+      "fund": "Turkey & Syria Earthquake Relief"
+    }
+  ],
+  "rowsQueued": 1
+}

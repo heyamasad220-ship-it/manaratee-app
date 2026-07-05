@@ -1,0 +1,106 @@
+{
+  "mode": "execute",
+  "paymentsOnly": true,
+  "file": "C:\\Users\\danan\\Downloads\\GroupDonationsImport.csv",
+  "campaignFilter": null,
+  "rowCount": 452,
+  "skippedEmpty": 0,
+  "skippedSummary": 0,
+  "skippedDuplicate": 0,
+  "contactsMatched": 29,
+  "contactsCreated": 322,
+  "groupsMatched": 0,
+  "groupsCreated": 37,
+  "groupMembersLinked": 452,
+  "donorsCreated": 322,
+  "campaignsCreated": 1,
+  "pledgesCreated": 0,
+  "paymentsCreated": 452,
+  "ambiguousMatches": [
+    {
+      "csvName": "Ahmed Ahmed",
+      "matchedName": "Ahmed Abughazaleh",
+      "reason": "fuzzy_name:85"
+    },
+    {
+      "csvName": "Badia Alamari &family",
+      "matchedName": "Badia Alamari",
+      "reason": "fuzzy_name:85"
+    }
+  ],
+  "errors": [],
+  "samples": [
+    {
+      "rowKey": "MAS_CAMPAIGN_LEDGER_V1|1b424cad68cf",
+      "name": "Aamir Waheed",
+      "group": "Boy Scouts",
+      "campaign": "January 2023",
+      "payments": [
+        400
+      ]
+    },
+    {
+      "rowKey": "MAS_CAMPAIGN_LEDGER_V1|0515029a4518",
+      "name": "Aamir Waheed",
+      "group": "Boy Scouts",
+      "campaign": "September 2025",
+      "payments": [
+        300
+      ]
+    },
+    {
+      "rowKey": "MAS_CAMPAIGN_LEDGER_V1|1276245af622",
+      "name": "Abdallah Emran",
+      "group": "CYP Usra",
+      "campaign": "September 2025",
+      "payments": [
+        300
+      ]
+    },
+    {
+      "rowKey": "MAS_CAMPAIGN_LEDGER_V1|590645e74cd8",
+      "name": "Abdallah Shawky",
+      "group": "Brothers Wednesday Night Halaqa",
+      "campaign": "January 2023",
+      "payments": [
+        400
+      ]
+    },
+    {
+      "rowKey": "MAS_CAMPAIGN_LEDGER_V1|af7a6b7625d2",
+      "name": "Abdel-Rahman Odeh",
+      "group": "Fajr Crew",
+      "campaign": "December 2023",
+      "payments": [
+        600
+      ]
+    },
+    {
+      "rowKey": "MAS_CAMPAIGN_LEDGER_V1|9e6dd568f63f",
+      "name": "Abdul Majid",
+      "group": "ICNA",
+      "campaign": "January 2023",
+      "payments": [
+        500
+      ]
+    },
+    {
+      "rowKey": "MAS_CAMPAIGN_LEDGER_V1|b5762e62a9d1",
+      "name": "Abdulatif Jabi",
+      "group": "MAS Irving Family",
+      "campaign": "October 2024",
+      "payments": [
+        1000
+      ]
+    },
+    {
+      "rowKey": "MAS_CAMPAIGN_LEDGER_V1|b3c00d0360e4",
+      "name": "Abdullah AbdulHameed",
+      "group": "Eagle Scout",
+      "campaign": "October 2024",
+      "payments": [
+        100
+      ]
+    }
+  ]
+}

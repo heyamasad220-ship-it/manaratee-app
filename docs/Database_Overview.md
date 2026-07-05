@@ -87,6 +87,8 @@ organization_modules.module_id → modules.id
 * contact_roles
 * contact_group_members
 * contact_payment_methods
+* families
+* family_members
 * organization_affiliation_settings
 * person_relationships
 * person_tags
@@ -111,6 +113,11 @@ organization_affiliation_settings.organization_id → organizations.id
 person_relationships.organization_id → organizations.id
 person_relationships.person_id → people.id
 person_relationships.related_person_id → people.id
+families.organization_id → organizations.id
+families.primary_contact_id → contacts.id
+family_members.family_id → families.id
+family_members.contact_id → contacts.id
+family_members.organization_id → organizations.id
 person_tags.organization_id → organizations.id
 person_tags.tag_id → discount_tags.id
 discount_tags.organization_id → organizations.id
@@ -123,6 +130,8 @@ discount_tags.organization_id → organizations.id
 **Contact record types (migration `132_contact_type_group.sql`):** `contacts.contact_type` CHECK — `individual` (person), `organization` (external entity), `group` (internal collective: halaqa, committee) with optional `primary_contact_name`. Group donor rows use `donors.donor_type = 'organization'`. Patch `sync_contact_affiliations` for groups: migration `133_sync_contact_affiliations_group.sql`.
 
 **Group membership (migration `135_contact_group_members.sql`):** `contact_group_members` links individuals to group contacts (`group_contact_id`, `member_contact_id`, `status`). Group gifts on group Financial tab; member gifts attributed via `payments.attributed_group_contact_id` (migration **`136_payment_attributed_group.sql`**) roll up for group competition; auto-membership when a group is selected on a gift. UI: group **Overview → Group Members**; person **Overview → Groups**; optional group picker on **Record Payment**. Server: `lib/contacts/group-members-load-action.ts`, `lib/contacts/group-membership-data.ts`, `lib/contacts/group-member-actions.ts`, `lib/contacts/group-giving-actions.ts`.
+
+**Family households (migration `148_families_and_family_members.sql`):** `families` + `family_members` are relationship containers only — **no family FK on payments**. Active members (`end_date IS NULL`) roll up to household totals on `/contacts/families` and `/contacts/families/[id]`. Backfilled from `person_relationships`; staff add/remove on contact profile syncs membership via `lib/contacts/family-sync.ts`. Household donor report RPC: **`149_household_giving_report.sql`**. `person_relationships` remains for portal/program family checks until fully migrated.
 
 **Contact payment methods (migration `138_contact_payment_methods.sql`):** `contact_payment_methods` stores cards on file for a contact (brand, last4, expiry, cardholder, default flag). **Staff** add cards from contact profile **Financial → Payment Methods**; **contacts** add cards from the customer portal **Profile → Payment Methods**. Both paths use the same `contact_payment_methods` rows (full PAN and CVV collected at save only; only last 4 + MM/YYYY expiration persist). Server: `lib/contacts/contact-payment-method-actions.ts`, `lib/contacts/contact-payment-method-validation.ts`, `components/contacts/contact-payment-methods-panel.tsx`. Run after `137_customer_role_merge.sql`.
 
@@ -288,7 +297,7 @@ Import CSV flow writes directly to `payments` + `payment_import_batches` (no row
 * donation_settings (receipt + pledge reminder config per org — migrations `090`, `091`)
 * donation_receipts (payment receipts + annual statements — canonical payments only)
 * pledge_reminders (pledge collection reminder activity log — migration `091`)
-* recurring_donation_plans (ongoing giving schedules — migration `092`; not pledges)
+* recurring_donation_plans (ongoing giving schedules — migration `092`; not pledges; `daily` frequency added in migration `155`; `total_payments` / `payments_made` added in migration `156`)
 * donation_checkout_sessions (in-flight Stripe Checkout — migration `093`; not a payment ledger)
 * payment_processor_events (Stripe webhook audit + idempotency — migration `093`)
 * transactional_email_log (operational donation email audit — migration `094`)
@@ -296,6 +305,8 @@ Import CSV flow writes directly to `payments` + `payment_import_batches` (no row
 **Stripe processor columns on `payments` (migration `093`):** `stripe_checkout_session_id`, `stripe_payment_intent_id`, `stripe_charge_id`, `refunded_amount`. Unique partial index on `stripe_payment_intent_id`. Online card donations are inserted only via webhook (`source_type = processor`, `source = stripe`).
 
 **Stripe recurring billing (migration `100_stripe_recurring_donations.sql`):** `payments.stripe_invoice_id` (unique partial index). `recurring_donation_plans.stripe_customer_id`. Plan statuses include `pending_setup` and `past_due`. Recurring charges insert `payments` via `invoice.paid` webhook with `recurring_donation_plan_id` set; `pledge_id` remains null.
+
+**Square plan metadata (migration `156_recurring_plan_payment_counts.sql`):** `recurring_donation_plans.total_payments` (expected count from processor export) and `payments_made` (completed count). Populated by `scripts/import-madina-recurring-plans.mjs` from Square recurring plans CSV.
 
 **Transactional email (migration `094`):** `transactional_email_log` tracks receipt, year-end statement, and pledge reminder sends. `donation_receipts.status` includes `failed`. `donation_settings.year_end_statement_email_template` for statement email body.
 
@@ -316,7 +327,7 @@ npm run validate:donations-security
 
 **Outstanding pledge flag (migration `124_donor_summary_outstanding_pledge.sql`):** `donor_summary_view.has_open_pledge` is true only when `pledge_status_view.balance_remaining > 0`. Backfills `pledges.status` from payment totals; trigger `sync_pledge_status_after_payment_change` keeps status in sync on payment changes.
 
-**Donor giving report RPCs (migration `127_donor_giving_report.sql`, patch `128_donor_giving_report_contact_id.sql`, fix `143_donor_giving_report_type_fix.sql`, patch `144_donor_giving_report_summary_gift_count_cast.sql`, patch `145_donor_giving_report_email_search.sql`, patch `146_donor_giving_report_min_total_given.sql`):** `donation_donor_giving_report` (paginated rows with optional payment date range, search, **minimum total given**, lapsed-only, pledge filters, outstanding pledge balance, **contact_id**, net payment amounts) and `donation_donor_giving_report_summary` (aggregate donor count / total given / gift count for the same filters). Migration **143** casts `payment_date` to `date` and aligns totals with `payment_net_amount`. Migration **144** casts `SUM(donation_count)` to `bigint`. Migration **145** adds email search. Migration **146** adds `p_min_total_given`. Used by Reports → Donors (`/donations/reports/donors`).
+**Donor giving report RPCs (migration `127_donor_giving_report.sql`, patch `128_donor_giving_report_contact_id.sql`, fix `143_donor_giving_report_type_fix.sql`, patch `144_donor_giving_report_summary_gift_count_cast.sql`, patch `145_donor_giving_report_email_search.sql`, patch `146_donor_giving_report_min_total_given.sql`, patch `150_donor_giving_report_email_phone.sql`, patch `151_donor_giving_report_pledge_status.sql`, patch `152_donor_giving_report_column_filters.sql`, patch `153_donor_giving_report_last_gift_filter.sql`):** `donation_donor_giving_report` (paginated rows with optional payment date range, column filters for donor name / email / phone / pledge status / **last gift** (`p_last_gift_filter`: all, active_12m, lapsed_12m, lapsed_24m, never), **minimum total given**, outstanding pledge balance, **contact_id**, net payment amounts) and `donation_donor_giving_report_summary` (aggregate donor count / total given / gift count for the same filters). Migration **143** casts `payment_date` to `date` and aligns totals with `payment_net_amount`. Migration **144** casts `SUM(donation_count)` to `bigint`. Migration **145** adds email search. Migration **146** adds `p_min_total_given`. Migration **153** replaces `p_lapsed_only` with `p_last_gift_filter`. Used by Reports → Donors (`/donations/reports/donors`).
 
 **People donor filter (migration `129_donor_giving_contact_search.sql`, grants `130_donor_giving_rpc_grants.sql`):** `search_donor_giving_contact_ids` — contacts with at least one non-voided payment (direct or via `donors.contact_id`). Run **`130`** so authenticated app users can call the RPC (without it, People falls back to ~95 affiliation tags). **Link orphan donors to People:** `node scripts/link-orphan-donors-to-contacts.mjs --execute` then `node scripts/sync-donor-affiliations.mjs --execute`.
 

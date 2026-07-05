@@ -1,0 +1,81 @@
+{
+  "generatedAt": "2026-07-01T11:44:22.232Z",
+  "orgId": "e057e00a-e4e3-4adf-9af5-f465db1894be",
+  "execute": true,
+  "contactIdsFound": 18,
+  "synced": 0,
+  "errors": [
+    {
+      "contactId": "9d86f589-ac15-4407-9a9e-62486e22a6dc",
+      "message": "column vr.billing_contact_id does not exist"
+    },
+    {
+      "contactId": "8aa1b331-d883-430e-8a70-7d5fe43fa8c7",
+      "message": "column vr.billing_contact_id does not exist"
+    },
+    {
+      "contactId": "4ad86173-69d7-47c0-a6f2-325fe62c0cf9",
+      "message": "column vr.billing_contact_id does not exist"
+    },
+    {
+      "contactId": "b640fe27-4f3c-43b6-8705-15684c86aac3",
+      "message": "column vr.billing_contact_id does not exist"
+    },
+    {
+      "contactId": "5fe6e299-448d-4486-8931-01755f451f14",
+      "message": "column vr.billing_contact_id does not exist"
+    },
+    {
+      "contactId": "c36976c5-be3a-4fd4-8776-9528920c9128",
+      "message": "column vr.billing_contact_id does not exist"
+    },
+    {
+      "contactId": "60fc27e1-d591-477e-b068-f633475af42c",
+      "message": "column vr.billing_contact_id does not exist"
+    },
+    {
+      "contactId": "7d16c45c-c07e-4540-acbb-17fd18dc2409",
+      "message": "column vr.billing_contact_id does not exist"
+    },
+    {
+      "contactId": "ba9a882d-1a02-4d1c-bcb4-587a61bf481f",
+      "message": "column vr.billing_contact_id does not exist"
+    },
+    {
+      "contactId": "0c160bac-11ea-4952-94b7-2a5d605f2844",
+      "message": "column vr.billing_contact_id does not exist"
+    },
+    {
+      "contactId": "23898cb6-aaf7-4653-9a00-d652f45efbf5",
+      "message": "column vr.billing_contact_id does not exist"
+    },
+    {
+      "contactId": "a311a454-b5f2-4c09-9e4e-ed8cbc91f714",
+      "message": "column vr.billing_contact_id does not exist"
+    },
+    {
+      "contactId": "761ec5cb-f82b-4fe9-8ed5-29da677f42f4",
+      "message": "column vr.billing_contact_id does not exist"
+    },
+    {
+      "contactId": "037c66c4-aa10-42ec-a301-e153d396877b",
+      "message": "column vr.billing_contact_id does not exist"
+    },
+    {
+      "contactId": "198a54ef-abd5-4eca-80a4-9e76f7f56c3d",
+      "message": "column vr.billing_contact_id does not exist"
+    },
+    {
+      "contactId": "c5af1da3-4365-479f-99f5-eed631bc18c9",
+      "message": "column vr.billing_contact_id does not exist"
+    },
+    {
+      "contactId": "ffa1e299-4600-474a-af61-8a058e0842a2",
+      "message": "column vr.billing_contact_id does not exist"
+    },
+    {
+      "contactId": "078d3a6b-ccdc-4ef9-b6e7-b776d3151d6d",
+      "message": "column vr.billing_contact_id does not exist"
+    }
+  ]
+}

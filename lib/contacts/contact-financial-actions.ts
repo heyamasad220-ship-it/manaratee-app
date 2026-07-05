@@ -1,14 +1,21 @@
 "use server"
 
-import { normalizePaymentStatus, pledgeDisplayStatus } from "@/lib/donations/donation-status"
+import {
+  formatFinancialActivityPaymentStatus,
+  pledgeDisplayStatus,
+} from "@/lib/donations/donation-status"
 import { donationPaymentDetailHref } from "@/lib/donations/donation-payment-paths"
 import { donationPledgesHref } from "@/lib/donations/donation-pledge-paths"
-import { formatPaymentSourceLabel } from "@/lib/donations/payment-source-channel"
+import { normalizePaymentSourceChannel } from "@/lib/donations/payment-source-channel"
 import {
-  canAllocatePayment,
+  loadStripeCardLast4ByPaymentIntentIds,
+  resolvePaymentMethodDisplayLabel,
+} from "@/lib/donations/payment-method-display"
+import {
   countsTowardGivingTotals,
   paymentNetAmount,
 } from "@/lib/donations/payment-net-amount"
+import { formatRecurringFrequencyLabel } from "@/lib/donations/recurring-donation-types"
 import { getVenueRentalStatusLabel } from "@/lib/bookings/venue-rental-status"
 import {
   RENTAL_PAYMENT_STATUSES,
@@ -60,9 +67,22 @@ function rentalPaymentLabel(paymentType: string) {
   }
 }
 
-function formatPaymentMethod(source: string | null | undefined) {
-  if (!source) return null
-  return formatPaymentSourceLabel(source)
+function formatPaymentMethod(
+  payment: {
+    source?: string | null
+    stripe_payment_intent_id?: string | null
+  },
+  stripeCardLast4ByIntentId: Map<string, string>
+) {
+  return resolvePaymentMethodDisplayLabel(payment, stripeCardLast4ByIntentId)
+}
+
+async function loadStripeCardLast4ForPayments(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  organizationId: string,
+  paymentIntentIds: string[]
+) {
+  return loadStripeCardLast4ByPaymentIntentIds(supabase, organizationId, paymentIntentIds)
 }
 
 const ACTIVITY_TYPE_LABELS = {
@@ -80,63 +100,17 @@ function activityTypeLabel(kind: keyof typeof ACTIVITY_TYPE_LABELS) {
 
 function describeDonationPayment(payment: {
   recurring_donation_plan_id?: string | null
+  recurring_frequency?: string | null
   memo?: string | null
 }) {
   const memo = String(payment.memo || "")
   if (payment.recurring_donation_plan_id || memo.includes("|recurring|")) {
+    if (payment.recurring_frequency) {
+      return `${formatRecurringFrequencyLabel(payment.recurring_frequency)} Recurring Donation`
+    }
     return "Recurring Donation"
   }
   return "One-Time Donation"
-}
-
-function paymentTimelineStatus(
-  payment: {
-    status?: string | null
-    pledge_id?: string | null
-    amount?: number | null
-    refunded_amount?: number | null
-  },
-  donorHasOpenPledge: boolean
-): Pick<ContactFinancialTimelineEvent, "status" | "statusAction"> {
-  const normalized = normalizePaymentStatus(payment.status)
-
-  if (
-    donorHasOpenPledge &&
-    canAllocatePayment({
-      pledge_id: payment.pledge_id,
-      status: payment.status,
-      amount: Number(payment.amount || 0),
-      refunded_amount: payment.refunded_amount,
-    })
-  ) {
-    return { status: null, statusAction: "link_to_pledge" }
-  }
-
-  if (normalized === "allocated") {
-    return { status: "Linked to Pledge", statusAction: null }
-  }
-
-  if (normalized === "pending_review") {
-    return { status: "Pending review", statusAction: null }
-  }
-
-  if (normalized === "unresolved") {
-    return { status: "Unresolved", statusAction: null }
-  }
-
-  if (normalized === "voided") {
-    return { status: "Voided", statusAction: null }
-  }
-
-  if (normalized === "refunded") {
-    return { status: "Refunded", statusAction: null }
-  }
-
-  if (normalized === "partially_refunded") {
-    return { status: "Partially refunded", statusAction: null }
-  }
-
-  return { status: normalized.replaceAll("_", " "), statusAction: null }
 }
 
 function formatPledgeTimelineStatusLabel(
@@ -147,10 +121,7 @@ function formatPledgeTimelineStatusLabel(
   const normalized = status?.toLowerCase()
   if (normalized === "cancelled") return "Cancelled"
 
-  const display = pledgeDisplayStatus(status, amountPledged, amountPaid)
-  if (display === "Fulfilled") return "Paid"
-  if (display === "Partial") return "Partially paid"
-  return "Open"
+  return pledgeDisplayStatus(status, amountPledged, amountPaid)
 }
 
 function describePledge(campaignName: string) {
@@ -216,7 +187,7 @@ export async function loadContactFinancialSummaryAction(
       supabase
         .from("payments")
         .select(
-          "id, amount, refunded_amount, payment_date, source, source_type, status, pledge_id, memo, recurring_donation_plan_id, attributed_group_contact_id"
+          "id, amount, refunded_amount, payment_date, source, source_type, status, pledge_id, memo, recurring_donation_plan_id, attributed_group_contact_id, stripe_payment_intent_id"
         )
         .eq("organization_id", organizationId)
         .eq("donor_id", activeDonorId)
@@ -247,11 +218,34 @@ export async function loadContactFinancialSummaryAction(
         ? await loadMemberContactsByIds(supabase, organizationId, attributedGroupIds)
         : new Map<string, { full_name: string | null; email: string | null; phone: string | null }>()
 
-    const donorHasOpenPledge = (pledges || []).some((pledge) => {
-      const balance = Number(pledge.balance_remaining || 0)
-      const status = String(pledge.calculated_status || "").toLowerCase()
-      return balance > 0 && status !== "cancelled"
-    })
+    const stripeCardLast4ByIntentId = await loadStripeCardLast4ForPayments(
+      supabase,
+      organizationId,
+      (payments || [])
+        .filter((payment) => normalizePaymentSourceChannel(payment.source) === "stripe")
+        .map((payment) => payment.stripe_payment_intent_id as string | null)
+    )
+
+    const recurringPlanIds = [
+      ...new Set(
+        (payments || [])
+          .map((payment) => payment.recurring_donation_plan_id as string | null)
+          .filter((id): id is string => Boolean(id))
+      ),
+    ]
+
+    const recurringFrequencyByPlanId = new Map<string, string>()
+    if (recurringPlanIds.length > 0) {
+      const { data: recurringPlans } = await supabase
+        .from("recurring_donation_plans")
+        .select("id, frequency")
+        .eq("organization_id", organizationId)
+        .in("id", recurringPlanIds)
+
+      for (const plan of recurringPlans || []) {
+        recurringFrequencyByPlanId.set(plan.id as string, plan.frequency as string)
+      }
+    }
 
     for (const payment of payments || []) {
       if (!countsTowardGivingTotals(payment)) continue
@@ -262,7 +256,13 @@ export async function loadContactFinancialSummaryAction(
 
       const description = isGroup
         ? payment.memo?.trim() || "Group Gift"
-        : describeDonationPayment(payment)
+        : describeDonationPayment({
+            recurring_donation_plan_id: payment.recurring_donation_plan_id,
+            recurring_frequency: payment.recurring_donation_plan_id
+              ? recurringFrequencyByPlanId.get(payment.recurring_donation_plan_id as string) ?? null
+              : null,
+            memo: payment.memo,
+          })
 
       const attributedGroupContactId =
         (payment.attributed_group_contact_id as string | null) ?? null
@@ -270,17 +270,14 @@ export async function loadContactFinancialSummaryAction(
         ? attributedGroupContacts.get(attributedGroupContactId)?.full_name ?? null
         : null
 
-      const paymentStatus = paymentTimelineStatus(payment, donorHasOpenPledge)
-
       timeline.push({
         id: `payment-${payment.id}`,
         date: payment.payment_date,
         eventType: activityTypeLabel("donation"),
         description,
         amount: net,
-        method: formatPaymentMethod(payment.source),
-        status: paymentStatus.status,
-        statusAction: paymentStatus.statusAction,
+        method: formatPaymentMethod(payment, stripeCardLast4ByIntentId),
+        status: formatFinancialActivityPaymentStatus(payment),
         sourceModule: "donations",
         filterCategory: "donations",
         href: donationPaymentDetailHref(payment.id),

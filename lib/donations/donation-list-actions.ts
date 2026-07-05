@@ -4,92 +4,172 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 
 import { requireDonationStaffAccess } from "@/lib/donations/donation-action-auth"
 import { DONATIONS_PAGE_SIZE } from "@/lib/donations/donation-pagination"
+import { formatFinancialActivityPaymentStatus } from "@/lib/donations/donation-status"
 import { attachPaymentDonorDisplayNames } from "@/lib/donations/payment-donor-display"
+import { attachPaymentMethodDisplayLabels } from "@/lib/donations/payment-method-display"
 
 function escapeIlike(value: string) {
   return value.replace(/[%_\\,]/g, "\\$&")
 }
 
+export type PaymentStatusDisplayFilter =
+  | "Succeeded"
+  | "Failed"
+  | "Refunded"
+  | "Partially Refunded"
+
 export type PaymentsPageInput = {
   page?: number
   pageSize?: number
   search?: string
+  donorName?: string
   status?: string
+  statusDisplay?: PaymentStatusDisplayFilter | "all"
   dateFrom?: string
   dateTo?: string
+}
+
+function applyPaymentStatusDisplayFilter<
+  T extends {
+    in: (column: string, values: string[]) => T
+    eq: (column: string, value: string) => T
+    not: (column: string, operator: string, value: string) => T
+  },
+>(query: T, statusDisplay: PaymentStatusDisplayFilter): T {
+  switch (statusDisplay) {
+    case "Failed":
+      return query.in("status", ["voided", "pending_review", "unresolved"])
+    case "Refunded":
+      return query.eq("status", "refunded")
+    case "Partially Refunded":
+      return query.eq("status", "partially_refunded")
+    case "Succeeded":
+      return query.not(
+        "status",
+        "in",
+        '("voided","pending_review","unresolved","refunded","partially_refunded")'
+      )
+    default:
+      return query
+  }
+}
+
+async function applyDonorNameFilter<
+  T extends { or: (filters: string) => T },
+>(supabase: SupabaseClient, orgId: string, query: T, donorName: string): Promise<T> {
+  const term = `%${escapeIlike(donorName.trim())}%`
+  const searchParts = [`sender_name.ilike.${term}`]
+
+  const { data: matchingDonors } = await supabase
+    .from("donor_summary_view")
+    .select("id")
+    .eq("organization_id", orgId)
+    .ilike("full_name", term)
+
+  const matchingDonorIds = (matchingDonors || [])
+    .map((row) => row.id as string)
+    .filter(Boolean)
+
+  if (matchingDonorIds.length > 0) {
+    searchParts.push(`donor_id.in.(${matchingDonorIds.join(",")})`)
+  }
+
+  return query.or(searchParts.join(","))
 }
 
 export async function fetchPaymentsPageAction(input: PaymentsPageInput = {}) {
   const access = await requireDonationStaffAccess("view")
   if (!access.ok) return { success: false as const, error: access.error }
 
-  const page = Math.max(1, input.page ?? 1)
-  const pageSize = Math.min(100, Math.max(1, input.pageSize ?? DONATIONS_PAGE_SIZE))
-  const from = (page - 1) * pageSize
-  const to = from + pageSize - 1
+  try {
+    const page = Math.max(1, input.page ?? 1)
+    const pageSize = Math.min(100, Math.max(1, input.pageSize ?? DONATIONS_PAGE_SIZE))
+    const from = (page - 1) * pageSize
+    const to = from + pageSize - 1
 
-  let query = access.supabase
-    .from("payments")
-    .select(
-      "id, amount, payment_date, source, memo, pledge_id, donor_id, contact_id, status, sender_name, donors ( donor_type )",
-      { count: "exact" }
-    )
-    .eq("organization_id", access.orgId)
-    .order("payment_date", { ascending: false })
-
-  if (input.status && input.status !== "all") {
-    query = query.eq("status", input.status)
-  }
-  if (input.dateFrom) {
-    query = query.gte("payment_date", input.dateFrom)
-  }
-  if (input.dateTo) {
-    query = query.lte("payment_date", input.dateTo)
-  }
-  if (input.search?.trim()) {
-    const term = `%${escapeIlike(input.search.trim())}%`
-    const searchParts = [`sender_name.ilike.${term}`, `memo.ilike.${term}`, `source.ilike.${term}`]
-
-    const { data: matchingDonors } = await access.supabase
-      .from("donor_summary_view")
-      .select("id")
+    let query = access.supabase
+      .from("payments")
+      .select(
+        "id, amount, refunded_amount, payment_date, source, source_type, memo, pledge_id, donor_id, contact_id, status, sender_name, import_batch_id, stripe_payment_intent_id, stripe_charge_id, donors ( donor_type )",
+        { count: "exact" }
+      )
       .eq("organization_id", access.orgId)
-      .ilike("full_name", term)
+      .order("payment_date", { ascending: false })
 
-    const matchingDonorIds = (matchingDonors || [])
-      .map((row) => row.id as string)
-      .filter(Boolean)
+    if (input.statusDisplay && input.statusDisplay !== "all") {
+      query = applyPaymentStatusDisplayFilter(query, input.statusDisplay)
+    } else if (input.status && input.status !== "all") {
+      query = query.eq("status", input.status)
+    }
+    if (input.dateFrom) {
+      query = query.gte("payment_date", input.dateFrom)
+    }
+    if (input.dateTo) {
+      query = query.lte("payment_date", input.dateTo)
+    }
+    if (input.donorName?.trim()) {
+      query = await applyDonorNameFilter(access.supabase, access.orgId, query, input.donorName)
+    } else if (input.search?.trim()) {
+      const term = `%${escapeIlike(input.search.trim())}%`
+      const searchParts = [`sender_name.ilike.${term}`, `memo.ilike.${term}`, `source.ilike.${term}`]
 
-    if (matchingDonorIds.length > 0) {
-      searchParts.push(`donor_id.in.(${matchingDonorIds.join(",")})`)
+      const { data: matchingDonors } = await access.supabase
+        .from("donor_summary_view")
+        .select("id")
+        .eq("organization_id", access.orgId)
+        .ilike("full_name", term)
+
+      const matchingDonorIds = (matchingDonors || [])
+        .map((row) => row.id as string)
+        .filter(Boolean)
+
+      if (matchingDonorIds.length > 0) {
+        searchParts.push(`donor_id.in.(${matchingDonorIds.join(",")})`)
+      }
+
+      query = query.or(searchParts.join(","))
     }
 
-    query = query.or(searchParts.join(","))
-  }
+    const { data, error, count } = await query.range(from, to)
 
-  const { data, error, count } = await query.range(from, to)
+    if (error) return { success: false as const, error: error.message }
 
-  if (error) return { success: false as const, error: error.message }
+    const payments = (data || []).map((row) => {
+      const donor = Array.isArray(row.donors) ? row.donors[0] : row.donors
+      const { donors: _donors, ...payment } = row as Record<string, unknown> & {
+        donors?: { donor_type?: string | null } | { donor_type?: string | null }[] | null
+      }
+      return {
+        ...payment,
+        donor_type: (donor?.donor_type as string | null) ?? null,
+      }
+    })
 
-  const payments = (data || []).map((row) => {
-    const donor = Array.isArray(row.donors) ? row.donors[0] : row.donors
-    const { donors: _donors, ...payment } = row as Record<string, unknown> & {
-      donors?: { donor_type?: string | null } | { donor_type?: string | null }[] | null
+    await attachPaymentDonorDisplayNames(access.supabase, access.orgId, payments)
+    await attachPaymentMethodDisplayLabels(access.supabase, access.orgId, payments)
+
+    for (const payment of payments) {
+      ;(payment as Record<string, unknown>).status_display = formatFinancialActivityPaymentStatus(
+        payment as {
+          status?: string | null
+          amount?: number | null
+          refunded_amount?: number | null
+        }
+      )
     }
+
     return {
-      ...payment,
-      donor_type: (donor?.donor_type as string | null) ?? null,
+      success: true as const,
+      payments,
+      total: count ?? 0,
+      page,
+      pageSize,
     }
-  })
-
-  await attachPaymentDonorDisplayNames(access.supabase, access.orgId, payments)
-
-  return {
-    success: true as const,
-    payments,
-    total: count ?? 0,
-    page,
-    pageSize,
+  } catch (error) {
+    return {
+      success: false as const,
+      error: error instanceof Error ? error.message : "Could not load payments",
+    }
   }
 }
 
@@ -132,7 +212,7 @@ function applyPledgeListFilters<
   }
   if (input.search?.trim()) {
     const term = `%${escapeIlike(input.search.trim())}%`
-    query = query.or(`donor_name.ilike.${term},campaign_name.ilike.${term}`)
+    query = query.ilike("donor_name", term)
   }
 
   return query
@@ -279,12 +359,30 @@ export async function fetchPledgeSummaryMetricsAction(input: PledgeSummaryMetric
 
 export type DonorPledgeFilter = "all" | "open_pledge" | "no_open_pledge"
 
+export type DonorReportPledgeStatusFilter =
+  | "all"
+  | "open"
+  | "partial"
+  | "fulfilled"
+  | "none"
+
+export type DonorReportLastGiftFilter =
+  | "all"
+  | "active_12m"
+  | "lapsed_12m"
+  | "lapsed_24m"
+  | "never"
+
 export type DonorsPageInput = {
   page?: number
   pageSize?: number
   search?: string
+  donorName?: string
+  email?: string
+  phone?: string
   pledgeFilter?: DonorPledgeFilter
-  lapsedOnly?: boolean
+  pledgeStatus?: DonorReportPledgeStatusFilter
+  lastGiftFilter?: DonorReportLastGiftFilter
   minTotalGiven?: number
   dateFrom?: string
   dateTo?: string
@@ -296,21 +394,42 @@ export type DonorSummaryReportRow = {
   id: string
   contact_id: string | null
   full_name: string | null
+  email: string | null
   phone: string | null
   donor_type: string | null
   total_donations: number
   donation_count: number
   last_donation_date: string | null
   lifetime_last_donation_date: string | null
+  pledge_status: string | null
   has_open_pledge: boolean
+  outstanding_pledge_balance: number
+}
+
+export type HouseholdGivingReportRow = {
+  family_id: string
+  family_name: string
+  primary_contact_id: string | null
+  primary_name: string
+  primary_email: string | null
+  primary_phone: string | null
+  member_count: number
+  total_donations: number
+  donation_count: number
+  last_donation_date: string | null
+  pledge_status: string | null
   outstanding_pledge_balance: number
 }
 
 export type DonorSummaryReportFilters = Pick<
   DonorsPageInput,
   | "search"
+  | "donorName"
+  | "email"
+  | "phone"
   | "pledgeFilter"
-  | "lapsedOnly"
+  | "pledgeStatus"
+  | "lastGiftFilter"
   | "minTotalGiven"
   | "dateFrom"
   | "dateTo"
@@ -322,12 +441,14 @@ type DonorGivingReportRpcRow = {
   id: string
   contact_id: string | null
   full_name: string | null
+  email: string | null
   phone: string | null
   donor_type: string | null
   total_donations: number | string | null
   donation_count: number | string | null
   last_donation_date: string | null
   lifetime_last_donation_date: string | null
+  pledge_status: string | null
   has_open_pledge: boolean | null
   outstanding_pledge_balance: number | string | null
   total_count: number | string | null
@@ -338,12 +459,14 @@ function mapDonorGivingReportRow(row: DonorGivingReportRpcRow): DonorSummaryRepo
     id: row.id,
     contact_id: row.contact_id ?? null,
     full_name: row.full_name,
+    email: row.email ?? null,
     phone: row.phone,
     donor_type: row.donor_type,
     total_donations: Number(row.total_donations || 0),
     donation_count: Number(row.donation_count || 0),
     last_donation_date: row.last_donation_date,
     lifetime_last_donation_date: row.lifetime_last_donation_date,
+    pledge_status: row.pledge_status ?? (row.has_open_pledge ? "Open" : null),
     has_open_pledge: Boolean(row.has_open_pledge),
     outstanding_pledge_balance: Number(row.outstanding_pledge_balance || 0),
   }
@@ -353,17 +476,35 @@ function buildDonorGivingReportFilterParams(
   orgId: string,
   input: Pick<
     DonorSummaryReportFilters,
-    "search" | "pledgeFilter" | "lapsedOnly" | "minTotalGiven" | "dateFrom" | "dateTo"
+    | "search"
+    | "donorName"
+    | "email"
+    | "phone"
+    | "pledgeFilter"
+    | "pledgeStatus"
+    | "lastGiftFilter"
+    | "minTotalGiven"
+    | "dateFrom"
+    | "dateTo"
   >
 ) {
+  const pledgeStatus =
+    input.pledgeStatus && input.pledgeStatus !== "all" ? input.pledgeStatus : null
+  const lastGiftFilter =
+    input.lastGiftFilter && input.lastGiftFilter !== "all" ? input.lastGiftFilter : null
+
   return {
     p_org_id: orgId,
     p_date_from: input.dateFrom || null,
     p_date_to: input.dateTo || null,
     p_search: input.search?.trim() || null,
-    p_pledge_filter: input.pledgeFilter || "all",
+    p_donor_name: input.donorName?.trim() || null,
+    p_email: input.email?.trim() || null,
+    p_phone: input.phone?.trim() || null,
+    p_pledge_filter: pledgeStatus ? "all" : input.pledgeFilter || "all",
+    p_pledge_status: pledgeStatus,
     p_donor_type: null,
-    p_lapsed_only: Boolean(input.lapsedOnly),
+    p_last_gift_filter: lastGiftFilter,
     p_min_total_given:
       input.minTotalGiven != null && input.minTotalGiven > 0 ? input.minTotalGiven : null,
   }
@@ -465,10 +606,99 @@ export async function fetchDonorSummaryPageAction(input: DonorsPageInput = {}) {
   }
 }
 
+type HouseholdGivingReportRpcRow = {
+  family_id: string
+  family_name: string | null
+  primary_contact_id: string | null
+  primary_name: string | null
+  primary_email: string | null
+  primary_phone: string | null
+  member_count: number | string | null
+  total_donations: number | string | null
+  donation_count: number | string | null
+  last_donation_date: string | null
+  pledge_status: string | null
+  outstanding_pledge_balance: number | string | null
+  total_count: number | string | null
+}
+
+function mapHouseholdGivingReportRow(row: HouseholdGivingReportRpcRow): HouseholdGivingReportRow {
+  return {
+    family_id: row.family_id,
+    family_name: row.family_name || "Household",
+    primary_contact_id: row.primary_contact_id ?? null,
+    primary_name: row.primary_name || "Unnamed",
+    primary_email: row.primary_email ?? null,
+    primary_phone: row.primary_phone ?? null,
+    member_count: Number(row.member_count || 0),
+    total_donations: Number(row.total_donations || 0),
+    donation_count: Number(row.donation_count || 0),
+    last_donation_date: row.last_donation_date,
+    pledge_status: row.pledge_status ?? null,
+    outstanding_pledge_balance: Number(row.outstanding_pledge_balance || 0),
+  }
+}
+
+export async function fetchHouseholdGivingReportPageAction(
+  input: Pick<
+    DonorsPageInput,
+    "page" | "pageSize" | "search" | "dateFrom" | "dateTo" | "sortBy" | "sortAsc"
+  > = {}
+) {
+  const access = await requireDonationStaffAccess("view")
+  if (!access.ok) return { success: false as const, error: access.error }
+
+  const page = Math.max(1, input.page ?? 1)
+  const pageSize = Math.min(100, Math.max(1, input.pageSize ?? DONATIONS_PAGE_SIZE))
+  const sortBy = input.sortBy ?? "total_donations"
+  const sortAsc = input.sortAsc ?? sortBy === "full_name"
+
+  const { data, error } = await access.supabase.rpc("donation_household_giving_report", {
+    p_org_id: access.orgId,
+    p_date_from: input.dateFrom ?? null,
+    p_date_to: input.dateTo ?? null,
+    p_search: input.search ?? null,
+    p_sort_by: sortBy === "outstanding_pledge_balance" ? "total_donations" : sortBy,
+    p_sort_asc: sortAsc,
+    p_limit: pageSize,
+    p_offset: (page - 1) * pageSize,
+  })
+
+  if (error) {
+    return {
+      success: false as const,
+      error: error.message.includes("donation_household_giving_report")
+        ? "Household giving report is not available yet. Run migration scripts/149_household_giving_report.sql."
+        : error.message,
+    }
+  }
+
+  const rpcRows = (data || []) as HouseholdGivingReportRpcRow[]
+  const households = rpcRows.map(mapHouseholdGivingReportRow)
+  const total = Number(rpcRows[0]?.total_count || 0)
+
+  return {
+    success: true as const,
+    households,
+    total,
+    page,
+    pageSize,
+  }
+}
+
 export async function fetchDonorSummaryReportSummaryAction(
   input: Pick<
     DonorsPageInput,
-    "search" | "pledgeFilter" | "lapsedOnly" | "minTotalGiven" | "dateFrom" | "dateTo"
+    | "search"
+    | "donorName"
+    | "email"
+    | "phone"
+    | "pledgeFilter"
+    | "pledgeStatus"
+    | "lastGiftFilter"
+    | "minTotalGiven"
+    | "dateFrom"
+    | "dateTo"
   > = {}
 ) {
   const access = await requireDonationStaffAccess("view")

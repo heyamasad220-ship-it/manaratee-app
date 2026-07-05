@@ -38,6 +38,9 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Check, ChevronsUpDown, Plus } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { TableColumnHeaderFilter } from "@/components/ui/table-column-header-filter";
+import { DonationPaymentRowActions } from "@/components/donations/donation-payment-row-actions";
 import {
   fetchOpenPledgesForAllocationAction,
   fetchPaymentsPageAction,
@@ -66,15 +69,18 @@ import {
   toPaymentAttributionColumns,
 } from "@/lib/donations/payment-attribution";
 import { canAllocatePayment } from "@/lib/donations/payment-net-amount";
-import { formatPaymentPledgeColumnLabel } from "@/lib/donations/donation-status";
+import { mapPaymentToDonationHistoryRow } from "@/lib/donations/payment-admin-capabilities";
+import { financialActivityStatusBadgeClass } from "@/lib/donations/donation-status";
 import { getDonorProfilePath } from "@/lib/donations/donor-profile-path";
 import { resolvePaymentDonorDisplayName } from "@/lib/donations/payment-donor-display";
 
 type Payment = {
   id: string;
   amount: number | string | null;
+  refunded_amount?: number | null;
   payment_date: string | null;
   source: string | null;
+  source_type?: string | null;
   memo: string | null;
   pledge_id: string | null;
   donor_id: string | null;
@@ -82,8 +88,13 @@ type Payment = {
   donor_type: string | null;
   status: string | null;
   sender_name: string | null;
+  import_batch_id?: string | null;
+  stripe_payment_intent_id?: string | null;
+  stripe_charge_id?: string | null;
   donor_display_name?: string | null;
   donor_contact_id?: string | null;
+  method_display?: string | null;
+  status_display?: string | null;
 };
 
 type ContactPickerOption = {
@@ -144,6 +155,24 @@ function canLinkPaymentToPledge(payment: Payment) {
     pledge_id: payment.pledge_id,
     status: payment.status,
     amount: Number(payment.amount || 0),
+    refunded_amount: Number(payment.refunded_amount || 0),
+  });
+}
+
+function toPaymentHistoryRow(payment: Payment) {
+  return mapPaymentToDonationHistoryRow({
+    id: payment.id,
+    amount: Number(payment.amount || 0),
+    refunded_amount: payment.refunded_amount,
+    payment_date: payment.payment_date || "",
+    source: payment.source,
+    source_type: payment.source_type,
+    status: payment.status,
+    memo: payment.memo,
+    import_batch_id: payment.import_batch_id,
+    stripe_payment_intent_id: payment.stripe_payment_intent_id,
+    stripe_charge_id: payment.stripe_charge_id,
+    pledge_id: payment.pledge_id,
   });
 }
 
@@ -154,10 +183,11 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
   const [payments, setPayments] = useState<Payment[]>([]);
   const [totalPayments, setTotalPayments] = useState(0);
   const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [donorNameFilter, setDonorNameFilter] = useState("");
+  const [donorNameFilterInput, setDonorNameFilterInput] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const [contacts, setContacts] = useState<ContactPickerOption[]>([]);
   const [pledges, setPledges] = useState<PledgeOption[]>([]);
@@ -220,44 +250,49 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
 
   async function loadPayments(nextPage = page) {
     setLoading(true);
+    setLoadError(null);
 
-    const result = await fetchPaymentsPageAction({
-      page: nextPage,
-      pageSize: DONATIONS_PAGE_SIZE,
-      search: debouncedSearch || undefined,
-      status: statusFilter,
-    });
+    try {
+      const result = await fetchPaymentsPageAction({
+        page: nextPage,
+        pageSize: DONATIONS_PAGE_SIZE,
+        donorName: donorNameFilter || undefined,
+        statusDisplay:
+          statusFilter === "all"
+            ? undefined
+            : (statusFilter as "Succeeded" | "Failed" | "Refunded" | "Partially Refunded"),
+      });
 
-    if (!result.success) {
-      setOrganizationId(null);
+      if (!result.success) {
+        setPayments([]);
+        setTotalPayments(0);
+        setLoadError(result.error || "Could not load payments.");
+        return;
+      }
+
+      setPayments(result.payments as Payment[]);
+      setTotalPayments(result.total);
+      setPage(result.page);
+
+      const effectiveOrgId = organizationId || (await getOrgIdForCurrentUser());
+      if (effectiveOrgId && !organizationId) {
+        setOrganizationId(effectiveOrgId);
+      }
+
+      if (effectiveOrgId) {
+        const pledgeResult = await fetchOpenPledgesForAllocationAction();
+
+        if (pledgeResult.success) {
+          setPledges(pledgeResult.pledges as PledgeOption[]);
+        }
+      }
+    } catch (error) {
       setPayments([]);
       setTotalPayments(0);
-      setContacts([]);
-      setPledges([]);
+      setLoadError(error instanceof Error ? error.message : "Could not load payments.");
+    } finally {
       setLoading(false);
-      return;
     }
-
-    setPayments(result.payments as Payment[]);
-    setTotalPayments(result.total);
-    setPage(result.page);
-
-    const orgId = organizationId;
-    if (!orgId) {
-      const orgFromProfile = await getOrgIdForCurrentUser();
-      if (orgFromProfile) setOrganizationId(orgFromProfile);
-    }
-
-    const effectiveOrgId = organizationId || (await getOrgIdForCurrentUser());
-    if (effectiveOrgId) {
-      const pledgeResult = await fetchOpenPledgesForAllocationAction();
-
-      if (pledgeResult.success) {
-        setPledges(pledgeResult.pledges as PledgeOption[]);
-      }
-    }
-
-    setLoading(false);
   }
 
   async function loadContactsForPicker(query: string) {
@@ -268,13 +303,13 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
   }
 
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    const timer = setTimeout(() => setDonorNameFilter(donorNameFilterInput), 300);
     return () => clearTimeout(timer);
-  }, [search]);
+  }, [donorNameFilterInput]);
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, statusFilter]);
+  }, [donorNameFilter, statusFilter]);
 
   useEffect(() => {
     void (async () => {
@@ -283,10 +318,71 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
         setOrganizationId(orgId);
         await loadContactsForPicker("");
       }
-      await loadPayments(page);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, statusFilter, page]);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      setLoading(true);
+      setLoadError(null);
+
+      try {
+        const result = await fetchPaymentsPageAction({
+          page,
+          pageSize: DONATIONS_PAGE_SIZE,
+          donorName: donorNameFilter || undefined,
+          statusDisplay:
+            statusFilter === "all"
+              ? undefined
+              : (statusFilter as "Succeeded" | "Failed" | "Refunded" | "Partially Refunded"),
+        });
+
+        if (cancelled) return;
+
+        if (!result.success) {
+          setPayments([]);
+          setTotalPayments(0);
+          setLoadError(result.error || "Could not load payments.");
+          return;
+        }
+
+        setPayments(result.payments as Payment[]);
+        setTotalPayments(result.total);
+        setPage(result.page);
+
+        const effectiveOrgId = organizationId || (await getOrgIdForCurrentUser());
+        if (effectiveOrgId && !organizationId) {
+          setOrganizationId(effectiveOrgId);
+        }
+
+        if (effectiveOrgId) {
+          const pledgeResult = await fetchOpenPledgesForAllocationAction();
+          if (cancelled) return;
+
+          if (pledgeResult.success) {
+            setPledges(pledgeResult.pledges as PledgeOption[]);
+          }
+        }
+      } catch (error) {
+        if (cancelled) return;
+        setPayments([]);
+        setTotalPayments(0);
+        setLoadError(error instanceof Error ? error.message : "Could not load payments.");
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [donorNameFilter, statusFilter, page]);
 
   useEffect(() => {
     if (!showAddDialog) return;
@@ -462,33 +558,18 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <Input
-            placeholder="Search sender, memo, or method..."
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            className="max-w-sm"
-          />
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Pledge" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All payments</SelectItem>
-              <SelectItem value="unallocated">No</SelectItem>
-              <SelectItem value="allocated">Yes</SelectItem>
-              <SelectItem value="pending_review">Pending review</SelectItem>
-              <SelectItem value="unresolved">Unresolved</SelectItem>
-              <SelectItem value="voided">Voided</SelectItem>
-              <SelectItem value="refunded">Refunded</SelectItem>
-              <SelectItem value="partially_refunded">Partially refunded</SelectItem>
-            </SelectContent>
-          </Select>
           <span className="text-sm text-muted-foreground">
             {totalPayments > 0
               ? `${(page - 1) * DONATIONS_PAGE_SIZE + 1}–${Math.min(page * DONATIONS_PAGE_SIZE, totalPayments)} of ${totalPayments}`
               : "No payments"}
           </span>
         </div>
+
+        {loadError ? (
+          <div className="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+            {loadError}
+          </div>
+        ) : null}
 
         <div className="rounded-lg border bg-white overflow-hidden">
           {loading ? (
@@ -501,11 +582,56 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
                 <thead className="bg-muted/50">
                   <tr className="border-b">
                     <th className="text-left p-3">Date</th>
-                    <th className="text-left p-3">Donor / Sender</th>
+                    <th className="text-left p-3">
+                      <TableColumnHeaderFilter
+                        label="Donor"
+                        active={Boolean(donorNameFilter.trim())}
+                      >
+                        {({ close }) => (
+                          <Input
+                            placeholder="Search by name"
+                            value={donorNameFilterInput}
+                            onChange={(event) => setDonorNameFilterInput(event.target.value)}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") {
+                                setDonorNameFilter(donorNameFilterInput);
+                                close();
+                              }
+                            }}
+                          />
+                        )}
+                      </TableColumnHeaderFilter>
+                    </th>
                     <th className="text-left p-3">Amount</th>
                     <th className="text-left p-3">Method</th>
-                    <th className="text-left p-3">Pledge</th>
-                    <th className="text-left p-3">Action</th>
+                    <th className="text-left p-3">
+                      <TableColumnHeaderFilter
+                        label="Status"
+                        active={statusFilter !== "all"}
+                      >
+                        {({ close }) => (
+                          <Select
+                            value={statusFilter}
+                            onValueChange={(value) => {
+                              setStatusFilter(value);
+                              close();
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All Status</SelectItem>
+                              <SelectItem value="Succeeded">Succeeded</SelectItem>
+                              <SelectItem value="Failed">Failed</SelectItem>
+                              <SelectItem value="Refunded">Refunded</SelectItem>
+                              <SelectItem value="Partially Refunded">Partially Refunded</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </TableColumnHeaderFilter>
+                    </th>
+                    <th className="text-right p-3">Actions</th>
                   </tr>
                 </thead>
 
@@ -531,28 +657,40 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
                         {formatCurrency(Number(payment.amount || 0))}
                       </td>
 
-                      <td className="p-3 capitalize">
-                        {payment.source || "—"}
+                      <td className="p-3 text-muted-foreground">
+                        {payment.method_display || "—"}
                       </td>
 
-                      <td className="p-3">{formatPaymentPledgeColumnLabel(payment.status)}</td>
-
                       <td className="p-3">
-                        {canLinkPaymentToPledge(payment) ? (
-                          <Button
-                            size="sm"
+                        {payment.status_display ? (
+                          <Badge
                             variant="outline"
-                            onClick={() => {
-                              setSelectedPayment(payment);
-                              setSelectedPledgeId("");
-                              setShowAllocateDialog(true);
-                            }}
+                            className={cn(
+                              "whitespace-nowrap",
+                              financialActivityStatusBadgeClass(payment.status_display)
+                            )}
                           >
-                            Link to pledge
-                          </Button>
+                            {payment.status_display}
+                          </Badge>
                         ) : (
-                          <span className="text-muted-foreground">—</span>
+                          "—"
                         )}
+                      </td>
+
+                      <td className="p-3 text-right">
+                        <DonationPaymentRowActions
+                          row={toPaymentHistoryRow(payment)}
+                          onLinkToPledge={
+                            canLinkPaymentToPledge(payment)
+                              ? () => {
+                                  setSelectedPayment(payment);
+                                  setSelectedPledgeId("");
+                                  setShowAllocateDialog(true);
+                                }
+                              : undefined
+                          }
+                          onUpdated={() => void loadPayments()}
+                        />
                       </td>
                     </tr>
                   ))}
@@ -790,8 +928,8 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
 
                   <div>
                     <span className="text-muted-foreground">Method:</span>{" "}
-                    <span className="font-medium capitalize">
-                      {selectedPayment.source || "—"}
+                    <span className="font-medium">
+                      {selectedPayment.method_display || "—"}
                     </span>
                   </div>
 
