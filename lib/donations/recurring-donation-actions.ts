@@ -209,3 +209,179 @@ export async function getRecurringReportingSummaryAction() {
     return { success: false as const, error: (error as Error).message }
   }
 }
+
+function parseOptionalCount(value: number | null | undefined) {
+  if (value == null) return null
+  if (!Number.isFinite(value) || value < 0) return null
+  return Math.trunc(value)
+}
+
+export async function getRecurringPlanContactPaymentMethodsAction(planId: string) {
+  const access = await requireDonationStaffAccess("view")
+  if (!access.ok) return { success: false as const, error: access.error }
+
+  const { data: plan, error: planError } = await access.supabase
+    .from("recurring_donation_plans")
+    .select("id, contact_id, donor_id, contact_payment_method_id")
+    .eq("organization_id", access.orgId)
+    .eq("id", planId)
+    .maybeSingle()
+
+  if (planError || !plan) {
+    return { success: false as const, error: planError?.message || "Plan not found" }
+  }
+
+  let contactId = (plan.contact_id as string | null) ?? null
+  if (!contactId && plan.donor_id) {
+    const { data: donor } = await access.supabase
+      .from("donors")
+      .select("contact_id")
+      .eq("id", plan.donor_id)
+      .maybeSingle()
+    contactId = (donor?.contact_id as string | null) ?? null
+  }
+
+  if (!contactId) {
+    return {
+      success: false as const,
+      error: "Link this donor to a contact before assigning a card on file.",
+    }
+  }
+
+  const { data, error } = await access.supabase
+    .from("contact_payment_methods")
+    .select("id, card_brand, last4, exp_month, exp_year, cardholder_name, is_default, created_at")
+    .eq("organization_id", access.orgId)
+    .eq("contact_id", contactId)
+    .order("is_default", { ascending: false })
+    .order("created_at", { ascending: false })
+
+  if (error) return { success: false as const, error: error.message }
+
+  return {
+    success: true as const,
+    contactId,
+    currentPaymentMethodId: (plan.contact_payment_method_id as string | null) ?? null,
+    paymentMethods: (data || []).map((row) => ({
+      id: row.id as string,
+      cardBrand: (row.card_brand as string | null) ?? null,
+      last4: row.last4 as string,
+      expMonth: row.exp_month == null ? null : Number(row.exp_month),
+      expYear: row.exp_year == null ? null : Number(row.exp_year),
+      cardholderName: (row.cardholder_name as string | null) ?? null,
+      isDefault: Boolean(row.is_default),
+      createdAt: row.created_at as string,
+    })),
+  }
+}
+
+export async function updateRecurringDonationPlanAction(input: {
+  planId: string
+  amount?: number
+  frequency?: RecurringFrequency
+  startDate?: string | null
+  endDate?: string | null
+  totalPayments?: number | null
+  paymentsMade?: number | null
+  nextPaymentDate?: string | null
+  campaignId?: string | null
+  categoryId?: string | null
+  subcategoryId?: string | null
+  notes?: string | null
+}) {
+  const access = await requireDonationStaffAccess("manage")
+  if (!access.ok) return { success: false as const, error: access.error }
+  const { supabase, orgId } = access
+
+  const patch: Record<string, unknown> = {}
+
+  if (input.amount != null) {
+    if (!Number.isFinite(input.amount) || input.amount <= 0) {
+      return { success: false as const, error: "Amount must be greater than zero" }
+    }
+    patch.amount = input.amount
+  }
+  if (input.frequency) patch.frequency = input.frequency
+  if (input.startDate !== undefined) patch.start_date = input.startDate
+  if (input.endDate !== undefined) patch.end_date = input.endDate
+  if (input.totalPayments !== undefined) patch.total_payments = parseOptionalCount(input.totalPayments)
+  if (input.paymentsMade !== undefined) patch.payments_made = parseOptionalCount(input.paymentsMade)
+  if (input.nextPaymentDate !== undefined) patch.next_payment_date = input.nextPaymentDate
+  if (input.campaignId !== undefined) patch.campaign_id = input.campaignId
+  if (input.categoryId !== undefined) patch.category_id = input.categoryId
+  if (input.subcategoryId !== undefined) patch.subcategory_id = input.subcategoryId
+  if (input.notes !== undefined) patch.notes = input.notes
+
+  if (Object.keys(patch).length === 0) {
+    return { success: false as const, error: "No changes to save" }
+  }
+
+  const { error } = await supabase
+    .from("recurring_donation_plans")
+    .update(patch)
+    .eq("id", input.planId)
+    .eq("organization_id", orgId)
+
+  if (error) return { success: false as const, error: error.message }
+  return { success: true as const }
+}
+
+export async function updateRecurringPlanPaymentMethodAction(input: {
+  planId: string
+  contactPaymentMethodId: string | null
+}) {
+  const access = await requireDonationStaffAccess("manage")
+  if (!access.ok) return { success: false as const, error: access.error }
+  const { supabase, orgId } = access
+
+  const { data: plan, error: planError } = await supabase
+    .from("recurring_donation_plans")
+    .select("id, contact_id, donor_id")
+    .eq("id", input.planId)
+    .eq("organization_id", orgId)
+    .maybeSingle()
+
+  if (planError || !plan) {
+    return { success: false as const, error: planError?.message || "Plan not found" }
+  }
+
+  if (input.contactPaymentMethodId) {
+    let contactId = plan.contact_id as string | null
+    if (!contactId && plan.donor_id) {
+      const { data: donor } = await supabase
+        .from("donors")
+        .select("contact_id")
+        .eq("id", plan.donor_id)
+        .maybeSingle()
+      contactId = (donor?.contact_id as string | null) ?? null
+    }
+
+    if (!contactId) {
+      return {
+        success: false as const,
+        error: "Link this donor to a contact before assigning a card on file.",
+      }
+    }
+
+    const { data: method, error: methodError } = await supabase
+      .from("contact_payment_methods")
+      .select("id")
+      .eq("id", input.contactPaymentMethodId)
+      .eq("organization_id", orgId)
+      .eq("contact_id", contactId)
+      .maybeSingle()
+
+    if (methodError || !method) {
+      return { success: false as const, error: "Selected card was not found for this donor." }
+    }
+  }
+
+  const { error } = await supabase
+    .from("recurring_donation_plans")
+    .update({ contact_payment_method_id: input.contactPaymentMethodId })
+    .eq("id", input.planId)
+    .eq("organization_id", orgId)
+
+  if (error) return { success: false as const, error: error.message }
+  return { success: true as const }
+}

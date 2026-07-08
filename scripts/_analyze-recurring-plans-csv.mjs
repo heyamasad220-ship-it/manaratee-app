@@ -13,6 +13,7 @@ const CATEGORY_FUND_MAP = new Map([
   ["masjid operations", { category: "Operations", fund: "Masjid Operations" }],
   ["zakat", { category: "Zakat", fund: null }],
   ["family emergency takaful fund", { category: "Family Emergency Takaful Fund", fund: null }],
+  ["sustainers campaign", { category: "General Donation", fund: "Sustainers Club" }],
 ])
 
 function loadEnv() {

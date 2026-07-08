@@ -75,7 +75,7 @@ const ContactFinancialPledgeEditDialog = dynamic(
 )
 
 const FILTER_LABELS: Record<ContactFinancialFilter, string> = {
-  all: "All Activity",
+  all: "All Transactions",
   donations: "Donations",
   pledges: "Pledges",
   programs: "Programs",
@@ -269,7 +269,9 @@ export function ContactFinancialPanel({
 
   const filteredTimeline = useMemo(() => {
     if (!data) return []
-    if (filter === "all") return data.timeline
+    if (filter === "all") {
+      return data.timeline.filter((event) => event.filterCategory !== "pledges")
+    }
     return data.timeline.filter((event) => event.filterCategory === filter)
   }, [data, filter])
 

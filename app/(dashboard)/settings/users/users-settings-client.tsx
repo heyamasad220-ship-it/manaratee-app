@@ -4,6 +4,9 @@ import { useEffect, useMemo, useState } from "react"
 import { Header } from "@/components/layout/header"
 import {
   fetchOrganizationUsersForSettings,
+  removeOrganizationMember,
+  sendOrganizationMemberPasswordReset,
+  updateOrganizationMemberProfile,
   updateOrganizationMemberRole,
   type OrganizationSettingsRole,
   type OrganizationSettingsUser,
@@ -59,6 +62,7 @@ import {
 import { OrganizationJoinLinkCard } from "@/components/settings/organization-join-link-card"
 import { enterCustomerPortalAsUser } from "@/lib/organizations/org-user-access-actions"
 import { isOrganizationSystemAdmin } from "@/lib/organizations/organization-system-admin"
+import { createClient } from "@/lib/supabase/client"
 
 export function UsersSettingsClient({
   organizationId,
@@ -86,9 +90,18 @@ export function UsersSettingsClient({
   const [sendingInvite, setSendingInvite] = useState(false)
 
   const [showRoleDialog, setShowRoleDialog] = useState(false)
+  const [showEditDialog, setShowEditDialog] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [selectedUser, setSelectedUser] = useState<OrganizationSettingsUser | null>(null)
   const [selectedRoleId, setSelectedRoleId] = useState("")
   const [savingRole, setSavingRole] = useState(false)
+  const [editFirstName, setEditFirstName] = useState("")
+  const [editLastName, setEditLastName] = useState("")
+  const [editEmail, setEditEmail] = useState("")
+  const [savingProfile, setSavingProfile] = useState(false)
+  const [sendingResetEmail, setSendingResetEmail] = useState(false)
+  const [deletingUser, setDeletingUser] = useState(false)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
 
   async function loadUsers() {
     if (!organizationId) {
@@ -127,6 +140,13 @@ export function UsersSettingsClient({
 
   useEffect(() => {
     loadUsers()
+    void (async () => {
+      const supabase = createClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      setCurrentUserId(user?.id ?? null)
+    })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [organizationId])
 
@@ -208,6 +228,93 @@ export function UsersSettingsClient({
     setSelectedUser(user)
     setSelectedRoleId(user.roleId ?? "")
     setShowRoleDialog(true)
+  }
+
+  function openEditProfileDialog(user: OrganizationSettingsUser) {
+    setSelectedUser(user)
+    setEditFirstName(user.firstName)
+    setEditLastName(user.lastName)
+    setEditEmail(user.email)
+    setShowEditDialog(true)
+  }
+
+  async function saveUserProfile() {
+    if (!selectedUser) return
+
+    setSavingProfile(true)
+    setError(null)
+
+    try {
+      await updateOrganizationMemberProfile({
+        membershipId: selectedUser.membershipId,
+        firstName: editFirstName,
+        lastName: editLastName,
+        email: editEmail,
+      })
+    } catch (saveError) {
+      setError(
+        saveError instanceof Error ? saveError.message : "Could not update user profile."
+      )
+      setSavingProfile(false)
+      return
+    }
+
+    setShowEditDialog(false)
+    setSelectedUser(null)
+    await loadUsers()
+    setSavingProfile(false)
+  }
+
+  async function handleSendResetEmail(user: OrganizationSettingsUser) {
+    const confirmed = window.confirm(
+      `Send a password reset email to ${user.email}?`
+    )
+    if (!confirmed) return
+
+    setSendingResetEmail(true)
+    setError(null)
+
+    try {
+      await sendOrganizationMemberPasswordReset(user.membershipId)
+      alert(`Password reset email sent to ${user.email}.`)
+    } catch (resetError) {
+      setError(
+        resetError instanceof Error
+          ? resetError.message
+          : "Could not send password reset email."
+      )
+    } finally {
+      setSendingResetEmail(false)
+    }
+  }
+
+  function openDeleteDialog(user: OrganizationSettingsUser) {
+    setSelectedUser(user)
+    setShowDeleteDialog(true)
+  }
+
+  async function confirmDeleteUser() {
+    if (!selectedUser) return
+
+    setDeletingUser(true)
+    setError(null)
+
+    try {
+      await removeOrganizationMember(selectedUser.membershipId)
+    } catch (deleteError) {
+      setError(
+        deleteError instanceof Error
+          ? deleteError.message
+          : "Could not remove user from organization."
+      )
+      setDeletingUser(false)
+      return
+    }
+
+    setShowDeleteDialog(false)
+    setSelectedUser(null)
+    await loadUsers()
+    setDeletingUser(false)
   }
 
   async function saveUserRole() {
@@ -522,17 +629,24 @@ export function UsersSettingsClient({
                                   </DropdownMenuItem>
                                 ) : null}
 
-                                <DropdownMenuItem disabled>
+                                <DropdownMenuItem onClick={() => openEditProfileDialog(user)}>
                                   <Pencil className="mr-2 h-4 w-4" />
                                   Edit Profile
                                 </DropdownMenuItem>
 
-                                <DropdownMenuItem disabled>
+                                <DropdownMenuItem
+                                  onClick={() => void handleSendResetEmail(user)}
+                                  disabled={sendingResetEmail}
+                                >
                                   <Mail className="mr-2 h-4 w-4" />
                                   Send Reset Email
                                 </DropdownMenuItem>
 
-                                <DropdownMenuItem disabled className="text-red-600">
+                                <DropdownMenuItem
+                                  onClick={() => openDeleteDialog(user)}
+                                  disabled={user.userId === currentUserId}
+                                  className="text-red-600 focus:text-red-600"
+                                >
                                   <Trash2 className="mr-2 h-4 w-4" />
                                   Delete
                                 </DropdownMenuItem>
@@ -669,6 +783,86 @@ export function UsersSettingsClient({
             <Button onClick={saveUserRole} disabled={savingRole}>
               {savingRole && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Save Role
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Profile</DialogTitle>
+            <DialogDescription>
+              {selectedUser
+                ? `Update name and login email for ${selectedUser.name}.`
+                : "Update user profile."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-col gap-4 py-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="edit-first-name">First Name</Label>
+                <Input
+                  id="edit-first-name"
+                  value={editFirstName}
+                  onChange={(event) => setEditFirstName(event.target.value)}
+                />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="edit-last-name">Last Name</Label>
+                <Input
+                  id="edit-last-name"
+                  value={editLastName}
+                  onChange={(event) => setEditLastName(event.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="edit-email">Email</Label>
+              <Input
+                id="edit-email"
+                type="email"
+                value={editEmail}
+                onChange={(event) => setEditEmail(event.target.value)}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditDialog(false)} disabled={savingProfile}>
+              Cancel
+            </Button>
+
+            <Button onClick={saveUserProfile} disabled={savingProfile}>
+              {savingProfile && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save Profile
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove User</DialogTitle>
+            <DialogDescription>
+              {selectedUser
+                ? `Remove ${selectedUser.name} from ${organizationName}? They will lose access to this organization but their login account will remain.`
+                : "Remove this user from the organization."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteDialog(false)} disabled={deletingUser}>
+              Cancel
+            </Button>
+
+            <Button variant="destructive" onClick={confirmDeleteUser} disabled={deletingUser}>
+              {deletingUser && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Remove User
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -306,7 +306,7 @@ Import CSV flow writes directly to `payments` + `payment_import_batches` (no row
 
 **Stripe recurring billing (migration `100_stripe_recurring_donations.sql`):** `payments.stripe_invoice_id` (unique partial index). `recurring_donation_plans.stripe_customer_id`. Plan statuses include `pending_setup` and `past_due`. Recurring charges insert `payments` via `invoice.paid` webhook with `recurring_donation_plan_id` set; `pledge_id` remains null.
 
-**Square plan metadata (migration `156_recurring_plan_payment_counts.sql`):** `recurring_donation_plans.total_payments` (expected count from processor export) and `payments_made` (completed count). Populated by `scripts/import-madina-recurring-plans.mjs` from Square recurring plans CSV.
+**Square plan metadata (migration `156_recurring_plan_payment_counts.sql`):** `recurring_donation_plans.total_payments` (expected count from processor export) and `payments_made` (completed count). Populated by `scripts/import-madina-recurring-plans.mjs` from Square recurring plans CSV. **`157_recurring_plan_contact_payment_method.sql`** adds `contact_payment_method_id` (FK to `contact_payment_methods`) for on-file cards on recurring plans.
 
 **Transactional email (migration `094`):** `transactional_email_log` tracks receipt, year-end statement, and pledge reminder sends. `donation_receipts.status` includes `failed`. `donation_settings.year_end_statement_email_template` for statement email body.
 

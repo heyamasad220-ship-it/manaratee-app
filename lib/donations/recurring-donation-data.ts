@@ -21,7 +21,7 @@ export async function fetchRecurringPlans(
   let query = supabase
     .from("recurring_donation_plans")
     .select(
-      "*, donors(full_name, email), contacts(phone), donation_categories(name), donation_subcategories(name), campaigns(name)"
+      "*, donors(full_name, email), contacts(phone), donation_categories(name), donation_subcategories(name), campaigns(name), contact_payment_methods(card_brand, last4, exp_month, exp_year)"
     )
     .eq("organization_id", organizationId)
     .order("next_payment_date", { ascending: true })
@@ -65,6 +65,7 @@ export async function fetchRecurringPlans(
     category_id: row.category_id,
     subcategory_id: row.subcategory_id,
     payment_method_id: row.payment_method_id,
+    contact_payment_method_id: row.contact_payment_method_id ?? null,
     amount: Number(row.amount || 0),
     frequency: row.frequency,
     status: row.status,
@@ -85,8 +86,25 @@ export async function fetchRecurringPlans(
     category_name: row.donation_categories?.name ?? null,
     fund_name: row.donation_subcategories?.name ?? null,
     campaign_name: row.campaigns?.name ?? null,
+    payment_method_label: formatContactPaymentMethodLabel(row.contact_payment_methods),
     linked_payment_count: linkedPaymentCountByPlanId.get(row.id) || 0,
   }))
+}
+
+function formatContactPaymentMethodLabel(
+  method:
+    | {
+        card_brand?: string | null
+        last4?: string | null
+        exp_month?: number | null
+        exp_year?: number | null
+      }
+    | null
+    | undefined
+) {
+  if (!method?.last4) return null
+  const brand = String(method.card_brand || "Card").trim()
+  return `${brand} •••• ${method.last4}`
 }
 
 export async function buildRecurringDashboardMetrics(

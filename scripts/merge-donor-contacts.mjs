@@ -11,10 +11,12 @@
  *   node scripts/merge-donor-contacts.mjs --target-id <uuid> --source-id <uuid>
  *   node scripts/merge-donor-contacts.mjs --target-id <uuid> --source-id <uuid> --execute
  *   node scripts/merge-donor-contacts.mjs --target-id <uuid> --source-id <uuid1> --source-id <uuid2> --execute
+ *   node scripts/merge-donor-contacts.mjs --target-id <uuid> --source-id <uuid> --rename "Marvels" --execute
  *
  * Options:
  *   --org <uuid>     Organization (default: MAS Dallas)
  *   --search <text>  List matching contacts (no merge)
+ *   --rename <text>  Set target full_name after merge (e.g. shorten group name)
  *   --execute        Apply changes (default: preview only)
  */
 import { readFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs"
@@ -35,6 +37,7 @@ function parseArgs(argv) {
     sourceIds: [],
     sourceNames: [],
     search: null,
+    rename: null,
   }
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -45,6 +48,7 @@ function parseArgs(argv) {
     else if (token === "--target") args.targetName = argv[++index]
     else if (token === "--source") args.sourceNames.push(argv[++index])
     else if (token === "--search") args.search = argv[++index]
+    else if (token === "--rename") args.rename = argv[++index]
   }
 
   return args
@@ -116,9 +120,18 @@ async function countRows(table, orgId, column, value) {
 
   if (error) {
     if (error.code === "42P01" || error.code === "42703") return 0
-    throw error
+    console.error(`countRows failed for ${table}.${column}:`, error.message)
+    return 0
   }
   return count ?? 0
+}
+
+function formatError(error) {
+  if (error instanceof Error) return error.message
+  if (error && typeof error === "object") {
+    return JSON.stringify(error)
+  }
+  return String(error)
 }
 
 async function resolveContact(orgId, { id, name }) {
@@ -248,6 +261,48 @@ async function reassignContactColumn(orgId, table, column, sourceContactId, targ
   return rowCount
 }
 
+async function reassignGroupMembers(orgId, sourceGroupId, targetGroupId) {
+  const sourceRows = await fetchAll("contact_group_members", (query) =>
+    query.eq("organization_id", orgId).eq("group_contact_id", sourceGroupId)
+  )
+  if (!sourceRows.length) return 0
+
+  const targetRows = await fetchAll("contact_group_members", (query) =>
+    query.eq("organization_id", orgId).eq("group_contact_id", targetGroupId)
+  )
+  const targetMemberIds = new Set(targetRows.map((row) => row.member_contact_id))
+
+  let moved = 0
+  let deduped = 0
+
+  for (const row of sourceRows) {
+    if (targetMemberIds.has(row.member_contact_id)) {
+      deduped += 1
+      if (execute) {
+        const { error } = await sb.from("contact_group_members").delete().eq("id", row.id)
+        if (error && error.code !== "42P01") {
+          throw new Error(`contact_group_members dedupe: ${error.message}`)
+        }
+      }
+      continue
+    }
+
+    moved += 1
+    if (execute) {
+      const { error } = await sb
+        .from("contact_group_members")
+        .update({ group_contact_id: targetGroupId })
+        .eq("id", row.id)
+      if (error && error.code !== "42P01") {
+        throw new Error(`contact_group_members reassign: ${error.message}`)
+      }
+    }
+    targetMemberIds.add(row.member_contact_id)
+  }
+
+  return moved + deduped
+}
+
 async function mergeDonorIntoTarget(orgId, sourceDonorId, targetDonorId, targetContactId) {
   const paymentPatch = { donor_id: targetDonorId, contact_id: targetContactId }
   const donorPatch = { donor_id: targetDonorId, contact_id: targetContactId }
@@ -328,7 +383,7 @@ async function syncAffiliation(orgId, contactId) {
   if (error) throw new Error(`sync_contact_affiliations: ${error.message}`)
 }
 
-async function mergeSourceIntoTarget(orgId, target, source) {
+async function mergeSourceIntoTarget(orgId, target, source, renameTarget = null) {
   if (target.id === source.id) {
     return { error: "Target and source contact are the same record." }
   }
@@ -391,6 +446,15 @@ async function mergeSourceIntoTarget(orgId, target, source) {
   for (const [table, column] of contactColumns) {
     const rows = await reassignContactColumn(orgId, table, column, source.id, target.id)
     if (rows > 0) report.steps.push({ table, column, rows })
+  }
+
+  const groupMemberRows = await reassignGroupMembers(orgId, source.id, target.id)
+  if (groupMemberRows > 0) {
+    report.steps.push({ table: "contact_group_members", group_contact_id: groupMemberRows })
+  }
+
+  if (renameTarget && renameTarget !== target.full_name) {
+    report.contactPatch.full_name = renameTarget
   }
 
   if (Object.keys(report.contactPatch).length > 0) {
@@ -504,7 +568,8 @@ async function main() {
       const mergeReport = await mergeSourceIntoTarget(
         args.orgId,
         targetResolved.contact,
-        sourceResolved.contact
+        sourceResolved.contact,
+        args.rename
       )
       if (mergeReport.error) {
         report.errors.push({ source: sourceResolved.contact.full_name, error: mergeReport.error })
@@ -514,7 +579,7 @@ async function main() {
     } catch (error) {
       report.errors.push({
         source: sourceResolved.contact.full_name,
-        message: error instanceof Error ? error.message : String(error),
+        message: formatError(error),
       })
     }
   }

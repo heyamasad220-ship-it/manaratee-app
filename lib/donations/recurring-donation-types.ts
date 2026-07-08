@@ -20,6 +20,7 @@ export type RecurringDonationPlan = {
   category_id: string | null
   subcategory_id: string | null
   payment_method_id: string | null
+  contact_payment_method_id: string | null
   amount: number
   frequency: RecurringFrequency
   status: RecurringStatus
@@ -43,6 +44,7 @@ export type RecurringPlanWithDonor = RecurringDonationPlan & {
   category_name: string | null
   fund_name: string | null
   campaign_name: string | null
+  payment_method_label: string | null
   linked_payment_count: number
 }
 

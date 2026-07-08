@@ -1,7 +1,7 @@
 /**
  * Import Square recurring donation plans from CSV and sync plan metadata.
  *
- * - Maps "Sustainers Campaign" → category Sustainers Club / fund General Donation
+ * - Maps "Sustainers Campaign" → category General Donation / fund Sustainers Club
  * - Skips Qays Hawwar (manual review)
  * - Inserts missing plans; updates total_payments, payments_made, end_date, status on matches
  *
@@ -28,7 +28,7 @@ const CATEGORY_FUND_MAP = new Map([
   ["masjid operations", { category: "Operations", fund: "Masjid Operations" }],
   ["zakat", { category: "Zakat", fund: null }],
   ["family emergency takaful fund", { category: "Family Emergency Takaful Fund", fund: null }],
-  ["sustainers campaign", { category: "Sustainers Club", fund: "General Donation" }],
+  ["sustainers campaign", { category: "General Donation", fund: "Sustainers Club" }],
 ])
 
 const FREQ_MAP = {
@@ -352,6 +352,8 @@ async function main() {
       )
 
       const payload = {
+        category_id: category.id,
+        subcategory_id: fund?.id ?? null,
         status,
         start_date: startDate,
         end_date: endDate,

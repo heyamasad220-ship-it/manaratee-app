@@ -13,6 +13,9 @@ export const ORGANIZATION_AUDIT_ACTIONS = {
   PLEDGE_MARKED_PAID: "pledge.marked_paid",
   PLEDGE_CANCELLED: "pledge.cancelled",
   MEMBER_ROLE_CHANGED: "member.role_changed",
+  MEMBER_PROFILE_UPDATED: "member.profile_updated",
+  MEMBER_PASSWORD_RESET_SENT: "member.password_reset_sent",
+  MEMBER_REMOVED: "member.removed",
   ROLE_PERMISSION_CHANGED: "role.permission_changed",
 } as const
 

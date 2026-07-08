@@ -407,13 +407,16 @@ export async function listOrganizationMembers(
       ? roleById.get(member.role_id as string)
       : null
     const email = profile?.email ?? "No email found"
-    const name =
-      `${profile?.first_name ?? ""} ${profile?.last_name ?? ""}`.trim() || email
+    const firstName = profile?.first_name?.trim() || ""
+    const lastName = profile?.last_name?.trim() || ""
+    const name = `${firstName} ${lastName}`.trim() || email
 
     return {
       membershipId: member.id as string,
       userId: member.user_id as string,
       name,
+      firstName,
+      lastName,
       email,
       systemRole: member.role as string,
       roleId: (member.role_id as string | null) ?? null,

@@ -342,7 +342,6 @@ export async function getDonationOverviewDashboardAction(): Promise<
     failedProcessorResult,
     pledgeReport,
     campaignEntries,
-    recentActivity,
   ] = await Promise.all([
     access.supabase
       .from("payments")
@@ -367,7 +366,6 @@ export async function getDonationOverviewDashboardAction(): Promise<
       .eq("processing_status", "failed"),
     buildPledgeCollectionReport(access.supabase, access.orgId),
     fetchCampaignAnalyticsEntries(access.supabase, access.orgId),
-    buildRecentActivity(access.supabase, access.orgId),
   ])
 
   const campaignsEndingSoon = campaignEntries
@@ -406,7 +404,7 @@ export async function getDonationOverviewDashboardAction(): Promise<
       summary: summaryResult.summary,
       actionItems,
       activeCampaigns,
-      recentActivity,
+      recentActivity: [],
     },
   }
 }

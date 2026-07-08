@@ -28,16 +28,6 @@ import {
 } from "@/lib/donations/donation-overview-actions"
 import { donationPledgesHref } from "@/lib/donations/donation-pledge-paths"
 
-function formatActivityDate(value: string) {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return "—"
-  return date.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  })
-}
-
 const QUICK_ACTIONS = [
   {
     label: "Record Payment",
@@ -100,7 +90,7 @@ export function DonationsOverviewDashboard() {
     return null
   }
 
-  const { summary, actionItems, activeCampaigns, recentActivity } = data
+  const { summary, actionItems, activeCampaigns } = data
   const totalPledged = summary.totalPledged
   const outstandingBalance = summary.outstandingBalance
 
@@ -222,35 +212,6 @@ export function DonationsOverviewDashboard() {
                       </span>
                     </div>
                     <CampaignProgressBar progressPercent={campaign.progressPercent} />
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Recent Activity</CardTitle>
-            <CardDescription>Latest donation-related events</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {recentActivity.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No recent activity yet.</p>
-            ) : (
-              <ul className="space-y-3">
-                {recentActivity.map((item) => (
-                  <li key={item.id} className="flex gap-3 text-sm">
-                    <span className="w-24 shrink-0 text-muted-foreground">
-                      {formatActivityDate(item.occurredAt)}
-                    </span>
-                    {item.href ? (
-                      <Link href={item.href} className="min-w-0 flex-1 text-primary hover:underline">
-                        {item.label}
-                      </Link>
-                    ) : (
-                      <span className="min-w-0 flex-1">{item.label}</span>
-                    )}
                   </li>
                 ))}
               </ul>
