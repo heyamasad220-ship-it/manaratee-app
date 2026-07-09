@@ -30,6 +30,11 @@ import {
   type ContactPaymentMethodRow,
 } from "@/lib/contacts/contact-payment-method-actions"
 import {
+  addCustomerContactPaymentMethodAction,
+  removeCustomerContactPaymentMethodAction,
+  setDefaultCustomerContactPaymentMethodAction,
+} from "@/lib/customer/customer-payment-method-actions"
+import {
   formatCardNumberInput,
   formatExpirationInput,
   parseCardExpiration,
@@ -43,6 +48,8 @@ type ContactPaymentMethodsPanelProps = {
   compact?: boolean
   /** Render without an outer Card (e.g. inside Financial Activity tabs). */
   embedded?: boolean
+  /** Customer portal uses contact-scoped auth instead of staff org selection. */
+  portal?: "staff" | "customer"
 }
 
 const CARD_BRANDS = ["Visa", "Mastercard", "American Express", "Discover", "Other"]
@@ -58,6 +65,7 @@ export function ContactPaymentMethodsPanel({
   paymentMethods: initialPaymentMethods,
   compact = false,
   embedded = false,
+  portal = "staff",
 }: ContactPaymentMethodsPanelProps) {
   const [paymentMethods, setPaymentMethods] = useState(initialPaymentMethods)
   const [showAddCard, setShowAddCard] = useState(false)
@@ -99,15 +107,26 @@ export function ContactPaymentMethodsPanel({
 
     setSaving(true)
     setError(null)
-    const result = await addContactPaymentMethodAction({
-      contactId,
-      cardBrand,
-      cardNumber,
-      securityCode,
-      expirationDate,
-      cardholderName,
-      setAsDefault: paymentMethods.length === 0,
-    })
+    const result =
+      portal === "customer"
+        ? await addCustomerContactPaymentMethodAction({
+            contactId,
+            cardBrand,
+            cardNumber,
+            securityCode,
+            expirationDate,
+            cardholderName,
+            setAsDefault: paymentMethods.length === 0,
+          })
+        : await addContactPaymentMethodAction({
+            contactId,
+            cardBrand,
+            cardNumber,
+            securityCode,
+            expirationDate,
+            cardholderName,
+            setAsDefault: paymentMethods.length === 0,
+          })
     setSaving(false)
 
     if (!result.success) {
@@ -126,7 +145,10 @@ export function ContactPaymentMethodsPanel({
   }
 
   async function handleSetDefault(paymentMethodId: string) {
-    const result = await setDefaultContactPaymentMethodAction({ contactId, paymentMethodId })
+    const result =
+      portal === "customer"
+        ? await setDefaultCustomerContactPaymentMethodAction({ contactId, paymentMethodId })
+        : await setDefaultContactPaymentMethodAction({ contactId, paymentMethodId })
     if (!result.success) {
       setError(result.error)
       return
@@ -140,7 +162,10 @@ export function ContactPaymentMethodsPanel({
   }
 
   async function handleRemove(paymentMethodId: string) {
-    const result = await removeContactPaymentMethodAction({ contactId, paymentMethodId })
+    const result =
+      portal === "customer"
+        ? await removeCustomerContactPaymentMethodAction({ contactId, paymentMethodId })
+        : await removeContactPaymentMethodAction({ contactId, paymentMethodId })
     if (!result.success) {
       setError(result.error)
       return
@@ -372,7 +397,11 @@ export function ContactPaymentMethodsPanel({
               Payment methods
             </CardTitle>
             {!compact ? (
-              <CardDescription>{CONTACT_PAYMENT_METHODS_ADMIN_HELP}</CardDescription>
+              <CardDescription>
+                {portal === "customer"
+                  ? CONTACT_PAYMENT_METHODS_CUSTOMER_HELP
+                  : CONTACT_PAYMENT_METHODS_ADMIN_HELP}
+              </CardDescription>
             ) : null}
           </div>
           <Button size="sm" className={compact ? "h-8 px-2.5 text-xs" : undefined} onClick={() => setShowAddCard(true)}>

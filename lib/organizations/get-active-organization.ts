@@ -33,25 +33,21 @@ export async function getActiveOrganization(): Promise<{
     const admin = getServiceRoleClient()
     const { data: org } = await admin
       .from("organizations")
-      .select("id, name")
+      .select("id, name, logo_url")
       .eq("id", supportOrgId)
       .maybeSingle()
 
     if (org?.name) {
+      const supportOrganization = {
+        organization_id: supportOrgId,
+        organization_name: org.name as string,
+        role_name: "Customer",
+        logo_url: (org.logo_url as string | null) ?? null,
+      }
+
       return {
-        activeOrganization: {
-          organization_id: supportOrgId,
-          organization_name: org.name as string,
-          role_name: "Customer",
-        },
-        organizations: [
-          {
-            organization_id: supportOrgId,
-            organization_name: org.name as string,
-            role_name: "Customer",
-          },
-          ...organizations,
-        ],
+        activeOrganization: supportOrganization,
+        organizations: [supportOrganization, ...organizations],
       }
     }
   }

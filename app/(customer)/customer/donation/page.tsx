@@ -9,10 +9,17 @@ import {
   Plus,
   CheckCircle2,
   Clock,
-  RefreshCw,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { loadCustomerDonationPortalData } from "@/lib/customer/customer-portal-data-actions"
+import { createCustomerPledgeAction, updateCustomerPledgePaymentPlanAction } from "@/lib/customer/customer-pledge-actions"
+import {
+  calculateInstallmentAmount,
+  computeScheduledPledgePaymentDate,
+  defaultFirstPaymentDate,
+  pledgeHasPaymentPlan,
+  suggestedPledgePaymentAmount,
+} from "@/lib/donations/pledge-payment-plan"
 import { ensureDonorExtensionForContact } from "@/lib/donations/donor-contact-bridge"
 import {
   formatPaymentStatusLabel,
@@ -51,7 +58,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import {
+  CustomerDonationPaymentPicker,
+  formatContactCardLabel,
+  getDefaultDonationPaymentMethodSelection,
+  isDonationOnlinePaymentSelection,
+  parseDonationPaymentMethodSelection,
+  resolveDonationPaymentMethodLabel,
+  type OrganizationPaymentMethodOption,
+} from "@/components/customer/customer-donation-payment-picker"
+import type { ContactPaymentMethodRow } from "@/lib/contacts/contact-payment-method-actions"
 
 type Contact = {
   id: string
@@ -79,11 +95,13 @@ type DonationPledge = {
   totalAmount: number
   paidAmount: number
   balance: number
+  installmentAmount: number | null
+  totalPayments: number | null
+  paymentsMade: number
   frequency: string
+  firstPaymentDate: string | null
   nextPaymentDate: string | null
-  nextPaymentAmount: number
-  startDate: string | null
-  endDate: string | null
+  pledgeDate: string | null
   status: string
 }
 
@@ -99,12 +117,56 @@ type DonationPayment = {
   campaign: string
   method: string
   status: string
+  paymentType: string
 }
 
-type SavedPaymentMethod = {
-  id: string
-  name: string
-  fee: string | null
+type DonationFrequency = "one-time" | "monthly" | "quarterly" | "annually"
+
+const DONATION_FREQUENCY_OPTIONS: Array<{ value: DonationFrequency; label: string }> = [
+  { value: "one-time", label: "One-time" },
+  { value: "monthly", label: "Monthly" },
+  { value: "quarterly", label: "Quarterly" },
+  { value: "annually", label: "Annually" },
+]
+
+function mapPortalPledgeRow(row: Record<string, unknown>): DonationPledge {
+  const totalAmount = Number(row.amount_pledged || 0)
+  const paidAmount = Number(row.amount_paid || 0)
+  const balance = Number(row.balance_remaining ?? 0)
+  const paymentsMade = Number(row.payments_made || 0)
+  const frequency = (row.frequency as string) || "one_time"
+  const firstPaymentDate = (row.first_payment_date as string | null) ?? null
+  const installmentAmount =
+    row.installment_amount == null ? null : Number(row.installment_amount)
+  const totalPayments = row.total_payments == null ? null : Number(row.total_payments)
+  const nextPaymentDate =
+    (row.next_payment_date as string | null) ??
+    computeScheduledPledgePaymentDate({
+      firstPaymentDate,
+      frequency,
+      paymentsMade,
+    })
+
+  return {
+    id: row.id as string,
+    campaignId: (row.campaign_id as string | null) ?? null,
+    campaign: (row.campaign_name as string) || "Campaign pledge",
+    totalAmount,
+    paidAmount,
+    balance,
+    installmentAmount,
+    totalPayments,
+    paymentsMade,
+    frequency,
+    firstPaymentDate,
+    nextPaymentDate,
+    pledgeDate: (row.pledge_date as string | null) ?? null,
+    status: formatPledgeStatusLabel(row.calculated_status as string | null),
+  }
+}
+
+function donationFrequencyLabel(frequency: DonationFrequency): string {
+  return DONATION_FREQUENCY_OPTIONS.find((option) => option.value === frequency)?.label ?? frequency
 }
 
 function resolvePaymentCampaignLabel(
@@ -135,6 +197,45 @@ function resolvePaymentCampaignLabel(
   }
 
   return payment.memo || "General Fund"
+}
+
+function resolvePaymentTypeLabel(payment: {
+  pledge_id?: string | null
+  recurring_donation_plan_id?: string | null
+}) {
+  if (payment.pledge_id) return "Pledge payment"
+  if (payment.recurring_donation_plan_id) return "Recurring donation"
+  return "One-time donation"
+}
+
+function mapPortalPaymentRow(
+  payment: Record<string, unknown>,
+  categories: DonationCategory[],
+  campaignRows: Array<{ id: string; name: string }>
+): DonationPayment {
+  return {
+    id: payment.id as string,
+    date: (payment.payment_date as string) || "",
+    amount: Number(payment.amount || 0),
+    campaign: resolvePaymentCampaignLabel(
+      payment as {
+        campaign_id?: string | null
+        category_id?: string | null
+        subcategory_id?: string | null
+        memo?: string | null
+      },
+      categories,
+      campaignRows
+    ),
+    method: (payment.source as string) || "Unknown",
+    status: formatPaymentStatusLabel(payment.status as string | null),
+    paymentType: resolvePaymentTypeLabel(
+      payment as {
+        pledge_id?: string | null
+        recurring_donation_plan_id?: string | null
+      }
+    ),
+  }
 }
 
 async function syncDonorAffiliationAfterDonation(input: {
@@ -169,123 +270,124 @@ export default function CustomerDonationsPage() {
   const [campaigns, setCampaigns] = useState<DonationCampaign[]>([])
   const [pledges, setPledges] = useState<DonationPledge[]>([])
   const [payments, setPayments] = useState<DonationPayment[]>([])
-  const [savedPaymentMethods, setSavedPaymentMethods] = useState<SavedPaymentMethod[]>([])
+  const [contactPaymentMethods, setContactPaymentMethods] = useState<ContactPaymentMethodRow[]>([])
+  const [organizationPaymentMethods, setOrganizationPaymentMethods] = useState<
+    OrganizationPaymentMethodOption[]
+  >([])
+  const [pageLoadError, setPageLoadError] = useState<string | null>(null)
 
   const [selectedPledge, setSelectedPledge] = useState<DonationPledge | null>(null)
   const [showPaymentDialog, setShowPaymentDialog] = useState(false)
+  const [showPaymentPlanDialog, setShowPaymentPlanDialog] = useState(false)
   const [showNewPledgeDialog, setShowNewPledgeDialog] = useState(false)
-  const [showOneTimeDonationDialog, setShowOneTimeDonationDialog] = useState(false)
-  const [showRecurringDonationDialog, setShowRecurringDonationDialog] = useState(false)
+  const [showDonateDialog, setShowDonateDialog] = useState(false)
 
   const [paymentAmount, setPaymentAmount] = useState("")
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("")
   const [isProcessing, setIsProcessing] = useState(false)
   const [paymentSuccess, setPaymentSuccess] = useState(false)
-  const [oneTimeDonationSuccess, setOneTimeDonationSuccess] = useState(false)
-  const [recurringDonationSuccess, setRecurringDonationSuccess] = useState(false)
+  const [donationSuccessType, setDonationSuccessType] = useState<"one-time" | "recurring" | null>(
+    null
+  )
   const [checkoutSuccessAmount, setCheckoutSuccessAmount] = useState<number | null>(null)
   const [checkoutSuccessFrequency, setCheckoutSuccessFrequency] = useState<string | null>(null)
   const [formError, setFormError] = useState("")
 
   const [newPledgeForm, setNewPledgeForm] = useState({
-    amount: "",
-    frequency: "one-time",
-    payments: "1",
     campaign: "",
-    category: "",
-    fund: "",
+    totalAmount: "",
   })
 
-  const [oneTimeDonationForm, setOneTimeDonationForm] = useState({
+  const [paymentPlanPledge, setPaymentPlanPledge] = useState<DonationPledge | null>(null)
+  const [paymentPlanForm, setPaymentPlanForm] = useState({
+    installmentAmount: "",
+    numberOfPayments: "10",
+    frequency: "monthly",
+    firstPaymentDate: defaultFirstPaymentDate(),
+  })
+
+  const [donationForm, setDonationForm] = useState({
     amount: "",
+    frequency: "one-time" as DonationFrequency,
     campaign: "",
     category: "",
     fund: "",
     paymentMethod: "",
   })
 
-  const [recurringDonationForm, setRecurringDonationForm] = useState({
-    amount: "",
-    frequency: "monthly" as "monthly" | "quarterly" | "annually",
-    campaign: "",
-    category: "",
-    fund: "",
-  })
-
   useEffect(() => {
     async function loadDonationsPage() {
       setLoading(true)
+      setPageLoadError(null)
 
-      const result = await loadCustomerDonationPortalData()
+      try {
+        const result = await loadCustomerDonationPortalData()
 
-      if (!result.ok || !result.contact) {
-        setContact(null)
-        setDonationCategories([])
-        setPledges([])
-        setPayments([])
-        setSavedPaymentMethods([])
-        setLoading(false)
-        return
-      }
+        if (!result.ok || !result.contact) {
+          setContact(null)
+          setDonationCategories([])
+          setPledges([])
+          setPayments([])
+          setContactPaymentMethods([])
+          setOrganizationPaymentMethods([])
+          setPageLoadError(result.error || "Could not load your donations.")
+          return
+        }
 
-      const contactData = result.contact
-      setContact(contactData)
+        const contactData = result.contact
+        setContact(contactData)
 
-      const formattedCategories: DonationCategory[] = result.categories.map((category) => ({
-        id: category.id,
-        name: category.name,
-        funds: category.funds,
-      }))
-
-      setDonationCategories(formattedCategories)
-      setCampaigns(
-        (result.campaigns || []).map((campaign) => ({
-          id: campaign.id as string,
-          name: campaign.name as string,
+        const formattedCategories: DonationCategory[] = result.categories.map((category) => ({
+          id: category.id,
+          name: category.name,
+          funds: category.funds,
         }))
-      )
 
-      const formattedPaymentMethods: SavedPaymentMethod[] = result.paymentMethods.map(
-        (method) => ({
+        setDonationCategories(formattedCategories)
+        setCampaigns(
+          (result.campaigns || []).map((campaign) => ({
+            id: campaign.id as string,
+            name: campaign.name as string,
+          }))
+        )
+
+        const formattedOrganizationPaymentMethods: OrganizationPaymentMethodOption[] = (
+          result.paymentMethods || []
+        ).map((method) => ({
           id: method.id as string,
           name: (method.name as string) || "Payment Method",
           fee: method.fee != null ? String(method.fee) : null,
-        })
-      )
+        }))
 
-      setSavedPaymentMethods(formattedPaymentMethods)
-      setSelectedPaymentMethod(formattedPaymentMethods[0]?.id || "")
+        const formattedContactPaymentMethods = result.contactPaymentMethods || []
+        const defaultPaymentMethod = getDefaultDonationPaymentMethodSelection(
+          formattedContactPaymentMethods,
+          formattedOrganizationPaymentMethods
+        )
 
-      const formattedPledges: DonationPledge[] = (result.pledges || []).map((p) => ({
-        id: p.id as string,
-        campaignId: (p.campaign_id as string | null) ?? null,
-        campaign: (p.campaign_name as string) || "General Fund",
-        totalAmount: Number(p.amount_pledged || 0),
-        paidAmount: Number(p.amount_paid || 0),
-        balance: Number(p.balance_remaining ?? 0),
-        frequency: (p.frequency as string) || "one-time",
-        nextPaymentDate: null,
-        nextPaymentAmount: 0,
-        startDate: (p.pledge_date as string | null) || null,
-        endDate: null,
-        status: formatPledgeStatusLabel(p.calculated_status as string | null),
-      }))
+        setOrganizationPaymentMethods(formattedOrganizationPaymentMethods)
+        setContactPaymentMethods(formattedContactPaymentMethods)
+        setSelectedPaymentMethod(defaultPaymentMethod)
 
-      const formattedPayments: DonationPayment[] = (result.payments || []).map((p) => ({
-        id: p.id as string,
-        date: (p.payment_date as string) || "",
-        amount: Number(p.amount || 0),
-        campaign: resolvePaymentCampaignLabel(p, formattedCategories, result.campaigns || []),
-        method: (p.source as string) || "Unknown",
-        status: formatPaymentStatusLabel(p.status as string | null),
-      }))
+        const formattedPledges: DonationPledge[] = (result.pledges || []).map((row) =>
+          mapPortalPledgeRow(row as Record<string, unknown>)
+        )
 
-      setPledges(formattedPledges)
-      setPayments(formattedPayments)
-      setLoading(false)
+        const formattedPayments: DonationPayment[] = (result.payments || []).map((p) =>
+          mapPortalPaymentRow(p as Record<string, unknown>, formattedCategories, result.campaigns || [])
+        )
+
+        setPledges(formattedPledges)
+        setPayments(formattedPayments)
+      } catch (error) {
+        console.error("[customer-donation] failed to load portal data:", error)
+        setPageLoadError("Could not load your donations. Please refresh and try again.")
+      } finally {
+        setLoading(false)
+      }
     }
 
-    loadDonationsPage()
+    void loadDonationsPage()
   }, [])
 
   useEffect(() => {
@@ -293,16 +395,38 @@ export default function CustomerDonationsPage() {
 
     const params = new URLSearchParams(window.location.search)
     const give = params.get("give")
-    if (give === "one-time") {
-      setShowOneTimeDonationDialog(true)
-    } else if (give === "recurring") {
-      setShowRecurringDonationDialog(true)
+    const campaign = params.get("campaign")?.trim() || ""
+    const action = params.get("action")?.trim() || ""
+
+    if (action === "pledge" && campaign) {
+      setNewPledgeForm({ campaign, totalAmount: "" })
+      setFormError("")
+      setShowNewPledgeDialog(true)
+      window.history.replaceState({}, "", "/customer/donation")
+      return
     }
 
     if (give === "one-time" || give === "recurring") {
+      setDonationForm({
+        amount: "",
+        frequency: give === "recurring" ? "monthly" : "one-time",
+        campaign,
+        category: "",
+        fund: "",
+        paymentMethod: getDefaultDonationPaymentMethodSelection(
+          contactPaymentMethods,
+          organizationPaymentMethods
+        ),
+      })
+      setDonationSuccessType(null)
+      setCheckoutSuccessAmount(null)
+      setCheckoutSuccessFrequency(null)
+      setFormError("")
+      setShowDonateDialog(true)
       window.history.replaceState({}, "", "/customer/donation")
     }
-  }, [loading])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, contactPaymentMethods, organizationPaymentMethods])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -314,11 +438,7 @@ export default function CustomerDonationsPage() {
 
     if (checkoutState === "cancelled") {
       setFormError("Online payment was cancelled. You can try again or choose an offline method.")
-      if (checkoutType === "recurring") {
-        setShowRecurringDonationDialog(true)
-      } else {
-        setShowOneTimeDonationDialog(true)
-      }
+      setShowDonateDialog(true)
       window.history.replaceState({}, "", "/customer/donation")
       return
     }
@@ -336,13 +456,13 @@ export default function CustomerDonationsPage() {
         if (result.status === "complete" && result.recurringPlan?.status === "active") {
           setCheckoutSuccessAmount(result.amount)
           setCheckoutSuccessFrequency(result.recurringPlan.frequency)
-          setRecurringDonationSuccess(true)
-          setShowRecurringDonationDialog(true)
+          setDonationSuccessType("recurring")
+          setShowDonateDialog(true)
         } else if (result.status === "complete") {
           setCheckoutSuccessAmount(result.amount)
           setCheckoutSuccessFrequency(result.recurringPlan?.frequency ?? null)
-          setRecurringDonationSuccess(true)
-          setShowRecurringDonationDialog(true)
+          setDonationSuccessType("recurring")
+          setShowDonateDialog(true)
           setFormError(
             "Your recurring gift is set up. The first charge may take a moment to appear in your history."
           )
@@ -357,26 +477,21 @@ export default function CustomerDonationsPage() {
 
       if (result.status === "complete" && result.payment) {
         setCheckoutSuccessAmount(result.amount)
-        setOneTimeDonationSuccess(true)
-        setShowOneTimeDonationDialog(true)
+        setDonationSuccessType("one-time")
+        setShowDonateDialog(true)
         await loadCustomerDonationPortalData().then((portalResult) => {
           if (!portalResult.ok || !portalResult.contact) return
-          const formattedPayments: DonationPayment[] = (portalResult.payments || []).map((p) => ({
-            id: p.id as string,
-            date: (p.payment_date as string) || "",
-            amount: Number(p.amount || 0),
-            campaign: resolvePaymentCampaignLabel(
-              p,
+          const formattedPayments: DonationPayment[] = (portalResult.payments || []).map((p) =>
+            mapPortalPaymentRow(
+              p as Record<string, unknown>,
               portalResult.categories.map((category) => ({
                 id: category.id,
                 name: category.name,
                 funds: category.funds,
               })),
               portalResult.campaigns || []
-            ),
-            method: (p.source as string) || "Unknown",
-            status: formatPaymentStatusLabel(p.status as string | null),
-          }))
+            )
+          )
           setPayments(formattedPayments)
         })
       } else {
@@ -407,83 +522,106 @@ export default function CustomerDonationsPage() {
     return fund?.name || category?.name || "General Fund"
   }
 
-  const getSelectedPaymentMethodName = (paymentMethodId: string) => {
-    const method = savedPaymentMethods.find((item) => item.id === paymentMethodId)
-    return method?.name || "Unknown"
-  }
-
   const totalPledged = pledges.reduce((sum, pledge) => sum + Number(pledge.totalAmount || 0), 0)
   const totalPaid = payments
     .filter((payment) => normalizePaymentStatus(payment.status) !== "voided")
     .reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
   const outstandingBalance = pledges.reduce((sum, pledge) => sum + Number(pledge.balance || 0), 0)
   const activePledges = pledges.filter(
-    (p) => formatPledgeStatusLabel(p.status) !== "Fulfilled" && p.status !== "Cancelled"
+    (pledge) => pledge.status !== "Fulfilled" && pledge.status !== "Cancelled" && pledge.balance > 0
   )
   const upcomingPaymentTotal = activePledges.reduce(
-    (sum, p) => sum + Number(p.nextPaymentAmount || 0),
+    (sum, pledge) =>
+      sum +
+      suggestedPledgePaymentAmount({
+        balance: pledge.balance,
+        installmentAmount: pledge.installmentAmount,
+        frequency: pledge.frequency,
+        totalPayments: pledge.totalPayments,
+      }),
     0
   )
   const nextPaymentDate =
-    activePledges.find((pledge) => pledge.nextPaymentDate)?.nextPaymentDate || "—"
+    activePledges
+      .map((pledge) => pledge.nextPaymentDate)
+      .filter(Boolean)
+      .sort()[0] || "—"
 
-  const handlePayPledge = (pledge: DonationPledge) => {
+  const handlePayPledge = (pledge: DonationPledge, presetAmount?: number) => {
     setSelectedPledge(pledge)
-    setPaymentAmount(String(pledge.nextPaymentAmount || pledge.balance || ""))
-    setSelectedPaymentMethod(savedPaymentMethods[0]?.id || "")
+    setPaymentAmount(
+      presetAmount != null
+        ? String(presetAmount)
+        : pledgeHasPaymentPlan(pledge)
+          ? String(
+              suggestedPledgePaymentAmount({
+                balance: pledge.balance,
+                installmentAmount: pledge.installmentAmount,
+                frequency: pledge.frequency,
+                totalPayments: pledge.totalPayments,
+              })
+            )
+          : ""
+    )
+    setSelectedPaymentMethod(
+      getDefaultDonationPaymentMethodSelection(contactPaymentMethods, organizationPaymentMethods)
+    )
     setShowPaymentDialog(true)
     setPaymentSuccess(false)
     setFormError("")
   }
 
-  const handleOpenOneTimeDonation = () => {
-    setOneTimeDonationForm({
+  const handleOpenDonate = (
+    frequency: DonationFrequency = "one-time",
+    campaignId = ""
+  ) => {
+    setDonationForm({
       amount: "",
-      campaign: "",
+      frequency,
+      campaign: campaignId,
       category: "",
       fund: "",
-      paymentMethod: savedPaymentMethods[0]?.id || "",
+      paymentMethod: getDefaultDonationPaymentMethodSelection(
+        contactPaymentMethods,
+        organizationPaymentMethods
+      ),
     })
-    setOneTimeDonationSuccess(false)
+    setDonationSuccessType(null)
+    setCheckoutSuccessAmount(null)
+    setCheckoutSuccessFrequency(null)
     setFormError("")
-    setShowOneTimeDonationDialog(true)
+    setShowDonateDialog(true)
   }
 
-  const handleOpenRecurringDonation = () => {
-    setRecurringDonationForm({
-      amount: "",
-      frequency: "monthly",
-      campaign: "",
-      category: "",
-      fund: "",
-    })
-    setRecurringDonationSuccess(false)
-    setFormError("")
-    setShowRecurringDonationDialog(true)
-  }
+  const isOneTimeDonation = donationForm.frequency === "one-time"
 
-  const processRecurringDonation = async () => {
+  const processDonation = async () => {
     if (!contact) return
+
+    if (isOneTimeDonation) {
+      await processOneTimeDonation()
+      return
+    }
 
     setIsProcessing(true)
     setFormError("")
 
-    const hasStripeMethod = savedPaymentMethods.some((method) =>
-      isStripeCheckoutPaymentMethod(method.name)
-    )
+    const hasOnlineDonations =
+      contactPaymentMethods.length > 0 ||
+      organizationPaymentMethods.some((method) => isStripeCheckoutPaymentMethod(method.name))
 
-    if (!hasStripeMethod) {
+    if (!hasOnlineDonations) {
       setFormError("Online card payments are not available for recurring gifts yet.")
       setIsProcessing(false)
       return
     }
 
     const result = await createRecurringDonationCheckoutAction({
-      amount: Number(recurringDonationForm.amount || 0),
-      frequency: recurringDonationForm.frequency,
-      campaignId: recurringDonationForm.campaign || null,
-      categoryId: recurringDonationForm.category || null,
-      subcategoryId: recurringDonationForm.fund || null,
+      amount: Number(donationForm.amount || 0),
+      frequency: donationForm.frequency,
+      campaignId: donationForm.campaign || null,
+      categoryId: donationForm.category || null,
+      subcategoryId: donationForm.fund || null,
     })
 
     if (!result.success || !result.checkoutUrl) {
@@ -495,17 +633,115 @@ export default function CustomerDonationsPage() {
     window.location.href = result.checkoutUrl
   }
 
-  const handleOpenNewPledge = () => {
+  const handleOpenNewPledge = (campaignId = "") => {
     setNewPledgeForm({
-      amount: "",
-      frequency: "one-time",
-      payments: "1",
-      campaign: "",
-      category: "",
-      fund: "",
+      campaign: campaignId || campaigns[0]?.id || "",
+      totalAmount: "",
     })
     setFormError("")
     setShowNewPledgeDialog(true)
+  }
+
+  const handleOpenPaymentPlan = (pledge: DonationPledge) => {
+    const hasPlan = pledgeHasPaymentPlan(pledge)
+    const numberOfPayments = hasPlan ? String(pledge.totalPayments ?? 10) : "10"
+    const installmentAmount = hasPlan
+      ? String(pledge.installmentAmount ?? "")
+      : pledge.totalAmount > 0 && Number(numberOfPayments) > 0
+        ? String(calculateInstallmentAmount(pledge.totalAmount, Number(numberOfPayments)))
+        : ""
+
+    setPaymentPlanPledge(pledge)
+    setPaymentPlanForm({
+      installmentAmount,
+      numberOfPayments,
+      frequency: hasPlan ? pledge.frequency : "monthly",
+      firstPaymentDate: pledge.firstPaymentDate || defaultFirstPaymentDate(),
+    })
+    setFormError("")
+    setShowPaymentPlanDialog(true)
+  }
+
+  const savePaymentPlan = async () => {
+    if (!paymentPlanPledge) return
+
+    setIsProcessing(true)
+    setFormError("")
+
+    const result = await updateCustomerPledgePaymentPlanAction({
+      pledgeId: paymentPlanPledge.id,
+      installmentAmount: Number(paymentPlanForm.installmentAmount || 0),
+      numberOfPayments: Number(paymentPlanForm.numberOfPayments || 0),
+      frequency: paymentPlanForm.frequency as "monthly" | "quarterly" | "annually",
+      firstPaymentDate: paymentPlanForm.firstPaymentDate,
+    })
+
+    if (!result.success) {
+      setFormError(result.error || "Could not save payment plan.")
+      setIsProcessing(false)
+      return
+    }
+
+    const { data: pledgeView } = await supabase
+      .from("pledge_status_view")
+      .select(
+        "id, campaign_id, campaign_name, amount_pledged, amount_paid, balance_remaining, calculated_status, frequency, pledge_date, installment_amount, total_payments, first_payment_date, next_payment_date"
+      )
+      .eq("id", paymentPlanPledge.id)
+      .maybeSingle()
+
+    if (pledgeView) {
+      setPledges((currentPledges) =>
+        currentPledges.map((pledge) =>
+          pledge.id === paymentPlanPledge.id
+            ? mapPortalPledgeRow({
+                ...pledgeView,
+                payments_made: pledge.paymentsMade,
+              })
+            : pledge
+        )
+      )
+    }
+
+    setIsProcessing(false)
+    setShowPaymentPlanDialog(false)
+    setPaymentPlanPledge(null)
+  }
+
+  const createPledge = async () => {
+    if (!contact) return
+
+    setIsProcessing(true)
+    setFormError("")
+
+    const result = await createCustomerPledgeAction({
+      campaignId: newPledgeForm.campaign,
+      totalAmount: Number(newPledgeForm.totalAmount || 0),
+    })
+
+    if (!result.success) {
+      setFormError(result.error || "Pledge could not be saved. Please try again.")
+      setIsProcessing(false)
+      return
+    }
+
+    const { data: pledgeView } = await supabase
+      .from("pledge_status_view")
+      .select(
+        "id, campaign_id, campaign_name, amount_pledged, amount_paid, balance_remaining, calculated_status, frequency, pledge_date, installment_amount, total_payments, first_payment_date, next_payment_date"
+      )
+      .eq("id", result.pledgeId)
+      .maybeSingle()
+
+    if (pledgeView) {
+      setPledges((currentPledges) => [
+        mapPortalPledgeRow({ ...pledgeView, payments_made: 0 }),
+        ...currentPledges,
+      ])
+    }
+
+    setIsProcessing(false)
+    setShowNewPledgeDialog(false)
   }
 
   const processPayment = async () => {
@@ -514,7 +750,16 @@ export default function CustomerDonationsPage() {
     setIsProcessing(true)
     setFormError("")
 
-    const paymentMethodName = getSelectedPaymentMethodName(selectedPaymentMethod)
+    const paymentMethodName = resolveDonationPaymentMethodLabel(
+      selectedPaymentMethod,
+      contactPaymentMethods,
+      organizationPaymentMethods
+    )
+    const parsedSelection = parseDonationPaymentMethodSelection(selectedPaymentMethod)
+    const selectedContactCard =
+      parsedSelection?.type === "contact"
+        ? contactPaymentMethods.find((method) => method.id === parsedSelection.id)
+        : null
 
     const donorId = await ensureDonorExtensionForContact(
       contact.organization_id,
@@ -523,6 +768,19 @@ export default function CustomerDonationsPage() {
 
     if (!donorId) {
       setFormError("Could not resolve your donor profile. Please try again.")
+      setIsProcessing(false)
+      return
+    }
+
+    const amount = Number(paymentAmount || 0)
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setFormError("Enter a valid payment amount.")
+      setIsProcessing(false)
+      return
+    }
+
+    if (amount > selectedPledge.balance + 0.01) {
+      setFormError(`Payment cannot exceed the remaining balance of ${formatCurrency(selectedPledge.balance)}.`)
       setIsProcessing(false)
       return
     }
@@ -538,12 +796,17 @@ export default function CustomerDonationsPage() {
         donor_id: donorId,
         pledge_id: selectedPledge.id,
         sender_name: contact.full_name || contact.email || null,
-        amount: Number(paymentAmount || 0),
+        amount: amount,
         payment_date: `${paymentDate}T12:00:00`,
-        source: normalizePaymentSourceChannel(paymentMethodName),
+        source: selectedContactCard
+          ? normalizePaymentSourceChannel("stripe")
+          : normalizePaymentSourceChannel(paymentMethodName),
         source_type: "portal",
         status: "allocated",
         is_verified: false,
+        memo: selectedContactCard
+          ? `Pledge payment recorded with card on file (${formatContactCardLabel(selectedContactCard)})`
+          : null,
         ...toPaymentAttributionColumns(pledgeAttribution),
       })
       .select("id, amount, payment_date, source, status, memo")
@@ -570,9 +833,36 @@ export default function CustomerDonationsPage() {
         campaign: selectedPledge.campaign,
         method: paymentMethodName,
         status: formatPaymentStatusLabel(data.status),
+        paymentType: "Pledge payment",
       },
       ...currentPayments,
     ])
+
+    const paymentValue = amount
+    const updatedPaidAmount = selectedPledge.paidAmount + paymentValue
+    const updatedBalance = Math.max(selectedPledge.totalAmount - updatedPaidAmount, 0)
+    const updatedPaymentsMade = selectedPledge.paymentsMade + 1
+    const updatedStatus =
+      updatedBalance <= 0 ? "Fulfilled" : updatedPaidAmount > 0 ? "Partial" : selectedPledge.status
+
+    setPledges((currentPledges) =>
+      currentPledges.map((pledge) =>
+        pledge.id === selectedPledge.id
+          ? {
+              ...pledge,
+              paidAmount: updatedPaidAmount,
+              balance: updatedBalance,
+              paymentsMade: updatedPaymentsMade,
+              status: updatedStatus,
+              nextPaymentDate: computeScheduledPledgePaymentDate({
+                firstPaymentDate: pledge.firstPaymentDate,
+                frequency: pledge.frequency,
+                paymentsMade: updatedPaymentsMade,
+              }),
+            }
+          : pledge
+      )
+    )
 
     setIsProcessing(false)
     setPaymentSuccess(true)
@@ -584,7 +874,20 @@ export default function CustomerDonationsPage() {
     setIsProcessing(true)
     setFormError("")
 
-    const paymentMethodName = getSelectedPaymentMethodName(oneTimeDonationForm.paymentMethod)
+    const paymentMethodName = resolveDonationPaymentMethodLabel(
+      donationForm.paymentMethod,
+      contactPaymentMethods,
+      organizationPaymentMethods
+    )
+    const parsedSelection = parseDonationPaymentMethodSelection(donationForm.paymentMethod)
+    const selectedContactCard =
+      parsedSelection?.type === "contact"
+        ? contactPaymentMethods.find((method) => method.id === parsedSelection.id)
+        : null
+    const useStripeCheckout = isDonationOnlinePaymentSelection(
+      donationForm.paymentMethod,
+      organizationPaymentMethods
+    )
 
     const donorId = await ensureDonorExtensionForContact(
       contact.organization_id,
@@ -597,27 +900,29 @@ export default function CustomerDonationsPage() {
       return
     }
 
-    if (isStripeCheckoutPaymentMethod(paymentMethodName)) {
+    if (useStripeCheckout) {
       const result = await createOneTimeDonationCheckoutAction({
-        amount: Number(oneTimeDonationForm.amount || 0),
-        campaignId: oneTimeDonationForm.campaign || null,
-        categoryId: oneTimeDonationForm.category || null,
-        subcategoryId: oneTimeDonationForm.fund || null,
+        amount: Number(donationForm.amount || 0),
+        campaignId: donationForm.campaign || null,
+        categoryId: donationForm.category || null,
+        subcategoryId: donationForm.fund || null,
       })
 
-      if (!result.success || !result.checkoutUrl) {
+      if (result.success && result.checkoutUrl) {
+        window.location.href = result.checkoutUrl
+        return
+      }
+
+      if (!selectedContactCard) {
         setFormError(result.error || "Could not start online checkout. Please try again.")
         setIsProcessing(false)
         return
       }
-
-      window.location.href = result.checkoutUrl
-      return
     }
 
     const selectedFundName = getSelectedFundName(
-      oneTimeDonationForm.category,
-      oneTimeDonationForm.fund
+      donationForm.category,
+      donationForm.fund
     )
 
     const paymentDate = new Date().toISOString().split("T")[0]
@@ -630,16 +935,20 @@ export default function CustomerDonationsPage() {
         donor_id: donorId,
         pledge_id: null,
         sender_name: contact.full_name || contact.email || null,
-        amount: Number(oneTimeDonationForm.amount || 0),
+        amount: Number(donationForm.amount || 0),
         payment_date: `${paymentDate}T12:00:00`,
-        source: normalizePaymentSourceChannel(paymentMethodName),
+        source: selectedContactCard
+          ? normalizePaymentSourceChannel("stripe")
+          : normalizePaymentSourceChannel(paymentMethodName),
         source_type: "portal",
         status: "unallocated",
         is_verified: false,
-        campaign_id: oneTimeDonationForm.campaign || null,
-        category_id: oneTimeDonationForm.category || null,
-        subcategory_id: oneTimeDonationForm.fund || null,
-        memo: `Offline donation recorded (${paymentMethodName})`,
+        campaign_id: donationForm.campaign || null,
+        category_id: donationForm.category || null,
+        subcategory_id: donationForm.fund || null,
+        memo: selectedContactCard
+          ? `Donation recorded with card on file (${formatContactCardLabel(selectedContactCard)})`
+          : `Offline donation recorded (${paymentMethodName})`,
       })
       .select("id, amount, payment_date, source, status, memo")
       .single()
@@ -663,112 +972,27 @@ export default function CustomerDonationsPage() {
         date: data.payment_date || "",
         amount: Number(data.amount || 0),
         campaign:
-          getSelectedFundName(oneTimeDonationForm.category, oneTimeDonationForm.fund) ||
-          campaigns.find((c) => c.id === oneTimeDonationForm.campaign)?.name ||
+          getSelectedFundName(donationForm.category, donationForm.fund) ||
+          campaigns.find((c) => c.id === donationForm.campaign)?.name ||
           "General Fund",
         method: paymentMethodName,
         status: formatPaymentStatusLabel(data.status),
+        paymentType: "One-time donation",
       },
       ...currentPayments,
     ])
 
     setIsProcessing(false)
     setCheckoutSuccessAmount(null)
-    setOneTimeDonationSuccess(true)
-  }
-
-  const createPledge = async () => {
-    if (!contact) return
-
-    setIsProcessing(true)
-    setFormError("")
-
-    const selectedFundName = getSelectedFundName(newPledgeForm.category, newPledgeForm.fund)
-    const numberOfPayments =
-      newPledgeForm.frequency === "one-time" ? 1 : Number(newPledgeForm.payments || 1)
-    const totalAmount = Number(newPledgeForm.amount || 0) * numberOfPayments
-    const pledgeDate = new Date().toISOString().split("T")[0]
-
-    const donorId = await ensureDonorExtensionForContact(
-      contact.organization_id,
-      contact.id
-    )
-
-    if (!donorId) {
-      setFormError("Could not resolve your donor profile. Please try again.")
-      setIsProcessing(false)
-      return
-    }
-
-    const pledgePayload = {
-      organization_id: contact.organization_id,
-      donor_id: donorId,
-      campaign_id: newPledgeForm.campaign || null,
-      category_id: newPledgeForm.category || null,
-      subcategory_id: newPledgeForm.fund || null,
-      amount_pledged: totalAmount,
-      pledge_date: pledgeDate,
-      pledge_type: newPledgeForm.frequency.toLowerCase().replace("-", "_"),
-      frequency: newPledgeForm.frequency.toLowerCase().replace("-", "_"),
-      status: "open",
-      notes: null,
-    }
-
-    const { data, error } = await supabase
-      .from("pledges")
-      .insert(pledgePayload)
-      .select("id")
-      .single()
-
-    if (error) {
-      setFormError(error.message || "Pledge could not be saved. Please try again.")
-      setIsProcessing(false)
-      return
-    }
-
-    const { data: pledgeView } = await supabase
-      .from("pledge_status_view")
-      .select(
-        "id, campaign_name, amount_pledged, amount_paid, balance_remaining, calculated_status, frequency, pledge_date"
-      )
-      .eq("id", data.id)
-      .maybeSingle()
-
-    const viewRow = pledgeView || {
-      id: data.id,
-      campaign_name: selectedFundName,
-      amount_pledged: totalAmount,
-      amount_paid: 0,
-      balance_remaining: totalAmount,
-      calculated_status: "open",
-      frequency: newPledgeForm.frequency,
-      pledge_date: pledgeDate,
-    }
-
-    setPledges((currentPledges) => [
-      {
-        id: viewRow.id as string,
-        campaignId: newPledgeForm.campaign || null,
-        campaign: (viewRow.campaign_name as string) || selectedFundName || "General Fund",
-        totalAmount: Number(viewRow.amount_pledged || totalAmount),
-        paidAmount: Number(viewRow.amount_paid || 0),
-        balance: Number(viewRow.balance_remaining ?? totalAmount),
-        frequency: (viewRow.frequency as string) || newPledgeForm.frequency,
-        nextPaymentDate: null,
-        nextPaymentAmount: 0,
-        startDate: (viewRow.pledge_date as string | null) || pledgeDate,
-        endDate: null,
-        status: formatPledgeStatusLabel(viewRow.calculated_status as string | null),
-      },
-      ...currentPledges,
-    ])
-
-    setIsProcessing(false)
-    setShowNewPledgeDialog(false)
+    setDonationSuccessType("one-time")
   }
 
   const getStatusBadge = (status: string) => {
     switch (status) {
+      case "Open":
+        return <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">Open</Badge>
+      case "Partial":
+        return <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">Partial</Badge>
       case "Active":
         return <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">Active</Badge>
       case "Fulfilled":
@@ -793,91 +1017,81 @@ export default function CustomerDonationsPage() {
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-4 [&>*]:w-fit">
-        <Card className="border-l-4 border-l-primary">
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between">
-              <div>
+      {pageLoadError ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          {pageLoadError}
+        </div>
+      ) : null}
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Card className="h-full border-l-4 border-l-primary">
+          <CardContent className="flex h-full flex-col p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0 flex-1">
                 <p className="text-sm text-muted-foreground">Total Pledged</p>
-                <p className="text-2xl font-bold text-foreground">
+                <p className="mt-1 text-2xl font-bold text-foreground">
                   {loading ? "—" : formatCurrency(totalPledged)}
                 </p>
+                <p className="mt-1 min-h-4 text-xs text-muted-foreground">&nbsp;</p>
               </div>
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
                 <Heart className="h-5 w-5 text-primary" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-emerald-500">
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between">
-              <div>
+        <Card className="h-full border-l-4 border-l-emerald-500">
+          <CardContent className="flex h-full flex-col p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0 flex-1">
                 <p className="text-sm text-muted-foreground">Total Paid</p>
-                <p className="text-2xl font-bold text-emerald-600">
+                <p className="mt-1 text-2xl font-bold text-emerald-600">
                   {loading ? "—" : formatCurrency(totalPaid)}
                 </p>
+                <p className="mt-1 min-h-4 text-xs text-muted-foreground">&nbsp;</p>
               </div>
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-100">
                 <CheckCircle2 className="h-5 w-5 text-emerald-600" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-amber-500">
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between">
-              <div>
+        <Card className="h-full border-l-4 border-l-amber-500">
+          <CardContent className="flex h-full flex-col p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0 flex-1">
                 <p className="text-sm text-muted-foreground">Outstanding Balance</p>
-                <p className="text-2xl font-bold text-amber-600">
+                <p className="mt-1 text-2xl font-bold text-amber-600">
                   {loading ? "—" : formatCurrency(outstandingBalance)}
                 </p>
+                <p className="mt-1 min-h-4 text-xs text-muted-foreground">&nbsp;</p>
               </div>
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-100">
                 <DollarSign className="h-5 w-5 text-amber-600" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-violet-500">
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between">
-              <div>
+        <Card className="h-full border-l-4 border-l-violet-500">
+          <CardContent className="flex h-full flex-col p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0 flex-1">
                 <p className="text-sm text-muted-foreground">Next Payment Due</p>
-                <p className="text-2xl font-bold text-violet-600">
+                <p className="mt-1 text-2xl font-bold text-violet-600">
                   {loading ? "—" : formatCurrency(upcomingPaymentTotal)}
                 </p>
-                <p className="mt-1 text-xs text-muted-foreground">{nextPaymentDate}</p>
+                <p className="mt-1 min-h-4 text-xs text-muted-foreground">{nextPaymentDate}</p>
               </div>
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-100">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-100">
                 <Calendar className="h-5 w-5 text-violet-600" />
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
-
-      {activePledges.length > 0 && (
-        <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-primary/10">
-          <CardContent className="p-5">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h3 className="font-semibold text-foreground">Pay All Upcoming Payments</h3>
-                <p className="text-sm text-muted-foreground">
-                  Pay {formatCurrency(upcomingPaymentTotal)} for all {activePledges.length} active pledges at once
-                </p>
-              </div>
-              <Button size="lg" className="gap-2">
-                <CreditCard className="h-4 w-4" />
-                Pay {formatCurrency(upcomingPaymentTotal)}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       <Tabs defaultValue="pledges" className="w-full">
         <TabsList className="grid w-full max-w-md grid-cols-2">
@@ -887,29 +1101,25 @@ export default function CustomerDonationsPage() {
 
         <TabsContent value="pledges" className="mt-6">
           <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <h2 className="text-lg font-semibold text-foreground">Your Pledges</h2>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <Button size="sm" onClick={handleOpenOneTimeDonation}>
-                  <Heart className="mr-1 h-4 w-4" />
-                  One-Time Donation
-                </Button>
-                <Button variant="secondary" size="sm" onClick={handleOpenRecurringDonation}>
-                  <RefreshCw className="mr-1 h-4 w-4" />
-                  Recurring Donation
-                </Button>
-                <Button variant="outline" size="sm" onClick={handleOpenNewPledge}>
-                  <Plus className="mr-1 h-4 w-4" />
-                  New Pledge
-                </Button>
-              </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <h2 className="text-lg font-semibold text-foreground">All Pledges</h2>
+              <Button size="sm" onClick={handleOpenNewPledge}>
+                <Plus className="mr-1 h-4 w-4" />
+                New Pledge
+              </Button>
             </div>
 
             <div className="flex flex-col gap-4">
               {loading ? (
                 <Card>
                   <CardContent className="p-6 text-sm text-muted-foreground">
-                    Loading donations...
+                    Loading pledges...
+                  </CardContent>
+                </Card>
+              ) : pageLoadError ? (
+                <Card>
+                  <CardContent className="p-6 text-sm text-muted-foreground">
+                    {pageLoadError}
                   </CardContent>
                 </Card>
               ) : pledges.length === 0 ? (
@@ -919,26 +1129,54 @@ export default function CustomerDonationsPage() {
                     <div>
                       <p className="text-sm font-medium text-foreground">No pledges yet</p>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        Create a pledge or make a one-time donation when you are ready to support a fund.
+                        Create a pledge toward a campaign when you are ready to support a fund.
                       </p>
                     </div>
                   </CardContent>
                 </Card>
               ) : (
-                pledges.map((pledge) => (
+                pledges.map((pledge) => {
+                  const hasPlan = pledgeHasPaymentPlan(pledge)
+                  const canPay =
+                    pledge.balance > 0 &&
+                    pledge.status !== "Fulfilled" &&
+                    pledge.status !== "Cancelled"
+
+                  return (
                   <Card key={pledge.id} className="overflow-hidden">
                     <CardContent className="p-0">
                       <div className="flex flex-col lg:flex-row">
                         <div className="flex-1 p-5">
-                          <div className="flex items-start justify-between">
+                          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-semibold text-foreground">{pledge.campaign}</h3>
+                              {getStatusBadge(pledge.status)}
+                            </div>
                             <div>
-                              <div className="flex items-center gap-2">
-                                <h3 className="font-semibold text-foreground">{pledge.campaign}</h3>
-                                {getStatusBadge(pledge.status)}
-                              </div>
-                              <p className="mt-1 text-sm text-muted-foreground">
-                                {pledge.frequency} pledge
-                              </p>
+                              <span className="text-muted-foreground">Pledged </span>
+                              <span className="font-medium text-foreground">
+                                {pledge.pledgeDate || "—"}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Total pledge </span>
+                              <span className="font-medium text-foreground">
+                                {formatCurrency(pledge.totalAmount)}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Payments made </span>
+                              <span className="font-medium text-foreground">
+                                {hasPlan
+                                  ? `${pledge.paymentsMade} of ${pledge.totalPayments}`
+                                  : pledge.paymentsMade}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Remaining balance </span>
+                              <span className="font-medium text-foreground">
+                                {formatCurrency(pledge.balance)}
+                              </span>
                             </div>
                           </div>
 
@@ -953,29 +1191,11 @@ export default function CustomerDonationsPage() {
                               value={pledge.totalAmount > 0 ? (pledge.paidAmount / pledge.totalAmount) * 100 : 0}
                               className="h-2"
                             />
-                            <div className="mt-1 flex justify-between text-xs text-muted-foreground">
-                              <span>
-                                {pledge.totalAmount > 0
-                                  ? Math.round((pledge.paidAmount / pledge.totalAmount) * 100)
-                                  : 0}
-                                % complete
-                              </span>
-                              <span>{formatCurrency(pledge.balance)} remaining</span>
-                            </div>
                           </div>
                         </div>
 
-                        {pledge.status === "Active" && (
-                          <div className="flex flex-col justify-center gap-3 border-t border-border bg-muted/30 p-5 lg:w-64 lg:border-l lg:border-t-0">
-                            <div className="text-center lg:text-left">
-                              <p className="text-xs text-muted-foreground">Next Payment</p>
-                              <p className="text-lg font-bold text-foreground">
-                                {formatCurrency(pledge.nextPaymentAmount)}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                Due {pledge.nextPaymentDate || "—"}
-                              </p>
-                            </div>
+                        {canPay ? (
+                          <div className="flex flex-col justify-center gap-2 border-t border-border p-5 lg:w-56 lg:border-l lg:border-t-0">
                             <Button
                               className="w-full gap-2"
                               onClick={() => handlePayPledge(pledge)}
@@ -983,8 +1203,16 @@ export default function CustomerDonationsPage() {
                               <CreditCard className="h-4 w-4" />
                               Pay Now
                             </Button>
+                            <Button
+                              variant="outline"
+                              className="w-full gap-2"
+                              onClick={() => handleOpenPaymentPlan(pledge)}
+                            >
+                              <Calendar className="h-4 w-4" />
+                              {hasPlan ? "Edit Payment Plan" : "Set Up Payment Plan"}
+                            </Button>
                           </div>
-                        )}
+                        ) : null}
 
                         {pledge.status === "Fulfilled" && (
                           <div className="flex flex-col items-center justify-center gap-2 border-t border-border bg-emerald-50 p-5 lg:w-64 lg:border-l lg:border-t-0">
@@ -996,7 +1224,8 @@ export default function CustomerDonationsPage() {
                       </div>
                     </CardContent>
                   </Card>
-                ))
+                  )
+                })
               )}
             </div>
           </div>
@@ -1010,13 +1239,15 @@ export default function CustomerDonationsPage() {
               <CardContent className="p-0">
                 {loading ? (
                   <div className="p-6 text-sm text-muted-foreground">Loading payment history...</div>
+                ) : pageLoadError ? (
+                  <div className="p-6 text-sm text-muted-foreground">{pageLoadError}</div>
                 ) : payments.length === 0 ? (
                   <div className="flex flex-col items-center justify-center gap-3 p-8 text-center">
                     <CreditCard className="h-10 w-10 text-muted-foreground/50" />
                     <div>
                       <p className="text-sm font-medium text-foreground">No payments yet</p>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        Your completed donation payments will appear here.
+                        Pledge payments, recurring donations, and one-time donations will appear here.
                       </p>
                     </div>
                   </div>
@@ -1030,7 +1261,11 @@ export default function CustomerDonationsPage() {
                           </div>
                           <div>
                             <p className="font-medium text-foreground">{payment.campaign}</p>
-                            <p className="text-sm text-muted-foreground">{payment.date}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {payment.date}
+                              <span className="mx-1.5">·</span>
+                              {payment.paymentType}
+                            </p>
                           </div>
                         </div>
                         <div className="flex items-center gap-4">
@@ -1050,331 +1285,60 @@ export default function CustomerDonationsPage() {
         </TabsContent>
       </Tabs>
 
-      {/* One-Time Donation Dialog */}
-      <Dialog open={showOneTimeDonationDialog} onOpenChange={setShowOneTimeDonationDialog}>
+      {/* Donate Dialog */}
+      <Dialog open={showDonateDialog} onOpenChange={setShowDonateDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>
-              {oneTimeDonationSuccess ? "Donation Successful" : "Make a One-Time Donation"}
-            </DialogTitle>
-            <DialogDescription>
-              {oneTimeDonationSuccess
-                ? "Thank you for your contribution!"
-                : "Choose an amount, fund, and payment method for your one-time donation."}
-            </DialogDescription>
-          </DialogHeader>
-
-          {oneTimeDonationSuccess ? (
-            <div className="flex flex-col items-center gap-4 py-6">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100">
-                <CheckCircle2 className="h-8 w-8 text-emerald-600" />
-              </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-foreground">
-                  {formatCurrency(
-                    checkoutSuccessAmount ?? Number(oneTimeDonationForm.amount || 0)
-                  )}
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {checkoutSuccessAmount != null
-                    ? "Online payment received — thank you!"
-                    : "Offline donation recorded — staff will reconcile if needed"}
-                </p>
-              </div>
-              <Button className="mt-4 w-full" onClick={() => setShowOneTimeDonationDialog(false)}>
-                Done
-              </Button>
-            </div>
-          ) : (
-            <>
-              <div className="flex flex-col gap-4 py-4">
-                <div className="flex flex-col gap-2">
-                  <Label>Donation Amount</Label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                      $
-                    </span>
-                    <Input
-                      type="number"
-                      value={oneTimeDonationForm.amount}
-                      onChange={(e) =>
-                        setOneTimeDonationForm({
-                          ...oneTimeDonationForm,
-                          amount: e.target.value,
-                        })
-                      }
-                      className="pl-7"
-                      placeholder="0.00"
-                    />
-                  </div>
-                </div>
-
-                {campaigns.length > 0 ? (
-                  <div className="flex flex-col gap-2">
-                    <Label>Campaign (optional)</Label>
-                    <Select
-                      value={oneTimeDonationForm.campaign || "none"}
-                      onValueChange={(v) =>
-                        setOneTimeDonationForm({
-                          ...oneTimeDonationForm,
-                          campaign: v === "none" ? "" : v,
-                        })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select campaign" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">No campaign</SelectItem>
-                        {campaigns.map((campaign) => (
-                          <SelectItem key={campaign.id} value={campaign.id}>
-                            {campaign.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                ) : null}
-
-                <div className="flex flex-col gap-2">
-                  <Label>Donation Category</Label>
-                  <Select
-                    value={oneTimeDonationForm.category}
-                    onValueChange={(v) =>
-                      setOneTimeDonationForm({
-                        ...oneTimeDonationForm,
-                        category: v,
-                        fund: "",
-                      })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {donationCategories.map((cat) => (
-                        <SelectItem key={cat.id} value={cat.id}>
-                          {cat.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {oneTimeDonationForm.category && (
-                  <div className="flex flex-col gap-2">
-                    <Label>Specific Fund</Label>
-                    <Select
-                      value={oneTimeDonationForm.fund}
-                      onValueChange={(v) =>
-                        setOneTimeDonationForm({
-                          ...oneTimeDonationForm,
-                          fund: v,
-                        })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select fund" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {donationCategories
-                          .find((c) => c.id === oneTimeDonationForm.category)
-                          ?.funds.map((fund) => (
-                            <SelectItem key={fund.id} value={fund.id}>
-                              {fund.name}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-
-                <div className="flex flex-col gap-2">
-                  <Label>Payment Method</Label>
-                  {savedPaymentMethods.length === 0 ? (
-                    <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-                      No payment methods are available yet.
-                    </div>
-                  ) : (
-                    <RadioGroup
-                      value={oneTimeDonationForm.paymentMethod}
-                      onValueChange={(v) =>
-                        setOneTimeDonationForm({
-                          ...oneTimeDonationForm,
-                          paymentMethod: v,
-                        })
-                      }
-                      className="flex flex-col gap-2"
-                    >
-                      {savedPaymentMethods.map((method) => {
-                        const isOnline = isStripeCheckoutPaymentMethod(method.name)
-                        return (
-                          <div key={method.id} className="flex items-center gap-3 rounded-lg border p-3">
-                            <RadioGroupItem value={method.id} id={`one-time-${method.id}`} />
-                            <Label htmlFor={`one-time-${method.id}`} className="flex-1 cursor-pointer">
-                              <div className="flex items-center justify-between gap-2">
-                                <span>{method.name}</span>
-                                <div className="flex items-center gap-2">
-                                  <Badge variant={isOnline ? "default" : "outline"} className="text-xs">
-                                    {isOnline ? "Pay online" : "Record offline"}
-                                  </Badge>
-                                  {method.fee && (
-                                    <Badge variant="secondary" className="text-xs">
-                                      {method.fee}
-                                    </Badge>
-                                  )}
-                                </div>
-                              </div>
-                            </Label>
-                          </div>
-                        )
-                      })}
-                    </RadioGroup>
-                  )}
-
-                  <Button variant="ghost" size="sm" className="w-fit text-primary">
-                    <Plus className="mr-1 h-4 w-4" />
-                    Add new card
-                  </Button>
-                </div>
-
-                {formError && (
-                  <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-                    {formError}
-                  </div>
-                )}
-
-                {oneTimeDonationForm.amount && (
-                  <div className="rounded-lg bg-muted/50 p-4">
-                    <p className="text-sm font-medium text-foreground">Donation Summary</p>
-                    <div className="mt-2 flex justify-between text-sm">
-                      <span className="text-muted-foreground">One-Time Donation:</span>
-                      <span className="font-bold text-foreground">
-                        {formatCurrency(Number(oneTimeDonationForm.amount))}
-                      </span>
-                    </div>
-                    {oneTimeDonationForm.category && (
-                      <div className="mt-1 flex justify-between text-sm">
-                        <span className="text-muted-foreground">Fund:</span>
-                        <span className="font-medium text-foreground">
-                          {getSelectedFundName(
-                            oneTimeDonationForm.category,
-                            oneTimeDonationForm.fund
-                          )}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setShowOneTimeDonationDialog(false)}>
-                  Cancel
-                </Button>
-                <Button
-                  onClick={processOneTimeDonation}
-                  disabled={
-                    !oneTimeDonationForm.amount ||
-                    !oneTimeDonationForm.category ||
-                    !oneTimeDonationForm.fund ||
-                    !oneTimeDonationForm.paymentMethod ||
-                    isProcessing
-                  }
-                  className="gap-2"
-                >
-                  {isProcessing ? (
-                    <>
-                      <Clock className="h-4 w-4 animate-spin" />
-                      Processing...
-                    </>
-                  ) : isStripeCheckoutPaymentMethod(
-                      getSelectedPaymentMethodName(oneTimeDonationForm.paymentMethod)
-                    ) ? (
-                    <>
-                      <CreditCard className="h-4 w-4" />
-                      Pay {formatCurrency(Number(oneTimeDonationForm.amount) || 0)} online
-                    </>
-                  ) : (
-                    <>
-                      <DollarSign className="h-4 w-4" />
-                      Record {formatCurrency(Number(oneTimeDonationForm.amount) || 0)} offline
-                    </>
-                  )}
-                </Button>
-              </DialogFooter>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Recurring Donation Dialog */}
-      <Dialog open={showRecurringDonationDialog} onOpenChange={setShowRecurringDonationDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>
-              {recurringDonationSuccess
+              {donationSuccessType === "recurring"
                 ? "Recurring Gift Started"
-                : "Set Up a Recurring Donation"}
+                : donationSuccessType === "one-time"
+                  ? "Donation Successful"
+                  : "Make a Donation"}
             </DialogTitle>
             <DialogDescription>
-              {recurringDonationSuccess
+              {donationSuccessType === "recurring"
                 ? "Thank you for your ongoing support!"
-                : "Choose an amount and frequency. You will complete card setup securely on Stripe."}
+                : donationSuccessType === "one-time"
+                  ? "Thank you for your contribution!"
+                  : "Choose an amount, frequency, fund, and payment details."}
             </DialogDescription>
           </DialogHeader>
 
-          {recurringDonationSuccess ? (
+          {donationSuccessType ? (
             <div className="flex flex-col items-center gap-4 py-6">
               <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100">
                 <CheckCircle2 className="h-8 w-8 text-emerald-600" />
               </div>
               <div className="text-center">
                 <p className="text-2xl font-bold text-foreground">
-                  {formatCurrency(checkoutSuccessAmount ?? Number(recurringDonationForm.amount || 0))}
+                  {formatCurrency(checkoutSuccessAmount ?? Number(donationForm.amount || 0))}
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {checkoutSuccessFrequency
-                    ? `${checkoutSuccessFrequency.charAt(0).toUpperCase()}${checkoutSuccessFrequency.slice(1)} recurring gift — card on file with Stripe`
-                    : "Recurring gift set up with Stripe"}
+                  {donationSuccessType === "recurring"
+                    ? checkoutSuccessFrequency
+                      ? `${checkoutSuccessFrequency.charAt(0).toUpperCase()}${checkoutSuccessFrequency.slice(1)} recurring gift — card on file with Stripe`
+                      : "Recurring gift set up with Stripe"
+                    : checkoutSuccessAmount != null
+                      ? "Online payment received — thank you!"
+                      : "Offline donation recorded — staff will reconcile if needed"}
                 </p>
               </div>
-              <Button className="mt-4 w-full" onClick={() => setShowRecurringDonationDialog(false)}>
+              <Button className="mt-4 w-full" onClick={() => setShowDonateDialog(false)}>
                 Done
               </Button>
             </div>
           ) : (
             <>
               <div className="flex flex-col gap-4 py-4">
-                <div className="flex flex-col gap-2">
-                  <Label>Donation Amount</Label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                      $
-                    </span>
-                    <Input
-                      type="number"
-                      value={recurringDonationForm.amount}
-                      onChange={(e) =>
-                        setRecurringDonationForm({
-                          ...recurringDonationForm,
-                          amount: e.target.value,
-                        })
-                      }
-                      className="pl-7"
-                      placeholder="0.00"
-                    />
-                  </div>
-                </div>
-
                 <div className="flex flex-col gap-2">
                   <Label>Frequency</Label>
                   <Select
-                    value={recurringDonationForm.frequency}
+                    value={donationForm.frequency}
                     onValueChange={(v) =>
-                      setRecurringDonationForm({
-                        ...recurringDonationForm,
-                        frequency: v as "monthly" | "quarterly" | "annually",
+                      setDonationForm({
+                        ...donationForm,
+                        frequency: v as DonationFrequency,
                       })
                     }
                   >
@@ -1382,21 +1346,44 @@ export default function CustomerDonationsPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="monthly">Monthly</SelectItem>
-                      <SelectItem value="quarterly">Quarterly</SelectItem>
-                      <SelectItem value="annually">Annually</SelectItem>
+                      {DONATION_FREQUENCY_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <Label>Donation Amount</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                      $
+                    </span>
+                    <Input
+                      type="number"
+                      value={donationForm.amount}
+                      onChange={(e) =>
+                        setDonationForm({
+                          ...donationForm,
+                          amount: e.target.value,
+                        })
+                      }
+                      className="pl-7"
+                      placeholder="0.00"
+                    />
+                  </div>
                 </div>
 
                 {campaigns.length > 0 ? (
                   <div className="flex flex-col gap-2">
                     <Label>Campaign (optional)</Label>
                     <Select
-                      value={recurringDonationForm.campaign || "none"}
+                      value={donationForm.campaign || "none"}
                       onValueChange={(v) =>
-                        setRecurringDonationForm({
-                          ...recurringDonationForm,
+                        setDonationForm({
+                          ...donationForm,
                           campaign: v === "none" ? "" : v,
                         })
                       }
@@ -1419,10 +1406,10 @@ export default function CustomerDonationsPage() {
                 <div className="flex flex-col gap-2">
                   <Label>Donation Category</Label>
                   <Select
-                    value={recurringDonationForm.category}
+                    value={donationForm.category}
                     onValueChange={(v) =>
-                      setRecurringDonationForm({
-                        ...recurringDonationForm,
+                      setDonationForm({
+                        ...donationForm,
                         category: v,
                         fund: "",
                       })
@@ -1441,14 +1428,14 @@ export default function CustomerDonationsPage() {
                   </Select>
                 </div>
 
-                {recurringDonationForm.category && (
+                {donationForm.category ? (
                   <div className="flex flex-col gap-2">
                     <Label>Specific Fund</Label>
                     <Select
-                      value={recurringDonationForm.fund}
+                      value={donationForm.fund}
                       onValueChange={(v) =>
-                        setRecurringDonationForm({
-                          ...recurringDonationForm,
+                        setDonationForm({
+                          ...donationForm,
                           fund: v,
                         })
                       }
@@ -1458,7 +1445,7 @@ export default function CustomerDonationsPage() {
                       </SelectTrigger>
                       <SelectContent>
                         {donationCategories
-                          .find((c) => c.id === recurringDonationForm.category)
+                          .find((c) => c.id === donationForm.category)
                           ?.funds.map((fund) => (
                             <SelectItem key={fund.id} value={fund.id}>
                               {fund.name}
@@ -1467,29 +1454,74 @@ export default function CustomerDonationsPage() {
                       </SelectContent>
                     </Select>
                   </div>
+                ) : null}
+
+                {isOneTimeDonation ? (
+                  contact ? (
+                    <CustomerDonationPaymentPicker
+                      contactId={contact.id}
+                      contactPaymentMethods={contactPaymentMethods}
+                      organizationPaymentMethods={organizationPaymentMethods}
+                      selectedPaymentMethodId={donationForm.paymentMethod}
+                      onSelectedPaymentMethodIdChange={(value) =>
+                        setDonationForm({
+                          ...donationForm,
+                          paymentMethod: value,
+                        })
+                      }
+                      onContactPaymentMethodsChange={setContactPaymentMethods}
+                    />
+                  ) : null
+                ) : (
+                  <div className="rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground">
+                    Payment method:{" "}
+                    <span className="font-medium text-foreground">Credit card via Stripe</span>
+                  </div>
                 )}
 
-                <div className="rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground">
-                  Payment method: <span className="font-medium text-foreground">Credit card via Stripe</span>
-                </div>
-
-                {formError && (
+                {formError ? (
                   <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
                     {formError}
                   </div>
-                )}
+                ) : null}
+
+                {donationForm.amount ? (
+                  <div className="rounded-lg bg-muted/50 p-4">
+                    <p className="text-sm font-medium text-foreground">Donation Summary</p>
+                    <div className="mt-2 flex justify-between text-sm">
+                      <span className="text-muted-foreground">
+                        {isOneTimeDonation
+                          ? "One-time donation"
+                          : `${donationFrequencyLabel(donationForm.frequency)} recurring gift`}
+                        :
+                      </span>
+                      <span className="font-bold text-foreground">
+                        {formatCurrency(Number(donationForm.amount))}
+                      </span>
+                    </div>
+                    {donationForm.category ? (
+                      <div className="mt-1 flex justify-between text-sm">
+                        <span className="text-muted-foreground">Fund:</span>
+                        <span className="font-medium text-foreground">
+                          {getSelectedFundName(donationForm.category, donationForm.fund)}
+                        </span>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
 
               <DialogFooter>
-                <Button variant="outline" onClick={() => setShowRecurringDonationDialog(false)}>
+                <Button variant="outline" onClick={() => setShowDonateDialog(false)}>
                   Cancel
                 </Button>
                 <Button
-                  onClick={processRecurringDonation}
+                  onClick={processDonation}
                   disabled={
-                    !recurringDonationForm.amount ||
-                    !recurringDonationForm.category ||
-                    !recurringDonationForm.fund ||
+                    !donationForm.amount ||
+                    !donationForm.category ||
+                    !donationForm.fund ||
+                    (isOneTimeDonation && !donationForm.paymentMethod) ||
                     isProcessing
                   }
                   className="gap-2"
@@ -1499,6 +1531,27 @@ export default function CustomerDonationsPage() {
                       <Clock className="h-4 w-4 animate-spin" />
                       Processing...
                     </>
+                  ) : isOneTimeDonation ? (
+                    parseDonationPaymentMethodSelection(donationForm.paymentMethod)?.type ===
+                    "contact" ? (
+                      <>
+                        <CreditCard className="h-4 w-4" />
+                        Pay {formatCurrency(Number(donationForm.amount) || 0)} with card
+                      </>
+                    ) : isDonationOnlinePaymentSelection(
+                        donationForm.paymentMethod,
+                        organizationPaymentMethods
+                      ) ? (
+                      <>
+                        <CreditCard className="h-4 w-4" />
+                        Pay {formatCurrency(Number(donationForm.amount) || 0)} online
+                      </>
+                    ) : (
+                      <>
+                        <DollarSign className="h-4 w-4" />
+                        Record {formatCurrency(Number(donationForm.amount) || 0)} offline
+                      </>
+                    )
                   ) : (
                     <>
                       <CreditCard className="h-4 w-4" />
@@ -1561,61 +1614,62 @@ export default function CustomerDonationsPage() {
                     />
                   </div>
                   {selectedPledge && (
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => setPaymentAmount(String(selectedPledge.nextPaymentAmount))}
+                        onClick={() => handlePayPledge(selectedPledge, selectedPledge.balance)}
                       >
-                        Next Due ({formatCurrency(selectedPledge.nextPaymentAmount)})
+                        Pay in Full ({formatCurrency(selectedPledge.balance)})
                       </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setPaymentAmount(String(selectedPledge.balance))}
-                      >
-                        Full Balance ({formatCurrency(selectedPledge.balance)})
-                      </Button>
+                      {pledgeHasPaymentPlan(selectedPledge) ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            setPaymentAmount(
+                              String(
+                                suggestedPledgePaymentAmount({
+                                  balance: selectedPledge.balance,
+                                  installmentAmount: selectedPledge.installmentAmount,
+                                  frequency: selectedPledge.frequency,
+                                  totalPayments: selectedPledge.totalPayments,
+                                })
+                              )
+                            )
+                          }
+                        >
+                          Plan Amount (
+                          {formatCurrency(
+                            suggestedPledgePaymentAmount({
+                              balance: selectedPledge.balance,
+                              installmentAmount: selectedPledge.installmentAmount,
+                              frequency: selectedPledge.frequency,
+                              totalPayments: selectedPledge.totalPayments,
+                            })
+                          )}
+                          )
+                        </Button>
+                      ) : null}
                     </div>
                   )}
+                  <p className="text-xs text-muted-foreground">
+                    Or enter any amount up to {formatCurrency(selectedPledge?.balance || 0)}.
+                  </p>
                 </div>
 
-                <div className="flex flex-col gap-2">
-                  <Label>Payment Method</Label>
-                  {savedPaymentMethods.length === 0 ? (
-                    <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-                      No payment methods are available yet.
-                    </div>
-                  ) : (
-                    <RadioGroup
-                      value={selectedPaymentMethod}
-                      onValueChange={setSelectedPaymentMethod}
-                      className="flex flex-col gap-2"
-                    >
-                      {savedPaymentMethods.map((method) => (
-                        <div key={method.id} className="flex items-center gap-3 rounded-lg border p-3">
-                          <RadioGroupItem value={method.id} id={method.id} />
-                          <Label htmlFor={method.id} className="flex-1 cursor-pointer">
-                            <div className="flex items-center justify-between">
-                              <span>{method.name}</span>
-                              {method.fee && (
-                                <Badge variant="secondary" className="text-xs">
-                                  {method.fee}
-                                </Badge>
-                              )}
-                            </div>
-                          </Label>
-                        </div>
-                      ))}
-                    </RadioGroup>
-                  )}
-                  <Button variant="ghost" size="sm" className="w-fit text-primary">
-                    <Plus className="mr-1 h-4 w-4" />
-                    Add new card
-                  </Button>
-                </div>
+                {contact ? (
+                  <CustomerDonationPaymentPicker
+                    contactId={contact.id}
+                    contactPaymentMethods={contactPaymentMethods}
+                    organizationPaymentMethods={organizationPaymentMethods}
+                    selectedPaymentMethodId={selectedPaymentMethod}
+                    onSelectedPaymentMethodIdChange={setSelectedPaymentMethod}
+                    onContactPaymentMethodsChange={setContactPaymentMethods}
+                  />
+                ) : null}
 
                 {formError && (
                   <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
@@ -1657,82 +1711,25 @@ export default function CustomerDonationsPage() {
           <DialogHeader>
             <DialogTitle>Make a New Pledge</DialogTitle>
             <DialogDescription>
-              Set up a new pledge to support our community.
+              Choose a campaign and the total amount you want to pledge. You can pay or set up a
+              payment plan later.
             </DialogDescription>
           </DialogHeader>
 
           <div className="flex flex-col gap-4 py-4">
-            <div className="flex flex-col gap-2">
-              <Label>Amount per Payment</Label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                  $
-                </span>
-                <Input
-                  type="number"
-                  value={newPledgeForm.amount}
-                  onChange={(e) => setNewPledgeForm({ ...newPledgeForm, amount: e.target.value })}
-                  className="pl-7"
-                  placeholder="0.00"
-                />
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <Label>Frequency</Label>
-              <Select
-                value={newPledgeForm.frequency}
-                onValueChange={(v) => setNewPledgeForm({ ...newPledgeForm, frequency: v })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="one-time">One-time</SelectItem>
-                  <SelectItem value="monthly">Monthly</SelectItem>
-                  <SelectItem value="quarterly">Quarterly</SelectItem>
-                  <SelectItem value="annual">Annual</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {newPledgeForm.frequency !== "one-time" && (
-              <div className="flex flex-col gap-2">
-                <Label>Number of Payments</Label>
-                <Select
-                  value={newPledgeForm.payments}
-                  onValueChange={(v) => setNewPledgeForm({ ...newPledgeForm, payments: v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="3">3 payments</SelectItem>
-                    <SelectItem value="6">6 payments</SelectItem>
-                    <SelectItem value="12">12 payments</SelectItem>
-                    <SelectItem value="24">24 payments</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
             {campaigns.length > 0 ? (
               <div className="flex flex-col gap-2">
-                <Label>Campaign (optional)</Label>
+                <Label>Campaign</Label>
                 <Select
-                  value={newPledgeForm.campaign || "none"}
-                  onValueChange={(v) =>
-                    setNewPledgeForm({
-                      ...newPledgeForm,
-                      campaign: v === "none" ? "" : v,
-                    })
+                  value={newPledgeForm.campaign}
+                  onValueChange={(value) =>
+                    setNewPledgeForm({ ...newPledgeForm, campaign: value })
                   }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select campaign" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">No campaign</SelectItem>
                     {campaigns.map((campaign) => (
                       <SelectItem key={campaign.id} value={campaign.id}>
                         {campaign.name}
@@ -1741,82 +1738,58 @@ export default function CustomerDonationsPage() {
                   </SelectContent>
                 </Select>
               </div>
-            ) : null}
-
-            <div className="flex flex-col gap-2">
-              <Label>Donation Category</Label>
-              <Select
-                value={newPledgeForm.category}
-                onValueChange={(v) =>
-                  setNewPledgeForm({ ...newPledgeForm, category: v, fund: "" })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {donationCategories.map((cat) => (
-                    <SelectItem key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {newPledgeForm.category && (
-              <div className="flex flex-col gap-2">
-                <Label>Specific Fund</Label>
-                <Select
-                  value={newPledgeForm.fund}
-                  onValueChange={(v) => setNewPledgeForm({ ...newPledgeForm, fund: v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select fund" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {donationCategories
-                      .find((c) => c.id === newPledgeForm.category)
-                      ?.funds.map((fund) => (
-                        <SelectItem key={fund.id} value={fund.id}>
-                          {fund.name}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
+            ) : (
+              <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                No active campaigns are available for pledges right now.
               </div>
             )}
 
-            {formError && (
+            <div className="flex flex-col gap-2">
+              <Label>Total pledge amount</Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                  $
+                </span>
+                <Input
+                  type="number"
+                  value={newPledgeForm.totalAmount}
+                  onChange={(e) =>
+                    setNewPledgeForm({ ...newPledgeForm, totalAmount: e.target.value })
+                  }
+                  className="pl-7"
+                  placeholder="1000"
+                />
+              </div>
+            </div>
+
+            {formError ? (
               <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
                 {formError}
               </div>
-            )}
+            ) : null}
 
-            {newPledgeForm.amount && (
+            {newPledgeForm.totalAmount ? (
               <div className="rounded-lg bg-muted/50 p-4">
-                <p className="text-sm font-medium text-foreground">Pledge Summary</p>
+                <p className="text-sm font-medium text-foreground">Pledge summary</p>
                 <div className="mt-2 flex justify-between text-sm">
-                  <span className="text-muted-foreground">Total Pledge:</span>
-                  <span className="font-bold text-foreground">
-                    {formatCurrency(
-                      Number(newPledgeForm.amount) *
-                        (newPledgeForm.frequency === "one-time"
-                          ? 1
-                          : Number(newPledgeForm.payments))
-                    )}
+                  <span className="text-muted-foreground">Campaign:</span>
+                  <span className="font-medium text-foreground">
+                    {campaigns.find((campaign) => campaign.id === newPledgeForm.campaign)?.name ||
+                      "—"}
                   </span>
                 </div>
-                {newPledgeForm.category && (
-                  <div className="mt-1 flex justify-between text-sm">
-                    <span className="text-muted-foreground">Fund:</span>
-                    <span className="font-medium text-foreground">
-                      {getSelectedFundName(newPledgeForm.category, newPledgeForm.fund)}
-                    </span>
-                  </div>
-                )}
+                <div className="mt-1 flex justify-between text-sm">
+                  <span className="text-muted-foreground">Total pledge:</span>
+                  <span className="font-bold text-foreground">
+                    {formatCurrency(Number(newPledgeForm.totalAmount))}
+                  </span>
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Pledge date will be set to today. You can pay or set up a payment plan after
+                  creating the pledge.
+                </p>
               </div>
-            )}
+            ) : null}
           </div>
 
           <DialogFooter>
@@ -1826,9 +1799,9 @@ export default function CustomerDonationsPage() {
             <Button
               onClick={createPledge}
               disabled={
-                !newPledgeForm.amount ||
-                !newPledgeForm.category ||
-                !newPledgeForm.fund ||
+                !newPledgeForm.campaign ||
+                !newPledgeForm.totalAmount ||
+                campaigns.length === 0 ||
                 isProcessing
               }
               className="gap-2"
@@ -1841,6 +1814,140 @@ export default function CustomerDonationsPage() {
               ) : (
                 "Create Pledge"
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Payment Plan Dialog */}
+      <Dialog open={showPaymentPlanDialog} onOpenChange={setShowPaymentPlanDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {paymentPlanPledge && pledgeHasPaymentPlan(paymentPlanPledge)
+                ? "Edit Payment Plan"
+                : "Set Up Payment Plan"}
+            </DialogTitle>
+            <DialogDescription>
+              {paymentPlanPledge
+                ? `Schedule how you want to pay your ${formatCurrency(paymentPlanPledge.totalAmount)} pledge to ${paymentPlanPledge.campaign}.`
+                : "Choose your installment schedule."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-col gap-4 py-4">
+            <div className="flex flex-col gap-2">
+              <Label>Payment frequency</Label>
+              <Select
+                value={paymentPlanForm.frequency}
+                onValueChange={(value) =>
+                  setPaymentPlanForm({ ...paymentPlanForm, frequency: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="monthly">Monthly</SelectItem>
+                  <SelectItem value="quarterly">Quarterly</SelectItem>
+                  <SelectItem value="annually">Annually</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label>Number of payments</Label>
+              <Input
+                type="number"
+                min={2}
+                value={paymentPlanForm.numberOfPayments}
+                onChange={(e) => {
+                  const numberOfPayments = e.target.value
+                  const totalAmount = paymentPlanPledge?.totalAmount ?? 0
+                  const installmentAmount =
+                    totalAmount > 0 && Number(numberOfPayments) > 0
+                      ? String(calculateInstallmentAmount(totalAmount, Number(numberOfPayments)))
+                      : paymentPlanForm.installmentAmount
+                  setPaymentPlanForm({
+                    ...paymentPlanForm,
+                    numberOfPayments,
+                    installmentAmount,
+                  })
+                }}
+                placeholder="10"
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label>Amount per payment</Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                  $
+                </span>
+                <Input
+                  type="number"
+                  value={paymentPlanForm.installmentAmount}
+                  onChange={(e) =>
+                    setPaymentPlanForm({
+                      ...paymentPlanForm,
+                      installmentAmount: e.target.value,
+                    })
+                  }
+                  className="pl-7"
+                  placeholder="100"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label>First payment date</Label>
+              <Input
+                type="date"
+                value={paymentPlanForm.firstPaymentDate}
+                onChange={(e) =>
+                  setPaymentPlanForm({
+                    ...paymentPlanForm,
+                    firstPaymentDate: e.target.value,
+                  })
+                }
+              />
+            </div>
+
+            {paymentPlanPledge ? (
+              <div className="rounded-lg bg-muted/50 p-4 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Total pledge</span>
+                  <span className="font-medium">{formatCurrency(paymentPlanPledge.totalAmount)}</span>
+                </div>
+                <div className="mt-1 flex justify-between">
+                  <span className="text-muted-foreground">Remaining balance</span>
+                  <span className="font-medium">{formatCurrency(paymentPlanPledge.balance)}</span>
+                </div>
+              </div>
+            ) : null}
+
+            {formError ? (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                {formError}
+              </div>
+            ) : null}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPaymentPlanDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={savePaymentPlan}
+              disabled={
+                !paymentPlanPledge ||
+                !paymentPlanForm.installmentAmount ||
+                !paymentPlanForm.numberOfPayments ||
+                !paymentPlanForm.firstPaymentDate ||
+                isProcessing
+              }
+            >
+              {isProcessing ? "Saving..." : "Save Payment Plan"}
             </Button>
           </DialogFooter>
         </DialogContent>

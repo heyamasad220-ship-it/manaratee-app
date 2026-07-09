@@ -2,6 +2,7 @@
 
 import { getActiveOrganization } from "@/lib/organizations/get-active-organization"
 import { getCustomerPortalSupabase } from "@/lib/auth/customer-portal-session"
+import { loadCustomerPortalEnabledModuleSlugs } from "@/lib/customer/customer-portal-modules-server"
 import { loadCustomerFamilyMembers } from "@/lib/customer/customer-family-actions"
 
 export async function loadCustomerProfilePortalData() {
@@ -13,6 +14,10 @@ export async function loadCustomerProfilePortalData() {
   }
 
   const organizationId = activeOrganization.organization_id
+
+  const enabledModuleSlugs = Array.from(
+    await loadCustomerPortalEnabledModuleSlugs(organizationId)
+  )
 
   const { data: contact, error } = await supabase
     .from("contacts")
@@ -26,6 +31,18 @@ export async function loadCustomerProfilePortalData() {
   if (error || !contact) {
     return { ok: false as const, error: error?.message || "Contact not found" }
   }
+
+  const contactId = contact.id as string
+
+  const { data: paymentMethodRows } = await supabase
+    .from("contact_payment_methods")
+    .select(
+      "id, card_brand, last4, exp_month, exp_year, cardholder_name, is_default, created_at"
+    )
+    .eq("organization_id", organizationId)
+    .eq("contact_id", contactId)
+    .order("is_default", { ascending: false })
+    .order("created_at", { ascending: false })
 
   let familyMembers: Awaited<ReturnType<typeof loadCustomerFamilyMembers>> = []
 
@@ -42,6 +59,17 @@ export async function loadCustomerProfilePortalData() {
     contact,
     familyMembers,
     accountEmail: session.authenticatedUser.email ?? null,
+    enabledModuleSlugs,
+    paymentMethods: (paymentMethodRows || []).map((row) => ({
+      id: row.id as string,
+      cardBrand: (row.card_brand as string | null) ?? null,
+      last4: row.last4 as string,
+      expMonth: row.exp_month == null ? null : Number(row.exp_month),
+      expYear: row.exp_year == null ? null : Number(row.exp_year),
+      cardholderName: (row.cardholder_name as string | null) ?? null,
+      isDefault: Boolean(row.is_default),
+      createdAt: row.created_at as string,
+    })),
   }
 }
 
@@ -80,6 +108,7 @@ export async function loadCustomerDonationPortalData() {
     categoriesResult,
     subcategoriesResult,
     paymentMethodsResult,
+    contactPaymentMethodsResult,
     pledgesResult,
     paymentsResult,
     campaignsResult,
@@ -100,11 +129,20 @@ export async function loadCustomerDonationPortalData() {
       .eq("organization_id", organizationId)
       .eq("enabled", true)
       .order("name", { ascending: true }),
+    supabase
+      .from("contact_payment_methods")
+      .select(
+        "id, card_brand, last4, exp_month, exp_year, cardholder_name, is_default, created_at"
+      )
+      .eq("organization_id", organizationId)
+      .eq("contact_id", contactId)
+      .order("is_default", { ascending: false })
+      .order("created_at", { ascending: false }),
     donorIds.length > 0
       ? supabase
           .from("pledge_status_view")
           .select(
-            "id, donor_id, donor_name, campaign_id, campaign_name, amount_pledged, amount_paid, balance_remaining, calculated_status, frequency, pledge_date"
+            "id, donor_id, donor_name, campaign_id, campaign_name, amount_pledged, amount_paid, balance_remaining, calculated_status, frequency, pledge_date, installment_amount, total_payments, first_payment_date, next_payment_date"
           )
           .eq("organization_id", organizationId)
           .in("donor_id", donorIds)
@@ -113,7 +151,7 @@ export async function loadCustomerDonationPortalData() {
     supabase
       .from("payments")
       .select(
-        "id, amount, payment_date, source, status, memo, pledge_id, campaign_id, category_id, subcategory_id"
+        "id, amount, payment_date, source, status, memo, pledge_id, campaign_id, category_id, subcategory_id, recurring_donation_plan_id"
       )
       .eq("organization_id", organizationId)
       .eq("contact_id", contactId)
@@ -122,6 +160,7 @@ export async function loadCustomerDonationPortalData() {
       .from("campaigns")
       .select("id, name")
       .eq("organization_id", organizationId)
+      .eq("status", "active")
       .order("name", { ascending: true }),
   ])
 
@@ -137,13 +176,35 @@ export async function loadCustomerDonationPortalData() {
       })),
   }))
 
+  const pledgePaymentRows = (paymentsResult.data || []).filter((row) => row.pledge_id)
+  const paymentsMadeByPledgeId = new Map<string, number>()
+  for (const row of pledgePaymentRows) {
+    const pledgeId = row.pledge_id as string
+    paymentsMadeByPledgeId.set(pledgeId, (paymentsMadeByPledgeId.get(pledgeId) || 0) + 1)
+  }
+
+  const pledges = (pledgesResult.data || []).map((row) => ({
+    ...row,
+    payments_made: paymentsMadeByPledgeId.get(row.id as string) || 0,
+  }))
+
   return {
     ok: true as const,
     isSupportSession: session.isSupportSession,
     contact,
     categories,
     paymentMethods: paymentMethodsResult.data || [],
-    pledges: pledgesResult.data || [],
+    contactPaymentMethods: (contactPaymentMethodsResult.data || []).map((row) => ({
+      id: row.id as string,
+      cardBrand: (row.card_brand as string | null) ?? null,
+      last4: row.last4 as string,
+      expMonth: row.exp_month == null ? null : Number(row.exp_month),
+      expYear: row.exp_year == null ? null : Number(row.exp_year),
+      cardholderName: (row.cardholder_name as string | null) ?? null,
+      isDefault: Boolean(row.is_default),
+      createdAt: row.created_at as string,
+    })),
+    pledges,
     payments: paymentsResult.data || [],
     campaigns: campaignsResult.data || [],
   }

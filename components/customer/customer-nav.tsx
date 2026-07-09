@@ -25,7 +25,11 @@ import {
   CUSTOMER_PORTAL_NAV_ITEMS,
   filterCustomerPortalNavItems,
 } from "@/lib/customer/customer-portal-modules"
-import { formatCustomerPortalRoleLabel } from "@/lib/customer/customer-portal-role-label"
+import {
+  CUSTOMER_PROFILE_NAV_ITEMS,
+  isCustomerProfileNavItemActive,
+  isCustomerProfilePath,
+} from "@/lib/customer/customer-profile-nav"
 import { cn } from "@/lib/utils"
 
 type CustomerNavProps = {
@@ -33,6 +37,7 @@ type CustomerNavProps = {
   organizations: CustomerOrganization[]
   portalCapabilities?: UserPortalCapabilities
   enabledModuleSlugs?: string[]
+  customerName?: string
 }
 
 const memberNavIcons = {
@@ -65,21 +70,23 @@ export function CustomerNav({
   organizations,
   portalCapabilities,
   enabledModuleSlugs = [],
+  customerName = "Customer",
 }: CustomerNavProps) {
   const pathname = usePathname()
-  const portalRoleLabel = formatCustomerPortalRoleLabel(
-    activeOrganization?.role_name
-  )
 
   const enabledSlugSet = new Set(enabledModuleSlugs)
   const filteredMemberNav = filterCustomerPortalNavItems(
     CUSTOMER_PORTAL_NAV_ITEMS,
     enabledSlugSet
-  ).map((item) => ({
-    ...item,
-    icon:
-      memberNavIcons[item.href as keyof typeof memberNavIcons] ?? Home,
-  }))
+  )
+    .filter((item) => item.href !== "/customer/profile")
+    .map((item) => ({
+      ...item,
+      icon:
+        memberNavIcons[item.href as keyof typeof memberNavIcons] ?? Home,
+    }))
+
+  const isProfileSection = isCustomerProfilePath(pathname)
 
   const isTeachingPortal = pathname.startsWith("/my-classes")
   const isStaffPortal = pathname.startsWith("/customer/staff")
@@ -98,18 +105,41 @@ export function CustomerNav({
             : []),
         ]
 
+  const logoUrl = activeOrganization?.logo_url
+  const organizationName = activeOrganization?.organization_name
+
   return (
     <aside className="hidden w-[260px] shrink-0 border-r border-border bg-card lg:flex lg:flex-col">
       <div className="border-b border-border px-6 py-6">
-        <Link href={isStaffPortal ? "/customer/staff" : "/customer/dashboard"}>
-          <Image
-            src="/logo.png"
-            alt="Manaratee"
-            width={220}
-            height={80}
-            className="h-auto w-full object-contain"
-            priority
-          />
+        <Link
+          href={isStaffPortal ? "/customer/staff" : "/customer/dashboard"}
+          className="flex flex-col items-center gap-3 text-center"
+        >
+          {logoUrl ? (
+            <Image
+              src={logoUrl}
+              alt={organizationName || "Organization"}
+              width={220}
+              height={80}
+              className="h-auto max-h-20 w-full object-contain"
+              priority
+            />
+          ) : !organizationName ? (
+            <Image
+              src="/logo.png"
+              alt="Manaratee"
+              width={220}
+              height={80}
+              className="h-auto w-full object-contain"
+              priority
+            />
+          ) : null}
+
+          {organizationName ? (
+            <p className="w-full text-xl font-bold leading-tight tracking-tight text-foreground">
+              {organizationName}
+            </p>
+          ) : null}
         </Link>
       </div>
 
@@ -149,6 +179,48 @@ export function CustomerNav({
               </Link>
             )
           })}
+
+          {!isTeachingPortal && !isStaffPortal ? (
+            <div className="mt-1 flex flex-col gap-1">
+              <Link
+                href="/customer/profile"
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-colors",
+                  pathname === "/customer/profile"
+                    ? "bg-primary/10 text-primary"
+                    : isProfileSection
+                      ? "text-primary"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                )}
+              >
+                <User className="h-4 w-4" />
+                <span>Profile</span>
+              </Link>
+
+              {isProfileSection ? (
+                <div className="ml-4 flex flex-col gap-0.5 border-l border-border pl-3">
+                  {CUSTOMER_PROFILE_NAV_ITEMS.map((item) => {
+                    const isActive = isCustomerProfileNavItemActive(item.href, pathname)
+
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        className={cn(
+                          "rounded-md px-3 py-2 text-sm transition-colors",
+                          isActive
+                            ? "bg-primary/10 font-medium text-primary"
+                            : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                        )}
+                      >
+                        {item.label}
+                      </Link>
+                    )
+                  })}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </nav>
       </div>
 
@@ -168,12 +240,7 @@ export function CustomerNav({
           </div>
 
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-foreground">
-              {portalRoleLabel}
-            </p>
-            <p className="truncate text-xs text-muted-foreground">
-              {activeOrganization?.organization_name || "Member portal"}
-            </p>
+            <p className="truncate text-sm font-semibold text-foreground">{customerName}</p>
           </div>
         </div>
 

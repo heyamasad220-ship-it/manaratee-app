@@ -4,27 +4,37 @@ import {
   CalendarDays,
   Gift,
   GraduationCap,
-  HeartHandshake,
-  ArrowRight,
+  HandCoins,
   User,
-  Building2,
-  Briefcase,
 } from "lucide-react"
 
 import { getCustomerPortalSupabase } from "@/lib/auth/customer-portal-session"
 import { getActiveOrganization } from "@/lib/organizations/get-active-organization"
-import { getUserPortalCapabilities } from "@/lib/auth/portal-capabilities"
 import {
   isCustomerPortalModuleEnabled,
 } from "@/lib/customer/customer-portal-modules"
 import { loadCustomerPortalEnabledModuleSlugs } from "@/lib/customer/customer-portal-modules-server"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { CustomerDashboardGivingSection } from "@/components/customer/customer-dashboard-giving-section"
+import type {
+  CustomerDashboardCampaign,
+} from "@/components/customer/customer-dashboard-campaigns"
+import type {
+  CustomerDashboardCategory,
+} from "@/components/customer/customer-dashboard-categories"
+
+function formatDashboardCurrency(amount: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount)
+}
 
 export default async function CustomerDashboardPage() {
   const { supabase, session } = await getCustomerPortalSupabase()
   const userId = session.effectiveUserId
-  const user = session.authenticatedUser
 
   const { activeOrganization } = await getActiveOrganization()
 
@@ -34,21 +44,14 @@ export default async function CustomerDashboardPage() {
 
   const organizationId = activeOrganization.organization_id
 
-  const portalCapabilities = await getUserPortalCapabilities(userId, organizationId)
   const enabledModuleSlugs = await loadCustomerPortalEnabledModuleSlugs(organizationId)
 
   const { data: contact } = await supabase
     .from("contacts")
-    .select("id, full_name, email, organization_id")
+    .select("id, organization_id")
     .eq("auth_user_id", userId)
     .eq("organization_id", organizationId)
     .maybeSingle()
-
-  const firstName =
-    contact?.full_name?.split(" ")?.[0] ||
-    contact?.email?.split("@")?.[0] ||
-    user.email?.split("@")?.[0] ||
-    "there"
 
   const { count: rentalsCount } = isCustomerPortalModuleEnabled(enabledModuleSlugs, "bookings")
     ? await supabase
@@ -56,18 +59,6 @@ export default async function CustomerDashboardPage() {
         .select("*", { count: "exact", head: true })
         .eq("organization_id", organizationId)
         .eq("customer_user_id", userId)
-    : { count: 0 }
-
-  const { count: pendingRentalsCount } = isCustomerPortalModuleEnabled(
-    enabledModuleSlugs,
-    "bookings"
-  )
-    ? await supabase
-        .from("venue_rentals")
-        .select("*", { count: "exact", head: true })
-        .eq("organization_id", organizationId)
-        .eq("customer_user_id", userId)
-        .eq("status", "awaiting_supervisor_approval")
     : { count: 0 }
 
   const { count: donationCount } =
@@ -88,9 +79,125 @@ export default async function CustomerDashboardPage() {
           .eq("registrant_contact_id", contact.id)
       : { count: 0 }
 
+  const donationsModuleEnabled = isCustomerPortalModuleEnabled(enabledModuleSlugs, "donations")
+
+  let openPledgeCount = 0
+  let openPledgeBalance = 0
+
+  if (donationsModuleEnabled && contact?.id) {
+    const { data: donorRows } = await supabase
+      .from("donors")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .eq("contact_id", contact.id)
+
+    const donorIds = (donorRows || []).map((row) => row.id as string)
+
+    if (donorIds.length > 0) {
+      const { data: pledgeRows } = await supabase
+        .from("pledge_status_view")
+        .select("balance_remaining, calculated_status")
+        .eq("organization_id", organizationId)
+        .in("donor_id", donorIds)
+
+      for (const row of pledgeRows || []) {
+        const status = String(row.calculated_status || "").toLowerCase()
+        if (status === "fulfilled" || status === "cancelled") continue
+
+        const balance = Number(row.balance_remaining || 0)
+        if (balance <= 0) continue
+
+        openPledgeCount += 1
+        openPledgeBalance += balance
+      }
+    }
+  }
+
+  const { data: activeCampaignRows } = donationsModuleEnabled
+    ? await supabase
+        .from("campaigns")
+        .select("id, name, description")
+        .eq("organization_id", organizationId)
+        .eq("status", "active")
+        .order("name", { ascending: true })
+    : { data: [] }
+
+  const activeCampaigns: CustomerDashboardCampaign[] = (activeCampaignRows || []).map((row) => ({
+    id: row.id as string,
+    name: row.name as string,
+    description: (row.description as string | null) ?? null,
+    flyerUrl: null,
+  }))
+
+  let categoryRows: Array<{ id: string; name: string }> = []
+
+  if (donationsModuleEnabled) {
+    const { data } = await supabase
+      .from("donation_categories")
+      .select("id, name")
+      .eq("organization_id", organizationId)
+      .order("name", { ascending: true })
+
+    categoryRows = (data || []) as Array<{ id: string; name: string }>
+  }
+
+  const activeCategories: CustomerDashboardCategory[] = (categoryRows || []).map((row) => ({
+    id: row.id as string,
+    name: row.name as string,
+  }))
+
+  type OverviewCardTheme = {
+    border: string
+    valueClass: string
+    iconWrap: string
+    icon: string
+  }
+
+  const cardThemes: Record<string, OverviewCardTheme> = {
+    profile: {
+      border: "border-l-4 border-l-primary",
+      valueClass: "text-foreground",
+      iconWrap: "bg-primary/10",
+      icon: "text-primary",
+    },
+    donations: {
+      border: "border-l-4 border-l-emerald-500",
+      valueClass: "text-emerald-600",
+      iconWrap: "bg-emerald-100",
+      icon: "text-emerald-600",
+    },
+    pledges: {
+      border: "border-l-4 border-l-amber-500",
+      valueClass: "text-amber-600",
+      iconWrap: "bg-amber-100",
+      icon: "text-amber-600",
+    },
+    bookings: {
+      border: "border-l-4 border-l-sky-500",
+      valueClass: "text-foreground",
+      iconWrap: "bg-sky-100",
+      icon: "text-sky-600",
+    },
+    programs: {
+      border: "border-l-4 border-l-violet-500",
+      valueClass: "text-violet-600",
+      iconWrap: "bg-violet-100",
+      icon: "text-violet-600",
+    },
+  }
+
   const overviewCards = [
+    {
+      key: "profile",
+      title: "Profile",
+      value: "View",
+      description: "Manage your account information",
+      href: "/customer/profile",
+      icon: User,
+    },
     isCustomerPortalModuleEnabled(enabledModuleSlugs, "bookings")
       ? {
+          key: "bookings",
           title: "Venue Rentals",
           value: rentalsCount || 0,
           description: "Venue requests and reservations",
@@ -100,6 +207,7 @@ export default async function CustomerDashboardPage() {
       : null,
     isCustomerPortalModuleEnabled(enabledModuleSlugs, "donations")
       ? {
+          key: "donations",
           title: "Donations",
           value: donationCount || 0,
           description: "Giving history and contributions",
@@ -107,8 +215,19 @@ export default async function CustomerDashboardPage() {
           icon: Gift,
         }
       : null,
+    isCustomerPortalModuleEnabled(enabledModuleSlugs, "donations")
+      ? {
+          key: "pledges",
+          title: "Pledges",
+          value: openPledgeCount,
+          description: `${formatDashboardCurrency(openPledgeBalance)} remaining balance`,
+          href: "/customer/donation",
+          icon: HandCoins,
+        }
+      : null,
     isCustomerPortalModuleEnabled(enabledModuleSlugs, "programs")
       ? {
+          key: "programs",
           title: "Programs",
           value: programEnrollmentCount || 0,
           description: "Program registrations and enrollments",
@@ -116,14 +235,8 @@ export default async function CustomerDashboardPage() {
           icon: GraduationCap,
         }
       : null,
-    {
-      title: "Profile",
-      value: "View",
-      description: "Manage your account information",
-      href: "/customer/profile",
-      icon: User,
-    },
   ].filter(Boolean) as Array<{
+    key: string
     title: string
     value: number | string
     description: string
@@ -133,178 +246,47 @@ export default async function CustomerDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-2xl border bg-card p-6 shadow-sm">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-sm text-muted-foreground">
-              {activeOrganization.organization_name}
-            </p>
-            <h1 className="mt-1 text-2xl font-bold tracking-tight">
-              Welcome back, {firstName}
-            </h1>
-            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-              This is your portal overview for your organization&apos;s enabled
-              services and account activity.
-            </p>
-          </div>
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {overviewCards.map((item) => {
+          const theme = cardThemes[item.key] ?? cardThemes.profile
+          const Icon = item.icon
 
-          {overviewCards.length > 1 ? (
-            <Button asChild>
-              <Link href={overviewCards[0]?.href ?? "/customer/profile"}>
-                Open Portal
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-          ) : null}
-        </div>
-      </section>
+          return (
+            <Link key={item.key} href={item.href} className="block h-full">
+              <Card
+                className={`h-full border shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${theme.border}`}
+              >
+                <CardContent className="flex h-full flex-col p-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm text-muted-foreground">{item.title}</p>
+                      <p className={`mt-1 text-2xl font-bold ${theme.valueClass}`}>
+                        {item.value}
+                      </p>
+                      <p className="mt-1 min-h-4 text-xs text-muted-foreground">
+                        {item.description}
+                      </p>
+                    </div>
 
-      <section className="flex flex-wrap gap-4 [&>*]:w-fit">
-        {overviewCards.map((item) => (
-          <Link key={item.title} href={item.href}>
-            <Card className="h-full transition-colors hover:bg-muted/50">
-              <CardContent className="flex h-full flex-col justify-between p-5">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">
-                      {item.title}
-                    </p>
-                    <p className="mt-2 text-3xl font-bold">{item.value}</p>
+                    <div
+                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${theme.iconWrap}`}
+                    >
+                      <Icon className={`h-5 w-5 ${theme.icon}`} />
+                    </div>
                   </div>
-
-                  <div className="rounded-full bg-muted p-3">
-                    <item.icon className="h-5 w-5 text-muted-foreground" />
-                  </div>
-                </div>
-
-                <p className="mt-4 text-xs text-muted-foreground">
-                  {item.description}
-                </p>
-              </CardContent>
-            </Card>
-          </Link>
-        ))}
+                </CardContent>
+              </Card>
+            </Link>
+          )
+        })}
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Portal Activity</CardTitle>
-          </CardHeader>
-
-          <CardContent className="grid gap-3 sm:grid-cols-2">
-            {isCustomerPortalModuleEnabled(enabledModuleSlugs, "bookings") ? (
-              <DashboardAction
-                href="/customer/rentals"
-                icon={CalendarDays}
-                title="Venue Rentals"
-                description={`${pendingRentalsCount || 0} pending request${
-                  pendingRentalsCount === 1 ? "" : "s"
-                }`}
-              />
-            ) : null}
-
-            {isCustomerPortalModuleEnabled(enabledModuleSlugs, "donations") ? (
-              <DashboardAction
-                href="/customer/donation"
-                icon={Gift}
-                title="Donations"
-                description="View giving history and donation options"
-              />
-            ) : null}
-
-            {isCustomerPortalModuleEnabled(enabledModuleSlugs, "programs") ? (
-              <DashboardAction
-                href="/customer/programs"
-                icon={HeartHandshake}
-                title="Programs"
-                description="View available and enrolled programs"
-              />
-            ) : null}
-
-            <DashboardAction
-              href="/customer/profile"
-              icon={User}
-              title="Profile"
-              description="Update your personal information"
-            />
-
-            {portalCapabilities.hasStaffToolsPortal ? (
-              <DashboardAction
-                href="/customer/staff"
-                icon={Briefcase}
-                title="Staff Tools"
-                description="Submit department event requests"
-              />
-            ) : null}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Account Summary</CardTitle>
-          </CardHeader>
-
-          <CardContent className="space-y-3 text-sm">
-            <div className="flex justify-between gap-4">
-              <span className="text-muted-foreground">Organization</span>
-              <span className="text-right font-medium">
-                {activeOrganization.organization_name}
-              </span>
-            </div>
-
-            <div className="flex justify-between gap-4">
-              <span className="text-muted-foreground">Role</span>
-              <span className="text-right font-medium">
-                {activeOrganization.role_name}
-              </span>
-            </div>
-
-            <div className="flex justify-between gap-4">
-              <span className="text-muted-foreground">Email</span>
-              <span className="text-right font-medium">
-                {contact?.email || user.email}
-              </span>
-            </div>
-
-            <div className="pt-3">
-              <Button variant="outline" className="w-full justify-start" asChild>
-                <Link href="/customer/profile">
-                  <Building2 className="mr-2 h-4 w-4" />
-                  Manage Profile
-                </Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </section>
+      {donationsModuleEnabled ? (
+        <CustomerDashboardGivingSection
+          campaigns={activeCampaigns}
+          categories={activeCategories}
+        />
+      ) : null}
     </div>
-  )
-}
-
-function DashboardAction({
-  href,
-  icon: Icon,
-  title,
-  description,
-}: {
-  href: string
-  icon: React.ElementType
-  title: string
-  description: string
-}) {
-  return (
-    <Link href={href}>
-      <div className="flex h-full items-start gap-3 rounded-xl border p-4 transition-colors hover:bg-muted/50">
-        <div className="rounded-full bg-muted p-2">
-          <Icon className="h-4 w-4 text-muted-foreground" />
-        </div>
-
-        <div>
-          <p className="font-medium">{title}</p>
-          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-        </div>
-      </div>
-    </Link>
   )
 }

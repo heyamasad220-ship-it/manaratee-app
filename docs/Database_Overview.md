@@ -285,11 +285,11 @@ Import CSV flow writes directly to `payments` + `payment_import_batches` (no row
 
 **`payments.source` constraint (patch `131_payments_source_square.sql`):** lowercase channel keys (`cash`, `check`, **`square`**, `zelle`, `venmo`, `paypal`, `stripe`, `import`, `manual`). **`square`** = Square terminal batch deposit on a campaign (no donor/contact). Campaign overview classifies via memo `|batch|square|` or `source = square`. Customer portal normalizes configured payment method display names via `lib/donations/payment-source-channel.ts` before insert.
 
-* campaigns (`goal_amount`, `description`, `start_date`, `end_date`, `status`, `code`, `overview_metric_keys` — migration `134`)
+* campaigns (`goal_amount`, `description`, `start_date`, `end_date`, `status`, `code`, `overview_metric_keys` — migration `134`; `flyer_url` — migration `160` for customer portal campaign cards)
 * donors
 * donation_categories
 * donation_subcategories
-* pledges
+* pledges (`installment_amount`, `total_payments`, `first_payment_date`, `next_payment_date` added in migration `158` for customer portal installment pledges)
 * payments
 * payment_methods
 * donor_summary_view
@@ -324,6 +324,8 @@ npm run validate:donations-security
 **Analytical views (migration `097_donations_views.sql`):** `pledge_status_view`, `donor_summary_view` with `security_invoker = true` (RLS on underlying tables applies). `donor_summary_view` includes `contact_id` (patch `116_donor_summary_view_contact_id.sql`) for payment contact matching.
 
 **Pilot blocker view fixes (migration `119_donations_pilot_blocker_views.sql`):** `pledge_status_view` excludes voided payments from pledge balances; cancelled pledges expose `calculated_status = cancelled` and `balance_remaining = 0`. `donor_summary_view` excludes voided from `total_donations`.
+
+**Pledge payment plans (migration `158_pledge_payment_plan.sql`):** `pledges.installment_amount`, `total_payments`, `first_payment_date`, `next_payment_date`. `pledge_status_view` exposes the new columns. Customer portal **New Pledge** writes only campaign + total; payment plans are added later via **Set Up Payment Plan**. Migration `159_customer_pledge_plan_update.sql` allows customers to UPDATE their own pledges for plan fields.
 
 **Outstanding pledge flag (migration `124_donor_summary_outstanding_pledge.sql`):** `donor_summary_view.has_open_pledge` is true only when `pledge_status_view.balance_remaining > 0`. Backfills `pledges.status` from payment totals; trigger `sync_pledge_status_after_payment_change` keeps status in sync on payment changes.
 
