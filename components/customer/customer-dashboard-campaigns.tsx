@@ -54,7 +54,7 @@ export function CustomerDashboardCampaigns({
   return (
     <>
       <section className="space-y-4">
-        <div>
+        <div className="min-h-[4.75rem]">
           <h2 className="text-lg font-semibold text-foreground">Active Campaigns</h2>
           <p className="text-sm text-muted-foreground">
             Support a campaign with a pledge, one-time gift, or recurring donation.

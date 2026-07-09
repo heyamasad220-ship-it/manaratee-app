@@ -256,7 +256,7 @@ export async function getDonorPledgesAction(donorId: string) {
     const { data: pledgeRows, error } = await supabase
       .from("pledge_status_view")
       .select(
-        "id, campaign_name, amount_pledged, amount_paid, balance_remaining, calculated_status, pledge_date, frequency"
+        "id, campaign_name, amount_pledged, amount_paid, balance_remaining, calculated_status, pledge_date, frequency, installment_amount, total_payments, first_payment_date, next_payment_date"
       )
       .eq("organization_id", orgId)
       .eq("donor_id", donorId)
@@ -275,6 +275,11 @@ export async function getDonorPledgesAction(donorId: string) {
         status: row.calculated_status,
         pledgeDate: row.pledge_date,
         frequency: row.frequency,
+        installmentAmount:
+          row.installment_amount == null ? null : Number(row.installment_amount),
+        totalPayments: row.total_payments == null ? null : Number(row.total_payments),
+        firstPaymentDate: row.first_payment_date,
+        nextPaymentDate: row.next_payment_date,
       })),
     }
   } catch (error) {

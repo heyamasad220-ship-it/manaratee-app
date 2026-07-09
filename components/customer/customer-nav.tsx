@@ -109,8 +109,8 @@ export function CustomerNav({
   const organizationName = activeOrganization?.organization_name
 
   return (
-    <aside className="hidden w-[260px] shrink-0 border-r border-border bg-card lg:flex lg:flex-col">
-      <div className="border-b border-border px-6 py-6">
+    <aside className="sticky top-0 hidden h-screen w-[260px] shrink-0 border-r border-border bg-card lg:flex lg:flex-col">
+      <div className="shrink-0 border-b border-border px-6 pb-5 pt-5">
         <Link
           href={isStaffPortal ? "/customer/staff" : "/customer/dashboard"}
           className="flex flex-col items-center gap-3 text-center"

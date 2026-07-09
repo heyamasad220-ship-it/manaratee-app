@@ -241,7 +241,7 @@ export async function fetchPledgesPageAction(input: PledgesPageInput = {}) {
   let query = access.supabase
     .from("pledge_status_view")
     .select(
-      "id, organization_id, donor_id, donor_name, campaign_id, campaign_name, amount_pledged, amount_paid, balance_remaining, calculated_status, pledge_date, frequency, status",
+      "id, organization_id, donor_id, donor_name, campaign_id, campaign_name, amount_pledged, amount_paid, balance_remaining, calculated_status, pledge_date, frequency, status, installment_amount, total_payments, first_payment_date, next_payment_date",
       { count: "exact" }
     )
     .eq("organization_id", access.orgId)

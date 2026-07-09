@@ -35,21 +35,17 @@ export function CustomerDashboardGivingSection({
 
   return (
     <>
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-8">
-        <div className="w-full shrink-0 lg:max-w-xs">
-          <CustomerDashboardCampaigns
-            campaigns={campaigns}
-            onOpenDonationDialog={(campaignId, frequency) =>
-              openDonationDialog({ campaignId, frequency })
-            }
-          />
-        </div>
-        <div className="min-w-0 flex-1">
-          <CustomerDashboardDonationOptions
-            categories={categories}
-            onDonate={(categoryId) => openDonationDialog({ categoryId })}
-          />
-        </div>
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,20rem)_1fr] lg:items-start">
+        <CustomerDashboardCampaigns
+          campaigns={campaigns}
+          onOpenDonationDialog={(campaignId, frequency) =>
+            openDonationDialog({ campaignId, frequency })
+          }
+        />
+        <CustomerDashboardDonationOptions
+          categories={categories}
+          onDonate={(categoryId) => openDonationDialog({ categoryId })}
+        />
       </div>
 
       <CustomerDonationDialog

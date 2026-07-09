@@ -66,7 +66,7 @@ import {
   type DonationAttributionValue,
 } from "@/components/donations/donation-attribution-fields";
 import { PledgeContactPicker } from "@/components/donations/pledge-contact-picker";
-import { getPledgeForEditAction, updatePledgeAction } from "@/lib/donations/pledge-admin-actions";
+import { getPledgeForEditAction, recordPledgePaymentAction, updatePledgeAction, updatePledgePaymentPlanAction } from "@/lib/donations/pledge-admin-actions";
 import {
   fetchPledgeAttribution,
   toPaymentAttributionColumns,
@@ -88,6 +88,15 @@ import {
   type PledgeMemberGroup,
 } from "@/lib/donations/pledge-donor-context";
 import { DONATION_REPORTS_PLEDGES_PATH } from "@/lib/donations/donation-pledge-paths";
+import {
+  formatPledgePaymentPlanSummary,
+  pledgeHasPaymentPlan,
+  suggestedPledgePaymentAmount,
+} from "@/lib/donations/pledge-payment-plan";
+import {
+  PledgePaymentPlanDialog,
+  type PledgePaymentPlanDialogPledge,
+} from "@/components/donations/pledge-payment-plan-dialog";
 import type { ContactRecordType } from "@/lib/contacts/contact-constants";
 import {
   Pagination,
@@ -112,6 +121,9 @@ interface Pledge {
   frequency: string;
   startDate: string;
   nextPayment: string | null;
+  installmentAmount: number | null;
+  totalPayments: number | null;
+  firstPaymentDate: string | null;
   status: PledgeDisplayStatus;
   campaignName: string;
   campaignId: string | null;
@@ -242,7 +254,11 @@ function pledgeFromRow(row: any): Pledge {
     balance_remaining: Number(row.balance_remaining ?? Math.max(amountPledged - amountPaid, 0)),
     frequency: row.frequency || "One-Time",
     startDate: normalizeDateInput(row.pledge_date) || "",
-    nextPayment: null,
+    nextPayment: normalizeDateInput(row.next_payment_date) || null,
+    installmentAmount:
+      row.installment_amount == null ? null : Number(row.installment_amount),
+    totalPayments: row.total_payments == null ? null : Number(row.total_payments),
+    firstPaymentDate: normalizeDateInput(row.first_payment_date) || null,
     status: pledgeDisplayStatus(row.calculated_status, amountPledged, amountPaid),
     campaignName: row.campaign_name || "Unassigned",
     campaignId: row.campaign_id || null,
@@ -253,6 +269,48 @@ function pledgeFromRow(row: any): Pledge {
     lastReminderStatus: null,
     lastContactedAt: null,
   };
+}
+
+function formatPledgeFrequencyLabel(pledge: Pledge) {
+  if (
+    pledgeHasPaymentPlan({
+      frequency: pledge.frequency,
+      totalPayments: pledge.totalPayments,
+      installmentAmount: pledge.installmentAmount,
+    })
+  ) {
+    return formatPledgePaymentPlanSummary({
+      totalAmount: pledge.amount_pledged,
+      installmentAmount: pledge.installmentAmount,
+      totalPayments: pledge.totalPayments,
+      frequency: pledge.frequency,
+    });
+  }
+
+  return pledge.frequency || "—";
+}
+
+function toPaymentPlanDialogPledge(pledge: Pledge): PledgePaymentPlanDialogPledge {
+  return {
+    id: pledge.id,
+    totalAmount: pledge.amount_pledged,
+    balance: pledge.balance_remaining,
+    campaignName: pledge.campaignName || "this campaign",
+    installmentAmount: pledge.installmentAmount,
+    totalPayments: pledge.totalPayments,
+    frequency: pledge.frequency,
+    firstPaymentDate: pledge.firstPaymentDate,
+  };
+}
+
+function suggestedPaymentAmountForPledge(pledge: Pledge) {
+  const amount = suggestedPledgePaymentAmount({
+    balance: pledge.balance_remaining,
+    installmentAmount: pledge.installmentAmount,
+    frequency: pledge.frequency,
+    totalPayments: pledge.totalPayments,
+  });
+  return amount > 0 ? String(amount) : "";
 }
 
 function pledgeFromEditResult(
@@ -271,7 +329,10 @@ function pledgeFromEditResult(
     balance_remaining: pledge.balanceRemaining,
     frequency: pledge.frequency,
     startDate: pledge.pledgeDate,
-    nextPayment: null,
+    nextPayment: pledge.nextPaymentDate || null,
+    installmentAmount: pledge.installmentAmount,
+    totalPayments: pledge.totalPayments,
+    firstPaymentDate: pledge.firstPaymentDate || null,
     status: pledge.status,
     campaignName: "",
     campaignId: pledge.campaignId || null,
@@ -307,10 +368,13 @@ export default function PledgesPage() {
   });
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
+  const [showPaymentPlanDialog, setShowPaymentPlanDialog] = useState(false);
   const [editingPledge, setEditingPledge] = useState<Pledge | null>(null);
 
   const [selectedPledge, setSelectedPledge] = useState<Pledge | null>(null);
   const [paymentPledge, setPaymentPledge] = useState<Pledge | null>(null);
+  const [paymentPlanPledge, setPaymentPlanPledge] = useState<Pledge | null>(null);
+  const [paymentPlanError, setPaymentPlanError] = useState<string | null>(null);
 
   const [pledges, setPledges] = useState<Pledge[]>([]);
   const [loading, setLoading] = useState(true);
@@ -332,6 +396,7 @@ export default function PledgesPage() {
   const [frequency, setFrequency] = useState("One-Time");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
+  const [savingPaymentPlan, setSavingPaymentPlan] = useState(false);
 
   const [editAmount, setEditAmount] = useState("");
   const [editAttribution, setEditAttribution] = useState<DonationAttributionValue>(
@@ -714,12 +779,7 @@ export default function PledgesPage() {
         setEditContactId(pledge.contactId || "");
         setEditContactLabel(pledge.donorName || "");
       } else if (action === "pay") {
-        setPaymentPledge(pledge);
-        setPaymentAmount("");
-        setPaymentDate("");
-        setPaymentSource("cash");
-        setPaymentMemo("");
-        setShowPaymentDialog(true);
+        openRecordPaymentDialog(pledge);
       } else {
         setSelectedPledge(pledge);
       }
@@ -837,7 +897,7 @@ export default function PledgesPage() {
     const { data, error } = await supabase
       .from("pledge_status_view")
       .select(
-        "id, organization_id, donor_id, donor_name, campaign_id, campaign_name, amount_pledged, amount_paid, balance_remaining, calculated_status, frequency, pledge_date, notes"
+        "id, organization_id, donor_id, donor_name, campaign_id, campaign_name, amount_pledged, amount_paid, balance_remaining, calculated_status, frequency, pledge_date, notes, installment_amount, total_payments, first_payment_date, next_payment_date"
       )
       .eq("organization_id", orgId)
       .eq("id", pledgeId)
@@ -896,15 +956,60 @@ export default function PledgesPage() {
     }
   };
 
-  const handleRecordPayment = async () => {
-    if (!paymentPledge) return;
+  const openRecordPaymentDialog = (pledge: Pledge) => {
+    setPaymentPledge(pledge);
+    setPaymentAmount(suggestedPaymentAmountForPledge(pledge));
+    setPaymentDate(getTodayPlainDate());
+    setPaymentSource("cash");
+    setPaymentMemo("");
+    setShowPaymentDialog(true);
+  };
 
-    const orgId = organizationId || (await getOrgIdForCurrentUser());
+  const openPaymentPlanDialog = (pledge: Pledge) => {
+    setPaymentPlanPledge(pledge);
+    setPaymentPlanError(null);
+    setShowPaymentPlanDialog(true);
+  };
 
-    if (!orgId) {
-      alert("No organization found for this admin user.");
+  const handleSavePaymentPlan = async (input: {
+    installmentAmount: number;
+    numberOfPayments: number;
+    frequency: "monthly" | "quarterly" | "annually";
+    firstPaymentDate: string;
+  }) => {
+    if (!paymentPlanPledge) return;
+
+    setSavingPaymentPlan(true);
+    setPaymentPlanError(null);
+
+    const result = await updatePledgePaymentPlanAction({
+      pledgeId: paymentPlanPledge.id,
+      installmentAmount: input.installmentAmount,
+      numberOfPayments: input.numberOfPayments,
+      frequency: input.frequency,
+      firstPaymentDate: input.firstPaymentDate,
+    });
+
+    setSavingPaymentPlan(false);
+
+    if (!result.success) {
+      setPaymentPlanError(result.error);
       return;
     }
+
+    const savedPledgeId = paymentPlanPledge.id;
+    setShowPaymentPlanDialog(false);
+    setPaymentPlanPledge(null);
+
+    const orgId = organizationId || (await getOrgIdForCurrentUser());
+    await fetchPledges();
+    if (orgId && selectedPledge?.id === savedPledgeId) {
+      await refreshSelectedPledge(savedPledgeId, orgId);
+    }
+  };
+
+  const handleRecordPayment = async () => {
+    if (!paymentPledge) return;
 
     if (!paymentAmount || Number(paymentAmount) <= 0) {
       alert("Enter a valid amount.");
@@ -913,67 +1018,31 @@ export default function PledgesPage() {
 
     setSavingPayment(true);
 
-    let contactId = paymentPledge.contactId;
-
-    if (!contactId && paymentPledge.donorId) {
-      const { data: donorRow } = await supabase
-        .from("donors")
-        .select("contact_id")
-        .eq("id", paymentPledge.donorId)
-        .maybeSingle();
-
-      contactId = (donorRow?.contact_id as string | null) ?? null;
-    }
-
     const paymentDateValue = normalizeDateInput(paymentDate) || getTodayPlainDate();
-    const pledgeAttribution = await fetchPledgeAttribution(supabase, paymentPledge.id);
-
-    const { error: paymentError } = await supabase.from("payments").insert({
-      organization_id: orgId,
-      donor_id: paymentPledge.donorId,
-      contact_id: contactId,
-      pledge_id: paymentPledge.id,
-      sender_name: paymentPledge.donorName,
+    const result = await recordPledgePaymentAction({
+      pledgeId: paymentPledge.id,
       amount: Number(paymentAmount),
-      payment_date: `${paymentDateValue}T12:00:00`,
+      paymentDate: paymentDateValue,
       source: paymentSource,
-      source_type: "manual",
       memo: paymentMemo || null,
-      status: "allocated",
-      is_verified: false,
-      ...toPaymentAttributionColumns(pledgeAttribution),
     });
-
-    if (paymentError) {
-      setSavingPayment(false);
-      alert(paymentError.message);
-      return;
-    }
-
-    if (contactId || paymentPledge.donorId) {
-      try {
-        const { handleDonationAffiliationSync } = await import(
-          "@/lib/contacts/contact-affiliation-sync"
-        );
-        await handleDonationAffiliationSync({
-          organizationId: orgId,
-          donorId: paymentPledge.donorId,
-          contactId,
-        });
-      } catch (syncError) {
-        const message = syncError instanceof Error ? syncError.message : String(syncError);
-        console.error(`[staff-pledges] affiliation sync failed (pledge payment): ${message}`);
-      }
-    }
 
     setSavingPayment(false);
 
+    if (!result.success) {
+      alert(result.error);
+      return;
+    }
+
+    const orgId = organizationId || (await getOrgIdForCurrentUser());
     resetPaymentForm();
     setShowPaymentDialog(false);
 
     await fetchPledges();
-    await loadPledgePayments(paymentPledge.id, orgId);
-    await refreshSelectedPledge(paymentPledge.id, orgId);
+    if (orgId) {
+      await loadPledgePayments(paymentPledge.id, orgId);
+      await refreshSelectedPledge(paymentPledge.id, orgId);
+    }
   };
 
   const getStatusBadge = (status: PledgeDisplayStatus) => {
@@ -1188,10 +1257,8 @@ export default function PledgesPage() {
                             donorName={pledge.donorName}
                             balanceRemaining={pledge.balance_remaining}
                             onViewDetails={() => setSelectedPledge(pledge)}
-                            onRecordPayment={() => {
-                              setPaymentPledge(pledge);
-                              setShowPaymentDialog(true);
-                            }}
+                            onRecordPayment={() => openRecordPaymentDialog(pledge)}
+                            onManagePaymentPlan={() => openPaymentPlanDialog(pledge)}
                             onEditPledge={() => openEditPledge(pledge)}
                             onDeletePledge={() => void handleDeletePledge(pledge.id)}
                             onReminderUpdated={() => void fetchPledges()}
@@ -1663,6 +1730,13 @@ export default function PledgesPage() {
                 </div>
 
                 <div className="flex flex-col gap-1">
+                  <span className="text-xs text-muted-foreground">Payment Plan</span>
+                  <span className="font-medium">
+                    {formatPledgeFrequencyLabel(selectedPledge)}
+                  </span>
+                </div>
+
+                <div className="flex flex-col gap-1">
                   <span className="text-xs text-muted-foreground">Next Payment</span>
                   <span className="font-medium">
                     {formatPlainDate(selectedPledge.nextPayment)}
@@ -1737,15 +1811,40 @@ export default function PledgesPage() {
   <Button
     onClick={() => {
       if (!selectedPledge) return;
-      setPaymentPledge(selectedPledge);
-      setShowPaymentDialog(true);
+      openRecordPaymentDialog(selectedPledge);
     }}
   >
     Record Payment
   </Button>
+  <Button
+    variant="outline"
+    onClick={() => {
+      if (!selectedPledge) return;
+      openPaymentPlanDialog(selectedPledge);
+    }}
+  >
+    {selectedPledge && pledgeHasPaymentPlan(selectedPledge)
+      ? "Edit Payment Plan"
+      : "Set Up Payment Plan"}
+  </Button>
 </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <PledgePaymentPlanDialog
+        open={showPaymentPlanDialog}
+        onOpenChange={(open) => {
+          setShowPaymentPlanDialog(open);
+          if (!open) {
+            setPaymentPlanPledge(null);
+            setPaymentPlanError(null);
+          }
+        }}
+        pledge={paymentPlanPledge ? toPaymentPlanDialogPledge(paymentPlanPledge) : null}
+        saving={savingPaymentPlan}
+        error={paymentPlanError}
+        onSave={handleSavePaymentPlan}
+      />
 
       <ContactProfileDialog
         contactId={contactProfileId}

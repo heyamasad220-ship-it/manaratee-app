@@ -5,10 +5,7 @@ import { revalidatePath } from "next/cache"
 import { getCustomerPortalSupabase } from "@/lib/auth/customer-portal-session"
 import { ensureDonorExtensionForContact } from "@/lib/donations/donor-contact-bridge"
 import {
-  calculateInstallmentAmount,
-  isInstallmentPledgePlan,
-  normalizePledgePlanFrequency,
-  roundCurrency,
+  validatePledgePaymentPlanInput,
   type PledgePlanFrequency,
 } from "@/lib/donations/pledge-payment-plan"
 import { getActiveOrganization } from "@/lib/organizations/get-active-organization"
@@ -153,34 +150,19 @@ export async function updateCustomerPledgePaymentPlanAction(input: {
     }
 
     const totalAmount = Number(pledge.amount_pledged || 0)
-    const frequency = normalizePledgePlanFrequency(input.frequency)
 
-    if (!isInstallmentPledgePlan(frequency)) {
-      return { success: false as const, error: "Choose a valid payment frequency." }
+    const validated = validatePledgePaymentPlanInput(totalAmount, {
+      installmentAmount: input.installmentAmount,
+      numberOfPayments: input.numberOfPayments,
+      frequency: input.frequency,
+      firstPaymentDate: input.firstPaymentDate,
+    })
+
+    if (!validated.ok) {
+      return { success: false as const, error: validated.error }
     }
 
-    const totalPayments = Number(input.numberOfPayments)
-    if (!Number.isInteger(totalPayments) || totalPayments < 2) {
-      return { success: false as const, error: "Enter at least 2 payments." }
-    }
-
-    let installmentAmount = roundCurrency(Number(input.installmentAmount))
-    if (!Number.isFinite(installmentAmount) || installmentAmount <= 0) {
-      installmentAmount = calculateInstallmentAmount(totalAmount, totalPayments)
-    }
-
-    const plannedTotal = roundCurrency(installmentAmount * totalPayments)
-    if (Math.abs(plannedTotal - totalAmount) > 0.05) {
-      return {
-        success: false as const,
-        error: "Payment amount × number of payments must equal the total pledge.",
-      }
-    }
-
-    const firstPaymentDate = input.firstPaymentDate?.trim()
-    if (!firstPaymentDate) {
-      return { success: false as const, error: "Choose a first payment date." }
-    }
+    const { installmentAmount, totalPayments, frequency, firstPaymentDate } = validated.plan
 
     const { error } = await supabase
       .from("pledges")

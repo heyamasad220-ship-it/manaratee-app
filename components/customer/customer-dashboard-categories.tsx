@@ -19,7 +19,7 @@ export function CustomerDashboardDonationOptions({
 }) {
   return (
     <section className="space-y-4">
-      <div>
+      <div className="min-h-[4.75rem]">
         <h2 className="text-lg font-semibold text-foreground">Donation Options</h2>
         <p className="text-sm text-muted-foreground">
           Give to a category with a one-time gift or recurring donation.

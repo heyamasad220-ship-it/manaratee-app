@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
-import { Ban, CheckCircle2, ChevronDown, DollarSign, MoreHorizontal, Pencil } from "lucide-react"
+import { Ban, CalendarClock, CheckCircle2, ChevronDown, DollarSign, MoreHorizontal, Pencil } from "lucide-react"
 
 import {
   DonationAttributionFields,
@@ -60,7 +60,17 @@ import {
   markPledgePaidAction,
   recordPledgePaymentAction,
   updatePledgeAction,
+  updatePledgePaymentPlanAction,
 } from "@/lib/donations/pledge-admin-actions"
+import {
+  formatPledgePaymentPlanSummary,
+  pledgeHasPaymentPlan,
+  suggestedPledgePaymentAmount,
+} from "@/lib/donations/pledge-payment-plan"
+import {
+  PledgePaymentPlanDialog,
+  type PledgePaymentPlanDialogPledge,
+} from "@/components/donations/pledge-payment-plan-dialog"
 
 type DonorPledgeRow = {
   id: string
@@ -71,6 +81,10 @@ type DonorPledgeRow = {
   status: string | null
   pledgeDate: string | null
   frequency: string | null
+  installmentAmount: number | null
+  totalPayments: number | null
+  firstPaymentDate: string | null
+  nextPaymentDate: string | null
 }
 
 type DonorPledgesTabProps = {
@@ -93,9 +107,31 @@ function formatDate(value: string | null) {
   })
 }
 
-function formatFrequency(value: string | null | undefined) {
-  if (!value) return "—"
-  return value.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase())
+function formatFrequency(pledge: DonorPledgeRow) {
+  if (pledgeHasPaymentPlan(pledge)) {
+    return formatPledgePaymentPlanSummary({
+      totalAmount: pledge.amountPledged,
+      installmentAmount: pledge.installmentAmount,
+      totalPayments: pledge.totalPayments,
+      frequency: pledge.frequency,
+    })
+  }
+
+  if (!pledge.frequency) return "—"
+  return pledge.frequency.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase())
+}
+
+function toPaymentPlanDialogPledge(pledge: DonorPledgeRow): PledgePaymentPlanDialogPledge {
+  return {
+    id: pledge.id,
+    totalAmount: pledge.amountPledged,
+    balance: pledge.balanceRemaining,
+    campaignName: pledge.campaignName || "this campaign",
+    installmentAmount: pledge.installmentAmount,
+    totalPayments: pledge.totalPayments,
+    frequency: pledge.frequency,
+    firstPaymentDate: pledge.firstPaymentDate,
+  }
 }
 
 function getTodayPlainDate() {
@@ -121,7 +157,7 @@ export function DonorPledgesTab({
   const [saving, setSaving] = useState(false)
 
   const [activePledge, setActivePledge] = useState<DonorPledgeRow | null>(null)
-  const [dialog, setDialog] = useState<"edit" | "payment" | "markPaid" | null>(null)
+  const [dialog, setDialog] = useState<"edit" | "payment" | "markPaid" | "paymentPlan" | null>(null)
 
   const [organizationId, setOrganizationId] = useState<string | null>(null)
   const [editAmount, setEditAmount] = useState("")
@@ -213,12 +249,26 @@ export function DonorPledgesTab({
     setActionError(null)
     setActivePledge(pledge)
     setDialog(markPaid ? "markPaid" : "payment")
-    setPaymentAmount(markPaid ? String(pledge.balanceRemaining) : "")
+    const suggestedAmount = markPaid
+      ? pledge.balanceRemaining
+      : suggestedPledgePaymentAmount({
+          balance: pledge.balanceRemaining,
+          installmentAmount: pledge.installmentAmount,
+          frequency: pledge.frequency,
+          totalPayments: pledge.totalPayments,
+        })
+    setPaymentAmount(suggestedAmount > 0 ? String(suggestedAmount) : "")
     setPaymentDate(getTodayPlainDate())
     setPaymentSource("check")
     setPaymentMemo(markPaid ? "Marked as paid" : "")
     setPaymentGroupContactId(null)
     setPaymentGroupLabel("")
+  }
+
+  function openPaymentPlanDialog(pledge: DonorPledgeRow) {
+    setActionError(null)
+    setActivePledge(pledge)
+    setDialog("paymentPlan")
   }
 
   async function handleSaveEdit() {
@@ -237,6 +287,35 @@ export function DonorPledgesTab({
       subcategoryId: editAttribution.subcategoryId || null,
       notes: editNotes,
       contactId: editContactId || null,
+    })
+
+    setSaving(false)
+    if (!result.success) {
+      setActionError(result.error)
+      return
+    }
+
+    closeDialog()
+    await loadPledges()
+    onUpdated?.()
+  }
+
+  async function handleSavePaymentPlan(input: {
+    installmentAmount: number
+    numberOfPayments: number
+    frequency: "monthly" | "quarterly" | "annually"
+    firstPaymentDate: string
+  }) {
+    if (!activePledge) return
+    setSaving(true)
+    setActionError(null)
+
+    const result = await updatePledgePaymentPlanAction({
+      pledgeId: activePledge.id,
+      installmentAmount: input.installmentAmount,
+      numberOfPayments: input.numberOfPayments,
+      frequency: input.frequency,
+      firstPaymentDate: input.firstPaymentDate,
     })
 
     setSaving(false)
@@ -342,7 +421,7 @@ export function DonorPledgesTab({
                     <td className="whitespace-nowrap px-3 py-2">
                       {formatDate(pledge.pledgeDate)}
                     </td>
-                    <td className="px-3 py-2">{formatFrequency(pledge.frequency)}</td>
+                    <td className="px-3 py-2">{formatFrequency(pledge)}</td>
                     <td className="px-3 py-2 text-right">
                       {formatCurrency(pledge.amountPledged)}
                     </td>
@@ -368,6 +447,7 @@ export function DonorPledgesTab({
                         canPay={canPay}
                         cancelled={cancelled}
                         onEdit={() => void openEditDialog(pledge)}
+                        onManagePaymentPlan={() => openPaymentPlanDialog(pledge)}
                         onRecordPayment={() => openPaymentDialog(pledge)}
                         onMarkPaid={() => openPaymentDialog(pledge, true)}
                         onCancel={() => void handleCancelPledge(pledge)}
@@ -644,6 +724,17 @@ export function DonorPledgesTab({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <PledgePaymentPlanDialog
+        open={dialog === "paymentPlan"}
+        onOpenChange={(open) => {
+          if (!open) closeDialog()
+        }}
+        pledge={activePledge ? toPaymentPlanDialogPledge(activePledge) : null}
+        saving={saving}
+        error={actionError}
+        onSave={handleSavePaymentPlan}
+      />
     </>
   )
 }
@@ -654,6 +745,7 @@ function PledgeRowMenu({
   canPay,
   cancelled,
   onEdit,
+  onManagePaymentPlan,
   onRecordPayment,
   onMarkPaid,
   onCancel,
@@ -664,6 +756,7 @@ function PledgeRowMenu({
   canPay: boolean
   cancelled: boolean
   onEdit: () => void
+  onManagePaymentPlan: () => void
   onRecordPayment: () => void
   onMarkPaid: () => void
   onCancel: () => void
@@ -679,6 +772,7 @@ function PledgeRowMenu({
       donorName={donorName}
       canPay={canPay}
       onEdit={onEdit}
+      onManagePaymentPlan={onManagePaymentPlan}
       onRecordPayment={onRecordPayment}
       onMarkPaid={onMarkPaid}
       onCancel={onCancel}
@@ -692,6 +786,7 @@ function PledgeRowMenuInner({
   donorName,
   canPay,
   onEdit,
+  onManagePaymentPlan,
   onRecordPayment,
   onMarkPaid,
   onCancel,
@@ -701,6 +796,7 @@ function PledgeRowMenuInner({
   donorName?: string
   canPay: boolean
   onEdit: () => void
+  onManagePaymentPlan: () => void
   onRecordPayment: () => void
   onMarkPaid: () => void
   onCancel: () => void
@@ -727,6 +823,12 @@ function PledgeRowMenuInner({
             <Pencil className="mr-2 size-4" />
             Edit
           </DropdownMenuItem>
+          {canPay ? (
+            <DropdownMenuItem onClick={onManagePaymentPlan}>
+              <CalendarClock className="mr-2 size-4" />
+              {pledgeHasPaymentPlan(pledge) ? "Edit Payment Plan" : "Set Up Payment Plan"}
+            </DropdownMenuItem>
+          ) : null}
           {canPay ? (
             <>
               <DropdownMenuItem onClick={onRecordPayment}>

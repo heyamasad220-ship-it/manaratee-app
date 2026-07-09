@@ -13,6 +13,10 @@ import {
   type PledgeDisplayStatus,
 } from "@/lib/donations/donation-status"
 import {
+  validatePledgePaymentPlanInput,
+  type PledgePlanFrequency,
+} from "@/lib/donations/pledge-payment-plan"
+import {
   fetchPledgeAttribution,
   toPaymentAttributionColumns,
 } from "@/lib/donations/payment-attribution"
@@ -34,7 +38,9 @@ function getTodayPlainDate() {
 }
 
 function frequencyToStorage(value: string) {
-  return value.trim().toLowerCase().replace("-", "_")
+  const normalized = value.trim().toLowerCase().replace("-", "_")
+  if (normalized === "yearly") return "annually"
+  return normalized
 }
 
 function frequencyToDisplay(value: string | null | undefined) {
@@ -84,7 +90,7 @@ async function loadOrgPledge(pledgeId: string) {
   const { data, error } = await access.supabase
     .from("pledge_status_view")
     .select(
-      "id, organization_id, donor_id, donor_name, campaign_id, campaign_name, amount_pledged, amount_paid, balance_remaining, calculated_status, pledge_date, frequency, notes, status"
+      "id, organization_id, donor_id, donor_name, campaign_id, campaign_name, amount_pledged, amount_paid, balance_remaining, calculated_status, pledge_date, frequency, notes, status, installment_amount, total_payments, first_payment_date, next_payment_date"
     )
     .eq("id", pledgeId)
     .eq("organization_id", access.orgId)
@@ -245,6 +251,11 @@ export async function getPledgeForEditAction(pledgeId: string) {
       subcategoryId: attribution.subcategory_id || "",
       notes: pledge.notes || "",
       calculatedStatus: pledge.calculated_status,
+      installmentAmount:
+        pledge.installment_amount == null ? null : Number(pledge.installment_amount),
+      totalPayments: pledge.total_payments == null ? null : Number(pledge.total_payments),
+      firstPaymentDate: normalizeDateInput(pledge.first_payment_date) || "",
+      nextPaymentDate: normalizeDateInput(pledge.next_payment_date) || "",
     },
   }
 }
@@ -478,6 +489,75 @@ export async function markPledgePaidAction(input: {
     attributedGroupContactId: input.attributedGroupContactId,
     auditAction: ORGANIZATION_AUDIT_ACTIONS.PLEDGE_MARKED_PAID,
   })
+}
+
+export async function updatePledgePaymentPlanAction(input: {
+  pledgeId: string
+  installmentAmount: number
+  numberOfPayments: number
+  frequency: PledgePlanFrequency
+  firstPaymentDate: string
+}) {
+  const loaded = await loadOrgPledge(input.pledgeId)
+  if (!loaded.ok) return { success: false as const, error: loaded.error }
+
+  if (String(loaded.pledge.calculated_status).toLowerCase() === "fulfilled") {
+    return { success: false as const, error: "This pledge is already fulfilled." }
+  }
+
+  const totalAmount = Number(loaded.pledge.amount_pledged || 0)
+  const validated = validatePledgePaymentPlanInput(totalAmount, {
+    installmentAmount: input.installmentAmount,
+    numberOfPayments: input.numberOfPayments,
+    frequency: input.frequency,
+    firstPaymentDate: input.firstPaymentDate,
+  })
+
+  if (!validated.ok) {
+    return { success: false as const, error: validated.error }
+  }
+
+  const { installmentAmount, totalPayments, frequency, firstPaymentDate } = validated.plan
+
+  const { error } = await loaded.access.supabase
+    .from("pledges")
+    .update({
+      installment_amount: installmentAmount,
+      total_payments: totalPayments,
+      first_payment_date: firstPaymentDate,
+      next_payment_date: firstPaymentDate,
+      pledge_type: frequency,
+      frequency,
+    })
+    .eq("id", input.pledgeId)
+    .eq("organization_id", loaded.access.orgId)
+
+  if (error) return { success: false as const, error: error.message }
+
+  const { access, pledge } = loaded
+  const label = pledgeLabel(pledge)
+  const contactId = await resolveDonorContactId(access.supabase, pledge.donor_id)
+
+  await writeOrganizationAuditLog({
+    organizationId: access.orgId,
+    category: "financial",
+    action: ORGANIZATION_AUDIT_ACTIONS.PLEDGE_UPDATED,
+    actorUserId: access.userId,
+    actorEmail: access.userEmail,
+    targetType: "pledge",
+    targetId: input.pledgeId,
+    targetLabel: label,
+    summary: `Updated payment plan for pledge ${label}`,
+    metadata: {
+      installmentAmount,
+      totalPayments,
+      frequency,
+      firstPaymentDate,
+    },
+  })
+
+  revalidatePledgePaths(pledge.donor_id, [contactId])
+  return { success: true as const }
 }
 
 export async function cancelPledgeAction(pledgeId: string) {

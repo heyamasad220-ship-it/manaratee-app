@@ -77,10 +77,10 @@ export default async function CustomerLayout({
 
       <main className="min-w-0 flex-1 overflow-x-hidden">
         <OrgUserSupportBanner />
-        <div className="w-full space-y-6 px-4 py-5 sm:px-5 lg:px-6">
+        <div className="sticky top-0 z-20 bg-muted/30 px-4 pb-4 pt-5 backdrop-blur supports-[backdrop-filter]:bg-muted/80 sm:px-5 lg:px-6">
           <CustomerWelcomeHeader />
-          {children}
         </div>
+        <div className="space-y-6 px-4 pb-6 sm:px-5 lg:px-6">{children}</div>
       </main>
     </div>
   )

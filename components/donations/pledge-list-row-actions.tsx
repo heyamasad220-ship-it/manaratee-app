@@ -21,6 +21,7 @@ type PledgeListRowActionsProps = {
   balanceRemaining: number
   onViewDetails: () => void
   onRecordPayment: () => void
+  onManagePaymentPlan: () => void
   onEditPledge: () => void
   onDeletePledge: () => void
   onReminderUpdated?: () => void
@@ -32,6 +33,7 @@ export function PledgeListRowActions({
   balanceRemaining,
   onViewDetails,
   onRecordPayment,
+  onManagePaymentPlan,
   onEditPledge,
   onDeletePledge,
   onReminderUpdated,
@@ -74,6 +76,17 @@ export function PledgeListRowActions({
           >
             Record Payment
           </DropdownMenuItem>
+          {balanceRemaining > 0.009 ? (
+            <DropdownMenuItem
+              onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                onManagePaymentPlan()
+              }}
+            >
+              Payment Plan
+            </DropdownMenuItem>
+          ) : null}
           <DropdownMenuItem
             onClick={(event) => {
               event.preventDefault()

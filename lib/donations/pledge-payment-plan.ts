@@ -18,7 +18,7 @@ export function normalizePledgePlanFrequency(
     .trim()
 
   if (normalized === "one-time" || normalized === "onetime") return "one_time"
-  if (normalized === "annual") return "annually"
+  if (normalized === "annual" || normalized === "yearly") return "annually"
   if (INSTALLMENT_FREQUENCIES.has(normalized as PledgePlanFrequency)) {
     return normalized as PledgePlanFrequency
   }
@@ -130,6 +130,64 @@ export function pledgeHasPaymentPlan(input: {
 }): boolean {
   if (!isInstallmentPledgePlan(input.frequency)) return false
   return (input.totalPayments ?? 0) > 1
+}
+
+export type PledgePaymentPlanInput = {
+  installmentAmount: number
+  numberOfPayments: number
+  frequency: string
+  firstPaymentDate: string
+}
+
+export type ValidatedPledgePaymentPlan = {
+  installmentAmount: number
+  totalPayments: number
+  frequency: PledgePlanFrequency
+  firstPaymentDate: string
+}
+
+export function validatePledgePaymentPlanInput(
+  totalAmount: number,
+  input: PledgePaymentPlanInput
+): { ok: true; plan: ValidatedPledgePaymentPlan } | { ok: false; error: string } {
+  const frequency = normalizePledgePlanFrequency(input.frequency)
+
+  if (!isInstallmentPledgePlan(frequency)) {
+    return { ok: false, error: "Choose a valid payment frequency." }
+  }
+
+  const totalPayments = Number(input.numberOfPayments)
+  if (!Number.isInteger(totalPayments) || totalPayments < 2) {
+    return { ok: false, error: "Enter at least 2 payments." }
+  }
+
+  let installmentAmount = roundCurrency(Number(input.installmentAmount))
+  if (!Number.isFinite(installmentAmount) || installmentAmount <= 0) {
+    installmentAmount = calculateInstallmentAmount(totalAmount, totalPayments)
+  }
+
+  const plannedTotal = roundCurrency(installmentAmount * totalPayments)
+  if (Math.abs(plannedTotal - totalAmount) > 0.05) {
+    return {
+      ok: false,
+      error: "Payment amount × number of payments must equal the total pledge.",
+    }
+  }
+
+  const firstPaymentDate = input.firstPaymentDate?.trim()
+  if (!firstPaymentDate) {
+    return { ok: false, error: "Choose a first payment date." }
+  }
+
+  return {
+    ok: true,
+    plan: {
+      installmentAmount,
+      totalPayments,
+      frequency,
+      firstPaymentDate,
+    },
+  }
 }
 
 function formatMoney(amount: number): string {
