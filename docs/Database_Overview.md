@@ -288,7 +288,7 @@ Import CSV flow writes directly to `payments` + `payment_import_batches` (no row
 * campaigns (`goal_amount`, `description`, `start_date`, `end_date`, `status`, `code`, `overview_metric_keys` — migration `134`; `flyer_url` — migration `160` for customer portal campaign cards)
 * donors
 * donation_categories
-* donation_subcategories
+* donation_subcategories (`is_active` — migration `161`; when false the fund is closed and hidden from new donation pickers; migration `162` blocks customer portal `payments` inserts to closed funds)
 * pledges (`installment_amount`, `total_payments`, `first_payment_date`, `next_payment_date` added in migration `158` for customer portal installment pledges)
 * payments
 * payment_methods

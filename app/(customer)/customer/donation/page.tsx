@@ -12,6 +12,7 @@ import {
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { loadCustomerDonationPortalData } from "@/lib/customer/customer-portal-data-actions"
+import { recordCustomerPortalDonationAction } from "@/lib/customer/customer-donation-actions"
 import { createCustomerPledgeAction, updateCustomerPledgePaymentPlanAction } from "@/lib/customer/customer-pledge-actions"
 import {
   calculateInstallmentAmount,
@@ -925,39 +926,26 @@ export default function CustomerDonationsPage() {
       donationForm.fund
     )
 
-    const paymentDate = new Date().toISOString().split("T")[0]
+    const result = await recordCustomerPortalDonationAction({
+      amount: Number(donationForm.amount || 0),
+      campaignId: donationForm.campaign || null,
+      categoryId: donationForm.category || null,
+      subcategoryId: donationForm.fund || null,
+      paymentMethodName: selectedContactCard
+        ? normalizePaymentSourceChannel("stripe")
+        : paymentMethodName,
+      memo: selectedContactCard
+        ? `Donation recorded with card on file (${formatContactCardLabel(selectedContactCard)})`
+        : `Offline donation recorded (${paymentMethodName})`,
+    })
 
-    const { data, error } = await supabase
-      .from("payments")
-      .insert({
-        organization_id: contact.organization_id,
-        contact_id: contact.id,
-        donor_id: donorId,
-        pledge_id: null,
-        sender_name: contact.full_name || contact.email || null,
-        amount: Number(donationForm.amount || 0),
-        payment_date: `${paymentDate}T12:00:00`,
-        source: selectedContactCard
-          ? normalizePaymentSourceChannel("stripe")
-          : normalizePaymentSourceChannel(paymentMethodName),
-        source_type: "portal",
-        status: "unallocated",
-        is_verified: false,
-        campaign_id: donationForm.campaign || null,
-        category_id: donationForm.category || null,
-        subcategory_id: donationForm.fund || null,
-        memo: selectedContactCard
-          ? `Donation recorded with card on file (${formatContactCardLabel(selectedContactCard)})`
-          : `Offline donation recorded (${paymentMethodName})`,
-      })
-      .select("id, amount, payment_date, source, status, memo")
-      .single()
-
-    if (error) {
-      setFormError("Donation could not be saved. Please try again.")
+    if (!result.success || !result.payment) {
+      setFormError(result.error || "Donation could not be saved. Please try again.")
       setIsProcessing(false)
       return
     }
+
+    const data = result.payment
 
     await syncDonorAffiliationAfterDonation({
       organizationId: contact.organization_id,

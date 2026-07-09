@@ -27,12 +27,6 @@ export const DONATION_REPORTS_TABS: DonationReportsTab[] = [
     extraMatchPrefixes: ["/donations/payments/recurring"],
   },
   {
-    label: "Pledges",
-    href: "/donations/reports/pledges",
-    matchPrefix: "/donations/reports/pledges",
-    extraMatchPrefixes: ["/donations/pledges"],
-  },
-  {
     label: "Donors",
     href: "/donations/reports/donors",
     matchPrefix: "/donations/reports/donors",

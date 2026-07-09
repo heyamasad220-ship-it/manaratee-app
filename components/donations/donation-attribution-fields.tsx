@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { isDonationFundActive } from "@/lib/donations/donation-fund-status"
 import { Label } from "@/components/ui/label"
 import {
   Select,
@@ -28,6 +29,7 @@ type FundOption = {
   id: string
   name: string
   categoryId: string
+  isActive: boolean
 }
 
 type DonationAttributionFieldsProps = {
@@ -78,7 +80,7 @@ export function DonationAttributionFields({
           .order("name"),
         supabase
           .from("donation_subcategories")
-          .select("id, name, category_id")
+          .select("id, name, category_id, is_active")
           .eq("organization_id", organizationId)
           .order("name"),
       ])
@@ -89,6 +91,7 @@ export function DonationAttributionFields({
         id: string
         name: string
         category_id: string
+        is_active?: boolean | null
       }>
 
       setAllFunds(
@@ -96,6 +99,7 @@ export function DonationAttributionFields({
           id: fund.id,
           name: fund.name,
           categoryId: fund.category_id,
+          isActive: isDonationFundActive(fund.is_active),
         }))
       )
 
@@ -104,7 +108,11 @@ export function DonationAttributionFields({
           id: category.id as string,
           name: category.name as string,
           funds: subcategories
-            .filter((fund) => fund.category_id === category.id)
+            .filter(
+              (fund) =>
+                fund.category_id === category.id &&
+                (isDonationFundActive(fund.is_active) || fund.id === value.subcategoryId)
+            )
             .map((fund) => ({
               id: fund.id as string,
               name: fund.name as string,
@@ -115,9 +123,13 @@ export function DonationAttributionFields({
 
     loadOptions()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [organizationId])
+  }, [organizationId, value.subcategoryId])
 
-  const usesFundFirstAttribution = allFunds.length > 0
+  const selectableFunds = allFunds.filter(
+    (fund) => fund.isActive || fund.id === value.subcategoryId
+  )
+
+  const usesFundFirstAttribution = selectableFunds.length > 0
 
   function update(patch: Partial<DonationAttributionValue>) {
     onChange({ ...value, ...patch })
@@ -181,9 +193,10 @@ export function DonationAttributionFields({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={NONE}>No fund</SelectItem>
-              {allFunds.map((fund) => (
+              {selectableFunds.map((fund) => (
                 <SelectItem key={fund.id} value={fund.id}>
                   {fund.name}
+                  {!fund.isActive ? " (Closed)" : ""}
                 </SelectItem>
               ))}
             </SelectContent>

@@ -11,6 +11,7 @@ export type DonationCampaignsTab = {
   matchPrefix: string
   overviewOnly?: boolean
   requiresManage?: boolean
+  extraMatchPrefixes?: string[]
 }
 
 export const DONATION_CAMPAIGNS_TABS: DonationCampaignsTab[] = [
@@ -20,26 +21,36 @@ export const DONATION_CAMPAIGNS_TABS: DonationCampaignsTab[] = [
     matchPrefix: "/donations/campaigns",
     overviewOnly: true,
   },
+  {
+    label: "Pledges",
+    href: "/donations/campaigns/pledges",
+    matchPrefix: "/donations/campaigns/pledges",
+    extraMatchPrefixes: ["/donations/reports/pledges", "/donations/pledges"],
+  },
 ]
 
-function isTabActive(tab: DonationCampaignsTab, pathname: string, tabs: DonationCampaignsTab[]) {
+function tabPathMatches(tab: DonationCampaignsTab, pathname: string) {
   if (tab.overviewOnly) {
     return isDonationCampaignsOverviewPath(pathname)
   }
 
-  const matches =
-    pathname === tab.href ||
-    pathname.startsWith(`${tab.matchPrefix}/`)
+  if (pathname === tab.href || pathname.startsWith(`${tab.matchPrefix}/`)) {
+    return true
+  }
+
+  return (tab.extraMatchPrefixes ?? []).some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  )
+}
+
+function isTabActive(tab: DonationCampaignsTab, pathname: string, tabs: DonationCampaignsTab[]) {
+  const matches = tabPathMatches(tab, pathname)
 
   if (!matches) return false
 
   const overridden = tabs.some((other) => {
     if (other.href === tab.href) return false
-    if (other.overviewOnly) return isDonationCampaignsOverviewPath(pathname)
-    const otherMatches =
-      pathname === other.href ||
-      pathname.startsWith(`${other.matchPrefix}/`)
-    return otherMatches && other.matchPrefix.length > tab.matchPrefix.length
+    return tabPathMatches(other, pathname) && other.matchPrefix.length > tab.matchPrefix.length
   })
 
   return !overridden

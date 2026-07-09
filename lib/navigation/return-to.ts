@@ -26,6 +26,7 @@ export function getReturnToLabel(path: string): string {
   const pathname = path.split("?")[0] || path
 
   if (pathname === "/donations/campaigns") return "Campaigns"
+  if (pathname.startsWith("/donations/campaigns/pledges")) return "Pledges"
   if (pathname.startsWith("/donations/campaigns/")) return "Campaign"
   if (pathname.startsWith("/donations/pledges")) return "Pledges"
   if (pathname.startsWith("/donations/reports")) return "Reports"

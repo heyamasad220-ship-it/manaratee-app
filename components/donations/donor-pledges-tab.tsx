@@ -62,6 +62,7 @@ import {
   updatePledgeAction,
   updatePledgePaymentPlanAction,
 } from "@/lib/donations/pledge-admin-actions"
+import { donationPledgesHref } from "@/lib/donations/donation-pledge-paths"
 import {
   formatPledgePaymentPlanSummary,
   pledgeHasPaymentPlan,
@@ -464,7 +465,7 @@ export function DonorPledgesTab({
 
       {pledges.length > 0 && !embedded ? (
         <div className="border-t px-1 pt-3 text-right">
-          <Link href="/donations/reports/pledges" className="text-sm text-primary hover:underline">
+          <Link href={donationPledgesHref()} className="text-sm text-primary hover:underline">
             View all pledges
           </Link>
         </div>

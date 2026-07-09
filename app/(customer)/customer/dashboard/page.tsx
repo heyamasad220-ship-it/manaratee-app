@@ -14,6 +14,7 @@ import {
   isCustomerPortalModuleEnabled,
 } from "@/lib/customer/customer-portal-modules"
 import { loadCustomerPortalEnabledModuleSlugs } from "@/lib/customer/customer-portal-modules-server"
+import { buildCustomerOpenDonationCategories } from "@/lib/customer/customer-portal-data-actions"
 import { Card, CardContent } from "@/components/ui/card"
 import { CustomerDashboardGivingSection } from "@/components/customer/customer-dashboard-giving-section"
 import type {
@@ -129,22 +130,35 @@ export default async function CustomerDashboardPage() {
     flyerUrl: null,
   }))
 
-  let categoryRows: Array<{ id: string; name: string }> = []
+  let activeCategories: CustomerDashboardCategory[] = []
 
   if (donationsModuleEnabled) {
-    const { data } = await supabase
-      .from("donation_categories")
-      .select("id, name")
-      .eq("organization_id", organizationId)
-      .order("name", { ascending: true })
+    const [{ data: categoryRows }, { data: subcategoryRows }] = await Promise.all([
+      supabase
+        .from("donation_categories")
+        .select("id, name")
+        .eq("organization_id", organizationId)
+        .order("name", { ascending: true }),
+      supabase
+        .from("donation_subcategories")
+        .select("id, name, category_id, is_active")
+        .eq("organization_id", organizationId)
+        .order("name", { ascending: true }),
+    ])
 
-    categoryRows = (data || []) as Array<{ id: string; name: string }>
+    activeCategories = buildCustomerOpenDonationCategories(
+      (categoryRows || []) as Array<{ id: string; name: string }>,
+      (subcategoryRows || []) as Array<{
+        id: string
+        name: string
+        category_id: string
+        is_active?: boolean | null
+      }>
+    ).map((category) => ({
+      id: category.id,
+      name: category.name,
+    }))
   }
-
-  const activeCategories: CustomerDashboardCategory[] = (categoryRows || []).map((row) => ({
-    id: row.id as string,
-    name: row.name as string,
-  }))
 
   type OverviewCardTheme = {
     border: string

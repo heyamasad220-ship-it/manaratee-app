@@ -15,6 +15,7 @@ import {
   type CampaignOutstandingPledgeRow,
 } from "@/lib/donations/campaign-analytics"
 import { formatPledgeStatusLabel } from "@/lib/donations/donation-status"
+import { DONATION_PLEDGES_PATH } from "@/lib/donations/donation-pledge-paths"
 
 type CampaignOutstandingPledgesTableProps = {
   pledges: CampaignOutstandingPledgeRow[]
@@ -54,7 +55,7 @@ function renderStatusBadge(status: string) {
 
 export function CampaignOutstandingPledgesTable({
   pledges,
-  pledgesPageHref = "/donations/reports/pledges",
+  pledgesPageHref = DONATION_PLEDGES_PATH,
   onDonorClick,
 }: CampaignOutstandingPledgesTableProps) {
   return (

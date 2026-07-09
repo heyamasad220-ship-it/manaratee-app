@@ -230,9 +230,9 @@ Removed **255** legacy imported rows from `public.vendors` (May 2026 CSV import)
 
 **Donations pilot blockers (June 2026):** Migrations `119`–`120` — voided payments excluded from `pledge_status_view` balances and headline totals; cancelled pledges emit `calculated_status = cancelled` (excluded from Collect/allocation); portal pledge pay saves `status = allocated`. Validation: `lib/donations/pilot-blocker-validation.test.ts`. Apply: `119_donations_pilot_blocker_views.sql`, `120_donations_pilot_blocker_totals.sql`.
 
-**Donations sidebar (June 2026):** Under Donations: **Overview**, **Campaigns** (campaign list + detail), **Reports** (tabs: One-Time Donations, Recurring Donations, Pledges, Donors, Import, Match Payments, Receipts), **Settings**. Legacy `/donations/pledges` redirects to `/donations/reports/pledges`. Campaign detail includes **Add Pledge** (pre-selects the campaign).
+**Donations sidebar (June 2026):** Under Donations: **Overview**, **Campaigns** (tabs: Overview, **Pledges** at `/donations/campaigns/pledges`; campaign list + detail), **Reports** (tabs: One-Time Donations, Recurring Donations, Donors, Import, Match Payments, Receipts), **Settings**. Legacy `/donations/pledges` and `/donations/reports/pledges` redirect to `/donations/campaigns/pledges`. Campaign detail includes **Add Pledge** (pre-selects the campaign).
 
-**Pledge collection merged into Pledges (June 2026):** Collect tab removed; collection reminders, last-contacted dates, and inline reminder actions live on **Campaigns → Pledges** (`/donations/pledges#collection-queue`). Legacy `/donations/collect` redirects to the same anchor.
+**Pledge collection merged into Pledges (June 2026):** Collect tab removed; collection reminders, last-contacted dates, and inline reminder actions live on **Campaigns → Pledges** (`/donations/campaigns/pledges#collection-queue`). Legacy `/donations/collect` redirects to the same anchor.
 
 **Donors giving report (June 2026):** Reports → **Donors** (`/donations/reports/donors`) … Donor names link to the **canonical contact profile** Financial tab (`/contacts/[contactId]?tab=financial`), not a separate donor page. Cross-module financial summary, pledge management, giving statements, and recurring gifts live on that tab via `ContactFinancialPanel`. Legacy `/donations/donors/individuals/[id]` and `/donations/donors/organizations/[id]` redirect to the contact profile when `donors.contact_id` is set. Contact basics and notes remain on the profile **Overview** tab. Apply `scripts/127_donor_giving_report.sql`, `scripts/128_donor_giving_report_contact_id.sql`, `scripts/143_donor_giving_report_type_fix.sql` (date cast + net amounts), `scripts/144_donor_giving_report_summary_gift_count_cast.sql` (summary gift_count bigint cast), `scripts/145_donor_giving_report_email_search.sql` (search by donor/contact email), and `scripts/146_donor_giving_report_min_total_given.sql` (minimum total given filter).
 
@@ -242,7 +242,7 @@ Removed **255** legacy imported rows from `public.vendors` (May 2026 CSV import)
 
 **Pledges summary cards (June 2026):** Pledges page stat cards match Donations Overview styling (colored left border, rounded icon badges). File: `app/(dashboard)/donations/(operations)/pledges/page.tsx`.
 
-**Donation attribution fields (June 2026):** Add Pledge / Record Payment forms pick **Fund** first (enabled); **Category** auto-fills from the fund and is read-only when funds exist. Manage categories and funds under **Donations → Settings → Categories** (`donation_categories`, `donation_subcategories`). File: `components/donations/donation-attribution-fields.tsx`, `app/(dashboard)/donations/settings/page.tsx`.
+**Donation attribution fields (June 2026):** Add Pledge / Record Payment forms pick **Fund** first (enabled); **Category** auto-fills from the fund and is read-only when funds exist. Manage categories and funds under **Donations → Settings → Categories** (`donation_categories`, `donation_subcategories`). **Fund close (July 2026):** `donation_subcategories.is_active` (migration `161`); closed funds show **Closed** in settings, are omitted from customer/staff fund pickers for new gifts, and remain on historical pledges/payments. Toggle **Accept new gifts** in the Edit Fund dialog. Customer donations validate open funds in `validateCustomerDonationAttribution` (portal UI, Stripe checkout, offline server action); migration `162` blocks portal payment inserts to closed funds at the database layer. Files: `components/donations/donation-attribution-fields.tsx`, `app/(dashboard)/donations/settings/page.tsx`, `lib/donations/donation-fund-status.ts`, `lib/customer/customer-donation-actions.ts`.
 
 **The Asad Realty org removed (June 2026):** Deleted dev/stress org `95c4eb7d-b151-4aa1-a489-a3c1e1289c7e` and org-scoped data (~7.5k payments, 1k donors, campaigns, contacts, etc.). **MAS Dallas pilot org preserved.** Backup: `scripts/backups/organization-delete/organization-delete-95c4eb7d-...json`. Tools: `node scripts/delete-organization.mjs` (dry run / `--execute --confirm-name=...`), `node scripts/cleanup-organization-orphans.mjs` for leftover rows. Auth users with **only** Asad membership were removed; `heyamasad220@gmail.com` kept (MAS membership).
 
@@ -698,7 +698,7 @@ Migrations `140`–`141` drop superseded tables after export via `scripts/cleanu
 
 ### Key files changed
 
-* `app/(dashboard)/donations/pledges/page.tsx` — pledges CRUD + record payment on canonical tables only
+* `app/(dashboard)/donations/campaigns/pledges/page.tsx` — pledges CRUD + record payment on canonical tables only
 * `app/(dashboard)/donations/page.tsx` — dashboard reads `pledge_status_view` + per-pledge outstanding
 * `app/(customer)/customer/donation/page.tsx` — portal writes to `payments` / `pledges`
 * `lib/customer/customer-portal-data-actions.ts` — portal reads canonical tables
@@ -772,8 +772,8 @@ Every canonical `payments` and `pledges` write path stores `campaign_id`, `categ
 | Path | File | Behavior |
 |------|------|----------|
 | Staff one-time payment | `components/donations/donation-payments-panel.tsx` (`/donations/payments/one-time`) | Contact picker searches all contacts; attribution pickers on insert; pledge allocate copies FKs from pledge |
-| Staff pledge create/edit | `app/(dashboard)/donations/pledges/page.tsx` | Contact picker searches all contacts; full FK pickers; edit pledge supports **Assigned to** reassignment (person/org/group) via `updatePledgeAction` |
-| Staff pledge payment | `app/(dashboard)/donations/pledges/page.tsx` | Copies pledge FKs onto payment |
+| Staff pledge create/edit | `app/(dashboard)/donations/campaigns/pledges/page.tsx` | Contact picker searches all contacts; full FK pickers; edit pledge supports **Assigned to** reassignment (person/org/group) via `updatePledgeAction` |
+| Staff pledge payment | `app/(dashboard)/donations/campaigns/pledges/page.tsx` | Copies pledge FKs onto payment |
 | Portal one-time / pledge / pledge pay | `app/(customer)/customer/donation/page.tsx` | FKs on insert; optional campaign picker |
 | Portal data | `lib/customer/customer-portal-data-actions.ts` | Payments select includes attribution columns; loads **active** campaigns only for customer pickers |
 | Recurring plan create | `components/donations/donation-recurring-panel.tsx` (`/donations/payments/recurring`) | Category + fund + campaign on plan |
@@ -962,7 +962,7 @@ Stripe-powered recurring billing on top of existing `recurring_donation_plans`. 
 * `/customer/donation` — **Donate** dialog: amount, frequency (one-time / monthly / quarterly / annually), campaign, category/fund; payment picker shows **cards on file** from `contact_payment_methods` (same as Profile → Payment Methods) plus org offline/online methods, with **Add new card** in-dialog
 * `/customer/donation` — **Payment History** tab lists all payments for the contact: pledge payments, recurring donations, and one-time donations. Dashboard **Active Campaigns** cards link here with `?campaign={id}&action=pledge` or `?campaign={id}&give=one-time|recurring` to pre-select the campaign.
 * `/customer/donation` — **New Pledge** (My Pledges tab): required **campaign** + **total pledge amount** only; pledge date is set automatically. After creating the pledge, donors use **Pay Now** (pay in full or any amount toward balance) or **Set Up Payment Plan** (monthly/quarterly/annually, number of payments, amount per payment, first payment date). Key files: `lib/customer/customer-pledge-actions.ts`, `lib/donations/pledge-payment-plan.ts`, migrations `158_pledge_payment_plan.sql`, `159_customer_pledge_plan_update.sql`
-* **Admin/customer pledge alignment (July 2026):** Staff can set or edit the same installment **payment plan** on `/donations/reports/pledges` and donor **Pledges** tabs via `updatePledgePaymentPlanAction` + `components/donations/pledge-payment-plan-dialog.tsx` (shared validation in `validatePledgePaymentPlanInput`). Main pledges page **Record Payment** now uses `recordPledgePaymentAction` (balance cap, audit log, affiliation sync). Plan summary and suggested pay amount match the customer portal. Admin `Yearly` frequency stores as `annually` for consistency.
+* **Admin/customer pledge alignment (July 2026):** Staff can set or edit the same installment **payment plan** on `/donations/campaigns/pledges` and donor **Pledges** tabs via `updatePledgePaymentPlanAction` + `components/donations/pledge-payment-plan-dialog.tsx` (shared validation in `validatePledgePaymentPlanInput`). Main pledges page **Record Payment** now uses `recordPledgePaymentAction` (balance cap, audit log, affiliation sync). Plan summary and suggested pay amount match the customer portal. Admin `Yearly` frequency stores as `annually` for consistency.
 * `createRecurringDonationCheckoutAction` creates `recurring_donation_plans` (`pending_setup`) + `donation_checkout_sessions` (`recurring_setup`) + Stripe Checkout `mode: subscription`
 * Success redirect: `/customer/donation?checkout=success&type=recurring&session_id={CHECKOUT_SESSION_ID}`
 
@@ -1177,7 +1177,7 @@ npm run validate:donations-production
 
 * `lib/donations/donation-list-actions.ts` — paginated payments, pledges, donor summary queries (50/page)
 * `/donations/reports/one-time` — summary metric cards + server-paginated payments table + search/status filters
-* `/donations/pledges` — server-paginated table; filters: status, campaign, minimum pledged amount; pledge summary cards reflect the same filters; donor name opens contact profile in a modal (`ContactProfileDialog`)
+* `/donations/campaigns/pledges` — server-paginated table; filters: status, campaign, minimum pledged amount; pledge summary cards reflect the same filters; donor name opens contact profile in a modal (`ContactProfileDialog`). Legacy `/donations/pledges` and `/donations/reports/pledges` redirect here.
 * `/donations/reports/donors` — `DonorsReportPanel` via `donation_donor_giving_report` RPC: period (lifetime / calendar year / custom), **column header filters** (Donor, Email, Phone, Total Given min, Last Gift, Pledge), email and phone columns, Pledge status (Open / Partial / Fulfilled) and Outstanding Balance columns, CSV + PDF export. Last Gift filter options: all, gift within 12 months, no gift in 12+/24+ months, never gave. Apply migrations `127`–`146`, **`150`**, **`151`**, **`152`**, **`153`** (last-gift column filter replaces toolbar lapsed-only checkbox).
 * `/donations` dashboard — executive overview: KPI cards (active campaigns, collected, outstanding, payments this month), **Action Required** (import match queue, payments that may link to an open pledge, overdue pledges, failed receipts, campaigns ending soon), **Active Campaigns** snapshot, **Quick Actions** (record payment/pledge, import, create campaign). **Recent Activity** feed is temporarily hidden while historical imports dominate the timeline. Key files: `app/(dashboard)/donations/page.tsx`, `components/donations/donations-overview-dashboard.tsx`, `lib/donations/donation-overview-actions.ts`
 
@@ -1204,12 +1204,12 @@ Status: Implemented (June 2026)
 * **Reports** — tab bar (`components/donations/donation-reports-nav.tsx`):
   * **One-Time Donations** — `/donations/reports/one-time` (summary metric cards + server-paginated payments table: Date, **Donor** (column filter by name), Amount, Method, **Status** (column filter: Succeeded / Failed / Refunded / Partially Refunded; colored badges), **Actions** blue ⋮ menu: Refund, Link to Pledge, Download Receipt, Email Receipt to Donor)
   * **Recurring Donations** — `/donations/reports/recurring`
-  * **Pledges** — `/donations/reports/pledges` (pledge table with column-header filters on Donor Name, Status, and Campaign; collection queue; add/edit pledge dialogs)
+  * **Pledges** — `/donations/campaigns/pledges` (pledge table with column-header filters on Donor Name, Status, and Campaign; collection queue; add/edit pledge dialogs). Legacy `/donations/reports/pledges` redirects here.
   * **Donors** — `/donations/reports/donors` (**Individual Giving** or **Household Giving** toggle; household aggregates active member contact gifts)
   * **Import** — `/donations/reports/import` (Upload + History; `donations.manage`)
   * **Match Payments** — `/donations/reports/match` (manage permission; operational health panel; KPI cards for **Needs match**, **May link to pledge**, **Unresolved**, **Action queue amount**; default filter **Needs match**)
   * **Receipts** — `/donations/reports/receipts`
-* **Campaigns** — `/donations/campaigns` (org-wide pledge summary cards + campaign list with add/edit/delete); campaign detail at `/donations/campaigns/[id]` with **Add Pledge** and outstanding pledges table. Pledge collection reminders at `/donations/reports/pledges#collection-queue`.
+* **Campaigns** — `/donations/campaigns` (org-wide pledge summary cards + campaign list with add/edit/delete; default table shows **active** campaigns plus the **two most recent** by start date, with **View all** for the full list); **Pledges** tab at `/donations/campaigns/pledges`; campaign detail at `/donations/campaigns/[id]` with **Add Pledge** and outstanding pledges table. Pledge collection reminders at `/donations/campaigns/pledges#collection-queue`.
 * Former **Payments** sidebar item removed; payment list/import/match live under **Reports** tabs. Legacy `/donations/payments/*` redirects to `/donations/reports/*`
 * Former **Records** sidebar item removed; duplicate read-only tabs (Donations, Donors, Campaigns, Recurring) removed from monolithic reports page
 * `/donations/reports` redirects to **One-Time Donations** (`/donations/reports/one-time`)
@@ -1235,7 +1235,7 @@ Status: Implemented (June 2026)
 
 | Route | Purpose |
 |-------|---------|
-| `/donations/campaigns` | Campaigns Overview — org-wide pledge summary cards; fundraising campaigns table (most recent first) |
+| `/donations/campaigns` | Campaigns Overview — org-wide pledge summary cards; fundraising campaigns table (active + two most recent by default; **View all** expands full list, most recent first) |
 | `/donations/campaigns/[id]` | Campaign detail — source breakdown + donor metrics (left), goal gauge (right) |
 | `/donations` | Donations executive dashboard — KPI cards, action required, active campaigns snapshot, recent activity, quick actions |
 | `/donations/settings` | Categories, **Funds** (subcategories under categories), Online Payments (Stripe Connect), receipt and pledge reminder settings. Campaign CRUD is under **Campaigns → Overview**. Org billing cards: **Billing** (`/billing`). |
@@ -1322,11 +1322,13 @@ Migration `scripts/091_pledge_reminders.sql`:
 | Route | Features |
 |-------|----------|
 | `/donations/settings` → Pledge Reminders | Enable reminders, message templates, schedule options |
-| `/donations/pledges` | Pledge list (filters: campaign, status, min amount), add/edit/pay, last reminder/contacted columns, inline reminder actions, detail dialog |
-| `/donations/collect` | Redirects to `/donations/pledges#collection-queue` |
+| `/donations/campaigns/pledges` | Pledge list (filters: campaign, status, min amount), add/edit/pay, last reminder/contacted columns, inline reminder actions, detail dialog |
+| `/donations/pledges` | Redirects to `/donations/campaigns/pledges` |
+| `/donations/collect` | Redirects to `/donations/campaigns/pledges#collection-queue` |
 | `/donations/donors/*/[id]` | Redirects to contact profile Financial tab when linked |
 | `/contacts/[id]?tab=financial` | Pledges (with Remind / Mark Contacted), reminder history, donation history |
-| `/donations/reports/collection` | Redirects to `/donations/pledges#collection-queue` |
+| `/donations/reports/collection` | Redirects to `/donations/campaigns/pledges#collection-queue` |
+| `/donations/reports/pledges` | Redirects to `/donations/campaigns/pledges` |
 
 ### Workflow
 

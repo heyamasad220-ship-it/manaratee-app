@@ -4,6 +4,7 @@ import type Stripe from "stripe"
 import { buildDonationCheckoutMetadata } from "@/lib/donations/stripe/metadata"
 import { stripeRecurringInterval } from "@/lib/donations/stripe/recurring-stripe-utils"
 import type { CreateRecurringDonationCheckoutInput } from "@/lib/donations/stripe/types"
+import { validateCustomerDonationAttribution } from "@/lib/donations/donation-fund-status"
 import { initialNextPaymentDate } from "@/lib/donations/recurring-donation-schedule"
 import {
   requireOrganizationStripeConnectAccountId,
@@ -22,6 +23,15 @@ export async function createRecurringDonationCheckout(
   const amountCents = Math.round(input.amount * 100)
   if (amountCents < 50) {
     throw new Error("Minimum donation amount is $0.50")
+  }
+
+  const attributionCheck = await validateCustomerDonationAttribution(supabase, input.organizationId, {
+    categoryId: input.categoryId,
+    subcategoryId: input.subcategoryId,
+  })
+
+  if (!attributionCheck.ok) {
+    throw new Error(attributionCheck.error)
   }
 
   const startDate = new Date().toISOString().slice(0, 10)

@@ -2,6 +2,7 @@
 
 import { getActiveOrganization } from "@/lib/organizations/get-active-organization"
 import { getCustomerPortalSupabase } from "@/lib/auth/customer-portal-session"
+import { isDonationFundActive } from "@/lib/donations/donation-fund-status"
 import { loadCustomerPortalEnabledModuleSlugs } from "@/lib/customer/customer-portal-modules-server"
 import { loadCustomerFamilyMembers } from "@/lib/customer/customer-family-actions"
 
@@ -73,6 +74,34 @@ export async function loadCustomerProfilePortalData() {
   }
 }
 
+export function buildCustomerOpenDonationCategories(
+  categories: Array<{ id: string; name: string }>,
+  subcategories: Array<{
+    id: string
+    name: string
+    category_id: string
+    is_active?: boolean | null
+  }>
+) {
+  const activeSubcategories = subcategories.filter((fund) =>
+    isDonationFundActive(fund.is_active)
+  )
+
+  return categories
+    .map((category) => ({
+      id: category.id,
+      name: category.name,
+      funds: activeSubcategories
+        .filter((fund) => fund.category_id === category.id)
+        .map((fund) => ({
+          id: fund.id,
+          name: fund.name,
+          category_id: fund.category_id,
+        })),
+    }))
+    .filter((category) => category.funds.length > 0)
+}
+
 export async function loadCustomerDonationPortalData() {
   const { supabase, session } = await getCustomerPortalSupabase()
   const { activeOrganization } = await getActiveOrganization()
@@ -120,7 +149,7 @@ export async function loadCustomerDonationPortalData() {
       .order("name", { ascending: true }),
     supabase
       .from("donation_subcategories")
-      .select("id, name, category_id")
+      .select("id, name, category_id, is_active")
       .eq("organization_id", organizationId)
       .order("name", { ascending: true }),
     supabase
@@ -164,17 +193,15 @@ export async function loadCustomerDonationPortalData() {
       .order("name", { ascending: true }),
   ])
 
-  const categories = (categoriesResult.data || []).map((category) => ({
-    id: category.id as string,
-    name: category.name as string,
-    funds: (subcategoriesResult.data || [])
-      .filter((fund) => fund.category_id === category.id)
-      .map((fund) => ({
-        id: fund.id as string,
-        name: fund.name as string,
-        category_id: fund.category_id as string,
-      })),
-  }))
+  const categories = buildCustomerOpenDonationCategories(
+    (categoriesResult.data || []) as Array<{ id: string; name: string }>,
+    (subcategoriesResult.data || []) as Array<{
+      id: string
+      name: string
+      category_id: string
+      is_active?: boolean | null
+    }>
+  )
 
   const pledgePaymentRows = (paymentsResult.data || []).filter((row) => row.pledge_id)
   const paymentsMadeByPledgeId = new Map<string, number>()

@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation"
 
+import { DONATION_PLEDGES_PATH } from "@/lib/donations/donation-pledge-paths"
+
 export default async function DonationsPledgesRedirectPage({
   searchParams,
 }: {
@@ -17,5 +19,5 @@ export default async function DonationsPledgesRedirectPage({
   }
 
   const queryString = query.toString()
-  redirect(queryString ? `/donations/reports/pledges?${queryString}` : "/donations/reports/pledges")
+  redirect(queryString ? `${DONATION_PLEDGES_PATH}?${queryString}` : DONATION_PLEDGES_PATH)
 }

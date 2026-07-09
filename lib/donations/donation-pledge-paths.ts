@@ -1,3 +1,6 @@
+export const DONATION_PLEDGES_PATH = "/donations/campaigns/pledges"
+
+/** @deprecated Legacy reports route — redirects to {@link DONATION_PLEDGES_PATH}. */
 export const DONATION_REPORTS_PLEDGES_PATH = "/donations/reports/pledges"
 
 export function donationPledgesHref(input?: {
@@ -24,15 +27,14 @@ export function donationPledgesHref(input?: {
   const hash = input?.hash ? `#${input.hash.replace(/^#/, "")}` : ""
 
   return query
-    ? `${DONATION_REPORTS_PLEDGES_PATH}?${query}${hash}`
-    : `${DONATION_REPORTS_PLEDGES_PATH}${hash}`
+    ? `${DONATION_PLEDGES_PATH}?${query}${hash}`
+    : `${DONATION_PLEDGES_PATH}${hash}`
 }
-
-/** @deprecated Use DONATION_REPORTS_PLEDGES_PATH — legacy route redirects to reports. */
-export const DONATION_PLEDGES_PATH = DONATION_REPORTS_PLEDGES_PATH
 
 export function isDonationPledgesPath(pathname: string) {
   return (
+    pathname === DONATION_PLEDGES_PATH ||
+    pathname.startsWith(`${DONATION_PLEDGES_PATH}/`) ||
     pathname === DONATION_REPORTS_PLEDGES_PATH ||
     pathname.startsWith(`${DONATION_REPORTS_PLEDGES_PATH}/`) ||
     pathname === "/donations/pledges" ||

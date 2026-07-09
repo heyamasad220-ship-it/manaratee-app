@@ -70,6 +70,7 @@ interface DonationFund {
   name: string
   categoryId: string
   categoryName: string
+  isActive: boolean
 }
 
 export default function DonationsSettingsPage() {
@@ -122,6 +123,7 @@ const [categoryTaxDeductible, setCategoryTaxDeductible] = useState(true)
   const [showFundDialog, setShowFundDialog] = useState(false)
   const [fundName, setFundName] = useState("")
   const [fundCategoryId, setFundCategoryId] = useState("")
+  const [fundIsActive, setFundIsActive] = useState(true)
   const [editingFund, setEditingFund] = useState<DonationFund | null>(null)
 async function handleAddCategory() {
   const orgId = await getOrganizationId()
@@ -196,7 +198,7 @@ async function loadFunds() {
 
   const { data, error } = await supabase
     .from("donation_subcategories")
-    .select("id, name, category_id")
+    .select("id, name, category_id, is_active")
     .eq("organization_id", orgId)
     .order("name", { ascending: true })
 
@@ -214,6 +216,7 @@ async function loadFunds() {
       name: fund.name,
       categoryId: fund.category_id,
       categoryName: categoryNameById.get(fund.category_id) || "Unknown category",
+      isActive: fund.is_active !== false,
     }))
   )
 }
@@ -240,12 +243,17 @@ async function handleSaveFund() {
     organization_id: orgId,
     category_id: fundCategoryId,
     name: fundName.trim(),
+    is_active: fundIsActive,
   }
 
   const { error } = editingFund
     ? await supabase
         .from("donation_subcategories")
-        .update({ category_id: fundCategoryId, name: fundName.trim() })
+        .update({
+          category_id: fundCategoryId,
+          name: fundName.trim(),
+          is_active: fundIsActive,
+        })
         .eq("id", editingFund.id)
         .eq("organization_id", orgId)
     : await supabase.from("donation_subcategories").insert(payload)
@@ -263,6 +271,7 @@ function resetFundForm() {
   setEditingFund(null)
   setFundName("")
   setFundCategoryId("")
+  setFundIsActive(true)
   setShowFundDialog(false)
 }
 
@@ -503,13 +512,14 @@ async function handleSaveCategory() {
                       <TableRow>
                         <TableHead>Category</TableHead>
                         <TableHead>Fund</TableHead>
+                        <TableHead>Status</TableHead>
                         <TableHead className="w-[100px]"></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {funds.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={3} className="py-8 text-center text-muted-foreground">
+                          <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
                             {categories.length === 0
                               ? "Create a category first, then add funds under it."
                               : "No funds yet. Add funds like Bathroom Renovation under Operations."}
@@ -521,6 +531,17 @@ async function handleSaveCategory() {
                             <TableCell className="text-muted-foreground">{fund.categoryName}</TableCell>
                             <TableCell className="font-medium">{fund.name}</TableCell>
                             <TableCell>
+                              {fund.isActive ? (
+                                <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
+                                  Open
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">
+                                  Closed
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell>
                               <div className="flex items-center gap-1">
                                 <Button
                                   variant="ghost"
@@ -530,6 +551,7 @@ async function handleSaveCategory() {
                                     setEditingFund(fund)
                                     setFundName(fund.name)
                                     setFundCategoryId(fund.categoryId)
+                                    setFundIsActive(fund.isActive)
                                     setShowFundDialog(true)
                                   }}
                                 >
@@ -698,8 +720,8 @@ async function handleSaveCategory() {
             <DialogHeader>
               <DialogTitle>{editingFund ? "Edit Fund" : "Add Fund"}</DialogTitle>
               <DialogDescription>
-                Funds are subcategories under a donation category. They appear in the Fund dropdown
-                on pledges and payments.
+                Funds are subcategories under a donation category. Open funds appear in the Fund
+                dropdown on pledges, payments, and the customer portal.
               </DialogDescription>
             </DialogHeader>
 
@@ -727,6 +749,21 @@ async function handleSaveCategory() {
                   placeholder="e.g., Bathroom Renovation"
                   value={fundName}
                   onChange={(event) => setFundName(event.target.value)}
+                />
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg border p-4">
+                <div>
+                  <Label htmlFor="fund-active">Accept new gifts</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Turn off when a time-limited fund is done collecting (e.g. Zakat Al Fitr 2023).
+                    Closed funds stay on past gifts but disappear from donation pickers.
+                  </p>
+                </div>
+                <Switch
+                  id="fund-active"
+                  checked={fundIsActive}
+                  onCheckedChange={setFundIsActive}
                 />
               </div>
             </div>

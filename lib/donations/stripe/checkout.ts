@@ -17,6 +17,7 @@ import {
   handleSubscriptionUpdated,
 } from "@/lib/donations/stripe/processor-subscription"
 import type { CreateOneTimeDonationCheckoutInput } from "@/lib/donations/stripe/types"
+import { validateCustomerDonationAttribution } from "@/lib/donations/donation-fund-status"
 import {
   requireOrganizationStripeConnectAccountId,
   stripeConnectRequestOptions,
@@ -35,6 +36,15 @@ export async function createOneTimeDonationCheckout(
   const amountCents = Math.round(input.amount * 100)
   if (amountCents < 50) {
     throw new Error("Minimum donation amount is $0.50")
+  }
+
+  const attributionCheck = await validateCustomerDonationAttribution(supabase, input.organizationId, {
+    categoryId: input.categoryId,
+    subcategoryId: input.subcategoryId,
+  })
+
+  if (!attributionCheck.ok) {
+    throw new Error(attributionCheck.error)
   }
 
   const baseUrl = getAppBaseUrl()

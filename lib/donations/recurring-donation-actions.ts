@@ -15,6 +15,7 @@ import type {
   RecurringFrequency,
   RecurringStatus,
 } from "@/lib/donations/recurring-donation-types"
+import { validateOpenDonationFund } from "@/lib/donations/donation-fund-status"
 
 export async function getRecurringDashboardAction() {
   const access = await requireDonationStaffAccess("view")
@@ -52,6 +53,11 @@ export async function createRecurringDonationPlanAction(input: {
   }
 
   const nextPaymentDate = initialNextPaymentDate(input.startDate, input.frequency)
+
+  const fundCheck = await validateOpenDonationFund(supabase, orgId, input.subcategoryId)
+  if (!fundCheck.ok) {
+    return { success: false as const, error: fundCheck.error }
+  }
 
   const { data, error } = await supabase
     .from("recurring_donation_plans")
@@ -314,6 +320,22 @@ export async function updateRecurringDonationPlanAction(input: {
 
   if (Object.keys(patch).length === 0) {
     return { success: false as const, error: "No changes to save" }
+  }
+
+  if (input.subcategoryId) {
+    const { data: existingPlan } = await supabase
+      .from("recurring_donation_plans")
+      .select("subcategory_id")
+      .eq("id", input.planId)
+      .eq("organization_id", orgId)
+      .maybeSingle()
+
+    if (input.subcategoryId !== existingPlan?.subcategory_id) {
+      const fundCheck = await validateOpenDonationFund(supabase, orgId, input.subcategoryId)
+      if (!fundCheck.ok) {
+        return { success: false as const, error: fundCheck.error }
+      }
+    }
   }
 
   const { error } = await supabase

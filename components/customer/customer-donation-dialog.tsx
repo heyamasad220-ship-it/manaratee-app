@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { CheckCircle2, Clock, CreditCard, DollarSign } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { loadCustomerDonationPortalData } from "@/lib/customer/customer-portal-data-actions"
+import { recordCustomerPortalDonationAction } from "@/lib/customer/customer-donation-actions"
 import { ensureDonorExtensionForContact } from "@/lib/donations/donor-contact-bridge"
 import { normalizePaymentSourceChannel, isStripeCheckoutPaymentMethod } from "@/lib/donations/payment-source-channel"
 import {
@@ -292,32 +293,21 @@ export function CustomerDonationDialog({
       }
     }
 
-    const paymentDate = new Date().toISOString().split("T")[0]
-
-    const { error } = await supabase.from("payments").insert({
-      organization_id: contact.organization_id,
-      contact_id: contact.id,
-      donor_id: donorId,
-      pledge_id: null,
-      sender_name: contact.full_name || contact.email || null,
+    const result = await recordCustomerPortalDonationAction({
       amount: Number(donationForm.amount || 0),
-      payment_date: `${paymentDate}T12:00:00`,
-      source: selectedContactCard
+      campaignId: donationForm.campaign || null,
+      categoryId: donationForm.category || null,
+      subcategoryId: donationForm.fund || null,
+      paymentMethodName: selectedContactCard
         ? normalizePaymentSourceChannel("stripe")
-        : normalizePaymentSourceChannel(paymentMethodName),
-      source_type: "portal",
-      status: "unallocated",
-      is_verified: false,
-      campaign_id: donationForm.campaign || null,
-      category_id: donationForm.category || null,
-      subcategory_id: donationForm.fund || null,
+        : paymentMethodName,
       memo: selectedContactCard
         ? `Donation recorded with card on file (${formatContactCardLabel(selectedContactCard)})`
         : `Offline donation recorded (${paymentMethodName})`,
     })
 
-    if (error) {
-      setFormError("Donation could not be saved. Please try again.")
+    if (!result.success) {
+      setFormError(result.error || "Donation could not be saved. Please try again.")
       setIsProcessing(false)
       return
     }

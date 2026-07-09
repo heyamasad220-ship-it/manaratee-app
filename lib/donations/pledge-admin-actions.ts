@@ -20,6 +20,7 @@ import {
   fetchPledgeAttribution,
   toPaymentAttributionColumns,
 } from "@/lib/donations/payment-attribution"
+import { validateOpenDonationFund } from "@/lib/donations/donation-fund-status"
 import {
   ORGANIZATION_AUDIT_ACTIONS,
   formatMoney,
@@ -69,6 +70,7 @@ function revalidatePledgePaths(
   donorId: string | null | undefined,
   contactIds: Array<string | null | undefined> = []
 ) {
+  revalidatePath("/donations/campaigns/pledges")
   revalidatePath("/donations/reports/pledges")
   revalidatePath("/donations/pledges")
   revalidatePath("/donations/campaigns")
@@ -300,6 +302,19 @@ export async function updatePledgeAction(input: {
     reassignment && reassignment.ok && reassignment.changed
       ? reassignment.newDonorId
       : loaded.pledge.donor_id
+
+  const currentAttribution = await fetchPledgeAttribution(loaded.access.supabase, input.pledgeId)
+  const nextSubcategoryId = input.subcategoryId || null
+  if (nextSubcategoryId && nextSubcategoryId !== currentAttribution.subcategory_id) {
+    const fundCheck = await validateOpenDonationFund(
+      loaded.access.supabase,
+      loaded.access.orgId,
+      nextSubcategoryId
+    )
+    if (!fundCheck.ok) {
+      return { success: false as const, error: fundCheck.error }
+    }
+  }
 
   const { error } = await loaded.access.supabase
     .from("pledges")

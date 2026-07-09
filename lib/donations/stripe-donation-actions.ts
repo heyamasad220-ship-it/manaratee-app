@@ -7,6 +7,7 @@ import { createOneTimeDonationCheckout } from "@/lib/donations/stripe/checkout"
 import { createRecurringDonationCheckout } from "@/lib/donations/stripe/recurring-checkout"
 import type { RecurringStripeFrequency } from "@/lib/donations/stripe/types"
 import { isStripeConfigured } from "@/lib/stripe/stripe-server"
+import { validateCustomerDonationAttribution } from "@/lib/donations/donation-fund-status"
 import { loadOrganizationStripeConnect } from "@/lib/stripe/stripe-connect-queries"
 import { isOrganizationStripeConnectReady } from "@/lib/stripe/stripe-connect-types"
 import { createServiceRoleClient } from "@/lib/supabase/service-role"
@@ -65,6 +66,18 @@ export async function createOneTimeDonationCheckoutAction(input: {
     return { success: false as const, error: "Could not resolve donor profile" }
   }
 
+  const fundCheck = await validateCustomerDonationAttribution(
+    readiness.serviceSupabase,
+    organizationId,
+    {
+      categoryId: input.categoryId,
+      subcategoryId: input.subcategoryId,
+    }
+  )
+  if (!fundCheck.ok) {
+    return { success: false as const, error: fundCheck.error }
+  }
+
   try {
     const checkout = await createOneTimeDonationCheckout(readiness.serviceSupabase, {
       organizationId,
@@ -121,6 +134,18 @@ export async function createRecurringDonationCheckoutAction(input: {
   const donorId = await ensureDonorExtensionForContact(organizationId, contact.id)
   if (!donorId) {
     return { success: false as const, error: "Could not resolve donor profile" }
+  }
+
+  const fundCheck = await validateCustomerDonationAttribution(
+    readiness.serviceSupabase,
+    organizationId,
+    {
+      categoryId: input.categoryId,
+      subcategoryId: input.subcategoryId,
+    }
+  )
+  if (!fundCheck.ok) {
+    return { success: false as const, error: fundCheck.error }
   }
 
   try {

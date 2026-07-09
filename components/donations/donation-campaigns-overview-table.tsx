@@ -106,6 +106,31 @@ function generateCampaignCode(campaignName: string) {
   return `${codePrefix}${randomSuffix}`
 }
 
+function sortCampaignsByStartDate(campaigns: CampaignRow[]) {
+  return [...campaigns].sort((a, b) => {
+    const aTime = a.startDate ? new Date(a.startDate).getTime() : 0
+    const bTime = b.startDate ? new Date(b.startDate).getTime() : 0
+    return bTime - aTime
+  })
+}
+
+function getDefaultVisibleCampaigns(campaigns: CampaignRow[]) {
+  const sorted = sortCampaignsByStartDate(campaigns)
+  const activeCampaigns = sorted.filter((campaign) => campaign.status === "Active")
+  const recentCampaigns = sorted.slice(0, 2)
+
+  const seen = new Set<string>()
+  const visible: CampaignRow[] = []
+
+  for (const campaign of [...activeCampaigns, ...recentCampaigns]) {
+    if (seen.has(campaign.id)) continue
+    seen.add(campaign.id)
+    visible.push(campaign)
+  }
+
+  return sortCampaignsByStartDate(visible)
+}
+
 export function DonationCampaignsOverviewTable({ canManage }: { canManage: boolean }) {
   const supabase = createClient()
   const [campaigns, setCampaigns] = useState<CampaignRow[]>([])
@@ -129,6 +154,7 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
     pledgeCount: 0,
   })
   const [metricsLoading, setMetricsLoading] = useState(true)
+  const [showAllCampaigns, setShowAllCampaigns] = useState(false)
 
   async function getOrganizationId() {
     const {
@@ -219,13 +245,15 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
     })
   }, [editingCampaign])
 
-  const sortedCampaigns = useMemo(() => {
-    return [...campaigns].sort((a, b) => {
-      const aTime = a.startDate ? new Date(a.startDate).getTime() : 0
-      const bTime = b.startDate ? new Date(b.startDate).getTime() : 0
-      return bTime - aTime
-    })
-  }, [campaigns])
+  const sortedCampaigns = useMemo(() => sortCampaignsByStartDate(campaigns), [campaigns])
+
+  const defaultVisibleCampaigns = useMemo(
+    () => getDefaultVisibleCampaigns(sortedCampaigns),
+    [sortedCampaigns]
+  )
+
+  const displayedCampaigns = showAllCampaigns ? sortedCampaigns : defaultVisibleCampaigns
+  const hiddenCampaignCount = Math.max(sortedCampaigns.length - defaultVisibleCampaigns.length, 0)
 
   async function handleSaveCampaign() {
     const orgId = await getOrganizationId()
@@ -339,7 +367,7 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
         <Card className="border border-border shadow-sm">
           <CardHeader className="sr-only">
             <CardTitle>Campaigns</CardTitle>
-            <CardDescription>All campaigns, most recent first</CardDescription>
+            <CardDescription>Active campaigns plus the two most recent</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
             <Table>
@@ -354,7 +382,7 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sortedCampaigns.length === 0 ? (
+                {displayedCampaigns.length === 0 ? (
                   <TableRow>
                     <TableCell
                       colSpan={canManage ? 6 : 5}
@@ -364,7 +392,7 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
                     </TableCell>
                   </TableRow>
                 ) : (
-                  sortedCampaigns.map((campaign) => {
+                  displayedCampaigns.map((campaign) => {
                     const progressPercent =
                       campaign.goalAmount > 0
                         ? Math.round((campaign.raisedAmount / campaign.goalAmount) * 100)
@@ -428,6 +456,20 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
                 )}
               </TableBody>
             </Table>
+            {!loading && !showAllCampaigns && hiddenCampaignCount > 0 ? (
+              <div className="flex justify-center border-t border-border px-4 py-3">
+                <Button variant="outline" size="sm" onClick={() => setShowAllCampaigns(true)}>
+                  View all ({hiddenCampaignCount} more)
+                </Button>
+              </div>
+            ) : null}
+            {!loading && showAllCampaigns && hiddenCampaignCount > 0 ? (
+              <div className="flex justify-center border-t border-border px-4 py-3">
+                <Button variant="ghost" size="sm" onClick={() => setShowAllCampaigns(false)}>
+                  Show fewer campaigns
+                </Button>
+              </div>
+            ) : null}
           </CardContent>
         </Card>
       </div>
