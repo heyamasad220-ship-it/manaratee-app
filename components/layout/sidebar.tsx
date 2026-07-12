@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, createContext, useContext, Suspense } from "react"
+import { useState, useEffect, useCallback, createContext, useContext, Suspense } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { usePathname, useSearchParams } from "next/navigation"
@@ -12,6 +12,7 @@ import {
   LayoutGrid,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Store,
   Heart,
   Users,
@@ -29,6 +30,20 @@ import {
 import type { LucideIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { isContactsListSegment, type ContactsListSegment } from "@/lib/contacts/contact-module-label"
+import { DONATIONS_SIDEBAR_CHILDREN } from "@/lib/navigation/donations-sidebar-children"
+import {
+  buildSubExpandKey,
+  filterSubItemsByPermission,
+  findActiveModuleWithChildren,
+  isChildActive,
+  isContactProfilePath,
+  isItemActive,
+  resolveContactProfileListSegment,
+  subItemHasActiveDescendant,
+  subItemMatchesPath,
+  type NavItem,
+  type SubItem,
+} from "@/lib/navigation/sidebar-nav"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 import { WORKFORCE_MODULE_LABEL } from "@/lib/hr/hr-module-label"
@@ -36,72 +51,6 @@ import { isFacilitiesOnlyAccess } from "@/lib/permissions/facilities-access"
 import {
   programsFinancialAssistanceNavItem,
 } from "@/lib/applications/application-nav"
-
-interface SubItem {
-  label: string
-  href: string
-  matchPrefix: string
-  alsoMatchPrefixes?: string[]
-  contactListSegment?: ContactsListSegment
-  permissionKey?: string
-  permissionKeys?: string[]
-}
-
-const CONTACTS_LIST_SEGMENTS = new Set([
-  "people",
-  "families",
-  "organizations",
-  "groups",
-  "settings",
-  "members",
-])
-
-function isContactProfilePath(pathname: string) {
-  const match = pathname.match(/^\/contacts\/([^/]+)$/)
-  if (!match) return false
-  return !CONTACTS_LIST_SEGMENTS.has(match[1])
-}
-
-function resolveContactProfileListSegment(
-  pathname: string,
-  searchParams: Pick<URLSearchParams, "get">
-): ContactsListSegment | null {
-  if (!isContactProfilePath(pathname)) return null
-  const list = searchParams.get("list")
-  return isContactsListSegment(list) ? list : null
-}
-
-function subItemMatchesPath(
-  child: SubItem,
-  pathname: string,
-  profileListSegment: ContactsListSegment | null
-) {
-  if (pathname === child.href || pathname.startsWith(`${child.matchPrefix}/`)) {
-    return true
-  }
-  if (
-    profileListSegment &&
-    child.contactListSegment === profileListSegment &&
-    isContactProfilePath(pathname)
-  ) {
-    return true
-  }
-  return child.alsoMatchPrefixes?.some(
-    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
-  )
-}
-
-interface NavItem {
-  label: string
-  href: string
-  icon: LucideIcon
-  matchPrefix: string
-  children?: SubItem[]
-  group?: string | null
-  permissionKey?: string
-  moduleSlug?: string
-  requiresSuperAdmin?: boolean
-}
 
 interface SidebarModuleRow {
   name: string
@@ -194,6 +143,12 @@ interface UserPermissionContext {
   isSuperAdmin: boolean
   enabledPermissions: Set<string>
 }
+
+const SIDEBAR_WIDTH_PX = 180
+
+const SIDEBAR_WIDTH_CLASS = "w-[180px]"
+
+const MODULE_DRAWER_WIDTH_CLASS = "w-[260px]"
 
 const DEFAULT_NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: Home, matchPrefix: "/dashboard" },
@@ -345,29 +300,7 @@ const moduleChildren: Record<string, SubItem[]> = {
     { label: "Teams", href: "/membership/teams", matchPrefix: "/membership/teams", permissionKey: "membership.view" },
     { label: "Settings", href: "/membership/settings", matchPrefix: "/membership/settings", permissionKey: "membership.manage" },
   ],
-  donations: [
-    { label: "Overview", href: "/donations", matchPrefix: "/donations", permissionKey: "donations.view" },
-    {
-      label: "Campaigns",
-      href: "/donations/campaigns",
-      matchPrefix: "/donations/campaigns",
-      permissionKey: "donations.view",
-    },
-    {
-      label: "Reports",
-      href: "/donations/reports/one-time",
-      matchPrefix: "/donations/reports",
-      alsoMatchPrefixes: [
-        "/donations/payments",
-        "/donations/donors",
-        "/donations/import",
-        "/donations/reconcile",
-        "/donations/pledges",
-      ],
-      permissionKey: "donations.view",
-    },
-    { label: "Settings", href: "/donations/settings", matchPrefix: "/donations/settings", permissionKey: "donations.manage" },
-  ],
+  donations: DONATIONS_SIDEBAR_CHILDREN,
   workforce: [
     {
       label: "Employees",
@@ -469,7 +402,8 @@ function userCanAccessModule(
 
 function groupNavItemsForDisplay(navItems: NavItem[]) {
   const dashboardItems = navItems.filter((item) => item.label === "Dashboard")
-  const otherItems = navItems.filter((item) => item.label !== "Dashboard")
+  const footerItems = navItems.filter((item) => item.pinToBottom)
+  const otherItems = navItems.filter((item) => item.label !== "Dashboard" && !item.pinToBottom)
   const byGroup = new Map<string | null, NavItem[]>()
 
   for (const item of otherItems) {
@@ -499,10 +433,17 @@ function groupNavItemsForDisplay(navItems: NavItem[]) {
     }
   }
 
-  return grouped
+  return { grouped, footerItems }
 }
 
 function filterNavItemsByPermissions(items: NavItem[], permissionContext: UserPermissionContext): NavItem[] {
+  const canAccess = (permissionKey?: string, permissionKeys?: string[]) => {
+    if (permissionKeys?.length) {
+      return permissionKeys.some((key) => userCanAccess(permissionContext, key))
+    }
+    return userCanAccess(permissionContext, permissionKey)
+  }
+
   const filtered = items
     .filter((item) => {
       if (item.requiresSuperAdmin && !permissionContext.isSuperAdmin) {
@@ -512,12 +453,7 @@ function filterNavItemsByPermissions(items: NavItem[], permissionContext: UserPe
     })
     .map((item) => ({
       ...item,
-      children: item.children?.filter((child) => {
-        if (child.permissionKeys?.length) {
-          return child.permissionKeys.some((key) => userCanAccess(permissionContext, key))
-        }
-        return userCanAccess(permissionContext, child.permissionKey)
-      }),
+      children: item.children ? filterSubItemsByPermission(item.children, canAccess) : undefined,
     }))
     .filter((item) => !(item.children && item.children.length === 0 && item.href === "#"))
 
@@ -574,15 +510,15 @@ function buildNavItems(rows: SidebarModuleRow[], permissionContext: UserPermissi
       href: "/billing",
       icon: CreditCard,
       matchPrefix: "/billing",
-      group: "System",
       requiresSuperAdmin: true,
+      pinToBottom: true,
     },
     {
       label: "Settings",
       href: "/settings/users",
       icon: Settings,
       matchPrefix: "/settings",
-      group: "System",
+      pinToBottom: true,
       children: [
         { label: "Users", href: "/settings/users", matchPrefix: "/settings/users", permissionKey: "settings.users.view" },
         { label: "Roles & Permissions", href: "/settings/roles-permissions", matchPrefix: "/settings/roles-permissions", permissionKey: "settings.roles.view" },
@@ -597,6 +533,12 @@ function buildNavItems(rows: SidebarModuleRow[], permissionContext: UserPermissi
             "donations.manage",
           ],
         },
+        {
+          label: "General",
+          href: "/settings/general",
+          matchPrefix: "/settings/general",
+          permissionKeys: ["settings.users.view", "donations.manage"],
+        },
       ],
     },
   ]
@@ -604,67 +546,23 @@ function buildNavItems(rows: SidebarModuleRow[], permissionContext: UserPermissi
   return filterNavItemsByPermissions(allItems, permissionContext)
 }
 
-function isItemActive(
-  item: NavItem,
-  pathname: string,
-  navItems: NavItem[],
-  profileListSegment: ContactsListSegment | null
-) {
-  const matchesSelf = pathname.startsWith(item.matchPrefix)
-  const matchesChild =
-    item.children?.some((child) => subItemMatchesPath(child, pathname, profileListSegment)) ??
-    false
-  const isOverridden = navItems.some(
-    (other) =>
-      other.label !== item.label &&
-      other.matchPrefix.startsWith(item.matchPrefix) &&
-      other.matchPrefix.length > item.matchPrefix.length &&
-      pathname.startsWith(other.matchPrefix),
-  )
-  return (matchesSelf && !isOverridden) || matchesChild
-}
-
-function findActiveModuleWithChildren(
-  navItems: NavItem[],
-  pathname: string,
-  profileListSegment: ContactsListSegment | null
-): NavItem | null {
-  for (const item of navItems) {
-    if (
-      item.children &&
-      item.children.length > 0 &&
-      isItemActive(item, pathname, navItems, profileListSegment)
-    ) {
-      return item
-    }
-  }
-  return null
-}
-
-function isChildActive(
-  child: SubItem,
-  siblings: SubItem[],
-  pathname: string,
-  profileListSegment: ContactsListSegment | null
-) {
-  const selfMatches = subItemMatchesPath(child, pathname, profileListSegment)
-  if (!selfMatches) return false
-
-  const isChildOverridden = siblings.some(
-    (other) =>
-      other.label !== child.label &&
-      subItemMatchesPath(other, pathname, profileListSegment) &&
-      (other.matchPrefix.length > child.matchPrefix.length ||
-        Boolean(other.alsoMatchPrefixes?.length))
-  )
-  return !isChildOverridden
-}
-
 interface SidebarContextType {
   mobileOpen: boolean
   setMobileOpen: (open: boolean) => void
   navItems: NavItem[]
   loading: boolean
+  /** Module whose navigation drawer is open (desktop). */
+  moduleDrawerModule: NavItem | null
+  openModuleDrawer: (module: NavItem | null) => void
+  closeModuleDrawer: () => void
+  toggleModuleDrawer: (module: NavItem) => void
+  /** @deprecated Use moduleDrawerModule — kept for breadcrumb handlers. */
+  selectedModule: NavItem | null
+  /** @deprecated Use openModuleDrawer — kept for breadcrumb handlers. */
+  setSelectedModule: (module: NavItem | null) => void
+  expandedSubKeys: Set<string>
+  ensureSubExpanded: (keys: string[]) => void
+  toggleSubExpanded: (key: string) => void
 }
 
 const SidebarContext = createContext<SidebarContextType | null>(null)
@@ -681,6 +579,46 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [navItems, setNavItems] = useState<NavItem[]>(DEFAULT_NAV_ITEMS)
   const [loading, setLoading] = useState(true)
+  const [moduleDrawerModule, setModuleDrawerModule] = useState<NavItem | null>(null)
+  const [expandedSubKeys, setExpandedSubKeys] = useState<Set<string>>(new Set())
+
+  const closeModuleDrawer = useCallback(() => {
+    setModuleDrawerModule(null)
+  }, [])
+
+  const openModuleDrawer = useCallback((module: NavItem | null) => {
+    setModuleDrawerModule(module)
+  }, [])
+
+  const toggleModuleDrawer = useCallback((module: NavItem) => {
+    setModuleDrawerModule((current) => (current?.label === module.label ? null : module))
+  }, [])
+
+  const ensureSubExpanded = useCallback((keys: string[]) => {
+    setExpandedSubKeys((current) => {
+      let changed = false
+      const next = new Set(current)
+      for (const key of keys) {
+        if (!next.has(key)) {
+          next.add(key)
+          changed = true
+        }
+      }
+      return changed ? next : current
+    })
+  }, [])
+
+  const toggleSubExpanded = useCallback((key: string) => {
+    setExpandedSubKeys((current) => {
+      const next = new Set(current)
+      if (next.has(key)) {
+        next.delete(key)
+      } else {
+        next.add(key)
+      }
+      return next
+    })
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -738,9 +676,71 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   return (
-    <SidebarContext.Provider value={{ mobileOpen, setMobileOpen, navItems, loading }}>
+    <SidebarContext.Provider
+      value={{
+        mobileOpen,
+        setMobileOpen,
+        navItems,
+        loading,
+        moduleDrawerModule,
+        openModuleDrawer,
+        closeModuleDrawer,
+        toggleModuleDrawer,
+        selectedModule: moduleDrawerModule,
+        setSelectedModule: openModuleDrawer,
+        expandedSubKeys,
+        ensureSubExpanded,
+        toggleSubExpanded,
+      }}
+    >
       {children}
     </SidebarContext.Provider>
+  )
+}
+
+function SidebarSelectionSync() {
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const search = searchParams.toString()
+  const { navItems, closeModuleDrawer, ensureSubExpanded } = useSidebarContext()
+
+  useEffect(() => {
+    closeModuleDrawer()
+
+    if (pathname === "/dashboard") {
+      return
+    }
+
+    const profileListSegment = resolveContactProfileListSegment(
+      pathname,
+      new URLSearchParams(search)
+    )
+    const activeModule = findActiveModuleWithChildren(navItems, pathname, profileListSegment)
+
+    if (!activeModule?.children?.length) {
+      return
+    }
+
+    const keysToExpand: string[] = []
+    for (const child of activeModule.children) {
+      const expandKey = buildSubExpandKey(activeModule.label, [], child.label)
+      if (subItemHasActiveDescendant(child, pathname, profileListSegment) && child.children?.length) {
+        keysToExpand.push(expandKey)
+      }
+    }
+    if (keysToExpand.length > 0) {
+      ensureSubExpanded(keysToExpand)
+    }
+  }, [pathname, search, navItems, closeModuleDrawer, ensureSubExpanded])
+
+  return null
+}
+
+export function SidebarNavigationSync() {
+  return (
+    <Suspense fallback={null}>
+      <SidebarSelectionSync />
+    </Suspense>
   )
 }
 
@@ -762,27 +762,49 @@ export function MobileMenuTrigger() {
 function PrimaryNavLink({
   item,
   isActive,
+  isSelected,
   onNavigate,
-  showChevron,
+  onSelectModule,
 }: {
   item: NavItem
   isActive: boolean
+  isSelected: boolean
   onNavigate?: () => void
-  showChevron?: boolean
+  onSelectModule?: (item: NavItem) => void
 }) {
+  const highlighted = isActive || isSelected
+  const hasChildren = Boolean(item.children && item.children.length > 0)
+  const className = cn(
+    "relative flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors",
+    highlighted ? "bg-amber-50 text-amber-700" : "text-zinc-700 hover:bg-amber-50 hover:text-amber-700",
+  )
+
+  if (hasChildren) {
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          onSelectModule?.(item)
+        }}
+        className={className}
+      >
+        {highlighted ? (
+          <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-r-full bg-amber-600" />
+        ) : null}
+        <item.icon className="h-5 w-5 shrink-0" />
+        <span className="flex-1 text-left leading-tight">{item.label}</span>
+        <ChevronRight className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+      </button>
+    )
+  }
+
   return (
-    <Link
-      href={item.href}
-      onClick={onNavigate}
-      className={cn(
-        "relative flex min-h-[44px] items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-        isActive ? "bg-amber-50 text-amber-700" : "text-zinc-700 hover:bg-amber-50 hover:text-amber-700",
-      )}
-    >
-      {isActive && <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-r-full bg-amber-600" />}
-      <item.icon className="h-[18px] w-[18px] shrink-0" />
-      <span className="flex-1">{item.label}</span>
-      {showChevron ? <ChevronRight className="h-4 w-4 shrink-0 text-zinc-400" /> : null}
+    <Link href={item.href} onClick={onNavigate} className={className}>
+      {highlighted ? (
+        <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-r-full bg-amber-600" />
+      ) : null}
+      <item.icon className="h-5 w-5 shrink-0" />
+      <span className="flex-1 text-left leading-tight">{item.label}</span>
     </Link>
   )
 }
@@ -791,9 +813,9 @@ function SidebarPrimaryNav({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const profileListSegment = resolveContactProfileListSegment(pathname, searchParams)
-  const { navItems, loading } = useSidebarContext()
+  const { navItems, loading, moduleDrawerModule, toggleModuleDrawer, closeModuleDrawer } = useSidebarContext()
 
-  const groupedItems = groupNavItemsForDisplay(navItems)
+  const { grouped, footerItems } = groupNavItemsForDisplay(navItems)
 
   if (loading) {
     return (
@@ -806,27 +828,125 @@ function SidebarPrimaryNav({ onNavigate }: { onNavigate?: () => void }) {
   }
 
   return (
-    <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-3 pt-3 pb-4">
-      {groupedItems.map((group, groupIndex) => (
-        <div key={`${group.group ?? "main"}-${groupIndex}`} className={groupIndex > 0 ? "mt-5" : ""}>
-          {group.group ? (
-            <div className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
-              {group.group}
-            </div>
-          ) : null}
-
+    <nav className="flex min-h-0 flex-1 flex-col overflow-y-auto px-2.5 pt-3 pb-4">
+      {grouped.map((group, groupIndex) => (
+        <div
+          key={`${group.group ?? "main"}-${groupIndex}`}
+          className={groupIndex > 0 ? "mt-3 border-t border-zinc-200 pt-3" : ""}
+        >
           {group.items.map((item) => (
             <PrimaryNavLink
               key={item.label}
               item={item}
               isActive={isItemActive(item, pathname, navItems, profileListSegment)}
-              onNavigate={onNavigate}
-              showChevron={Boolean(item.children && item.children.length > 0)}
+              isSelected={moduleDrawerModule?.label === item.label}
+              onNavigate={() => {
+                closeModuleDrawer()
+                onNavigate?.()
+              }}
+              onSelectModule={toggleModuleDrawer}
             />
           ))}
         </div>
       ))}
+
+      {footerItems.length > 0 ? (
+        <div className="mt-4 border-t border-zinc-200 pt-3">
+          {footerItems.map((item) => (
+            <PrimaryNavLink
+              key={item.label}
+              item={item}
+              isActive={isItemActive(item, pathname, navItems, profileListSegment)}
+              isSelected={moduleDrawerModule?.label === item.label}
+              onNavigate={() => {
+                closeModuleDrawer()
+                onNavigate?.()
+              }}
+              onSelectModule={toggleModuleDrawer}
+            />
+          ))}
+        </div>
+      ) : null}
     </nav>
+  )
+}
+
+function SidebarSubNavItem({
+  item,
+  siblings,
+  moduleLabel,
+  ancestorLabels,
+  depth,
+  onNavigate,
+}: {
+  item: SubItem
+  siblings: SubItem[]
+  moduleLabel: string
+  ancestorLabels: string[]
+  depth: number
+  onNavigate?: () => void
+}) {
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const profileListSegment = resolveContactProfileListSegment(pathname, searchParams)
+  const { expandedSubKeys, toggleSubExpanded } = useSidebarContext()
+  const hasChildren = Boolean(item.children && item.children.length > 0)
+  const expandKey = buildSubExpandKey(moduleLabel, ancestorLabels, item.label)
+  const isExpanded = expandedSubKeys.has(expandKey) || subItemHasActiveDescendant(item, pathname, profileListSegment)
+  const active = isChildActive(item, siblings, pathname, profileListSegment)
+
+  if (hasChildren) {
+    return (
+      <div className="flex flex-col gap-0.5">
+        <button
+          type="button"
+          onClick={() => toggleSubExpanded(expandKey)}
+          className={cn(
+            "relative flex min-h-[40px] items-center rounded-md px-3 py-2 text-left text-sm font-medium transition-colors",
+            active ? "bg-amber-50 text-amber-700" : "text-zinc-600 hover:bg-amber-50 hover:text-amber-700",
+          )}
+          style={{ paddingLeft: `${12 + depth * 12}px` }}
+        >
+          {active ? (
+            <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-r-full bg-amber-600" />
+          ) : null}
+          <span className="flex-1">{item.label}</span>
+          {isExpanded ? (
+            <ChevronDown className="h-4 w-4 shrink-0 text-zinc-400" />
+          ) : (
+            <ChevronRight className="h-4 w-4 shrink-0 text-zinc-400" />
+          )}
+        </button>
+        {isExpanded
+          ? item.children?.map((child) => (
+              <SidebarSubNavItem
+                key={`${item.label}-${child.label}`}
+                item={child}
+                siblings={item.children ?? []}
+                moduleLabel={moduleLabel}
+                ancestorLabels={[...ancestorLabels, item.label]}
+                depth={depth + 1}
+                onNavigate={onNavigate}
+              />
+            ))
+          : null}
+      </div>
+    )
+  }
+
+  return (
+    <Link
+      href={item.href}
+      onClick={onNavigate}
+      className={cn(
+        "relative flex min-h-[40px] items-center rounded-md px-3 py-2 text-sm font-medium transition-colors",
+        active ? "bg-amber-50 text-amber-700" : "text-zinc-600 hover:bg-amber-50 hover:text-amber-700",
+      )}
+      style={{ paddingLeft: `${12 + depth * 12}px` }}
+    >
+      {active ? <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-r-full bg-amber-600" /> : null}
+      {item.label}
+    </Link>
   )
 }
 
@@ -837,76 +957,75 @@ function SidebarSubNavLinks({
   module: NavItem
   onNavigate?: () => void
 }) {
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
-  const profileListSegment = resolveContactProfileListSegment(pathname, searchParams)
   const children = module.children ?? []
 
   return (
-    <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 pt-3 pb-4">
-      {children.map((child) => {
-        const active = isChildActive(child, children, pathname, profileListSegment)
-        return (
-          <Link
-            key={child.label}
-            href={child.href}
-            onClick={onNavigate}
-            className={cn(
-              "relative flex min-h-[40px] items-center rounded-md px-3 py-2 text-sm font-medium transition-colors",
-              active ? "bg-amber-50 text-amber-700" : "text-zinc-600 hover:bg-amber-50 hover:text-amber-700",
-            )}
-          >
-            {active ? <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-r-full bg-amber-600" /> : null}
-            {child.label}
-          </Link>
-        )
-      })}
+    <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-2 pt-3 pb-4">
+      {children.map((child) => (
+        <SidebarSubNavItem
+          key={child.label}
+          item={child}
+          siblings={children}
+          moduleLabel={module.label}
+          ancestorLabels={[]}
+          depth={0}
+          onNavigate={onNavigate}
+        />
+      ))}
     </nav>
   )
 }
 
-function ModuleSubNavContent() {
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
-  const profileListSegment = resolveContactProfileListSegment(pathname, searchParams)
-  const { navItems, loading } = useSidebarContext()
-  const activeModule = findActiveModuleWithChildren(navItems, pathname, profileListSegment)
+function ModuleNavDrawerContent() {
+  const { moduleDrawerModule, closeModuleDrawer } = useSidebarContext()
+  const open = Boolean(moduleDrawerModule?.children?.length)
 
-  if (loading || !activeModule?.children?.length) {
+  if (!open || !moduleDrawerModule) {
     return null
   }
 
   return (
-    <aside className="hidden h-screen w-[200px] shrink-0 flex-col border-r border-zinc-200 bg-zinc-50/80 text-zinc-900 lg:flex">
-      <div className="flex h-[220px] items-end border-b border-zinc-200 px-4 pb-3">
-        <p className="text-sm font-semibold text-zinc-900">{activeModule.label}</p>
-      </div>
-      <SidebarSubNavLinks module={activeModule} />
-    </aside>
-  )
-}
-
-function SidebarHeader() {
-  return (
-    <div className="border-b border-zinc-200 p-2">
-      <div className="relative aspect-square w-full">
-        <Image
-          src="/Logo2.png"
-          alt="Manaratee"
-          fill
-          sizes="220px"
-          className="object-contain"
-          priority
-        />
-      </div>
-    </div>
+    <>
+      <button
+        type="button"
+        className="fixed inset-0 z-40 hidden bg-black/20 lg:block"
+        style={{ left: SIDEBAR_WIDTH_PX }}
+        onClick={closeModuleDrawer}
+        aria-label="Close navigation menu"
+      />
+      <aside
+        className={cn(
+          "fixed top-0 z-50 hidden h-screen flex-col border-r border-zinc-200 bg-white text-zinc-900 shadow-xl lg:flex",
+          MODULE_DRAWER_WIDTH_CLASS,
+        )}
+        style={{ left: SIDEBAR_WIDTH_PX }}
+      >
+        <div className="flex h-14 shrink-0 items-center justify-between border-b border-zinc-200 px-4">
+          <p className="text-sm font-semibold text-zinc-800">{moduleDrawerModule.label}</p>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-zinc-600 hover:bg-amber-50 hover:text-amber-700"
+            onClick={closeModuleDrawer}
+            aria-label="Close module menu"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+        <SidebarSubNavLinks module={moduleDrawerModule} onNavigate={closeModuleDrawer} />
+      </aside>
+    </>
   )
 }
 
 function SidebarContent() {
   return (
-    <aside className="hidden h-screen w-[220px] shrink-0 flex-col border-r border-zinc-200 bg-white text-zinc-900 lg:flex">
-      <SidebarHeader />
+    <aside
+      className={cn(
+        "relative z-30 hidden h-screen shrink-0 flex-col border-r border-zinc-200 bg-white text-zinc-900 lg:flex",
+        SIDEBAR_WIDTH_CLASS,
+      )}
+    >
       <SidebarPrimaryNav />
     </aside>
   )
@@ -914,11 +1033,15 @@ function SidebarContent() {
 
 function SidebarFallback() {
   return (
-    <aside className="hidden h-screen w-[220px] shrink-0 flex-col border-r border-zinc-200 bg-white text-zinc-900 lg:flex">
-      <SidebarHeader />
-      <nav className="flex flex-1 flex-col gap-2 px-3 pt-3">
+    <aside
+      className={cn(
+        "relative z-30 hidden h-screen shrink-0 flex-col border-r border-zinc-200 bg-white text-zinc-900 lg:flex",
+        SIDEBAR_WIDTH_CLASS,
+      )}
+    >
+      <nav className="flex flex-1 flex-col gap-2 px-2.5 pt-3">
         {Array.from({ length: 7 }).map((_, index) => (
-          <div key={index} className="h-11 animate-pulse rounded-lg bg-amber-50" />
+          <div key={index} className="h-14 animate-pulse rounded-lg bg-amber-50" />
         ))}
       </nav>
     </aside>
@@ -933,16 +1056,21 @@ export function Sidebar() {
   )
 }
 
-export function ModuleSubNav() {
+export function ModuleNavDrawer() {
   return (
     <Suspense fallback={null}>
-      <ModuleSubNavContent />
+      <ModuleNavDrawerContent />
     </Suspense>
   )
 }
 
+/** @deprecated Use ModuleNavDrawer */
+export function ModuleSubNav() {
+  return <ModuleNavDrawer />
+}
+
 function MobileSidebarContent() {
-  const { mobileOpen, setMobileOpen, navItems, loading } = useSidebarContext()
+  const { mobileOpen, setMobileOpen, navItems, loading, openModuleDrawer } = useSidebarContext()
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const profileListSegment = resolveContactProfileListSegment(pathname, searchParams)
@@ -968,13 +1096,14 @@ function MobileSidebarContent() {
 
   function handlePrimaryClick(item: NavItem) {
     if (item.children && item.children.length > 0) {
+      openModuleDrawer(item)
       setMobileModule(item)
       return
     }
     closeMobile()
   }
 
-  const groupedItems = groupNavItemsForDisplay(navItems)
+  const { grouped, footerItems } = groupNavItemsForDisplay(navItems)
 
   return (
     <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
@@ -1025,13 +1154,15 @@ function MobileSidebarContent() {
         ) : mobileModule ? (
           <div className="flex h-[calc(100vh-88px)] flex-col">
             <div className="border-b border-zinc-200 px-4 py-3">
-              <p className="text-sm font-semibold text-zinc-900">{mobileModule.label}</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+                {mobileModule.label}
+              </p>
             </div>
             <SidebarSubNavLinks module={mobileModule} onNavigate={closeMobile} />
           </div>
         ) : (
-          <nav className="flex max-h-[calc(100vh-88px)] flex-col gap-0.5 overflow-y-auto px-3 pt-3 pb-4">
-            {groupedItems.map((group, groupIndex) => (
+          <nav className="max-h-[calc(100vh-88px)] overflow-y-auto px-3 pt-3 pb-4">
+            {grouped.map((group, groupIndex) => (
               <div key={`${group.group ?? "main"}-${groupIndex}`} className={groupIndex > 0 ? "mt-5" : ""}>
                 {group.group ? (
                   <div className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
@@ -1087,6 +1218,57 @@ function MobileSidebarContent() {
                 })}
               </div>
             ))}
+
+            {footerItems.length > 0 ? (
+              <div className="mt-5 border-t border-zinc-200 pt-3">
+                {footerItems.map((item) => {
+                  const hasChildren = Boolean(item.children && item.children.length > 0)
+
+                  if (hasChildren) {
+                    return (
+                      <button
+                        key={item.label}
+                        type="button"
+                        onClick={() => handlePrimaryClick(item)}
+                        className={cn(
+                          "relative flex min-h-[44px] w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                          isItemActive(item, pathname, navItems, profileListSegment)
+                            ? "bg-amber-50 text-amber-700"
+                            : "text-zinc-700 hover:bg-amber-50 hover:text-amber-700",
+                        )}
+                      >
+                        {isItemActive(item, pathname, navItems, profileListSegment) ? (
+                          <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-r-full bg-amber-600" />
+                        ) : null}
+                        <item.icon className="h-[18px] w-[18px] shrink-0" />
+                        <span className="flex-1 text-left">{item.label}</span>
+                        <ChevronRight className="h-4 w-4 shrink-0 text-zinc-400" />
+                      </button>
+                    )
+                  }
+
+                  return (
+                    <Link
+                      key={item.label}
+                      href={item.href}
+                      onClick={closeMobile}
+                      className={cn(
+                        "relative flex min-h-[44px] items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                        isItemActive(item, pathname, navItems, profileListSegment)
+                          ? "bg-amber-50 text-amber-700"
+                          : "text-zinc-700 hover:bg-amber-50 hover:text-amber-700",
+                      )}
+                    >
+                      {isItemActive(item, pathname, navItems, profileListSegment) ? (
+                        <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-r-full bg-amber-600" />
+                      ) : null}
+                      <item.icon className="h-[18px] w-[18px] shrink-0" />
+                      {item.label}
+                    </Link>
+                  )
+                })}
+              </div>
+            ) : null}
           </nav>
         )}
       </SheetContent>

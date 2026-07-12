@@ -82,10 +82,11 @@ Completed:
 * Server-side protection
 * Unauthorized page
 * Permission-aware sidebar
+* **Tiered staff navigation (July 2026):** Primary sidebar (`180px`, icon + label). Manaratee logo sits in the top header bar beside the organization logo; breadcrumb path is on the row below. Clicking a module opens a slide-out drawer with expandable groups; choosing a destination navigates and closes the drawer. **Billing** and **Settings** follow enabled modules in the sidebar (not pinned to the viewport bottom). Key files: `components/layout/sidebar.tsx`, `components/layout/header.tsx`, `lib/navigation/sidebar-nav.ts`.
 * Subscription-aware modules
 * **Roles & Permissions subscription filter (June 2026):** Settings → Roles & Permissions only lists permission rows for modules enabled on the org (`lib/permissions/permission-definitions.ts`, filtered via `loadOrganizationEnabledModuleSlugs`). Core modules (Settings, Contacts) always appear; product modules (e.g. Donations only for MAS Dallas) gate their permission groups. **Facility Manager** and **Facility Coordinator** roles are hidden unless the org has **Facilities** (`spaces`) or **Venue Rentals** (`bookings`) enabled (`filterOrganizationRolesForOrganization` in `lib/permissions/facilities-access.ts`).
 * **Organization audit log (June 2026):** Settings → **Audit Log** (`/settings/audit-log`) — append-only history of donation ledger edits (payment update/void/refund/allocate, pledge update/payment/cancel) and permission changes (member role assignment, role permission toggles). Table: `organization_audit_logs` (migration `142_organization_audit_logs.sql`). Writes via service role in `lib/audit/organization-audit-log.ts`; reads via RLS for staff with `settings.users.view`, `settings.roles.view`, `donations.view`, or `donations.manage`. Permission toggles route through `setOrganizationRolePermissionAction` so changes are logged server-side.
-* **Org billing view (June 2026):** `/billing` (sidebar **Billing** under System; `/settings/billing` and `/settings/subscription` redirect here) — plan price, persona bundle, plan limits, enabled modules, payment methods on file, and billing history (`lib/organizations/organization-billing-actions.ts`, `organization-subscription-summary.ts`). Visible to platform support sessions, `organization_members.role` of `super_admin`/`owner`, or org role name **Super Admin**. Apply migration `121_organization_billing.sql` for payment methods and invoice history tables.
+* **Org billing view (June 2026):** `/billing` (sidebar **Billing**, pinned to the bottom of the icon rail; `/settings/billing` and `/settings/subscription` redirect here) — plan price, persona bundle, plan limits, enabled modules, payment methods on file, and billing history (`lib/organizations/organization-billing-actions.ts`, `organization-subscription-summary.ts`). Visible to platform support sessions, `organization_members.role` of `super_admin`/`owner`, or org role name **Super Admin**. Apply migration `121_organization_billing.sql` for payment methods and invoice history tables.
 * **Subscription terms (June 2026):** Platform admin → Organizations → **Billing** tab sets `subscription_start_date`, optional **3 months free** (`complimentary_months`), and optional **first year special rate** (`first_year_special_monthly_rate`). Org `/billing` shows start date, complimentary period, effective rate, and first-year pricing notice (standard rate after year one; owner may adjust pricing). Migration `123_organization_subscription_terms.sql`. API: `PATCH /api/platform/organizations/[id]/billing-terms`.
 
 ---
@@ -242,7 +243,7 @@ Removed **255** legacy imported rows from `public.vendors` (May 2026 CSV import)
 
 **Pledges summary cards (June 2026):** Pledges page stat cards match Donations Overview styling (colored left border, rounded icon badges). File: `app/(dashboard)/donations/(operations)/pledges/page.tsx`.
 
-**Donation attribution fields (June 2026):** Add Pledge / Record Payment forms pick **Fund** first (enabled); **Category** auto-fills from the fund and is read-only when funds exist. Manage categories and funds under **Donations → Settings → Categories** (`donation_categories`, `donation_subcategories`). **Fund close (July 2026):** `donation_subcategories.is_active` (migration `161`); closed funds show **Closed** in settings, are omitted from customer/staff fund pickers for new gifts, and remain on historical pledges/payments. Toggle **Accept new gifts** in the Edit Fund dialog. Customer donations validate open funds in `validateCustomerDonationAttribution` (portal UI, Stripe checkout, offline server action); migration `162` blocks portal payment inserts to closed funds at the database layer. Files: `components/donations/donation-attribution-fields.tsx`, `app/(dashboard)/donations/settings/page.tsx`, `lib/donations/donation-fund-status.ts`, `lib/customer/customer-donation-actions.ts`.
+**Donation attribution fields (June 2026):** Add Pledge / Record Payment forms pick **Fund** first (enabled); **Category** auto-fills from the fund and is read-only when funds exist. Manage categories and funds under **Donations → Settings → Categories** (`donation_categories`, `donation_subcategories`). **Fund close (July 2026):** `donation_subcategories.is_active` (migration `161`); closed funds show **Closed** in settings, are omitted from customer/staff fund pickers for new gifts, and remain on historical pledges/payments. Toggle **Accept new gifts** in the Edit Fund dialog. Settings **Funds** table defaults to **open** funds with **View all** for closed. Customer donations validate open funds in `validateCustomerDonationAttribution` (portal UI, Stripe checkout, offline server action); migration `162` blocks portal payment inserts to closed funds at the database layer. Files: `components/donations/donation-attribution-fields.tsx`, `app/(dashboard)/donations/settings/page.tsx`, `lib/donations/donation-fund-status.ts`, `lib/customer/customer-donation-actions.ts`.
 
 **The Asad Realty org removed (June 2026):** Deleted dev/stress org `95c4eb7d-b151-4aa1-a489-a3c1e1289c7e` and org-scoped data (~7.5k payments, 1k donors, campaigns, contacts, etc.). **MAS Dallas pilot org preserved.** Backup: `scripts/backups/organization-delete/organization-delete-95c4eb7d-...json`. Tools: `node scripts/delete-organization.mjs` (dry run / `--execute --confirm-name=...`), `node scripts/cleanup-organization-orphans.mjs` for leftover rows. Auth users with **only** Asad membership were removed; `heyamasad220@gmail.com` kept (MAS membership).
 
@@ -1200,8 +1201,8 @@ npm run validate:donations-production
 
 Status: Implemented (June 2026)
 
-* Sidebar: **Overview**, **Campaigns**, **Reports**, **Settings** (`components/layout/sidebar.tsx`)
-* **Reports** — tab bar (`components/donations/donation-reports-nav.tsx`):
+* Sidebar: **Overview**, **Campaigns** (nested: Overview, Pledges), **Reports** (nested report links mirror tab bar), **Settings** (`components/layout/sidebar.tsx`, `lib/navigation/donations-sidebar-children.ts`)
+* **Reports** — in-page tab bar still available (`components/donations/donation-reports-nav.tsx`); same destinations as sidebar nested links:
   * **One-Time Donations** — `/donations/reports/one-time` (summary metric cards + server-paginated payments table: Date, **Donor** (column filter by name), Amount, Method, **Status** (column filter: Succeeded / Failed / Refunded / Partially Refunded; colored badges), **Actions** blue ⋮ menu: Refund, Link to Pledge, Download Receipt, Email Receipt to Donor)
   * **Recurring Donations** — `/donations/reports/recurring`
   * **Pledges** — `/donations/campaigns/pledges` (pledge table with column-header filters on Donor Name, Status, and Campaign; collection queue; add/edit pledge dialogs). Legacy `/donations/reports/pledges` redirects here.
@@ -1238,7 +1239,7 @@ Status: Implemented (June 2026)
 | `/donations/campaigns` | Campaigns Overview — org-wide pledge summary cards; fundraising campaigns table (active + two most recent by default; **View all** expands full list, most recent first) |
 | `/donations/campaigns/[id]` | Campaign detail — source breakdown + donor metrics (left), goal gauge (right) |
 | `/donations` | Donations executive dashboard — KPI cards, action required, active campaigns snapshot, recent activity, quick actions |
-| `/donations/settings` | Categories, **Funds** (subcategories under categories), Online Payments (Stripe Connect), receipt and pledge reminder settings. Campaign CRUD is under **Campaigns → Overview**. Org billing cards: **Billing** (`/billing`). |
+| `/donations/settings` | Categories, **Funds** (subcategories under categories), Online Payments (Stripe Connect), receipt and pledge reminder settings. Campaign CRUD is under **Campaigns → Overview**. Org legal name/address/EIN: **Settings → General** (`/settings/general`). Org billing cards: **Billing** (`/billing`). |
 
 ### Validation
 
@@ -1276,7 +1277,7 @@ Migration `scripts/090_donation_receipts.sql`:
 
 | Route | Receipt features |
 |-------|------------------|
-| `/donations/settings` | General tab — org legal/address/EIN; Receipts tab — full receipt config |
+| `/donations/settings` | Receipts tab — full receipt config (org legal/address/EIN moved to **Settings → General**) |
 | `/donations/donors/individuals/[id]` | Lifetime giving totals; donation history per-payment receipts; annual statement |
 | `/donations/donors/organizations/[id]` | Same as individual donor profile |
 | `/donations/reports/receipts` | Receipt summary + year-end statements (bulk send, ⋯ per donor) |

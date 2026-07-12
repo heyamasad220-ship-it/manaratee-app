@@ -3,6 +3,10 @@
 import { deliverPaymentReceiptById } from "@/lib/donations/donation-email-delivery"
 import { requireDonationStaffAccess } from "@/lib/donations/donation-action-auth"
 import {
+  PERMISSIONS,
+  hasAnyPermission,
+} from "@/lib/permissions/permissions"
+import {
   allocateReceiptNumber,
   buildAnnualGivingStatementPayload,
   buildPaymentReceiptPayload,
@@ -15,8 +19,36 @@ import type {
   ReceiptStatus,
 } from "@/lib/donations/receipt-types"
 
-export async function getDonationReceiptSettingsAction() {
+async function requireDonationReceiptSettingsAccess() {
+  const canManageSettings = await hasAnyPermission(
+    PERMISSIONS.SETTINGS_USERS_MANAGE,
+    PERMISSIONS.DONATIONS_MANAGE
+  )
+
+  if (!canManageSettings) {
+    return { ok: false as const, error: "You do not have permission to manage these settings." }
+  }
+
   const access = await requireDonationStaffAccess("manage")
+  if (access.ok) {
+    return access
+  }
+
+  const { getCurrentUserPermissionContext } = await import("@/lib/permissions/permissions")
+  const { supabase, organizationId } = await getCurrentUserPermissionContext()
+
+  return {
+    ok: true as const,
+    supabase,
+    orgId: organizationId,
+    userId: "",
+    userEmail: null,
+    canManage: true,
+  }
+}
+
+export async function getDonationReceiptSettingsAction() {
+  const access = await requireDonationReceiptSettingsAccess()
   if (!access.ok) return { success: false as const, error: access.error }
   const { supabase, orgId } = access
   try {
@@ -30,7 +62,7 @@ export async function getDonationReceiptSettingsAction() {
 export async function saveDonationReceiptSettingsAction(
   settings: Omit<import("@/lib/donations/receipt-types").DonationReceiptSettings, "organization_id">
 ) {
-  const access = await requireDonationStaffAccess("manage")
+  const access = await requireDonationReceiptSettingsAccess()
   if (!access.ok) return { success: false as const, error: access.error }
   const { supabase, orgId } = access
 

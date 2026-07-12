@@ -1,6 +1,6 @@
 "use client"
 
-import { Suspense, useEffect, useState } from "react"
+import { Suspense, useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Header } from "@/components/layout/header"
@@ -39,7 +39,7 @@ import { DonationReceiptSettingsForm } from "@/components/donations/donation-rec
 import { PledgeReminderSettingsForm } from "@/components/donations/pledge-reminder-settings-form"
 import { DonationStripeConnectPanel } from "@/components/donations/donation-stripe-connect-panel"
 
-const settingsTabs = ["General", "Categories", "Online Payments", "Receipts", "Pledge Reminders", "Notifications"] as const
+const settingsTabs = ["Categories", "Online Payments", "Receipts", "Pledge Reminders", "Notifications"] as const
 type SettingsTab = (typeof settingsTabs)[number]
 
 function DonationSettingsTabSync({
@@ -62,7 +62,6 @@ interface Category {
   id: string
   name: string
   description: string
-  taxDeductible: boolean
 }
 
 interface DonationFund {
@@ -112,19 +111,23 @@ function DonationsSettingsPageContent() {
 
   return data?.organization_id || null
 }
-  const [activeTab, setActiveTab] = useState<SettingsTab>("General")
+  const [activeTab, setActiveTab] = useState<SettingsTab>("Categories")
   const [categories, setCategories] = useState<Category[]>([])
   const [showAddCategoryDialog, setShowAddCategoryDialog] = useState(false)
   const [categoryName, setCategoryName] = useState("")
 const [categoryDescription, setCategoryDescription] = useState("")
 const [editingCategory, setEditingCategory] = useState<Category | null>(null)
-const [categoryTaxDeductible, setCategoryTaxDeductible] = useState(true)
   const [funds, setFunds] = useState<DonationFund[]>([])
   const [showFundDialog, setShowFundDialog] = useState(false)
   const [fundName, setFundName] = useState("")
   const [fundCategoryId, setFundCategoryId] = useState("")
   const [fundIsActive, setFundIsActive] = useState(true)
   const [editingFund, setEditingFund] = useState<DonationFund | null>(null)
+  const [showAllFunds, setShowAllFunds] = useState(false)
+
+  const openFunds = useMemo(() => funds.filter((fund) => fund.isActive), [funds])
+  const displayedFunds = showAllFunds ? funds : openFunds
+  const hiddenClosedFundCount = funds.length - openFunds.length
 async function handleAddCategory() {
   const orgId = await getOrganizationId()
 
@@ -142,7 +145,7 @@ async function handleAddCategory() {
     organization_id: orgId,
     name: categoryName.trim(),
     description: categoryDescription.trim() || null,
-    tax_deductible: categoryTaxDeductible,
+    tax_deductible: true,
   })
 
   if (error) {
@@ -152,7 +155,6 @@ async function handleAddCategory() {
 
   setCategoryName("")
   setCategoryDescription("")
-  setCategoryTaxDeductible(true)
   setShowAddCategoryDialog(false)
 
   await loadCategories()
@@ -183,7 +185,6 @@ async function loadCategories() {
       id: c.id,
       name: c.name,
       description: c.description || "",
-      taxDeductible: c.tax_deductible || false,
     }))
   )
 }
@@ -351,7 +352,7 @@ async function handleSaveCategory() {
       .update({
         name: categoryName.trim(),
         description: categoryDescription.trim() || null,
-        tax_deductible: categoryTaxDeductible,
+        tax_deductible: true,
       })
       .eq("id", editingCategory.id)
       .eq("organization_id", orgId)
@@ -365,7 +366,7 @@ async function handleSaveCategory() {
       organization_id: orgId,
       name: categoryName.trim(),
       description: categoryDescription.trim() || null,
-      tax_deductible: categoryTaxDeductible,
+      tax_deductible: true,
     })
 
     if (error) {
@@ -377,7 +378,6 @@ async function handleSaveCategory() {
   setEditingCategory(null)
   setCategoryName("")
   setCategoryDescription("")
-  setCategoryTaxDeductible(true)
   setShowAddCategoryDialog(false)
 
   await loadCategories()
@@ -408,12 +408,6 @@ async function handleSaveCategory() {
           ))}
         </div>
 
-        {activeTab === "General" && (
-          <div className="flex flex-col gap-6">
-            <DonationReceiptSettingsForm mode="general" />
-          </div>
-        )}
-
         {activeTab === "Categories" && (
           <div className="flex flex-col gap-8">
             <div className="flex flex-col gap-4">
@@ -421,7 +415,7 @@ async function handleSaveCategory() {
                 <div>
                   <h3 className="text-base font-semibold text-foreground">Donation Categories</h3>
                   <p className="text-sm text-muted-foreground">
-                    Top-level gift types for accounting and tax treatment (not campaigns)
+                    Top-level gift types for organizing donations (not campaigns)
                   </p>
                 </div>
                 <Button onClick={() => setShowAddCategoryDialog(true)}>
@@ -437,14 +431,13 @@ async function handleSaveCategory() {
                       <TableRow>
                         <TableHead>Category</TableHead>
                         <TableHead>Description</TableHead>
-                        <TableHead>Tax Deductible</TableHead>
                         <TableHead className="w-[100px]"></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {categories.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
+                          <TableCell colSpan={3} className="py-8 text-center text-muted-foreground">
                             No categories yet. Add a category before creating funds.
                           </TableCell>
                         </TableRow>
@@ -455,7 +448,6 @@ async function handleSaveCategory() {
                             <TableCell className="text-muted-foreground">
                               {category.description}
                             </TableCell>
-                            <TableCell>{category.taxDeductible ? "Yes" : "No"}</TableCell>
                             <TableCell>
                               <div className="flex items-center gap-1">
                                 <Button
@@ -466,7 +458,6 @@ async function handleSaveCategory() {
                                     setEditingCategory(category)
                                     setCategoryName(category.name)
                                     setCategoryDescription(category.description)
-                                    setCategoryTaxDeductible(category.taxDeductible)
                                     setShowAddCategoryDialog(true)
                                   }}
                                 >
@@ -525,8 +516,14 @@ async function handleSaveCategory() {
                               : "No funds yet. Add funds like Bathroom Renovation under Operations."}
                           </TableCell>
                         </TableRow>
+                      ) : displayedFunds.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
+                            No open funds. Use View all to see closed funds.
+                          </TableCell>
+                        </TableRow>
                       ) : (
-                        funds.map((fund) => (
+                        displayedFunds.map((fund) => (
                           <TableRow key={fund.id}>
                             <TableCell className="text-muted-foreground">{fund.categoryName}</TableCell>
                             <TableCell className="font-medium">{fund.name}</TableCell>
@@ -572,6 +569,20 @@ async function handleSaveCategory() {
                       )}
                     </TableBody>
                   </Table>
+                  {funds.length > 0 && !showAllFunds && hiddenClosedFundCount > 0 ? (
+                    <div className="flex justify-center border-t border-border px-4 py-3">
+                      <Button variant="outline" size="sm" onClick={() => setShowAllFunds(true)}>
+                        View all ({hiddenClosedFundCount} closed)
+                      </Button>
+                    </div>
+                  ) : null}
+                  {funds.length > 0 && showAllFunds && hiddenClosedFundCount > 0 ? (
+                    <div className="flex justify-center border-t border-border px-4 py-3">
+                      <Button variant="ghost" size="sm" onClick={() => setShowAllFunds(false)}>
+                        Show open funds only
+                      </Button>
+                    </div>
+                  ) : null}
                 </CardContent>
               </Card>
             </div>
@@ -683,15 +694,6 @@ async function handleSaveCategory() {
           onChange={(event) => setCategoryDescription(event.target.value)}
         />
       </div>
-
-      <div className="flex items-center gap-2">
-        <Switch
-          id="cat-tax"
-          checked={categoryTaxDeductible}
-          onCheckedChange={setCategoryTaxDeductible}
-        />
-        <Label htmlFor="cat-tax">Tax Deductible</Label>
-      </div>
     </div>
 
     <DialogFooter>
@@ -701,7 +703,6 @@ async function handleSaveCategory() {
           setEditingCategory(null)
           setCategoryName("")
           setCategoryDescription("")
-          setCategoryTaxDeductible(true)
           setShowAddCategoryDialog(false)
         }}
       >

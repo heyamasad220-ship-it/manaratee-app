@@ -2,7 +2,7 @@
 
 import { getActiveOrganization } from "@/lib/organizations/get-active-organization"
 import { getCustomerPortalSupabase } from "@/lib/auth/customer-portal-session"
-import { isDonationFundActive } from "@/lib/donations/donation-fund-status"
+import { buildCustomerOpenDonationCategories } from "@/lib/customer/customer-open-donation-categories"
 import { loadCustomerPortalEnabledModuleSlugs } from "@/lib/customer/customer-portal-modules-server"
 import { loadCustomerFamilyMembers } from "@/lib/customer/customer-family-actions"
 
@@ -72,34 +72,6 @@ export async function loadCustomerProfilePortalData() {
       createdAt: row.created_at as string,
     })),
   }
-}
-
-export function buildCustomerOpenDonationCategories(
-  categories: Array<{ id: string; name: string }>,
-  subcategories: Array<{
-    id: string
-    name: string
-    category_id: string
-    is_active?: boolean | null
-  }>
-) {
-  const activeSubcategories = subcategories.filter((fund) =>
-    isDonationFundActive(fund.is_active)
-  )
-
-  return categories
-    .map((category) => ({
-      id: category.id,
-      name: category.name,
-      funds: activeSubcategories
-        .filter((fund) => fund.category_id === category.id)
-        .map((fund) => ({
-          id: fund.id,
-          name: fund.name,
-          category_id: fund.category_id,
-        })),
-    }))
-    .filter((category) => category.funds.length > 0)
 }
 
 export async function loadCustomerDonationPortalData() {

@@ -1,4 +1,4 @@
-import { Sidebar, ModuleSubNav, MobileSidebar, SidebarProvider } from "@/components/layout/sidebar"
+import { Sidebar, ModuleNavDrawer, MobileSidebar, SidebarProvider, SidebarNavigationSync } from "@/components/layout/sidebar"
 import { DashboardAccessGuard } from "@/components/layout/dashboard-access-guard"
 import { DashboardReturnTracker } from "@/components/navigation/dashboard-return-tracker"
 import { PlatformSupportBanner } from "@/components/platform/platform-support-banner"
@@ -16,9 +16,12 @@ export default function DashboardLayout({
       <Suspense fallback={null}>
         <DashboardReturnTracker />
       </Suspense>
+      <Suspense fallback={null}>
+        <SidebarNavigationSync />
+      </Suspense>
       <div className="fixed inset-0 flex overflow-hidden">
         <Sidebar />
-        <ModuleSubNav />
+        <ModuleNavDrawer />
         <MobileSidebar />
 
         <main className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain bg-background">

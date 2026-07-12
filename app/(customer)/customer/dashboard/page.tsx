@@ -14,7 +14,7 @@ import {
   isCustomerPortalModuleEnabled,
 } from "@/lib/customer/customer-portal-modules"
 import { loadCustomerPortalEnabledModuleSlugs } from "@/lib/customer/customer-portal-modules-server"
-import { buildCustomerOpenDonationCategories } from "@/lib/customer/customer-portal-data-actions"
+import { buildCustomerOpenDonationCategories } from "@/lib/customer/customer-open-donation-categories"
 import { Card, CardContent } from "@/components/ui/card"
 import { CustomerDashboardGivingSection } from "@/components/customer/customer-dashboard-giving-section"
 import type {
