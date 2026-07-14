@@ -7,13 +7,6 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -29,18 +22,19 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { ContactAddPledgeDialog } from "@/components/contacts/contact-add-pledge-dialog"
 import { ContactMergeDialog } from "@/components/contacts/contact-merge-dialog"
-import { ContactBasicsPanel, type ContactBasicsHeaderMeta } from "@/components/contacts/contact-basics-panel"
-import { ContactOverviewGroupsBar } from "@/components/contacts/contact-overview-groups-bar"
+import { ContactBasicsPanel } from "@/components/contacts/contact-basics-panel"
+import { ContactReceivePaymentDialog } from "@/components/contacts/contact-receive-payment-dialog"
 import { ContactFamilyPanel } from "@/components/contacts/contact-family-panel"
 import { ContactEmployeePanel } from "@/components/contacts/contact-employee-panel"
 import { ContactFinancialPanel } from "@/components/contacts/contact-financial-panel"
+import { ContactProfileCollapsibleSection } from "@/components/contacts/contact-profile-collapsible-section"
 import { ContactGroupGivingOverview } from "@/components/contacts/contact-group-giving-overview"
 import { ContactGroupMembersPanel } from "@/components/contacts/contact-group-members-panel"
 import { ContactMembershipPanel } from "@/components/contacts/contact-membership-panel"
 import { ContactProgramEnrollmentsPanel } from "@/components/contacts/contact-program-enrollments-panel"
 import { ContactNotesPanel } from "@/components/contacts/contact-notes-panel"
-import { ContactRelationshipSummaryCard } from "@/components/contacts/contact-relationship-summary"
 import { ContactTimelinePanel } from "@/components/contacts/contact-timeline-panel"
 import { ContactVendorEvaluationsPanel } from "@/components/contacts/contact-vendor-evaluations-panel"
 import { ContactVolunteerDetails } from "@/components/contacts/contact-volunteer-details"
@@ -61,8 +55,6 @@ import {
   ROLE_ICONS,
   ROLE_VALUE_TO_LABEL,
   STATUS_COLORS,
-  STATUS_OPTIONS,
-  type ContactRecordType,
 } from "@/lib/contacts/contact-constants"
 import { cn } from "@/lib/utils"
 import type { ContactProfileData } from "@/lib/contacts/contact-profile-data"
@@ -73,32 +65,27 @@ import type { StaffSummaryForContact } from "@/lib/hr/staff-summary"
 import { getContactProfileModuleFlags } from "@/lib/contacts/contact-profile-module-access"
 import {
   contactsListSegmentForRecordType,
-  getContactsListLabelForSegment,
   getContactsListPathForSegment,
   isContactsListSegment,
   type ContactsListSegment,
 } from "@/lib/contacts/contact-module-label"
-import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
+import { contactProfileHref, normalizeContactProfileTab } from "@/lib/contacts/contact-profile-path"
+import { STAFF_MAIN_CONTENT_STICKY_TOP_CLASS } from "@/lib/layout/staff-dashboard-chrome"
 import {
-  formatReturnToBackLabel,
   isSafeReturnToPath,
   readStoredReturnToPath,
   RETURN_TO_QUERY_PARAM,
 } from "@/lib/navigation/return-to"
 import {
-  ArrowLeft,
   Briefcase,
   Building2,
-  Calendar,
+  DollarSign,
   GitMerge,
-  Heart,
-  History,
+  HandCoins,
   Loader2,
   Mail,
   MoreVertical,
-  Pencil,
   Phone,
-  Plus,
   Store,
   Trash2,
   User,
@@ -106,35 +93,26 @@ import {
   Wrench,
 } from "lucide-react"
 
-const CONTACT_TABS = [
-  "overview",
-  "participation",
-  "workforce",
-  "financial",
-  "activity",
-] as const
+const MODULE_TABS = ["participation", "workforce"] as const
 
-type ContactTab = (typeof CONTACT_TABS)[number]
+type ModuleTab = (typeof MODULE_TABS)[number]
+type ContactTab = "home" | ModuleTab
 
-function formatText(value: string | null | undefined) {
-  if (!value) return "-"
-  return value
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (c: string) => c.toUpperCase())
-}
+type ProfileSection = "overview" | "activity"
 
-function formatDate(value: string | null | undefined) {
-  if (!value) return "-"
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return "-"
-  return date.toLocaleDateString()
-}
-
-function normalizeTab(value: string | null, available: ContactTab[]): ContactTab {
-  if (value && available.includes(value as ContactTab)) {
-    return value as ContactTab
-  }
+function normalizeProfileSection(value: string | null): ProfileSection {
+  if (value === "activity") return "activity"
+  // general / family / overview / details → Overview
   return "overview"
+}
+
+function normalizeTab(value: string | null, availableModules: ModuleTab[]): ContactTab {
+  const normalized = normalizeContactProfileTab(value)
+  if (normalized === "participation" || normalized === "workforce") {
+    return availableModules.includes(normalized) ? normalized : "home"
+  }
+  // details / overview / financial / home → combined summary page
+  return "home"
 }
 
 type ContactProfileClientProps = {
@@ -220,9 +198,6 @@ export function ContactProfileClient({
 
   const backPath =
     resolvedReturnTo ?? getContactsListPathForSegment(profileListSegment)
-  const backLabel = resolvedReturnTo
-    ? formatReturnToBackLabel(resolvedReturnTo)
-    : `Back to ${getContactsListLabelForSegment(profileListSegment)}`
 
   const profileHrefOptions = useMemo(
     () => ({
@@ -273,7 +248,7 @@ export function ContactProfileClient({
 
   const showWorkforceTab = modules.workforce || modules.vendorHub
 
-  const showFinancialTab =
+  const showFinancialHome =
     modules.donations || modules.bookings || modules.programs || modules.membership
 
   const showProgramAssignments = useMemo(() => {
@@ -286,43 +261,112 @@ export function ContactProfileClient({
     })
   }, [modules.programs, programAssignments.length, roles, staffSummary])
 
-  const availableTabs = useMemo(() => {
-    const tabs: ContactTab[] = ["overview"]
+  const availableModuleTabs = useMemo(() => {
+    const tabs: ModuleTab[] = []
     if (showParticipationTab) tabs.push("participation")
     if (showWorkforceTab) tabs.push("workforce")
-    if (showFinancialTab) tabs.push("financial")
-    tabs.push("activity")
     return tabs
-  }, [showFinancialTab, showParticipationTab, showWorkforceTab])
+  }, [showParticipationTab, showWorkforceTab])
 
   const [activeTab, setActiveTab] = useState<ContactTab>(() =>
-    normalizeTab(tabParam, availableTabs)
+    normalizeTab(tabParam, availableModuleTabs)
   )
   const [showMergeDialog, setShowMergeDialog] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
-  const [showAssignGroupDialog, setShowAssignGroupDialog] = useState(false)
+  const [showReceivePaymentDialog, setShowReceivePaymentDialog] = useState(false)
+  const [showAddPledgeDialog, setShowAddPledgeDialog] = useState(false)
+  const [financialRefreshToken, setFinancialRefreshToken] = useState(0)
   const [deleting, setDeleting] = useState(false)
-  const [overviewSubTab, setOverviewSubTab] = useState<"general" | "family">("general")
-  const [basicsHeaderMeta, setBasicsHeaderMeta] = useState<ContactBasicsHeaderMeta | null>(
-    null
+
+  async function handleDonationDialogSuccess() {
+    setFinancialRefreshToken((current) => current + 1)
+    await onContactUpdated()
+  }
+  const sectionParam = searchParams.get("section")
+  const initialProfileSection = normalizeProfileSection(
+    tabParam === "activity" ? "activity" : sectionParam
+  )
+  const shouldOpenProfileFromUrl =
+    defaultEdit ||
+    searchParams.get("edit") === "1" ||
+    tabParam === "details" ||
+    tabParam === "activity" ||
+    sectionParam === "general" ||
+    sectionParam === "family" ||
+    sectionParam === "overview" ||
+    sectionParam === "activity"
+
+  const [overviewOpen, setOverviewOpen] = useState(
+    () =>
+      Boolean(shouldOpenProfileFromUrl && initialProfileSection === "overview") ||
+      defaultEdit ||
+      searchParams.get("edit") === "1"
+  )
+  const [notesActivityOpen, setNotesActivityOpen] = useState(
+    () => Boolean(shouldOpenProfileFromUrl && initialProfileSection === "activity")
   )
 
-  const handleBasicsHeaderMetaChange = useCallback((meta: ContactBasicsHeaderMeta) => {
-    setBasicsHeaderMeta(meta)
-  }, [])
-
   useEffect(() => {
-    if (tabParam) {
-      setActiveTab(normalizeTab(tabParam, availableTabs))
+    if (tabParam === "activity") {
+      setActiveTab("home")
+      setNotesActivityOpen(true)
+      if (!isDialog) {
+        router.replace(
+          contactProfileHref(contact.id, {
+            ...profileHrefOptions,
+            section: "activity",
+          }),
+          { scroll: false }
+        )
+      }
       return
     }
 
-    setActiveTab((current) => (availableTabs.includes(current) ? current : "overview"))
-  }, [tabParam, availableTabs])
+    if (isEditMode) {
+      setActiveTab("home")
+      setOverviewOpen(true)
+      return
+    }
+
+    if (tabParam) {
+      setActiveTab(normalizeTab(tabParam, availableModuleTabs))
+    } else {
+      setActiveTab((current) =>
+        current === "participation" || current === "workforce"
+          ? availableModuleTabs.includes(current)
+            ? current
+            : "home"
+          : "home"
+      )
+    }
+
+    if (sectionParam === "activity") {
+      setNotesActivityOpen(true)
+    } else if (
+      sectionParam === "general" ||
+      sectionParam === "family" ||
+      sectionParam === "overview" ||
+      tabParam === "details"
+    ) {
+      setOverviewOpen(true)
+    }
+  }, [
+    availableModuleTabs,
+    contact.id,
+    isDialog,
+    isEditMode,
+    profileHrefOptions,
+    router,
+    sectionParam,
+    tabParam,
+  ])
 
   useEffect(() => {
     if (isDialog) {
       setDialogEditMode(defaultEdit)
+      if (defaultEdit) {
+        setOverviewOpen(true)
+      }
     }
   }, [defaultEdit, isDialog, contact.id])
 
@@ -333,20 +377,21 @@ export function ContactProfileClient({
     const expectedList = contactsListSegmentForRecordType(recordType)
     if (fromQuery === expectedList) return
 
-    const tab = normalizeTab(tabParam, availableTabs)
+    const tab = normalizeTab(tabParam, availableModuleTabs)
     router.replace(
       contactProfileHref(contact.id, {
         ...profileHrefOptions,
-        tab: tab === "overview" ? undefined : tab,
-        edit: isEditMode,
+        tab: tab === "home" ? undefined : tab,
+        section: notesActivityOpen && !overviewOpen ? "activity" : undefined,
       }),
       { scroll: false }
     )
   }, [
-    availableTabs,
+    availableModuleTabs,
     contact.id,
     isDialog,
-    isEditMode,
+    notesActivityOpen,
+    overviewOpen,
     profileHrefOptions,
     recordType,
     router,
@@ -356,40 +401,42 @@ export function ContactProfileClient({
 
   function setContactEditMode(edit: boolean) {
     if (edit) {
-      setActiveTab("overview")
-      setOverviewSubTab("general")
-    }
-
-    if (isDialog) {
-      setDialogEditMode(edit)
-      return
-    }
-
-    const tab = normalizeTab(tabParam, availableTabs)
-    router.replace(
-      contactProfileHref(contact.id, {
-        ...profileHrefOptions,
-        tab: tab === "overview" ? undefined : tab,
-        edit,
-      }),
-      { scroll: false }
-    )
-  }
-
-  function handleTabChange(value: string) {
-    const tab = normalizeTab(value, availableTabs)
-    setActiveTab(tab)
-    if (isDialog) {
-      if (dialogEditMode) {
-        setDialogEditMode(false)
+      setActiveTab("home")
+      setOverviewOpen(true)
+      if (isDialog) {
+        setDialogEditMode(true)
       }
       return
     }
 
+    if (isDialog) {
+      setDialogEditMode(false)
+      return
+    }
+
+    // Clear deep-link ?edit=1 without treating edit as a separate page state.
+    if (searchParams.get("edit") === "1") {
+      router.replace(
+        contactProfileHref(contact.id, {
+          ...profileHrefOptions,
+          edit: false,
+        }),
+        { scroll: false }
+      )
+    }
+  }
+
+  function handleTabChange(value: string) {
+    const tab = normalizeTab(value, availableModuleTabs)
+    setActiveTab(tab)
+    if (isDialog) {
+      if (dialogEditMode) setDialogEditMode(false)
+      return
+    }
     router.replace(
       contactProfileHref(contact.id, {
         ...profileHrefOptions,
-        tab: tab === "overview" ? undefined : tab,
+        tab: tab === "home" ? undefined : tab,
         edit: false,
       }),
       { scroll: false }
@@ -436,28 +483,112 @@ export function ContactProfileClient({
     router.push(backPath)
   }
 
-  return (
-    <div className={isDialog ? "flex flex-col gap-6 p-4 sm:p-6" : "flex flex-col gap-6 p-6"}>
-      {!isDialog ? (
-        <div className="flex justify-start">
-          <Button variant="outline" onClick={() => router.push(backPath)}>
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            {backLabel}
-          </Button>
-        </div>
-      ) : onClose ? (
-        <div className="flex justify-end">
-          <Button variant="outline" onClick={onClose}>
-            Close
-          </Button>
-        </div>
-      ) : null}
+  const showStickyInFinancialPanel = activeTab === "home" && showFinancialHome
+  const stickyTopClass = isDialog ? "top-0" : STAFF_MAIN_CONTENT_STICKY_TOP_CLASS
 
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
+  const identityHeader = (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+        {isOrganization ? (
+          <Building2 className="h-5 w-5 shrink-0 text-muted-foreground" />
+        ) : isGroup ? (
+          <Users className="h-5 w-5 shrink-0 text-muted-foreground" />
+        ) : (
+          <User className="h-5 w-5 shrink-0 text-muted-foreground" />
+        )}
+        <h1 className="text-xl font-semibold">{contact.full_name || "Unnamed Contact"}</h1>
+        {roleLabels.length > 0 ? (
+          roleLabels.map((label) => {
+            const RoleIcon = ROLE_ICONS[label]
+            return (
+              <Badge
+                key={label}
+                variant="secondary"
+                className={cn("gap-1 font-normal", ROLE_COLORS[label])}
+              >
+                <RoleIcon className="h-3 w-3" />
+                {label}
+              </Badge>
+            )
+          })
+        ) : isEntity ? (
+          <Badge variant="outline" className="font-normal">
+            {getContactRecordTypeLabel(recordType)}
+          </Badge>
+        ) : null}
+        <Badge variant="secondary" className={STATUS_COLORS[mapStatus(contact.status)]}>
+          {mapStatus(contact.status)}
+        </Badge>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button size="sm" className="h-7 w-7 shrink-0 p-0">
+              <span className="sr-only">Contact actions</span>
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            {modules.donations ? (
+              <>
+                <DropdownMenuItem onClick={() => setShowReceivePaymentDialog(true)}>
+                  <DollarSign className="mr-2 h-4 w-4" />
+                  Receive Payment
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowAddPledgeDialog(true)}>
+                  <HandCoins className="mr-2 h-4 w-4" />
+                  Add Pledge
+                </DropdownMenuItem>
+              </>
+            ) : null}
+            {!isEntity ? (
+              <DropdownMenuItem onClick={() => setShowMergeDialog(true)}>
+                <GitMerge className="mr-2 h-4 w-4" />
+                Merge duplicate
+              </DropdownMenuItem>
+            ) : null}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="text-red-600 focus:text-red-600"
+              onClick={() => setShowDeleteDialog(true)}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+        <div className="flex items-center gap-1.5">
+          <Phone className="h-3.5 w-3.5 shrink-0" />
+          {contact.phone ? (
+            <a href={`tel:${contact.phone}`} className="text-foreground hover:underline">
+              {contact.phone}
+            </a>
+          ) : (
+            <span>—</span>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Mail className="h-3.5 w-3.5 shrink-0" />
+          {contact.email ? (
+            <a href={`mailto:${contact.email}`} className="text-foreground hover:underline">
+              {contact.email}
+            </a>
+          ) : (
+            <span>—</span>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+
+  const moduleTabs =
+    (showParticipationTab || showWorkforceTab) &&
+    (activeTab === "participation" || activeTab === "workforce" || activeTab === "home") ? (
+      <Tabs value={activeTab === "home" ? "home" : activeTab} onValueChange={handleTabChange}>
         <TabsList className="flex h-auto flex-wrap justify-start gap-1">
-          <TabsTrigger value="overview" className="gap-2">
+          <TabsTrigger value="home" className="gap-2">
             <User className="size-4" />
-            Overview
+            Summary
           </TabsTrigger>
           {showParticipationTab ? (
             <TabsTrigger value="participation" className="gap-2">
@@ -471,239 +602,183 @@ export function ContactProfileClient({
               Workforce
             </TabsTrigger>
           ) : null}
-          {showFinancialTab ? (
-            <TabsTrigger value="financial" className="gap-2">
-              <Heart className="size-4" />
-              Financial
-            </TabsTrigger>
-          ) : null}
-          <TabsTrigger value="activity" className="gap-2">
-            <History className="size-4" />
-            Activity
-          </TabsTrigger>
         </TabsList>
+      </Tabs>
+    ) : null
 
-        <TabsContent value="overview" className="mt-0 space-y-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="min-w-0 flex-1 space-y-2">
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-                {isOrganization ? (
-                  <Building2 className="h-5 w-5 shrink-0 text-muted-foreground" />
-                ) : isGroup ? (
-                  <Users className="h-5 w-5 shrink-0 text-muted-foreground" />
-                ) : (
-                  <User className="h-5 w-5 shrink-0 text-muted-foreground" />
-                )}
-                <h1 className="text-xl font-semibold">{contact.full_name || "Unnamed Contact"}</h1>
-                {isEditMode && basicsHeaderMeta ? (
-                  <>
-                    <Select
-                      value={basicsHeaderMeta.contactType}
-                      onValueChange={(value) =>
-                        basicsHeaderMeta.setContactType(value as ContactRecordType)
-                      }
-                    >
-                      <SelectTrigger className="h-7 w-[7.5rem] text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="individual">Person</SelectItem>
-                        <SelectItem value="organization">Organization</SelectItem>
-                        <SelectItem value="group">Group</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Select
-                      value={basicsHeaderMeta.status}
-                      onValueChange={basicsHeaderMeta.setStatus}
-                    >
-                      <SelectTrigger className="h-7 w-[6.5rem] text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {STATUS_OPTIONS.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </>
-                ) : (
-                  <>
-                    {roleLabels.length > 0 ? (
-                      roleLabels.map((label) => {
-                        const RoleIcon = ROLE_ICONS[label]
-                        return (
-                          <Badge
-                            key={label}
-                            variant="secondary"
-                            className={cn("gap-1 font-normal", ROLE_COLORS[label])}
-                          >
-                            <RoleIcon className="h-3 w-3" />
-                            {label}
-                          </Badge>
-                        )
-                      })
-                    ) : isEntity ? (
-                      <Badge variant="outline" className="font-normal">
-                        {getContactRecordTypeLabel(recordType)}
-                      </Badge>
-                    ) : null}
-                    <Badge
-                      variant="secondary"
-                      className={STATUS_COLORS[mapStatus(contact.status)]}
-                    >
-                      {mapStatus(contact.status)}
-                    </Badge>
-                  </>
-                )}
-                {!isEntity ? (
-                  <ContactOverviewGroupsBar
-                    contactId={contact.id}
-                    assignDialogOpen={showAssignGroupDialog}
-                    onAssignDialogOpenChange={setShowAssignGroupDialog}
-                  />
-                ) : null}
-                {!isEditMode ? (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button size="sm" className="h-7 w-7 shrink-0 p-0">
-                        <span className="sr-only">Contact actions</span>
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start">
-                      <DropdownMenuItem onClick={() => setContactEditMode(true)}>
-                        <Pencil className="mr-2 h-4 w-4" />
-                        Edit
-                      </DropdownMenuItem>
-                      {!isEntity ? (
-                        <>
-                          <DropdownMenuItem onClick={() => setShowMergeDialog(true)}>
-                            <GitMerge className="mr-2 h-4 w-4" />
-                            Merge duplicate
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => setShowAssignGroupDialog(true)}>
-                            <Plus className="mr-2 h-4 w-4" />
-                            Assign to a group
-                          </DropdownMenuItem>
-                        </>
-                      ) : null}
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        className="text-red-600 focus:text-red-600"
-                        onClick={() => setShowDeleteDialog(true)}
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                ) : null}
-              </div>
-            </div>
-          </div>
+  return (
+    <div className={isDialog ? "flex flex-col gap-6 p-4 sm:p-6" : "flex flex-col gap-6 p-6"}>
+      {isDialog && onClose ? (
+        <div className="flex justify-end">
+          <Button variant="outline" onClick={onClose}>
+            Close
+          </Button>
+        </div>
+      ) : null}
 
-          {!isEntity ? (
-            <Tabs
-              value={overviewSubTab}
-              onValueChange={(value) => setOverviewSubTab(value as "general" | "family")}
-              className="space-y-3"
-            >
-              <TabsList className="h-8">
-                <TabsTrigger value="general" className="px-3 text-xs">
-                  General
-                </TabsTrigger>
-                <TabsTrigger value="family" className="px-3 text-xs">
-                  Family
-                </TabsTrigger>
-              </TabsList>
-              <TabsContent value="general" className="mt-0">
-                <ContactBasicsPanel
-                  contact={contact}
-                  personDetails={profileExtendedData?.personDetails ?? null}
-                  defaultEditing={isEditMode}
-                  onEditingChange={setContactEditMode}
-                  onSaved={onContactUpdated}
-                  layout="overview-general"
-                  showEditButton={false}
-                  onHeaderMetaChange={handleBasicsHeaderMetaChange}
-                />
-              </TabsContent>
-              <TabsContent value="family" className="mt-0">
-                {profileExtendedLoading ? (
-                  <Card>
-                    <CardContent className="flex items-center gap-2 p-4 text-sm text-muted-foreground">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Loading family members...
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <ContactFamilyPanel
-                    contactId={contact.id}
-                    familyMembers={profileExtendedData?.familyMembers ?? []}
-                    onChanged={onExtendedDataChanged}
-                    embedded
-                  />
-                )}
-              </TabsContent>
-            </Tabs>
-          ) : (
-            <ContactBasicsPanel
-              contact={contact}
-              personDetails={profileExtendedData?.personDetails ?? null}
-              defaultEditing={isEditMode}
-              onEditingChange={setContactEditMode}
-              onSaved={onContactUpdated}
-              layout="overview-general"
-              showEditButton={false}
-              onHeaderMetaChange={handleBasicsHeaderMetaChange}
-            />
+      {!showStickyInFinancialPanel ? (
+        <div
+          className={cn(
+            "sticky z-40 -mx-6 space-y-4 border-b border-border bg-background px-6 pb-4 pt-1",
+            stickyTopClass
           )}
+        >
+          {identityHeader}
+        </div>
+      ) : null}
 
+      {!showStickyInFinancialPanel ? moduleTabs : null}
+
+      {activeTab === "home" ? (
+        <div className="space-y-6">
           {isGroup ? (
             <ContactGroupMembersPanel
               groupContactId={contact.id}
               groupName={contact.full_name || "Group"}
             />
           ) : null}
-        </TabsContent>
+          {isGroup && showDonorPanel && !profileLoading ? (
+            <ContactGroupGivingOverview
+              groupContactId={contact.id}
+              groupName={contact.full_name || "Group"}
+            />
+          ) : null}
 
-        {showParticipationTab ? (
-          <TabsContent value="participation" className="mt-0 space-y-6">
-            {modules.membership ? (
-              <ContactMembershipPanel
-                contactId={contact.id}
-                contactName={contact.full_name || "Unnamed Contact"}
-                teamsCount={profileData?.activeTeamsCount ?? 0}
-                onMembershipChanged={onRolesUpdated}
-              />
-            ) : null}
-            {modules.programs ? (
-              <ContactProgramEnrollmentsPanel
-                enrollments={profileData?.enrollmentRecords ?? []}
-                loading={profileLoading}
-              />
-            ) : null}
-            {showProgramAssignments &&
-              (assignmentsLoading ? (
-                <Card>
-                  <CardContent className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Loading program assignments...
-                  </CardContent>
-                </Card>
-              ) : (
-                <ContactProgramAssignmentsPanel
+          {(() => {
+            const overviewSection = (
+              <ContactProfileCollapsibleSection
+                id="contact-section-overview"
+                title="Overview"
+                open={overviewOpen}
+                onOpenChange={setOverviewOpen}
+              >
+                <div className="space-y-6">
+                  <ContactBasicsPanel
+                    contact={contact}
+                    personDetails={profileExtendedData?.personDetails ?? null}
+                    defaultEditing={isEditMode}
+                    onEditingChange={setContactEditMode}
+                    onSaved={onContactUpdated}
+                    layout="overview-general"
+                    showEditButton
+                  />
+                  {!isEntity ? (
+                    profileExtendedLoading ? (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Loading family members...
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <h4 className="text-sm font-semibold">Family</h4>
+                        <ContactFamilyPanel
+                          contactId={contact.id}
+                          familyMembers={profileExtendedData?.familyMembers ?? []}
+                          onChanged={onExtendedDataChanged}
+                          embedded
+                        />
+                      </div>
+                    )
+                  ) : null}
+                </div>
+              </ContactProfileCollapsibleSection>
+            )
+
+            const notesActivitySection = (
+              <ContactProfileCollapsibleSection
+                id="contact-section-activity"
+                title="Notes & Activity"
+                open={notesActivityOpen}
+                onOpenChange={setNotesActivityOpen}
+              >
+                <div className="space-y-6">
+                  {!isEntity && modules.applications ? (
+                    <ContactApplicationsPanel contactId={contact.id} />
+                  ) : null}
+                  <ContactTimelinePanel
+                    items={profileData?.timeline ?? []}
+                    loading={profileLoading}
+                  />
+                  <ContactNotesPanel
+                    contactId={contact.id}
+                    notes={profileData?.notes ?? []}
+                    loading={profileLoading}
+                    onNotesChanged={onNotesChanged}
+                  />
+                </div>
+              </ContactProfileCollapsibleSection>
+            )
+
+            if (showFinancialHome) {
+              return (
+                <ContactFinancialPanel
                   contactId={contact.id}
-                  assignments={programAssignments}
+                  contactName={contact.full_name || "Contact"}
+                  contactEmail={contact.email}
+                  contactPhone={contact.phone}
+                  donorId={profileData?.donorId}
+                  personId={contact.person_id ?? null}
+                  isGroup={isGroup}
+                  modules={modules}
+                  paymentMethods={profileExtendedData?.paymentMethods ?? []}
+                  paymentMethodsLoading={profileExtendedLoading}
+                  showPaymentMethods={!isGroup}
+                  hideIdentity
+                  stickyHeader={identityHeader}
+                  stickyTopClass={stickyTopClass}
+                  belowSticky={moduleTabs}
+                  leadingContent={overviewSection}
+                  trailingContent={notesActivitySection}
+                  refreshToken={financialRefreshToken}
                 />
-              ))}
-          </TabsContent>
-        ) : null}
+              )
+            }
 
-        {showWorkforceTab ? (
-        <TabsContent value="workforce" className="mt-0 space-y-6">
+            return (
+              <div className="space-y-3">
+                {overviewSection}
+                {notesActivitySection}
+              </div>
+            )
+          })()}
+        </div>
+      ) : null}
+
+      {activeTab === "participation" && showParticipationTab ? (
+        <div className="space-y-6">
+          {modules.membership ? (
+            <ContactMembershipPanel
+              contactId={contact.id}
+              contactName={contact.full_name || "Unnamed Contact"}
+              teamsCount={profileData?.activeTeamsCount ?? 0}
+              onMembershipChanged={onRolesUpdated}
+            />
+          ) : null}
+          {modules.programs ? (
+            <ContactProgramEnrollmentsPanel
+              enrollments={profileData?.enrollmentRecords ?? []}
+              loading={profileLoading}
+            />
+          ) : null}
+          {showProgramAssignments &&
+            (assignmentsLoading ? (
+              <Card>
+                <CardContent className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading program assignments...
+                </CardContent>
+              </Card>
+            ) : (
+              <ContactProgramAssignmentsPanel
+                contactId={contact.id}
+                assignments={programAssignments}
+              />
+            ))}
+        </div>
+      ) : null}
+
+      {activeTab === "workforce" && showWorkforceTab ? (
+        <div className="space-y-6">
           {modules.workforce && staffRecordId ? (
             <ContactEmployeePanel
               staffId={staffRecordId}
@@ -788,51 +863,8 @@ export function ContactProfileClient({
               </CardContent>
             </Card>
           ) : null}
-        </TabsContent>
-        ) : null}
-
-        {showFinancialTab ? (
-        <TabsContent value="financial" className="mt-0 space-y-6">
-            {isGroup && showDonorPanel && !profileLoading ? (
-              <ContactGroupGivingOverview
-                groupContactId={contact.id}
-                groupName={contact.full_name || "Group"}
-              />
-            ) : null}
-            <ContactFinancialPanel
-              contactId={contact.id}
-              contactName={contact.full_name || "Contact"}
-              donorId={profileData?.donorId}
-              personId={contact.person_id ?? null}
-              isGroup={isGroup}
-              modules={modules}
-              paymentMethods={profileExtendedData?.paymentMethods ?? []}
-              paymentMethodsLoading={profileExtendedLoading}
-              showPaymentMethods={!isGroup}
-            />
-          </TabsContent>
-        ) : null}
-
-        <TabsContent value="activity" className="mt-0 space-y-6">
-          <ContactRelationshipSummaryCard
-            contactId={contact.id}
-            summary={profileData?.summary ?? null}
-            activity={profileData?.activity ?? null}
-            loading={profileLoading}
-            hideTeams={isEntity}
-          />
-          {!isEntity && modules.applications ? (
-            <ContactApplicationsPanel contactId={contact.id} />
-          ) : null}
-          <ContactTimelinePanel items={profileData?.timeline ?? []} loading={profileLoading} />
-          <ContactNotesPanel
-            contactId={contact.id}
-            notes={profileData?.notes ?? []}
-            loading={profileLoading}
-            onNotesChanged={onNotesChanged}
-          />
-        </TabsContent>
-      </Tabs>
+        </div>
+      ) : null}
 
       <ContactMergeDialog
         open={showMergeDialog}
@@ -848,6 +880,31 @@ export function ContactProfileClient({
           void onContactUpdated()
         }}
       />
+
+      {modules.donations ? (
+        <>
+          <ContactReceivePaymentDialog
+            open={showReceivePaymentDialog}
+            onOpenChange={setShowReceivePaymentDialog}
+            contactId={contact.id}
+            contactName={contact.full_name || "Unnamed Contact"}
+            organizationId={organizationId}
+            onSuccess={() => {
+              void handleDonationDialogSuccess()
+            }}
+          />
+          <ContactAddPledgeDialog
+            open={showAddPledgeDialog}
+            onOpenChange={setShowAddPledgeDialog}
+            contactId={contact.id}
+            contactName={contact.full_name || "Unnamed Contact"}
+            organizationId={organizationId}
+            onSuccess={() => {
+              void handleDonationDialogSuccess()
+            }}
+          />
+        </>
+      ) : null}
 
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <DialogContent>

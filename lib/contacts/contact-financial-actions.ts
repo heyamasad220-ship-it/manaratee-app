@@ -167,7 +167,6 @@ export async function loadContactFinancialSummaryAction(
 
   let resolvedDonorId = donorId ?? null
   if (modules.donations) {
-    availableFilters.add("donations")
     availableFilters.add("pledges")
 
     if (!resolvedDonorId) {
@@ -573,7 +572,6 @@ export async function loadContactFinancialSummaryAction(
 
   const filterOrder: ContactFinancialFilter[] = [
     "all",
-    "donations",
     "pledges",
     "programs",
     "venue_rentals",

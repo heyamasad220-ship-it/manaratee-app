@@ -7,6 +7,7 @@ export function donationPledgesHref(input?: {
   pledgeId?: string
   action?: "add" | "edit" | "pay" | "view"
   campaignId?: string
+  contactId?: string
   hash?: string
 }) {
   const params = new URLSearchParams()
@@ -21,6 +22,10 @@ export function donationPledgesHref(input?: {
 
   if (input?.campaignId) {
     params.set("campaignId", input.campaignId)
+  }
+
+  if (input?.contactId) {
+    params.set("contactId", input.contactId)
   }
 
   const query = params.toString()

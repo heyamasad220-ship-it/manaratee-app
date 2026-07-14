@@ -502,6 +502,21 @@ export async function executeContactMerge(
       survivingDonorId,
       canonicalSenderName
     )
+
+    const { error: donorNameError } = await supabase
+      .from("donors")
+      .update({
+        full_name: canonicalSenderName,
+        email: target.email,
+        phone: target.phone,
+        contact_id: target.id,
+      })
+      .eq("organization_id", orgId)
+      .eq("id", survivingDonorId)
+
+    if (donorNameError && donorNameError.code !== "42P01") {
+      throw new Error(`donor name sync: ${donorNameError.message}`)
+    }
   }
 
   return preview

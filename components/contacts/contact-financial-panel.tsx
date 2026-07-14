@@ -1,13 +1,15 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
 import dynamic from "next/dynamic"
 import Link from "next/link"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import {
   Calendar,
   DollarSign,
   Loader2,
+  Mail,
+  Phone,
   Scale,
   TrendingUp,
 } from "lucide-react"
@@ -19,8 +21,8 @@ import {
   DonationMetricCardGrid,
 } from "@/components/donations/donation-metric-card"
 import { ContactPaymentMethodsPanel } from "@/components/contacts/contact-payment-methods-panel"
+import { ContactProfileCollapsibleSection } from "@/components/contacts/contact-profile-collapsible-section"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Sheet,
@@ -40,7 +42,6 @@ import {
 import { loadContactFinancialSummaryAction } from "@/lib/contacts/contact-financial-actions"
 import { financialActivityStatusBadgeClass } from "@/lib/donations/donation-status"
 import type {
-  ContactFinancialFilter,
   ContactFinancialSummaryPayload,
   ContactFinancialTimelineEvent,
   ContactOpenBalanceRow,
@@ -50,12 +51,6 @@ import { getPaymentDetailPageDataAction } from "@/lib/donations/payment-admin-ac
 import type { DonationHistoryRow } from "@/components/donations/donor-donation-history-table"
 import type { ContactProfileModuleFlags } from "@/lib/contacts/contact-profile-module-access"
 import type { ContactPaymentMethodRow } from "@/lib/contacts/contact-payment-method-actions"
-import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
-import {
-  isSafeReturnToPath,
-  readStoredReturnToPath,
-  RETURN_TO_QUERY_PARAM,
-} from "@/lib/navigation/return-to"
 import { cn } from "@/lib/utils"
 
 const ContactFinancialPaymentEditDialog = dynamic(
@@ -73,52 +68,6 @@ const ContactFinancialPledgeEditDialog = dynamic(
     ),
   { ssr: false }
 )
-
-const FILTER_LABELS: Record<ContactFinancialFilter, string> = {
-  all: "All Transactions",
-  donations: "Donations",
-  pledges: "Pledges",
-  programs: "Programs",
-  venue_rentals: "Venue Rentals",
-  membership: "Membership",
-  other: "Other",
-}
-
-type FinancialActivitySection = "activity" | "payment_methods" | "statements"
-
-function buildFinancialActivityTabs(input: {
-  availableFilters: ContactFinancialFilter[]
-  showPaymentMethodsTab: boolean
-  showStatementsTab: boolean
-}) {
-  const tabs: Array<
-    | { kind: "filter"; value: ContactFinancialFilter; label: string }
-    | { kind: "section"; value: Exclude<FinancialActivitySection, "activity">; label: string }
-  > = []
-
-  for (const option of input.availableFilters) {
-    tabs.push({ kind: "filter", value: option, label: FILTER_LABELS[option] })
-    if (option === "pledges") {
-      if (input.showPaymentMethodsTab) {
-        tabs.push({ kind: "section", value: "payment_methods", label: "Payment Methods" })
-      }
-      if (input.showStatementsTab) {
-        tabs.push({ kind: "section", value: "statements", label: "Statements" })
-      }
-    }
-  }
-
-  if (!input.availableFilters.includes("pledges")) {
-    if (input.showPaymentMethodsTab) {
-      tabs.push({ kind: "section", value: "payment_methods", label: "Payment Methods" })
-    }
-    if (input.showStatementsTab) {
-      tabs.push({ kind: "section", value: "statements", label: "Statements" })
-    }
-  }
-
-  return tabs
-}
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("en-US", {
@@ -214,6 +163,8 @@ function OpenBalancesTable({ rows }: { rows: ContactOpenBalanceRow[] }) {
 type ContactFinancialPanelProps = {
   contactId: string
   contactName: string
+  contactEmail?: string | null
+  contactPhone?: string | null
   donorId?: string | null
   personId?: string | null
   isGroup?: boolean
@@ -221,11 +172,149 @@ type ContactFinancialPanelProps = {
   paymentMethods?: ContactPaymentMethodRow[]
   paymentMethodsLoading?: boolean
   showPaymentMethods?: boolean
+  /** Parent owns sticky identity; only show KPI cards and activity. */
+  hideIdentity?: boolean
+  /** When set with hideIdentity, identity + KPI cards share one sticky header. */
+  stickyHeader?: ReactNode
+  /** Rendered directly under the sticky strip (e.g. Summary/Participation tabs). */
+  belowSticky?: ReactNode
+  /** Rendered above All Transactions (e.g. Overview). */
+  leadingContent?: ReactNode
+  /** Sticky offset class for page chrome (omit / top-0 in dialogs). */
+  stickyTopClass?: string
+  /** Increment to reload summary (e.g. after inline payment/pledge create). */
+  refreshToken?: number
+  /** Rendered after Statements (e.g. Notes & Activity). */
+  trailingContent?: ReactNode
+}
+
+function ContactFinancialIdentity({
+  name,
+  email,
+  phone,
+}: {
+  name: string
+  email?: string | null
+  phone?: string | null
+}) {
+  return (
+    <div className="min-w-0 shrink-0 space-y-3 lg:w-[220px] xl:w-[260px]">
+      <h2 className="text-lg font-semibold leading-tight text-foreground">{name}</h2>
+      <div className="space-y-2 text-sm">
+        <div className="flex items-start gap-2 text-muted-foreground">
+          <Phone className="mt-0.5 h-4 w-4 shrink-0" />
+          {phone ? (
+            <a href={`tel:${phone}`} className="break-all text-foreground hover:underline">
+              {phone}
+            </a>
+          ) : (
+            <span>—</span>
+          )}
+        </div>
+        <div className="flex items-start gap-2 text-muted-foreground">
+          <Mail className="mt-0.5 h-4 w-4 shrink-0" />
+          {email ? (
+            <a href={`mailto:${email}`} className="break-all text-foreground hover:underline">
+              {email}
+            </a>
+          ) : (
+            <span>—</span>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ContactFinancialMetricsGrid({
+  metrics,
+  onOpenBalances,
+}: {
+  metrics: ContactFinancialSummaryPayload["metrics"]
+  onOpenBalances: () => void
+}) {
+  return (
+    <DonationMetricCardGrid columns={4} colorful compact className="w-full min-w-0">
+      <DonationMetricCard
+        title="Total Paid"
+        value={formatCurrency(metrics.totalPaid)}
+        icon={DollarSign}
+        accent="emerald"
+        compact
+      />
+      <DonationMetricCard
+        title="Lifetime Contributions"
+        value={formatCurrency(metrics.lifetimeContributions)}
+        icon={TrendingUp}
+        accent="rose"
+        compact
+      />
+      <DonationMetricCard
+        title="Outstanding Balance"
+        value={formatCurrency(metrics.outstandingBalance)}
+        icon={Scale}
+        accent="amber"
+        compact
+        onClick={onOpenBalances}
+      />
+      <DonationMetricCard
+        title="Last Activity"
+        value={formatDate(metrics.lastActivityDate)}
+        icon={Calendar}
+        accent="blue"
+        compact
+      />
+    </DonationMetricCardGrid>
+  )
+}
+
+function ContactFinancialSummaryStrip({
+  contactName,
+  contactEmail,
+  contactPhone,
+  metrics,
+  onOpenBalances,
+  hideIdentity = false,
+  stickyTopClass = "top-0",
+}: {
+  contactName: string
+  contactEmail?: string | null
+  contactPhone?: string | null
+  metrics: ContactFinancialSummaryPayload["metrics"]
+  onOpenBalances: () => void
+  hideIdentity?: boolean
+  stickyTopClass?: string
+}) {
+  if (hideIdentity) {
+    return <ContactFinancialMetricsGrid metrics={metrics} onOpenBalances={onOpenBalances} />
+  }
+
+  return (
+    <div
+      className={cn(
+        "sticky z-40 -mx-6 border-b border-border bg-background px-6 pb-4 pt-1",
+        stickyTopClass
+      )}
+    >
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <ContactFinancialIdentity
+          name={contactName}
+          email={contactEmail}
+          phone={contactPhone}
+        />
+        <div className="w-full min-w-0 lg:max-w-2xl lg:flex-1">
+          <ContactFinancialMetricsGrid metrics={metrics} onOpenBalances={onOpenBalances} />
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export function ContactFinancialPanel({
   contactId,
   contactName,
+  contactEmail,
+  contactPhone,
   donorId,
   personId,
   isGroup = false,
@@ -233,12 +322,17 @@ export function ContactFinancialPanel({
   paymentMethods = [],
   paymentMethodsLoading = false,
   showPaymentMethods = false,
+  hideIdentity = false,
+  stickyHeader,
+  belowSticky,
+  leadingContent,
+  trailingContent,
+  refreshToken = 0,
+  stickyTopClass = "top-0",
 }: ContactFinancialPanelProps) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [data, setData] = useState<ContactFinancialSummaryPayload | null>(null)
-  const [filter, setFilter] = useState<ContactFinancialFilter>("all")
-  const [section, setSection] = useState<FinancialActivitySection>("activity")
   const [openBalancesOpen, setOpenBalancesOpen] = useState(false)
 
   const loadData = useCallback(async () => {
@@ -265,94 +359,157 @@ export function ContactFinancialPanel({
 
   useEffect(() => {
     void loadData()
-  }, [loadData])
-
-  const filteredTimeline = useMemo(() => {
-    if (!data) return []
-    if (filter === "all") {
-      return data.timeline.filter((event) => event.filterCategory !== "pledges")
-    }
-    return data.timeline.filter((event) => event.filterCategory === filter)
-  }, [data, filter])
+  }, [loadData, refreshToken])
 
   const showDonationSidebar = Boolean(modules.donations && donorId)
+  const showPaymentPlansTab = showDonationSidebar && !isGroup
   const showPaymentMethodsTab = showPaymentMethods
   const showStatementsTab = showDonationSidebar && Boolean(donorId) && !isGroup
 
-  const showSidebar =
-    (showDonationSidebar && !isGroup) || modules.membership
+  const showMembershipSidebar = modules.membership && !isGroup
   const hasAnyModule =
     modules.donations || modules.bookings || modules.programs || modules.membership
 
+  const contactIdentity = hideIdentity ? null : (
+    <ContactFinancialIdentity
+      name={contactName}
+      email={contactEmail}
+      phone={contactPhone}
+    />
+  )
+
+  function renderCombinedSticky(metricsContent: ReactNode) {
+    if (!hideIdentity || !stickyHeader) return null
+    return (
+      <div
+        className={cn(
+          "sticky z-40 -mx-6 space-y-4 border-b border-border bg-background px-6 pb-4 pt-1",
+          stickyTopClass
+        )}
+      >
+        {stickyHeader}
+        {metricsContent}
+      </div>
+    )
+  }
+
+  const stickyStripClassName = cn(
+    "sticky z-40 -mx-6 border-b border-border bg-background px-6 pb-4 pt-1",
+    stickyTopClass
+  )
+
   if (loading) {
     return (
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        Loading financial summary...
+      <div className="space-y-6">
+        {hideIdentity && stickyHeader ? (
+          renderCombinedSticky(
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading financial summary...
+            </div>
+          )
+        ) : hideIdentity ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading financial summary...
+          </div>
+        ) : (
+          <div className={stickyStripClassName}>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              {contactIdentity}
+              <div className="flex flex-1 items-center gap-2 text-sm text-muted-foreground lg:justify-end">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading financial summary...
+              </div>
+            </div>
+          </div>
+        )}
+        {belowSticky}
+        <div className="space-y-3">
+          {leadingContent}
+          {trailingContent}
+        </div>
       </div>
     )
   }
 
   if (error) {
     return (
-      <Card>
-        <CardContent className="p-6 text-sm text-destructive">{error}</CardContent>
-      </Card>
+      <div className="space-y-6">
+        {hideIdentity && stickyHeader
+          ? renderCombinedSticky(null)
+          : contactIdentity ? (
+              <div className={stickyStripClassName}>
+                {contactIdentity}
+              </div>
+            ) : null}
+        {belowSticky}
+        <div className="space-y-3">
+          {leadingContent}
+          <Card>
+            <CardContent className="p-6 text-sm text-destructive">{error}</CardContent>
+          </Card>
+          {trailingContent}
+        </div>
+      </div>
     )
   }
 
   if (!data || !hasAnyModule) {
     return (
-      <Card>
-        <CardContent className="p-6 text-sm text-muted-foreground">
-          No financial modules are enabled for this organization.
-        </CardContent>
-      </Card>
+      <div className="space-y-6">
+        {hideIdentity && stickyHeader
+          ? renderCombinedSticky(null)
+          : contactIdentity ? (
+              <div className={stickyStripClassName}>
+                {contactIdentity}
+              </div>
+            ) : null}
+        {belowSticky}
+        <div className="space-y-3">
+          {leadingContent}
+          <Card>
+            <CardContent className="p-6 text-sm text-muted-foreground">
+              No financial modules are enabled for this organization.
+            </CardContent>
+          </Card>
+          {trailingContent}
+        </div>
+      </div>
     )
   }
 
-  const { metrics, openBalances, availableFilters } = data
+  const { metrics, openBalances } = data
   const hasActivity = data.timeline.length > 0 || openBalances.length > 0
+
+  const metricsBlock = !isGroup ? (
+    <ContactFinancialSummaryStrip
+      contactName={contactName}
+      contactEmail={contactEmail}
+      contactPhone={contactPhone}
+      metrics={metrics}
+      onOpenBalances={() => setOpenBalancesOpen(true)}
+      hideIdentity={hideIdentity}
+      stickyTopClass={stickyTopClass}
+    />
+  ) : contactIdentity ? (
+    contactIdentity
+  ) : null
 
   return (
     <div className="space-y-6">
-      {!isGroup ? (
-        <DonationMetricCardGrid columns={4} colorful>
-          <DonationMetricCard
-            title="Total Paid"
-            value={formatCurrency(metrics.totalPaid)}
-            description={
-              metrics.donationsOnlyTotalPaid
-                ? "Donations only — other modules will add here when available"
-                : "Received across donations, programs, and rentals"
-            }
-            icon={DollarSign}
-            accent="emerald"
-          />
-          <DonationMetricCard
-            title="Lifetime Contributions"
-            value={formatCurrency(metrics.lifetimeContributions)}
-            description="Charitable giving and donations only"
-            icon={TrendingUp}
-            accent="rose"
-          />
-          <DonationMetricCard
-            title="Outstanding Balance"
-            value={formatCurrency(metrics.outstandingBalance)}
-            description="Click to view open balances"
-            icon={Scale}
-            accent="amber"
-            onClick={() => setOpenBalancesOpen(true)}
-          />
-          <DonationMetricCard
-            title="Last Financial Activity"
-            value={formatDate(metrics.lastActivityDate)}
-            description="Most recent payment, pledge, or fee event"
-            icon={Calendar}
-            accent="blue"
-          />
-        </DonationMetricCardGrid>
-      ) : null}
+      {hideIdentity && stickyHeader
+        ? renderCombinedSticky(
+            !isGroup ? (
+              <ContactFinancialMetricsGrid
+                metrics={metrics}
+                onOpenBalances={() => setOpenBalancesOpen(true)}
+              />
+            ) : null
+          )
+        : metricsBlock}
+
+      {belowSticky}
 
       {!isGroup ? (
         <Sheet open={openBalancesOpen} onOpenChange={setOpenBalancesOpen}>
@@ -370,15 +527,10 @@ export function ContactFinancialPanel({
         </Sheet>
       ) : null}
 
-      {showSidebar ? (
+      {showMembershipSidebar ? (
         <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-          <FinancialActivityCard
-            section={section}
-            onSectionChange={setSection}
-            filter={filter}
-            onFilterChange={setFilter}
-            availableFilters={availableFilters}
-            filteredTimeline={filteredTimeline}
+          <FinancialActivitySections
+            timeline={data.timeline}
             hasActivity={hasActivity}
             contactId={contactId}
             contactName={contactName}
@@ -386,37 +538,28 @@ export function ContactFinancialPanel({
             onTimelineUpdated={() => void loadData()}
             paymentMethods={paymentMethods}
             paymentMethodsLoading={paymentMethodsLoading}
-            showPaymentMethodsTab={showPaymentMethodsTab}
-            showStatementsTab={showStatementsTab}
-            showGroupColumn={!isGroup}
+            showPaymentPlans={showPaymentPlansTab}
+            showPaymentMethods={showPaymentMethodsTab}
+            showStatements={showStatementsTab}
+            leadingContent={leadingContent}
+            trailingContent={trailingContent}
           />
 
           <div className="space-y-6">
-            {showDonationSidebar && !isGroup ? (
-              <DonorRecurringPanel donorId={donorId!} />
-            ) : null}
-
-            {modules.membership ? (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Membership</CardTitle>
-                </CardHeader>
-                <CardContent className="text-sm text-muted-foreground">
-                  Membership dues and billing history will appear here when membership financial
-                  records are linked to contacts.
-                </CardContent>
-              </Card>
-            ) : null}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Membership</CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground">
+                Membership dues and billing history will appear here when membership financial
+                records are linked to contacts.
+              </CardContent>
+            </Card>
           </div>
         </div>
       ) : (
-        <FinancialActivityCard
-          section={section}
-          onSectionChange={setSection}
-          filter={filter}
-          onFilterChange={setFilter}
-          availableFilters={availableFilters}
-          filteredTimeline={filteredTimeline}
+        <FinancialActivitySections
+          timeline={data.timeline}
           hasActivity={hasActivity}
           contactId={contactId}
           contactName={contactName}
@@ -424,22 +567,19 @@ export function ContactFinancialPanel({
           onTimelineUpdated={() => void loadData()}
           paymentMethods={paymentMethods}
           paymentMethodsLoading={paymentMethodsLoading}
-          showPaymentMethodsTab={showPaymentMethodsTab}
-          showStatementsTab={showStatementsTab}
-          showGroupColumn={!isGroup}
+          showPaymentPlans={showPaymentPlansTab}
+          showPaymentMethods={showPaymentMethodsTab}
+          showStatements={showStatementsTab}
+          leadingContent={leadingContent}
+          trailingContent={trailingContent}
         />
       )}
     </div>
   )
 }
 
-type FinancialActivityCardProps = {
-  section: FinancialActivitySection
-  onSectionChange: (section: FinancialActivitySection) => void
-  filter: ContactFinancialFilter
-  onFilterChange: (filter: ContactFinancialFilter) => void
-  availableFilters: ContactFinancialFilter[]
-  filteredTimeline: ContactFinancialSummaryPayload["timeline"]
+type FinancialActivitySectionsProps = {
+  timeline: ContactFinancialSummaryPayload["timeline"]
   hasActivity: boolean
   contactId: string
   contactName: string
@@ -447,18 +587,15 @@ type FinancialActivityCardProps = {
   onTimelineUpdated?: () => void
   paymentMethods: ContactPaymentMethodRow[]
   paymentMethodsLoading: boolean
-  showPaymentMethodsTab: boolean
-  showStatementsTab: boolean
-  showGroupColumn?: boolean
+  showPaymentPlans: boolean
+  showPaymentMethods: boolean
+  showStatements: boolean
+  leadingContent?: ReactNode
+  trailingContent?: ReactNode
 }
 
-function FinancialActivityCard({
-  section,
-  onSectionChange,
-  filter,
-  onFilterChange,
-  availableFilters,
-  filteredTimeline,
+function FinancialActivitySections({
+  timeline,
   hasActivity,
   contactId,
   contactName,
@@ -466,19 +603,13 @@ function FinancialActivityCard({
   onTimelineUpdated,
   paymentMethods,
   paymentMethodsLoading,
-  showPaymentMethodsTab,
-  showStatementsTab,
-  showGroupColumn = false,
-}: FinancialActivityCardProps) {
+  showPaymentPlans,
+  showPaymentMethods,
+  showStatements,
+  leadingContent,
+  trailingContent,
+}: FinancialActivitySectionsProps) {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const profileReturnTo = useMemo(() => {
-    const fromQuery = searchParams.get(RETURN_TO_QUERY_PARAM)
-    if (fromQuery && isSafeReturnToPath(fromQuery)) {
-      return fromQuery
-    }
-    return readStoredReturnToPath()
-  }, [searchParams])
   const [openingPaymentId, setOpeningPaymentId] = useState<string | null>(null)
   const [pledgeEditId, setPledgeEditId] = useState<string | null>(null)
   const [paymentEdit, setPaymentEdit] = useState<{
@@ -486,6 +617,26 @@ function FinancialActivityCard({
     row: DonationHistoryRow
     initialDialog: "edit" | "allocate"
   } | null>(null)
+
+  const transactions = useMemo(
+    () => timeline.filter((event) => event.filterCategory !== "pledges"),
+    [timeline]
+  )
+  const pledges = useMemo(
+    () => timeline.filter((event) => event.filterCategory === "pledges"),
+    [timeline]
+  )
+
+  const [transactionsOpen, setTransactionsOpen] = useState(false)
+  const [paymentPlansOpen, setPaymentPlansOpen] = useState(false)
+  const [pledgesOpen, setPledgesOpen] = useState(false)
+  const [paymentMethodsOpen, setPaymentMethodsOpen] = useState(false)
+  const [statementsOpen, setStatementsOpen] = useState(false)
+  const [paymentPlansCount, setPaymentPlansCount] = useState<number | null>(null)
+
+  const handleHasPlansChange = useCallback((info: { hasPlans: boolean; count: number }) => {
+    setPaymentPlansCount(info.count)
+  }, [])
 
   const openPaymentEditor = useCallback(
     async (paymentId: string, initialDialog: "edit" | "allocate" = "edit") => {
@@ -551,175 +702,129 @@ function FinancialActivityCard({
     [openPaymentEditor, router]
   )
 
-  const activityTabs = useMemo(
-    () =>
-      buildFinancialActivityTabs({
-        availableFilters,
-        showPaymentMethodsTab,
-        showStatementsTab,
-      }),
-    [availableFilters, showPaymentMethodsTab, showStatementsTab]
-  )
+  function renderTimelineTable(
+    rows: ContactFinancialTimelineEvent[],
+    emptyMessage: string
+  ) {
+    if (rows.length === 0) {
+      return <p className="text-sm text-muted-foreground">{emptyMessage}</p>
+    }
+
+    return (
+      <div className="overflow-x-auto rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Date</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead>Description</TableHead>
+              <TableHead className="text-right">Amount</TableHead>
+              <TableHead>Method</TableHead>
+              <TableHead>Status</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((event) => {
+              const editable = isTimelineEventEditable(event)
+              const paymentId = getTimelinePaymentId(event)
+              const isOpening = paymentId != null && openingPaymentId === paymentId
+
+              return (
+                <TableRow key={event.id}>
+                  <TableCell className="whitespace-nowrap">
+                    {editable ? (
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1 text-primary hover:underline disabled:opacity-50"
+                        disabled={isOpening}
+                        onClick={() => handleTimelineDateClick(event)}
+                      >
+                        {isOpening ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                        {formatDate(event.date)}
+                      </button>
+                    ) : (
+                      <span className="text-muted-foreground">{formatDate(event.date)}</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">{event.eventType}</TableCell>
+                  <TableCell className="max-w-[240px] truncate font-medium">
+                    {event.description}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {event.amount != null ? formatCurrency(event.amount) : "—"}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">{event.method || "—"}</TableCell>
+                  <TableCell>
+                    {event.status ? (
+                      <Badge
+                        variant="outline"
+                        className={cn(financialActivityStatusBadgeClass(event.status))}
+                      >
+                        {event.status}
+                      </Badge>
+                    ) : (
+                      "—"
+                    )}
+                  </TableCell>
+                </TableRow>
+              )
+            })}
+          </TableBody>
+        </Table>
+      </div>
+    )
+  }
 
   return (
-    <Card>
-      <CardHeader className="gap-3 space-y-0">
-        <CardTitle>Financial Activity</CardTitle>
-        <div className="flex flex-wrap gap-1.5 pt-1">
-          {activityTabs.map((tab) => {
-            const isActive =
-              tab.kind === "filter"
-                ? section === "activity" && filter === tab.value
-                : section === tab.value
+    <div className="space-y-3">
+      {leadingContent}
 
-            return (
-              <Button
-                key={tab.kind === "filter" ? tab.value : tab.value}
-                type="button"
-                size="sm"
-                variant={isActive ? "default" : "outline"}
-                className="h-7 text-xs"
-                onClick={() => {
-                  if (tab.kind === "filter") {
-                    onSectionChange("activity")
-                    onFilterChange(tab.value)
-                    return
-                  }
-                  onSectionChange(tab.value)
-                }}
-              >
-                {tab.label}
-              </Button>
-            )
-          })}
-        </div>
-      </CardHeader>
-      <CardContent>
-        {section === "activity" ? (
-          filteredTimeline.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              {filter === "pledges"
-                ? "There are no pledges."
-                : hasActivity
-                  ? "No activity matches this filter."
-                  : "No financial activity recorded for this contact yet."}
-            </p>
-          ) : (
-            <div className="overflow-x-auto rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Description</TableHead>
-                    {showGroupColumn ? <TableHead>Group</TableHead> : null}
-                    <TableHead className="text-right">Amount</TableHead>
-                    <TableHead>Method</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredTimeline.map((event) => {
-                    const editable = isTimelineEventEditable(event)
-                    const paymentId = getTimelinePaymentId(event)
-                    const isOpening = paymentId != null && openingPaymentId === paymentId
+      <ContactProfileCollapsibleSection
+        title="All Transactions"
+        count={transactions.length}
+        open={transactionsOpen}
+        onOpenChange={setTransactionsOpen}
+      >
+        {renderTimelineTable(
+          transactions,
+          hasActivity
+            ? "No transactions recorded for this contact yet."
+            : "No financial activity recorded for this contact yet."
+        )}
+      </ContactProfileCollapsibleSection>
 
-                    return (
-                    <TableRow key={event.id}>
-                      <TableCell className="whitespace-nowrap">
-                        {editable ? (
-                          <button
-                            type="button"
-                            className="inline-flex items-center gap-1 text-primary hover:underline disabled:opacity-50"
-                            disabled={isOpening}
-                            onClick={() => handleTimelineDateClick(event)}
-                          >
-                            {isOpening ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : null}
-                            {formatDate(event.date)}
-                          </button>
-                        ) : (
-                          <span className="text-muted-foreground">{formatDate(event.date)}</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap">{event.eventType}</TableCell>
-                      <TableCell className="max-w-[240px] truncate font-medium">
-                        {event.description}
-                      </TableCell>
-                      {showGroupColumn ? (
-                        <TableCell className="max-w-[160px] truncate">
-                          {event.attributedGroupContactId ? (
-                            <Link
-                              href={contactProfileHref(event.attributedGroupContactId, {
-                                tab: "financial",
-                                returnTo: profileReturnTo ?? undefined,
-                              })}
-                              className="text-primary hover:underline"
-                            >
-                              {event.attributedGroupName || "Unnamed group"}
-                            </Link>
-                          ) : (
-                            "—"
-                          )}
-                        </TableCell>
-                      ) : null}
-                      <TableCell className="text-right">
-                        {event.amount != null ? formatCurrency(event.amount) : "—"}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {event.method || "—"}
-                      </TableCell>
-                      <TableCell>
-                        {event.status ? (
-                          <Badge
-                            variant="outline"
-                            className={cn(financialActivityStatusBadgeClass(event.status))}
-                          >
-                            {event.status}
-                          </Badge>
-                        ) : (
-                          "—"
-                        )}
-                      </TableCell>
-                    </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          )
-        ) : null}
-
-        {paymentEdit ? (
-          <ContactFinancialPaymentEditDialog
-            donorId={paymentEdit.donorId}
-            donation={paymentEdit.row}
-            initialDialog={paymentEdit.initialDialog}
-            onClosed={() => setPaymentEdit(null)}
-            onUpdated={() => {
-              setPaymentEdit(null)
-              onTimelineUpdated?.()
-            }}
+      {showPaymentPlans && donorId ? (
+        <ContactProfileCollapsibleSection
+          title="Payment Plans"
+          count={paymentPlansCount}
+          open={paymentPlansOpen}
+          onOpenChange={setPaymentPlansOpen}
+        >
+          <DonorRecurringPanel
+            donorId={donorId}
+            embedded
+            onHasPlansChange={handleHasPlansChange}
           />
-        ) : null}
+        </ContactProfileCollapsibleSection>
+      ) : null}
 
-        {pledgeEditId ? (
-          <ContactFinancialPledgeEditDialog
-            pledgeId={pledgeEditId}
-            open
-            onOpenChange={(open) => {
-              if (!open) setPledgeEditId(null)
-            }}
-            onUpdated={() => {
-              setPledgeEditId(null)
-              onTimelineUpdated?.()
-            }}
-          />
-        ) : null}
+      <ContactProfileCollapsibleSection
+        title="Pledges"
+        count={pledges.length}
+        open={pledgesOpen}
+        onOpenChange={setPledgesOpen}
+      >
+        {renderTimelineTable(pledges, "There are no pledges.")}
+      </ContactProfileCollapsibleSection>
 
-        {section === "payment_methods" && showPaymentMethodsTab ? (
-          paymentMethodsLoading ? (
+      {showPaymentMethods ? (
+        <ContactProfileCollapsibleSection
+          title="Payment Methods"
+          count={paymentMethodsLoading ? null : paymentMethods.length}
+          open={paymentMethodsOpen}
+          onOpenChange={setPaymentMethodsOpen}
+        >
+          {paymentMethodsLoading ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
               Loading payment methods...
@@ -730,18 +835,53 @@ function FinancialActivityCard({
               paymentMethods={paymentMethods}
               embedded
             />
-          )
-        ) : null}
+          )}
+        </ContactProfileCollapsibleSection>
+      ) : null}
 
-        {section === "statements" && showStatementsTab && donorId ? (
+      {showStatements && donorId ? (
+        <ContactProfileCollapsibleSection
+          title="Statements"
+          open={statementsOpen}
+          onOpenChange={setStatementsOpen}
+        >
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
               Generate, preview, download, or email annual giving statements for {contactName}.
             </p>
             <GivingStatementActions donorId={donorId} donorName={contactName} />
           </div>
-        ) : null}
-      </CardContent>
-    </Card>
+        </ContactProfileCollapsibleSection>
+      ) : null}
+
+      {trailingContent}
+
+      {paymentEdit ? (
+        <ContactFinancialPaymentEditDialog
+          donorId={paymentEdit.donorId}
+          donation={paymentEdit.row}
+          initialDialog={paymentEdit.initialDialog}
+          onClosed={() => setPaymentEdit(null)}
+          onUpdated={() => {
+            setPaymentEdit(null)
+            onTimelineUpdated?.()
+          }}
+        />
+      ) : null}
+
+      {pledgeEditId ? (
+        <ContactFinancialPledgeEditDialog
+          pledgeId={pledgeEditId}
+          open
+          onOpenChange={(open) => {
+            if (!open) setPledgeEditId(null)
+          }}
+          onUpdated={() => {
+            setPledgeEditId(null)
+            onTimelineUpdated?.()
+          }}
+        />
+      ) : null}
+    </div>
   )
 }

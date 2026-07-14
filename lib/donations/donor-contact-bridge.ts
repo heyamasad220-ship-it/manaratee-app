@@ -82,3 +82,41 @@ export async function ensureDonorExtensionForContact(
 
   return created?.id ?? null
 }
+
+/** Keep linked donors rows aligned with the canonical contact profile. */
+export async function syncDonorExtensionFromContact(
+  organizationId: string,
+  contactId: string,
+  fields: {
+    fullName?: string | null
+    email?: string | null
+    phone?: string | null
+  },
+  supabaseClient?: SupabaseClient
+): Promise<void> {
+  const supabase = supabaseClient || (await createClient())
+  const patch: Record<string, string | null> = {}
+
+  if (fields.fullName !== undefined) {
+    const fullName = fields.fullName?.trim() || null
+    if (fullName) patch.full_name = fullName
+  }
+  if (fields.email !== undefined) {
+    patch.email = fields.email?.trim().toLowerCase() || null
+  }
+  if (fields.phone !== undefined) {
+    patch.phone = fields.phone?.trim() || null
+  }
+
+  if (Object.keys(patch).length === 0) return
+
+  const { error } = await supabase
+    .from("donors")
+    .update(patch)
+    .eq("organization_id", organizationId)
+    .eq("contact_id", contactId)
+
+  if (error && error.code !== "42P01" && error.code !== "42703") {
+    console.warn("Donor profile sync failed:", error.message)
+  }
+}

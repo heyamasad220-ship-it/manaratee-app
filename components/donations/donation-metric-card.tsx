@@ -66,6 +66,7 @@ type DonationMetricCardProps = {
   accent?: DonationMetricAccent
   className?: string
   valueClassName?: string
+  compact?: boolean
   onValueClick?: () => void
   onClick?: () => void
 }
@@ -75,14 +76,16 @@ function MetricValue({
   valueClassName,
   styles,
   onValueClick,
+  compact = false,
 }: {
   value: ReactNode
   valueClassName?: string
   styles: { value?: string } | null
   onValueClick?: () => void
+  compact?: boolean
 }) {
   const className = cn(
-    "mt-1 text-2xl font-bold",
+    compact ? "mt-0.5 text-lg font-bold leading-tight" : "mt-1 text-2xl font-bold",
     styles?.value,
     valueClassName,
     onValueClick && "cursor-pointer transition hover:underline"
@@ -107,6 +110,7 @@ export function DonationMetricCard({
   accent,
   className,
   valueClassName,
+  compact = false,
   onValueClick,
   onClick,
 }: DonationMetricCardProps) {
@@ -136,19 +140,27 @@ export function DonationMetricCard({
         role={interactive ? "button" : undefined}
         tabIndex={interactive ? 0 : undefined}
       >
-        <CardContent className="flex h-full flex-col justify-center pt-6">
-          <div className="flex items-start justify-between gap-3">
+        <CardContent className={cn("flex h-full flex-col justify-center", compact ? "p-3" : "pt-6")}>
+          <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-muted-foreground">{title}</p>
+              <p
+                className={cn(
+                  "font-medium text-muted-foreground",
+                  compact ? "text-xs leading-tight" : "text-sm"
+                )}
+              >
+                {title}
+              </p>
               {value != null && value !== "" ? (
                 <MetricValue
                   value={value}
                   valueClassName={valueClassName}
                   styles={styles}
                   onValueClick={onValueClick}
+                  compact={compact}
                 />
               ) : null}
-              {description ? (
+              {description && !compact ? (
                 <div
                   className={cn(
                     "text-xs text-muted-foreground",
@@ -160,8 +172,8 @@ export function DonationMetricCard({
               ) : null}
             </div>
             {Icon ? (
-              <div className={cn(styles.iconWrap, "shrink-0")}>
-                <Icon className={cn("h-5 w-5", styles.icon)} />
+              <div className={cn(styles.iconWrap, "shrink-0", compact && "p-2")}>
+                <Icon className={cn(compact ? "h-4 w-4" : "h-5 w-5", styles.icon)} />
               </div>
             ) : null}
           </div>
@@ -200,6 +212,7 @@ type DonationMetricCardGridProps = {
   className?: string
   columns?: 2 | 3 | 4 | 5
   colorful?: boolean
+  compact?: boolean
 }
 
 export function DonationMetricCardGrid({
@@ -207,9 +220,17 @@ export function DonationMetricCardGrid({
   className,
   columns = 4,
   colorful = false,
+  compact = false,
 }: DonationMetricCardGridProps) {
-  const columnClass =
-    columns === 2
+  const columnClass = compact
+    ? columns === 2
+      ? "grid-cols-2"
+      : columns === 3
+        ? "grid-cols-2 lg:grid-cols-3"
+        : columns === 5
+          ? "grid-cols-2 lg:grid-cols-5"
+          : "grid-cols-2 lg:grid-cols-4"
+    : columns === 2
       ? "sm:grid-cols-2"
       : columns === 3
         ? "sm:grid-cols-2 lg:grid-cols-3"
@@ -219,7 +240,16 @@ export function DonationMetricCardGrid({
 
   if (colorful) {
     return (
-      <div className={cn("grid grid-cols-1 gap-4", columnClass, className)}>{children}</div>
+      <div
+        className={cn(
+          "grid grid-cols-1",
+          compact ? "gap-2" : "gap-4",
+          columnClass,
+          className
+        )}
+      >
+        {children}
+      </div>
     )
   }
 

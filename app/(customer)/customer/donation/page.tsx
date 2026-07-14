@@ -12,6 +12,7 @@ import {
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { loadCustomerDonationPortalData } from "@/lib/customer/customer-portal-data-actions"
+import { customerDonationCategoryRequiresFund } from "@/lib/customer/customer-open-donation-categories"
 import { recordCustomerPortalDonationAction } from "@/lib/customer/customer-donation-actions"
 import { createCustomerPledgeAction, updateCustomerPledgePaymentPlanAction } from "@/lib/customer/customer-pledge-actions"
 import {
@@ -595,6 +596,13 @@ export default function CustomerDonationsPage() {
   }
 
   const isOneTimeDonation = donationForm.frequency === "one-time"
+
+  const selectedDonationCategory = donationCategories.find(
+    (category) => category.id === donationForm.category
+  )
+  const selectedCategoryRequiresFund = selectedDonationCategory
+    ? customerDonationCategoryRequiresFund(selectedDonationCategory)
+    : false
 
   const processDonation = async () => {
     if (!contact) return
@@ -1416,7 +1424,7 @@ export default function CustomerDonationsPage() {
                   </Select>
                 </div>
 
-                {donationForm.category ? (
+                {donationForm.category && selectedCategoryRequiresFund ? (
                   <div className="flex flex-col gap-2">
                     <Label>Specific Fund</Label>
                     <Select
@@ -1432,13 +1440,11 @@ export default function CustomerDonationsPage() {
                         <SelectValue placeholder="Select fund" />
                       </SelectTrigger>
                       <SelectContent>
-                        {donationCategories
-                          .find((c) => c.id === donationForm.category)
-                          ?.funds.map((fund) => (
-                            <SelectItem key={fund.id} value={fund.id}>
-                              {fund.name}
-                            </SelectItem>
-                          ))}
+                        {selectedDonationCategory?.funds.map((fund) => (
+                          <SelectItem key={fund.id} value={fund.id}>
+                            {fund.name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -1508,7 +1514,7 @@ export default function CustomerDonationsPage() {
                   disabled={
                     !donationForm.amount ||
                     !donationForm.category ||
-                    !donationForm.fund ||
+                    (selectedCategoryRequiresFund && !donationForm.fund) ||
                     (isOneTimeDonation && !donationForm.paymentMethod) ||
                     isProcessing
                   }

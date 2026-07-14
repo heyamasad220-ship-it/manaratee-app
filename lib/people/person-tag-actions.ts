@@ -117,3 +117,42 @@ export async function removePersonTag(contactId: string, tagId: string) {
 
   revalidatePath(`/contacts/${contactId}`)
 }
+
+/** Replace all person discount tags with a single selection (or none). */
+export async function setPersonDiscountTag(contactId: string, tagId: string | null) {
+  const supabase = await createClient()
+  const organizationId = await getSelectedOrganizationId()
+
+  if (!organizationId) {
+    throw new Error("No organization selected")
+  }
+
+  const personId = await ensurePersonForContact(contactId)
+
+  const { error: deleteError } = await supabase
+    .from("person_tags")
+    .delete()
+    .eq("organization_id", organizationId)
+    .eq("person_id", personId)
+
+  if (deleteError) {
+    throw new Error(deleteError.message)
+  }
+
+  if (!tagId) {
+    revalidatePath(`/contacts/${contactId}`)
+    return
+  }
+
+  const { error: insertError } = await supabase.from("person_tags").insert({
+    organization_id: organizationId,
+    person_id: personId,
+    tag_id: tagId,
+  })
+
+  if (insertError) {
+    throw new Error(insertError.message)
+  }
+
+  revalidatePath(`/contacts/${contactId}`)
+}

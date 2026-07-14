@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useTransition } from "react"
+import { useEffect, useState, useTransition, type ReactNode } from "react"
 import { Loader2, MapPin, Pencil } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -19,6 +19,9 @@ import {
 } from "@/components/ui/select"
 import { updateContactBasics } from "@/lib/contacts/contact-actions"
 import { updateContactPersonDetails } from "@/lib/contacts/contact-profile-admin-actions"
+import { ContactDiscountTagsField } from "@/components/contacts/contact-discount-tags-field"
+import { ContactGroupsField } from "@/components/contacts/contact-groups-field"
+import { cn } from "@/lib/utils"
 import {
   STATUS_OPTIONS,
   statusToDbValue,
@@ -81,6 +84,10 @@ function formatAddress(contact: ContactBasicsPanelProps["contact"]) {
   ].filter(Boolean)
 
   return parts.length > 0 ? parts.join("\n") : "—"
+}
+
+function FieldLabel({ children }: { children: ReactNode }) {
+  return <dt className="text-xs font-medium text-muted-foreground">{children}</dt>
 }
 
 export function ContactBasicsPanel({
@@ -233,6 +240,60 @@ export function ContactBasicsPanel({
     })
   }
 
+  const addressEditor = (
+    <div className="grid gap-2 sm:grid-cols-6">
+      <Input
+        id="profile-address"
+        value={address}
+        onChange={(event) => setAddress(event.target.value)}
+        placeholder="Street"
+        className="sm:col-span-2"
+      />
+      <Input
+        id="profile-city"
+        value={city}
+        onChange={(event) => setCity(event.target.value)}
+        placeholder="City"
+      />
+      <Input
+        id="profile-state"
+        value={state}
+        onChange={(event) => setState(event.target.value)}
+        placeholder="State"
+      />
+      <Input
+        id="profile-zip"
+        value={zip}
+        onChange={(event) => setZip(event.target.value)}
+        placeholder="Zip"
+      />
+      <Input
+        id="profile-country"
+        value={country}
+        onChange={(event) => setCountry(event.target.value)}
+        placeholder="Country"
+      />
+    </div>
+  )
+
+  const overviewSaveBar = isEditing ? (
+    <div className="flex justify-end gap-2 pt-1">
+      <Button variant="outline" onClick={handleCancel} disabled={isPending}>
+        Cancel
+      </Button>
+      <Button onClick={handleSave} disabled={isPending}>
+        {isPending ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Saving...
+          </>
+        ) : (
+          "Save changes"
+        )}
+      </Button>
+    </div>
+  ) : null
+
   return (
     <Card>
       {!isOverviewGeneral ? (
@@ -245,487 +306,539 @@ export function ContactBasicsPanel({
             </Button>
           ) : null}
         </CardHeader>
+      ) : !isEditing && showEditButton ? (
+        <CardHeader className="flex flex-row items-center justify-end space-y-0 pb-0 pt-4">
+          <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+            <Pencil className="mr-2 h-4 w-4" />
+            Edit
+          </Button>
+        </CardHeader>
       ) : null}
-      <CardContent className={isOverviewGeneral ? "pt-4" : undefined}>
+      <CardContent
+        className={isOverviewGeneral ? (isEditing || !showEditButton ? "pt-4" : "pt-2") : undefined}
+      >
         {error ? (
           <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
             {error}
           </div>
         ) : null}
 
-        {isEditing ? (
-          isOverviewGeneral ? (
-            <div className="space-y-3">
+        {isOverviewGeneral ? (
+          <div className={cn("space-y-3 text-sm", isEditing && "[&_label]:text-xs")}>
+            <div
+              className={cn(
+                "grid gap-x-4",
+                isEditing ? "gap-y-3" : "gap-y-1",
+                !isEntity ? "sm:grid-cols-4" : "sm:grid-cols-2"
+              )}
+            >
+              <div className={isEditing ? "space-y-1.5" : undefined}>
+                {isEditing ? (
+                  <>
+                    <Label htmlFor="profile-contact-type">Record type</Label>
+                    <Select
+                      value={contactType}
+                      onValueChange={(value) => setContactType(value as ContactRecordType)}
+                    >
+                      <SelectTrigger id="profile-contact-type">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="individual">Person</SelectItem>
+                        <SelectItem value="organization">Organization</SelectItem>
+                        <SelectItem value="group">Group</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </>
+                ) : (
+                  <>
+                    <FieldLabel>Record type</FieldLabel>
+                    <dd>{getContactRecordTypeLabel(contactType)}</dd>
+                  </>
+                )}
+              </div>
+              <div className={isEditing ? "space-y-1.5" : undefined}>
+                {isEditing ? (
+                  <>
+                    <Label htmlFor="profile-status">Status</Label>
+                    <Select value={status} onValueChange={setStatus}>
+                      <SelectTrigger id="profile-status">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {STATUS_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </>
+                ) : (
+                  <>
+                    <FieldLabel>Status</FieldLabel>
+                    <dd>{mapStatus(contact.status)}</dd>
+                  </>
+                )}
+              </div>
               {!isEntity ? (
                 <>
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="profile-full-name">Full name</Label>
+                  <ContactDiscountTagsField contactId={contact.id} editing={isEditing} />
+                  <ContactGroupsField contactId={contact.id} editing={isEditing} />
+                </>
+              ) : null}
+            </div>
+
+            {!isEntity ? (
+              <>
+                <div
+                  className={cn(
+                    "grid gap-x-4 sm:grid-cols-3",
+                    isEditing ? "gap-y-3" : "gap-y-1"
+                  )}
+                >
+                  <div className={isEditing ? "space-y-1.5" : undefined}>
+                    {isEditing ? (
+                      <>
+                        <Label htmlFor="profile-full-name">Full name</Label>
+                        <Input
+                          id="profile-full-name"
+                          value={fullName}
+                          onChange={(event) => setFullName(event.target.value)}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <FieldLabel>Full name</FieldLabel>
+                        <dd>{contact.full_name || "—"}</dd>
+                      </>
+                    )}
+                  </div>
+                  <div className={isEditing ? "space-y-1.5" : undefined}>
+                    {isEditing ? (
+                      <>
+                        <Label htmlFor="profile-dob">Date of birth</Label>
+                        <BirthDateInput
+                          id="profile-dob"
+                          value={dateOfBirth}
+                          onChange={setDateOfBirth}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <FieldLabel>Date of birth</FieldLabel>
+                        <dd>{formatDate(personDetails?.dateOfBirth)}</dd>
+                      </>
+                    )}
+                  </div>
+                  <div className={isEditing ? "space-y-1.5" : undefined}>
+                    {isEditing ? (
+                      <>
+                        <Label htmlFor="profile-gender">Gender</Label>
+                        <Select value={gender} onValueChange={setGender}>
+                          <SelectTrigger id="profile-gender">
+                            <SelectValue placeholder="Select gender" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Male">Male</SelectItem>
+                            <SelectItem value="Female">Female</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </>
+                    ) : (
+                      <>
+                        <FieldLabel>Gender</FieldLabel>
+                        <dd>{personDetails?.gender || "—"}</dd>
+                      </>
+                    )}
+                  </div>
+                </div>
+                <div
+                  className={cn(
+                    "grid gap-x-4 sm:grid-cols-3",
+                    isEditing ? "gap-y-3" : "gap-y-1"
+                  )}
+                >
+                  <div className={isEditing ? "space-y-1.5" : undefined}>
+                    {isEditing ? (
+                      <>
+                        <Label htmlFor="profile-phone">Phone</Label>
+                        <Input
+                          id="profile-phone"
+                          type="tel"
+                          value={phone}
+                          onChange={(event) => setPhone(event.target.value)}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <FieldLabel>Phone</FieldLabel>
+                        <dd>{contact.phone || "—"}</dd>
+                      </>
+                    )}
+                  </div>
+                  <div className={isEditing ? "space-y-1.5" : undefined}>
+                    {isEditing ? (
+                      <>
+                        <Label htmlFor="profile-email">Email</Label>
+                        <Input
+                          id="profile-email"
+                          type="email"
+                          value={email}
+                          onChange={(event) => setEmail(event.target.value)}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <FieldLabel>Email</FieldLabel>
+                        <dd>{contact.email || "—"}</dd>
+                      </>
+                    )}
+                  </div>
+                </div>
+                <div className={isEditing ? "space-y-1.5" : undefined}>
+                  {isEditing ? (
+                    <>
+                      <Label htmlFor="profile-address">Address</Label>
+                      {addressEditor}
+                    </>
+                  ) : (
+                    <>
+                      <dt className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                        <MapPin className="h-3.5 w-3.5" />
+                        Address
+                      </dt>
+                      <dd className="mt-0.5 whitespace-pre-wrap">{formatAddress(contact)}</dd>
+                    </>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                <div className={isEditing ? "space-y-1.5" : undefined}>
+                  {isEditing ? (
+                    <>
+                      <Label htmlFor="profile-full-name">
+                        {isOrganization ? "Organization name" : "Group name"}
+                      </Label>
                       <Input
                         id="profile-full-name"
                         value={fullName}
                         onChange={(event) => setFullName(event.target.value)}
                       />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="profile-dob">Date of birth</Label>
-                      <BirthDateInput
-                        id="profile-dob"
-                        value={dateOfBirth}
-                        onChange={setDateOfBirth}
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="profile-gender">Gender</Label>
-                      <Select value={gender} onValueChange={setGender}>
-                        <SelectTrigger id="profile-gender">
-                          <SelectValue placeholder="Select gender" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Male">Male</SelectItem>
-                          <SelectItem value="Female">Female</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="profile-phone">Phone</Label>
-                      <Input
-                        id="profile-phone"
-                        type="tel"
-                        value={phone}
-                        onChange={(event) => setPhone(event.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="profile-email">Email</Label>
-                      <Input
-                        id="profile-email"
-                        type="email"
-                        value={email}
-                        onChange={(event) => setEmail(event.target.value)}
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="profile-address">Address</Label>
-                    <div className="grid gap-2 sm:grid-cols-6">
-                      <Input
-                        id="profile-address"
-                        value={address}
-                        onChange={(event) => setAddress(event.target.value)}
-                        placeholder="Street"
-                        className="sm:col-span-2"
-                      />
-                      <Input
-                        id="profile-city"
-                        value={city}
-                        onChange={(event) => setCity(event.target.value)}
-                        placeholder="City"
-                      />
-                      <Input
-                        id="profile-state"
-                        value={state}
-                        onChange={(event) => setState(event.target.value)}
-                        placeholder="State"
-                      />
-                      <Input
-                        id="profile-zip"
-                        value={zip}
-                        onChange={(event) => setZip(event.target.value)}
-                        placeholder="Zip"
-                      />
-                      <Input
-                        id="profile-country"
-                        value={country}
-                        onChange={(event) => setCountry(event.target.value)}
-                        placeholder="Country"
-                      />
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="profile-full-name">
-                      {isOrganization ? "Organization name" : "Group name"}
-                    </Label>
-                    <Input
-                      id="profile-full-name"
-                      value={fullName}
-                      onChange={(event) => setFullName(event.target.value)}
-                    />
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="profile-email">Email</Label>
-                      <Input
-                        id="profile-email"
-                        type="email"
-                        value={email}
-                        onChange={(event) => setEmail(event.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="profile-phone">Phone</Label>
-                      <Input
-                        id="profile-phone"
-                        type="tel"
-                        value={phone}
-                        onChange={(event) => setPhone(event.target.value)}
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="profile-primary-contact">Primary contact name</Label>
-                    <Input
-                      id="profile-primary-contact"
-                      placeholder={
-                        isGroup
-                          ? "Leader or coordinator for this group"
-                          : "Person we reach at this organization"
-                      }
-                      value={primaryContactName}
-                      onChange={(event) => setPrimaryContactName(event.target.value)}
-                    />
-                  </div>
-                  {!isGroup ? (
-                    <div className="space-y-1.5">
-                      <Label htmlFor="profile-address">Address</Label>
-                      <div className="grid gap-2 sm:grid-cols-6">
-                        <Input
-                          id="profile-address"
-                          value={address}
-                          onChange={(event) => setAddress(event.target.value)}
-                          placeholder="Street"
-                          className="sm:col-span-2"
-                        />
-                        <Input
-                          id="profile-city"
-                          value={city}
-                          onChange={(event) => setCity(event.target.value)}
-                          placeholder="City"
-                        />
-                        <Input
-                          id="profile-state"
-                          value={state}
-                          onChange={(event) => setState(event.target.value)}
-                          placeholder="State"
-                        />
-                        <Input
-                          id="profile-zip"
-                          value={zip}
-                          onChange={(event) => setZip(event.target.value)}
-                          placeholder="Zip"
-                        />
-                        <Input
-                          id="profile-country"
-                          value={country}
-                          onChange={(event) => setCountry(event.target.value)}
-                          placeholder="Country"
-                        />
-                      </div>
-                    </div>
-                  ) : null}
-                </>
-              )}
-              <div className="space-y-1.5">
-                <Label htmlFor="profile-notes">Notes</Label>
-                <Textarea
-                  id="profile-notes"
-                  value={notes}
-                  onChange={(event) => setNotes(event.target.value)}
-                  className="min-h-14 resize-none"
-                  placeholder="Notes about this contact..."
-                />
-              </div>
-              <div className="flex justify-end gap-2 pt-1">
-                <Button variant="outline" onClick={handleCancel} disabled={isPending}>
-                  Cancel
-                </Button>
-                <Button onClick={handleSave} disabled={isPending}>
-                  {isPending ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Saving...
                     </>
                   ) : (
-                    "Save changes"
+                    <>
+                      <FieldLabel>
+                        {isOrganization ? "Organization name" : "Group name"}
+                      </FieldLabel>
+                      <dd>{contact.full_name || "—"}</dd>
+                    </>
                   )}
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="profile-full-name">
-                    {isOrganization
-                      ? "Organization name"
-                      : contactType === "group"
-                        ? "Group name"
-                        : "Full name"}
-                  </Label>
-                  <Input
-                    id="profile-full-name"
-                    value={fullName}
-                    onChange={(event) => setFullName(event.target.value)}
-                  />
                 </div>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="profile-email">Email</Label>
-                    <Input
-                      id="profile-email"
-                      type="email"
-                      value={email}
-                      onChange={(event) => setEmail(event.target.value)}
-                    />
+                <div
+                  className={cn(
+                    "grid gap-x-4 sm:grid-cols-2",
+                    isEditing ? "gap-y-3" : "gap-y-1"
+                  )}
+                >
+                  <div className={isEditing ? "space-y-1.5" : undefined}>
+                    {isEditing ? (
+                      <>
+                        <Label htmlFor="profile-phone">Phone</Label>
+                        <Input
+                          id="profile-phone"
+                          type="tel"
+                          value={phone}
+                          onChange={(event) => setPhone(event.target.value)}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <FieldLabel>Phone</FieldLabel>
+                        <dd>{contact.phone || "—"}</dd>
+                      </>
+                    )}
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="profile-phone">Phone</Label>
-                    <Input
-                      id="profile-phone"
-                      type="tel"
-                      value={phone}
-                      onChange={(event) => setPhone(event.target.value)}
-                    />
+                  <div className={isEditing ? "space-y-1.5" : undefined}>
+                    {isEditing ? (
+                      <>
+                        <Label htmlFor="profile-email">Email</Label>
+                        <Input
+                          id="profile-email"
+                          type="email"
+                          value={email}
+                          onChange={(event) => setEmail(event.target.value)}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <FieldLabel>Email</FieldLabel>
+                        <dd>{contact.email || "—"}</dd>
+                      </>
+                    )}
                   </div>
                 </div>
-                <div className="space-y-2 sm:max-w-xs">
-                  <Label htmlFor="profile-contact-type">Record type</Label>
-                  <Select
-                    value={contactType}
-                    onValueChange={(value) => setContactType(value as ContactRecordType)}
-                  >
-                    <SelectTrigger id="profile-contact-type">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="individual">Person</SelectItem>
-                      <SelectItem value="organization">Organization</SelectItem>
-                      <SelectItem value="group">Group</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                {isEntity ? (
-                  <div className="space-y-2">
-                    <Label htmlFor="profile-primary-contact">Primary contact name</Label>
-                    <Input
-                      id="profile-primary-contact"
-                      placeholder={
-                        contactType === "group"
-                          ? "Leader or coordinator for this group"
-                          : "Person we reach at this organization"
-                      }
-                      value={primaryContactName}
-                      onChange={(event) => setPrimaryContactName(event.target.value)}
-                    />
+                {isEditing || contact.primary_contact_name ? (
+                  <div className={isEditing ? "space-y-1.5" : undefined}>
+                    {isEditing ? (
+                      <>
+                        <Label htmlFor="profile-primary-contact">Primary contact name</Label>
+                        <Input
+                          id="profile-primary-contact"
+                          placeholder={
+                            isGroup
+                              ? "Leader or coordinator for this group"
+                              : "Person we reach at this organization"
+                          }
+                          value={primaryContactName}
+                          onChange={(event) => setPrimaryContactName(event.target.value)}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <FieldLabel>Primary contact</FieldLabel>
+                        <dd>{contact.primary_contact_name}</dd>
+                      </>
+                    )}
                   </div>
                 ) : null}
-                <div className="space-y-2 sm:max-w-xs">
-                  <Label>Status</Label>
-                  <Select value={status} onValueChange={setStatus}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {STATUS_OPTIONS.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {!isEntity ? (
-                <>
-                  <Separator />
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="profile-dob">Date of birth</Label>
-                      <BirthDateInput
-                        id="profile-dob"
-                        value={dateOfBirth}
-                        onChange={setDateOfBirth}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="profile-gender">Gender</Label>
-                      <Select value={gender} onValueChange={setGender}>
-                        <SelectTrigger id="profile-gender">
-                          <SelectValue placeholder="Select gender" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Male">Male</SelectItem>
-                          <SelectItem value="Female">Female</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </>
-              ) : null}
-
-              <Separator />
-
-              <div className="space-y-2">
-                <Label htmlFor="profile-notes">Bio / notes</Label>
-                <Textarea
-                  id="profile-notes"
-                  value={notes}
-                  onChange={(event) => setNotes(event.target.value)}
-                  className="min-h-20 resize-none"
-                  placeholder="Notes about this contact..."
-                />
-              </div>
-
-              <Separator />
-
-              {!isGroup ? (
-                <div className="space-y-4">
-                  <h3 className="flex items-center gap-2 text-sm font-semibold">
-                    <MapPin className="h-4 w-4" />
-                    Address
-                  </h3>
-                  <div className="space-y-2">
-                    <Label htmlFor="profile-address">Street address</Label>
-                    <Input
-                      id="profile-address"
-                      value={address}
-                      onChange={(event) => setAddress(event.target.value)}
-                    />
-                  </div>
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="profile-city">City</Label>
-                      <Input
-                        id="profile-city"
-                        value={city}
-                        onChange={(event) => setCity(event.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="profile-state">State</Label>
-                      <Input
-                        id="profile-state"
-                        value={state}
-                        onChange={(event) => setState(event.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="profile-zip">Zip code</Label>
-                      <Input
-                        id="profile-zip"
-                        value={zip}
-                        onChange={(event) => setZip(event.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="profile-country">Country</Label>
-                      <Input
-                        id="profile-country"
-                        value={country}
-                        onChange={(event) => setCountry(event.target.value)}
-                      />
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={handleCancel} disabled={isPending}>
-                  Cancel
-                </Button>
-                <Button onClick={handleSave} disabled={isPending}>
-                  {isPending ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    "Save changes"
-                  )}
-                </Button>
-              </div>
-            </div>
-          )
-        ) : isOverviewGeneral ? (
-          <div className="space-y-3 text-sm">
-            {!isEntity ? (
-              <>
-                <dl className="grid gap-x-4 gap-y-1 sm:grid-cols-3">
-                  <div>
-                    <dt className="text-xs font-medium text-muted-foreground">Full name</dt>
-                    <dd>{contact.full_name || "—"}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs font-medium text-muted-foreground">Date of birth</dt>
-                    <dd>{formatDate(personDetails?.dateOfBirth)}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs font-medium text-muted-foreground">Gender</dt>
-                    <dd>{personDetails?.gender || "—"}</dd>
-                  </div>
-                </dl>
-                <dl className="grid gap-x-4 gap-y-1 sm:grid-cols-2">
-                  <div>
-                    <dt className="text-xs font-medium text-muted-foreground">Phone</dt>
-                    <dd>{contact.phone || "—"}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs font-medium text-muted-foreground">Email</dt>
-                    <dd>{contact.email || "—"}</dd>
-                  </div>
-                </dl>
-                <div>
-                  <dt className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                    <MapPin className="h-3.5 w-3.5" />
-                    Address
-                  </dt>
-                  <dd className="mt-0.5 whitespace-pre-wrap">{formatAddress(contact)}</dd>
-                </div>
-              </>
-            ) : (
-              <>
-                <dl className="grid gap-x-4 gap-y-1 sm:grid-cols-2">
-                  <div className="sm:col-span-2">
-                    <dt className="text-xs font-medium text-muted-foreground">
-                      {isOrganization ? "Organization name" : "Group name"}
-                    </dt>
-                    <dd>{contact.full_name || "—"}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs font-medium text-muted-foreground">Phone</dt>
-                    <dd>{contact.phone || "—"}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs font-medium text-muted-foreground">Email</dt>
-                    <dd>{contact.email || "—"}</dd>
-                  </div>
-                  {contact.primary_contact_name ? (
-                    <div className="sm:col-span-2">
-                      <dt className="text-xs font-medium text-muted-foreground">Primary contact</dt>
-                      <dd>{contact.primary_contact_name}</dd>
-                    </div>
-                  ) : null}
-                </dl>
                 {!isGroup ? (
-                  <div>
-                    <dt className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                      <MapPin className="h-3.5 w-3.5" />
-                      Address
-                    </dt>
-                    <dd className="mt-0.5 whitespace-pre-wrap">{formatAddress(contact)}</dd>
+                  <div className={isEditing ? "space-y-1.5" : undefined}>
+                    {isEditing ? (
+                      <>
+                        <Label htmlFor="profile-address">Address</Label>
+                        {addressEditor}
+                      </>
+                    ) : (
+                      <>
+                        <dt className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                          <MapPin className="h-3.5 w-3.5" />
+                          Address
+                        </dt>
+                        <dd className="mt-0.5 whitespace-pre-wrap">{formatAddress(contact)}</dd>
+                      </>
+                    )}
                   </div>
                 ) : null}
               </>
             )}
-            <div>
-              <dt className="text-xs font-medium text-muted-foreground">Notes</dt>
-              <dd className="mt-0.5 whitespace-pre-wrap">{contact.notes || "—"}</dd>
+
+            <div className={isEditing ? "space-y-1.5" : undefined}>
+              {isEditing ? (
+                <>
+                  <Label htmlFor="profile-notes">Notes</Label>
+                  <Textarea
+                    id="profile-notes"
+                    value={notes}
+                    onChange={(event) => setNotes(event.target.value)}
+                    className="min-h-14 resize-none"
+                    placeholder="Notes about this contact..."
+                  />
+                </>
+              ) : (
+                <>
+                  <FieldLabel>Notes</FieldLabel>
+                  <dd className="mt-0.5 whitespace-pre-wrap">{contact.notes || "—"}</dd>
+                </>
+              )}
+            </div>
+
+            {overviewSaveBar}
+          </div>
+        ) : isEditing ? (
+          <div className="space-y-6">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="profile-full-name">
+                  {isOrganization
+                    ? "Organization name"
+                    : contactType === "group"
+                      ? "Group name"
+                      : "Full name"}
+                </Label>
+                <Input
+                  id="profile-full-name"
+                  value={fullName}
+                  onChange={(event) => setFullName(event.target.value)}
+                />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="profile-email">Email</Label>
+                  <Input
+                    id="profile-email"
+                    type="email"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="profile-phone">Phone</Label>
+                  <Input
+                    id="profile-phone"
+                    type="tel"
+                    value={phone}
+                    onChange={(event) => setPhone(event.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2 sm:max-w-xs">
+                <Label htmlFor="profile-contact-type">Record type</Label>
+                <Select
+                  value={contactType}
+                  onValueChange={(value) => setContactType(value as ContactRecordType)}
+                >
+                  <SelectTrigger id="profile-contact-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="individual">Person</SelectItem>
+                    <SelectItem value="organization">Organization</SelectItem>
+                    <SelectItem value="group">Group</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {isEntity ? (
+                <div className="space-y-2">
+                  <Label htmlFor="profile-primary-contact">Primary contact name</Label>
+                  <Input
+                    id="profile-primary-contact"
+                    placeholder={
+                      contactType === "group"
+                        ? "Leader or coordinator for this group"
+                        : "Person we reach at this organization"
+                    }
+                    value={primaryContactName}
+                    onChange={(event) => setPrimaryContactName(event.target.value)}
+                  />
+                </div>
+              ) : null}
+              <div className="space-y-2 sm:max-w-xs">
+                <Label>Status</Label>
+                <Select value={status} onValueChange={setStatus}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STATUS_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {!isEntity ? (
+              <>
+                <Separator />
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="profile-dob">Date of birth</Label>
+                    <BirthDateInput
+                      id="profile-dob"
+                      value={dateOfBirth}
+                      onChange={setDateOfBirth}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="profile-gender">Gender</Label>
+                    <Select value={gender} onValueChange={setGender}>
+                      <SelectTrigger id="profile-gender">
+                        <SelectValue placeholder="Select gender" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Male">Male</SelectItem>
+                        <SelectItem value="Female">Female</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </>
+            ) : null}
+
+            <Separator />
+
+            <div className="space-y-2">
+              <Label htmlFor="profile-notes">Bio / notes</Label>
+              <Textarea
+                id="profile-notes"
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+                className="min-h-20 resize-none"
+                placeholder="Notes about this contact..."
+              />
+            </div>
+
+            <Separator />
+
+            {!isGroup ? (
+              <div className="space-y-4">
+                <h3 className="flex items-center gap-2 text-sm font-semibold">
+                  <MapPin className="h-4 w-4" />
+                  Address
+                </h3>
+                <div className="space-y-2">
+                  <Label htmlFor="profile-address">Street address</Label>
+                  <Input
+                    id="profile-address"
+                    value={address}
+                    onChange={(event) => setAddress(event.target.value)}
+                  />
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="profile-city">City</Label>
+                    <Input
+                      id="profile-city"
+                      value={city}
+                      onChange={(event) => setCity(event.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="profile-state">State</Label>
+                    <Input
+                      id="profile-state"
+                      value={state}
+                      onChange={(event) => setState(event.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="profile-zip">Zip code</Label>
+                    <Input
+                      id="profile-zip"
+                      value={zip}
+                      onChange={(event) => setZip(event.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="profile-country">Country</Label>
+                    <Input
+                      id="profile-country"
+                      value={country}
+                      onChange={(event) => setCountry(event.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={handleCancel} disabled={isPending}>
+                Cancel
+              </Button>
+              <Button onClick={handleSave} disabled={isPending}>
+                {isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save changes"
+                )}
+              </Button>
             </div>
           </div>
         ) : (

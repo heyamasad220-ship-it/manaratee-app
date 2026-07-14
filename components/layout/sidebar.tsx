@@ -49,6 +49,12 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 import { WORKFORCE_MODULE_LABEL } from "@/lib/hr/hr-module-label"
 import { isFacilitiesOnlyAccess } from "@/lib/permissions/facilities-access"
 import {
+  STAFF_BREADCRUMB_ROW_HEIGHT_CLASS,
+  STAFF_HEADER_HEIGHT_CLASS,
+  STAFF_SIDEBAR_NAV_HEIGHT_CLASS,
+  STAFF_SIDEBAR_NAV_TOP_CLASS,
+} from "@/lib/layout/staff-dashboard-chrome"
+import {
   programsFinancialAssistanceNavItem,
 } from "@/lib/applications/application-nav"
 
@@ -828,7 +834,7 @@ function SidebarPrimaryNav({ onNavigate }: { onNavigate?: () => void }) {
   }
 
   return (
-    <nav className="flex min-h-0 flex-1 flex-col overflow-y-auto px-2.5 pt-3 pb-4">
+    <nav className="flex min-h-0 flex-1 flex-col overflow-y-auto px-2.5 pt-1 pb-4">
       {grouped.map((group, groupIndex) => (
         <div
           key={`${group.group ?? "main"}-${groupIndex}`}
@@ -988,14 +994,16 @@ function ModuleNavDrawerContent() {
     <>
       <button
         type="button"
-        className="fixed inset-0 z-40 hidden bg-black/20 lg:block"
+        className="fixed inset-0 z-[55] hidden bg-black/20 lg:block"
         style={{ left: SIDEBAR_WIDTH_PX }}
         onClick={closeModuleDrawer}
         aria-label="Close navigation menu"
       />
       <aside
         className={cn(
-          "fixed top-0 z-50 hidden h-screen flex-col border-r border-zinc-200 bg-white text-zinc-900 shadow-xl lg:flex",
+          "fixed z-[60] hidden flex-col border-r border-zinc-200 bg-white text-zinc-900 shadow-xl lg:flex",
+          STAFF_SIDEBAR_NAV_TOP_CLASS,
+          STAFF_SIDEBAR_NAV_HEIGHT_CLASS,
           MODULE_DRAWER_WIDTH_CLASS,
         )}
         style={{ left: SIDEBAR_WIDTH_PX }}
@@ -1018,6 +1026,49 @@ function ModuleNavDrawerContent() {
   )
 }
 
+function SidebarLogoBand() {
+  return (
+    <div
+      className={cn(
+        "relative hidden shrink-0 border-b border-zinc-200 lg:block",
+        STAFF_HEADER_HEIGHT_CLASS,
+      )}
+    >
+      <Link
+        href="/dashboard"
+        className="absolute inset-0 flex items-center justify-center px-2 py-3"
+        aria-label="Manaratee home"
+      >
+        <div className="relative h-full w-full">
+          <Image
+            src="/Logo2.png"
+            alt="Manaratee"
+            fill
+            sizes="180px"
+            className="object-contain object-center"
+            priority
+          />
+        </div>
+      </Link>
+    </div>
+  )
+}
+
+function SidebarChromeSpacer() {
+  return (
+    <>
+      <SidebarLogoBand />
+      <div
+        className={cn(
+          "hidden shrink-0 border-b border-zinc-200 lg:block",
+          STAFF_BREADCRUMB_ROW_HEIGHT_CLASS,
+        )}
+        aria-hidden
+      />
+    </>
+  )
+}
+
 function SidebarContent() {
   return (
     <aside
@@ -1026,6 +1077,7 @@ function SidebarContent() {
         SIDEBAR_WIDTH_CLASS,
       )}
     >
+      <SidebarChromeSpacer />
       <SidebarPrimaryNav />
     </aside>
   )
@@ -1039,7 +1091,8 @@ function SidebarFallback() {
         SIDEBAR_WIDTH_CLASS,
       )}
     >
-      <nav className="flex flex-1 flex-col gap-2 px-2.5 pt-3">
+      <SidebarChromeSpacer />
+      <nav className="flex flex-1 flex-col gap-2 px-2.5 pt-1">
         {Array.from({ length: 7 }).map((_, index) => (
           <div key={index} className="h-14 animate-pulse rounded-lg bg-amber-50" />
         ))}

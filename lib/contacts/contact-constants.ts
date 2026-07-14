@@ -323,6 +323,13 @@ export function splitFullName(fullName: string) {
   }
 }
 
+/** Re-export person-name casing helpers used by contact create/update flows. */
+export {
+  properCasePersonNameIfNeeded,
+  shouldProperCasePersonName,
+  toProperPersonName,
+} from "@/lib/contacts/proper-case-name"
+
 export function normalizePhone(phone?: string | null) {
   return (phone || "").replace(/[^\d]/g, "")
 }

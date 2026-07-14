@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { CheckCircle2, Clock, CreditCard, DollarSign } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { loadCustomerDonationPortalData } from "@/lib/customer/customer-portal-data-actions"
+import { customerDonationCategoryRequiresFund } from "@/lib/customer/customer-open-donation-categories"
 import { recordCustomerPortalDonationAction } from "@/lib/customer/customer-donation-actions"
 import { ensureDonorExtensionForContact } from "@/lib/donations/donor-contact-bridge"
 import { normalizePaymentSourceChannel, isStripeCheckoutPaymentMethod } from "@/lib/donations/payment-source-channel"
@@ -144,6 +145,13 @@ export function CustomerDonationDialog({
   })
 
   const isOneTimeDonation = donationForm.frequency === "one-time"
+
+  const selectedDonationCategory = donationCategories.find(
+    (category) => category.id === donationForm.category
+  )
+  const selectedCategoryRequiresFund = selectedDonationCategory
+    ? customerDonationCategoryRequiresFund(selectedDonationCategory)
+    : false
 
   const getSelectedFundName = (categoryId: string, fundId: string) => {
     const category = donationCategories.find((cat) => cat.id === categoryId)
@@ -524,7 +532,7 @@ export function CustomerDonationDialog({
                 </Select>
               </div>
 
-              {donationForm.category ? (
+              {donationForm.category && selectedCategoryRequiresFund ? (
                 <div className="flex flex-col gap-2">
                   <Label>Specific Fund</Label>
                   <Select
@@ -540,13 +548,11 @@ export function CustomerDonationDialog({
                       <SelectValue placeholder="Select fund" />
                     </SelectTrigger>
                     <SelectContent>
-                      {donationCategories
-                        .find((category) => category.id === donationForm.category)
-                        ?.funds.map((fund) => (
-                          <SelectItem key={fund.id} value={fund.id}>
-                            {fund.name}
-                          </SelectItem>
-                        ))}
+                      {selectedDonationCategory?.funds.map((fund) => (
+                        <SelectItem key={fund.id} value={fund.id}>
+                          {fund.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -616,7 +622,7 @@ export function CustomerDonationDialog({
                 disabled={
                   !donationForm.amount ||
                   !donationForm.category ||
-                  !donationForm.fund ||
+                  (selectedCategoryRequiresFund && !donationForm.fund) ||
                   (isOneTimeDonation && !donationForm.paymentMethod) ||
                   isProcessing
                 }

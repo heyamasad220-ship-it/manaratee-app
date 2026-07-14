@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Header } from "@/components/layout/header";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -178,6 +179,9 @@ function toPaymentHistoryRow(payment: Payment) {
 
 export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean }) {
   const supabase = createClient();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [handledAddQuery, setHandledAddQuery] = useState(false);
 
   const [organizationId, setOrganizationId] = useState<string | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -321,6 +325,54 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    const action = searchParams.get("action");
+    if (action !== "add" || handledAddQuery) return;
+
+    const contactId = searchParams.get("contactId");
+
+    void (async () => {
+      if (contactId) {
+        const { data: contactRow } = await supabase
+          .from("contacts")
+          .select("id, full_name, email, phone")
+          .eq("id", contactId)
+          .maybeSingle();
+
+        if (contactRow) {
+          setContacts((current) => {
+            if (current.some((item) => item.contactId === contactRow.id)) {
+              return current;
+            }
+            return [
+              {
+                contactId: contactRow.id as string,
+                full_name: (contactRow.full_name as string | null) ?? null,
+                email: (contactRow.email as string | null) ?? null,
+                phone: (contactRow.phone as string | null) ?? null,
+              },
+              ...current,
+            ];
+          });
+          setSelectedContactId(contactRow.id as string);
+          setDonorSearch(
+            (contactRow.full_name as string | null) ||
+              (contactRow.email as string | null) ||
+              (contactRow.phone as string | null) ||
+              ""
+          );
+        } else {
+          setSelectedContactId(contactId);
+        }
+      }
+
+      setPaymentDate(new Date().toISOString().slice(0, 10));
+      setShowAddDialog(true);
+      setHandledAddQuery(true);
+      router.replace("/donations/reports/one-time", { scroll: false });
+    })();
+  }, [handledAddQuery, router, searchParams, supabase]);
 
   useEffect(() => {
     let cancelled = false;

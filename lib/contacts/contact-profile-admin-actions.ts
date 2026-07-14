@@ -6,6 +6,7 @@ import { ensureContactForPerson } from "@/lib/contacts/contact-actions"
 import {
   isEntityContactType,
   normalizePhone,
+  properCasePersonNameIfNeeded,
 } from "@/lib/contacts/contact-constants"
 import { removeMemberFromHousehold, syncFamilyMemberAdded } from "@/lib/contacts/family-sync"
 import { normalizeDateOfBirth } from "@/lib/dates/date-input-utils"
@@ -310,8 +311,8 @@ export async function addContactFamilyMember(input: {
   phone?: string | null
   relationship: string
 }) {
-  const firstName = input.firstName.trim()
-  const lastName = input.lastName.trim()
+  const firstName = properCasePersonNameIfNeeded(input.firstName)
+  const lastName = properCasePersonNameIfNeeded(input.lastName)
   const relationship = input.relationship.trim()
   const email = input.email?.trim().toLowerCase() || null
   const phone = normalizePhone(input.phone) || null

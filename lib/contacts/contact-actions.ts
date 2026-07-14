@@ -7,6 +7,7 @@ import {
   type ContactRoleValue,
   type ContactRecordType,
   normalizePhone,
+  properCasePersonNameIfNeeded,
   sanitizeRoleInput,
   splitFullName,
   CONTACT_MANUAL_AFFILIATION_ROLES,
@@ -14,6 +15,7 @@ import {
   usesPrimaryContactField,
 } from "@/lib/contacts/contact-constants"
 import { syncContactAffiliations } from "@/lib/contacts/contact-affiliation-sync"
+import { syncDonorExtensionFromContact } from "@/lib/donations/donor-contact-bridge"
 
 type FindOrCreateContactInput = {
   organizationId: string
@@ -27,7 +29,11 @@ type FindOrCreateContactInput = {
 
 export async function findOrCreateContact(input: FindOrCreateContactInput) {
   const supabase = await createClient()
-  const cleanName = input.fullName.trim()
+  const contactType = input.contactType || "individual"
+  const cleanName =
+    contactType === "individual"
+      ? properCasePersonNameIfNeeded(input.fullName)
+      : input.fullName.trim()
   const cleanEmail = input.email?.trim().toLowerCase() || null
   const cleanPhone = normalizePhone(input.phone) || null
 
@@ -93,7 +99,6 @@ export async function findOrCreateContact(input: FindOrCreateContactInput) {
     throw new Error(rpcError?.message || "Could not create contact")
   }
 
-  const contactType = input.contactType || "individual"
   const primaryContactName = usesPrimaryContactField(contactType)
     ? input.primaryContactName?.trim() || null
     : null
@@ -545,11 +550,6 @@ export async function updateContactBasics(input: {
     throw new Error("No organization selected")
   }
 
-  const cleanName = input.fullName.trim()
-  if (!cleanName) {
-    throw new Error("Contact name is required")
-  }
-
   const { data: existing, error: loadError } = await supabase
     .from("contacts")
     .select("id, contact_type")
@@ -562,6 +562,14 @@ export async function updateContactBasics(input: {
   }
 
   const recordType = (input.contactType ?? existing.contact_type) as ContactRecordType
+  const cleanName =
+    recordType === "individual"
+      ? properCasePersonNameIfNeeded(input.fullName)
+      : input.fullName.trim()
+  if (!cleanName) {
+    throw new Error("Contact name is required")
+  }
+
   const primaryContactName = usesPrimaryContactField(recordType)
     ? input.primaryContactName?.trim() || null
     : null
@@ -595,6 +603,18 @@ export async function updateContactBasics(input: {
     throw new Error(error.message || "Could not update contact")
   }
 
+  await syncDonorExtensionFromContact(
+    organizationId,
+    input.contactId,
+    {
+      fullName: cleanName,
+      email: updatePayload.email as string | null,
+      phone: updatePayload.phone as string | null,
+    },
+    supabase
+  )
+
   revalidateContactPaths()
   revalidatePath(`/contacts/${input.contactId}`)
+  revalidatePath("/donations/reports/donors")
 }

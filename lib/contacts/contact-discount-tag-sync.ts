@@ -10,6 +10,10 @@ import {
 import { matchDiscountTagsForRoles } from "@/lib/contacts/contact-discount-tag-mapping"
 import { ensurePersonForContact } from "@/lib/people/person-tag-actions"
 
+/**
+ * Ensure role-linked discount tags are present for a contact.
+ * Does not remove tags — staff can assign/remove tags on the contact Overview.
+ */
 export async function syncContactDiscountTags(
   contactId: string,
   organizationIdInput?: string | null,
@@ -55,34 +59,35 @@ export async function syncContactDiscountTags(
     throw new Error(tagsError.message || "Could not load discount tags")
   }
 
-  const matchedTags = matchDiscountTagsForRoles(roles, tagRows || [])
-  const matchedTagIds = matchedTags.map((tag) => tag.id)
+  const desiredAutoIds = matchDiscountTagsForRoles(roles, tagRows || []).map((tag) => tag.id)
+  if (desiredAutoIds.length === 0) {
+    return
+  }
 
   let personId = contact.person_id as string | null
-
   if (!personId) {
-    if (matchedTagIds.length === 0) {
-      return
-    }
     personId = await ensurePersonForContact(contactId, organizationId)
   }
 
-  const { error: deleteError } = await supabase
+  const { data: existingRows, error: existingError } = await supabase
     .from("person_tags")
-    .delete()
+    .select("tag_id")
     .eq("organization_id", organizationId)
     .eq("person_id", personId)
 
-  if (deleteError) {
-    throw new Error(deleteError.message || "Could not reset person discount tags")
+  if (existingError) {
+    throw new Error(existingError.message || "Could not load person discount tags")
   }
 
-  if (matchedTagIds.length === 0) {
+  const existingIds = new Set((existingRows || []).map((row) => row.tag_id as string))
+  const toAdd = desiredAutoIds.filter((tagId) => !existingIds.has(tagId))
+
+  if (toAdd.length === 0) {
     return
   }
 
   const { error: insertError } = await supabase.from("person_tags").insert(
-    matchedTagIds.map((tagId) => ({
+    toAdd.map((tagId) => ({
       organization_id: organizationId,
       person_id: personId,
       tag_id: tagId,

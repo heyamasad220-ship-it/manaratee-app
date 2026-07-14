@@ -45,6 +45,15 @@ export function donationPaymentDetailHref(paymentId: string) {
   return `/donations/payments/${paymentId}`
 }
 
+export function donationRecordPaymentHref(input?: { contactId?: string }) {
+  const params = new URLSearchParams()
+  params.set("action", "add")
+  if (input?.contactId) {
+    params.set("contactId", input.contactId)
+  }
+  return `/donations/reports/one-time?${params.toString()}`
+}
+
 export function isDonationPaymentDetailPath(pathname: string) {
   return /^\/donations\/payments\/[0-9a-f-]{36}$/i.test(pathname)
 }

@@ -469,6 +469,30 @@ async function mergeSourceIntoTarget(orgId, target, source, renameTarget = null)
     report.steps.push({ table: "contacts", patched: report.contactPatch })
   }
 
+  const survivingDonorId = targetDonor?.id ?? sourceDonor?.id ?? null
+  const syncedName =
+    report.contactPatch.full_name ||
+    renameTarget ||
+    target.full_name ||
+    null
+
+  if (execute && survivingDonorId && syncedName) {
+    const donorPatch = {
+      full_name: syncedName,
+      contact_id: target.id,
+    }
+    if (report.contactPatch.email) donorPatch.email = report.contactPatch.email
+    if (report.contactPatch.phone) donorPatch.phone = report.contactPatch.phone
+
+    const { error: donorSyncError } = await sb
+      .from("donors")
+      .update(donorPatch)
+      .eq("organization_id", orgId)
+      .eq("id", survivingDonorId)
+    if (donorSyncError) throw new Error(`donor name sync: ${donorSyncError.message}`)
+    report.steps.push({ table: "donors", patched: donorPatch })
+  }
+
   if (execute) {
     const { error: deleteError } = await sb
       .from("contacts")

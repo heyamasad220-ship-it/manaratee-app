@@ -734,11 +734,42 @@ export default function PledgesPage() {
       }));
     }
 
+    const contactId = searchParams.get("contactId");
+    if (contactId) {
+      void (async () => {
+        const { data: contactRow } = await supabase
+          .from("contacts")
+          .select("id, full_name, email, phone")
+          .eq("id", contactId)
+          .maybeSingle();
+
+        if (contactRow) {
+          setContactOptions([
+            {
+              contactId: contactRow.id as string,
+              full_name: (contactRow.full_name as string | null) ?? null,
+              email: (contactRow.email as string | null) ?? null,
+              phone: (contactRow.phone as string | null) ?? null,
+            },
+          ]);
+          setSelectedContactId(contactRow.id as string);
+          setDonorSearch(
+            (contactRow.full_name as string | null) ||
+              (contactRow.email as string | null) ||
+              (contactRow.phone as string | null) ||
+              ""
+          );
+        } else {
+          setSelectedContactId(contactId);
+        }
+      })();
+    }
+
     setPledgeDate(getTodayPlainDate());
     setShowAddDialog(true);
     setHandledAddQuery(true);
     router.replace(DONATION_PLEDGES_PATH, { scroll: false });
-  }, [searchParams, handledAddQuery, router]);
+  }, [searchParams, handledAddQuery, router, supabase]);
 
   useEffect(() => {
     const pledgeId = searchParams.get("pledgeId");

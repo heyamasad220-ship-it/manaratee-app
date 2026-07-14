@@ -14,7 +14,9 @@ import {
 } from "@/components/ui/breadcrumb"
 import { isContactsListSegment } from "@/lib/contacts/contact-module-label"
 import { buildNavigationTrail } from "@/lib/navigation/sidebar-nav"
+import { STAFF_BREADCRUMB_ROW_HEIGHT_CLASS } from "@/lib/layout/staff-dashboard-chrome"
 import { useSidebarContext } from "@/components/layout/sidebar"
+import { cn } from "@/lib/utils"
 
 function resolveContactProfileListSegment(
   pathname: string,
@@ -54,7 +56,12 @@ export function NavigationBreadcrumbs() {
   }
 
   return (
-    <div className="border-b border-border bg-background px-6 py-2.5">
+    <div
+      className={cn(
+        "flex items-center border-b border-border bg-background px-6",
+        STAFF_BREADCRUMB_ROW_HEIGHT_CLASS,
+      )}
+    >
       <Breadcrumb>
         <BreadcrumbList>
           {trail.map((segment, index) => {
