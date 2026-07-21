@@ -6,10 +6,12 @@ import { revalidatePath } from "next/cache"
 import { syncOperationalBriefForProgram } from "@/lib/operational-briefs/operational-brief-queries"
 import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
+import { programOfferingManageHref } from "@/lib/programs/program-offering-paths"
 import { getInstructorScheduleConflicts } from "@/lib/programs/program-schedule-queries"
 
 type ScheduleItemInput = {
   program_id: string
+  offering_id: string
   title: string
   day_of_week: string
   start_time: string
@@ -22,6 +24,40 @@ type ScheduleItemInput = {
 
 type CreateRecurringScheduleInput = Omit<ScheduleItemInput, "day_of_week"> & {
   days_of_week: string[]
+}
+
+function revalidateSchedulePaths(programId: string, offeringId: string) {
+  revalidatePath(`/programs/${programId}`)
+  revalidatePath(`/programs/${programId}/offerings`)
+  revalidatePath(programOfferingManageHref(programId, offeringId, "schedule"))
+  revalidatePath(`/customer/programs/${programId}`)
+  revalidatePath("/programs/schedule")
+  revalidatePath("/facilities/calendar")
+  revalidatePath("/facilities/availability")
+  revalidatePath("/facilities/reservation-center")
+}
+
+async function assertOfferingBelongsToProgram(
+  organizationId: string,
+  programId: string,
+  offeringId: string
+) {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from("program_offerings")
+    .select("id")
+    .eq("id", offeringId)
+    .eq("program_id", programId)
+    .eq("organization_id", organizationId)
+    .maybeSingle()
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  if (!data) {
+    throw new Error("Offering not found for this program")
+  }
 }
 
 async function checkInstructorConflicts(input: {
@@ -52,6 +88,16 @@ export async function createScheduleItem(input: ScheduleItemInput) {
     throw new Error("No organization selected")
   }
 
+  if (!input.offering_id) {
+    throw new Error("Offering is required for schedule items")
+  }
+
+  await assertOfferingBelongsToProgram(
+    organizationId,
+    input.program_id,
+    input.offering_id
+  )
+
   const conflicts = await checkInstructorConflicts({
     program_id: input.program_id,
     day_of_week: input.day_of_week,
@@ -69,6 +115,7 @@ export async function createScheduleItem(input: ScheduleItemInput) {
   const { error } = await supabase.from("program_schedule_items").insert({
     organization_id: organizationId,
     program_id: input.program_id,
+    offering_id: input.offering_id,
     title: input.title,
     day_of_week: input.day_of_week,
     start_time: input.start_time,
@@ -88,10 +135,7 @@ export async function createScheduleItem(input: ScheduleItemInput) {
 
   await syncOperationalBriefForProgram(input.program_id, organizationId)
 
-  revalidatePath(`/programs/${input.program_id}`)
-  revalidatePath("/facilities/calendar")
-  revalidatePath("/facilities/availability")
-  revalidatePath("/facilities/reservation-center")
+  revalidateSchedulePaths(input.program_id, input.offering_id)
 }
 
 export async function createRecurringScheduleItems(
@@ -104,9 +148,19 @@ export async function createRecurringScheduleItems(
     throw new Error("No organization selected")
   }
 
+  if (!input.offering_id) {
+    throw new Error("Offering is required for schedule items")
+  }
+
   if (!input.days_of_week.length) {
     throw new Error("At least one day is required")
   }
+
+  await assertOfferingBelongsToProgram(
+    organizationId,
+    input.program_id,
+    input.offering_id
+  )
 
   for (const day of input.days_of_week) {
     const conflicts = await checkInstructorConflicts({
@@ -129,6 +183,7 @@ export async function createRecurringScheduleItems(
   const rows = input.days_of_week.map((day) => ({
     organization_id: organizationId,
     program_id: input.program_id,
+    offering_id: input.offering_id,
     title: input.title,
     day_of_week: day,
     start_time: input.start_time,
@@ -150,10 +205,7 @@ export async function createRecurringScheduleItems(
 
   await syncOperationalBriefForProgram(input.program_id, organizationId)
 
-  revalidatePath(`/programs/${input.program_id}`)
-  revalidatePath("/facilities/calendar")
-  revalidatePath("/facilities/availability")
-  revalidatePath("/facilities/reservation-center")
+  revalidateSchedulePaths(input.program_id, input.offering_id)
 }
 
 export async function updateScheduleItem(
@@ -166,6 +218,16 @@ export async function updateScheduleItem(
   if (!organizationId) {
     throw new Error("No organization selected")
   }
+
+  if (!input.offering_id) {
+    throw new Error("Offering is required for schedule items")
+  }
+
+  await assertOfferingBelongsToProgram(
+    organizationId,
+    input.program_id,
+    input.offering_id
+  )
 
   const conflicts = await checkInstructorConflicts({
     program_id: input.program_id,
@@ -193,10 +255,12 @@ export async function updateScheduleItem(
       instructor_name: input.instructor_name || null,
       capacity: input.capacity || null,
       color: input.color || "bg-blue-500",
+      updated_at: new Date().toISOString(),
     })
     .eq("id", itemId)
     .eq("organization_id", organizationId)
     .eq("program_id", input.program_id)
+    .eq("offering_id", input.offering_id)
 
   if (error) {
     console.error(error)
@@ -205,13 +269,14 @@ export async function updateScheduleItem(
 
   await syncOperationalBriefForProgram(input.program_id, organizationId)
 
-  revalidatePath(`/programs/${input.program_id}`)
-  revalidatePath("/facilities/calendar")
-  revalidatePath("/facilities/availability")
-  revalidatePath("/facilities/reservation-center")
+  revalidateSchedulePaths(input.program_id, input.offering_id)
 }
 
-export async function deleteScheduleItem(itemId: string, programId: string) {
+export async function deleteScheduleItem(
+  itemId: string,
+  programId: string,
+  offeringId: string
+) {
   const supabase = await createClient()
   const organizationId = await getSelectedOrganizationId()
 
@@ -225,6 +290,7 @@ export async function deleteScheduleItem(itemId: string, programId: string) {
     .eq("id", itemId)
     .eq("organization_id", organizationId)
     .eq("program_id", programId)
+    .eq("offering_id", offeringId)
 
   if (error) {
     console.error(error)
@@ -233,8 +299,96 @@ export async function deleteScheduleItem(itemId: string, programId: string) {
 
   await syncOperationalBriefForProgram(programId, organizationId)
 
-  revalidatePath(`/programs/${programId}`)
-  revalidatePath("/facilities/calendar")
-  revalidatePath("/facilities/availability")
-  revalidatePath("/facilities/reservation-center")
+  revalidateSchedulePaths(programId, offeringId)
+}
+
+export async function copyOfferingScheduleItems(input: {
+  organizationId: string
+  programId: string
+  sourceOfferingId: string
+  targetOfferingId: string
+}) {
+  const supabase = await createClient()
+
+  const { data: sourceItems, error } = await supabase
+    .from("program_schedule_items")
+    .select(
+      "title, day_of_week, start_time, end_time, location, instructor_name, capacity, color, is_recurring, recurring_group_id"
+    )
+    .eq("organization_id", input.organizationId)
+    .eq("offering_id", input.sourceOfferingId)
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  if (!sourceItems || sourceItems.length === 0) {
+    return
+  }
+
+  const groupIdMap = new Map<string, string>()
+
+  const rows = sourceItems.map((item) => {
+    let recurringGroupId = item.recurring_group_id as string | null
+    if (item.is_recurring && recurringGroupId) {
+      if (!groupIdMap.has(recurringGroupId)) {
+        groupIdMap.set(recurringGroupId, randomUUID())
+      }
+      recurringGroupId = groupIdMap.get(recurringGroupId) || null
+    } else {
+      recurringGroupId = null
+    }
+
+    return {
+      organization_id: input.organizationId,
+      program_id: input.programId,
+      offering_id: input.targetOfferingId,
+      title: item.title,
+      day_of_week: item.day_of_week,
+      start_time: item.start_time,
+      end_time: item.end_time,
+      location: item.location,
+      instructor_name: item.instructor_name,
+      capacity: item.capacity,
+      color: item.color || "bg-blue-500",
+      is_recurring: Boolean(item.is_recurring),
+      recurring_group_id: recurringGroupId,
+    }
+  })
+
+  const { error: insertError } = await supabase
+    .from("program_schedule_items")
+    .insert(rows)
+
+  if (insertError) {
+    throw new Error(insertError.message)
+  }
+
+  revalidateSchedulePaths(input.programId, input.targetOfferingId)
+}
+
+/** Resolve offering Schedule tab for /programs/schedule?program= redirects. */
+export async function resolveProgramScheduleRedirect(
+  programId: string
+): Promise<string | null> {
+  const organizationId = await getSelectedOrganizationId()
+  if (!organizationId || !programId) return null
+
+  const supabase = await createClient()
+
+  const { data: offerings } = await supabase
+    .from("program_offerings")
+    .select("id, is_default, status")
+    .eq("organization_id", organizationId)
+    .eq("program_id", programId)
+    .neq("status", "archived")
+    .order("is_default", { ascending: false })
+    .order("name", { ascending: true })
+
+  const offering = (offerings || [])[0]
+  if (!offering?.id) {
+    return `/programs/${programId}`
+  }
+
+  return programOfferingManageHref(programId, offering.id as string, "schedule")
 }

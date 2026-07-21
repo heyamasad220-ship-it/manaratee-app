@@ -321,21 +321,6 @@ const moduleChildren: Record<string, SubItem[]> = {
       matchPrefix: "/programs/reports",
       alsoMatchPrefixes: ["/programs/registrations"],
       permissionKey: "reports.view",
-      children: [
-        {
-          label: "Overview",
-          href: "/programs/reports",
-          matchPrefix: "/programs/reports",
-          exact: true,
-          permissionKey: "reports.view",
-        },
-        {
-          label: "Registrations",
-          href: "/programs/registrations",
-          matchPrefix: "/programs/registrations",
-          permissionKey: "programs.manage",
-        },
-      ],
     },
     {
       label: "Settings",

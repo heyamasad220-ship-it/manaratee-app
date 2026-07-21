@@ -2,15 +2,19 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { ChevronDown, ChevronRight, DollarSign, Loader2, Users } from "lucide-react"
-
 import {
-  DonationMetricCard,
-  DonationMetricCardGrid,
-} from "@/components/donations/donation-metric-card"
+  ChevronDown,
+  ChevronRight,
+  DollarSign,
+  Heart,
+  Loader2,
+  Users,
+} from "lucide-react"
+
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { StatCard, StatCardsRow } from "@/components/ui/stat-card"
 import {
   Table,
   TableBody,
@@ -196,25 +200,61 @@ export function DonationGroupFinancialPanel({
   if (!summary) return null
 
   const giftCount = summary.campaigns.reduce((sum, campaign) => sum + campaign.giftCount, 0)
+  const donorIds = new Set(
+    summary.campaigns.flatMap((campaign) =>
+      campaign.members.map((member) => member.contactId).filter(Boolean)
+    )
+  )
 
   return (
     <div className="space-y-6">
-      <DonationMetricCardGrid colorful columns={2}>
-        <DonationMetricCard
-          title="Total giving"
+      <StatCardsRow equal columns={5}>
+        <StatCard
+          layout="header"
+          fill
+          tone="emerald"
+          label="Total giving"
           value={formatCurrency(summary.combinedTotal)}
           icon={DollarSign}
-          accent="blue"
-          description={`Individual gifts toward ${groupName}`}
+          hint={`Toward ${groupName}`}
         />
-        <DonationMetricCard
-          title="Gifts"
-          value={String(giftCount)}
+        <StatCard
+          layout="header"
+          fill
+          tone="blue"
+          label="Gifts"
+          value={giftCount}
+          icon={Heart}
+          hint="Across all campaigns"
+        />
+        <StatCard
+          layout="header"
+          fill
+          tone="violet"
+          label="Campaigns"
+          value={summary.campaigns.length}
+          icon={Heart}
+          hint="With recorded gifts"
+        />
+        <StatCard
+          layout="header"
+          fill
+          tone="sky"
+          label="Member gifts"
+          value={formatCurrency(summary.memberGiftsTotal)}
           icon={Users}
-          accent="emerald"
-          description="Across all campaigns"
+          hint="From individuals"
         />
-      </DonationMetricCardGrid>
+        <StatCard
+          layout="header"
+          fill
+          tone="amber"
+          label="Donors"
+          value={donorIds.size}
+          icon={Users}
+          hint="Unique contacts"
+        />
+      </StatCardsRow>
 
       <Card>
         <CardHeader className="pb-2">

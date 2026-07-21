@@ -55,6 +55,34 @@ const REGISTRATION_OPTION_ITEMS = [
   },
 ] as const
 
+/** Registration form source: offering SSOT with program defaults as fallback (S6). */
+function getOfferingRegistrationSource(
+  offering: ProgramOffering,
+  program: Program
+) {
+  return {
+    min_age: offering.min_age ?? program.min_age ?? null,
+    max_age: offering.max_age ?? program.max_age ?? null,
+    min_grade: offering.min_grade ?? program.min_grade ?? null,
+    max_grade: offering.max_grade ?? program.max_grade ?? null,
+    grade_levels:
+      offering.grade_levels?.length > 0
+        ? offering.grade_levels
+        : program.grade_levels ?? [],
+    gender: offering.gender ?? program.gender ?? "All",
+    enrollment_open_date:
+      offering.enrollment_open_date ?? program.enrollment_open_date ?? null,
+    enrollment_close_date:
+      offering.enrollment_close_date ?? program.enrollment_close_date ?? null,
+    capacity:
+      offering.capacity_mode === "limited"
+        ? Math.max(0, Number(offering.capacity || 0))
+        : 0,
+    enable_waitlist: offering.enable_waitlist ?? false,
+    waitlist_capacity: offering.waitlist_capacity ?? null,
+  }
+}
+
 function syncRegistrationTypeState(
   options: OfferingWorkspaceData["registrationOptions"],
   setters: {
@@ -84,6 +112,7 @@ export function OfferingRegistrationPanel({
   onCapacityGroupsChange,
   onRegistrationOptionsSaved,
   onNavigateNext,
+  enrolled,
 }: {
   program: Program
   offering: ProgramOffering
@@ -95,28 +124,33 @@ export function OfferingRegistrationPanel({
     registrationOptions: ProgramRegistrationOption[]
   ) => void
   onNavigateNext?: () => void
+  enrolled?: number
 }) {
   const router = useRouter()
   const capacitySectionRef =
     React.useRef<OfferingRegistrationCapacitySectionHandle>(null)
+  const source = React.useMemo(
+    () => getOfferingRegistrationSource(offering, program),
+    [offering, program]
+  )
   const initialAgeBounds = React.useMemo(
-    () => parseProgramAgeBounds(program),
-    [program]
+    () => parseProgramAgeBounds(source),
+    [source]
   )
 
   const [minAge, setMinAge] = React.useState<number | null>(initialAgeBounds.minAge)
   const [maxAge, setMaxAge] = React.useState<number | null>(initialAgeBounds.maxAge)
   const [gradeLevels, setGradeLevels] = React.useState<string[]>(() =>
-    getInitialGradeLevels(program)
+    getInitialGradeLevels(source)
   )
   const [programGender, setProgramGender] = React.useState<ProgramGender>(
-    (program.gender as ProgramGender) || "All"
+    (source.gender as ProgramGender) || "All"
   )
   const [enrollmentOpenDate, setEnrollmentOpenDate] = React.useState(
-    program.enrollment_open_date ?? ""
+    source.enrollment_open_date ?? ""
   )
   const [enrollmentCloseDate, setEnrollmentCloseDate] = React.useState(
-    program.enrollment_close_date ?? ""
+    source.enrollment_close_date ?? ""
   )
   const [fullProgramEnabled, setFullProgramEnabled] = React.useState(() =>
     isRegistrationOptionActive(workspaceData.registrationOptions, "full_program")
@@ -137,29 +171,29 @@ export function OfferingRegistrationPanel({
   const [dropInEnabled, setDropInEnabled] = React.useState(() =>
     isRegistrationOptionActive(workspaceData.registrationOptions, "drop_in")
   )
-  const [capacity, setCapacity] = React.useState(program.capacity ?? 0)
+  const [capacity, setCapacity] = React.useState(source.capacity)
   const [enableWaitlist, setEnableWaitlist] = React.useState(
-    program.enable_waitlist ?? false
+    source.enable_waitlist
   )
   const [waitlistCapacity, setWaitlistCapacity] = React.useState(
-    program.waitlist_capacity?.toString() ?? ""
+    source.waitlist_capacity?.toString() ?? ""
   )
   const [isSaving, setIsSaving] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [success, setSuccess] = React.useState(false)
 
   React.useEffect(() => {
-    const ageBounds = parseProgramAgeBounds(program)
+    const ageBounds = parseProgramAgeBounds(source)
     setMinAge(ageBounds.minAge)
     setMaxAge(ageBounds.maxAge)
-    setGradeLevels(getInitialGradeLevels(program))
-    setProgramGender((program.gender as ProgramGender) || "All")
-    setEnrollmentOpenDate(program.enrollment_open_date ?? "")
-    setEnrollmentCloseDate(program.enrollment_close_date ?? "")
-    setCapacity(program.capacity ?? 0)
-    setEnableWaitlist(program.enable_waitlist ?? false)
-    setWaitlistCapacity(program.waitlist_capacity?.toString() ?? "")
-  }, [program])
+    setGradeLevels(getInitialGradeLevels(source))
+    setProgramGender((source.gender as ProgramGender) || "All")
+    setEnrollmentOpenDate(source.enrollment_open_date ?? "")
+    setEnrollmentCloseDate(source.enrollment_close_date ?? "")
+    setCapacity(source.capacity)
+    setEnableWaitlist(source.enable_waitlist)
+    setWaitlistCapacity(source.waitlist_capacity?.toString() ?? "")
+  }, [source])
 
   const registrationOptionsSignature = React.useMemo(
     () => getRegistrationOptionsSignature(workspaceData.registrationOptions),
@@ -254,7 +288,7 @@ export function OfferingRegistrationPanel({
             enrollmentCloseDate={enrollmentCloseDate}
             onEnrollmentOpenDateChange={setEnrollmentOpenDate}
             onEnrollmentCloseDateChange={setEnrollmentCloseDate}
-            description="Program enrollment window used when an offering does not set its own dates."
+            description="Enrollment window for this offering."
           />
 
           <EligibilitySection
@@ -316,6 +350,7 @@ export function OfferingRegistrationPanel({
         onEnableWaitlistChange={setEnableWaitlist}
         waitlistCapacity={waitlistCapacity}
         onWaitlistCapacityChange={setWaitlistCapacity}
+        enrolled={enrolled}
       />
 
       {error ? (

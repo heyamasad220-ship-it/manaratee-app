@@ -4,11 +4,18 @@ import { revalidatePath } from "next/cache"
 
 import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
+import {
+  attributesFromProgramRow,
+  mergeOfferingAttributes,
+} from "@/lib/programs/program-offering-attributes"
 import type {
   ProgramOfferingInput,
   ProgramOfferingType,
 } from "@/lib/programs/program-offering-types"
 import { syncRegistrationOptionsFromProgramFlags } from "@/lib/programs/program-registration-option-actions"
+
+const PROGRAM_ATTRIBUTE_SELECT =
+  "id, organization_id, start_date, end_date, enrollment_open_date, enrollment_close_date, status, full_program_registration_enabled, session_registration_enabled, program_type, min_age, max_age, min_grade, max_grade, grade_levels, gender, require_guardian, require_grade, require_emergency_contact, capacity, enable_waitlist, waitlist_capacity, waitlist_offer_deadline_days"
 
 type CreateDefaultOfferingInput = {
   organizationId: string
@@ -27,6 +34,15 @@ export async function createDefaultOffering(input: CreateDefaultOfferingInput) {
   const offeringStatus =
     input.programStatus === "draft" ? "draft" : "active"
 
+  const { data: program } = await supabase
+    .from("programs")
+    .select(PROGRAM_ATTRIBUTE_SELECT)
+    .eq("id", input.programId)
+    .eq("organization_id", input.organizationId)
+    .maybeSingle()
+
+  const attributes = attributesFromProgramRow(program || {})
+
   const { data, error } = await supabase
     .from("program_offerings")
     .insert({
@@ -40,6 +56,7 @@ export async function createDefaultOffering(input: CreateDefaultOfferingInput) {
       enrollment_open_date: input.enrollmentOpenDate ?? null,
       enrollment_close_date: input.enrollmentCloseDate ?? null,
       status: offeringStatus,
+      ...attributes,
     })
     .select("id")
     .single()
@@ -124,9 +141,7 @@ async function getProgramForOfferingActions(
 
   const { data, error } = await supabase
     .from("programs")
-    .select(
-      "id, organization_id, start_date, end_date, enrollment_open_date, enrollment_close_date, status, full_program_registration_enabled, session_registration_enabled"
-    )
+    .select(PROGRAM_ATTRIBUTE_SELECT)
     .eq("id", programId)
     .eq("organization_id", organizationId)
     .maybeSingle()
@@ -175,13 +190,27 @@ export async function createProgramOffering(
     input.status ??
     (program.status === "draft" ? "draft" : "active")
 
+  const attributes = mergeOfferingAttributes(
+    attributesFromProgramRow(program),
+    input.attributes
+  )
+
+  const { count: existingCount } = await supabase
+    .from("program_offerings")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", resolvedOrganizationId)
+    .eq("program_id", programId)
+    .neq("status", "archived")
+
+  const isDefault = (existingCount ?? 0) === 0
+
   const { data, error } = await supabase
     .from("program_offerings")
     .insert({
       organization_id: program.organization_id,
       program_id: programId,
       name,
-      is_default: false,
+      is_default: isDefault,
       offering_type: input.offering_type ?? "standard",
       start_date: input.start_date ?? program.start_date,
       end_date: input.end_date ?? program.end_date,
@@ -190,6 +219,7 @@ export async function createProgramOffering(
       enrollment_close_date:
         input.enrollment_close_date ?? program.enrollment_close_date,
       status: offeringStatus,
+      ...attributes,
     })
     .select("*")
     .single()

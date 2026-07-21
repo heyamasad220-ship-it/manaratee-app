@@ -389,7 +389,7 @@ export default async function RegistrationDetailPage({
                 value={enrollment.registrant_type}
               />
               <DetailItem label="Payer" value={payerName} />
-              <DetailItem label="Child Age" value={enrollment.child_age} />
+              <DetailItem label="Age" value={enrollment.child_age} />
 
               <div>
                 <p className="text-sm text-muted-foreground">Contact Email</p>

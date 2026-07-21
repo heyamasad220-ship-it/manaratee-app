@@ -5,9 +5,10 @@ import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { replaceProgramCapacityGroups } from "@/lib/programs/program-capacity-group-actions"
-import { getProgramCapacityGroups } from "@/lib/programs/program-capacity-group-queries"
+import { getOfferingCapacityGroups } from "@/lib/programs/program-capacity-group-queries"
 import {
   createProgram,
+  ensureProgramHasOfferingForLegacyCopy,
   updateProgram,
 } from "@/lib/programs/program-actions"
 import {
@@ -23,6 +24,7 @@ import { getDefaultOfferingForProgram } from "@/lib/programs/program-offering-qu
 import { getAllRegistrationOptionsForOffering } from "@/lib/programs/program-registration-option-queries"
 import { getProgramById } from "@/lib/programs/program-queries"
 import { getAgeGroupLabelsFromMinMax } from "@/lib/programs/program-eligibility-display"
+import { normalizeProgramAudienceType } from "@/lib/programs/program-offering-attributes"
 import type { ProgramStatus } from "@/lib/programs/program-status"
 
 type ProgramRow = Record<string, unknown> & {
@@ -30,7 +32,7 @@ type ProgramRow = Record<string, unknown> & {
   name: string
   description: string | null
   department_id: string | null
-  program_type: "adult" | "youth" | "family"
+  program_type: "adult" | "youth"
   start_date: string | null
   end_date: string | null
   enrollment_open_date: string | null
@@ -162,7 +164,7 @@ export async function duplicateProgram(
       name: duplicateName,
       description: sourceProgram.description ?? "",
       department_id: sourceProgram.department_id,
-      program_type: sourceProgram.program_type,
+      program_type: normalizeProgramAudienceType(sourceProgram.program_type),
       start_date: null,
       end_date: null,
       enrollment_open_date: null,
@@ -200,9 +202,8 @@ export async function duplicateProgram(
       ),
       grade_levels: sourceProgram.grade_levels ?? [],
       gender: sourceProgram.gender,
-      capacity: sourceProgram.capacity ?? 0,
       status: "draft",
-      program_type: sourceProgram.program_type,
+      program_type: normalizeProgramAudienceType(sourceProgram.program_type),
       min_age: sourceProgram.min_age,
       max_age: sourceProgram.max_age,
       min_grade: sourceProgram.min_grade,
@@ -210,16 +211,6 @@ export async function duplicateProgram(
       require_guardian: sourceProgram.require_guardian,
       require_grade: sourceProgram.require_grade,
       require_emergency_contact: sourceProgram.require_emergency_contact,
-      full_program_registration_enabled:
-        sourceProgram.full_program_registration_enabled ?? true,
-      session_registration_enabled:
-        sourceProgram.session_registration_enabled ?? false,
-      single_session_registration_enabled:
-        sourceProgram.single_session_registration_enabled ?? false,
-      drop_in_registration_enabled:
-        sourceProgram.drop_in_registration_enabled ?? false,
-      enable_waitlist: sourceProgram.enable_waitlist ?? false,
-      waitlist_capacity: sourceProgram.waitlist_capacity,
       visibility: sourceProgram.visibility ?? "public",
       financial_assistance_enabled:
         sourceProgram.financial_assistance_enabled ?? false,
@@ -228,27 +219,23 @@ export async function duplicateProgram(
         sourceProgram.financial_assistance_close_date,
       financial_assistance_instructions:
         sourceProgram.financial_assistance_instructions,
-      billing_type: sourceProgram.billing_type ?? "free",
-      tuition_amount: sourceProgram.tuition_amount ?? 0,
-      deposit_amount: sourceProgram.deposit_amount ?? 0,
-      monthly_amount: sourceProgram.monthly_amount ?? 0,
-      installment_count: sourceProgram.installment_count,
-      payment_due_day: sourceProgram.payment_due_day,
+      identityAndDefaultsOnly: true,
     })
 
-    const sourceCapacityGroups = await getProgramCapacityGroups(sourceProgramId)
-
-    if (sourceCapacityGroups.length > 0) {
-      await replaceProgramCapacityGroups({
-        program_id: newProgramId,
-        groups: sourceCapacityGroups.map((group) => ({
-          name: group.name,
-          grade_levels: group.grade_levels || [],
-          genders: group.genders || [],
-          capacity: group.capacity,
-        })),
-      })
-    }
+    await ensureProgramHasOfferingForLegacyCopy({
+      organizationId,
+      programId: newProgramId,
+      programName: duplicateName,
+      startDate: null,
+      endDate: null,
+      enrollmentOpenDate: null,
+      enrollmentCloseDate: null,
+      programStatus: "draft",
+      fullProgramEnabled:
+        sourceProgram.full_program_registration_enabled ?? true,
+      sessionRegistrationEnabled:
+        sourceProgram.session_registration_enabled ?? false,
+    })
 
     const [sourceOffering, newOffering] = await Promise.all([
       getDefaultOfferingForProgram(sourceProgramId),
@@ -256,6 +243,23 @@ export async function duplicateProgram(
     ])
 
     if (sourceOffering && newOffering) {
+      const sourceCapacityGroups = await getOfferingCapacityGroups(
+        sourceOffering.id
+      )
+
+      if (sourceCapacityGroups.length > 0) {
+        await replaceProgramCapacityGroups({
+          program_id: newProgramId,
+          offering_id: newOffering.id,
+          groups: sourceCapacityGroups.map((group) => ({
+            name: group.name,
+            grade_levels: group.grade_levels || [],
+            genders: group.genders || [],
+            capacity: group.capacity,
+          })),
+        })
+      }
+
       const [sourceBundle, sourceOptions, newOptions] = await Promise.all([
         getFeePlanBundleForOffering(sourceOffering.id, organizationId),
         getAllRegistrationOptionsForOffering(sourceOffering.id),

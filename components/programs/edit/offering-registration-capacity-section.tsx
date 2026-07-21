@@ -35,6 +35,7 @@ export const OfferingRegistrationCapacitySection = React.forwardRef<
     onEnableWaitlistChange: (enabled: boolean) => void
     waitlistCapacity: string
     onWaitlistCapacityChange: (value: string) => void
+    enrolled?: number
   }
 >(function OfferingRegistrationCapacitySection(
   {
@@ -52,6 +53,7 @@ export const OfferingRegistrationCapacitySection = React.forwardRef<
     onEnableWaitlistChange,
     waitlistCapacity,
     onWaitlistCapacityChange,
+    enrolled,
   },
   ref
 ) {
@@ -93,7 +95,7 @@ export const OfferingRegistrationCapacitySection = React.forwardRef<
             ) : (
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label htmlFor="program-capacity">Program capacity</Label>
+                  <Label htmlFor="program-capacity">Offering capacity</Label>
                   <Input
                     id="program-capacity"
                     type="number"
@@ -109,12 +111,16 @@ export const OfferingRegistrationCapacitySection = React.forwardRef<
                 <div className="space-y-1.5">
                   <Label>Currently enrolled</Label>
                   <div className="flex h-9 items-center rounded-md border bg-muted/40 px-3 text-sm">
-                    {program.enrolled ?? 0}
+                    {enrolled ?? program.enrolled ?? 0}
                     {capacity > 0 ? (
                       <span className="ml-1 text-muted-foreground">
                         / {capacity}
                       </span>
-                    ) : null}
+                    ) : (
+                      <span className="ml-1 text-muted-foreground">
+                        / Unlimited
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>

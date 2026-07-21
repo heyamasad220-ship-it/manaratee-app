@@ -3,12 +3,17 @@
 import { useCallback, useEffect, useState, useTransition } from "react"
 import Link from "next/link"
 import {
+  BookOpen,
+  DollarSign,
+  GraduationCap,
   Loader2,
   Plus,
   RefreshCw,
   Calendar,
   Tag,
+  TrendingUp,
   Users,
+  Wallet,
 } from "lucide-react"
 
 import { ProgramFlyerField } from "@/components/programs/edit/program-flyer-field"
@@ -33,6 +38,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { StatCard, StatCardsRow } from "@/components/ui/stat-card"
 import type { DepartmentYearProgramRow } from "@/lib/departments/department-active-programs"
 import {
   archiveDepartmentYearProgramAction,
@@ -41,9 +47,29 @@ import {
   updateDepartmentYearFlyerAction,
   type DepartmentYearProgramsBundle,
 } from "@/lib/departments/department-year-actions"
+import {
+  fetchDepartmentWorkspaceOverviewAction,
+  type DepartmentWorkspaceOverview,
+} from "@/lib/departments/department-workspace-overview"
 import { departmentGroupWorkspaceHref } from "@/lib/donations/donation-group-path"
 import { getProgramStatusLabel, type ProgramStatus } from "@/lib/programs/program-status"
 import { cn } from "@/lib/utils"
+
+function formatMoney(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(value)
+}
+
+function formatNet(value: number) {
+  const abs = formatMoney(Math.abs(value)).replace(/^\$/, "")
+  if (value > 0) return `+${abs}`
+  if (value < 0) return `-${abs}`
+  return abs
+}
 
 const FLYER_PLACEHOLDER_COLORS = [
   "bg-sky-500",
@@ -97,6 +123,7 @@ export function DepartmentOverviewPanel({
   departmentName: string
 }) {
   const [bundle, setBundle] = useState<DepartmentYearProgramsBundle | null>(null)
+  const [overview, setOverview] = useState<DepartmentWorkspaceOverview | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
@@ -115,13 +142,17 @@ export function DepartmentOverviewPanel({
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
-    const result = await fetchDepartmentYearProgramsAction(departmentId)
-    if (!result.success) {
-      setError(result.error)
+    const [yearsResult, overviewResult] = await Promise.all([
+      fetchDepartmentYearProgramsAction(departmentId),
+      fetchDepartmentWorkspaceOverviewAction(departmentId),
+    ])
+    if (!yearsResult.success) {
+      setError(yearsResult.error)
       setBundle(null)
     } else {
-      setBundle(result.data)
+      setBundle(yearsResult.data)
     }
+    setOverview(overviewResult.success ? overviewResult.overview : null)
     setLoading(false)
   }, [departmentId])
 
@@ -223,22 +254,85 @@ export function DepartmentOverviewPanel({
   }
 
   const copySources = [...bundle.openPrograms, ...bundle.archivedPrograms]
+  const openOfferings = bundle.openPrograms.reduce(
+    (sum, program) => sum + program.offeringCount,
+    0
+  )
+  const openEnrolled = bundle.openPrograms.reduce((sum, program) => sum + program.enrolled, 0)
 
   return (
     <div className="space-y-6">
+      {overview ? (
+        <StatCardsRow equal columns={6}>
+          <StatCard
+            layout="header"
+            fill
+            tone="blue"
+            label="Students"
+            value={overview.studentsCount}
+            icon={GraduationCap}
+            hint="Enrolled students"
+          />
+          <StatCard
+            layout="header"
+            fill
+            tone="sky"
+            label="Staff"
+            value={overview.staffCount}
+            icon={Users}
+            hint="Department employees"
+          />
+          <StatCard
+            layout="header"
+            fill
+            tone="emerald"
+            label="Revenue"
+            value={formatMoney(overview.revenue)}
+            icon={DollarSign}
+            hint="From Programs billing"
+          />
+          <StatCard
+            layout="header"
+            fill
+            tone="amber"
+            label="Expenses"
+            value={formatMoney(overview.expenses)}
+            icon={Wallet}
+            hint="Approved payroll"
+          />
+          <StatCard
+            layout="header"
+            fill
+            tone={overview.net >= 0 ? "emerald" : "rose"}
+            label="Net"
+            value={formatNet(overview.net)}
+            icon={TrendingUp}
+            hint="Revenue − expenses"
+          />
+          <StatCard
+            layout="header"
+            fill
+            tone="violet"
+            label="Programs"
+            value={bundle.openPrograms.length}
+            icon={BookOpen}
+            hint={
+              openOfferings === 1
+                ? `1 offering · ${openEnrolled} enrolled`
+                : `${openOfferings} offerings · ${openEnrolled} enrolled`
+            }
+          />
+        </StatCardsRow>
+      ) : null}
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-lg font-semibold tracking-tight">Year programs</h2>
-          <p className="text-sm text-muted-foreground">
-            Set up the academic year here (like Catalog). Courses are offerings under the
-            year program. Operating tabs show open years only; archived years are under
-            Reports.
-          </p>
+          <h2 className="text-lg font-semibold tracking-tight">Programs</h2>
         </div>
         {bundle.canManageYears ? (
           <Button onClick={openCreate}>
             <Plus className="mr-2 h-4 w-4" />
-            Add year program
+            Add Program
           </Button>
         ) : null}
       </div>
@@ -246,11 +340,7 @@ export function DepartmentOverviewPanel({
       {bundle.openPrograms.length === 0 ? (
         <Card>
           <CardHeader>
-            <CardTitle>No open year</CardTitle>
-            <CardDescription>
-              Create the academic year program for this department to start offerings and
-              rosters.
-            </CardDescription>
+            <CardTitle>No Open Programs</CardTitle>
           </CardHeader>
         </Card>
       ) : (
@@ -399,9 +489,9 @@ export function DepartmentOverviewPanel({
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Add year program</DialogTitle>
+            <DialogTitle>Add Program</DialogTitle>
             <DialogDescription>
-              Creates the academic year under this department. Optionally copy courses and
+              Creates a program under this department. Optionally copy courses and
               teachers from a previous year (rosters stay empty).
             </DialogDescription>
           </DialogHeader>

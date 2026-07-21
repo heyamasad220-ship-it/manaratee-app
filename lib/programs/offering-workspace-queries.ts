@@ -6,6 +6,7 @@ import {
 import type { ProgramOffering } from "@/lib/programs/program-offering-types"
 import { getAllRegistrationOptionsForOffering } from "@/lib/programs/program-registration-option-queries"
 import { getProgramSessionsForOffering } from "@/lib/programs/program-session-queries"
+import { getOfferingScheduleItems } from "@/lib/programs/program-schedule-queries"
 import { getStaffAssignmentsForOffering } from "@/lib/programs/program-staff-assignment-queries"
 import type {
   OfferingWorkspaceData,
@@ -22,6 +23,7 @@ export async function getOfferingWorkspaceData(
     feePlanBundle,
     invalidFeePlanLinks,
     sessions,
+    scheduleItems,
     staffAssignments,
     billingSchedule,
   ] = await Promise.all([
@@ -33,6 +35,7 @@ export async function getOfferingWorkspaceData(
       offering.id,
       offering.is_default
     ),
+    getOfferingScheduleItems(offering.id),
     getStaffAssignmentsForOffering(offering.id, organizationId),
     getOfferingBillingScheduleBundle(programId, organizationId, offering.id, {
       includeParticipants: false,
@@ -46,6 +49,7 @@ export async function getOfferingWorkspaceData(
     feePlanDiscountRules: feePlanBundle.discountRules,
     invalidFeePlanLinks,
     sessions,
+    scheduleItems,
     staffAssignments,
     billingSchedule,
   }

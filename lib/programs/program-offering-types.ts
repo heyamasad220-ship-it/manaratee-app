@@ -1,3 +1,5 @@
+import type { ProgramOfferingAttributes } from "@/lib/programs/program-offering-attributes"
+
 export type ProgramOfferingType =
   | "standard"
   | "academic_year"
@@ -7,7 +9,7 @@ export type ProgramOfferingType =
 
 export type ProgramOfferingStatus = "draft" | "active" | "closed" | "archived"
 
-export interface ProgramOffering {
+export interface ProgramOffering extends ProgramOfferingAttributes {
   id: string
   organization_id: string
   program_id: string
@@ -31,6 +33,8 @@ export type ProgramOfferingInput = {
   enrollment_open_date?: string | null
   enrollment_close_date?: string | null
   status?: ProgramOfferingStatus
+  /** When set, used instead of inheriting from the parent program. */
+  attributes?: Partial<ProgramOfferingAttributes>
 }
 
 export const PROGRAM_OFFERING_STATUS_LABELS: Record<

@@ -20,7 +20,6 @@ import { Cell, Pie, PieChart } from "recharts"
 
 import { DonationRecurringPanel } from "@/components/donations/donation-recurring-panel"
 import { DonorPledgesTab } from "@/components/donations/donor-pledges-tab"
-import { DonationPaymentRowActions } from "@/components/donations/donation-payment-row-actions"
 import { GivingStatementActions } from "@/components/donations/giving-statement-actions"
 import {
   DonationMetricCard,
@@ -65,6 +64,7 @@ import type {
 import { mapPaymentToDonationHistoryRow } from "@/lib/donations/payment-admin-capabilities"
 import { getPaymentDetailPageDataAction } from "@/lib/donations/payment-admin-actions"
 import type { DonationHistoryRow } from "@/components/donations/donor-donation-history-table"
+import { ContactTransactionRowActions } from "@/components/contacts/contact-transaction-row-actions"
 import type { ContactProfileModuleFlags } from "@/lib/contacts/contact-profile-module-access"
 import type { ContactPaymentMethodRow } from "@/lib/contacts/contact-payment-method-actions"
 import { cn } from "@/lib/utils"
@@ -141,7 +141,11 @@ function isRefundEvent(event: ContactFinancialTimelineEvent) {
 }
 
 function isPaidTransaction(event: ContactFinancialTimelineEvent) {
-  return event.filterCategory !== "pledges" && !isRefundEvent(event)
+  return (
+    event.amount != null &&
+    event.filterCategory !== "pledges" &&
+    !isRefundEvent(event)
+  )
 }
 
 function OpenBalancesTable({ rows }: { rows: ContactOpenBalanceRow[] }) {
@@ -724,6 +728,8 @@ export function ContactFinancialPanel({
               rows={transactions}
               emptyMessage="No transactions recorded for this contact yet."
               contactId={contactId}
+              contactName={contactName}
+              contactEmail={contactEmail}
               onUpdated={() => void loadData()}
             />
           </div>
@@ -752,6 +758,8 @@ export function ContactFinancialPanel({
                     rows={recentTransactions}
                     emptyMessage="No transactions recorded for this contact yet."
                     contactId={contactId}
+                    contactName={contactName}
+                    contactEmail={contactEmail}
                     onUpdated={() => void loadData()}
                     compact
                   />
@@ -777,6 +785,8 @@ export function ContactFinancialPanel({
                   rows={transactions}
                   emptyMessage="No transactions recorded for this group yet."
                   contactId={contactId}
+                  contactName={contactName}
+                  contactEmail={contactEmail}
                   onUpdated={() => void loadData()}
                 />
               </CardContent>
@@ -846,6 +856,8 @@ export function ContactFinancialPanel({
                         rows={refunds}
                         emptyMessage="No refunds recorded for this contact."
                         contactId={contactId}
+                        contactName={contactName}
+                        contactEmail={contactEmail}
                         onUpdated={() => void loadData()}
                       />
                     </TabsContent>
@@ -1021,12 +1033,16 @@ function FinancialTransactionsTable({
   rows,
   emptyMessage,
   contactId: _contactId,
+  contactName,
+  contactEmail,
   onUpdated,
   compact = false,
 }: {
   rows: ContactFinancialTimelineEvent[]
   emptyMessage: string
   contactId: string
+  contactName: string
+  contactEmail?: string | null
   onUpdated?: () => void
   compact?: boolean
 }) {
@@ -1108,7 +1124,6 @@ function FinancialTransactionsTable({
             <TableRow>
               <TableHead>Date</TableHead>
               <TableHead>Type</TableHead>
-              {!compact ? <TableHead>Module</TableHead> : null}
               <TableHead>Description</TableHead>
               <TableHead className="text-right">Amount</TableHead>
               <TableHead>Status</TableHead>
@@ -1144,11 +1159,6 @@ function FinancialTransactionsTable({
                     )}
                   </TableCell>
                   <TableCell className="whitespace-nowrap">{event.eventType}</TableCell>
-                  {!compact ? (
-                    <TableCell className="whitespace-nowrap text-muted-foreground">
-                      {MODULE_LABELS[event.sourceModule] || event.sourceModule}
-                    </TableCell>
-                  ) : null}
                   <TableCell className="max-w-[200px] truncate font-medium">
                     {event.description}
                   </TableCell>
@@ -1169,15 +1179,18 @@ function FinancialTransactionsTable({
                   </TableCell>
                   {!compact ? (
                     <TableCell className="text-right">
-                      {actionRow && paymentId ? (
-                        <DonationPaymentRowActions
-                          row={actionRow}
-                          onLinkToPledge={() => void openPaymentEditor(paymentId, "allocate")}
-                          onUpdated={() => onUpdated?.()}
-                        />
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
+                      <ContactTransactionRowActions
+                        event={event}
+                        contactName={contactName}
+                        contactEmail={contactEmail}
+                        donationRow={actionRow}
+                        onLinkToPledge={
+                          paymentId
+                            ? () => void openPaymentEditor(paymentId, "allocate")
+                            : undefined
+                        }
+                        onUpdated={() => onUpdated?.()}
+                      />
                     </TableCell>
                   ) : null}
                 </TableRow>

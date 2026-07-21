@@ -77,6 +77,7 @@ export type ContactNoteRecord = {
 export type ContactEnrollmentRecord = {
   id: string
   programName: string
+  offeringName: string | null
   status: string | null
   enrollmentDate: string | null
 }
@@ -355,13 +356,18 @@ export async function fetchContactProfileData(
       payment_status: string | null
       created_at: string | null
       programs?: { name?: string } | null
+      offerings?: { name?: string } | null
+      offering?: { name?: string } | null
     }>
   ) {
     for (const enrollment of enrollments) {
       const programName = enrollment.programs?.name || "Program"
+      const offeringName =
+        enrollment.offering?.name || enrollment.offerings?.name || null
       enrollmentRecords.push({
         id: enrollment.id,
         programName,
+        offeringName,
         status: enrollment.status || enrollment.payment_status,
         enrollmentDate: enrollment.enrollment_date || enrollment.created_at,
       })
@@ -369,14 +375,16 @@ export async function fetchContactProfileData(
         id: enrollment.id,
         module: "programs",
         activityType: "registered_program",
-        title: programName,
+        title: offeringName ? `${programName} — ${offeringName}` : programName,
         date: enrollment.enrollment_date || enrollment.created_at,
         status: enrollment.status || enrollment.payment_status,
       })
       pushTimeline({
         id: `enrollment-${enrollment.id}`,
         date: enrollment.enrollment_date || enrollment.created_at || new Date().toISOString(),
-        title: `Registered for ${programName}`,
+        title: offeringName
+          ? `Registered for ${offeringName}`
+          : `Registered for ${programName}`,
         module: "Programs",
         status: enrollment.status || enrollment.payment_status,
       })
@@ -389,7 +397,8 @@ export async function fetchContactProfileData(
     status,
     payment_status,
     created_at,
-    programs:program_id (name)
+    programs:program_id (name),
+    offering:offering_id (name)
   `
 
   const { data: enrollmentsByContact } = await supabase

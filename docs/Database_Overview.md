@@ -195,7 +195,10 @@ npm run validate:contacts-security -- --post-m4   # after 111
 
 ## Programs Module
 
-* programs
+* programs — optional defaults; `capacity` temporarily = sum of limited offerings (S2 sync; catalog may also read offerings live in S6). S4: staff saves no longer write operational eligibility/capacity/`billing_*` as SSOT. **S5:** `program_type` CHECK adult|youth only (`179_drop_program_type_family.sql`; family backfilled to youth). Obsolete eligibility/capacity columns retained pending RPC cutover.
+* program_offerings — S1 attribute columns; S4 registration panel writes here only. Programs may have **zero** offerings; first created offering is `is_default`. Audience adult|youth. Catalog enrollment display uses offering `capacity_mode` / `capacity` (S6).
+* program_capacity_groups — S2 `offering_id` required (`177`); `program_id` retained for queries
+* program_schedule_items — S3 `offering_id` required (`178`); weekly class times edited on offering Schedule tab
 * departments — RLS repair: `scripts/164_departments_rls_policies.sql` (org members can manage). App writes also authorize then use service role when needed.
 * age_groups
 * program_sessions
@@ -213,6 +216,7 @@ Key relationships:
 program_sessions.program_id → programs.id
 program_sessions.organization_id → organizations.id
 program_schedule_items.program_id → programs.id
+program_schedule_items.offering_id → program_offerings.id
 program_lunch_options.organization_id → organizations.id
 program_fee_options.program_id → programs.id
 program_fee_options.organization_id → organizations.id

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, useTransition } from "react"
 import Link from "next/link"
-import { BookOpen, ExternalLink, Loader2, Plus } from "lucide-react"
+import { BookOpen, ExternalLink, Loader2, Plus, Tag } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -24,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { StatCard, StatCardsRow } from "@/components/ui/stat-card"
 import {
   Table,
   TableBody,
@@ -97,8 +98,74 @@ export function DepartmentOfferingsPanel({
     void load()
   }, [load])
 
+  const activeOfferings = offerings.filter((row) => row.status === "active").length
+  const draftOfferings = offerings.filter((row) => row.status === "draft").length
+  const academicYear = offerings.filter((row) => row.offeringType === "academic_year").length
+  const seasonal = offerings.filter(
+    (row) => row.offeringType === "summer" || row.offeringType === "season"
+  ).length
+
   return (
-    <>
+    <div className="space-y-6">
+      {!loading && !error ? (
+        <StatCardsRow equal columns={6}>
+          <StatCard
+            layout="header"
+            fill
+            tone="blue"
+            label="Offerings"
+            value={offerings.length}
+            icon={BookOpen}
+            hint="All courses"
+          />
+          <StatCard
+            layout="header"
+            fill
+            tone="sky"
+            label="Programs"
+            value={programs.length}
+            icon={BookOpen}
+            hint="Parent programs"
+          />
+          <StatCard
+            layout="header"
+            fill
+            tone="emerald"
+            label="Active"
+            value={activeOfferings}
+            icon={Tag}
+            hint="Open for registration"
+          />
+          <StatCard
+            layout="header"
+            fill
+            tone="slate"
+            label="Draft"
+            value={draftOfferings}
+            icon={Tag}
+            hint="Not published"
+          />
+          <StatCard
+            layout="header"
+            fill
+            tone="violet"
+            label="Academic year"
+            value={academicYear}
+            icon={BookOpen}
+            hint="Year-long offerings"
+          />
+          <StatCard
+            layout="header"
+            fill
+            tone="amber"
+            label="Seasonal"
+            value={seasonal}
+            icon={Tag}
+            hint="Summer / season"
+          />
+        </StatCardsRow>
+      ) : null}
+
       <Card>
         <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 pb-2">
           <div>
@@ -212,7 +279,7 @@ export function DepartmentOfferingsPanel({
           await load()
         }}
       />
-    </>
+    </div>
   )
 }
 

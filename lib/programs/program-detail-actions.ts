@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { updateProgram } from "@/lib/programs/program-actions"
 import { getAgeGroupLabelsFromMinMax } from "@/lib/programs/program-eligibility-display"
+import { normalizeProgramAudienceType } from "@/lib/programs/program-offering-attributes"
 import { workforceDepartmentDetailPath } from "@/lib/departments/department-paths"
 
 function emptyToNull(value: string | null | undefined) {
@@ -102,7 +103,7 @@ export async function updateProgramBasics(
     gender?: string | null
     capacity?: number | null
     status?: string | null
-    program_type?: "adult" | "youth" | "family"
+    program_type?: "adult" | "youth"
     min_age?: number | null
     max_age?: number | null
     min_grade?: string | null
@@ -186,12 +187,11 @@ export async function updateProgramBasics(
       age_groups: getAgeGroupLabelsFromMinMax(resolvedMinAge, resolvedMaxAge),
       grade_levels: program.grade_levels ?? [],
       gender,
-      capacity: program.capacity ?? 0,
       status,
       program_type:
         resolvedMinAge != null
           ? inferProgramTypeFromMinAge(resolvedMinAge)
-          : program.program_type || "family",
+          : normalizeProgramAudienceType(program.program_type),
       min_age: resolvedMinAge,
       max_age: resolvedMaxAge,
       min_grade: program.min_grade ?? null,
@@ -199,16 +199,6 @@ export async function updateProgramBasics(
       require_guardian: program.require_guardian ?? true,
       require_grade: program.require_grade ?? false,
       require_emergency_contact: program.require_emergency_contact ?? true,
-      full_program_registration_enabled:
-        program.full_program_registration_enabled ?? true,
-      session_registration_enabled:
-        program.session_registration_enabled ?? false,
-      single_session_registration_enabled:
-        program.single_session_registration_enabled ?? false,
-      drop_in_registration_enabled:
-        program.drop_in_registration_enabled ?? false,
-      enable_waitlist: program.enable_waitlist ?? false,
-      waitlist_capacity: program.waitlist_capacity ?? null,
       visibility,
       financial_assistance_enabled:
         program.financial_assistance_enabled ?? false,
@@ -217,12 +207,7 @@ export async function updateProgramBasics(
         program.financial_assistance_close_date ?? null,
       financial_assistance_instructions:
         program.financial_assistance_instructions ?? null,
-      billing_type: program.billing_type ?? "free",
-      tuition_amount: program.tuition_amount ?? 0,
-      deposit_amount: program.deposit_amount ?? 0,
-      monthly_amount: program.monthly_amount ?? 0,
-      installment_count: program.installment_count ?? null,
-      payment_due_day: program.payment_due_day ?? null,
+      identityAndDefaultsOnly: true,
     })
 
     if (input.syncOfferingDates !== false) {

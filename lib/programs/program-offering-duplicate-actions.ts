@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache"
 
 import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
+import { copyOfferingCapacityGroups } from "@/lib/programs/program-capacity-group-actions"
+import { copyOfferingScheduleItems } from "@/lib/programs/program-schedule-actions"
 import { getOfferingBillingPeriods } from "@/lib/programs/program-billing-queries"
 import { saveOfferingFeePlans } from "@/lib/programs/program-fee-plan-actions"
 import {
@@ -185,6 +187,24 @@ export async function duplicateProgramOffering(
       enrollment_open_date: source.enrollment_open_date,
       enrollment_close_date: source.enrollment_close_date,
       status: offeringStatus,
+      audience_type: source.audience_type ?? "youth",
+      min_age: source.min_age ?? null,
+      max_age: source.max_age ?? null,
+      min_grade: source.min_grade ?? null,
+      max_grade: source.max_grade ?? null,
+      grade_levels: source.grade_levels ?? [],
+      gender: source.gender ?? null,
+      require_guardian: source.require_guardian ?? false,
+      require_grade: source.require_grade ?? false,
+      require_emergency_contact: source.require_emergency_contact ?? true,
+      capacity_mode: source.capacity_mode ?? "unlimited",
+      capacity: source.capacity ?? null,
+      enable_waitlist: source.enable_waitlist ?? false,
+      waitlist_capacity: source.waitlist_capacity ?? null,
+      waitlist_offer_deadline_days: source.waitlist_offer_deadline_days ?? null,
+      registration_mode: source.registration_mode ?? "required",
+      attendance_tracked: source.attendance_tracked ?? false,
+      delivery_format: source.delivery_format ?? "in_person",
     })
     .select("*")
     .single()
@@ -205,6 +225,20 @@ export async function duplicateProgramOffering(
       source.name as string,
       name
     )
+
+    await copyOfferingCapacityGroups({
+      organizationId,
+      programId,
+      sourceOfferingId,
+      targetOfferingId: newOfferingId,
+    })
+
+    await copyOfferingScheduleItems({
+      organizationId,
+      programId,
+      sourceOfferingId,
+      targetOfferingId: newOfferingId,
+    })
 
     const [sourceSessions, billingPeriods] = await Promise.all([
       getProgramSessionsForOffering(

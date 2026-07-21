@@ -25,7 +25,7 @@ export interface Program {
 financial_assistance_open: boolean
 financial_assistance_close_date: string | null
 financial_assistance_instructions: string | null
-program_type: "adult" | "youth" | "family"
+program_type: "adult" | "youth"
 min_age: number | null
 max_age: number | null
 min_grade: string | null
@@ -35,6 +35,8 @@ require_grade: boolean
 require_emergency_contact: boolean
 enable_waitlist: boolean
 waitlist_capacity: number | null
+/** Optional default for new offerings (S1+); offerings may override. */
+waitlist_offer_deadline_days: number | null
 billing_type: "free" | "one_time" | "deposit_balance" | "monthly" | "installments"
 tuition_amount: number
 deposit_amount: number

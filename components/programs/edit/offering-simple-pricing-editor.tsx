@@ -347,7 +347,7 @@ export function OfferingSimplePricingEditor({
       <div className="space-y-1">
         <h3 className="text-base font-semibold">Pricing</h3>
         <p className="text-sm text-muted-foreground">
-          What will a family be charged for {offering.name}?
+          What will families be charged for {offering.name}?
         </p>
         {requiredTotal > 0 ? (
           <p className="text-sm font-medium">

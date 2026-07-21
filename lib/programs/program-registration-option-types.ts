@@ -4,7 +4,8 @@ export type ProgramRegistrationOptionType =
   | "single_session"
   | "drop_in"
 
-export type ParticipantType = "adult" | "youth" | "family" | "group"
+export type ParticipantType = "adult" | "youth" | "group" | "family" // family = legacy enrollments only
+
 
 export type RegistrantType = "adult_self" | "guardian" | "organization" | "staff"
 

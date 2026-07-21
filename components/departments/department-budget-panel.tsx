@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState, useTransition } from "react"
-import { Loader2, PieChart, Plus, Trash2 } from "lucide-react"
+import { DollarSign, Loader2, PieChart, Plus, Trash2, TrendingUp, Wallet } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { StatCard, StatCardsRow } from "@/components/ui/stat-card"
 import {
   Table,
   TableBody,
@@ -73,7 +74,48 @@ export function DepartmentBudgetPanel({
   const periods = summary?.periods ?? summary?.byMonth ?? []
 
   return (
-    <>
+    <div className="space-y-6">
+      {!loading && !error && summary ? (
+        <StatCardsRow equal columns={4}>
+          <StatCard
+            layout="header"
+            fill
+            tone="emerald"
+            label="Tuition"
+            value={formatCurrency(summary.totals.studentTuition)}
+            icon={DollarSign}
+            hint="Student payments"
+          />
+          <StatCard
+            layout="header"
+            fill
+            tone="amber"
+            label="Payroll"
+            value={formatCurrency(summary.totals.teacherSalaries)}
+            icon={Wallet}
+            hint="Approved payroll"
+          />
+          <StatCard
+            layout="header"
+            fill
+            tone={summary.totals.profit >= 0 ? "emerald" : "rose"}
+            label="Profit"
+            value={formatCurrency(summary.totals.profit)}
+            icon={TrendingUp}
+            hint="Tuition − payroll"
+          />
+          <StatCard
+            layout="header"
+            fill
+            tone="violet"
+            label="Periods"
+            value={periods.length}
+            icon={PieChart}
+            hint="Budget date ranges"
+          />
+        </StatCardsRow>
+      ) : null}
+
       <Card>
         <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 pb-2">
           <div>
@@ -216,7 +258,7 @@ export function DepartmentBudgetPanel({
           await load()
         }}
       />
-    </>
+    </div>
   )
 }
 

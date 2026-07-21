@@ -19,7 +19,7 @@ export const SIGN_UPS_APPLICATIONS_PATH = "/people-management/applications"
 /** @deprecated Child Care applications moved back under People Management */
 export const CHILD_CARE_APPLICATIONS_PATH = "/people-management/applications"
 
-export type ApplicationsPageTab = "overview" | "submissions" | "templates"
+export type ApplicationsPageTab = "overview" | "submissions" | "templates" | (string & {})
 export type PeopleManagementApplicationsPageTab = ApplicationsPageTab
 
 export type HrWorkforceApplicationType =

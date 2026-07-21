@@ -135,6 +135,7 @@ export function DepartmentDetailClient({
                   <TableRow>
                     <TableHead>Name</TableHead>
                     <TableHead>Email</TableHead>
+                    <TableHead>Phone</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -155,6 +156,9 @@ export function DepartmentDetailClient({
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {member.email || "—"}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {member.phone || "—"}
                       </TableCell>
                       <TableCell className="capitalize text-muted-foreground">
                         {member.employmentStatus || "—"}

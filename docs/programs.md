@@ -129,7 +129,7 @@ Apply in Supabase SQL Editor in this order:
 | `programs` | Program master record |
 | `departments` | Optional department link |
 | `program_sessions` | Sessions/weeks; linked to `offering_id` |
-| `program_schedule_items` | Daily schedule items inside a program |
+| `program_schedule_items` | Weekly class times per **offering** (`offering_id`; S3) |
 | `program_lunch_options` | Lunch add-ons (org-scoped) |
 | `program_capacity_groups` | Capacity by grade/gender groups |
 
@@ -377,11 +377,11 @@ TypeScript helpers: `lib/programs/program-lifecycle-types.ts`
 
 | Nav item | Route | Permission |
 |----------|-------|------------|
+| Departments | `/workforce/departments` | `staff.view` |
 | Catalog | `/programs/catalog` | `programs.view` |
-| Registrations | `/programs/registrations` | `programs.manage` |
 | Schedule | `/programs/schedule` | `programs.view` |
-| Reports | `/programs/reports` | `reports.view` |
-| Financial Assistance | `/programs/financial-assistance` | (module nav helper) |
+| Financial Assistance | `/programs/financial-assistance` | `applications.view` — Overview / Submissions / Templates + FA report + Payment Plans tabs |
+| Reports | `/programs/reports` | `reports.view` — Overview / Payments (→ `/programs/registrations`). Expenses → department workspace; Waitlist/Care/Attendance → offering manage |
 | Settings | `/programs/settings` (General + Service Needs) | `programs.manage` |
 
 ### Program management routes
@@ -393,7 +393,7 @@ TypeScript helpers: `lib/programs/program-lifecycle-types.ts`
 | `/programs/create` | **Quick Create** — basics + eligibility; redirects to `/programs/[id]` after save |
 | `/programs/[id]` | Program detail home (Overview inline edit + Offerings; Catalog → Edit) |
 | `/programs/[id]/offerings` | Redirects to first non-archived offering manage page (or program detail if none) |
-| `/programs/[id]/offerings/[offeringId]` | **Offering manage** — Overview / Registration / Fees / Schedule / Staff for one offering |
+| `/programs/[id]/offerings/[offeringId]` | **Offering manage** — Overview / Registration / Fees / Schedule / Staff / Waitlist / Before & After Care / Attendance |
 | `/programs/[id]/edit` | **Retired** — redirects to detail or offering manage (legacy deep links) |
 | `/programs/[id]/billing` | Redirects to offering Fees tab |
 | `/programs/[id]/car-tags` | Printable car dismissal name tags (staff operations) |
@@ -575,6 +575,8 @@ Phase 2B creates the ledger Phase 3 checkout will use. **No Stripe in 2B.**
 - Wire `register_for_program` to create charges + `pending_payment`
 - Checkout expiry cron
 - Refunds / autopay
+- **Registration pipeline** (apply → evaluate/approve → waitlist/FA → register → Registrations + Payment transactions reports) — design only: [programs-registration-pipeline-design.md](./programs-registration-pipeline-design.md)
+- **Program → Offering attributes migration** — **S1–S6 in repo** (`176`–`179`); catalog Unlimited when no limited offerings — [programs-offering-attributes-migration.md](./programs-offering-attributes-migration.md)
 
 Legacy cart tables (`registration_carts`, `registration_orders`) remain unused; prefer `program_checkouts`.
 
@@ -582,6 +584,8 @@ Legacy cart tables (`registration_carts`, `registration_orders`) remain unused; 
 
 ## Related Documentation
 
+- [programs-offering-attributes-migration.md](./programs-offering-attributes-migration.md) — **Program identity vs Offering attributes (schema-first plan)**
+- [programs-registration-pipeline-design.md](./programs-registration-pipeline-design.md) — **apply / approve / waitlist / FA / register + reports (design, not built)**
 - [programs-staff-setup-ui.md](./programs-staff-setup-ui.md) — Quick Create + program detail + offering manage UI
 - [programs-architecture-reset-plan.md](./programs-architecture-reset-plan.md) — **workflow audit & refactor sequence (review before Phase 3)**
 - [programs-phase-2b-charge-ledger.md](./programs-phase-2b-charge-ledger.md) — charge ledger design

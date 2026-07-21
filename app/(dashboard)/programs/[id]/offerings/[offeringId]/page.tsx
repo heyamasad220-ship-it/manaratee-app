@@ -4,7 +4,7 @@ import { Header } from "@/components/layout/header"
 import { OfferingManageClient } from "@/components/programs/offering-manage-client"
 import { getDepartments } from "@/lib/departments/department-queries"
 import { getOfferingWorkspaceData } from "@/lib/programs/offering-workspace-queries"
-import { getProgramCapacityGroups } from "@/lib/programs/program-capacity-group-queries"
+import { getOfferingCapacityGroups } from "@/lib/programs/program-capacity-group-queries"
 import { getOfferingsForProgram } from "@/lib/programs/program-offering-queries"
 import { getProgramById } from "@/lib/programs/program-queries"
 import { getOfferingEnrollmentCount } from "@/lib/programs/program-staff-assignment-queries"
@@ -23,7 +23,7 @@ export default async function ManageProgramOfferingPage({
     getProgramById(id),
     getOfferingsForProgram(id),
     getDepartments(),
-    getProgramCapacityGroups(id),
+    getOfferingCapacityGroups(offeringId),
   ])
 
   if (!program) {
@@ -52,6 +52,9 @@ export default async function ManageProgramOfferingPage({
     "fees",
     "schedule",
     "staff",
+    "waitlist",
+    "care",
+    "attendance",
   ] as const
   const tabParam = resolvedSearch?.tab
   const initialTab = allowedTabs.includes(tabParam as (typeof allowedTabs)[number])

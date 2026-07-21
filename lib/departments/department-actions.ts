@@ -220,6 +220,7 @@ export type DepartmentStaffMember = {
   contactId: string | null
   fullName: string
   email: string | null
+  phone: string | null
   employmentStatus: string | null
   staffType: string | null
   positionId: string | null
@@ -310,6 +311,25 @@ export async function fetchDepartmentDetail(
       .eq("department_id", departmentId),
   ])
 
+  const contactIds = [
+    ...new Set(
+      (staffRows || [])
+        .map((row) => row.contact_id as string | null)
+        .filter((id): id is string => Boolean(id))
+    ),
+  ]
+  const phoneByContactId = new Map<string, string | null>()
+  if (contactIds.length > 0) {
+    const { data: contacts } = await supabase
+      .from("contacts")
+      .select("id, phone, email")
+      .eq("organization_id", organizationId)
+      .in("id", contactIds)
+    for (const contact of contacts || []) {
+      phoneByContactId.set(contact.id as string, (contact.phone as string | null) ?? null)
+    }
+  }
+
   const staff: DepartmentStaffMember[] = (staffRows || []).map((row) => {
     const first = (row.first_name as string | null)?.trim() || ""
     const last = (row.last_name as string | null)?.trim() || ""
@@ -324,11 +344,13 @@ export async function fetchDepartmentDetail(
     const salaryRaw = row.monthly_salary
     const monthlySalary =
       salaryRaw == null || Number.isNaN(Number(salaryRaw)) ? null : Number(salaryRaw)
+    const contactId = (row.contact_id as string | null) ?? null
     return {
       staffId: row.id as string,
-      contactId: (row.contact_id as string | null) ?? null,
+      contactId,
       fullName,
       email: (row.email as string | null) ?? null,
+      phone: contactId ? phoneByContactId.get(contactId) ?? null : null,
       employmentStatus: (row.status as string | null) ?? null,
       staffType: (row.staff_type as string | null) ?? null,
       positionId: (row.position_id as string | null) ?? null,

@@ -6,18 +6,17 @@ import { useRouter, useSearchParams } from "next/navigation"
 import {
   ArrowLeft,
   BookOpen,
+  Briefcase,
   CalendarClock,
   CalendarDays,
   DollarSign,
   FileBarChart,
-  GraduationCap,
   Heart,
   LayoutDashboard,
   Loader2,
   Pencil,
   PieChart,
   Plus,
-  TrendingUp,
   UserMinus,
   UserRound,
   Users,
@@ -25,6 +24,7 @@ import {
 } from "lucide-react"
 
 import { DepartmentBudgetPanel } from "@/components/departments/department-budget-panel"
+import { DepartmentExpensesPanel } from "@/components/departments/department-expenses-panel"
 import { DepartmentGroupGivingPanel } from "@/components/departments/department-group-giving-panel"
 import { DepartmentOfferingsPanel } from "@/components/departments/department-offerings-panel"
 import { DepartmentOverviewPanel } from "@/components/departments/department-overview-panel"
@@ -84,10 +84,6 @@ import {
   removeStaffFromDepartmentAction,
   updateDepartmentEmployeeAction,
 } from "@/lib/departments/department-staff-actions"
-import {
-  fetchDepartmentWorkspaceOverviewAction,
-  type DepartmentWorkspaceOverview,
-} from "@/lib/departments/department-workspace-overview"
 import { WORKFORCE_DEPARTMENTS_PATH } from "@/lib/departments/department-paths"
 import {
   departmentGroupWorkspaceHref,
@@ -136,22 +132,6 @@ function formatHourlyRate(value: number | null) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value)
-}
-
-function formatMoney(value: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value)
-}
-
-function formatNet(value: number) {
-  const abs = formatMoney(Math.abs(value)).replace(/^\$/, "")
-  if (value > 0) return `+${abs}`
-  if (value < 0) return `-${abs}`
-  return abs
 }
 
 function EmployeesPanel({
@@ -339,8 +319,66 @@ function EmployeesPanel({
     })
   }
 
+  const staff = department.staff
+  const activeCount = staff.filter(
+    (member) => (member.employmentStatus || "active") === "active"
+  ).length
+  const hourlyCount = staff.filter((member) => member.payBasis === "hourly").length
+  const monthlyCount = staff.filter((member) => member.payBasis === "monthly").length
+  const positionCount = new Set(
+    staff.map((member) => member.positionId).filter(Boolean)
+  ).size
+
   return (
-    <>
+    <div className="space-y-6">
+      <StatCardsRow equal columns={5}>
+        <StatCard
+          layout="header"
+          fill
+          tone="blue"
+          label="Employees"
+          value={staff.length}
+          icon={Users}
+          hint="Assigned to department"
+        />
+        <StatCard
+          layout="header"
+          fill
+          tone="emerald"
+          label="Active"
+          value={activeCount}
+          icon={UserRound}
+          hint="Employment status"
+        />
+        <StatCard
+          layout="header"
+          fill
+          tone="sky"
+          label="Hourly"
+          value={hourlyCount}
+          icon={Wallet}
+          hint="Pay basis"
+        />
+        <StatCard
+          layout="header"
+          fill
+          tone="amber"
+          label="Monthly"
+          value={monthlyCount}
+          icon={Briefcase}
+          hint="Pay basis"
+        />
+        <StatCard
+          layout="header"
+          fill
+          tone="violet"
+          label="Positions"
+          value={positionCount}
+          icon={Briefcase}
+          hint="Distinct roles filled"
+        />
+      </StatCardsRow>
+
       <Card>
         <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 pb-2">
           <div>
@@ -369,6 +407,7 @@ function EmployeesPanel({
                     <TableHead>Position</TableHead>
                     <TableHead>Pay</TableHead>
                     <TableHead>Email</TableHead>
+                    <TableHead>Phone</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="w-[100px]" />
                   </TableRow>
@@ -402,6 +441,9 @@ function EmployeesPanel({
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {member.email || "—"}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {member.phone || "—"}
                       </TableCell>
                       <TableCell className="capitalize text-muted-foreground">
                         {member.employmentStatus || "—"}
@@ -627,7 +669,7 @@ function EmployeesPanel({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   )
 }
 
@@ -642,7 +684,6 @@ export function DepartmentGroupWorkspaceClient({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [department, setDepartment] = useState<DepartmentDetail | null>(null)
-  const [overview, setOverview] = useState<DepartmentWorkspaceOverview | null>(null)
   const [pair, setPair] = useState<DepartmentGivingPair | null>(null)
   const [groupEdit, setGroupEdit] = useState<GroupEditRecord | null>(null)
   const [editOpen, setEditOpen] = useState(false)
@@ -669,15 +710,13 @@ export function DepartmentGroupWorkspaceClient({
     setError(null)
 
     try {
-      const [departmentData, pairResult, overviewResult] = await Promise.all([
+      const [departmentData, pairResult] = await Promise.all([
         fetchDepartmentDetail(departmentId),
         findGivingGroupForDepartmentAction(departmentId),
-        fetchDepartmentWorkspaceOverviewAction(departmentId),
       ])
 
       if (!departmentData) {
         setDepartment(null)
-        setOverview(null)
         setPair(null)
         setError("This department could not be found.")
         setLoading(false)
@@ -685,7 +724,6 @@ export function DepartmentGroupWorkspaceClient({
       }
 
       setDepartment(departmentData)
-      setOverview(overviewResult.success ? overviewResult.overview : null)
 
       let nextPair = pairResult.success ? pairResult.pair : null
 
@@ -818,16 +856,6 @@ export function DepartmentGroupWorkspaceClient({
                 Department
               </Badge>
             </div>
-            <p className="text-sm text-muted-foreground">
-              Department workspace for year programs, staff, rosters, offerings, and payroll
-              {hasGiving
-                ? " — plus optional group giving (separate from the financial summary)."
-                : `. ${department.staff.length} employee${
-                    department.staff.length === 1 ? "" : "s"
-                  } · ${department.programsCount} program${
-                    department.programsCount === 1 ? "" : "s"
-                  }.`}
-            </p>
           </div>
           {groupEdit ? (
             <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
@@ -836,69 +864,6 @@ export function DepartmentGroupWorkspaceClient({
             </Button>
           ) : null}
         </div>
-
-        {overview ? (
-          <StatCardsRow equal columns={6}>
-            <StatCard
-              layout="header"
-              fill
-              tone="blue"
-              label="Students"
-              value={overview.studentsCount}
-              icon={GraduationCap}
-              hint="Enrolled students"
-            />
-            <StatCard
-              layout="header"
-              fill
-              tone="sky"
-              label="Staff"
-              value={overview.staffCount}
-              icon={Users}
-              hint="Department employees"
-            />
-            <StatCard
-              layout="header"
-              fill
-              tone="emerald"
-              label="Revenue"
-              value={formatMoney(overview.revenue)}
-              icon={DollarSign}
-              hint="From Programs billing"
-            />
-            <StatCard
-              layout="header"
-              fill
-              tone="amber"
-              label="Expenses"
-              value={formatMoney(overview.expenses)}
-              icon={Wallet}
-              hint="Approved payroll"
-            />
-            <StatCard
-              layout="header"
-              fill
-              tone={overview.net >= 0 ? "emerald" : "rose"}
-              label="Net"
-              value={formatNet(overview.net)}
-              icon={TrendingUp}
-              hint="Revenue − expenses"
-            />
-            <StatCard
-              layout="header"
-              fill
-              tone="violet"
-              label="Upcoming"
-              value={
-                overview.upcomingEventsCount === 1
-                  ? "1 Event"
-                  : `${overview.upcomingEventsCount} Events`
-              }
-              icon={CalendarDays}
-              hint="Department events"
-            />
-          </StatCardsRow>
-        ) : null}
 
         <Tabs value={resolvedTab} onValueChange={handleTabChange}>
           <TabsList className="flex h-auto flex-wrap justify-start gap-1">
@@ -925,6 +890,10 @@ export function DepartmentGroupWorkspaceClient({
             <TabsTrigger value="payroll" className="gap-2">
               <Wallet className="size-4" />
               Payroll
+            </TabsTrigger>
+            <TabsTrigger value="expenses" className="gap-2">
+              <DollarSign className="size-4" />
+              Expenses
             </TabsTrigger>
             <TabsTrigger value="budget" className="gap-2">
               <PieChart className="size-4" />
@@ -986,6 +955,13 @@ export function DepartmentGroupWorkspaceClient({
           />
         ) : null}
 
+        {resolvedTab === "expenses" ? (
+          <DepartmentExpensesPanel
+            departmentId={department.id}
+            departmentName={displayName}
+          />
+        ) : null}
+
         {resolvedTab === "budget" ? (
           <DepartmentBudgetPanel
             departmentId={department.id}
@@ -1014,14 +990,6 @@ export function DepartmentGroupWorkspaceClient({
             departmentId={department.id}
             departmentName={displayName}
           />
-        ) : null}
-
-        {!hasGiving ? (
-          <p className="text-xs text-muted-foreground">
-            No matching giving group yet. When a Group Donation record shares this
-            department name (or is linked in Edit group), Group giving appears here.
-            Activity shows department events (not individual gifts).
-          </p>
         ) : null}
       </div>
 

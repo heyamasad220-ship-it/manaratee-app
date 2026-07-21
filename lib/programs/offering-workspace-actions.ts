@@ -7,7 +7,10 @@ import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-orga
 import { getOfferingWorkspaceDataForProgram } from "@/lib/programs/offering-workspace-queries"
 import { getOfferingsForProgram } from "@/lib/programs/program-offering-queries"
 import type { OfferingWorkspaceDataMap } from "@/lib/programs/offering-workspace-types"
-import { replaceProgramCapacityGroups } from "@/lib/programs/program-capacity-group-actions"
+import {
+  replaceProgramCapacityGroups,
+  syncProgramCapacityFromOfferings,
+} from "@/lib/programs/program-capacity-group-actions"
 import type { ProgramCapacityGroupInput } from "@/lib/programs/program-capacity-group-types"
 import { getTotalCapacityFromGroups } from "@/lib/programs/program-capacity-group-types"
 import {
@@ -22,8 +25,11 @@ import {
 import { syncRegistrationOptionsFromProgramFlags } from "@/lib/programs/program-registration-option-actions"
 import { getAllRegistrationOptionsForOffering } from "@/lib/programs/program-registration-option-queries"
 import type { ProgramRegistrationOption } from "@/lib/programs/program-registration-option-types"
-import { getAgeGroupLabelsFromMinMax } from "@/lib/programs/program-eligibility-display"
 import { getMinMaxGradeFromLevels } from "@/lib/programs/grade-levels"
+import {
+  deriveCapacityMode,
+  deriveRegistrationMode,
+} from "@/lib/programs/program-offering-attributes"
 
 function inferProgramTypeFromMinAge(
   minAge: number | null
@@ -116,6 +122,39 @@ export async function saveOfferingSiblingDiscountRules(input: {
   revalidateOfferingPaths(input.programId)
 }
 
+export async function saveOfferingWaitlistSettings(input: {
+  programId: string
+  offeringId: string
+  enable_waitlist: boolean
+  waitlist_capacity: number | null
+}) {
+  const supabase = await createClient()
+  const organizationId = await getSelectedOrganizationId()
+
+  if (!organizationId) {
+    throw new Error("No organization selected")
+  }
+
+  const { error } = await supabase
+    .from("program_offerings")
+    .update({
+      enable_waitlist: input.enable_waitlist,
+      waitlist_capacity: input.waitlist_capacity,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", input.offeringId)
+    .eq("program_id", input.programId)
+    .eq("organization_id", organizationId)
+
+  if (error) {
+    console.error("[saveOfferingWaitlistSettings]", error)
+    throw new Error("Failed to save waitlist settings.")
+  }
+
+  revalidateOfferingPaths(input.programId)
+}
+
+/** @deprecated Use saveOfferingWaitlistSettings (S4). */
 export async function saveProgramWaitlistSettings(input: {
   programId: string
   enable_waitlist: boolean
@@ -128,22 +167,24 @@ export async function saveProgramWaitlistSettings(input: {
     throw new Error("No organization selected")
   }
 
-  const { error } = await supabase
-    .from("programs")
-    .update({
-      enable_waitlist: input.enable_waitlist,
-      waitlist_capacity: input.waitlist_capacity,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", input.programId)
+  const { data: offering } = await supabase
+    .from("program_offerings")
+    .select("id")
     .eq("organization_id", organizationId)
+    .eq("program_id", input.programId)
+    .eq("is_default", true)
+    .maybeSingle()
 
-  if (error) {
-    console.error("[saveProgramWaitlistSettings]", error)
-    throw new Error("Failed to save waitlist settings.")
+  if (!offering?.id) {
+    throw new Error("No offering found. Configure waitlist on an offering.")
   }
 
-  revalidateOfferingPaths(input.programId)
+  await saveOfferingWaitlistSettings({
+    programId: input.programId,
+    offeringId: offering.id as string,
+    enable_waitlist: input.enable_waitlist,
+    waitlist_capacity: input.waitlist_capacity,
+  })
 }
 
 export async function saveOfferingRegistrationPanel(input: {
@@ -201,6 +242,7 @@ export async function saveOfferingRegistrationPanel(input: {
 
     await replaceProgramCapacityGroups({
       program_id: input.programId,
+      offering_id: input.offeringId,
       groups: persistableGroups,
     })
 
@@ -210,32 +252,46 @@ export async function saveOfferingRegistrationPanel(input: {
         : Math.max(0, Number(input.capacity || 0))
   }
 
-  const { error } = await supabase
-    .from("programs")
+  const capacityMode = deriveCapacityMode(resolvedCapacity)
+  const registrationMode = deriveRegistrationMode({
+    fullProgramEnabled: input.fullProgramEnabled,
+    sessionRegistrationEnabled:
+      input.sessionRegistrationEnabled ||
+      input.singleSessionEnabled ||
+      input.dropInEnabled,
+  })
+
+  // S4: offering is SSOT for eligibility / capacity / registration mode.
+  const { error: offeringError } = await supabase
+    .from("program_offerings")
     .update({
+      audience_type: programType,
       min_age: input.min_age,
       max_age: input.max_age,
       grade_levels: gradeLevels,
       min_grade: minGrade,
       max_grade: maxGrade,
       gender: input.gender || "All",
-      program_type: programType,
-      age_groups: getAgeGroupLabelsFromMinMax(input.min_age, input.max_age),
       require_guardian: programType !== "adult",
-      enrollment_open_date: input.enrollment_open_date || null,
-      enrollment_close_date: input.enrollment_close_date || null,
-      capacity: resolvedCapacity,
+      capacity_mode: capacityMode,
+      capacity: capacityMode === "limited" ? resolvedCapacity : null,
       enable_waitlist: input.enable_waitlist,
       waitlist_capacity: input.waitlist_capacity,
+      registration_mode: registrationMode,
+      enrollment_open_date: input.enrollment_open_date || null,
+      enrollment_close_date: input.enrollment_close_date || null,
       updated_at: new Date().toISOString(),
     })
-    .eq("id", input.programId)
+    .eq("id", input.offeringId)
     .eq("organization_id", organizationId)
 
-  if (error) {
-    console.error("[saveOfferingRegistrationPanel]", error)
-    throw new Error("Failed to save eligibility and enrollment settings.")
+  if (offeringError) {
+    console.error("[saveOfferingRegistrationPanel] offering:", offeringError)
+    throw new Error("Failed to save offering registration settings.")
   }
+
+  // Catalog dual-read: program.capacity = sum of limited offerings.
+  await syncProgramCapacityFromOfferings(organizationId, input.programId)
 
   await syncRegistrationOptionsFromProgramFlags({
     organizationId,
@@ -246,30 +302,6 @@ export async function saveOfferingRegistrationPanel(input: {
     singleSessionEnabled: input.singleSessionEnabled,
     dropInEnabled: input.dropInEnabled,
   })
-
-  const { data: offeringRow } = await supabase
-    .from("program_offerings")
-    .select("is_default")
-    .eq("id", input.offeringId)
-    .eq("organization_id", organizationId)
-    .maybeSingle()
-
-  if (offeringRow?.is_default) {
-    const { error: programFlagsError } = await supabase
-      .from("programs")
-      .update({
-        full_program_registration_enabled: input.fullProgramEnabled,
-        session_registration_enabled: input.sessionRegistrationEnabled,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", input.programId)
-      .eq("organization_id", organizationId)
-
-    if (programFlagsError) {
-      console.error("[saveOfferingRegistrationPanel] program flags:", programFlagsError)
-      throw new Error("Failed to save registration type settings.")
-    }
-  }
 
   revalidateOfferingPaths(input.programId)
 

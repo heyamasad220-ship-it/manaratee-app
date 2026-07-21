@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
+import type { ProgramScheduleItem } from "@/lib/programs/program-schedule-types"
 
 function timeToMinutes(value: string) {
   if (!value) return 0
@@ -34,7 +35,57 @@ function timesOverlap(
   )
 }
 
-export async function getProgramScheduleItems(programId: string) {
+const DAY_ORDER: Record<string, number> = {
+  monday: 1,
+  tuesday: 2,
+  wednesday: 3,
+  thursday: 4,
+  friday: 5,
+  saturday: 6,
+  sunday: 7,
+}
+
+function sortScheduleItems<T extends { day_of_week?: string; start_time?: string }>(
+  items: T[]
+) {
+  return [...items].sort((a, b) => {
+    const dayDiff =
+      (DAY_ORDER[(a.day_of_week || "").toLowerCase()] || 99) -
+      (DAY_ORDER[(b.day_of_week || "").toLowerCase()] || 99)
+    if (dayDiff !== 0) return dayDiff
+    return String(a.start_time || "").localeCompare(String(b.start_time || ""))
+  })
+}
+
+/** Weekly slots for one offering (Schedule tab editor). */
+export async function getOfferingScheduleItems(
+  offeringId: string
+): Promise<ProgramScheduleItem[]> {
+  const supabase = await createClient()
+  const organizationId = await getSelectedOrganizationId()
+
+  if (!organizationId) return []
+
+  const { data, error } = await supabase
+    .from("program_schedule_items")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .eq("offering_id", offeringId)
+    .order("day_of_week", { ascending: true })
+    .order("start_time", { ascending: true })
+
+  if (error) {
+    console.error(error)
+    throw new Error("Failed to load offering schedule")
+  }
+
+  return sortScheduleItems((data || []) as ProgramScheduleItem[])
+}
+
+/** All weekly slots under a program (any offering) — department / customer / briefs. */
+export async function getProgramScheduleItems(
+  programId: string
+): Promise<ProgramScheduleItem[]> {
   const supabase = await createClient()
   const organizationId = await getSelectedOrganizationId()
 
@@ -53,7 +104,7 @@ export async function getProgramScheduleItems(programId: string) {
     throw new Error("Failed to load schedule")
   }
 
-  return data
+  return sortScheduleItems((data || []) as ProgramScheduleItem[])
 }
 
 type ScheduleConflictInput = {
@@ -65,6 +116,7 @@ type ScheduleConflictInput = {
   excludeItemId?: string
 }
 
+/** Instructor conflicts across offerings of the same program. */
 export async function getInstructorScheduleConflicts({
   programId,
   dayOfWeek,

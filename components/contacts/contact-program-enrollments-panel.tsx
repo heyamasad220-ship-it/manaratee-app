@@ -52,7 +52,12 @@ export function ContactProgramEnrollmentsPanel({
                 className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between"
               >
                 <div>
-                  <p className="font-medium">{enrollment.programName}</p>
+                  <p className="font-medium">
+                    {enrollment.offeringName || enrollment.programName}
+                  </p>
+                  {enrollment.offeringName ? (
+                    <p className="text-sm text-muted-foreground">{enrollment.programName}</p>
+                  ) : null}
                   <p className="text-sm text-muted-foreground">
                     Enrolled {formatContactDate(enrollment.enrollmentDate)}
                   </p>

@@ -249,10 +249,10 @@ export default async function WaitlistRegistrationDetailPage({
               <CardTitle>Contact</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-5 sm:grid-cols-2">
-              <DetailItem label="Child Age" value={waitlist.child_age} />
-              <DetailItem label="Parent Name" value={waitlist.parent_name} />
+              <DetailItem label="Age" value={waitlist.child_age} />
+              <DetailItem label="Contact Name" value={waitlist.parent_name} />
               <div>
-                <p className="text-sm text-muted-foreground">Parent Email</p>
+                <p className="text-sm text-muted-foreground">Contact Email</p>
                 {waitlist.parent_email ? (
                   <a
                     href={`mailto:${waitlist.parent_email}`}
@@ -266,7 +266,7 @@ export default async function WaitlistRegistrationDetailPage({
                 )}
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Parent Phone</p>
+                <p className="text-sm text-muted-foreground">Contact Phone</p>
                 {waitlist.parent_phone ? (
                   <a
                     href={`tel:${waitlist.parent_phone}`}

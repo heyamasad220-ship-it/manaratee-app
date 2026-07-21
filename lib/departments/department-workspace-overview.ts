@@ -23,8 +23,8 @@ function todayIsoDate() {
 }
 
 /**
- * KPI strip for the department workspace header:
- * students, staff, revenue, expenses, net, upcoming events.
+ * KPI strip for the department Overview tab:
+ * students, staff, revenue, expenses, net, and related program counts.
  */
 export async function fetchDepartmentWorkspaceOverview(
   departmentId: string

@@ -7,6 +7,8 @@ export type DepartmentScheduleWeeklyRow = {
   id: string
   programId: string
   programName: string
+  offeringId: string | null
+  offeringName: string | null
   title: string
   dayOfWeek: string
   startTime: string
@@ -32,7 +34,7 @@ export type DepartmentScheduleSessionRow = {
 export type DepartmentScheduleSummary = {
   weekly: DepartmentScheduleWeeklyRow[]
   sessions: DepartmentScheduleSessionRow[]
-  programs: Array<{ id: string; name: string }>
+  programs: Array<{ id: string; name: string; defaultOfferingId: string | null }>
 }
 
 const DAY_ORDER: Record<string, number> = {
@@ -81,7 +83,7 @@ export async function fetchDepartmentSchedule(
       supabase
         .from("program_schedule_items")
         .select(
-          "id, program_id, title, day_of_week, start_time, end_time, location, instructor_name"
+          "id, program_id, offering_id, title, day_of_week, start_time, end_time, location, instructor_name"
         )
         .eq("organization_id", organizationId)
         .in("program_id", programIds),
@@ -96,9 +98,10 @@ export async function fetchDepartmentSchedule(
         .order("start_date", { ascending: true }),
       supabase
         .from("program_offerings")
-        .select("id, name")
+        .select("id, name, program_id, is_default, status")
         .eq("organization_id", organizationId)
-        .in("program_id", programIds),
+        .in("program_id", programIds)
+        .neq("status", "archived"),
     ])
 
   const offeringNameById = new Map(
@@ -108,11 +111,28 @@ export async function fetchDepartmentSchedule(
     ])
   )
 
+  const defaultOfferingByProgram = new Map<string, string>()
+  for (const row of offerings || []) {
+    if (row.is_default === true) {
+      defaultOfferingByProgram.set(row.program_id as string, row.id as string)
+    }
+  }
+  for (const row of offerings || []) {
+    const programId = row.program_id as string
+    if (!defaultOfferingByProgram.has(programId)) {
+      defaultOfferingByProgram.set(programId, row.id as string)
+    }
+  }
+
   const weekly: DepartmentScheduleWeeklyRow[] = (scheduleItems || [])
     .map((row) => ({
       id: row.id as string,
       programId: row.program_id as string,
       programName: programNameById.get(row.program_id as string) || "Program",
+      offeringId: (row.offering_id as string | null) ?? null,
+      offeringName: row.offering_id
+        ? offeringNameById.get(row.offering_id as string) || null
+        : null,
       title: (row.title as string) || "Class",
       dayOfWeek: (row.day_of_week as string) || "",
       startTime: (row.start_time as string) || "",
@@ -152,6 +172,7 @@ export async function fetchDepartmentSchedule(
     programs: programRows.map((row) => ({
       id: row.id as string,
       name: (row.name as string) || "Program",
+      defaultOfferingId: defaultOfferingByProgram.get(row.id as string) || null,
     })),
   }
 }

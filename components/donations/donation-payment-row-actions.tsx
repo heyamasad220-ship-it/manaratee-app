@@ -48,6 +48,8 @@ type DonationPaymentRowActionsProps = {
   row: DonationHistoryRow
   onLinkToPledge?: () => void
   onUpdated?: () => void
+  emailReceiptLabel?: string
+  alwaysShowRefund?: boolean
 }
 
 function formatMoney(value: number) {
@@ -61,6 +63,8 @@ export function DonationPaymentRowActions({
   row,
   onLinkToPledge,
   onUpdated,
+  emailReceiptLabel = "Email Receipt",
+  alwaysShowRefund = false,
 }: DonationPaymentRowActionsProps) {
   const [refundOpen, setRefundOpen] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -72,6 +76,7 @@ export function DonationPaymentRowActions({
 
   const { capabilities } = row
   const hasRefund = capabilities.canStripeRefund || capabilities.canRecordRefund
+  const showRefund = alwaysShowRefund || hasRefund
   const refundTitle = paymentRefundDialogTitle()
   const refundMenuLabel = paymentRefundMenuLabel()
   const refundConfirmLabel = paymentRefundConfirmLabel()
@@ -83,6 +88,13 @@ export function DonationPaymentRowActions({
   })
 
   function openRefundDialog() {
+    if (!hasRefund) {
+      alert(
+        capabilities.stripeRefundBlockedReason ||
+          "This payment has no remaining refundable balance."
+      )
+      return
+    }
     setError(null)
     setRefundReason("")
     setRefundFull(true)
@@ -196,7 +208,7 @@ export function DonationPaymentRowActions({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()}>
-          {hasRefund ? (
+          {showRefund ? (
             <DropdownMenuItem
               onClick={(event) => {
                 event.preventDefault()
@@ -208,7 +220,7 @@ export function DonationPaymentRowActions({
               {refundMenuLabel}
             </DropdownMenuItem>
           ) : null}
-          {capabilities.canAllocate && onLinkToPledge ? (
+          {onLinkToPledge ? (
             <DropdownMenuItem
               onClick={(event) => {
                 event.preventDefault()
@@ -240,7 +252,7 @@ export function DonationPaymentRowActions({
             }}
           >
             <Mail className="mr-2 h-4 w-4" />
-            Email Receipt to Donor
+            {emailReceiptLabel}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

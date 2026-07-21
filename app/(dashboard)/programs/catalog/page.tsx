@@ -24,7 +24,10 @@ import {
 } from "@/components/ui/table"
 
 import { getPrograms } from "@/lib/programs/program-queries"
-import { getOfferingCountsByProgramIds } from "@/lib/programs/program-offering-queries"
+import {
+  getCatalogCapacityByProgramIds,
+  getOfferingCountsByProgramIds,
+} from "@/lib/programs/program-offering-queries"
 import type { Program } from "@/lib/programs/program-types"
 import type { ProgramStatus } from "@/lib/programs/program-status"
 import { getProgramStatusLabel } from "@/lib/programs/program-status"
@@ -33,6 +36,12 @@ import {
   isProgramAcceptingRegistration,
 } from "@/lib/programs/program-enrollment-availability"
 import { formatProgramAgeEligibility } from "@/lib/programs/program-eligibility-display"
+import {
+  catalogCapacityFromProgramTotal,
+  formatEnrollmentCapacityLabel,
+  getCatalogEnrollmentPercent,
+  type ProgramCatalogCapacity,
+} from "@/lib/programs/program-catalog-capacity"
 import { ProgramCatalogFilters } from "@/components/programs/program-catalog-filters"
 import { ProgramCardActions } from "@/components/programs/program-card-actions"
 import { cn } from "@/lib/utils"
@@ -70,13 +79,18 @@ function formatDate(value: string | null) {
   })
 }
 
-function getEnrollmentPercent(program: Program) {
-  if (!program.capacity || program.capacity <= 0) return 0
-  return Math.min(Math.round((program.enrolled / program.capacity) * 100), 100)
+function getEnrollmentPercent(
+  enrolled: number,
+  capacity: ProgramCatalogCapacity
+) {
+  return getCatalogEnrollmentPercent(enrolled, capacity)
 }
 
-function getEnrollmentColor(program: Program) {
-  const percent = getEnrollmentPercent(program)
+function getEnrollmentColor(
+  enrolled: number,
+  capacity: ProgramCatalogCapacity
+) {
+  const percent = getEnrollmentPercent(enrolled, capacity)
 
   if (percent >= 90) return "bg-red-500"
   if (percent >= 70) return "bg-amber-500"
@@ -178,15 +192,21 @@ function ProgramStatusBadge({ status }: { status: ProgramStatus }) {
 function ProgramCard({
   program,
   offeringCount,
+  catalogCapacity,
 }: {
   program: Program
   offeringCount: number
+  catalogCapacity: ProgramCatalogCapacity
 }) {
-  const percent = getEnrollmentPercent(program)
+  const percent = getEnrollmentPercent(program.enrolled, catalogCapacity)
   const acceptingRegistration = isProgramAcceptingRegistration(program)
   const availabilityLabel = getProgramRegistrationAvailabilityLabel(program)
   const ageLabel = formatProgramAgeEligibility(program)
   const audienceLabel = `${program.gender || "All"} • ${ageLabel}`
+  const enrollmentLabel = formatEnrollmentCapacityLabel(
+    program.enrolled,
+    catalogCapacity
+  )
 
   return (
     <Card className="overflow-hidden border-border/80 shadow-sm">
@@ -253,7 +273,7 @@ function ProgramCard({
             <div className="mb-1 flex justify-between text-sm">
               <span className="text-muted-foreground">Enrollment</span>
               <span className="font-medium tabular-nums">
-                {program.enrolled} / {program.capacity || 0}
+                {enrollmentLabel}
               </span>
             </div>
 
@@ -273,7 +293,7 @@ function ProgramCard({
                 className={cn(
                   "h-full rounded-full transition-all",
                   acceptingRegistration
-                    ? getEnrollmentColor(program)
+                    ? getEnrollmentColor(program.enrolled, catalogCapacity)
                     : "bg-muted-foreground/30"
                 )}
                 style={{ width: `${percent}%` }}
@@ -286,7 +306,13 @@ function ProgramCard({
   )
 }
 
-function ProgramsTable({ programs }: { programs: Program[] }) {
+function ProgramsTable({
+  programs,
+  capacityByProgramId,
+}: {
+  programs: Program[]
+  capacityByProgramId: Map<string, ProgramCatalogCapacity>
+}) {
   return (
     <Card>
       <CardContent className="p-0">
@@ -302,7 +328,11 @@ function ProgramsTable({ programs }: { programs: Program[] }) {
           </TableHeader>
 
           <TableBody>
-            {programs.map((program) => (
+            {programs.map((program) => {
+              const catalogCapacity =
+                capacityByProgramId.get(program.id) ??
+                catalogCapacityFromProgramTotal(program.capacity)
+              return (
               <TableRow key={program.id}>
                 <TableCell>
                   <p className="font-medium">{program.name}</p>
@@ -316,7 +346,10 @@ function ProgramsTable({ programs }: { programs: Program[] }) {
                 </TableCell>
 
                 <TableCell>
-                  {program.enrolled}/{program.capacity}
+                  {formatEnrollmentCapacityLabel(
+                    program.enrolled,
+                    catalogCapacity
+                  )}
                 </TableCell>
 
                 <TableCell>
@@ -333,7 +366,8 @@ function ProgramsTable({ programs }: { programs: Program[] }) {
                   />
                 </TableCell>
               </TableRow>
-            ))}
+              )
+            })}
           </TableBody>
         </Table>
       </CardContent>
@@ -453,9 +487,11 @@ export default async function ProgramsPage({
   const filteredPrograms = programs.filter((program) =>
     matchesProgram(program, filters)
   )
-  const offeringCounts = await getOfferingCountsByProgramIds(
-    filteredPrograms.map((program) => program.id)
-  )
+  const filteredIds = filteredPrograms.map((program) => program.id)
+  const [offeringCounts, capacityByProgramId] = await Promise.all([
+    getOfferingCountsByProgramIds(filteredIds),
+    getCatalogCapacityByProgramIds(filteredIds),
+  ])
 
   const viewMode = filters.view === "table" ? "table" : "cards"
   const totalCount = filteredPrograms.length
@@ -515,7 +551,10 @@ export default async function ProgramsPage({
           </Card>
         ) : viewMode === "table" ? (
           <>
-            <ProgramsTable programs={pagePrograms} />
+            <ProgramsTable
+              programs={pagePrograms}
+              capacityByProgramId={capacityByProgramId}
+            />
             <CatalogPagination
               page={page}
               totalPages={totalPages}
@@ -532,6 +571,10 @@ export default async function ProgramsPage({
                   key={program.id}
                   program={program}
                   offeringCount={offeringCounts.get(program.id) || 0}
+                  catalogCapacity={
+                    capacityByProgramId.get(program.id) ??
+                    catalogCapacityFromProgramTotal(program.capacity)
+                  }
                 />
               ))}
             </div>

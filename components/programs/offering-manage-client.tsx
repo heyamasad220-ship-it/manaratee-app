@@ -20,6 +20,11 @@ import { OfferingPricingPanel } from "@/components/programs/edit/offering-pricin
 import { OfferingRegistrationPanel } from "@/components/programs/edit/offering-registration-panel"
 import { OfferingStaffPanel } from "@/components/programs/edit/offering-staff-panel"
 import {
+  OfferingAttendancePanel,
+  OfferingBeforeAfterCarePanel,
+  OfferingWaitlistPanel,
+} from "@/components/programs/offering-operations-report-panels"
+import {
   OfferingSchedulePanel,
   OfferingSessionsPanel,
 } from "@/components/programs/edit/offering-workspace-panels"
@@ -39,6 +44,10 @@ import {
   buildProgramRegistrationUrl,
 } from "@/lib/programs/program-customer-url"
 import type { ProgramCapacityGroupInput } from "@/lib/programs/program-capacity-group-types"
+import {
+  formatOfferingEnrollmentLabel,
+  getOfferingEnrollmentPercent,
+} from "@/lib/programs/program-catalog-capacity"
 import { updateProgramOffering } from "@/lib/programs/program-offering-actions"
 import { isOfferingEnrollmentOpen } from "@/lib/programs/program-offering-display"
 import { programOfferingManageHref } from "@/lib/programs/program-offering-paths"
@@ -66,6 +75,9 @@ const MANAGE_TABS = [
   { value: "fees", label: "Fees" },
   { value: "schedule", label: "Schedule" },
   { value: "staff", label: "Staff" },
+  { value: "waitlist", label: "Waitlist" },
+  { value: "care", label: "Before & After Care" },
+  { value: "attendance", label: "Attendance" },
 ] as const
 
 type ManageTab = (typeof MANAGE_TABS)[number]["value"]
@@ -143,9 +155,12 @@ export function OfferingManageClient({
   ])
 
   const registrationOpen = isOfferingEnrollmentOpen(selected, program)
-  const capacity = program.capacity || 0
-  const enrollmentPercent =
-    capacity > 0 ? Math.min(Math.round((enrolled / capacity) * 100), 100) : 0
+  const enrollmentPercent = getOfferingEnrollmentPercent(enrolled, selected)
+  const enrollmentLabel = formatOfferingEnrollmentLabel(enrolled, selected)
+  const offeringCapacity =
+    selected.capacity_mode === "limited"
+      ? Math.max(0, Number(selected.capacity || 0))
+      : null
   const sessionRegistrationEnabled = isSessionManagementEnabled(
     workspaceData.registrationOptions
   )
@@ -298,7 +313,7 @@ export function OfferingManageClient({
           <GlanceCard
             icon={<Users className="h-4 w-4 text-violet-600" />}
             label="Enrollment"
-            value={`${enrolled} / ${capacity || "—"}`}
+            value={enrollmentLabel}
             footer={
               <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
                 <div
@@ -430,11 +445,11 @@ export function OfferingManageClient({
                       value={academicYearLabel(selected.start_date, selected.end_date)}
                     />
                     <DetailItem
-                      label="Default capacity"
+                      label="Capacity"
                       value={
-                        capacity > 0
-                          ? `${capacity} student${capacity === 1 ? "" : "s"}`
-                          : "Not set"
+                        offeringCapacity != null
+                          ? `${offeringCapacity} student${offeringCapacity === 1 ? "" : "s"}`
+                          : "Unlimited"
                       }
                     />
                     <DetailItem
@@ -454,6 +469,7 @@ export function OfferingManageClient({
               offering={selected}
               workspaceData={workspaceData}
               capacityGroups={capacityGroups}
+              enrolled={enrolled}
               onCapacityGroupsChange={setCapacityGroups}
               onRegistrationOptionsSaved={(_, registrationOptions) => {
                 setWorkspaceData((current) => ({
@@ -482,7 +498,11 @@ export function OfferingManageClient({
               workspaceData={workspaceData}
               sessionRegistrationEnabled={sessionRegistrationEnabled}
             />
-            <OfferingSchedulePanel programId={program.id} offering={selected} />
+            <OfferingSchedulePanel
+              programId={program.id}
+              offering={selected}
+              workspaceData={workspaceData}
+            />
           </TabsContent>
 
           <TabsContent value="staff" className="mt-0">
@@ -497,6 +517,30 @@ export function OfferingManageClient({
                   staffAssignments: assignments,
                 }))
               }}
+            />
+          </TabsContent>
+
+          <TabsContent value="waitlist" className="mt-0">
+            <OfferingWaitlistPanel
+              programId={program.id}
+              offeringId={selected.id}
+              offeringName={selected.name}
+            />
+          </TabsContent>
+
+          <TabsContent value="care" className="mt-0">
+            <OfferingBeforeAfterCarePanel
+              programId={program.id}
+              offeringId={selected.id}
+              offeringName={selected.name}
+            />
+          </TabsContent>
+
+          <TabsContent value="attendance" className="mt-0">
+            <OfferingAttendancePanel
+              programId={program.id}
+              offeringId={selected.id}
+              offeringName={selected.name}
             />
           </TabsContent>
         </div>

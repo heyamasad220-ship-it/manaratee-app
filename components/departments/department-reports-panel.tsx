@@ -208,6 +208,36 @@ export function DepartmentReportsPanel({
 
   return (
     <div className="space-y-6">
+      <StatCardsRow equal columns={3}>
+        <StatCard
+          layout="header"
+          fill
+          tone="violet"
+          label="Archived years"
+          value={archived.length}
+          icon={FileBarChart}
+          hint="Closed academic years"
+        />
+        <StatCard
+          layout="header"
+          fill
+          tone="blue"
+          label="Enrollments"
+          value={archived.reduce((sum, program) => sum + program.enrolled, 0)}
+          icon={FileBarChart}
+          hint="Across archived years"
+        />
+        <StatCard
+          layout="header"
+          fill
+          tone="sky"
+          label="Courses"
+          value={archived.reduce((sum, program) => sum + program.offeringCount, 0)}
+          icon={FileBarChart}
+          hint="Offerings in archives"
+        />
+      </StatCardsRow>
+
       <div>
         <h2 className="text-lg font-semibold tracking-tight">Reports</h2>
         <p className="text-sm text-muted-foreground">

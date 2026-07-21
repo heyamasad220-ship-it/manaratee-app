@@ -6,6 +6,7 @@ export type ProgramCapacityGroup = {
   id: string
   organization_id: string
   program_id: string
+  offering_id: string
   name: string
   grade_levels: string[]
   genders: string[]

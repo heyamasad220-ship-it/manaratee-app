@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
-import { Loader2, Users } from "lucide-react"
+import { BookOpen, Loader2, UserRound, Users } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { StatCard, StatCardsRow } from "@/components/ui/stat-card"
 import {
   Table,
   TableBody,
@@ -63,8 +64,82 @@ export function DepartmentParticipantsPanel({
     void load()
   }, [load])
 
+  const uniqueStudents = new Set(
+    participants.map((row) => row.studentContactId).filter(Boolean)
+  ).size
+  const courses = new Set(participants.map((row) => row.courseName).filter(Boolean)).size
+  const withTeacher = participants.filter((row) => Boolean(row.teacherName)).length
+  const pendingCount = participants.filter((row) => {
+    const status = (row.status || "").toLowerCase()
+    return status === "pending" || status === "pending_payment"
+  }).length
+  const activeCount = participants.filter((row) => {
+    const status = (row.status || "").toLowerCase()
+    return status === "enrolled" || status === "active"
+  }).length
+
   return (
-    <Card>
+    <div className="space-y-6">
+      {!loading && !error ? (
+        <StatCardsRow equal columns={6}>
+          <StatCard
+            layout="header"
+            fill
+            tone="blue"
+            label="Enrollments"
+            value={participants.length}
+            icon={Users}
+            hint="Roster rows"
+          />
+          <StatCard
+            layout="header"
+            fill
+            tone="sky"
+            label="Students"
+            value={uniqueStudents}
+            icon={UserRound}
+            hint="Unique contacts"
+          />
+          <StatCard
+            layout="header"
+            fill
+            tone="violet"
+            label="Courses"
+            value={courses}
+            icon={BookOpen}
+            hint="Distinct courses"
+          />
+          <StatCard
+            layout="header"
+            fill
+            tone="emerald"
+            label="With teacher"
+            value={withTeacher}
+            icon={Users}
+            hint="Assigned instructor"
+          />
+          <StatCard
+            layout="header"
+            fill
+            tone="amber"
+            label="Pending"
+            value={pendingCount}
+            icon={Users}
+            hint="Awaiting completion"
+          />
+          <StatCard
+            layout="header"
+            fill
+            tone="slate"
+            label="Active"
+            value={activeCount}
+            icon={Users}
+            hint="Enrolled / active"
+          />
+        </StatCardsRow>
+      ) : null}
+
+      <Card>
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 text-base">
           <Users className="size-4" />
@@ -150,5 +225,6 @@ export function DepartmentParticipantsPanel({
         )}
       </CardContent>
     </Card>
+    </div>
   )
 }

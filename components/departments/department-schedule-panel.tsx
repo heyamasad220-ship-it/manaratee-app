@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
-import { CalendarClock, ExternalLink, Loader2 } from "lucide-react"
+import { CalendarClock, ExternalLink, Loader2, Users } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { StatCard, StatCardsRow } from "@/components/ui/stat-card"
 import {
   Table,
   TableBody,
@@ -75,8 +76,76 @@ export function DepartmentSchedulePanel({
     void load()
   }, [load])
 
+  const weeklyCount = summary?.weekly.length ?? 0
+  const sessionsCount = summary?.sessions.length ?? 0
+  const programsCount = summary?.programs.length ?? 0
+  const seatsFilled =
+    summary?.sessions.reduce((sum, session) => sum + Number(session.enrolled || 0), 0) ?? 0
+  const capacity =
+    summary?.sessions.reduce((sum, session) => sum + Number(session.capacity || 0), 0) ?? 0
+  const openSeats = Math.max(0, capacity - seatsFilled)
+
   return (
     <div className="space-y-6">
+      {!loading && !error && summary ? (
+        <StatCardsRow equal columns={6}>
+          <StatCard
+            layout="header"
+            fill
+            tone="violet"
+            label="Weekly slots"
+            value={weeklyCount}
+            icon={CalendarClock}
+            hint="Recurring class times"
+          />
+          <StatCard
+            layout="header"
+            fill
+            tone="blue"
+            label="Sessions"
+            value={sessionsCount}
+            icon={CalendarClock}
+            hint="Terms / camps"
+          />
+          <StatCard
+            layout="header"
+            fill
+            tone="sky"
+            label="Programs"
+            value={programsCount}
+            icon={CalendarClock}
+            hint="With schedule"
+          />
+          <StatCard
+            layout="header"
+            fill
+            tone="emerald"
+            label="Seats filled"
+            value={seatsFilled}
+            icon={Users}
+            hint="Across sessions"
+          />
+          <StatCard
+            layout="header"
+            fill
+            tone="amber"
+            label="Capacity"
+            value={capacity}
+            icon={Users}
+            hint="Session seats"
+          />
+          <StatCard
+            layout="header"
+            fill
+            tone="slate"
+            label="Open seats"
+            value={openSeats}
+            icon={Users}
+            hint="Capacity − filled"
+          />
+        </StatCardsRow>
+      ) : null}
+
       <Card>
         <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 pb-2">
           <div>
@@ -86,7 +155,7 @@ export function DepartmentSchedulePanel({
             </CardTitle>
             <CardDescription>
               Weekly class times and session / term dates for programs in {departmentName}. Edit
-              details from the offering Schedule tab or the program schedule builder.
+              details from the offering Schedule tab.
             </CardDescription>
           </div>
         </CardHeader>
@@ -107,7 +176,17 @@ export function DepartmentSchedulePanel({
             <div className="flex flex-wrap gap-2">
               {summary.programs.map((program) => (
                 <Button key={program.id} type="button" size="sm" variant="outline" asChild>
-                  <Link href={`/programs/schedule?program=${program.id}`}>
+                  <Link
+                    href={
+                      program.defaultOfferingId
+                        ? programOfferingManageHref(
+                            program.id,
+                            program.defaultOfferingId,
+                            "schedule"
+                          )
+                        : `/programs/${program.id}`
+                    }
+                  >
                     Edit weekly schedule · {program.name}
                     <ExternalLink className="ml-1.5 size-3.5" />
                   </Link>
@@ -139,6 +218,7 @@ export function DepartmentSchedulePanel({
                         <TableHead>Time</TableHead>
                         <TableHead>Title</TableHead>
                         <TableHead>Program</TableHead>
+                        <TableHead>Offering</TableHead>
                         <TableHead>Location</TableHead>
                         <TableHead>Instructor</TableHead>
                       </TableRow>
@@ -152,6 +232,9 @@ export function DepartmentSchedulePanel({
                           </TableCell>
                           <TableCell>{row.title}</TableCell>
                           <TableCell className="text-muted-foreground">{row.programName}</TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {row.offeringName || "—"}
+                          </TableCell>
                           <TableCell className="text-muted-foreground">
                             {row.location || "—"}
                           </TableCell>

@@ -30,7 +30,7 @@ export type SaveEditProgramInput = {
     end_date: string | null
     enrollment_open_date: string | null
     enrollment_close_date: string | null
-    program_type: "adult" | "youth" | "family"
+    program_type: "adult" | "youth"
     min_age: number | null
     max_age: number | null
     min_grade: string | null
@@ -86,6 +86,7 @@ export async function saveEditProgram(
       enrollment_open_date: formData.enrollment_open_date,
       enrollment_close_date: formData.enrollment_close_date,
 
+      // Optional defaults for new offerings only (S4).
       program_type: formData.program_type,
       min_age: formData.min_age,
       max_age: formData.max_age,
@@ -98,47 +99,36 @@ export async function saveEditProgram(
       require_grade: false,
       require_emergency_contact: true,
 
-      full_program_registration_enabled:
-        formData.full_program_registration_enabled,
-      session_registration_enabled: formData.session_registration_enabled,
-      single_session_registration_enabled:
-        formData.single_session_registration_enabled,
-      drop_in_registration_enabled: formData.drop_in_registration_enabled,
-
-      capacity: formData.capacity,
-      enable_waitlist: formData.enable_waitlist,
-      waitlist_capacity: formData.waitlist_capacity,
       status: formData.status,
       visibility: formData.visibility,
-
-      billing_type: program.billing_type || "free",
-      tuition_amount: program.tuition_amount || 0,
-      deposit_amount: program.deposit_amount || 0,
-      monthly_amount: program.monthly_amount || 0,
-      installment_count: program.installment_count ?? null,
-      payment_due_day: program.payment_due_day ?? null,
 
       financial_assistance_enabled: formData.financial_assistance_enabled,
       financial_assistance_open: formData.financial_assistance_open,
       financial_assistance_close_date: formData.financial_assistance_close_date,
       financial_assistance_instructions:
         formData.financial_assistance_instructions,
+
+      identityAndDefaultsOnly: true,
     })
 
+    // Capacity groups belong on offerings — only when an offering is in context.
     const shouldPersistCapacityGroups =
       !skipCapacityGroups &&
+      Boolean(offeringId) &&
       (formData.min_age == null || formData.min_age < ADULT_MIN_AGE)
 
     const persistedCapacityGroups = shouldPersistCapacityGroups
       ? getPersistableCapacityGroups(capacityGroups, formData.grade_levels)
       : []
 
-    const savedCapacityGroups = skipCapacityGroups
-      ? []
-      : await replaceProgramCapacityGroups({
-          program_id: program.id,
-          groups: persistedCapacityGroups,
-        })
+    const savedCapacityGroups =
+      shouldPersistCapacityGroups && offeringId
+        ? await replaceProgramCapacityGroups({
+            program_id: program.id,
+            offering_id: offeringId,
+            groups: persistedCapacityGroups,
+          })
+        : []
 
     const normalizedCapacityGroups = skipCapacityGroups
       ? normalizeCapacityGroups(capacityGroups, formData.grade_levels)

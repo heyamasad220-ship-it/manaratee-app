@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState, useTransition } from "react"
-import { Check, Loader2, Plus, Send, Wallet, X } from "lucide-react"
+import { Check, Clock, FileText, Loader2, Plus, Send, Users, Wallet, X } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -23,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { StatCard, StatCardsRow } from "@/components/ui/stat-card"
 import {
   Table,
   TableBody,
@@ -155,8 +156,77 @@ export function DepartmentPayrollPanel({
     })
   }
 
+  const pendingCount = rows.filter((row) => row.status === "pending").length
+  const draftCount = rows.filter((row) => row.status === "draft").length
+  const approvedTotal = rows
+    .filter((row) => row.status === "approved")
+    .reduce((sum, row) => sum + Number(row.amount || 0), 0)
+  const hoursTotal = rows
+    .filter((row) => row.payBasis === "hourly")
+    .reduce((sum, row) => sum + Number(row.hoursWorked || 0), 0)
+  const childcareCount = rows.filter((row) => row.isChildcareProvider).length
+
   return (
-    <>
+    <div className="space-y-6">
+      {!loading && !error ? (
+        <StatCardsRow equal columns={6}>
+          <StatCard
+            layout="header"
+            fill
+            tone="blue"
+            label="Pay lines"
+            value={rows.length}
+            icon={Wallet}
+            hint="All period rows"
+          />
+          <StatCard
+            layout="header"
+            fill
+            tone="amber"
+            label="Pending"
+            value={pendingCount}
+            icon={Send}
+            hint="Awaiting approval"
+          />
+          <StatCard
+            layout="header"
+            fill
+            tone="emerald"
+            label="Approved"
+            value={formatCurrency(approvedTotal)}
+            icon={Check}
+            hint="Approved pay total"
+          />
+          <StatCard
+            layout="header"
+            fill
+            tone="slate"
+            label="Draft"
+            value={draftCount}
+            icon={FileText}
+            hint="Not submitted"
+          />
+          <StatCard
+            layout="header"
+            fill
+            tone="sky"
+            label="Hours"
+            value={Math.round(hoursTotal * 10) / 10}
+            icon={Clock}
+            hint="Hourly rows"
+          />
+          <StatCard
+            layout="header"
+            fill
+            tone="violet"
+            label="Childcare"
+            value={childcareCount}
+            icon={Users}
+            hint="Provider lines"
+          />
+        </StatCardsRow>
+      ) : null}
+
       <Card>
         <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 pb-2">
           <div>
@@ -403,7 +473,7 @@ export function DepartmentPayrollPanel({
           ) : null}
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   )
 }
 

@@ -1,5 +1,9 @@
 import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
+import {
+  summarizeOfferingsCapacity,
+  type ProgramCatalogCapacity,
+} from "@/lib/programs/program-catalog-capacity"
 import type { ProgramOffering } from "@/lib/programs/program-offering-types"
 
 export async function getDefaultOfferingForProgram(programId: string) {
@@ -148,4 +152,56 @@ export async function getOfferingCountsByProgramIds(programIds: string[]) {
   }
 
   return counts
+}
+
+/** Catalog capacity per program: sum of limited offerings (S6). */
+export async function getCatalogCapacityByProgramIds(programIds: string[]) {
+  const empty = new Map<string, ProgramCatalogCapacity>()
+  if (programIds.length === 0) {
+    return empty
+  }
+
+  const supabase = await createClient()
+  const organizationId = await getSelectedOrganizationId()
+
+  if (!organizationId) {
+    return empty
+  }
+
+  const { data, error } = await supabase
+    .from("program_offerings")
+    .select("program_id, capacity, capacity_mode")
+    .eq("organization_id", organizationId)
+    .in("program_id", programIds)
+    .neq("status", "archived")
+
+  if (error) {
+    console.error("getCatalogCapacityByProgramIds:", error.message)
+    return empty
+  }
+
+  const byProgram = new Map<
+    string,
+    Array<{ capacity_mode?: string | null; capacity?: number | null }>
+  >()
+
+  for (const row of data || []) {
+    const programId = row.program_id as string
+    const list = byProgram.get(programId) || []
+    list.push({
+      capacity_mode: row.capacity_mode as string | null,
+      capacity: row.capacity as number | null,
+    })
+    byProgram.set(programId, list)
+  }
+
+  const summaries = new Map<string, ProgramCatalogCapacity>()
+  for (const programId of programIds) {
+    summaries.set(
+      programId,
+      summarizeOfferingsCapacity(byProgram.get(programId) || [])
+    )
+  }
+
+  return summaries
 }

@@ -4,10 +4,10 @@ import { revalidatePath } from "next/cache"
 
 import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
-import { ensureDefaultOffering } from "@/lib/programs/program-offering-actions"
 import { syncRegistrationOptionsFromProgramFlags } from "@/lib/programs/program-registration-option-actions"
 
 import { getAgeGroupLabelsFromMinMax } from "@/lib/programs/program-eligibility-display"
+import { normalizeProgramAudienceType } from "@/lib/programs/program-offering-attributes"
 import {
   getTodayDateString,
   shouldCloseEnrollmentForStatus,
@@ -24,16 +24,6 @@ function isMissingAgeColumnError(error: { message?: string; code?: string }) {
   )
 }
 
-function isMissingColumnError(error: { message?: string; code?: string }) {
-  const message = (error.message || "").toLowerCase()
-
-  return (
-    error.code === "PGRST204" ||
-    message.includes("schema cache") ||
-    (message.includes("column") && message.includes("does not exist"))
-  )
-}
-
 type CreateProgramInput = {
   name: string
   subtitle?: string | null
@@ -41,7 +31,7 @@ type CreateProgramInput = {
   department_id?: string | null
   flyer_url?: string | null
   background_color?: string | null
-  program_type?: "adult" | "youth" | "family"
+  program_type?: "adult" | "youth"
   start_date?: string | null
   end_date?: string | null
   enrollment_open_date?: string | null
@@ -62,6 +52,10 @@ type CreateProgramInput = {
   require_emergency_contact?: boolean
 }
 
+/**
+ * Create program identity + optional defaults only.
+ * Does not create a default offering (S4 — programs may have 0 offerings).
+ */
 export async function createProgram(input: CreateProgramInput) {
   const supabase = await createClient()
   const organizationId = await getSelectedOrganizationId()
@@ -83,6 +77,8 @@ export async function createProgram(input: CreateProgramInput) {
     ? getTodayDateString()
     : input.enrollment_close_date || null
 
+  const programType = normalizeProgramAudienceType(input.program_type)
+
   const { data, error } = await supabase
     .from("programs")
     .insert({
@@ -98,7 +94,8 @@ export async function createProgram(input: CreateProgramInput) {
       enrollment_open_date: input.enrollment_open_date || null,
       enrollment_close_date: enrollmentCloseDate,
 
-      program_type: input.program_type || "youth",
+      // Optional defaults inherited by new offerings (not operational SSOT).
+      program_type: programType,
       age_groups: getAgeGroupLabelsFromMinMax(input.min_age, input.max_age),
       grade_levels: input.grade_levels || [],
       min_grade: input.min_grade ?? null,
@@ -108,8 +105,7 @@ export async function createProgram(input: CreateProgramInput) {
       max_age: input.max_age ?? null,
 
       require_guardian:
-        input.require_guardian ??
-        (input.program_type === "adult" ? false : true),
+        input.require_guardian ?? (programType === "adult" ? false : true),
       require_grade: input.require_grade ?? false,
       require_emergency_contact: input.require_emergency_contact ?? true,
 
@@ -134,25 +130,6 @@ export async function createProgram(input: CreateProgramInput) {
 
   const programId = data.id as string
 
-  const offeringId = await ensureDefaultOffering({
-    organizationId,
-    programId,
-    programName: input.name,
-    startDate: input.start_date,
-    endDate: input.end_date,
-    enrollmentOpenDate: input.enrollment_open_date,
-    enrollmentCloseDate: enrollmentCloseDate,
-    programStatus: status,
-  })
-
-  await syncRegistrationOptionsFromProgramFlags({
-    organizationId,
-    programId,
-    offeringId,
-    fullProgramEnabled: input.full_program_registration_enabled ?? true,
-    sessionRegistrationEnabled: input.session_registration_enabled ?? false,
-  })
-
   revalidatePath("/programs")
   revalidatePath("/programs/catalog")
 
@@ -174,6 +151,7 @@ type UpdateProgramInput = {
   age_groups?: string[]
   grade_levels?: string[]
   gender?: string | null
+  /** @deprecated Catalog uses sum of offering capacities; ignored on write when omitOperationalFields. */
   capacity?: number
   status?: string
 
@@ -187,7 +165,7 @@ type UpdateProgramInput = {
   financial_assistance_close_date?: string | null
   financial_assistance_instructions?: string | null
 
-  program_type?: "adult" | "youth" | "family"
+  program_type?: "adult" | "youth"
   min_age?: number | null
   max_age?: number | null
   min_grade?: string | null
@@ -199,6 +177,7 @@ type UpdateProgramInput = {
   enable_waitlist?: boolean
   waitlist_capacity?: number | null
 
+  /** @deprecated Fee plans live on offerings — not written (S4). */
   billing_type?:
     | "free"
     | "one_time"
@@ -212,6 +191,12 @@ type UpdateProgramInput = {
   payment_due_day?: number | null
 
   visibility?: "public" | "private" | "members_only"
+
+  /**
+   * When true (default), only identity + optional defaults + FA are written.
+   * Operational eligibility/capacity/registration/billing stay on offerings.
+   */
+  identityAndDefaultsOnly?: boolean
 }
 
 export async function updateProgram(input: UpdateProgramInput) {
@@ -245,7 +230,9 @@ export async function updateProgram(input: UpdateProgramInput) {
     }
   }
 
-  const programPayload = {
+  const identityAndDefaultsOnly = input.identityAndDefaultsOnly !== false
+
+  const programPayload: Record<string, unknown> = {
     name: input.name,
     subtitle: input.subtitle || null,
     description: input.description || null,
@@ -256,7 +243,10 @@ export async function updateProgram(input: UpdateProgramInput) {
     end_date: input.end_date || null,
     enrollment_open_date: enrollmentOpenDate,
     enrollment_close_date: enrollmentCloseDate,
+    status,
+    visibility: input.visibility,
 
+    // Optional defaults for new offerings
     age_groups: ageGroups,
     grade_levels: input.grade_levels || [],
     gender: input.gender || "All",
@@ -264,42 +254,36 @@ export async function updateProgram(input: UpdateProgramInput) {
     max_age: maxAge,
     min_grade: input.min_grade ?? null,
     max_grade: input.max_grade ?? null,
-
-    full_program_registration_enabled:
-      input.full_program_registration_enabled ?? true,
-    session_registration_enabled:
-      input.session_registration_enabled ?? false,
-
-    capacity: input.capacity || 0,
-    status,
+    program_type: normalizeProgramAudienceType(input.program_type),
+    require_guardian: input.require_guardian,
+    require_grade: input.require_grade,
+    require_emergency_contact: input.require_emergency_contact,
 
     financial_assistance_enabled:
       input.financial_assistance_enabled || false,
-    financial_assistance_open:
-      input.financial_assistance_open || false,
+    financial_assistance_open: input.financial_assistance_open || false,
     financial_assistance_close_date:
       input.financial_assistance_close_date || null,
     financial_assistance_instructions:
       input.financial_assistance_instructions || null,
 
     updated_at: new Date().toISOString(),
+  }
 
-    program_type: input.program_type,
-    require_guardian: input.require_guardian,
-    require_grade: input.require_grade,
-    require_emergency_contact: input.require_emergency_contact,
-
-    enable_waitlist: input.enable_waitlist,
-    waitlist_capacity: input.waitlist_capacity,
-
-    billing_type: input.billing_type,
-    tuition_amount: input.tuition_amount,
-    deposit_amount: input.deposit_amount,
-    monthly_amount: input.monthly_amount,
-    installment_count: input.installment_count,
-    payment_due_day: input.payment_due_day,
-
-    visibility: input.visibility,
+  if (!identityAndDefaultsOnly) {
+    programPayload.full_program_registration_enabled =
+      input.full_program_registration_enabled ?? true
+    programPayload.session_registration_enabled =
+      input.session_registration_enabled ?? false
+    programPayload.capacity = input.capacity || 0
+    programPayload.enable_waitlist = input.enable_waitlist
+    programPayload.waitlist_capacity = input.waitlist_capacity
+    programPayload.billing_type = input.billing_type
+    programPayload.tuition_amount = input.tuition_amount
+    programPayload.deposit_amount = input.deposit_amount
+    programPayload.monthly_amount = input.monthly_amount
+    programPayload.installment_count = input.installment_count
+    programPayload.payment_due_day = input.payment_due_day
   }
 
   let { error } = await supabase
@@ -323,17 +307,6 @@ export async function updateProgram(input: UpdateProgramInput) {
     throw new Error(error.message || "Failed to update program")
   }
 
-  await ensureDefaultOffering({
-    organizationId,
-    programId: input.id,
-    programName: input.name,
-    startDate: input.start_date,
-    endDate: input.end_date,
-    enrollmentOpenDate,
-    enrollmentCloseDate,
-    programStatus: status,
-  })
-
   revalidatePath("/programs")
   revalidatePath("/programs/catalog")
   revalidatePath(`/programs/${input.id}`)
@@ -341,4 +314,42 @@ export async function updateProgram(input: UpdateProgramInput) {
   revalidatePath("/customer/programs")
   revalidatePath(`/customer/programs/${input.id}`)
   revalidatePath(`/customer/programs/${input.id}/register`)
+}
+
+/** @deprecated Prefer createProgramOffering; kept for duplicate/year helpers. */
+export async function ensureProgramHasOfferingForLegacyCopy(input: {
+  organizationId: string
+  programId: string
+  programName: string
+  startDate?: string | null
+  endDate?: string | null
+  enrollmentOpenDate?: string | null
+  enrollmentCloseDate?: string | null
+  programStatus?: string | null
+  fullProgramEnabled?: boolean
+  sessionRegistrationEnabled?: boolean
+}) {
+  const { ensureDefaultOffering } = await import(
+    "@/lib/programs/program-offering-actions"
+  )
+  const offeringId = await ensureDefaultOffering({
+    organizationId: input.organizationId,
+    programId: input.programId,
+    programName: input.programName,
+    startDate: input.startDate,
+    endDate: input.endDate,
+    enrollmentOpenDate: input.enrollmentOpenDate,
+    enrollmentCloseDate: input.enrollmentCloseDate,
+    programStatus: input.programStatus,
+  })
+
+  await syncRegistrationOptionsFromProgramFlags({
+    organizationId: input.organizationId,
+    programId: input.programId,
+    offeringId,
+    fullProgramEnabled: input.fullProgramEnabled ?? true,
+    sessionRegistrationEnabled: input.sessionRegistrationEnabled ?? false,
+  })
+
+  return offeringId
 }

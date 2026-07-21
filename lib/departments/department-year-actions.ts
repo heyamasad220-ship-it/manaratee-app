@@ -19,7 +19,10 @@ import {
   hasPermission,
 } from "@/lib/permissions/permissions"
 import { createProgram } from "@/lib/programs/program-actions"
+import { copyOfferingCapacityGroups } from "@/lib/programs/program-capacity-group-actions"
 import { createProgramOffering } from "@/lib/programs/program-offering-actions"
+import { normalizeProgramAudienceType } from "@/lib/programs/program-offering-attributes"
+import { copyOfferingScheduleItems } from "@/lib/programs/program-schedule-actions"
 import { createClient } from "@/lib/supabase/server"
 
 async function resolveOrgRoleName(
@@ -262,7 +265,7 @@ export async function createDepartmentYearProgramAction(
         source?.description ||
         "Department academic year program",
       department_id: input.departmentId,
-      program_type: (source?.program_type as "adult" | "youth" | "family") || "adult",
+      program_type: normalizeProgramAudienceType(source?.program_type) || "adult",
       start_date: input.startDate || null,
       end_date: input.endDate || null,
       enrollment_open_date: input.startDate || null,
@@ -282,7 +285,7 @@ export async function createDepartmentYearProgramAction(
       const { data: sourceOfferings } = await supabase
         .from("program_offerings")
         .select(
-          "id, name, offering_type, start_date, end_date, enrollment_open_date, enrollment_close_date, status, is_default"
+          "id, name, offering_type, start_date, end_date, enrollment_open_date, enrollment_close_date, status, is_default, audience_type, min_age, max_age, min_grade, max_grade, grade_levels, gender, require_guardian, require_grade, require_emergency_contact, capacity_mode, capacity, enable_waitlist, waitlist_capacity, waitlist_offer_deadline_days, registration_mode, attendance_tracked, delivery_format"
         )
         .eq("organization_id", organizationId)
         .eq("program_id", source.id)
@@ -295,15 +298,10 @@ export async function createDepartmentYearProgramAction(
       })
 
       if (courseOfferings.length > 0) {
-        await supabase
-          .from("program_offerings")
-          .delete()
-          .eq("organization_id", organizationId)
-          .eq("program_id", programId)
-
         for (const offering of courseOfferings) {
           const createdOffering = await createProgramOffering(programId, {
             name: String(offering.name),
+            // Type label only — not a behavioral controller (S6).
             offering_type:
               (offering.offering_type as
                 | "standard"
@@ -318,8 +316,57 @@ export async function createDepartmentYearProgramAction(
             enrollment_close_date:
               input.endDate || (offering.enrollment_close_date as string | null),
             status: "draft",
+            attributes: {
+              audience_type:
+                offering.audience_type === "adult" ? "adult" : "youth",
+              min_age: (offering.min_age as number | null) ?? null,
+              max_age: (offering.max_age as number | null) ?? null,
+              min_grade: (offering.min_grade as string | null) ?? null,
+              max_grade: (offering.max_grade as string | null) ?? null,
+              grade_levels: Array.isArray(offering.grade_levels)
+                ? (offering.grade_levels as string[])
+                : [],
+              gender: (offering.gender as string | null) ?? null,
+              require_guardian: Boolean(offering.require_guardian),
+              require_grade: Boolean(offering.require_grade),
+              require_emergency_contact:
+                offering.require_emergency_contact !== false,
+              capacity_mode:
+                offering.capacity_mode === "limited" ? "limited" : "unlimited",
+              capacity: (offering.capacity as number | null) ?? null,
+              enable_waitlist: Boolean(offering.enable_waitlist),
+              waitlist_capacity:
+                (offering.waitlist_capacity as number | null) ?? null,
+              waitlist_offer_deadline_days:
+                (offering.waitlist_offer_deadline_days as number | null) ?? null,
+              registration_mode:
+                offering.registration_mode === "optional" ||
+                offering.registration_mode === "none"
+                  ? offering.registration_mode
+                  : "required",
+              attendance_tracked: Boolean(offering.attendance_tracked),
+              delivery_format:
+                offering.delivery_format === "online" ||
+                offering.delivery_format === "hybrid"
+                  ? offering.delivery_format
+                  : "in_person",
+            },
           })
           const newOfferingId = createdOffering.id as string
+
+          await copyOfferingCapacityGroups({
+            organizationId,
+            programId,
+            sourceOfferingId: offering.id as string,
+            targetOfferingId: newOfferingId,
+          })
+
+          await copyOfferingScheduleItems({
+            organizationId,
+            programId,
+            sourceOfferingId: offering.id as string,
+            targetOfferingId: newOfferingId,
+          })
 
           const { data: assignments } = await supabase
             .from("program_staff_assignments")

@@ -2,11 +2,14 @@ import {
   getGradeRange,
   getMinMaxGradeFromLevels,
 } from "@/lib/programs/grade-levels"
-import type { Program } from "@/lib/programs/program-types"
 
 export { getMinMaxGradeFromLevels }
 
-export function getInitialGradeLevels(program: Program) {
+export function getInitialGradeLevels(program: {
+  grade_levels?: string[] | null
+  min_grade?: string | null
+  max_grade?: string | null
+}) {
   if (program.grade_levels?.length) {
     return program.grade_levels
   }

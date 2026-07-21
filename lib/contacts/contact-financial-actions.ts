@@ -398,7 +398,21 @@ export async function loadContactFinancialSummaryAction(
               description: `${rentalPaymentLabel(payment.payment_type)} — ${eventLabel}`,
               amount,
               method: payment.status.replace(/_/g, " "),
-              status: "Paid",
+              status: "Succeeded",
+              sourceModule: "venue_rentals",
+              filterCategory: "venue_rentals",
+              href: `/bookings/rentals/${payment.venue_rental_id}`,
+            })
+          } else if (payment.status === RENTAL_PAYMENT_STATUSES.refunded && amount > 0) {
+            activityDates.push(eventDate)
+            timeline.push({
+              id: `rental-payment-${payment.id}`,
+              date: eventDate,
+              eventType: activityTypeLabel("venue_rentals"),
+              description: `${rentalPaymentLabel(payment.payment_type)} — ${eventLabel}`,
+              amount,
+              method: payment.status.replace(/_/g, " "),
+              status: "Refunded",
               sourceModule: "venue_rentals",
               filterCategory: "venue_rentals",
               href: `/bookings/rentals/${payment.venue_rental_id}`,
@@ -459,7 +473,7 @@ export async function loadContactFinancialSummaryAction(
         created_at,
         child_name,
         programs:program_id ( name ),
-        program_charges:charge_id ( id, total, amount_paid, due_today )
+        program_charges:charge_id ( id, total, amount_paid, due_today, paid_at )
       `
       )
       .eq("organization_id", organizationId)
@@ -475,68 +489,127 @@ export async function loadContactFinancialSummaryAction(
         availableFilters.add("programs")
       }
 
+      const chargeIds = (enrollments || [])
+        .map((enrollment) => {
+          const chargeRel = enrollment.program_charges as
+            | { id: string }
+            | { id: string }[]
+            | null
+          const charge = Array.isArray(chargeRel) ? chargeRel[0] : chargeRel
+          return charge?.id as string | undefined
+        })
+        .filter((id): id is string => Boolean(id))
+
+      const schedulesByChargeId = new Map<
+        string,
+        Array<{
+          id: string
+          amount: number | null
+          due_date: string | null
+          paid_at: string | null
+          status: string | null
+          label: string | null
+        }>
+      >()
+
+      if (chargeIds.length > 0) {
+        const { data: scheduleRows } = await supabase
+          .from("program_charge_schedule")
+          .select("id, charge_id, amount, due_date, paid_at, status, label")
+          .eq("organization_id", organizationId)
+          .in("charge_id", chargeIds)
+          .order("paid_at", { ascending: true })
+
+        for (const row of scheduleRows || []) {
+          const chargeId = row.charge_id as string
+          if (!schedulesByChargeId.has(chargeId)) {
+            schedulesByChargeId.set(chargeId, [])
+          }
+          schedulesByChargeId.get(chargeId)!.push({
+            id: row.id as string,
+            amount: row.amount as number | null,
+            due_date: row.due_date as string | null,
+            paid_at: row.paid_at as string | null,
+            status: row.status as string | null,
+            label: row.label as string | null,
+          })
+        }
+      }
+
       for (const enrollment of enrollments || []) {
         const programRel = enrollment.programs as { name: string } | { name: string }[] | null
         const programName = Array.isArray(programRel)
           ? programRel[0]?.name
           : programRel?.name || enrollment.child_name || "Program enrollment"
         const chargeRel = enrollment.program_charges as
-          | { id: string; total: number; amount_paid: number; due_today: number }
-          | { id: string; total: number; amount_paid: number; due_today: number }[]
+          | {
+              id: string
+              total: number
+              amount_paid: number
+              due_today: number
+              paid_at: string | null
+            }
+          | {
+              id: string
+              total: number
+              amount_paid: number
+              due_today: number
+              paid_at: string | null
+            }[]
           | null
         const charge = Array.isArray(chargeRel) ? chargeRel[0] : chargeRel
-        const eventDate =
+        const enrollmentDate =
           enrollment.enrollment_date || enrollment.created_at || new Date().toISOString()
         const total = charge ? Number(charge.total || 0) : 0
         const paid = charge ? Number(charge.amount_paid || 0) : 0
-        const due = charge
-          ? Math.max(Number(charge.due_today ?? total - paid), 0)
-          : 0
+        // Remaining balance from fee − paid (due_today on charges is often the original due, not remaining).
+        const due = Math.max(total - paid, 0)
 
-        activityDates.push(eventDate)
+        const schedules = charge?.id ? schedulesByChargeId.get(charge.id) || [] : []
+        const paidSchedules = schedules.filter(
+          (row) =>
+            (row.status || "").toLowerCase() === "paid" && Number(row.amount || 0) > 0
+        )
 
-        if (total > 0) {
-          timeline.push({
-            id: `program-charge-${enrollment.id}`,
-            date: eventDate,
-            eventType: activityTypeLabel("programs"),
-            description: programName,
-            amount: total,
-            method: null,
-            status: enrollment.status,
-            sourceModule: "programs",
-            filterCategory: "programs",
-            href: `/programs/registrations/${enrollment.id}`,
-          })
-        } else {
-          timeline.push({
-            id: `program-enrollment-${enrollment.id}`,
-            date: eventDate,
-            eventType: activityTypeLabel("programs"),
-            description: programName,
-            amount: null,
-            method: null,
-            status: enrollment.status,
-            sourceModule: "programs",
-            filterCategory: "programs",
-            href: `/programs/registrations/${enrollment.id}`,
-          })
-        }
-
-        if (paid > 0) {
+        if (paidSchedules.length > 0) {
+          for (const schedule of paidSchedules) {
+            const paymentAmount = Number(schedule.amount || 0)
+            const paymentDate =
+              schedule.paid_at || schedule.due_date || charge?.paid_at || enrollmentDate
+            otherPaidTotal += paymentAmount
+            activityDates.push(paymentDate)
+            timeline.push({
+              id: `program-payment-${schedule.id}`,
+              date: paymentDate,
+              eventType: activityTypeLabel("programs"),
+              description: `${programName} — ${schedule.label || "Payment"}`,
+              amount: paymentAmount,
+              method: null,
+              status: "Succeeded",
+              sourceModule: "programs",
+              filterCategory: "programs",
+              href: `/programs/registrations/${enrollment.id}`,
+            })
+          }
+        } else if (paid > 0) {
           otherPaidTotal += paid
+          const paymentDate = charge?.paid_at || enrollmentDate
+          activityDates.push(paymentDate)
           timeline.push({
             id: `program-payment-${enrollment.id}`,
-            date: eventDate,
+            date: paymentDate,
             eventType: activityTypeLabel("programs"),
             description: `${programName} — Payment`,
             amount: paid,
             method: null,
-            status: enrollment.status,
+            status: "Succeeded",
             sourceModule: "programs",
             filterCategory: "programs",
             href: `/programs/registrations/${enrollment.id}`,
           })
+        } else if (enrollmentDate) {
+          // Keep last-activity date even when no payment yet (no enrollment row in Transactions).
+          activityDates.push(enrollmentDate)
         }
 
         if (due > 0) {

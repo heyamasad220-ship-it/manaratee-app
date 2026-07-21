@@ -287,7 +287,11 @@ export function OfferingWorkspace({
         </TabsContent>
 
         <TabsContent value="schedule" className="mt-0">
-          <OfferingSchedulePanel programId={program.id} offering={offering} />
+          <OfferingSchedulePanel
+            programId={program.id}
+            offering={offering}
+            workspaceData={workspaceData}
+          />
         </TabsContent>
       </Tabs>
     </div>

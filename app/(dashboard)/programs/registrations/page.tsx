@@ -178,6 +178,32 @@ function resolvePaymentBucket(
   return "partial"
 }
 
+/** Transaction outcome for the Payments list Status column. */
+function resolveTransactionStatus(
+  paymentStatus: string | null | undefined,
+  amountPaid: number | null | undefined
+): "succeeded" | "refunded" | "failed" {
+  const raw = (paymentStatus || "").toLowerCase().trim()
+  if (raw === "refunded") return "refunded"
+  if (raw === "failed") return "failed"
+  if (
+    raw === "paid" ||
+    raw === "partial" ||
+    raw === "partially_paid" ||
+    raw === "waived"
+  ) {
+    return "succeeded"
+  }
+  if (Number(amountPaid || 0) > 0.009) return "succeeded"
+  return "failed"
+}
+
+function formatTransactionStatus(status: "succeeded" | "refunded" | "failed") {
+  if (status === "succeeded") return "Succeeded"
+  if (status === "refunded") return "Refunded"
+  return "Failed"
+}
+
 function getPaymentBadgeVariant(paymentStatus: string | null) {
   const status = (paymentStatus || "").toLowerCase()
 
@@ -188,16 +214,11 @@ function getPaymentBadgeVariant(paymentStatus: string | null) {
   return "secondary"
 }
 
-function getStatusBadgeVariant(status: string | null, type: string) {
-  const normalized = (status || "").toLowerCase()
-
-  if (type === "waitlist") return "outline"
-  if (normalized === "enrolled" || normalized === "active") return "default"
-  if (normalized === "pending") return "outline"
-  if (normalized === "cancelled" || normalized === "canceled") {
-    return "destructive"
-  }
-
+function getTransactionStatusBadgeVariant(
+  status: "succeeded" | "refunded" | "failed"
+) {
+  if (status === "succeeded") return "default"
+  if (status === "failed") return "destructive"
   return "secondary"
 }
 
@@ -263,7 +284,9 @@ function matchesFilters(row: RegistrationRow, filters: PageSearchParams) {
 
   const matchesStatus =
     statusFilter === "all" ||
-    (row.status || "unknown").toLowerCase() === statusFilter
+    (row.type === "enrollment" &&
+      resolveTransactionStatus(row.payment_status, row.amount_paid) ===
+        statusFilter)
 
   const matchesType = typeFilter === "all" || row.type === typeFilter
 
@@ -443,7 +466,7 @@ export default async function ProgramsRegistrationsPage({
         ? participantName
         : contactLabel(registrantContact, row.parent_name) ||
           row.parent_name ||
-          "Parent not set"
+          "Contact not set"
       const contactEmail = adult
         ? (participantContact?.email as string | null | undefined) ||
           row.parent_email
@@ -516,7 +539,7 @@ export default async function ProgramsRegistrationsPage({
         "Unknown offering",
       participant_name: row.child_name,
       participant_contact_id: null,
-      contact_name: row.parent_name || "Parent not set",
+      contact_name: row.parent_name || "Contact not set",
       contact_profile_id: null,
       contact_email: row.parent_email,
       contact_phone: row.parent_phone,
@@ -572,13 +595,7 @@ export default async function ProgramsRegistrationsPage({
     )
   ).sort()
 
-  const statuses = Array.from(
-    new Set(
-      registrationRows
-        .map((row) => (row.status || "").toLowerCase())
-        .filter(Boolean)
-    )
-  ).sort()
+  const statuses = ["succeeded", "refunded", "failed"] as const
 
   const departmentFilter = filters.department || "all"
   const offeringsForSelect =
@@ -632,10 +649,10 @@ export default async function ProgramsRegistrationsPage({
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-xl font-semibold text-foreground">
-              Registrations
+              Payments
             </h2>
             <p className="text-sm text-muted-foreground">
-              View real program enrollments and waitlist entries.
+              View program enrollment fees, payments received, and balances.
             </p>
           </div>
 
@@ -753,7 +770,7 @@ export default async function ProgramsRegistrationsPage({
                   <option value="all">All Statuses</option>
                   {statuses.map((status) => (
                     <option key={status} value={status}>
-                      {normalizeStatus(status)}
+                      {formatTransactionStatus(status)}
                     </option>
                   ))}
                 </select>
@@ -777,9 +794,9 @@ export default async function ProgramsRegistrationsPage({
           <Card>
             <CardContent className="flex min-h-[220px] flex-col items-center justify-center p-8 text-center">
               <Users className="mb-4 h-10 w-10 text-muted-foreground" />
-              <h3 className="font-semibold">No registrations found</h3>
+              <h3 className="font-semibold">No payments found</h3>
               <p className="mt-2 max-w-md text-sm text-muted-foreground">
-                Try clearing filters, or enrollments will appear here after registration.
+                Try clearing filters, or payments will appear here after registration.
               </p>
             </CardContent>
           </Card>
@@ -793,7 +810,7 @@ export default async function ProgramsRegistrationsPage({
                     <TableHead>Contact</TableHead>
                     <TableHead>Offering</TableHead>
                     <TableHead>Registered</TableHead>
-                    <TableHead>Amount</TableHead>
+                    <TableHead>Fee</TableHead>
                     <TableHead>Received</TableHead>
                     <TableHead>Balance</TableHead>
                     <TableHead>Payment</TableHead>
@@ -808,6 +825,13 @@ export default async function ProgramsRegistrationsPage({
                       row.type === "waitlist"
                         ? null
                         : outstandingBalance(row.total_amount, row.amount_paid)
+                    const txStatus =
+                      row.type === "waitlist"
+                        ? null
+                        : resolveTransactionStatus(
+                            row.payment_status,
+                            row.amount_paid
+                          )
 
                     return (
                     <TableRow key={`${row.type}-${row.id}`}>
@@ -904,11 +928,15 @@ export default async function ProgramsRegistrationsPage({
                       </TableCell>
 
                       <TableCell>
-                        <Badge
-                          variant={getStatusBadgeVariant(row.status, row.type)}
-                        >
-                          {normalizeStatus(row.status)}
-                        </Badge>
+                        {txStatus == null ? (
+                          <Badge variant="secondary">N/A</Badge>
+                        ) : (
+                          <Badge
+                            variant={getTransactionStatusBadgeVariant(txStatus)}
+                          >
+                            {formatTransactionStatus(txStatus)}
+                          </Badge>
+                        )}
                       </TableCell>
 
                       <TableCell>

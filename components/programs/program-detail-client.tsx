@@ -21,6 +21,16 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
   Table,
   TableBody,
   TableCell,
@@ -39,6 +49,7 @@ import {
   formatOfferingDateRange,
   isOfferingEnrollmentOpen,
 } from "@/lib/programs/program-offering-display"
+import { formatOfferingEnrollmentLabel } from "@/lib/programs/program-catalog-capacity"
 import {
   PROGRAM_OFFERING_STATUS_LABELS,
   type ProgramOffering,
@@ -505,7 +516,47 @@ function OfferingsPanel({
   archivedCount: number
   showArchived?: ProgramDetailOfferingRow[]
 }) {
-  const capacity = program.capacity || 0
+  const router = useRouter()
+  const [addOpen, setAddOpen] = React.useState(false)
+  const [offeringName, setOfferingName] = React.useState("")
+  const [creating, setCreating] = React.useState(false)
+  const [createError, setCreateError] = React.useState<string | null>(null)
+
+  async function handleCreateOffering() {
+    const name = offeringName.trim()
+    if (!name) {
+      setCreateError("Offering name is required.")
+      return
+    }
+
+    setCreating(true)
+    setCreateError(null)
+
+    try {
+      const { createProgramOffering } = await import(
+        "@/lib/programs/program-offering-actions"
+      )
+      const created = await createProgramOffering(program.id, {
+        name,
+        offering_type: "standard",
+        start_date: program.start_date,
+        end_date: program.end_date,
+        enrollment_open_date: program.enrollment_open_date,
+        enrollment_close_date: program.enrollment_close_date,
+        status: program.status === "draft" ? "draft" : "active",
+      })
+      setAddOpen(false)
+      setOfferingName("")
+      router.push(programOfferingManageHref(program.id, created.id as string))
+      router.refresh()
+    } catch (error) {
+      setCreateError(
+        error instanceof Error ? error.message : "Could not create offering."
+      )
+    } finally {
+      setCreating(false)
+    }
+  }
 
   return (
     <Card className="border-border/80 shadow-sm">
@@ -517,19 +568,28 @@ function OfferingsPanel({
               Manage offerings, pricing, sessions, and staff assignments.
             </p>
           </div>
-          <Button size="sm" asChild>
-            <Link href={`/programs/${program.id}/offerings`}>
-              <Plus className="mr-1.5 h-4 w-4" />
-              Add Offering
-            </Link>
+          <Button size="sm" type="button" onClick={() => setAddOpen(true)}>
+            <Plus className="mr-1.5 h-4 w-4" />
+            Add Offering
           </Button>
         </div>
 
         {rows.length === 0 ? (
-          <p className="rounded-md border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
-            No offerings yet. Add an offering to open registration, fees, and
-            schedule.
-          </p>
+          <div className="rounded-md border border-dashed px-4 py-8 text-center">
+            <p className="text-sm text-muted-foreground">
+              No offerings yet. Add an offering to open registration, fees, and
+              schedule.
+            </p>
+            <Button
+              type="button"
+              size="sm"
+              className="mt-4"
+              onClick={() => setAddOpen(true)}
+            >
+              <Plus className="mr-1.5 h-4 w-4" />
+              Add first offering
+            </Button>
+          </div>
         ) : (
           <div className="overflow-x-auto rounded-md border">
             <Table>
@@ -571,8 +631,7 @@ function OfferingsPanel({
                       <TableCell>
                         <div className="space-y-1">
                           <p>
-                            {enrolled}
-                            {capacity > 0 ? ` / ${capacity}` : ""}
+                            {formatOfferingEnrollmentLabel(enrolled, offering)}
                           </p>
                           <p
                             className={cn(
@@ -625,6 +684,48 @@ function OfferingsPanel({
             </ul>
           </div>
         ) : null}
+
+        <Dialog open={addOpen} onOpenChange={setAddOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add offering</DialogTitle>
+              <DialogDescription>
+                Customers register for offerings. Registration, fees, and
+                schedule are configured on the offering after you create it.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2 py-2">
+              <Label htmlFor="detail-offering-name">Name</Label>
+              <Input
+                id="detail-offering-name"
+                value={offeringName}
+                onChange={(event) => setOfferingName(event.target.value)}
+                placeholder="e.g. Beginner Quran"
+                disabled={creating}
+              />
+              {createError ? (
+                <p className="text-sm text-destructive">{createError}</p>
+              ) : null}
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setAddOpen(false)}
+                disabled={creating}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={() => void handleCreateOffering()}
+                disabled={creating}
+              >
+                {creating ? "Creating…" : "Create offering"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   )

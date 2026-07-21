@@ -737,12 +737,18 @@ async function createEnrollmentAndCharge(
         subtotal: allocation.courseFee,
         discount_total: 0,
         total: allocation.courseFee,
-        due_today: allocation.courseFee,
+        due_today: Math.max(allocation.courseFee - allocation.amountPaid, 0),
         amount_paid: allocation.amountPaid,
         payment_required: true,
         charge_status: chargeStatus,
         checkout_status: allocation.amountPaid > 0 ? "paid" : "not_started",
-        paid_at: allocation.amountPaid > 0 ? new Date().toISOString() : null,
+        paid_at:
+          allocation.amountPaid > 0
+            ? (() => {
+                const firstDate = allocation.paymentParts.find((part) => part.date)?.date
+                return firstDate ? `${firstDate}T12:00:00Z` : new Date().toISOString()
+              })()
+            : null,
         metadata: { import_tag: IMPORT_TAG, import_key: importKey },
         quote_snapshot: { import: IMPORT_TAG },
       })
@@ -768,6 +774,12 @@ async function createEnrollmentAndCharge(
       sort_order: 0,
     })
   } else {
+    const paidAt =
+      allocation.amountPaid > 0
+        ? allocation.paymentParts.find((part) => part.date)?.date
+          ? `${allocation.paymentParts.find((part) => part.date).date}T12:00:00Z`
+          : null
+        : null
     await sb
       .from("program_charges")
       .update({
@@ -775,6 +787,8 @@ async function createEnrollmentAndCharge(
         charge_status: chargeStatus,
         total: allocation.courseFee,
         subtotal: allocation.courseFee,
+        due_today: Math.max(allocation.courseFee - allocation.amountPaid, 0),
+        ...(paidAt ? { paid_at: paidAt } : {}),
       })
       .eq("id", chargeId)
       .eq("organization_id", orgId)

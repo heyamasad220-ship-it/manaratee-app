@@ -10,7 +10,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { EligibilitySection } from "@/components/programs/edit/eligibility-section"
 import { EditProgramStickyFooter } from "@/components/programs/edit/edit-program-sticky-footer"
 import { EnrollmentSettingsSection } from "@/components/programs/edit/enrollment-settings-section"
-import { FeePlansSection } from "@/components/programs/edit/fee-plans-section"
 import { ProgramBasicsSection } from "@/components/programs/edit/program-basics-section"
 import { ProgramOfferingsSection } from "@/components/programs/edit/program-offerings-section"
 import type {
@@ -28,7 +27,6 @@ import {
 import type { FeePlanEditorState } from "@/components/programs/program-fee-plan-editor"
 import type { Department } from "@/lib/departments/department-types"
 import { createProgram } from "@/lib/programs/program-actions"
-import { replaceProgramCapacityGroups } from "@/lib/programs/program-capacity-group-actions"
 import type { ProgramCapacityGroupInput } from "@/lib/programs/program-capacity-group-types"
 import {
   getPersistableCapacityGroups,
@@ -487,13 +485,6 @@ export function ProgramForm(props: ProgramFormProps) {
       return
     }
 
-    const persistedCapacityGroups = getCapacityGroupsForSave(
-      payload.finalGradeLevels
-    )
-    const persistedTotalCapacity = getTotalCapacityForSave(
-      persistedCapacityGroups
-    )
-
     const registrationFlags = getProgramRegistrationFlags(
       program,
       registrationOptions,
@@ -518,7 +509,7 @@ export function ProgramForm(props: ProgramFormProps) {
       min_grade: payload.finalMinGrade,
       max_grade: payload.finalMaxGrade,
       gender: payload.selectedGender,
-      capacity: persistedTotalCapacity,
+      capacity: 0,
       status: "draft",
       visibility: payload.selectedVisibility,
       full_program_registration_enabled:
@@ -527,76 +518,10 @@ export function ProgramForm(props: ProgramFormProps) {
         registrationFlags.session_registration_enabled,
     })
 
-    if (
-      persistedCapacityGroups.length > 0 &&
-      (payload.minAgeValue == null || payload.minAgeValue < 18)
-    ) {
-      await replaceProgramCapacityGroups({
-        program_id: programId,
-        groups: persistedCapacityGroups,
-      })
-    }
-
-    const { program: savedProgram, offeringId } =
-      await getProgramSaveContext(programId)
-
-    const { offeringId: createOfferingId, feePlanState: createFeePlanState } =
-      getFeePlanStateForSave(offeringId)
-
-    const result = await saveEditProgram({
-      program: savedProgram,
-      formData: {
-        name: payload.name,
-        subtitle: payload.subtitle,
-        description: payload.description,
-        department_id: payload.department_id,
-        flyer_url: payload.flyer_url,
-        background_color: payload.background_color,
-        start_date: payload.start_date,
-        end_date: payload.end_date,
-        enrollment_open_date: payload.enrollment_open_date,
-        enrollment_close_date: payload.enrollment_close_date,
-        program_type: payload.selectedProgramType,
-        min_age: payload.minAgeValue,
-        max_age: payload.maxAgeValue,
-        min_grade: payload.finalMinGrade,
-        max_grade: payload.finalMaxGrade,
-        age_groups: payload.finalAgeGroups,
-        grade_levels: payload.finalGradeLevels,
-        gender: payload.selectedGender,
-        full_program_registration_enabled:
-          registrationFlags.full_program_registration_enabled,
-        session_registration_enabled:
-          registrationFlags.session_registration_enabled,
-        single_session_registration_enabled:
-          registrationFlags.single_session_registration_enabled,
-        drop_in_registration_enabled:
-          registrationFlags.drop_in_registration_enabled,
-        capacity: persistedTotalCapacity,
-        enable_waitlist: payload.enable_waitlist,
-        waitlist_capacity: payload.waitlist_capacity,
-        status: payload.status,
-        visibility: payload.selectedVisibility,
-        financial_assistance_enabled: payload.financial_assistance_enabled,
-        financial_assistance_open: payload.financial_assistance_open,
-        financial_assistance_close_date: payload.financial_assistance_close_date,
-        financial_assistance_instructions: payload.financial_assistance_instructions,
-      },
-      capacityGroups: persistedCapacityGroups,
-      offeringId: createOfferingId ?? offeringId,
-      feePlanState: createFeePlanState,
-    })
-
-    if (!result.success) {
-      setSaveError(result.error)
-      continueAfterSaveRef.current = false
-      return
-    }
-
-    const nextTab = continueAfterSaveRef.current ? "offerings" : activeTab
+    // S4: no default offering — capacity groups and fee plans are configured per offering.
     continueAfterSaveRef.current = false
-
-    router.replace(`/programs/${programId}`)
+    router.replace(`/programs/${programId}?created=1`)
+    return
   }
 
   async function handleEditSubmit(
@@ -835,24 +760,12 @@ export function ProgramForm(props: ProgramFormProps) {
                   programGender={programGender}
                   onProgramGenderChange={setProgramGender}
                 />
-                <EnrollmentSettingsSection program={program} />
-                <FeePlansSection
-                  draftMode
-                  programId={program?.id ?? ""}
-                  offeringId={defaultOffering?.id ?? ""}
-                  feePlans={feePlans}
-                  feePlanComponents={feePlanComponents}
-                  feePlanDiscountRules={feePlanDiscountRules}
-                  registrationOptions={registrationOptions}
-                  invalidFeePlanLinks={invalidFeePlanLinks}
-                  onChange={handleFeePlanChange}
-                />
                 <p className="text-xs text-muted-foreground">
-                  Fee plan links to registration options are finalized when you
-                  save the program for the first time. After that, configure
-                  pricing per offering on the Offerings tab. Promo codes are
-                  managed in Programs → Settings → Promo Codes.
+                  These are optional defaults for new offerings. Registration,
+                  capacity, fees, and schedule are set on each offering after
+                  you create one.
                 </p>
+                <EnrollmentSettingsSection program={program} />
               </>
             ) : null}
           </TabsContent>

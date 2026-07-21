@@ -171,6 +171,7 @@ export async function createDepartmentOfferingAction(input: {
 
   const payload: ProgramOfferingInput = {
     name: input.name,
+    // Type label only (e.g. academic year); does not control capacity/pricing.
     offering_type: input.offeringType ?? "academic_year",
     start_date: input.startDate || null,
     end_date: input.endDate || null,

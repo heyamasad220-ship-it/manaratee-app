@@ -11,6 +11,7 @@ export type GroupWorkspaceTab =
   | "offerings"
   | "schedule"
   | "payroll"
+  | "expenses"
   | "budget"
   | "group-giving"
   | "activity"
@@ -67,6 +68,7 @@ export function mapDonationTabToWorkspaceTab(
     tab === "offerings" ||
     tab === "schedule" ||
     tab === "payroll" ||
+    tab === "expenses" ||
     tab === "budget" ||
     tab === "activity" ||
     tab === "reports"
@@ -98,6 +100,7 @@ export function parseDepartmentWorkspaceTab(
     tab === "offerings" ||
     tab === "schedule" ||
     tab === "payroll" ||
+    tab === "expenses" ||
     tab === "budget" ||
     tab === "group-giving" ||
     tab === "activity" ||
