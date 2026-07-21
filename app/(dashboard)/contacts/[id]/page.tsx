@@ -50,6 +50,11 @@ import {
   isContactsListSegment,
 } from "@/lib/contacts/contact-module-label"
 import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
+import { donationGroupHref } from "@/lib/donations/donation-group-path"
+import {
+  isSafeReturnToPath,
+  RETURN_TO_QUERY_PARAM,
+} from "@/lib/navigation/return-to"
 
 import { refreshContactAffiliations } from "@/lib/contacts/contact-affiliation-sync"
 
@@ -396,7 +401,24 @@ export default function ContactDetailPage() {
 
     }
 
-
+    if (data.contact_type === "group") {
+      const returnTo = searchParams.get(RETURN_TO_QUERY_PARAM)
+      const tabParam = searchParams.get("tab")
+      const tab =
+        tabParam === "financial"
+          ? "financial"
+          : tabParam === "activity"
+            ? "activity"
+            : "members"
+      router.replace(
+        donationGroupHref(contactId, {
+          tab,
+          returnTo:
+            returnTo && isSafeReturnToPath(returnTo) ? returnTo : undefined,
+        })
+      )
+      return
+    }
 
     setContact(data)
     setOrganizationId(orgId)
@@ -478,7 +500,7 @@ export default function ContactDetailPage() {
 
     setLoading(false)
 
-  }, [contactId, loadExtendedData, loadProfileData, supabase])
+  }, [contactId, loadExtendedData, loadProfileData, router, searchParams, supabase])
 
 
 

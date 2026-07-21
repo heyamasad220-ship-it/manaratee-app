@@ -6,10 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { StatCard, StatCardsRow } from "@/components/ui/stat-card"
 import { fetchMembershipOverviewStats } from "@/lib/memberships/membership-overview-actions"
 import {
+  MEMBERSHIP_GROUPS_PATH,
   MEMBERSHIP_MEMBERS_PATH,
   MEMBERSHIP_MODULE_LABEL,
   MEMBERSHIP_SETTINGS_PATH,
-  MEMBERSHIP_TEAMS_PATH,
 } from "@/lib/memberships/membership-module-label"
 import {
   isOrganizationModuleEnabled,
@@ -37,9 +37,9 @@ export default async function MembershipOverviewPage() {
       hint: "Within 30 days",
     },
     {
-      label: "Teams",
-      value: stats.teams.activeTeams,
-      hint: `${stats.teams.totalMembers} team assignments`,
+      label: "Groups",
+      value: stats.groups.activeGroups,
+      hint: `${stats.groups.totalMembers} group assignments`,
     },
     {
       label: "Lapsed",
@@ -56,9 +56,9 @@ export default async function MembershipOverviewPage() {
       icon: UserCheck,
     },
     {
-      label: "Teams",
-      href: MEMBERSHIP_TEAMS_PATH,
-      description: "Optional member team assignments",
+      label: "Groups",
+      href: MEMBERSHIP_GROUPS_PATH,
+      description: "Member groups and optional assignments",
       icon: UsersRound,
     },
     {
@@ -77,7 +77,7 @@ export default async function MembershipOverviewPage() {
           <CardContent className="p-6">
             <p className="text-sm text-muted-foreground">
               {MEMBERSHIP_MODULE_LABEL} covers who belongs to your organization, their benefits,
-              and optional team assignments.
+              and member groups.
               {programsEnabled ? (
                 <>
                   {" "}
@@ -118,15 +118,14 @@ export default async function MembershipOverviewPage() {
               <CardHeader className="flex flex-row items-start justify-between gap-4">
                 <div>
                   <CardTitle className="flex items-center gap-2 text-base">
-                    <link.icon className="h-4 w-4" />
+                    <link.icon className="h-4 w-4 text-muted-foreground" />
                     {link.label}
                   </CardTitle>
-                  <CardDescription>{link.description}</CardDescription>
+                  <CardDescription className="mt-1.5">{link.description}</CardDescription>
                 </div>
-                <Button variant="outline" size="sm" asChild>
-                  <Link href={link.href}>
-                    Open
-                    <ArrowRight className="ml-2 h-4 w-4" />
+                <Button asChild variant="ghost" size="icon" className="shrink-0">
+                  <Link href={link.href} aria-label={`Open ${link.label}`}>
+                    <ArrowRight className="h-4 w-4" />
                   </Link>
                 </Button>
               </CardHeader>

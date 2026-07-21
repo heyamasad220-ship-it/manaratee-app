@@ -2,13 +2,12 @@
 
 import { revalidatePath } from "next/cache"
 
-import { ensureContactForPerson } from "@/lib/contacts/contact-actions"
 import {
   isEntityContactType,
   normalizePhone,
   properCasePersonNameIfNeeded,
 } from "@/lib/contacts/contact-constants"
-import { removeMemberFromHousehold, syncFamilyMemberAdded } from "@/lib/contacts/family-sync"
+import { removeMemberFromHousehold } from "@/lib/contacts/family-sync"
 import { normalizeDateOfBirth } from "@/lib/dates/date-input-utils"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { createClient } from "@/lib/supabase/server"
@@ -156,39 +155,78 @@ async function attachFamilyMemberContactIds(
   const personIds = members.map((member) => member.id)
   const { data: contactRows, error } = await supabase
     .from("contacts")
-    .select("id, person_id")
+    .select("id, person_id, email, phone")
     .eq("organization_id", organizationId)
     .in("person_id", personIds)
 
   if (error) {
     console.warn("attachFamilyMemberContactIds:", error.message)
+    return members
   }
 
-  const contactIdByPersonId = new Map<string, string>()
+  const contactByPersonId = new Map<
+    string,
+    { id: string; email: string | null; phone: string | null }
+  >()
   for (const row of contactRows || []) {
     if (row.person_id) {
-      contactIdByPersonId.set(row.person_id as string, row.id as string)
+      contactByPersonId.set(row.person_id as string, {
+        id: row.id as string,
+        email: (row.email as string | null) ?? null,
+        phone: (row.phone as string | null) ?? null,
+      })
     }
   }
 
-  return Promise.all(
-    members.map(async (member) => {
-      let contactId = contactIdByPersonId.get(member.id) ?? null
+  const contactIds = Array.from(contactByPersonId.values()).map((row) => row.id)
+  const profileWorthyContactIds = new Set<string>()
 
-      if (!contactId) {
-        const ensured = await ensureContactForPerson({
-          organizationId,
-          personId: member.id,
-        })
-        contactId = ensured.contactId
-      }
+  for (const row of contactByPersonId.values()) {
+    if (row.email?.trim() || row.phone?.trim()) {
+      profileWorthyContactIds.add(row.id)
+    }
+  }
 
-      return {
-        ...member,
-        contactId,
-      }
-    })
-  )
+  if (contactIds.length > 0) {
+    const [{ data: roleRows }, { data: paymentRows }, { data: donorRows }] = await Promise.all([
+      supabase
+        .from("contact_roles")
+        .select("contact_id")
+        .eq("organization_id", organizationId)
+        .in("contact_id", contactIds)
+        .limit(500),
+      supabase
+        .from("payments")
+        .select("contact_id")
+        .eq("organization_id", organizationId)
+        .in("contact_id", contactIds)
+        .limit(500),
+      supabase
+        .from("donors")
+        .select("contact_id")
+        .eq("organization_id", organizationId)
+        .in("contact_id", contactIds)
+        .limit(500),
+    ])
+
+    for (const row of roleRows || []) {
+      if (row.contact_id) profileWorthyContactIds.add(row.contact_id as string)
+    }
+    for (const row of paymentRows || []) {
+      if (row.contact_id) profileWorthyContactIds.add(row.contact_id as string)
+    }
+    for (const row of donorRows || []) {
+      if (row.contact_id) profileWorthyContactIds.add(row.contact_id as string)
+    }
+  }
+
+  return members.map((member) => {
+    const contact = contactByPersonId.get(member.id)
+    if (!contact || !profileWorthyContactIds.has(contact.id)) {
+      return { ...member, contactId: null }
+    }
+    return { ...member, contactId: contact.id }
+  })
 }
 
 export async function loadContactProfileExtendedData(
@@ -368,46 +406,130 @@ export async function addContactFamilyMember(input: {
     throw new Error(relationshipError?.message || "Could not save family relationship.")
   }
 
-  const { contactId: familyMemberContactId } = await ensureContactForPerson({
-    organizationId,
-    personId: createdPerson.id as string,
-  })
-
-  if (email || phone) {
-    const { error: contactUpdateError } = await supabase
-      .from("contacts")
-      .update({
-        email,
-        phone,
-      })
-      .eq("organization_id", organizationId)
-      .eq("id", familyMemberContactId)
-
-    if (contactUpdateError) {
-      throw new Error(contactUpdateError.message || "Could not save family member contact details.")
-    }
-  }
-
-  try {
-    await syncFamilyMemberAdded({
-      supabase,
-      organizationId,
-      primaryContactId: input.contactId,
-      primaryName: (contact.full_name as string | null) || `${firstName} ${lastName}`.trim(),
-      memberContactId: familyMemberContactId,
-      relationshipType: relationship,
-      personRelationshipId: createdRelationship.id as string,
-    })
-  } catch (syncError) {
-    console.warn("Family membership sync failed:", syncError)
-  }
-
+  // Person-only household members do not get a contact profile. Profile links appear only when
+  // staff link an existing contact (see linkExistingContactToFamilyAction).
   revalidatePath(`/contacts/${input.contactId}`)
-  revalidatePath(`/contacts/${familyMemberContactId}`)
   revalidatePath("/customer/profile")
   revalidatePath("/contacts/families")
 
   return { personId: createdPerson.id as string }
+}
+
+export async function updateContactFamilyMember(input: {
+  contactId: string
+  relatedPersonId: string
+  firstName: string
+  lastName: string
+  gender?: string | null
+  dateOfBirth?: string | null
+  email?: string | null
+  phone?: string | null
+  relationship: string
+}) {
+  const relatedPersonId = input.relatedPersonId.trim()
+  const firstName = properCasePersonNameIfNeeded(input.firstName)
+  const lastName = properCasePersonNameIfNeeded(input.lastName)
+  const relationship = input.relationship.trim()
+  const email = input.email?.trim().toLowerCase() || null
+  const phone = normalizePhone(input.phone) || null
+
+  if (!relatedPersonId) {
+    throw new Error("Family member is required.")
+  }
+  if (!firstName || !lastName) {
+    throw new Error("First and last name are required.")
+  }
+  if (!relationship) {
+    throw new Error("Relationship is required.")
+  }
+
+  const { supabase, organizationId, contact } = await getContactForOrg(input.contactId)
+
+  if (isEntityContactType(contact.contact_type)) {
+    throw new Error("Family members can only be edited on individual contacts.")
+  }
+
+  if (!contact.person_id) {
+    throw new Error("Contact has no linked person record.")
+  }
+
+  const parentPersonId = contact.person_id as string
+  const dateOfBirth = normalizeDateOfBirth(input.dateOfBirth, { required: false })
+
+  const { data: relationshipRow, error: relationshipLookupError } = await supabase
+    .from("person_relationships")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("person_id", parentPersonId)
+    .eq("related_person_id", relatedPersonId)
+    .maybeSingle()
+
+  if (relationshipLookupError) {
+    throw new Error(relationshipLookupError.message || "Could not load family relationship.")
+  }
+  if (!relationshipRow?.id) {
+    throw new Error("Family member was not found on this contact.")
+  }
+
+  const { error: personError } = await supabase
+    .from("people")
+    .update({
+      first_name: firstName,
+      last_name: lastName,
+      gender: input.gender?.trim() || null,
+      date_of_birth: dateOfBirth,
+      email,
+      phone,
+    })
+    .eq("organization_id", organizationId)
+    .eq("id", relatedPersonId)
+
+  if (personError) {
+    throw new Error(personError.message || "Could not update family member.")
+  }
+
+  const { error: relationshipError } = await supabase
+    .from("person_relationships")
+    .update({ relationship_type: relationship })
+    .eq("organization_id", organizationId)
+    .eq("id", relationshipRow.id as string)
+
+  if (relationshipError) {
+    throw new Error(relationshipError.message || "Could not update family relationship.")
+  }
+
+  const { data: memberContact } = await supabase
+    .from("contacts")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("person_id", relatedPersonId)
+    .maybeSingle()
+
+  const memberContactId = (memberContact?.id as string | null) ?? null
+  if (memberContactId) {
+    const fullName = `${firstName} ${lastName}`.trim()
+    const { error: contactUpdateError } = await supabase
+      .from("contacts")
+      .update({
+        full_name: fullName || null,
+        email,
+        phone,
+      })
+      .eq("organization_id", organizationId)
+      .eq("id", memberContactId)
+
+    if (contactUpdateError) {
+      throw new Error(contactUpdateError.message || "Could not update linked contact details.")
+    }
+
+    revalidatePath(`/contacts/${memberContactId}`)
+  }
+
+  revalidatePath(`/contacts/${input.contactId}`)
+  revalidatePath("/customer/profile")
+  revalidatePath("/contacts/families")
+
+  return { personId: relatedPersonId }
 }
 
 export async function removeContactFamilyMember(input: {

@@ -33,8 +33,8 @@ type UpdateProgramSessionInput = ProgramSessionFieldsInput & {
 
 function revalidateProgramSessionPaths(programId: string) {
   revalidatePath(`/programs/${programId}/sessions`)
-  revalidatePath(`/programs/${programId}/edit`)
   revalidatePath(`/programs/${programId}`)
+  revalidatePath(`/programs/${programId}/offerings`)
 }
 
 export async function createProgramSession(

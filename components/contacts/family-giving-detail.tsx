@@ -108,7 +108,7 @@ export function FamilyGivingDetail({ rollup, canManage = false }: FamilyGivingDe
 
       <Card>
         <CardHeader>
-          <CardTitle>Recent Family Giving</CardTitle>
+          <CardTitle>Family Giving</CardTitle>
           <CardDescription>Latest gifts from all active household members</CardDescription>
         </CardHeader>
         <CardContent className="p-0">

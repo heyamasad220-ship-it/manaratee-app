@@ -2,7 +2,15 @@ import type { ApplicationStatus, ModuleOwner } from "@/lib/applications/applicat
 import { isWorkforceModuleOwner } from "@/lib/applications/application-types"
 import type { ApplicationStatusTabId } from "@/lib/applications/application-status-tabs"
 
+/** @deprecated Hub removed — redirects to HR category Applications tabs. */
 export const PEOPLE_MANAGEMENT_APPLICATIONS_PATH = "/settings/applications"
+export const HR_APPLICATION_TEMPLATES_PATH = "/workforce/settings/application-templates"
+export const HR_EMPLOYEE_APPLICATIONS_PATH = "/workforce/employees"
+export const HR_VOLUNTEER_APPLICATIONS_PATH = "/workforce/volunteers"
+export const HR_CHILDCARE_APPLICATIONS_PATH = "/workforce/childcare"
+/** @deprecated Use MEMBERSHIP_APPLICATIONS_PATH — committee apps live under Membership. */
+export const HR_COMMITTEE_APPLICATIONS_PATH = "/workforce/settings/committee-applications"
+export const MEMBERSHIP_APPLICATIONS_PATH = "/membership/applications"
 export const VENDOR_HUB_APPLICATIONS_PATH = "/vendor-hub/events"
 export const PROGRAMS_FINANCIAL_ASSISTANCE_PATH = "/programs/financial-assistance"
 
@@ -14,6 +22,56 @@ export const CHILD_CARE_APPLICATIONS_PATH = "/people-management/applications"
 export type ApplicationsPageTab = "overview" | "submissions" | "templates"
 export type PeopleManagementApplicationsPageTab = ApplicationsPageTab
 
+export type HrWorkforceApplicationType =
+  | "employment"
+  | "volunteer"
+  | "childcare_provider"
+  | "committee_member"
+
+export function hrCategoryApplicationsPath(
+  applicationType?: string | null
+): string {
+  switch (applicationType) {
+    case "employment":
+      return HR_EMPLOYEE_APPLICATIONS_PATH
+    case "volunteer":
+      return HR_VOLUNTEER_APPLICATIONS_PATH
+    case "childcare_provider":
+      return HR_CHILDCARE_APPLICATIONS_PATH
+    case "committee_member":
+      return MEMBERSHIP_APPLICATIONS_PATH
+    default:
+      return HR_EMPLOYEE_APPLICATIONS_PATH
+  }
+}
+
+export function isHrCategoryApplicationsPath(path: string) {
+  return (
+    path === HR_EMPLOYEE_APPLICATIONS_PATH ||
+    path === HR_VOLUNTEER_APPLICATIONS_PATH ||
+    path === HR_CHILDCARE_APPLICATIONS_PATH ||
+    path === MEMBERSHIP_APPLICATIONS_PATH ||
+    path === HR_COMMITTEE_APPLICATIONS_PATH
+  )
+}
+
+/** HR category Applications tab URL, e.g. /workforce/employees?tab=applications */
+export function hrCategoryApplicationsUrl(options?: {
+  applicationType?: string | null
+  status?: ApplicationStatusTabId | ApplicationStatus | ApplicationStatus[]
+}) {
+  const path = hrCategoryApplicationsPath(options?.applicationType)
+  const params = new URLSearchParams()
+  params.set("tab", "applications")
+
+  if (options?.status && options.status !== "all") {
+    const value = Array.isArray(options.status) ? options.status.join(",") : options.status
+    params.set("status", value)
+  }
+
+  return `${path}?${params.toString()}`
+}
+
 export function applicationsPageUrl(
   basePath: string,
   options?: {
@@ -22,6 +80,18 @@ export function applicationsPageUrl(
     applicationType?: string
   }
 ) {
+  if (
+    basePath === PEOPLE_MANAGEMENT_APPLICATIONS_PATH ||
+    basePath === "/people-management/applications" ||
+    isHrCategoryApplicationsPath(basePath)
+  ) {
+    return peopleManagementApplicationsUrl({
+      pageTab: options?.pageTab,
+      status: options?.status,
+      applicationType: options?.applicationType,
+    })
+  }
+
   const params = new URLSearchParams()
 
   const pageTab =
@@ -61,12 +131,20 @@ export function programsFinancialAssistanceUrl(options?: {
   return applicationsPageUrl(PROGRAMS_FINANCIAL_ASSISTANCE_PATH, options)
 }
 
+/** Resolves to the matching HR category Applications tab (or templates settings). */
 export function peopleManagementApplicationsUrl(options?: {
   pageTab?: ApplicationsPageTab
   status?: ApplicationStatusTabId | ApplicationStatus | ApplicationStatus[]
   applicationType?: string
 }) {
-  return applicationsPageUrl(PEOPLE_MANAGEMENT_APPLICATIONS_PATH, options)
+  if (options?.pageTab === "templates") {
+    return HR_APPLICATION_TEMPLATES_PATH
+  }
+
+  return hrCategoryApplicationsUrl({
+    applicationType: options?.applicationType,
+    status: options?.status,
+  })
 }
 
 /** @deprecated Use peopleManagementApplicationsUrl with applicationType volunteer */

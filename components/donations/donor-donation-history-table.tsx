@@ -45,6 +45,12 @@ import {
   updatePaymentAction,
   voidPaymentAction,
 } from "@/lib/donations/payment-admin-actions"
+import {
+  paymentRefundConfirmLabel,
+  paymentRefundDialogDescription,
+  paymentRefundDialogTitle,
+  paymentRefundMenuLabel,
+} from "@/lib/donations/payment-admin-copy"
 import { fetchOpenPledgesForAllocationAction } from "@/lib/donations/donation-list-actions"
 
 export type DonationHistoryRow = {
@@ -307,9 +313,17 @@ export function DonorDonationHistoryTable({
     )
   }
 
-  const refundTitle = active?.capabilities.canStripeRefund
-    ? "Refund via Stripe"
-    : "Record Refund"
+  const refundTitle = paymentRefundDialogTitle()
+  const refundMenuLabel = paymentRefundMenuLabel()
+  const refundConfirmLabel = paymentRefundConfirmLabel()
+  const refundDescription = active
+    ? paymentRefundDialogDescription({
+        remainingRefundable: active.capabilities.remainingRefundable,
+        canStripeRefund: active.capabilities.canStripeRefund,
+        stripeRefundBlockedReason: active.capabilities.stripeRefundBlockedReason,
+        formatMoney,
+      })
+    : null
 
   const actionDialogs = (
     <>
@@ -418,10 +432,7 @@ export function DonorDonationHistoryTable({
           <DialogHeader>
             <DialogTitle>{refundTitle}</DialogTitle>
             <DialogDescription>
-              {active?.capabilities.canStripeRefund
-                ? `Issue a refund through Stripe. Up to ${formatMoney(active.capabilities.remainingRefundable)} remaining.`
-                : active?.capabilities.stripeRefundBlockedReason ||
-                  `Record a refund processed outside the app. Up to ${formatMoney(active?.capabilities.remainingRefundable || 0)} remaining.`}
+              {refundDescription}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -475,7 +486,7 @@ export function DonorDonationHistoryTable({
               Cancel
             </Button>
             <Button onClick={handleRefund} disabled={saving}>
-              {saving ? "Processing..." : active?.capabilities.canStripeRefund ? "Refund" : "Record Refund"}
+              {saving ? "Processing..." : refundConfirmLabel}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -693,7 +704,7 @@ function PaymentRowMenu({
         {hasRefund ? (
           <DropdownMenuItem onClick={() => onAction(donation, "refund")}>
             <RotateCcw className="mr-2 size-4" />
-            {capabilities.canStripeRefund ? "Refund" : "Record Refund"}
+            {paymentRefundMenuLabel()}
           </DropdownMenuItem>
         ) : null}
         {capabilities.canVoid ? (

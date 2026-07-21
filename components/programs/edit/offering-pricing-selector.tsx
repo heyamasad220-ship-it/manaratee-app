@@ -1,6 +1,6 @@
 "use client"
 
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 
 import { Label } from "@/components/ui/label"
 import type { ProgramOffering } from "@/lib/programs/program-offering-types"
@@ -15,19 +15,16 @@ export function OfferingPricingSelector({
   selectedOfferingId: string
 }) {
   const router = useRouter()
-  const searchParams = useSearchParams()
 
   function handleChange(offeringId: string) {
     if (offeringId === selectedOfferingId) {
       return
     }
 
-    const params = new URLSearchParams(searchParams.toString())
-    params.set("tab", "offerings")
-    params.set("offering", offeringId)
-    router.replace(`/programs/${programId}/edit?${params.toString()}`, {
-      scroll: false,
-    })
+    router.replace(
+      `/programs/${programId}/offerings/${offeringId}?tab=fees`,
+      { scroll: false }
+    )
     router.refresh()
   }
 

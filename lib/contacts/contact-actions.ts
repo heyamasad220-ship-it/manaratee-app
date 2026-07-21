@@ -16,6 +16,8 @@ import {
 } from "@/lib/contacts/contact-constants"
 import { syncContactAffiliations } from "@/lib/contacts/contact-affiliation-sync"
 import { syncDonorExtensionFromContact } from "@/lib/donations/donor-contact-bridge"
+import { DONATIONS_GROUP_GIVING_REPORT_PATH } from "@/lib/donations/donor-giving-report"
+import { donationGroupHref } from "@/lib/donations/donation-group-path"
 
 type FindOrCreateContactInput = {
   organizationId: string
@@ -447,6 +449,12 @@ export async function addContactWithRoles(input: {
     input.contactType || "individual"
   )
 
+  if (input.contactType === "group") {
+    throw new Error(
+      "Giving groups are managed under Donations, not as Contacts. Use Group Giving or a donation import."
+    )
+  }
+
   const { contactId, created } = await findOrCreateContact({
     organizationId,
     fullName: input.fullName,
@@ -476,7 +484,7 @@ function revalidateContactPaths() {
   revalidatePath("/contacts")
   revalidatePath("/contacts/people")
   revalidatePath("/contacts/organizations")
-  revalidatePath("/contacts/groups")
+  revalidatePath(DONATIONS_GROUP_GIVING_REPORT_PATH)
   revalidatePath("/contacts/members")
   revalidatePath("/membership")
   revalidatePath("/membership/members")
@@ -528,6 +536,138 @@ export async function linkStaffToContact(input: {
   return contactId
 }
 
+/** Create an employee from an existing contact (contact-first HR flow). */
+export async function createEmployeeFromContact(input: {
+  contactId: string
+  staff_type?: "full_time" | "part_time" | "temporary" | "contract" | "seasonal"
+  status?: "active" | "inactive" | "on_leave" | "pending"
+  position_id?: string | null
+  position_name?: string | null
+  hr_job_role_id?: string | null
+  hire_date?: string | null
+  department_id?: string | null
+  hourly_rate?: number | null
+}) {
+  const supabase = await createClient()
+  const organizationId = await getSelectedOrganizationId()
+
+  if (!organizationId) {
+    throw new Error("No organization selected")
+  }
+
+  const contactId = input.contactId.trim()
+  if (!contactId) {
+    throw new Error("Select a contact first")
+  }
+
+  const { data: contact, error: contactError } = await supabase
+    .from("contacts")
+    .select("id, full_name, email, phone, contact_type")
+    .eq("id", contactId)
+    .eq("organization_id", organizationId)
+    .maybeSingle()
+
+  if (contactError || !contact) {
+    throw new Error(contactError?.message || "Contact not found")
+  }
+
+  if (contact.contact_type && contact.contact_type !== "individual") {
+    throw new Error("Only individual contacts can be added as employees")
+  }
+
+  const { data: existingStaff, error: existingError } = await supabase
+    .from("staff")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("contact_id", contactId)
+    .maybeSingle()
+
+  if (existingError && existingError.code !== "42703") {
+    throw new Error(existingError.message || "Could not check existing employee")
+  }
+
+  if (existingStaff) {
+    throw new Error("This contact is already an employee")
+  }
+
+  const { first_name, last_name } = splitFullName(contact.full_name || "Unnamed")
+  const email = (contact.email as string | null) || null
+  const phone = normalizePhone(contact.phone as string | null) || null
+  const hourlyRate =
+    input.hourly_rate == null || Number.isNaN(Number(input.hourly_rate))
+      ? null
+      : Math.max(0, Number(input.hourly_rate))
+
+  const insertPayload: Record<string, unknown> = {
+    organization_id: organizationId,
+    contact_id: contactId,
+    first_name,
+    last_name,
+    email,
+    phone,
+    staff_type: input.staff_type || "full_time",
+    status: input.status || "active",
+    position: input.position_name || null,
+    position_id: input.position_id || null,
+    hr_job_role_id: input.hr_job_role_id || null,
+    hire_date: input.hire_date || null,
+    department_id: input.department_id || null,
+  }
+
+  if (hourlyRate != null) {
+    insertPayload.hourly_rate = hourlyRate
+  }
+
+  const { data: createdStaff, error: insertError } = await supabase
+    .from("staff")
+    .insert(insertPayload)
+    .select("id")
+    .single()
+
+  if (insertError || !createdStaff) {
+    // Retry without hourly_rate if the column is not migrated yet.
+    if (
+      hourlyRate != null &&
+      (insertError?.code === "42703" ||
+        /hourly_rate/i.test(insertError?.message || ""))
+    ) {
+      delete insertPayload.hourly_rate
+      const retry = await supabase
+        .from("staff")
+        .insert(insertPayload)
+        .select("id")
+        .single()
+      if (retry.error || !retry.data) {
+        throw new Error(retry.error?.message || "Could not create employee")
+      }
+      await ensureRoleRow(organizationId, contactId, "employee")
+      await syncContactAffiliations(contactId, organizationId, supabase)
+      revalidateContactPaths()
+      revalidatePath("/workforce/employees")
+      if (input.department_id) {
+        revalidatePath(`/workforce/departments/${input.department_id}`)
+        revalidatePath("/workforce/departments")
+      }
+      revalidatePath(`/contacts/${contactId}`)
+      return { staffId: retry.data.id as string, contactId }
+    }
+    throw new Error(insertError?.message || "Could not create employee")
+  }
+
+  await ensureRoleRow(organizationId, contactId, "employee")
+  await syncContactAffiliations(contactId, organizationId, supabase)
+
+  revalidateContactPaths()
+  revalidatePath("/workforce/employees")
+  if (input.department_id) {
+    revalidatePath(`/workforce/departments/${input.department_id}`)
+    revalidatePath("/workforce/departments")
+  }
+  revalidatePath(`/contacts/${contactId}`)
+
+  return { staffId: createdStaff.id as string, contactId }
+}
+
 export async function updateContactBasics(input: {
   contactId: string
   fullName: string
@@ -561,7 +701,18 @@ export async function updateContactBasics(input: {
     throw new Error("Contact not found")
   }
 
-  const recordType = (input.contactType ?? existing.contact_type) as ContactRecordType
+  const existingType = (existing.contact_type as ContactRecordType) || "individual"
+  let recordType = (input.contactType ?? existingType) as ContactRecordType
+
+  // Giving groups stay groups; contacts cannot be converted into groups from CRM.
+  if (existingType === "group") {
+    recordType = "group"
+  } else if (recordType === "group") {
+    throw new Error(
+      "Giving groups are managed under Donations, not as Contacts."
+    )
+  }
+
   const cleanName =
     recordType === "individual"
       ? properCasePersonNameIfNeeded(input.fullName)
@@ -615,6 +766,11 @@ export async function updateContactBasics(input: {
   )
 
   revalidateContactPaths()
-  revalidatePath(`/contacts/${input.contactId}`)
+  if (recordType === "group") {
+    revalidatePath(donationGroupHref(input.contactId))
+    revalidatePath(DONATIONS_GROUP_GIVING_REPORT_PATH)
+  } else {
+    revalidatePath(`/contacts/${input.contactId}`)
+  }
   revalidatePath("/donations/reports/donors")
 }

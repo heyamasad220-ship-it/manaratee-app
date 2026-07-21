@@ -13,6 +13,7 @@ import {
   addContactWithRoles,
 } from "@/lib/contacts/contact-actions"
 import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
+import { donationGroupHref } from "@/lib/donations/donation-group-path"
 import {
   contactsListSegmentForRecordType,
   type ContactsListSegment,
@@ -299,7 +300,7 @@ export function ContactsCrmList({
     usesEntityColumnControls,
   ])
 
-  const listTitle = isRecentView ? `Recent ${entityLabel}` : entityLabel
+  const listTitle = entityLabel
   const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
   const rangeEnd = Math.min(page * PAGE_SIZE, total)
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
@@ -356,6 +357,11 @@ export function ContactsCrmList({
   }
 
   function profileHrefForContact(contact: ContactListRow, options?: { edit?: boolean }) {
+    if (contact.recordType === "group") {
+      return donationGroupHref(contact.id, {
+        tab: options?.edit ? "members" : undefined,
+      })
+    }
     return contactProfileHref(contact.id, {
       list: profileListSegmentForContact(contact),
       edit: options?.edit,
@@ -733,7 +739,6 @@ export function ContactsCrmList({
                   <SelectContent>
                     <SelectItem value="individual">Person</SelectItem>
                     <SelectItem value="organization">Organization</SelectItem>
-                    <SelectItem value="group">Group</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

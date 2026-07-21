@@ -45,6 +45,8 @@ import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
 type ContactGroupMembersPanelProps = {
   groupContactId: string
   groupName: string
+  /** Department workspaces use "participants"; membership/donation groups keep "members". */
+  personRole?: "member" | "participant"
 }
 
 function formatCurrency(value: number) {
@@ -86,7 +88,14 @@ function mergeMemberGivingStats(
 export function ContactGroupMembersPanel({
   groupContactId,
   groupName,
+  personRole = "member",
 }: ContactGroupMembersPanelProps) {
+  const isParticipant = personRole === "participant"
+  const personLabel = isParticipant ? "participant" : "member"
+  const personLabelPlural = isParticipant ? "participants" : "members"
+  const personLabelTitle = isParticipant ? "Participant" : "Member"
+  const panelTitle = isParticipant ? "Participants" : "Group Members"
+
   const cachedMembers = getCachedGroupMembers(groupContactId)
   const [members, setMembers] = useState<GroupMemberRow[]>(cachedMembers ?? [])
   const [loading, setLoading] = useState(!cachedMembers)
@@ -205,7 +214,7 @@ export function ContactGroupMembersPanel({
   }
 
   async function handleRemoveMember(membershipId: string, memberName: string | null) {
-    if (!confirm(`Remove ${memberName || "this member"} from ${groupName}?`)) return
+    if (!confirm(`Remove ${memberName || `this ${personLabel}`} from ${groupName}?`)) return
 
     const result = await removeGroupMemberAction(membershipId)
     if (!result.success) {
@@ -225,37 +234,40 @@ export function ContactGroupMembersPanel({
         <div>
           <CardTitle className="flex items-center gap-2">
             <Users className="h-5 w-5" />
-            Group Members
+            {panelTitle}
             {statsLoading ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : null}
           </CardTitle>
           <CardDescription>
-            People who belong to {groupName}. When a member selects this group on a gift, they are
-            added here automatically.
+            {isParticipant
+              ? `People who participate in courses or programs offered by ${groupName}. When someone selects this group on a gift, they are added here automatically.`
+              : `People who belong to ${groupName}. When a member selects this group on a gift, they are added here automatically.`}
           </CardDescription>
         </div>
         <Button size="sm" onClick={() => setDialogOpen(true)}>
           <Plus className="mr-2 h-4 w-4" />
-          Add member
+          Add {personLabel}
         </Button>
       </CardHeader>
       <CardContent>
         {showInitialSpinner ? (
           <p className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
-            Loading members...
+            Loading {personLabelPlural}...
           </p>
         ) : error ? (
           <p className="text-sm text-destructive">{error}</p>
         ) : members.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No members yet. Add people who donate individually but belong to this group.
+            {isParticipant
+              ? `No ${personLabelPlural} yet. Add people who take part in this department's programs.`
+              : `No ${personLabelPlural} yet. Add people who donate individually but belong to this group.`}
           </p>
         ) : (
           <div className="overflow-x-auto rounded-md border">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Member</TableHead>
+                  <TableHead>{personLabelTitle}</TableHead>
                   <TableHead className="text-right">Individual giving</TableHead>
                   <TableHead>Last gift</TableHead>
                   <TableHead className="w-[80px]" />
@@ -296,7 +308,7 @@ export function ContactGroupMembersPanel({
                       <Button
                         variant="ghost"
                         size="icon"
-                        aria-label={`Remove ${member.memberName || "member"}`}
+                        aria-label={`Remove ${member.memberName || personLabel}`}
                         onClick={() => void handleRemoveMember(member.id, member.memberName)}
                       >
                         <UserMinus className="h-4 w-4" />
@@ -313,7 +325,7 @@ export function ContactGroupMembersPanel({
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Add group member</DialogTitle>
+            <DialogTitle>Add {personLabel}</DialogTitle>
             <DialogDescription>
               Search for an individual contact to add to {groupName}.
             </DialogDescription>

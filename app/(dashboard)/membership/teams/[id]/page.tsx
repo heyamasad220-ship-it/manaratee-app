@@ -1,17 +1,13 @@
-import { Header } from "@/components/layout/header"
-import { HrTeamDetailClient } from "@/components/hr/hr-team-detail-client"
+import { redirect } from "next/navigation"
 
-export default async function MembershipTeamDetailPage({
+import { membershipTeamDetailPath } from "@/lib/memberships/membership-module-label"
+
+/** Legacy Teams detail — member groups live at Membership → Groups. */
+export default async function MembershipTeamDetailRedirectPage({
   params,
 }: {
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-
-  return (
-    <>
-      <Header title="Team" />
-      <HrTeamDetailClient teamId={id} />
-    </>
-  )
+  redirect(membershipTeamDetailPath(id))
 }

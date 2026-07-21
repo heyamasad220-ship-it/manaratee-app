@@ -38,6 +38,7 @@ import {
 } from "@/lib/applications/application-actions"
 import {
   applicationsPageUrl,
+  isHrCategoryApplicationsPath,
   peopleManagementApplicationsUrl,
   PROGRAMS_FINANCIAL_ASSISTANCE_PATH,
   VENDOR_HUB_APPLICATIONS_PATH,
@@ -102,16 +103,23 @@ function buildPageUrl(
     pageTab?: PeopleManagementApplicationsPageTab
   }
 ) {
-  if (options.embedded && options.embeddedSyncPath) {
+  if (
+    (options.embedded && options.embeddedSyncPath) ||
+    isHrCategoryApplicationsPath(basePath)
+  ) {
+    const path = options.embeddedSyncPath || basePath
     const params = new URLSearchParams()
     params.set(options.embeddedTabQueryKey ?? "tab", "applications")
     if (options.statusTab && options.statusTab !== "all") {
       params.set("status", options.statusTab)
     }
-    return `${options.embeddedSyncPath}?${params.toString()}`
+    return `${path}?${params.toString()}`
   }
 
-  if (basePath === "/people-management/applications") {
+  if (
+    basePath === "/people-management/applications" ||
+    basePath === "/settings/applications"
+  ) {
     return peopleManagementApplicationsUrl({
       pageTab: options.pageTab ?? "submissions",
       status: options.statusTab,

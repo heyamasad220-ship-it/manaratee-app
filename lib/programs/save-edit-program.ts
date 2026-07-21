@@ -154,7 +154,8 @@ export async function saveEditProgram(
       })
     }
 
-    revalidatePath(`/programs/${program.id}/edit`)
+    revalidatePath(`/programs/${program.id}`)
+    revalidatePath(`/programs/${program.id}/offerings`)
     revalidatePath("/programs/catalog")
 
     return { success: true, capacityGroups: normalizedCapacityGroups }

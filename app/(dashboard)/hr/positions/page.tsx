@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation"
 
 export default function HrPositionsRedirectPage() {
-  redirect("/settings/positions")
+  redirect("/workforce/settings/positions")
 }

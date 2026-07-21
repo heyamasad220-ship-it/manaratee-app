@@ -355,7 +355,7 @@ export async function duplicateProgram(
 
     revalidatePath("/programs/catalog")
     revalidatePath("/programs")
-    revalidatePath(`/programs/${newProgramId}/edit`)
+    revalidatePath(`/programs/${newProgramId}`)
 
     return { success: true, programId: newProgramId }
   } catch (error) {
@@ -465,7 +465,7 @@ export async function updateProgramStatus(
 
     revalidatePath("/programs/catalog")
     revalidatePath("/programs")
-    revalidatePath(`/programs/${programId}/edit`)
+    revalidatePath(`/programs/${programId}`)
 
     return { success: true }
   } catch (updateError) {

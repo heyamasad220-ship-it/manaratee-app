@@ -7,7 +7,7 @@ import { Loader2, Users } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { fetchContactGroupsAction } from "@/lib/contacts/group-member-actions"
 import type { ContactGroupSummary } from "@/lib/contacts/group-member-types"
-import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
+import { donationGroupHref } from "@/lib/donations/donation-group-path"
 
 type ContactMemberGroupsPanelProps = {
   contactId: string
@@ -56,14 +56,15 @@ export function ContactMemberGroupsPanel({
           Groups
         </CardTitle>
         <CardDescription>
-          Collectives {contactName} belongs to. Group gifts are recorded on the group profile.
+          Giving collectives {contactName} belongs to. Pooled gifts are recorded on the group
+          under Donations.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-2">
         {groups.map((group) => (
           <Link
             key={group.id}
-            href={contactProfileHref(group.id, "financial")}
+            href={donationGroupHref(group.id, { tab: "financial" })}
             className="flex items-center justify-between rounded-md border px-3 py-2 text-sm hover:bg-muted"
           >
             <span className="font-medium">{group.groupName || "Unnamed group"}</span>

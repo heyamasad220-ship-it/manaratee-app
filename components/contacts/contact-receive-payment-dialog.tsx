@@ -14,7 +14,6 @@ import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -31,7 +30,29 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { ensureGroupMembershipForDonationAction } from "@/lib/contacts/group-giving-actions"
 import { ensureDonorExtensionForContact } from "@/lib/donations/donor-contact-bridge"
+import { getDonorPledgesAction } from "@/lib/donations/pledge-reminder-actions"
+import { recordPledgePaymentAction } from "@/lib/donations/pledge-admin-actions"
+import { recordRecurringDonationPaymentAction } from "@/lib/donations/recurring-donation-actions"
+import { formatRecurringFrequencyLabel } from "@/lib/donations/recurring-donation-types"
 import { getSelectedOrganizationIdClient } from "@/lib/organizations/get-selected-organization-id-client"
+
+const APPLY_ONE_TIME = "__one_time__"
+const APPLY_PLEDGE_PREFIX = "pledge:"
+const APPLY_PLAN_PREFIX = "plan:"
+
+type OpenPledgeOption = {
+  id: string
+  campaignName: string | null
+  balanceRemaining: number
+}
+
+type OpenPlanOption = {
+  id: string
+  campaignName: string | null
+  amount: number
+  frequency: string
+  status: string
+}
 
 type ContactReceivePaymentDialogProps = {
   open: boolean
@@ -40,6 +61,30 @@ type ContactReceivePaymentDialogProps = {
   contactName: string
   organizationId?: string | null
   onSuccess?: () => void
+}
+
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(value)
+}
+
+function applyToValue(kind: "pledge" | "plan", id: string) {
+  return kind === "pledge" ? `${APPLY_PLEDGE_PREFIX}${id}` : `${APPLY_PLAN_PREFIX}${id}`
+}
+
+function parseApplyTo(value: string): { kind: "one_time" } | { kind: "pledge" | "plan"; id: string } {
+  if (value === APPLY_ONE_TIME) return { kind: "one_time" }
+  if (value.startsWith(APPLY_PLEDGE_PREFIX)) {
+    return { kind: "pledge", id: value.slice(APPLY_PLEDGE_PREFIX.length) }
+  }
+  if (value.startsWith(APPLY_PLAN_PREFIX)) {
+    return { kind: "plan", id: value.slice(APPLY_PLAN_PREFIX.length) }
+  }
+  return { kind: "one_time" }
 }
 
 export function ContactReceivePaymentDialog({
@@ -62,6 +107,10 @@ export function ContactReceivePaymentDialog({
   )
   const [groupContactId, setGroupContactId] = useState<string | null>(null)
   const [groupLabel, setGroupLabel] = useState("")
+  const [applyTo, setApplyTo] = useState(APPLY_ONE_TIME)
+  const [openPledges, setOpenPledges] = useState<OpenPledgeOption[]>([])
+  const [openPlans, setOpenPlans] = useState<OpenPlanOption[]>([])
+  const [loadingTargets, setLoadingTargets] = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -72,16 +121,82 @@ export function ContactReceivePaymentDialog({
     setAttribution(EMPTY_DONATION_ATTRIBUTION_VALUE)
     setGroupContactId(null)
     setGroupLabel("")
+    setApplyTo(APPLY_ONE_TIME)
+    setOpenPledges([])
+    setOpenPlans([])
 
-    if (!organizationIdProp) {
-      void (async () => {
-        const orgId = await getSelectedOrganizationIdClient()
-        setOrganizationId(orgId)
-      })()
-    } else {
-      setOrganizationId(organizationIdProp)
+    void (async () => {
+      const orgId = organizationIdProp || (await getSelectedOrganizationIdClient())
+      setOrganizationId(orgId)
+      if (!orgId) return
+
+      setLoadingTargets(true)
+      try {
+        const donorId = await ensureDonorExtensionForContact(orgId, contactId)
+        if (!donorId) {
+          setOpenPledges([])
+          setOpenPlans([])
+          return
+        }
+
+        const [pledgesResult, plansResult] = await Promise.all([
+          getDonorPledgesAction(donorId),
+          supabase
+            .from("recurring_donation_plans")
+            .select("id, amount, frequency, status, campaigns(name)")
+            .eq("organization_id", orgId)
+            .eq("donor_id", donorId)
+            .in("status", ["active", "paused", "past_due"])
+            .order("next_payment_date", { ascending: true }),
+        ])
+
+        setOpenPledges(
+          pledgesResult.success
+            ? pledgesResult.pledges
+                .filter(
+                  (pledge) =>
+                    pledge.balanceRemaining > 0 &&
+                    String(pledge.status || "").toLowerCase() !== "cancelled"
+                )
+                .map((pledge) => ({
+                  id: pledge.id,
+                  campaignName: pledge.campaignName,
+                  balanceRemaining: pledge.balanceRemaining,
+                }))
+            : []
+        )
+
+        if (plansResult.error) {
+          setOpenPlans([])
+        } else {
+          setOpenPlans(
+            (plansResult.data || []).map((plan: any) => ({
+              id: plan.id as string,
+              campaignName: (plan.campaigns?.name as string | null) ?? null,
+              amount: Number(plan.amount || 0),
+              frequency: String(plan.frequency || ""),
+              status: String(plan.status || ""),
+            }))
+          )
+        }
+      } finally {
+        setLoadingTargets(false)
+      }
+    })()
+  }, [open, organizationIdProp, contactId])
+
+  useEffect(() => {
+    const target = parseApplyTo(applyTo)
+    if (target.kind === "pledge") {
+      const pledge = openPledges.find((row) => row.id === target.id)
+      if (pledge) setAmount(String(pledge.balanceRemaining))
+      return
     }
-  }, [open, organizationIdProp])
+    if (target.kind === "plan") {
+      const plan = openPlans.find((row) => row.id === target.id)
+      if (plan) setAmount(String(plan.amount))
+    }
+  }, [applyTo, openPledges, openPlans])
 
   async function handleSave() {
     const orgId = organizationId || (await getSelectedOrganizationIdClient())
@@ -113,6 +228,52 @@ export function ContactReceivePaymentDialog({
     if (!donorId) {
       setSaving(false)
       alert("Could not resolve a donor record for this contact.")
+      return
+    }
+
+    const target = parseApplyTo(applyTo)
+
+    if (target.kind === "pledge") {
+      const result = await recordPledgePaymentAction({
+        pledgeId: target.id,
+        amount: Number(amount),
+        paymentDate,
+        source,
+        memo: memo || null,
+        attributedGroupContactId: groupContactId,
+      })
+
+      setSaving(false)
+
+      if (!result.success) {
+        alert(result.error)
+        return
+      }
+
+      onOpenChange(false)
+      onSuccess?.()
+      return
+    }
+
+    if (target.kind === "plan") {
+      const result = await recordRecurringDonationPaymentAction({
+        planId: target.id,
+        amount: Number(amount),
+        paymentDate,
+        source,
+        memo: memo || undefined,
+        attributedGroupContactId: groupContactId,
+      })
+
+      setSaving(false)
+
+      if (!result.success) {
+        alert(result.error)
+        return
+      }
+
+      onOpenChange(false)
+      onSuccess?.()
       return
     }
 
@@ -156,25 +317,50 @@ export function ContactReceivePaymentDialog({
     onSuccess?.()
   }
 
+  const applyingToTarget = applyTo !== APPLY_ONE_TIME
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Receive Payment</DialogTitle>
-          <DialogDescription>
-            Record a payment for {contactName || "this contact"}.
-          </DialogDescription>
+          <p className="text-base font-medium text-foreground">{contactName || "Unnamed"}</p>
         </DialogHeader>
 
         <div className="flex flex-col gap-4 py-4">
           <div className="flex flex-col gap-2">
-            <Label>Contact</Label>
-            <Input value={contactName || "Unnamed contact"} disabled />
+            <Label htmlFor="receive-payment-apply-to">Apply to</Label>
+            <Select value={applyTo} onValueChange={setApplyTo} disabled={loadingTargets || saving}>
+              <SelectTrigger id="receive-payment-apply-to">
+                <SelectValue placeholder={loadingTargets ? "Loading..." : "Select target"} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={APPLY_ONE_TIME}>One-time donation</SelectItem>
+                {openPledges.map((pledge) => (
+                  <SelectItem key={pledge.id} value={applyToValue("pledge", pledge.id)}>
+                    Pledge: {pledge.campaignName || "Campaign"} (
+                    {formatCurrency(pledge.balanceRemaining)} due)
+                  </SelectItem>
+                ))}
+                {openPlans.map((plan) => (
+                  <SelectItem key={plan.id} value={applyToValue("plan", plan.id)}>
+                    Plan: {plan.campaignName || "Payment plan"} — {formatCurrency(plan.amount)}{" "}
+                    {formatRecurringFrequencyLabel(plan.frequency).toLowerCase()}
+                    {plan.status === "past_due" ? " (past due)" : plan.status === "paused" ? " (paused)" : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Program fees and failed/missed payment make-ups can be added here as those modules are
+              wired up.
+            </p>
           </div>
 
           <DonationGroupPicker
             groupContactId={groupContactId}
             groupLabel={groupLabel}
+            memberContactId={contactId}
             onChange={(nextGroupId, label) => {
               setGroupContactId(nextGroupId)
               setGroupLabel(label)
@@ -220,11 +406,13 @@ export function ContactReceivePaymentDialog({
             </Select>
           </div>
 
-          <DonationAttributionFields
-            organizationId={organizationId}
-            value={attribution}
-            onChange={setAttribution}
-          />
+          {!applyingToTarget ? (
+            <DonationAttributionFields
+              organizationId={organizationId}
+              value={attribution}
+              onChange={setAttribution}
+            />
+          ) : null}
 
           <div className="flex flex-col gap-2">
             <Label>Memo</Label>

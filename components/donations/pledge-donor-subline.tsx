@@ -1,7 +1,7 @@
 import Link from "next/link"
 
 import { Badge } from "@/components/ui/badge"
-import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
+import { donationGroupHref } from "@/lib/donations/donation-group-path"
 import {
   pledgeGroupBadgeClassName,
   showsPrimaryContactSubline,
@@ -45,7 +45,10 @@ export function PledgeDonorSubline({
           asChild
         >
           <Link
-            href={contactProfileHref(group.id, { list: "groups", tab: "financial" })}
+            href={donationGroupHref(group.id, {
+              tab: "financial",
+              returnTo: "/donations/reports/donors?view=group",
+            })}
             onClick={(event) => {
               event.stopPropagation()
               onNavigate?.()

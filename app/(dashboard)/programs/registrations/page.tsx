@@ -25,6 +25,8 @@ import {
   TableRow,
 } from "@/components/ui/table"
 
+import { getDepartments } from "@/lib/departments/department-queries"
+import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
 import { createClient } from "@/lib/supabase/server"
 import { getPrograms } from "@/lib/programs/program-queries"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
@@ -37,7 +39,8 @@ import {
 
 type PageSearchParams = {
   q?: string
-  program?: string
+  department?: string
+  offering?: string
   payment?: string
   status?: string
   type?: string
@@ -47,6 +50,7 @@ type EnrollmentRow = {
   id: string
   organization_id: string | null
   program_id: string | null
+  offering_id: string | null
   department_id: string | null
   child_name: string
   child_age: number | null
@@ -86,14 +90,17 @@ type RegistrationRow = {
   id: string
   type: "enrollment" | "waitlist"
   program_id: string | null
+  offering_id: string | null
+  department_id: string | null
   program_name: string
+  offering_name: string
   participant_name: string
-  registrant_name: string | null
-  payer_name: string | null
+  participant_contact_id: string | null
+  contact_name: string
+  contact_profile_id: string | null
+  contact_email: string | null
+  contact_phone: string | null
   child_age: number | null
-  parent_name: string | null
-  parent_email: string | null
-  parent_phone: string | null
   registered_date: string | null
   status: string | null
   payment_status: string | null
@@ -109,20 +116,36 @@ function getValue(value: string | string[] | undefined) {
 function formatDate(value: string | null) {
   if (!value) return "TBD"
 
-  return new Date(`${value}T00:00:00`).toLocaleDateString(undefined, {
+  const date = value.includes("T")
+    ? new Date(value)
+    : new Date(`${value}T00:00:00`)
+
+  if (Number.isNaN(date.getTime())) return "TBD"
+
+  return date.toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
     year: "numeric",
   })
 }
 
-function formatCurrency(value: number | null) {
-  if (!value || value <= 0) return "$0"
+function formatCurrency(value: number | null | undefined) {
+  const amount = Number(value || 0)
+  if (!Number.isFinite(amount) || amount <= 0) return "$0.00"
 
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
-  }).format(value)
+  }).format(amount)
+}
+
+function outstandingBalance(
+  totalAmount: number | null | undefined,
+  amountPaid: number | null | undefined
+) {
+  const total = Number(totalAmount || 0)
+  const paid = Number(amountPaid || 0)
+  return Math.max(0, total - paid)
 }
 
 function normalizeStatus(value: string | null) {
@@ -132,6 +155,27 @@ function normalizeStatus(value: string | null) {
     .split("_")
     .join(" ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase())
+}
+
+/** Normalize DB / display payment labels into filter buckets. */
+function resolvePaymentBucket(
+  paymentStatus: string | null | undefined,
+  amountPaid: number | null | undefined,
+  totalAmount: number | null | undefined
+) {
+  const raw = (paymentStatus || "").toLowerCase().trim()
+  if (raw === "partially_paid") return "partial"
+  if (raw === "pending_payment" || raw === "unpaid") return "pending"
+  if (raw === "paid" || raw === "partial" || raw === "pending" || raw === "none") {
+    return raw
+  }
+
+  const paid = Number(amountPaid || 0)
+  const total = Number(totalAmount || 0)
+  if (total <= 0 && paid <= 0) return raw || "none"
+  if (paid <= 0.009) return "pending"
+  if (paid + 0.009 >= total) return "paid"
+  return "partial"
 }
 
 function getPaymentBadgeVariant(paymentStatus: string | null) {
@@ -160,7 +204,9 @@ function getStatusBadgeVariant(status: string | null, type: string) {
 function isThisMonth(value: string | null) {
   if (!value) return false
 
-  const date = new Date(`${value}T00:00:00`)
+  const date = value.includes("T")
+    ? new Date(value)
+    : new Date(`${value}T00:00:00`)
   const now = new Date()
 
   return (
@@ -169,29 +215,51 @@ function isThisMonth(value: string | null) {
   )
 }
 
+function isAdultEnrollment(row: EnrollmentRow) {
+  const participantType = (row.participant_type || "").toLowerCase()
+  const registrantType = (row.registrant_type || "").toLowerCase()
+  return (
+    participantType === "adult" ||
+    registrantType === "adult_self" ||
+    registrantType === "adult"
+  )
+}
+
 function matchesFilters(row: RegistrationRow, filters: PageSearchParams) {
   const query = (filters.q || "").trim().toLowerCase()
-  const programFilter = filters.program || "all"
-  const paymentFilter = filters.payment || "all"
-  const statusFilter = filters.status || "all"
+  const departmentFilter = (filters.department || "all").toLowerCase()
+  const offeringFilter = filters.offering || "all"
+  const paymentFilter = (filters.payment || "all").toLowerCase()
+  const statusFilter = (filters.status || "all").toLowerCase()
   const typeFilter = filters.type || "all"
 
   const matchesSearch =
     !query ||
     row.participant_name.toLowerCase().includes(query) ||
-    (row.registrant_name || "").toLowerCase().includes(query) ||
-    (row.payer_name || "").toLowerCase().includes(query) ||
-    (row.parent_name || "").toLowerCase().includes(query) ||
-    (row.parent_email || "").toLowerCase().includes(query) ||
-    (row.parent_phone || "").toLowerCase().includes(query) ||
+    row.contact_name.toLowerCase().includes(query) ||
+    (row.contact_email || "").toLowerCase().includes(query) ||
+    (row.contact_phone || "").toLowerCase().includes(query) ||
+    row.offering_name.toLowerCase().includes(query) ||
     row.program_name.toLowerCase().includes(query)
 
-  const matchesProgram =
-    programFilter === "all" || row.program_id === programFilter
+  const matchesDepartment =
+    departmentFilter === "all" ||
+    (row.department_id || "").toLowerCase() === departmentFilter
+
+  const matchesOffering =
+    offeringFilter === "all" || row.offering_id === offeringFilter
+
+  const paymentBucket = resolvePaymentBucket(
+    row.payment_status,
+    row.amount_paid,
+    row.total_amount
+  )
 
   const matchesPayment =
     paymentFilter === "all" ||
-    (row.payment_status || "none").toLowerCase() === paymentFilter
+    paymentBucket === paymentFilter ||
+    (paymentFilter === "none" &&
+      (paymentBucket === "none" || !row.payment_status))
 
   const matchesStatus =
     statusFilter === "all" ||
@@ -201,7 +269,8 @@ function matchesFilters(row: RegistrationRow, filters: PageSearchParams) {
 
   return (
     matchesSearch &&
-    matchesProgram &&
+    matchesDepartment &&
+    matchesOffering &&
     matchesPayment &&
     matchesStatus &&
     matchesType
@@ -217,7 +286,8 @@ export default async function ProgramsRegistrationsPage({
 
   const filters: PageSearchParams = {
     q: getValue(resolvedSearchParams?.q),
-    program: getValue(resolvedSearchParams?.program) || "all",
+    department: getValue(resolvedSearchParams?.department) || "all",
+    offering: getValue(resolvedSearchParams?.offering) || "all",
     payment: getValue(resolvedSearchParams?.payment) || "all",
     status: getValue(resolvedSearchParams?.status) || "all",
     type: getValue(resolvedSearchParams?.type) || "all",
@@ -225,26 +295,45 @@ export default async function ProgramsRegistrationsPage({
 
   const supabase = await createClient()
   const organizationId = await getSelectedOrganizationId()
-  const programs = await getPrograms()
+  const [programs, departments] = await Promise.all([
+    getPrograms(),
+    getDepartments(),
+  ])
   const programIds = programs.map((program) => program.id)
 
   const programNameById = new Map(
     programs.map((program) => [program.id, program.name])
   )
+  const programDepartmentById = new Map(
+    programs.map((program) => [
+      program.id,
+      (program.department_id as string | null) || null,
+    ])
+  )
 
   let enrollments: EnrollmentRow[] = []
   let waitlist: WaitlistRow[] = []
   let loadError: string | null = null
+  const offeringNameById = new Map<string, string>()
+  const offeringMeta: Array<{
+    id: string
+    name: string
+    programId: string
+    departmentId: string | null
+    status: string
+  }> = []
 
   if (programIds.length > 0 && organizationId) {
-    const [enrollmentsResult, waitlistResult] = await Promise.all([
-      supabase
-        .from("program_enrollments")
-        .select(
-          `
+    const [enrollmentsResult, waitlistResult, offeringsResult] =
+      await Promise.all([
+        supabase
+          .from("program_enrollments")
+          .select(
+            `
           id,
           organization_id,
           program_id,
+          offering_id,
           department_id,
           child_name,
           child_age,
@@ -263,14 +352,14 @@ export default async function ProgramsRegistrationsPage({
           total_amount,
           created_at
         `
-        )
-        .eq("organization_id", organizationId)
-        .in("program_id", programIds)
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("program_waitlist")
-        .select(
-          `
+          )
+          .eq("organization_id", organizationId)
+          .in("program_id", programIds)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("program_waitlist")
+          .select(
+            `
           id,
           organization_id,
           program_id,
@@ -285,11 +374,18 @@ export default async function ProgramsRegistrationsPage({
           priority,
           created_at
         `
-        )
-        .eq("organization_id", organizationId)
-        .in("program_id", programIds)
-        .order("created_at", { ascending: false }),
-    ])
+          )
+          .eq("organization_id", organizationId)
+          .in("program_id", programIds)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("program_offerings")
+          .select("id, name, program_id, status")
+          .eq("organization_id", organizationId)
+          .in("program_id", programIds)
+          .neq("status", "archived")
+          .order("name", { ascending: true }),
+      ])
 
     if (enrollmentsResult.error) {
       loadError = enrollmentsResult.error.message
@@ -301,6 +397,20 @@ export default async function ProgramsRegistrationsPage({
       loadError = waitlistResult.error.message
     } else {
       waitlist = (waitlistResult.data || []) as WaitlistRow[]
+    }
+
+    for (const offering of offeringsResult.data || []) {
+      const id = offering.id as string
+      const programId = offering.program_id as string
+      const name = (offering.name as string) || "Offering"
+      offeringNameById.set(id, name)
+      offeringMeta.push({
+        id,
+        name,
+        programId,
+        departmentId: programDepartmentById.get(programId) || null,
+        status: (offering.status as string) || "active",
+      })
     }
   }
 
@@ -315,53 +425,105 @@ export default async function ProgramsRegistrationsPage({
     : new Map()
 
   const registrationRows: RegistrationRow[] = [
-    ...enrollments.map((row) => ({
-      id: row.id,
-      type: "enrollment" as const,
-      program_id: row.program_id,
-      program_name:
-        (row.program_id ? programNameById.get(row.program_id) : null) ||
-        "Unknown Program",
-      participant_name: contactLabel(
+    ...enrollments.map((row) => {
+      const participantName = contactLabel(
         row.participant_contact_id
           ? contactsById.get(row.participant_contact_id)
           : undefined,
         row.child_name
-      ),
-      registrant_name: row.registrant_contact_id
-        ? contactLabel(contactsById.get(row.registrant_contact_id), row.parent_name)
-        : row.parent_name,
-      payer_name: row.payer_contact_id
-        ? contactLabel(contactsById.get(row.payer_contact_id), row.parent_name)
-        : row.parent_name,
-      child_age: row.child_age,
-      parent_name: row.parent_name,
-      parent_email: row.parent_email,
-      parent_phone: row.parent_phone,
-      registered_date: row.enrollment_date || row.created_at,
-      status: row.status,
-      payment_status: row.payment_status,
-      amount_paid: row.amount_paid,
-      total_amount: row.total_amount,
-      waitlist_position: null,
-    })),
+      )
+      const participantContact = row.participant_contact_id
+        ? contactsById.get(row.participant_contact_id)
+        : undefined
+      const registrantContact = row.registrant_contact_id
+        ? contactsById.get(row.registrant_contact_id)
+        : undefined
+      const adult = isAdultEnrollment(row)
+      const contactName = adult
+        ? participantName
+        : contactLabel(registrantContact, row.parent_name) ||
+          row.parent_name ||
+          "Parent not set"
+      const contactEmail = adult
+        ? (participantContact?.email as string | null | undefined) ||
+          row.parent_email
+        : row.parent_email ||
+          (registrantContact?.email as string | null | undefined) ||
+          null
+      const contactPhone = adult
+        ? (participantContact?.phone as string | null | undefined) ||
+          row.parent_phone
+        : row.parent_phone ||
+          (registrantContact?.phone as string | null | undefined) ||
+          null
+
+      const departmentId =
+        row.department_id ||
+        (row.program_id ? programDepartmentById.get(row.program_id) : null) ||
+        null
+
+      const offeringName = row.offering_id
+        ? offeringNameById.get(row.offering_id) || "Offering"
+        : (row.program_id ? programNameById.get(row.program_id) : null) ||
+          "Unknown offering"
+
+      const paymentBucket = resolvePaymentBucket(
+        row.payment_status,
+        row.amount_paid,
+        row.total_amount
+      )
+
+      return {
+        id: row.id,
+        type: "enrollment" as const,
+        program_id: row.program_id,
+        offering_id: row.offering_id,
+        department_id: departmentId,
+        program_name:
+          (row.program_id ? programNameById.get(row.program_id) : null) ||
+          "Unknown Program",
+        offering_name: offeringName,
+        participant_name: participantName,
+        participant_contact_id: row.participant_contact_id,
+        contact_name: contactName,
+        contact_profile_id: adult
+          ? row.participant_contact_id
+          : row.registrant_contact_id,
+        contact_email: contactEmail || null,
+        contact_phone: contactPhone || null,
+        child_age: row.child_age,
+        registered_date: row.enrollment_date || row.created_at,
+        status: row.status,
+        payment_status: paymentBucket,
+        amount_paid: row.amount_paid,
+        total_amount: row.total_amount,
+        waitlist_position: null,
+      }
+    }),
     ...waitlist.map((row) => ({
       id: row.id,
       type: "waitlist" as const,
       program_id: row.program_id,
+      offering_id: null,
+      department_id: row.program_id
+        ? programDepartmentById.get(row.program_id) || null
+        : null,
       program_name:
         (row.program_id ? programNameById.get(row.program_id) : null) ||
         "Unknown Program",
+      offering_name:
+        (row.program_id ? programNameById.get(row.program_id) : null) ||
+        "Unknown offering",
       participant_name: row.child_name,
-      registrant_name: row.parent_name,
-      payer_name: row.parent_name,
+      participant_contact_id: null,
+      contact_name: row.parent_name || "Parent not set",
+      contact_profile_id: null,
+      contact_email: row.parent_email,
+      contact_phone: row.parent_phone,
       child_age: row.child_age,
-      parent_name: row.parent_name,
-      parent_email: row.parent_email,
-      parent_phone: row.parent_phone,
       registered_date: row.added_date || row.created_at,
       status: row.status || "waiting",
-      payment_status: null,
+      payment_status: "none",
       amount_paid: null,
       total_amount: null,
       waitlist_position: row.position,
@@ -385,7 +547,9 @@ export default async function ProgramsRegistrationsPage({
   ).length
 
   const pendingPaymentCount = enrollments.filter(
-    (row) => (row.payment_status || "").toLowerCase() === "pending"
+    (row) =>
+      resolvePaymentBucket(row.payment_status, row.amount_paid, row.total_amount) ===
+      "pending"
   ).length
 
   const revenue = enrollments.reduce(
@@ -395,9 +559,16 @@ export default async function ProgramsRegistrationsPage({
 
   const paymentStatuses = Array.from(
     new Set(
-      enrollments
-        .map((row) => (row.payment_status || "").toLowerCase())
-        .filter(Boolean)
+      registrationRows
+        .filter((row) => row.type === "enrollment")
+        .map((row) =>
+          resolvePaymentBucket(
+            row.payment_status,
+            row.amount_paid,
+            row.total_amount
+          )
+        )
+        .filter((status) => status && status !== "none")
     )
   ).sort()
 
@@ -408,6 +579,17 @@ export default async function ProgramsRegistrationsPage({
         .filter(Boolean)
     )
   ).sort()
+
+  const departmentFilter = filters.department || "all"
+  const offeringsForSelect =
+    departmentFilter === "all"
+      ? offeringMeta.filter(
+          (o) =>
+            o.status === "active" ||
+            o.status === "draft" ||
+            o.status === "closed"
+        )
+      : offeringMeta.filter((o) => (o.departmentId || "") === departmentFilter)
 
   const stats = [
     {
@@ -458,9 +640,14 @@ export default async function ProgramsRegistrationsPage({
           </div>
 
           <div className="flex flex-wrap gap-2">
-            {filters.program && filters.program !== "all" ? (
+            {filters.offering && filters.offering !== "all" ? (
               <Button variant="outline" asChild>
-                <Link href={`/programs/${filters.program}/car-tags`}>
+                <Link
+                  href={`/programs/${
+                    offeringMeta.find((o) => o.id === filters.offering)?.programId ||
+                    ""
+                  }/car-tags`}
+                >
                   <Printer className="mr-2 h-4 w-4" />
                   Print Car Tags
                 </Link>
@@ -493,76 +680,86 @@ export default async function ProgramsRegistrationsPage({
 
         <Card className="mb-6">
           <CardContent className="p-4">
-            <form className="grid gap-4 lg:grid-cols-6">
-  <div className="relative lg:col-span-2">
-    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <form method="get" className="grid gap-4 lg:grid-cols-7">
+              <div className="relative lg:col-span-2">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  name="q"
+                  defaultValue={filters.q}
+                  placeholder="Search by participant, contact, email, phone, or offering..."
+                  className="pl-9"
+                />
+              </div>
 
-    <Input
-      name="q"
-      defaultValue={filters.q}
-      placeholder="Search by participant, parent, email, phone, or program..."
-      className="pl-9"
-    />
-  </div>
+              <select
+                name="department"
+                defaultValue={filters.department}
+                className="h-10 rounded-md border bg-background px-3 text-sm"
+              >
+                <option value="all">All Departments</option>
+                {departments.map((department) => (
+                  <option key={department.id} value={department.id}>
+                    {department.name}
+                  </option>
+                ))}
+              </select>
 
-  <select
-    name="program"
-    defaultValue={filters.program}
-    className="h-10 rounded-md border bg-background px-3 text-sm"
-  >
-    <option value="all">All Programs</option>
+              <select
+                name="offering"
+                defaultValue={filters.offering}
+                className="h-10 rounded-md border bg-background px-3 text-sm"
+              >
+                <option value="all">All Offerings</option>
+                {offeringsForSelect.map((offering) => (
+                  <option key={offering.id} value={offering.id}>
+                    {offering.name}
+                    {programNameById.get(offering.programId)
+                      ? ` · ${programNameById.get(offering.programId)}`
+                      : ""}
+                  </option>
+                ))}
+              </select>
 
-    {programs.map((program) => (
-      <option key={program.id} value={program.id}>
-        {program.name}
-      </option>
-    ))}
-  </select>
+              <select
+                name="type"
+                defaultValue={filters.type}
+                className="h-10 rounded-md border bg-background px-3 text-sm"
+              >
+                <option value="all">All Types</option>
+                <option value="enrollment">Enrollments</option>
+                <option value="waitlist">Waitlist</option>
+              </select>
 
-  <select
-    name="type"
-    defaultValue={filters.type}
-    className="h-10 rounded-md border bg-background px-3 text-sm"
-  >
-    <option value="all">All Types</option>
-    <option value="enrollment">Enrollments</option>
-    <option value="waitlist">Waitlist</option>
-  </select>
+              <select
+                name="payment"
+                defaultValue={(filters.payment || "all").toLowerCase()}
+                className="h-10 rounded-md border bg-background px-3 text-sm"
+              >
+                <option value="all">All Payments</option>
+                {paymentStatuses.map((status) => (
+                  <option key={status} value={status}>
+                    {normalizeStatus(status)}
+                  </option>
+                ))}
+                <option value="none">No Payment</option>
+              </select>
 
-  <select
-    name="payment"
-    defaultValue={filters.payment}
-    className="h-10 rounded-md border bg-background px-3 text-sm"
-  >
-    <option value="all">All Payments</option>
-
-    {paymentStatuses.map((status) => (
-      <option key={status} value={status}>
-        {normalizeStatus(status)}
-      </option>
-    ))}
-
-    <option value="none">No Payment</option>
-  </select>
-
-  <div className="flex gap-4">
-    <select
-      name="status"
-      defaultValue={filters.status}
-      className="h-10 flex-1 rounded-md border bg-background px-3 text-sm"
-    >
-      <option value="all">All Statuses</option>
-
-      {statuses.map((status) => (
-        <option key={status} value={status}>
-          {normalizeStatus(status)}
-        </option>
-      ))}
-    </select>
-
-    <Button type="submit">Apply</Button>
-  </div>
-</form>
+              <div className="flex gap-4">
+                <select
+                  name="status"
+                  defaultValue={(filters.status || "all").toLowerCase()}
+                  className="h-10 flex-1 rounded-md border bg-background px-3 text-sm"
+                >
+                  <option value="all">All Statuses</option>
+                  {statuses.map((status) => (
+                    <option key={status} value={status}>
+                      {normalizeStatus(status)}
+                    </option>
+                  ))}
+                </select>
+                <Button type="submit">Apply</Button>
+              </div>
+            </form>
           </CardContent>
         </Card>
 
@@ -582,7 +779,7 @@ export default async function ProgramsRegistrationsPage({
               <Users className="mb-4 h-10 w-10 text-muted-foreground" />
               <h3 className="font-semibold">No registrations found</h3>
               <p className="mt-2 max-w-md text-sm text-muted-foreground">
-                Customer enrollments and waitlist entries will appear here.
+                Try clearing filters, or enrollments will appear here after registration.
               </p>
             </CardContent>
           </Card>
@@ -594,24 +791,40 @@ export default async function ProgramsRegistrationsPage({
                   <TableRow>
                     <TableHead>Participant</TableHead>
                     <TableHead>Contact</TableHead>
-                    <TableHead>Program</TableHead>
+                    <TableHead>Offering</TableHead>
                     <TableHead>Registered</TableHead>
                     <TableHead>Amount</TableHead>
+                    <TableHead>Received</TableHead>
+                    <TableHead>Balance</TableHead>
                     <TableHead>Payment</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead className="w-[90px]">Type</TableHead>
                     <TableHead className="w-[90px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
 
                 <TableBody>
-                  {filteredRows.map((row) => (
+                  {filteredRows.map((row) => {
+                    const balance =
+                      row.type === "waitlist"
+                        ? null
+                        : outstandingBalance(row.total_amount, row.amount_paid)
+
+                    return (
                     <TableRow key={`${row.type}-${row.id}`}>
                       <TableCell>
                         <div>
-                          <p className="font-medium text-foreground">
-                            {row.participant_name}
-                          </p>
+                          {row.participant_contact_id ? (
+                            <Link
+                              href={contactProfileHref(row.participant_contact_id)}
+                              className="font-medium text-primary hover:underline"
+                            >
+                              {row.participant_name}
+                            </Link>
+                          ) : (
+                            <p className="font-medium text-foreground">
+                              {row.participant_name}
+                            </p>
+                          )}
                           <p className="text-xs text-muted-foreground">
                             {row.child_age !== null && row.child_age !== undefined
                               ? `Age ${row.child_age}`
@@ -627,20 +840,32 @@ export default async function ProgramsRegistrationsPage({
 
                       <TableCell>
                         <div>
-                          <p className="text-sm text-foreground">
-                            {row.parent_name || "Parent not set"}
+                          {row.contact_profile_id ? (
+                            <Link
+                              href={contactProfileHref(row.contact_profile_id)}
+                              className="text-sm text-primary hover:underline"
+                            >
+                              {row.contact_name}
+                            </Link>
+                          ) : (
+                            <p className="text-sm text-foreground">{row.contact_name}</p>
+                          )}
+                          <p className="text-xs text-muted-foreground">
+                            {row.contact_email || "No email"}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            {row.parent_email || "No email"}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {row.parent_phone || "No phone"}
+                            {row.contact_phone || "No phone"}
                           </p>
                         </div>
                       </TableCell>
 
                       <TableCell>
-                        <span>{row.program_name}</span>
+                        <div>
+                          <p className="text-sm text-foreground">{row.offering_name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {row.program_name}
+                          </p>
+                        </div>
                       </TableCell>
 
                       <TableCell className="text-muted-foreground">
@@ -651,6 +876,18 @@ export default async function ProgramsRegistrationsPage({
                         {row.type === "waitlist"
                           ? "N/A"
                           : formatCurrency(row.total_amount)}
+                      </TableCell>
+
+                      <TableCell className="font-medium">
+                        {row.type === "waitlist"
+                          ? "N/A"
+                          : formatCurrency(row.amount_paid)}
+                      </TableCell>
+
+                      <TableCell className="font-medium">
+                        {row.type === "waitlist"
+                          ? "N/A"
+                          : formatCurrency(balance)}
                       </TableCell>
 
                       <TableCell>
@@ -675,16 +912,6 @@ export default async function ProgramsRegistrationsPage({
                       </TableCell>
 
                       <TableCell>
-                        <Badge
-                          variant={
-                            row.type === "enrollment" ? "default" : "outline"
-                          }
-                        >
-                          {row.type === "enrollment" ? "Enrolled" : "Waitlist"}
-                        </Badge>
-                      </TableCell>
-
-                      <TableCell>
                         <RegistrationRowActions
                           registrationId={row.id}
                           recordType={row.type}
@@ -692,7 +919,8 @@ export default async function ProgramsRegistrationsPage({
                         />
                       </TableCell>
                     </TableRow>
-                  ))}
+                    )
+                  })}
                 </TableBody>
               </Table>
             </CardContent>

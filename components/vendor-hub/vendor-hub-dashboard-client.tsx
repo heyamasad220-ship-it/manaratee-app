@@ -331,7 +331,7 @@ export function VendorHubDashboardClient({
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Recent Activity</CardTitle>
+            <CardTitle className="text-base">Activity</CardTitle>
             <CardDescription>Latest vendor hub updates</CardDescription>
           </CardHeader>
           <CardContent>

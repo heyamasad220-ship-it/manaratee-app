@@ -7,7 +7,7 @@ import { Loader2 } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import { fetchContactGroupsAction } from "@/lib/contacts/group-member-actions"
 import type { ContactGroupSummary } from "@/lib/contacts/group-member-types"
-import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
+import { donationGroupHref } from "@/lib/donations/donation-group-path"
 import { cn } from "@/lib/utils"
 
 type ContactGroupsFieldProps = {
@@ -51,7 +51,10 @@ export function ContactGroupsField({
       {groups.map((group) => (
         <li key={group.id}>
           <Link
-            href={contactProfileHref(group.id, { list: "groups" })}
+            href={donationGroupHref(group.id, {
+              tab: "financial",
+              returnTo: "/donations/reports/donors?view=group",
+            })}
             className="text-foreground hover:underline"
           >
             {group.groupName || "Unnamed group"}

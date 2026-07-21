@@ -2,7 +2,9 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 
-import { upsertActiveGroupMember } from "@/lib/contacts/group-membership-data"
+import {
+  isMissingGroupMembersTable,
+} from "@/lib/contacts/group-membership-data"
 import { requireDonationStaffAccess } from "@/lib/donations/donation-action-auth"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { hasPermission } from "@/lib/permissions/permissions"
@@ -107,6 +109,72 @@ export async function searchGroupsForDonationPickerAction(search: string, limit 
   }
 }
 
+/** Groups this contact already belongs to (no org-wide list; add membership from the group page). */
+export async function searchMemberGroupsForDonationPickerAction(
+  memberContactId: string,
+  search: string,
+  limit = 30
+) {
+  const access = await requireDonationStaffAccess("view")
+  if (!access.ok) return { success: false as const, error: access.error }
+
+  const { data: memberships, error: membershipError } = await access.supabase
+    .from("contact_group_members")
+    .select("group_contact_id")
+    .eq("organization_id", access.orgId)
+    .eq("member_contact_id", memberContactId)
+    .eq("status", "active")
+
+  if (membershipError) {
+    if (isMissingGroupMembersTable(membershipError)) {
+      return { success: true as const, groups: [] as Array<DonationGroupPickerOption & { label: string }> }
+    }
+    return { success: false as const, error: membershipError.message }
+  }
+
+  const groupIds = [...new Set(
+    (memberships || [])
+      .map((row) => row.group_contact_id as string | null)
+      .filter((id): id is string => Boolean(id))
+  )]
+
+  if (groupIds.length === 0) {
+    return { success: true as const, groups: [] as Array<DonationGroupPickerOption & { label: string }> }
+  }
+
+  let query = access.supabase
+    .from("contacts")
+    .select("id, full_name, primary_contact_name")
+    .eq("organization_id", access.orgId)
+    .eq("contact_type", "group")
+    .in("id", groupIds)
+    .order("full_name", { ascending: true })
+    .limit(Math.min(limit, 50))
+
+  if (search.trim()) {
+    const term = `%${escapeIlike(search.trim())}%`
+    query = query.or(
+      `full_name.ilike.${term},primary_contact_name.ilike.${term}`
+    )
+  }
+
+  const { data, error } = await query
+  if (error) return { success: false as const, error: error.message }
+
+  return {
+    success: true as const,
+    groups: (data || []).map((row) => ({
+      contactId: row.id as string,
+      full_name: row.full_name as string | null,
+      primary_contact_name: row.primary_contact_name as string | null,
+      label: formatGroupLabel({
+        full_name: row.full_name as string | null,
+        primary_contact_name: row.primary_contact_name as string | null,
+      }),
+    })) satisfies Array<DonationGroupPickerOption & { label: string }>,
+  }
+}
+
 export async function ensureGroupMembershipForDonationAction(input: {
   memberContactId: string
   groupContactId: string | null
@@ -139,14 +207,31 @@ export async function ensureGroupMembershipForDonationAction(input: {
   if (!group.ok) return { success: false as const, error: group.error }
   if (!member.ok) return { success: false as const, error: member.error }
 
-  const membership = await upsertActiveGroupMember(
-    supabase,
-    organizationId,
-    input.groupContactId,
-    input.memberContactId
-  )
+  const { data: membership, error: membershipError } = await supabase
+    .from("contact_group_members")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("group_contact_id", input.groupContactId)
+    .eq("member_contact_id", input.memberContactId)
+    .eq("status", "active")
+    .maybeSingle()
 
-  if (!membership.ok) return { success: false as const, error: membership.error }
+  if (membershipError) {
+    if (isMissingGroupMembersTable(membershipError)) {
+      return {
+        success: false as const,
+        error: "Group membership is not available yet. Run migration scripts/135_contact_group_members.sql.",
+      }
+    }
+    return { success: false as const, error: membershipError.message }
+  }
+
+  if (!membership) {
+    return {
+      success: false as const,
+      error: "Contact is not a member of that group. Add them from the group page first.",
+    }
+  }
 
   return { success: true as const, groupContactId: input.groupContactId }
 }

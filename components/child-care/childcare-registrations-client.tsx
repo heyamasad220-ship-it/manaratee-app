@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
-import { Header } from "@/components/layout/header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -253,16 +252,7 @@ export function ChildcareRegistrationsClient({
   }
 
   return (
-    <>
-      <Header title="Workforce" />
-      <div className="flex flex-1 flex-col gap-6 p-6">
-        <div>
-          <h2 className="text-xl font-semibold text-foreground">Childcare registrations</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Manage child registrations across events. Open an event workspace for event-specific
-            childcare.
-          </p>
-        </div>
+    <div className="flex flex-1 flex-col gap-6 p-6">
         {error ? (
           <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
             {error}
@@ -755,6 +745,6 @@ export function ChildcareRegistrationsClient({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   )
 }

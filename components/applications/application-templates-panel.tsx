@@ -14,13 +14,13 @@ import {
   type ApplicationTypeDefinition,
   type ModuleOwner,
 } from "@/lib/applications/application-types"
-import { applicationsPageUrl } from "@/lib/applications/application-routes"
+import { peopleManagementApplicationsUrl } from "@/lib/applications/application-routes"
 
 const PM_HR_TEMPLATE_TYPE_IDS = ["committee_member", "childcare_provider"] as const
 
 export function ApplicationTemplatesPanel({
   moduleOwner,
-  basePath,
+  basePath: _basePath,
   hubApplicationTypes,
 }: {
   moduleOwner: ModuleOwner
@@ -149,7 +149,7 @@ export function ApplicationTemplatesPanel({
                     </Button>
                     <Button variant="ghost" size="sm" asChild>
                       <Link
-                        href={applicationsPageUrl(basePath, {
+                        href={peopleManagementApplicationsUrl({
                           pageTab: "submissions",
                           applicationType: type.id,
                         })}

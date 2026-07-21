@@ -15,6 +15,8 @@ export function contactsListSegmentForRecordType(
 }
 
 export function getContactsListPathForSegment(segment: ContactsListSegment): string {
+  // Giving collectives are not a Contacts sidebar list — they surface on Group Giving.
+  if (segment === "groups") return "/donations/reports/donors?view=group"
   return `/contacts/${segment}`
 }
 

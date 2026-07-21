@@ -9,6 +9,25 @@ function Tabs({
   className,
   ...props
 }: React.ComponentProps<typeof TabsPrimitive.Root>) {
+  // Radix generates aria-controls / id values via useId(). Those can disagree
+  // between SSR and the first client render (especially under Turbopack), which
+  // surfaces as a hydration mismatch. Render Radix only after mount.
+  const [mounted, setMounted] = React.useState(false)
+
+  React.useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) {
+    return (
+      <div
+        data-slot="tabs"
+        className={cn('flex flex-col gap-2', className)}
+        aria-hidden
+      />
+    )
+  }
+
   return (
     <TabsPrimitive.Root
       data-slot="tabs"

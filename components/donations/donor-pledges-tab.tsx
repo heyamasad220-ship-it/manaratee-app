@@ -91,8 +91,10 @@ type DonorPledgeRow = {
 type DonorPledgesTabProps = {
   donorId: string
   donorName?: string
+  contactId?: string | null
   embedded?: boolean
   onUpdated?: () => void
+  onCountChange?: (count: number) => void
 }
 
 function formatCurrency(value: number) {
@@ -148,8 +150,10 @@ function isCancelled(status: string | null | undefined) {
 export function DonorPledgesTab({
   donorId,
   donorName,
+  contactId = null,
   embedded = false,
   onUpdated,
+  onCountChange,
 }: DonorPledgesTabProps) {
   const [pledges, setPledges] = useState<DonorPledgeRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -199,15 +203,17 @@ export function DonorPledgesTab({
     if (!result.success) {
       setError(result.error)
       setPledges([])
+      onCountChange?.(0)
     } else {
       setPledges(result.pledges)
+      onCountChange?.(result.pledges.length)
     }
     setLoading(false)
 
     if (embedded) {
       await loadReminderHistory()
     }
-  }, [donorId, embedded, loadReminderHistory])
+  }, [donorId, embedded, loadReminderHistory, onCountChange])
 
   useEffect(() => {
     void loadPledges()
@@ -646,7 +652,7 @@ export function DonorPledgesTab({
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>
-              {dialog === "markPaid" ? "Mark Pledge as Paid" : "Record Payment"}
+              {dialog === "markPaid" ? "Mark Pledge as Paid" : "Receive Payment"}
             </DialogTitle>
             <DialogDescription>
               {dialog === "markPaid"
@@ -704,6 +710,7 @@ export function DonorPledgesTab({
             <DonationGroupPicker
               groupContactId={paymentGroupContactId}
               groupLabel={paymentGroupLabel}
+              memberContactId={contactId || editContactId || null}
               onChange={(groupContactId, label) => {
                 setPaymentGroupContactId(groupContactId)
                 setPaymentGroupLabel(label)
@@ -834,7 +841,7 @@ function PledgeRowMenuInner({
             <>
               <DropdownMenuItem onClick={onRecordPayment}>
                 <DollarSign className="mr-2 size-4" />
-                Record Payment
+                Receive Payment
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onMarkPaid}>
                 <CheckCircle2 className="mr-2 size-4" />

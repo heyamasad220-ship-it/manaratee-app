@@ -327,11 +327,11 @@ export default function OverviewPage() {
 
         {/* Main Content Grid */}
         <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
-          {/* Recent Event Requests */}
+          {/* Event Requests */}
           <Card>
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-base font-semibold">Recent Event Requests</CardTitle>
+                <CardTitle className="text-base font-semibold">Event Requests</CardTitle>
                 <Button variant="ghost" size="sm" asChild>
                   <Link href="/bookings/requests" className="text-xs">
                     View All

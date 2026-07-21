@@ -8,6 +8,7 @@ import { LayoutGrid, List, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import type { Department } from "@/lib/departments/department-types"
+import { cn } from "@/lib/utils"
 
 type CatalogFilters = {
   q: string
@@ -69,6 +70,11 @@ export function ProgramCatalogFilters({
         params.delete("view")
       }
 
+      // Reset page when filters change
+      if (next.q !== undefined || next.status !== undefined || next.department !== undefined) {
+        params.delete("page")
+      }
+
       const queryString = params.toString()
       startTransition(() => {
         router.push(
@@ -98,6 +104,7 @@ export function ProgramCatalogFilters({
     } else {
       params.delete("view")
     }
+    params.delete("page")
     const queryString = params.toString()
     return queryString ? `/programs/catalog?${queryString}` : "/programs/catalog"
   }
@@ -106,16 +113,19 @@ export function ProgramCatalogFilters({
 
   return (
     <div
-      className={`flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between ${isPending ? "opacity-70" : ""}`}
+      className={cn(
+        "flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between",
+        isPending && "opacity-70"
+      )}
     >
-      <div className="flex flex-1 flex-col gap-4 sm:flex-row">
-        <div className="relative flex-1 lg:max-w-sm">
+      <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative w-full flex-1 sm:max-w-md">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search programs..."
-            className="pl-9"
+            className="h-10 bg-background pl-9"
           />
         </div>
 
@@ -149,18 +159,25 @@ export function ProgramCatalogFilters({
         </select>
       </div>
 
-      <div className="flex gap-2">
-        <Button variant={viewMode === "cards" ? "secondary" : "outline"} asChild>
-          <Link href={buildViewHref("cards")}>
-            <LayoutGrid className="mr-2 h-4 w-4" />
-            Cards
+      <div className="inline-flex h-10 shrink-0 items-center rounded-md border bg-muted/40 p-0.5">
+        <Button
+          variant={viewMode === "cards" ? "default" : "ghost"}
+          size="icon"
+          className="h-9 w-9 rounded-[6px]"
+          asChild
+        >
+          <Link href={buildViewHref("cards")} aria-label="Cards view">
+            <LayoutGrid className="h-4 w-4" />
           </Link>
         </Button>
-
-        <Button variant={viewMode === "table" ? "secondary" : "outline"} asChild>
-          <Link href={buildViewHref("table")}>
-            <List className="mr-2 h-4 w-4" />
-            Table
+        <Button
+          variant={viewMode === "table" ? "default" : "ghost"}
+          size="icon"
+          className="h-9 w-9 rounded-[6px]"
+          asChild
+        >
+          <Link href={buildViewHref("table")} aria-label="Table view">
+            <List className="h-4 w-4" />
           </Link>
         </Button>
       </div>

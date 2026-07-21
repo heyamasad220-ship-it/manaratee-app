@@ -63,7 +63,7 @@ export function ContactProgramAssignmentsPanel({
                 </div>
                 <Button variant="outline" size="sm" asChild>
                   <Link
-                    href={`/programs/${assignment.program_id}/edit?tab=offerings&offering=${assignment.offering_id}&workspaceTab=staff`}
+                    href={`/programs/${assignment.program_id}/offerings/${assignment.offering_id}?tab=staff`}
                   >
                     Manage
                   </Link>

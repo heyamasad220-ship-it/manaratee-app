@@ -160,6 +160,8 @@ User Invitations
 
 **Contacts security remediation (RLS wave 1)** — **G6 complete** (June 2026). M6b gate alignment + CR-8 harness shipped. M4 (`111`) **authorized for staging** after `109`–`110` applied. Validation: `npm run validate:contacts-g6`.
 
+**Contact profile homepage Phase 2** — Overview right rail (Quick Actions, Financial Summary, Activity) in place (July 2026). **Financial** tab redesigned to homepage-style KPIs, chart, sub-tabs, and right rail (July 2026).
+
 ---
 
 ## People Management Module
@@ -168,23 +170,29 @@ Display name: **People Management** (database module slug remains `hr`).
 
 Label constant: `lib/hr/hr-module-label.ts` → `PEOPLE_MANAGEMENT_MODULE_LABEL`
 
-Routes remain under `/hr/*` for now. Canonical Applications hub:
+Routes remain under `/hr/*` / `/workforce/*` for now. Application submissions live on each category’s Applications view (not a Settings hub):
 
-`/people-management/applications`
+* Employment → `/workforce/employees?tab=applications`
+* Volunteer → `/workforce/volunteers?tab=applications`
+* Childcare → `/workforce/childcare?tab=applications`
+* Committee → `/membership/applications`
 
-Sidebar (People Management):
+Sidebar (People Management / HR):
 
-* Members
+* Overview → `/workforce`
 * Employees
 * Volunteers
 * Child Care
-* Teams
-* Applications → `/people-management/applications`
 * Reports
-* Settings → `/hr/settings` (Discount Policies only)
+* Settings → `/hr/settings` (Discount Policies only); HR org settings at `/workforce/settings` (Positions, Application Templates). **Departments** lives under **Programs** in the sidebar (`/workforce/departments`: Overview, Employees, Rosters, Offerings, Schedule, Payroll, Financial Summary, Reports for archived years; Group giving when a donations group is linked; Activity = department events not individual gifts).
+
+Membership sidebar includes **Groups** (`/membership/groups` — member groups / former HR Teams). Giving collectives are under Donations (`/donations/groups/[id]`, Group Giving report) — badge can link a collective to a Membership Group or Department, otherwise **Group Donation**.
+
+Employees, Volunteers, and Childcare Providers use a shared directory UI (`HrDirectoryShell`): roster | Applications | Archived, KPI cards, export, and pagination. Adding employees/volunteers is contact-first (search Contacts; create contact first if missing).
 
 Other modules link to Applications with filters:
 
 * Vendor Hub → `/applications/all?application_type=vendor`
 * Programs → Financial Assistance filter
-* Employment applications → `/people-management/applications?tab=submissions&application_type=employment`
+* Employment applications → `/workforce/employees?tab=applications`
+* Committee applications → `/membership/applications`

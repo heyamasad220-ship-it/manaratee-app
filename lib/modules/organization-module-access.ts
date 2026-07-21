@@ -11,6 +11,29 @@ import {
   PRODUCT_MODULE_SLUGS,
   SUBSCRIPTION_BUNDLES,
 } from "@/lib/modules/module-catalog"
+import { PERMISSIONS } from "@/lib/permissions/permission-keys"
+
+/** Permissions to grant Admin / Super Admin roles when a product module is turned on. */
+const MODULE_ENABLE_PERMISSION_SEEDS: Record<string, string[]> = {
+  "event-management": [
+    PERMISSIONS.EVENTS_VIEW,
+    PERMISSIONS.EVENTS_MANAGE,
+    PERMISSIONS.TICKETING_VIEW,
+    PERMISSIONS.TICKETING_MANAGE,
+    PERMISSIONS.REPORTS_VIEW,
+  ],
+  programs: [PERMISSIONS.PROGRAMS_VIEW, PERMISSIONS.PROGRAMS_MANAGE, PERMISSIONS.REPORTS_VIEW],
+  donations: [PERMISSIONS.DONATIONS_VIEW, PERMISSIONS.DONATIONS_MANAGE],
+  workforce: [PERMISSIONS.STAFF_VIEW, PERMISSIONS.STAFF_MANAGE],
+  membership: [PERMISSIONS.MEMBERSHIP_VIEW, PERMISSIONS.MEMBERSHIP_MANAGE],
+  bookings: [
+    PERMISSIONS.BOOKINGS_VIEW,
+    PERMISSIONS.BOOKINGS_MANAGE,
+    PERMISSIONS.SPACES_VIEW,
+    PERMISSIONS.SPACES_MANAGE,
+  ],
+  "vendor-hub": [PERMISSIONS.VENDOR_HUB_VIEW, PERMISSIONS.VENDOR_HUB_MANAGE],
+}
 
 type ModuleRow = {
   id: string
@@ -314,6 +337,14 @@ export async function applySubscriptionBundleToOrganization(
     await upsertOrganizationModule(admin, organizationId, moduleId, true, false)
   }
 
+  for (const productSlug of bundle.moduleSlugs) {
+    await seedAdminRolePermissionsForModule(
+      admin,
+      organizationId,
+      normalizeModuleSlug(productSlug)
+    )
+  }
+
   const { error: orgError } = await admin
     .from("organizations")
     .update({ subscription_bundle_slug: bundleSlug })
@@ -324,6 +355,47 @@ export async function applySubscriptionBundleToOrganization(
   }
 
   return getOrganizationModuleAccess(organizationId)
+}
+
+async function seedAdminRolePermissionsForModule(
+  admin: SupabaseClient,
+  organizationId: string,
+  moduleSlug: string
+) {
+  const permissionKeys = MODULE_ENABLE_PERMISSION_SEEDS[moduleSlug]
+  if (!permissionKeys?.length) return
+
+  const { data: roles, error: rolesError } = await admin
+    .from("organization_roles")
+    .select("id, name")
+    .eq("organization_id", organizationId)
+
+  if (rolesError) {
+    throw new Error(rolesError.message)
+  }
+
+  const adminRoles = (roles ?? []).filter((role) =>
+    ["super admin", "admin"].includes(String(role.name || "").trim().toLowerCase())
+  )
+
+  if (adminRoles.length === 0) return
+
+  const rows = adminRoles.flatMap((role) =>
+    permissionKeys.map((permissionKey) => ({
+      organization_id: organizationId,
+      role_id: role.id,
+      permission_key: permissionKey,
+      enabled: true,
+    }))
+  )
+
+  const { error } = await admin.from("role_permissions").upsert(rows, {
+    onConflict: "role_id,permission_key",
+  })
+
+  if (error) {
+    throw new Error(error.message)
+  }
 }
 
 export async function setOrganizationModuleEnabled(
@@ -347,6 +419,13 @@ export async function setOrganizationModuleEnabled(
   const moduleIdsBySlug = await loadModuleSlugMap(admin)
   const targets = getModuleToggleTargets(slug, enabled)
 
+  const primaryModuleId = moduleIdsBySlug.get(slug)
+  if (!primaryModuleId) {
+    throw new Error(
+      `Module "${slug}" is missing from the modules catalog. Run the Event Management navigation migration (038) and module catalog migration (067).`
+    )
+  }
+
   for (const targetSlug of targets) {
     const moduleId = moduleIdsBySlug.get(targetSlug)
     if (!moduleId) continue
@@ -358,6 +437,10 @@ export async function setOrganizationModuleEnabled(
       enabled,
       true
     )
+  }
+
+  if (enabled) {
+    await seedAdminRolePermissionsForModule(admin, organizationId, slug)
   }
 
   const { error: orgError } = await admin

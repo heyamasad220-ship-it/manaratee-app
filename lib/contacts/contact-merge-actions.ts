@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache"
 import { executeContactMerge, previewContactMerge } from "@/lib/contacts/contact-merge"
 import { syncContactAffiliations } from "@/lib/contacts/contact-affiliation-sync"
 import { getContactRecordTypeLabel, normalizeContactRecordType } from "@/lib/contacts/contact-constants"
+import { DONATIONS_GROUP_GIVING_REPORT_PATH } from "@/lib/donations/donor-giving-report"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { hasPermission } from "@/lib/permissions/permissions"
 import { PERMISSIONS } from "@/lib/permissions/permission-keys"
@@ -247,7 +248,7 @@ export async function mergeContactsAction(targetContactId: string, sourceContact
     revalidatePath("/contacts")
     revalidatePath("/contacts/people")
     revalidatePath("/contacts/organizations")
-    revalidatePath("/contacts/groups")
+    revalidatePath(DONATIONS_GROUP_GIVING_REPORT_PATH)
     revalidatePath(`/contacts/${targetContactId}`)
     revalidatePath("/donations")
 

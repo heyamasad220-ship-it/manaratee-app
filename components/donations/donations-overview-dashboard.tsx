@@ -30,12 +30,12 @@ import { donationPledgesHref } from "@/lib/donations/donation-pledge-paths"
 
 const QUICK_ACTIONS = [
   {
-    label: "Record Payment",
+    label: "Receive Payment",
     href: "/donations/reports/one-time",
     icon: DollarSign,
   },
   {
-    label: "Record Pledge",
+    label: "Add Pledge",
     href: donationPledgesHref({ action: "add" }),
     icon: HandCoins,
   },

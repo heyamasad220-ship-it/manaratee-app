@@ -123,8 +123,8 @@ export default async function ProgramSessionsPage({
   }
 
   const editProgramHref = selectedOffering
-    ? `/programs/${program.id}/edit?tab=offerings`
-    : `/programs/${program.id}/edit`
+    ? `/programs/${program.id}/offerings/${selectedOffering.id}?tab=schedule`
+    : `/programs/${program.id}`
 
   return (
     <>
@@ -154,7 +154,9 @@ export default async function ProgramSessionsPage({
             </div>
 
             <Button asChild variant="outline">
-              <Link href={editProgramHref}>Edit Program</Link>
+              <Link href={editProgramHref}>
+                {selectedOffering ? "Manage Offering" : "View Program"}
+              </Link>
             </Button>
           </div>
 
@@ -166,8 +168,8 @@ export default async function ProgramSessionsPage({
             />
           ) : (
             <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
-              No offerings are configured for this program. Add an offering on
-              the Edit Program page before creating sessions.
+              No offerings are configured for this program. Add an offering from
+              the program page before creating sessions.
             </div>
           )}
 

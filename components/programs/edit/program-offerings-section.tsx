@@ -47,6 +47,7 @@ import type {
   ProgramOfferingStatus,
 } from "@/lib/programs/program-offering-types"
 import { PROGRAM_OFFERING_STATUS_LABELS } from "@/lib/programs/program-offering-types"
+import { loadOfferingWorkspaceDataForProgramAction } from "@/lib/programs/offering-workspace-actions"
 import type { OfferingWorkspaceDataMap } from "@/lib/programs/offering-workspace-types"
 import type { ProgramCapacityGroupInput } from "@/lib/programs/program-capacity-group-types"
 import type { ProgramRegistrationOption } from "@/lib/programs/program-registration-option-types"
@@ -146,10 +147,55 @@ export function ProgramOfferingsSection({
   const [isDuplicating, setIsDuplicating] = React.useState(false)
   const [workspaceDataMap, setWorkspaceDataMap] =
     React.useState(initialWorkspaceDataMap)
+  const [workspaceLoading, setWorkspaceLoading] = React.useState(
+    Object.keys(initialWorkspaceDataMap).length === 0 && initialOfferings.length > 0
+  )
+  const workspaceLoadedRef = React.useRef(
+    Object.keys(initialWorkspaceDataMap).length > 0
+  )
 
   React.useEffect(() => {
+    if (Object.keys(initialWorkspaceDataMap).length === 0) {
+      return
+    }
+
     setWorkspaceDataMap(initialWorkspaceDataMap)
+    workspaceLoadedRef.current = true
+    setWorkspaceLoading(false)
   }, [initialWorkspaceDataMap])
+
+  React.useEffect(() => {
+    if (workspaceLoadedRef.current || initialOfferings.length === 0) {
+      return
+    }
+
+    let cancelled = false
+    setWorkspaceLoading(true)
+
+    void loadOfferingWorkspaceDataForProgramAction(program.id)
+      .then((data) => {
+        if (cancelled) return
+        setWorkspaceDataMap(data)
+        workspaceLoadedRef.current = true
+      })
+      .catch((loadError) => {
+        if (cancelled) return
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Failed to load offering details."
+        )
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setWorkspaceLoading(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [program.id, initialOfferings.length])
 
   const handleRegistrationOptionsSaved = React.useCallback(
     (offeringId: string, registrationOptions: ProgramRegistrationOption[]) => {
@@ -194,9 +240,22 @@ export function ProgramOfferingsSection({
     []
   )
 
+  const offeringsSignature = React.useMemo(
+    () =>
+      initialOfferings
+        .map(
+          (offering) =>
+            `${offering.id}:${offering.updated_at ?? ""}:${offering.name}:${offering.status}`
+        )
+        .join("|"),
+    [initialOfferings]
+  )
+
   React.useEffect(() => {
     setOfferings(initialOfferings)
-  }, [initialOfferings])
+    // Sync from server when offering rows actually change, not on array identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- tracked via offeringsSignature
+  }, [offeringsSignature])
 
   React.useEffect(() => {
     const offering = resolveOfferingFromParam(offerings, offeringParam)
@@ -551,33 +610,40 @@ export function ProgramOfferingsSection({
           </div>
 
           <div className="rounded-lg border p-4">
-            <OfferingWorkspace
-              program={program}
-              offering={selectedOffering}
-              isCreating={isCreating}
-              draft={draft}
-              savedDraft={savedDraft}
-              onDraftChange={setDraft}
-              onSaveOverview={handleSaveOverview}
-              onDelete={handleDelete}
-              isSaving={isSaving}
-              error={error}
-              workspaceDataMap={workspaceDataMap}
-              capacityGroups={capacityGroups}
-              onCapacityGroupsChange={onCapacityGroupsChange}
-              onRegistrationOptionsSaved={handleRegistrationOptionsSaved}
-              onStaffAssignmentsChange={handleStaffAssignmentsChange}
-              initialWorkspaceTab={
-                workspaceTabParam === "registration" ||
-                workspaceTabParam === "pricing" ||
-                workspaceTabParam === "sessions" ||
-                workspaceTabParam === "staff" ||
-                workspaceTabParam === "schedule" ||
-                workspaceTabParam === "overview"
-                  ? workspaceTabParam
-                  : undefined
-              }
-            />
+            {workspaceLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading offering details…
+              </div>
+            ) : (
+              <OfferingWorkspace
+                program={program}
+                offering={selectedOffering}
+                isCreating={isCreating}
+                draft={draft}
+                savedDraft={savedDraft}
+                onDraftChange={setDraft}
+                onSaveOverview={handleSaveOverview}
+                onDelete={handleDelete}
+                isSaving={isSaving}
+                error={error}
+                workspaceDataMap={workspaceDataMap}
+                capacityGroups={capacityGroups}
+                onCapacityGroupsChange={onCapacityGroupsChange}
+                onRegistrationOptionsSaved={handleRegistrationOptionsSaved}
+                onStaffAssignmentsChange={handleStaffAssignmentsChange}
+                initialWorkspaceTab={
+                  workspaceTabParam === "registration" ||
+                  workspaceTabParam === "pricing" ||
+                  workspaceTabParam === "sessions" ||
+                  workspaceTabParam === "staff" ||
+                  workspaceTabParam === "schedule" ||
+                  workspaceTabParam === "overview"
+                    ? workspaceTabParam
+                    : undefined
+                }
+              />
+            )}
           </div>
         </div>
 

@@ -129,3 +129,25 @@ export function countAvailablePortals(input: {
     input.hasAdminPortal,
   ].filter(Boolean).length
 }
+
+/**
+ * Portal switcher is only for users who have a personal (customer) account
+ * and at least one staff-side portal (admin dashboard, staff tools, or teaching).
+ * Staff-only users (e.g. admin@org with no customer login) should not see it.
+ */
+export function shouldShowPortalSwitcher(input: {
+  hasPersonalPortal: boolean
+  hasStaffToolsPortal: boolean
+  hasTeachingPortal: boolean
+  hasAdminPortal: boolean
+}): boolean {
+  if (!input.hasPersonalPortal) {
+    return false
+  }
+
+  return (
+    input.hasStaffToolsPortal ||
+    input.hasTeachingPortal ||
+    input.hasAdminPortal
+  )
+}

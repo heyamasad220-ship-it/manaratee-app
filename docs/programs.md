@@ -40,8 +40,8 @@ The Programs module lets organizations create and manage programs (camps, classe
 | Contact-based enrollments | Working (016+) |
 | Customer browse + register UI | Working |
 | Live quote preview | Working (019+) |
-| Fee plan editor (staff) | Working (019+); tabbed Edit Program UI (June 2026) |
-| Quick Create + Edit Program split | Working — see [programs-staff-setup-ui.md](./programs-staff-setup-ui.md) |
+| Fee plan editor (staff) | Working (019+); offering manage Fees tab |
+| Quick Create + program detail + offering manage | Working — see [programs-staff-setup-ui.md](./programs-staff-setup-ui.md) |
 | Registration RPC (`register_for_program`) | Implemented; end-to-end submission may need data/debugging |
 | Lifecycle RPCs (cancel, advance, waitlist) | Working (018) |
 | Financial assistance (customer + admin UI) | Partial — DB complete, workflows in progress |
@@ -382,7 +382,7 @@ TypeScript helpers: `lib/programs/program-lifecycle-types.ts`
 | Schedule | `/programs/schedule` | `programs.view` |
 | Reports | `/programs/reports` | `reports.view` |
 | Financial Assistance | `/programs/financial-assistance` | (module nav helper) |
-| Settings | `/programs/settings` | `programs.manage` |
+| Settings | `/programs/settings` (General + Service Needs) | `programs.manage` |
 
 ### Program management routes
 
@@ -390,28 +390,32 @@ TypeScript helpers: `lib/programs/program-lifecycle-types.ts`
 |-------|---------|
 | `/programs` | Redirect / landing |
 | `/programs/catalog` | Program list |
-| `/programs/create` | **Quick Create** — basics only; redirects to `/programs/[id]/edit` after save |
-| `/programs/[id]` | Program detail |
-| `/programs/[id]/edit` | **Full setup** — tabbed editor (see [programs-staff-setup-ui.md](./programs-staff-setup-ui.md)) |
-| `/programs/[id]/billing` | Billing schedule (linked from Edit → Pricing tab) |
+| `/programs/create` | **Quick Create** — basics + eligibility; redirects to `/programs/[id]` after save |
+| `/programs/[id]` | Program detail home (Overview inline edit + Offerings; Catalog → Edit) |
+| `/programs/[id]/offerings` | Redirects to first non-archived offering manage page (or program detail if none) |
+| `/programs/[id]/offerings/[offeringId]` | **Offering manage** — Overview / Registration / Fees / Schedule / Staff for one offering |
+| `/programs/[id]/edit` | **Retired** — redirects to detail or offering manage (legacy deep links) |
+| `/programs/[id]/billing` | Redirects to offering Fees tab |
 | `/programs/[id]/car-tags` | Printable car dismissal name tags (staff operations) |
-| `/programs/[id]/sessions` | Session management (standalone route; also in Edit → Sessions tab) |
+| `/programs/[id]/sessions` | Session management (standalone route; also in offering Schedule) |
 | `/programs/[id]/discounts` | Program discounts |
 | `/programs/instructors` | Instructor assignments |
 | `/programs/registrations` | Enrollment + waitlist queue |
 | `/programs/registrations/[type]/[id]` | Enrollment or waitlist detail |
 | `/programs/schedule` | Cross-program schedule view |
 | `/programs/reports` | Reports |
-| `/programs/settings` | Module settings |
+| `/programs/settings` | Module settings (General, Promo Codes, etc.) |
+| `/programs/settings/service-needs` | Per-program volunteer / childcare / vendor service needs (temporary home; still saved on the selected program) |
 
 ### Staff setup flow
 
-See **[programs-staff-setup-ui.md](./programs-staff-setup-ui.md)** for Quick Create vs Edit Program architecture, shared section components, capacity group rules, and save behavior.
+See **[programs-staff-setup-ui.md](./programs-staff-setup-ui.md)** for Quick Create → program detail → offering manage flow, shared section components, and capacity group rules.
 
 **Summary:**
 
-- **Quick Create** — name, dates, eligibility, capacity, visibility, draft/active only.
-- **Edit Program** — tabs: Basics, Enrollment, Registration, Pricing, Sessions, Financial Assistance. Sticky Save applies to all tabs via `saveEditProgram`.
+- **Quick Create** — name, dates, eligibility, capacity, visibility, draft/active.
+- **Program detail** — inline edit for publishing basics; offerings list.
+- **Offering manage** — Registration, Fees, Schedule, Staff per offering.
 
 ---
 
@@ -463,7 +467,8 @@ Organization context comes from `active_organization_id` cookie and `getMyOrgani
 | `program-register-session-fields.tsx` | `components/customer/` | Customer session picker |
 | `program-register-quote-preview.tsx` | `components/customer/` | Live quote preview |
 | `create-program-form.tsx` | `app/(dashboard)/programs/create/` | Quick Create form |
-| `edit-program-form.tsx` | `app/(dashboard)/programs/[id]/edit/` | Tabbed Edit Program orchestrator |
+| `program-detail-client.tsx` | `components/programs/` | Program detail + inline basics edit |
+| `offering-manage-client.tsx` | `components/programs/` | Offering manage workspace |
 
 ---
 
@@ -497,7 +502,7 @@ Do not break Contacts module when changing registration logic.
 | `program_enrollments.child_person_id` | `participant_contact_id` |
 | Legacy program billing fields on edit form | Offering **fee plans** on Edit → Pricing tab |
 | `program_fee_options` on program | `program_offering_fee_plans` on offering |
-| Monolithic create + edit forms | Quick Create + tabbed Edit Program ([programs-staff-setup-ui.md](./programs-staff-setup-ui.md)) |
+| Monolithic create + edit forms | Quick Create + program detail + offering manage ([programs-staff-setup-ui.md](./programs-staff-setup-ui.md)) |
 | `program_enrollment_sessions` | `program_registration_session_access` |
 | `schedule_sessions` | **Do not use** — use `program_sessions` |
 
@@ -577,7 +582,7 @@ Legacy cart tables (`registration_carts`, `registration_orders`) remain unused; 
 
 ## Related Documentation
 
-- [programs-staff-setup-ui.md](./programs-staff-setup-ui.md) — Quick Create + Edit Program UI architecture
+- [programs-staff-setup-ui.md](./programs-staff-setup-ui.md) — Quick Create + program detail + offering manage UI
 - [programs-architecture-reset-plan.md](./programs-architecture-reset-plan.md) — **workflow audit & refactor sequence (review before Phase 3)**
 - [programs-phase-2b-charge-ledger.md](./programs-phase-2b-charge-ledger.md) — charge ledger design
 - `docs/Features.md` — high-level feature list

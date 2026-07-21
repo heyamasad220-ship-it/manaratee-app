@@ -226,10 +226,10 @@ export function HrTeamDetailClient({ teamId }: { teamId: string }) {
       <div className="p-6">
         <Card>
           <CardContent className="p-6 text-sm text-muted-foreground">
-            Team not found.
+            Group not found.
             <Button variant="outline" className="mt-4" onClick={() => router.push(MEMBERSHIP_TEAMS_PATH)}>
               <ArrowLeft className="mr-2 size-4" />
-              Back to Teams
+              Back to Groups
             </Button>
           </CardContent>
         </Card>
@@ -243,7 +243,7 @@ export function HrTeamDetailClient({ teamId }: { teamId: string }) {
         <div>
           <Button variant="ghost" size="sm" className="mb-2 -ml-2" onClick={() => router.push(MEMBERSHIP_TEAMS_PATH)}>
             <ArrowLeft className="mr-2 size-4" />
-            Back to Teams
+            Back to Groups
           </Button>
           <div className="flex items-center gap-3">
             <span

@@ -82,7 +82,7 @@ Completed:
 * Server-side protection
 * Unauthorized page
 * Permission-aware sidebar
-* **Tiered staff navigation (July 2026):** Primary sidebar (`180px`, icon + label). **Manaratee logo** sits at the top of the sidebar (upper left, large). Organization logo on the far right of the header bar. Sidebar nav starts below the logo band + breadcrumb spacer so **Dashboard** aligns with the breadcrumb row (`Dashboard > …`). Breadcrumb path sits on the row below the header. Clicking a module opens a slide-out drawer with expandable groups; choosing a destination navigates and closes the drawer. **Billing** and **Settings** follow enabled modules in the sidebar (not pinned to the viewport bottom). Shared chrome heights: `lib/layout/staff-dashboard-chrome.ts`. Key files: `components/layout/sidebar.tsx`, `components/layout/header.tsx`, `lib/navigation/sidebar-nav.ts`.
+* **Tiered staff navigation (July 2026):** Primary sidebar (`180px`, icon + label). **Manaratee logo** sits at the top of the sidebar (upper left, large). Organization logo on the far right of the header bar. Sidebar nav starts below the logo band + breadcrumb spacer so **Dashboard** aligns with the breadcrumb row (`Dashboard > …`). Breadcrumb path sits on the row below the header. Clicking a module opens a slide-out drawer with expandable groups; choosing a destination navigates and closes the drawer. **Module order (July 2026):** Dashboard → Contacts → HR → Membership → Donations → Programs → Event Management → Venue Rentals → Vendor Hub → Facility Manager → Billing → Settings. Membership is already implemented (`/membership`); if missing from the rail, enable it for the org (repair SQL `scripts/165_ensure_membership_sidebar.sql`, or Platform Admin → Organizations → modules). Flat list (no People/Operations regrouping). Shared chrome heights: `lib/layout/staff-dashboard-chrome.ts`. **Event Management visibility (July 2026):** Org-enabled modules always appear in the staff rail (sub-nav still permission-gated). Loader recovers missing `modules` embeds, normalizes slugs, and keeps product modules even if `is_active` was flipped off. Org **Super Admin** gets full sidebar permissions. Enabling a product module seeds Admin/Super Admin permissions. Repair script: `scripts/138_ensure_event_management_sidebar.sql`. Key files: `components/layout/sidebar.tsx`, `lib/organizations/load-organization-sidebar-modules.ts`, `lib/organizations/sidebar-nav-context.ts`, `lib/modules/organization-module-access.ts`.
 * Subscription-aware modules
 * **Roles & Permissions subscription filter (June 2026):** Settings → Roles & Permissions only lists permission rows for modules enabled on the org (`lib/permissions/permission-definitions.ts`, filtered via `loadOrganizationEnabledModuleSlugs`). Core modules (Settings, Contacts) always appear; product modules (e.g. Donations only for MAS Dallas) gate their permission groups. **Facility Manager** and **Facility Coordinator** roles are hidden unless the org has **Facilities** (`spaces`) or **Venue Rentals** (`bookings`) enabled (`filterOrganizationRolesForOrganization` in `lib/permissions/facilities-access.ts`).
 * **Organization audit log (June 2026):** Settings → **Audit Log** (`/settings/audit-log`) — append-only history of donation ledger edits (payment update/void/refund/allocate, pledge update/payment/cancel) and permission changes (member role assignment, role permission toggles). Table: `organization_audit_logs` (migration `142_organization_audit_logs.sql`). Writes via service role in `lib/audit/organization-audit-log.ts`; reads via RLS for staff with `settings.users.view`, `settings.roles.view`, `donations.view`, or `donations.manage`. Permission toggles route through `setOrganizationRolePermissionAction` so changes are logged server-side.
@@ -125,6 +125,8 @@ Customer sidebar and dashboard only show areas enabled for the active organizati
 Key files: `lib/customer/customer-portal-modules.ts` (client-safe), `lib/customer/customer-portal-modules-server.ts` (server loaders/guards), `components/customer/customer-nav.tsx`, `app/(customer)/layout.tsx`. Disabled module routes redirect to `/customer/dashboard`. **Dashboard** (`/customer/dashboard`): KPI cards; two-column giving section — **Active Campaigns** (left, one campaign per row) and **Donation Options** (right, two categories per row each with a **Donate** button that opens the **Make a Donation** dialog in place via `components/customer/customer-donation-dialog.tsx`). Customer sidebar branding uses the active org `logo_url` with **organization name** in bold below the logo (falls back to name-only or Manaratee logo). **Profile** submenu (Family, Notification Preferences, Applications) appears only after the donor opens Profile. **Notification Preferences** (`/customer/profile/notifications`) shows toggles only for org-enabled modules (`lib/customer/customer-notification-preferences.ts`); Donations module includes payment completed, payment charges, failed transactions, pledge reminders, and SMS payment reminders, plus org-wide newsletter.
 
 For a donations-only org (e.g. MAS Dallas on the **Nonprofit** bundle), ensure only `donations` is enabled in platform admin → organization modules (or assign bundle `nonprofit`).
+
+**Portal switcher (July 2026):** User menu **Switch portal** appears only when the same login has a **personal (customer) portal** and at least one staff-side portal (Admin Dashboard, Staff Tools, or Teaching). Staff-only accounts (e.g. `admin@org` with admin + staff-tools permissions but no personal/customer account) do not see the switcher. Key: `shouldShowPortalSwitcher` in `lib/auth/resolve-portal-permissions.ts`, `components/portal/portal-switcher.tsx`.
 
 **Donor join deep-link (June 2026):** Settings → Users exposes two links: general customer join and **Donor signup and give**. The donor link is `/join/{org-slug}?next=/customer/donation?give=one-time` (encoded in the URL). After signup or sign-in, the user is routed to `/customer/donation` and the **Donate** dialog opens (one-time by default). Requires donations module + org Stripe Connect (Donations → Settings → Online Payments). Key files: `lib/organizations/join-organization-url.ts`, `lib/auth/sanitize-customer-redirect-path.ts`, `components/customer/organization-join-client.tsx`, `components/settings/organization-join-link-card.tsx`.
 
@@ -177,13 +179,23 @@ Removed **255** legacy imported rows from `public.vendors` (May 2026 CSV import)
 
 **MAS Dallas contacts cleaned (June 2026):** Removed `DONATIONS_DEV_SEED_V1` test contacts; only pilot contact Heyam Asad retained. Removed erroneous `member` membership/role from Heyam (kept `employee` via active staff record). Tool: `node scripts/clean-mas-contacts-pilot.mjs`.
 
-**Contacts list UI (June 2026):** Removed **All Contacts** (`/contacts` redirects to `/contacts/people`). Sidebar lists **People**, **Families**, **Organizations**, **Groups**, **Reports**, and **Settings**. User-facing **Affiliation** terminology replaced with **Roles** in Contacts → Settings automatic-role rules (contact profiles no longer show an editable Roles card — roles sync from activity only). Discount tags still sync automatically from roles in the background (`person_tags` on affiliation sync — adds only, does not remove manual assignments); staff can also **assign Discount tags** on contact Overview → Edit (tags from Contacts → Settings → Discount Tags). **Contact profile (July 2026):** Default contact page is one scrolling summary: sticky strip (name, phone, email, status/roles, ⋮ actions + KPI cards — always visible while scrolling), then collapsible sections — **Overview** (personal info + family on one page, no tabs), **All Transactions**, **Payment Plans**, **Pledges**, **Payment Methods**, **Statements**, and **Notes & Activity** (timeline + notes; **Activity at a glance** summary card removed). Actions menu: **Receive Payment** and **Add Pledge** open dialogs on the contact page (do not navigate away); also **Merge duplicate**, **Delete**. Overview **Edit** toggles the same fields in place (record type, status, discount tag, **Groups** list of affiliations, and contact details) — no separate edit page. Name is not clickable. All sections start collapsed. People/Organizations/Groups lists: search + add only (role/status dropdown filters removed); table columns **Contact** (name styled as link), **Email**, **Phone**, **Created by** (not stored yet — shows —), **Last modified**, **Status** (Active/Inactive only). No **Actions** column — edit, merge, delete, and **View Details** live on the contact profile sticky header actions menu. Removed intro banners and stat cards on type-specific list pages. Removed Teams column and team filter from `ContactsCrmList`. Team assignment remains on individual contact profiles where HR teams are enabled. **Organizations list (July 2026):** first column renamed **Organization** with column **sort** + **filter** (name); **Primary Contact** moved between organization name and Email; top search bar removed (use column filter); server-side sort via `fetchContactsList` (`sortBy`, `nameFilter`). **Groups list (July 2026):** same pattern — **Group** column with sort/filter, Primary Contact after name, no top search bar. **Individual name casing (July 2026):** ALL CAPS / all-lowercase individual contact names can be rewritten to proper case (`ABEER ZOUBI` → `Abeer Zoubi`) via `node scripts/proper-case-individual-contact-names.mjs` (dry-run; add `--execute` to apply). Organizations and groups are skipped. Create/update of individual contacts also applies the same rule. Helper: `lib/contacts/proper-case-name.ts`.
+**Contacts list UI (June 2026):** Removed **All Contacts** (`/contacts` redirects to `/contacts/people`). Sidebar lists **People**, **Families**, **Organizations**, **Groups**, **Reports**, and **Settings**. User-facing **Affiliation** terminology replaced with **Roles** in Contacts → Settings automatic-role rules (contact profiles no longer show an editable Roles card — roles sync from activity only). Discount tags still sync automatically from roles in the background (`person_tags` on affiliation sync — adds only, does not remove manual assignments); staff can also **assign Discount tags** on contact Overview → Edit (tags from Contacts → Settings → Discount Tags). People/Organizations/Groups lists: search + add only (role/status dropdown filters removed); table columns **Contact** (name styled as link), **Email**, **Phone**, **Created by** (not stored yet — shows —), **Last modified**, **Status** (Active/Inactive only). No **Actions** column — edit, merge, delete, and **View Details** live on the contact profile sticky header actions menu. Removed intro banners and stat cards on type-specific list pages. Removed Teams column and team filter from `ContactsCrmList`. Team assignment remains on individual contact profiles where HR teams are enabled. **Organizations list (July 2026):** first column renamed **Organization** with column **sort** + **filter** (name); **Primary Contact** moved between organization name and Email; top search bar removed (use column filter); server-side sort via `fetchContactsList` (`sortBy`, `nameFilter`). **Groups list (July 2026):** same pattern — **Group** column with sort/filter, Primary Contact after name, no top search bar. **Individual name casing (July 2026):** ALL CAPS / all-lowercase individual contact names can be rewritten to proper case (`ABEER ZOUBI` → `Abeer Zoubi`) via `node scripts/proper-case-individual-contact-names.mjs` (dry-run; add `--execute` to apply). Organizations and groups are skipped. Create/update of individual contacts also applies the same rule. Helper: `lib/contacts/proper-case-name.ts`.
 
 **Contacts Reports — Phase 1 (June 2026):** Sidebar **Reports** (above Settings). Hub at `/contacts/reports`; **Contact Directory** at `/contacts/reports/directory`. Column-header filters on **Contact** (search name/email/phone), **Type**, **Roles**, **Status**, and **Teams** (no separate filters card). Summary cards (total + people/orgs/groups breakdown), paginated preview (50 rows/page), **Export CSV** of the full filtered set (includes address fields). Requires `contacts.view`. Donor giving totals remain under **Donations → Reports → Donors** (hub links there). Key files: `lib/contacts/contact-report-actions.ts`, `lib/contacts/contact-report-csv.ts`, `components/contacts/contacts-directory-report-panel.tsx`.
 
-**Group giving attribution (June 2026):** When recording a payment (Donations → Payments or pledge payment), staff can optionally pick a **Group** from `/contacts/groups`. The gift stays on the individual contact; `payments.attributed_group_contact_id` counts it toward the group total and **auto-adds the donor to `contact_group_members`**. Group Financial tab rollups: **Group Gifts** (payments on the group donor) + **Member Gifts for Group** (attributed individual gifts) = **Combined Total**. Pooled group checks should still be recorded on the group contact directly. Apply **`scripts/136_payment_attributed_group.sql`** (after `135`). Key files: `lib/contacts/group-giving-actions.ts`, `components/donations/donation-group-picker.tsx`, `components/donations/donation-payments-panel.tsx`.
+**Group giving attribution (June 2026 / July 2026):** When recording a payment (Donations → Payments, contact **Receive Payment**, or pledge payment), staff can optionally pick a **Group**. The gift stays on the individual contact; `payments.attributed_group_contact_id` counts it toward the group total. The picker lists **only groups the contact already belongs to** — add membership from **`/donations/groups/[id]`** first (no auto-add on payment). **UI (July 2026):** Group giving / Campaign gifts shows a single **Amount** per campaign (no Group / Attributed / Combined split) — going forward gifts are individual contributions toward the group, not pooled gifts from the group as a whole. Click Amount to see donors for that campaign. Apply **`scripts/136_payment_attributed_group.sql`** (after `135`). Key files: `lib/contacts/group-giving-actions.ts`, `components/donations/donation-group-picker.tsx`, `components/donations/donation-group-financial-panel.tsx`.
 
-**Contacts Groups record type (June 2026):** New **Groups** list at `/contacts/groups` for internal collectives (halaqas, committees, pooled giving). **Groups are the primary name** for collectives: add **members** on the group profile (**Overview → Group Members**); group gifts and **group pledges** stay on the group **Financial** tab (**Donations**, **Pledges** filters); each member’s individual gifts stay on their own profile. Group **Overview** hides address (organizations still show address). **Payment Methods** and **Statements** tabs are hidden for groups (people and organizations only; giving statements go to individual contacts). Group **Financial** uses **Group Gifts / Member Gifts / Combined Total** rollup cards only (not the generic Total Paid / Lifetime summary row on people and orgs). Individuals are added to groups from the group profile (**Group Members** on the summary page), not from the person profile. Table: `contact_group_members` (migration `135`). `contact_type = 'group'` with optional `primary_contact_name`. Group donor rows use `donor_type = 'organization'`. HR **Teams** remain optional for membership programs; use **Groups** for donation rollups. Apply: `scripts/132_contact_type_group.sql`, `scripts/133_sync_contact_affiliations_group.sql`, **`scripts/135_contact_group_members.sql`**. Key files: `lib/contacts/group-members-load-action.ts`, `lib/contacts/group-membership-data.ts`, `lib/contacts/group-member-actions.ts`, `components/contacts/contact-group-members-panel.tsx`, `components/contacts/contact-group-financial-panel.tsx`.
+**Contacts Groups record type (June 2026 / July 2026):** CRM `contact_type = group` remains for giving attribution but **is not a contact profile**. Detail UI is **`/donations/groups/[id]`** for Group Donation / Membership Group collectives. When the collective is a **Department** (linked via `linked_department_id`, or unique same-name match — auto-linked on open), Group Giving redirects to the shared **Department workspace** at **`/workforce/departments/[id]`**. Department tabs: **Overview** (year programs + flyer; Super Admin archive), **Employees**, **Rosters** (student names, courses, teachers — no payment details), **Offerings**, **Schedule**, **Payroll**, **Financial Summary** (revenue from Programs billing in the background), **Group giving** when linked, **Activity** (events only), and **Reports** (archived years). Financial assistance stays at org/committee level (not under departments). Legacy `?tab=payments` / `participants` → Rosters; `babysitting` → Payroll. Apply **`scripts/167_giving_group_category.sql`**. Opening `/contacts/[id]` for a group redirects appropriately. Key files: `components/departments/department-group-workspace-client.tsx`, `components/departments/department-student-payments-panel.tsx`, `components/departments/department-group-giving-panel.tsx`, `lib/departments/department-giving-link.ts`, `lib/donations/donation-group-path.ts`.
+
+**Department year programs / Overview + Reports (July 2026):** Department workspace default tab is **Overview** (Catalog-like year setup for that department): list open year programs, add next year (optional copy of courses + teachers, empty roster), upload/change year flyer; **Super Admin** can **Archive year** (confirm name) → program `archived`, offerings closed, read-only. Operating tabs (Rosters, Offerings, Schedule, Financial Summary KPIs from billing) include **open** programs only (`draft`/`active`/`paused`). **Employees**, Group giving, Activity stay department-wide. **Reports** (last tab) lists archived years → read-only report (students, payments received, fee/balance summary). Catalog continues to show the same programs. Key files: `department-overview-panel.tsx`, `department-reports-panel.tsx`, `department-year-actions.ts`, `department-active-programs.ts`.
+
+**QIL year import (July 2026):** Historical QIL 2025–26 roster + Stripe payment CSV → department / **one year program** `Quran Institute for Ladies 2025-2026` / **course offerings** / enrollments / `program_charges`. Requires **`scripts/174_enrollment_unique_per_offering.sql`** (unique active enrollment is per offering so students can take multiple courses). If courses were wrongly created as `QIL — {course}` programs, consolidate with `node scripts/migrate-qil-courses-to-offerings.mjs --execute` after running 174. Import: `node scripts/import-qil-year.mjs` / `--execute`. Display fix for imported rows: `node scripts/fix-qil-enrollment-display.mjs --execute` sets `enrollment_date` to **2025-08-31**, `participant_type=adult`, and contact fields from the participant. Contact profiles + **Programs** affiliation (`program_participant`): run **`scripts/175_split_customer_programs_affiliation.sql`**, then `node scripts/sync-qil-participant-contacts.mjs --execute`. Report: `scripts/reports/qil-import-YYYY-MM-DD.json`. Department **Rosters** = names/courses/teachers only; payments under **Programs → Reports → Registrations**; **Financial Summary** uses billing totals.
+
+**Programs vs Customer affiliations (July 2026):** Split the unified Customer tag. **Programs** (`program_participant`) = program enrollments as participant or registrant (parents of minors). **Customer** = events/ticketing + venue rentals only. Apply **`scripts/175_split_customer_programs_affiliation.sql`**. Settings toggles under Contacts → Affiliations. Key files: `contact-affiliation-rules.ts`, `contact-affiliation-sync.ts`, `contact-constants.ts`.
+
+**Programs → Reports → Registrations filters (July 2026):** Payment filter uses GET query params and normalizes buckets (`partially_paid` → `partial`, amount fallback). Column **Offering** (course name; year program as subtitle). Columns: Amount (fee), **Received**, **Balance** (outstanding); Type column removed (Status only). Filters: **Department**, **Offering**, type, payment, status. Adults show participant as Contact; minors show parent. Participant (and contact) names link to CRM profiles when `participant_contact_id` / registrant contact is set. Key file: `app/(dashboard)/programs/registrations/page.tsx`.
+
+**Department operating payments / Financial Summary (July 2026):** Replaces Google Sheets trackers for departments like Qur’an Institute for Ladies. **Tabs:** Rosters, Offerings, Schedule, Payroll, Financial Summary (separate from Group giving). **Rosters:** enrollment list (student, course, teacher) without payment columns. **Offerings:** create/manage courses for the department’s programs (year/season runs); Catalog under Programs reads the same offerings. **Schedule:** weekly class times + session/term list with links to edit. **Payroll:** teachers and childcare providers; log hours; create pay period for all; approve. **Financial Summary:** custom start/end periods; revenue totals from Programs billing (no student payment detail UI); approved payroll expenses. Header KPIs: Students, Staff, Revenue, Expenses, Net, Upcoming. SQL: `169`–`173`. Key files: `department-group-workspace-client.tsx`, `department-offerings*.tsx/ts`, `department-schedule*.tsx/ts`, `department-participants*.tsx/ts`, `department-payroll*.tsx/ts`, `department-budget*.tsx/ts`.
 
 **Settings → Users list fix (June 2026):** `/settings/users` now loads members via `fetchOrganizationUsersForSettings()` (service role + `settings.users.view`) instead of browser Supabase queries limited by RLS — admins see all org members (e.g. invited Super Admins), not only their own row. Row menu supports **Change Role**, **Edit Profile** (name + login email), **Send Reset Email** (Supabase recovery link to `/auth/confirm`), and **Delete** (removes org membership; blocks self-delete and last Super Admin). Actions require org system admin or `settings.users.manage`; audit log entries: `member.profile_updated`, `member.password_reset_sent`, `member.removed`. Key file: `lib/organizations/organization-users-actions.ts`.
 
@@ -195,11 +207,13 @@ Removed **255** legacy imported rows from `public.vendors` (May 2026 CSV import)
 
 **Contacts search fix (June 2026):** Contact list search no longer references `primary_contact_name` when that column is absent in the database — fixes production search errors after bulk import.
 
-**Contact profile module gating (June 2026):** Contact detail tabs and panels respect org-enabled modules from `/api/organizations/sidebar-modules` — e.g. MAS Dallas (donations-only) hides Workforce, venue rentals, programs/membership participation, and applications sections. Key files: `lib/contacts/contact-profile-module-access.ts`, `components/contacts/contact-profile-client.tsx`.
+**Contact profile homepage (July 2026):** Redesigned toward header + tabs + Overview right rail: sticky header (avatar initials, name, status, role badges, phone/email/location, Edit / More / + New), tabs **Overview** | **Financial** | **Activity** only (no Participation, Workforce, or Notes tabs). Overview uses a main column of cards (Contact Information with bio/notes, Family, **Activity** feed (last 5 timeline items → View all), Related Activity with lifetime/last-gift/enrollment snapshots by enabled modules) plus a right rail: **Quick Actions** (Add Donation/Pledge/Note/Register when modules allow) and **Financial Summary** (lifetime giving, gifts, pledges, rentals when enabled → View financial details). Quick Action / + New **Add Note** opens Overview in edit mode. **Financial** uses a homepage-style layout: KPI cards, Financial by Module chart + Recent Transactions, detail sub-tabs, and a right rail (see Contact Financial below). **Activity** = timeline (+ applications when enabled) and, when the contact has relevant activity, participation panels (membership groups, program enrollments/assignments) and workforce panels (employee/volunteer/vendor/etc.). Footer shows created date. Legacy `?tab=home|details|overview|notes` and `?section=activity` map to the new tabs (`notes` → Overview); `?tab=participation|workforce` map to Activity. Staff employee profile links that used the workforce tab now land on Activity. Key files: `components/contacts/contact-profile-client.tsx`, `components/contacts/contact-profile-header.tsx`, `components/contacts/contact-profile-overview-rail.tsx`, `lib/contacts/contact-profile-path.ts`, `lib/contacts/contact-profile-module-access.ts`.
 
-**Contact profile admin parity (June 2026):** Staff contact profile **Overview** mirrors the customer portal profile: editable address, bio/notes, date of birth, gender, and family members (add/remove). **Payment methods** (stored credit/debit cards on the contact profile) are on the **Financial** tab with **Add Card** (full card number and security code at entry; only last 4, expiration, and cardholder name persist). Customer portal **Profile → Payment Methods** uses the same `ContactPaymentMethodsPanel` and persists via `lib/customer/customer-payment-method-actions.ts` (loaded in `loadCustomerProfilePortalData`). Apply migration `138_contact_payment_methods.sql`. **Date of birth** is optional on staff contact edit and when staff add a family member (email and phone optional too); it remains required on customer signup and customer family-member add. Key files: `components/contacts/contact-basics-panel.tsx`, `components/contacts/contact-family-panel.tsx`, `components/contacts/contact-payment-methods-panel.tsx`, `lib/contacts/contact-payment-method-actions.ts`, `lib/contacts/contact-profile-admin-actions.ts`.
+**Contact profile module gating (June 2026):** Contact detail panels respect org-enabled modules from `/api/organizations/sidebar-modules` — e.g. MAS Dallas (donations-only) omits venue rentals and participation/workforce/applications surfaces under Activity (those panels appear under Activity only when the contact has relevant activity and the module is enabled). Key files: `lib/contacts/contact-profile-module-access.ts`, `components/contacts/contact-profile-client.tsx`.
 
-**Family giving / households (July 2026):** Donations remain on **individual contacts** only — no `family_id` on `payments`. New tables `families` + `family_members` (migration **`148`**) backfill from `person_relationships`; removing a member sets `end_date` (gifts stay on the contact). **Contacts → Families** list shows lifetime giving, gift count, and last gift; click a **family name** to open `/contacts/families/[id]` with summary cards, per-member giving, and recent family gifts. **Donations → Reports → Donors** toggles **Individual Giving** vs **Household Giving** (RPC `donation_household_giving_report`, migration **`149`**). Tax receipts stay on the donating contact. Adding/removing family on a contact profile syncs `family_members` via `lib/contacts/family-sync.ts`. **Household management (July 2026):** Contact profile **Family** tab — **Link existing contact** (search spouse/donor already in CRM) or create new person; banner links to household giving page. **Remove member** ends household membership only — the contact and all donations stay on their individual record (divorce / separation). **Household settings** on `/contacts/families/[id]` — edit household name, change primary contact / head, and remove members from the Members table (`lib/contacts/family-management-actions.ts`, `components/contacts/family-settings-panel.tsx`, `components/contacts/family-members-panel.tsx`). Linking ends the member's prior solo household when they were the only active member. Key files: `lib/contacts/family-giving-data.ts`, `lib/contacts/family-actions.ts`, `components/contacts/family-giving-detail.tsx`, `components/contacts/contact-family-panel.tsx`.
+**Contact profile admin parity (June 2026):** Staff contact profile **Overview** mirrors the customer portal profile: editable address, bio/notes, date of birth, gender, and family members (add/remove). Creating a new family member on staff Overview creates a **person** only (no contact profile / no People list row). Profile name links appear only for members who already have a real contact profile (linked existing contact, or contact with email/phone/roles/payments/donor record); auto-created shell contacts are not linked in the UI. **Payment methods** (stored credit/debit cards on the contact profile) are on the **Financial** tab with **Add Card** (full card number and security code at entry; only last 4, expiration, and cardholder name persist). Customer portal **Profile → Payment Methods** uses the same `ContactPaymentMethodsPanel` and persists via `lib/customer/customer-payment-method-actions.ts` (loaded in `loadCustomerProfilePortalData`). Apply migration `138_contact_payment_methods.sql`. **Date of birth** is optional on staff contact edit and when staff add a family member (email and phone optional too); it remains required on customer signup and customer family-member add. Key files: `components/contacts/contact-basics-panel.tsx`, `components/contacts/contact-family-panel.tsx`, `components/contacts/contact-payment-methods-panel.tsx`, `lib/contacts/contact-payment-method-actions.ts`, `lib/contacts/contact-profile-admin-actions.ts`.
+
+**Family giving / households (July 2026):** Donations remain on **individual contacts** only — no `family_id` on `payments`. New tables `families` + `family_members` (migration **`148`**) backfill from `person_relationships`; removing a member sets `end_date` (gifts stay on the contact). **Contacts → Families** list shows lifetime giving, gift count, and last gift; click a **family name** to open `/contacts/families/[id]` with summary cards, per-member giving, and recent family gifts. **Donations → Reports → Donors** toggles **Individual Giving**, **Household Giving**, and **Group Giving** (household RPC `donation_household_giving_report` / **`149`**; group RPC `donation_group_giving_report` / **`166`** — only groups with gifts or attributions in the selected period). Tax receipts stay on the donating contact. Adding/removing family on a contact profile syncs `family_members` via `lib/contacts/family-sync.ts`. **Household management (July 2026):** Contact profile **Family** tab — **Link existing contact** joins a real contact into the household for giving rollups; create new member adds a **person** only (no contact profile / People row). Name links only when the member already has a real contact profile (not an auto-created shell). Banner links to household giving page. **Remove member** ends household membership only — the contact and all donations stay on their individual record (divorce / separation). **Household settings** on `/contacts/families/[id]` — edit household name, change primary contact / head, and remove members from the Members table (`lib/contacts/family-management-actions.ts`, `components/contacts/family-settings-panel.tsx`, `components/contacts/family-members-panel.tsx`). Linking ends the member's prior solo household when they were the only active member. Key files: `lib/contacts/family-giving-data.ts`, `lib/contacts/family-actions.ts`, `components/contacts/family-giving-detail.tsx`, `components/contacts/contact-family-panel.tsx`.
 
 **Configurable automatic affiliations (June 2026):** Contacts → Settings → **Affiliations** lets each org turn activity-based affiliations on/off. Defaults follow subscribed modules (e.g. venue-only orgs have Donor off when Donations is not enabled). Stored in `organization_affiliation_settings`; enforced by `sync_contact_affiliations` (migration `115`). Manual affiliations on contact profiles are unchanged. Files: `lib/contacts/contact-affiliation-settings.ts`, `components/contacts/affiliation-rules-panel.tsx`, `scripts/115_organization_affiliation_settings.sql`.
 
@@ -209,9 +223,9 @@ Removed **255** legacy imported rows from `public.vendors` (May 2026 CSV import)
 
 **Pledge reassignment (June 2026):** **Edit Pledge** on **Campaigns → Pledges** (`/donations/pledges`) and contact profile **Financial → Pledges** includes an **Assigned to** picker (person, organization, or group). Saving reassigns the pledge to the selected contact’s donor record and moves linked **payments** and **pledge reminders** with it; affiliation sync runs on both old and new contacts. Use this to move historical pledges from an individual to a group (e.g. Quran Institute). Key files: `lib/donations/pledge-admin-actions.ts` (`updatePledgeAction`, `reassignPledgeContact`), `components/donations/pledge-contact-picker.tsx`, `components/donations/donor-pledges-tab.tsx`, `app/(dashboard)/donations/(operations)/pledges/page.tsx`.
 
-**Contact Financial → cross-module summary (June 2026):** Contact profile **Financial** tab is a read-only summary hub (not a second ledger). **Summary strip (July 2026):** sticky row with contact **name**, **phone**, and **email** on the left and compact 2×2 metric cards on the right (**Total Paid**, **Lifetime Contributions**, **Outstanding Balance**, **Last Activity**). **Open Balances** lists unpaid pledges, venue rental payment lines, and program fee balances from existing tables. **Financial Activity** is a unified timeline shown as a single scrolling stack of collapsible sections: **All Transactions** (actual payments only, no pledges), **Payment Plans** (recurring donations and other scheduled payments), **Pledges**, plus **Payment Methods** and **Statements** when applicable. All sections start collapsed. The separate **Donations** filter tab was removed — gifts appear under **All Transactions**. **Payment Methods** tab: staff add cards here; contacts can also add cards from **Profile → Payment Methods** in the customer portal (same saved list). Table columns: **Type** = activity kind (Donation, Pledge, Programs, Venue Rental, …); **Description** = campaign name for pledges, One-Time/Recurring Donation for gifts, program name for programs; **Method** = Cash, Check, Zelle, PayPal, Venmo, Square, etc.; Stripe shows `•••• 1234` when card metadata is available; generic **manual** / **import** sources show **—**; **Status** = for donations: **Succeeded**, **Failed**, **Refunded**, or **Partially Refunded** (imported/unallocated gifts show **Succeeded**); for pledges: **Open**, **Partial**, **Fulfilled**, or **Cancelled**. **Date** is clickable: donation **payments** open an inline **Edit Payment** dialog; **pledges** open an inline **Edit Pledge** dialog on the same contact profile; venue rentals and other modules follow their linked record. Pledge commitments appear under the **Pledges** filter; gift payments appear under **All Transactions** even when later linked to a pledge. Key files: `components/contacts/contact-financial-panel.tsx`, `components/donations/donor-recurring-panel.tsx`, `lib/contacts/contact-financial-actions.ts`. **Contact profile navigation (July 2026):** Breadcrumbs handle return paths (e.g. **Dashboard > Contacts > People**); the redundant profile back button was removed. `returnTo` query param and session-tracked paths still apply for **Open full profile** links and post-delete redirects. Key files: `components/contacts/contact-profile-client.tsx`, `lib/navigation/return-to.ts`.
+**Contact Financial → cross-module summary (June 2026 / layout July 2026):** Contact profile **Financial** tab is a read-only summary hub (not a second ledger). **Layout (July 2026):** KPI cards — **Lifetime Giving**, **Total Paid**, **Outstanding Balance**, **Last Payment** (each with subtitles) — plus an **All Time** period selector (All Time only for now). Two-column middle: **Financial by Module** doughnut chart and **Recent Transactions** (**View all** opens a full-list sheet). Detail sub-tabs: **Recurring** | **Pledges** | **Invoices** (placeholder) | **Refunds** | **Payment Methods** (module-gated). Right rail: **Financial Summary**, **Payment Methods**, **Statements** (and a **Membership** placeholder when the membership module is on). Footer: “All financial information is associated with {contact}.” **Open Balances** still opens from the Outstanding Balance KPI (or rail link) as a sheet; it lists unpaid pledges, venue rental payment lines, and program fee balances from existing tables. **Transactions** show actual payments only (no pledges) with the same row actions as One-Time Reports (**Refund**, **Link to Pledge**, **Download/Email Receipt**; click date still opens Edit). **Payment Plans** use donor-scoped **Reports → Recurring** actions: Edit, Change Card, Receive Payment, Pause/Resume, Cancel, New Plan; **Completed** plans are view-only — create a new plan instead of reactivating. **Pledges** use `DonorPledgesTab` (Edit, Payment Plan, Receive Payment, Mark as Paid, Cancel, reminders). **Payment Methods**: staff add cards on the Financial tab (and rail); contacts can also add cards from **Profile → Payment Methods** in the customer portal (same saved list). **Statements**: generate, preview, download, or email annual giving statements when donations apply. Profile ⋮ **Receive Payment** shows the contact name under the title (no Contact field); **Apply to** is a one-time donation, an open pledge, or an open payment plan (program/failed-payment targets to follow). The separate **Donations** filter tab was removed — gifts appear under transactions. Table columns: **Type** = activity kind (Donation, Pledge, Programs, Venue Rental, …); **Description** = campaign name for pledges, One-Time/Recurring Donation for gifts, program name for programs; **Status** = for donations: **Succeeded**, **Failed**, **Refunded**, or **Partially Refunded** (imported/unallocated gifts show **Succeeded**); for pledges: **Open**, **Partial**, **Fulfilled**, or **Cancelled**. **Date** is clickable: donation **payments** open an inline **Edit Payment** dialog; **pledges** open an inline **Edit Pledge** dialog on the same contact profile; venue rentals and other modules follow their linked record. Pledge commitments appear under the **Pledges** sub-tab; gift payments appear under transactions even when later linked to a pledge. Key files: `components/contacts/contact-financial-panel.tsx`, `components/donations/donor-recurring-panel.tsx`, `lib/contacts/contact-financial-actions.ts`. **Contact profile navigation (July 2026):** Breadcrumbs handle return paths (e.g. **Dashboard > Contacts > People**); the redundant profile back button was removed. `returnTo` query param and session-tracked paths still apply for **Open full profile** links and post-delete redirects. Key files: `components/contacts/contact-profile-client.tsx`, `lib/navigation/return-to.ts`.
 
-**Contact Financial → Pledges + reminders (June 2026):** Pledge remind/mark-contacted and payment actions remain in Donations module (`DonorPledgesTab` on donor workflows). Contact Financial tab lists pledge events in the unified timeline only.
+**Contact Financial → Pledges + reminders (June 2026 / July 2026):** Contact profile **Pledges** section uses `DonorPledgesTab` (Edit, Payment Plan, Receive Payment, Mark as Paid, Cancel Pledge, reminders) so actions stay in sync with donor workflows.
 
 **Payment import & match (June 2026 — unified flow):** Under **Payments** → **Import** (`/donations/payments/import`; Upload + History sub-tabs) and **Match Payments** (`/donations/payments/match`). Upload CSV → payments are created immediately in the match queue (`pending_review`) in **100-row server chunks**. **Auto-match after import** is on by default: high-confidence contact matches (≥85%, email/phone/exact name) link automatically; **name-only imports with no ≥85% match auto-create a new contact** from the payment sender name (no email/phone on the row). Weak partial matches (e.g. shared “Dr.”) are not shown as suggestions. Remainder with email/phone but no match stays for manual review. **Auto-allocate to best pledge** (default on with auto-match) uses `lib/donations/payment-pledge-allocation.ts`: prefers **lump-sum** (`one_time`) open pledges over **installment** schedules (`monthly`, `quarterly`, `yearly`); skips installment pledges when donor has an active `recurring_donation_plans` row and a lump-sum pledge exists; leaves payment **unallocated** when two pledges tie on top balance. Bulk auto-match and **Quick Apply** share the same picker. Migrations `116`–`118`. Key files: `components/donations/payment-import-match-workspace.tsx`, `lib/donations/payment-import-match-actions.ts`, `lib/donations/payment-contact-matching.ts`, `lib/donations/payment-pledge-allocation.ts`. Legacy `/donations/import` and `/donations/reconcile` redirect to the new Payments routes.
 
@@ -316,16 +330,18 @@ Staff routes under `/programs/*` require the **Programs** product module to be e
 
 Completed:
 
-* **Quick Create** (`/programs/create`) — basics only; redirects to edit after save
-* **Edit Program** (`/programs/[id]/edit`) — tabbed full setup (Basics, Enrollment, Registration, Pricing, Sessions, Financial Assistance)
-* Shared section components in `components/programs/edit/`
-* `saveEditProgram` wrapper for edit save (returns errors instead of throwing)
-* Legacy Billing / Program Fees cards removed from edit form; fee plans are SSOT on Pricing tab
+* **Catalog** (`/programs/catalog`) — mockup-aligned cards grid (flyer/placeholder, status badge, audience/offerings meta, enrollment bar, ⋮ menu: Edit / Duplicate / Registration Link / Download QR / Delete; status changes on Edit/detail; cards/table toggle, pagination)
+* **Program detail** (`/programs/[id]`) — single Overview page with program summary + offerings list (archived included). Inline **Edit** (name, subtitle, flyer, description, department, visibility, status) via Actions → Edit program or Overview Edit. Catalog ⋮ **Edit** opens this page. Key files: `program-detail-client.tsx`, `program-detail-actions.ts`.
+* **Offering manage** (`/programs/[id]/offerings/[offeringId]`) — single offering view with Overview / Registration / Fees / Schedule / Staff tabs. Optional `?tab=`. Switch offerings from program detail. `/programs/[id]/offerings` redirects to the first non-archived offering (or program detail if none).
+* **Quick Create** (`/programs/create`) — basics + eligibility; redirects to **program detail** after save.
+* **Retired Edit Program** (`/programs/[id]/edit`) — redirects to program detail (General) or offering manage (Offerings / legacy tab deep links). Billing route redirects to offering Fees.
+* **Service Needs** at **Programs → Settings → Service Needs** (`/programs/settings/service-needs`). Key files: `components/programs/program-service-needs-settings-client.tsx`, `components/programs/edit/program-service-requirements-panel.tsx`
+* Shared section components in `components/programs/edit/` (create + detail edit reuse basics; offerings use manage panels)
 * Capacity group gender/grade rules (Male/Female parallel pools)
 
 Quick Create collects: name, type, department, description, dates, eligibility, capacity, visibility, draft/active.
 
-Edit Program completes: registration options, fee plans, sessions, waitlist, financial assistance.
+Offering manage completes: registration options, fee plans, sessions/schedule, staff.
 
 ---
 
@@ -336,7 +352,7 @@ Completed:
 * Program CRUD
 * Departments
 * Eligibility fields (min/max age, grade levels, gender)
-* Registration types (Edit Program → Registration tab)
+* Registration types (Offering manage → Registration tab)
 * Visibility on create + edit
 
 ---
@@ -417,7 +433,10 @@ Routes:
 Features:
 
 * Search
-* Filters
+* Filters (department, offering, payment bucket, status, type)
+* Offering column (course; year program as subtitle)
+* Adult contact = participant; minor contact = parent
+* Amount / Received / Balance columns (no separate Type column; Status covers enrolled vs waitlist)
 * Stats
 * Status changes
 * Waitlist conversion
@@ -539,15 +558,34 @@ Technical note: URL paths remain `/hr/*`; only display names changed.
 
 Completed:
 
-* Tabs reduced to: Overview, Employees, Departments, Positions
+* Employees page is roster-only (no Departments/Positions tabs)
+* **Departments** is under **Programs** in the sidebar (first item: Departments, then Catalog, Schedule, Financial Assistance, Reports, Settings). Department names open `/workforce/departments/[id]`. Tabs: Overview (year programs), Employees, Rosters, Offerings, Schedule, Payroll, Financial Summary, Reports (archived years). Employees: name → contact; pencil → employment + **pay basis** (hourly rate or monthly salary). Legacy `/workforce/settings/departments` redirects to the list. Registrations moved under Programs → Reports.
+* **Positions** remain under **HR → Settings** (`/workforce/settings/positions`)
 * Removed: Time Off, Work Schedule, Notifications, Teams, Applications (as employee sub-tabs)
 * Removed QuickBooks payroll/scheduling note from copy
-* Employment applications linked from Employees header via `ModuleApplicationsLink`
+* **Contact-first hiring:** Add Employee searches existing Contacts only; if none match, create the person under Contacts first, then add them as an employee (`createEmployeeFromContact`). Same pattern for Add Volunteer.
+
+### HR directory list pattern
+
+Employees, Volunteers, and Childcare Providers share the same directory shell (`components/workforce/hr-directory-shell.tsx`):
+
+* Header: title, subtitle, Export CSV, primary Add/Review action (default blue buttons)
+* Tabs: Directory | Applications (pending count → people-management submissions) | Archived
+* KPI stat cards, search/filters bar, avatar table, 10-per-page pagination
+
+Key files:
+
+* `components/hr/staff-records-client.tsx` — Employees
+* `components/workforce/volunteers-list.tsx` — Volunteers
+* `components/hr/hr-childcare-panel.tsx` — Childcare Providers
 
 Redirects:
 
-* `/hr/time-off` → `/hr/employees?tab=overview`
-* Old settings tab URLs for departments/positions → `/hr/employees?tab=...`
+* `/hr/time-off` → `/workforce/employees`
+* `/workforce/employees?tab=departments` → `/workforce/departments`
+* `/workforce/employees?tab=positions` → `/workforce/settings/positions`
+* `/settings/departments`, `/hr/departments`, `/workforce/settings/departments` → `/workforce/departments`
+* `/settings/positions`, `/workforce/positions` → `/workforce/settings/positions`
 
 ---
 
@@ -555,17 +593,18 @@ Redirects:
 
 Status: Complete (data wiring)
 
-Route: `/hr/childcare`
+**Providers:** `/workforce/childcare` (HR)  
+**Registrations:** `/event-management/reports/childcare` (Event Management → Reports)
 
 Completed:
 
-* Moved under People Management at `/hr/childcare`
+* Providers under HR at `/workforce/childcare` using the shared HR directory shell
+* Registrations under **Event Management → Reports → Childcare Registrations** (moved from Workforce; old `/workforce/childcare/registrations` redirects)
 * Removed mock provider array
 * Providers loaded from approved `childcare_provider` applications
-* Summary stat cards preserved (blue/green/purple/amber color scheme)
 * Provider detail dialog shows real `form_data` from applications
 * Empty states for no providers and no event history
-* Review Applications / Add Provider flows link to Applications Submissions tab
+* Applications tab / Review Applications link to Applications Submissions tab
 
 Pending:
 
@@ -575,6 +614,8 @@ Key files:
 
 * `lib/hr/childcare-provider-actions.ts`
 * `components/hr/hr-childcare-panel.tsx`
+* `components/child-care/childcare-registrations-client.tsx`
+* `app/(dashboard)/event-management/reports/childcare/page.tsx`
 
 ---
 
@@ -642,35 +683,20 @@ Completed:
 
 ## People Management Applications Page
 
-Status: Active Development
+Status: Relocated
 
-Route: `/people-management/applications`
+HR application submissions no longer live under Settings. Each type opens on the matching category **Applications** view:
 
-Completed:
+* Employment → `/workforce/employees?tab=applications`
+* Volunteer → `/workforce/volunteers?tab=applications`
+* Childcare provider → `/workforce/childcare?tab=applications`
+* Committee member → `/membership/applications`
 
-* Three top-level tabs: **Overview**, **Submissions**, **Templates**
-* Overview: stat cards, status shortcuts, per-type counts; clicks navigate to Submissions with filters
-* Submissions: status tabs, search, type/status filters, applications table
-* Templates: cards per PM application type with scaffold for future form builder
-* Module shortcut links (Child Care, Employees, etc.) open Submissions tab with type filter
-* `PEOPLE_MANAGEMENT_APPLICATIONS_HUB_TYPES` excludes employment from default hub view
+**Application Templates** remain at **HR → Settings → Application Templates** (`/workforce/settings/application-templates`).
 
-URL behavior:
+Legacy `/settings/applications` (and `/people-management/applications`) redirects to the category Applications tab based on `application_type` (default: employment). `?tab=templates` redirects to Application Templates. Legacy `/workforce/settings/committee-applications` redirects to Membership Applications.
 
-* `/people-management/applications` → Overview
-* `?tab=submissions` → Submissions
-* `?tab=templates` → Templates
-* `?application_type=` or `?status=` → Submissions (auto)
-
-Pending:
-
-* Template form builder (Configure Fields)
-* Custom org-defined application types in UI
-
-Key files:
-
-* `components/applications/people-management-applications-client.tsx`
-* `components/applications/application-templates-panel.tsx`
+Module shortcut links and directory Applications tabs open the embedded submissions list for that category.
 
 ---
 
@@ -934,7 +960,7 @@ Staff with `donations.manage` can edit, void, refund, and **allocate** payments 
 | Stripe refund (full/partial) | No | Yes |
 | Record refund (ledger only) | Yes | No (except imported rows) |
 
-Imported CSV payments (`source_type = import`) cannot receive in-app Stripe refunds even if the method column says `stripe`; staff refund externally and **Record Refund** in the app.
+Imported CSV payments (`source_type = import`) cannot receive in-app Stripe refunds even if the method column says `stripe`; staff refund externally and use **Refund** in the app.
 
 **Totals:** migration `125_payment_refunds_net_amounts.sql` — net amount `amount - refunded_amount` in `pledge_status_view`, `donor_summary_view`, dashboard RPCs, and pledge refresh trigger (also fires on `refunded_amount` updates). Payment statuses: `partially_refunded`, `refunded`.
 
@@ -1206,7 +1232,7 @@ Status: Implemented (June 2026)
   * **One-Time Donations** — `/donations/reports/one-time` (summary metric cards + server-paginated payments table: Date, **Donor** (column filter by name), Amount, Method, **Status** (column filter: Succeeded / Failed / Refunded / Partially Refunded; colored badges), **Actions** blue ⋮ menu: Refund, Link to Pledge, Download Receipt, Email Receipt to Donor)
   * **Recurring Donations** — `/donations/reports/recurring`
   * **Pledges** — `/donations/campaigns/pledges` (pledge table with column-header filters on Donor Name, Status, and Campaign; collection queue; add/edit pledge dialogs). Legacy `/donations/reports/pledges` redirects here.
-  * **Donors** — `/donations/reports/donors` (**Individual Giving** or **Household Giving** toggle; household aggregates active member contact gifts)
+  * **Donors** — `/donations/reports/donors` (**Individual Giving**, **Household Giving**, or **Group Giving** toggle; group report only lists groups with gifts/attributions in the selected period — group gifts + attributed member gifts; RPC `donation_group_giving_report`, migration **`166`**)
   * **Import** — `/donations/reports/import` (Upload + History; `donations.manage`)
   * **Match Payments** — `/donations/reports/match` (manage permission; operational health panel; KPI cards for **Needs match**, **May link to pledge**, **Unresolved**, **Action queue amount**; default filter **Needs match**)
   * **Receipts** — `/donations/reports/receipts`
@@ -1459,7 +1485,7 @@ Activity write (donation, enrollment, ticket order, volunteer roster)
 |--------|-------|
 | **S-01** | `handleDonationAffiliationSync` accepts optional `organizationId` + `supabaseClient` for webhook/service-role callers |
 | **S-02/S-03** | Stripe webhook donation affiliation sync via `syncDonationAffiliationFromWebhook` |
-| **S-04A/B** | Unified **Customer** role (`customer`) replaces `program_participant`, `event_attendee`, `venue_rental_customer`; derivation in `computeDerivedAffiliations` + RPC (migration `137_customer_role_merge.sql`) |
+| **S-04A/B** | **Programs** (`program_participant`) for enrollments (participant or registrant); **Customer** (`customer`) for events/ticketing + venue rentals (migration `175` after unified `137`) |
 | **S-05/S-06** | Portal/staff pledge **payment** → `handleDonationAffiliationSync`; pledge create does not sync donor |
 | **S-07** | `createTicketOrder` → `findOrCreateContact` + `ticket_orders.contact_id` |
 | **S-08** | Ticketing completion → `syncContactAffiliations` on completed orders |
@@ -1477,7 +1503,7 @@ Activity write (donation, enrollment, ticket order, volunteer roster)
 | `customer` | Program enrollment (non-terminal), completed ticket order, or venue rental with `billing_contact_id` (status not declined/cancelled/draft) | Never (sticky) | `syncContactAffiliations` |
 | `member` | Active `memberships` row | Yes when membership lapses | `syncContactAffiliations` |
 
-Migration **`137_customer_role_merge.sql`** backfills legacy `program_participant`, `event_attendee`, and `venue_rental_customer` rows into `customer` and merges org auto-sync settings.
+Migration **`137_customer_role_merge.sql`** backfills legacy `program_participant`, `event_attendee`, and `venue_rental_customer` rows into `customer` and merges org auto-sync settings. Migration **`175_split_customer_programs_affiliation.sql`** restores **Programs** (`program_participant`) for enrollments and narrows **Customer** to events/venue.
 
 ### Module write paths
 

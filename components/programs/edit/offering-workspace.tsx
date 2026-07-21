@@ -294,7 +294,7 @@ export function OfferingWorkspace({
   )
 }
 
-function OfferingOverviewFields({
+export function OfferingOverviewFields({
   draft,
   onDraftChange,
 }: {

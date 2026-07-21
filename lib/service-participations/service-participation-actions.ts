@@ -34,7 +34,7 @@ function revalidateParticipationPaths(
     revalidatePath(`/event-management/${sourceId}`)
   }
   if (sourceType === "program" && sourceId) {
-    revalidatePath(`/programs/${sourceId}/edit`)
+    revalidatePath(`/programs/${sourceId}`)
   }
 }
 
@@ -198,6 +198,7 @@ export async function registerChildForOpportunityChildcare(input: {
   }
 
   revalidateParticipationPaths(input.sourceType, input.sourceId)
+  revalidatePath("/event-management/reports/childcare")
   revalidatePath("/workforce/childcare/registrations")
 }
 
@@ -281,7 +282,8 @@ export async function updateProgramServiceRequirements(input: {
     throw new Error(error.message || "Could not save program service needs.")
   }
 
-  revalidatePath(`/programs/${input.programId}/edit`)
+  revalidatePath(`/programs/${input.programId}`)
+  revalidatePath("/programs/settings/service-needs")
   revalidatePath("/customer/opportunities")
 }
 

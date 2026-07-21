@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 
 import {
   canViewOrganizationBilling,
+  isOrganizationSuperAdminRoleName,
   isOrganizationSystemAdmin,
 } from "@/lib/organizations/organization-system-admin"
 import { PERMISSIONS } from "@/lib/permissions/permission-keys"
@@ -49,10 +50,12 @@ export async function buildSidebarPermissionContext(input: {
     platformSupport: false,
   })
 
-  if (isOwner) {
+  // System admins and org Super Admin should see every enabled module in the sidebar,
+  // even when role_permissions were seeded before a newly enabled module existed.
+  if (isOwner || isOrganizationSuperAdminRoleName(organizationRoleName)) {
     return {
       isOwner: true,
-      isSuperAdmin: isSuperAdmin || isOwner,
+      isSuperAdmin: true,
       enabledPermissions: Object.values(PERMISSIONS),
     }
   }

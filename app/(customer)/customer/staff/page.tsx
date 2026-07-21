@@ -121,7 +121,7 @@ export default async function CustomerStaffToolsPage() {
 
       {myRequests.length > 0 ? (
         <section className="space-y-3">
-          <h2 className="text-lg font-semibold">Recent requests</h2>
+          <h2 className="text-lg font-semibold">Requests</h2>
           <div className="space-y-3">
             {myRequests.slice(0, 5).map((event) => (
               <Card key={event.id}>

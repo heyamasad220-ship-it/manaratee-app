@@ -1,5 +1,8 @@
 export type DonorDateRangeMode = "lifetime" | "year" | "custom"
 
+export const DONATIONS_DONORS_REPORT_PATH = "/donations/reports/donors"
+export const DONATIONS_GROUP_GIVING_REPORT_PATH = `${DONATIONS_DONORS_REPORT_PATH}?view=group`
+
 export type DonorReportSortBy =
   | "full_name"
   | "total_donations"

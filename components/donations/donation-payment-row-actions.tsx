@@ -37,6 +37,12 @@ import {
   recordPaymentRefundAction,
   stripeRefundPaymentAction,
 } from "@/lib/donations/payment-admin-actions"
+import {
+  paymentRefundConfirmLabel,
+  paymentRefundDialogDescription,
+  paymentRefundDialogTitle,
+  paymentRefundMenuLabel,
+} from "@/lib/donations/payment-admin-copy"
 
 type DonationPaymentRowActionsProps = {
   row: DonationHistoryRow
@@ -66,7 +72,15 @@ export function DonationPaymentRowActions({
 
   const { capabilities } = row
   const hasRefund = capabilities.canStripeRefund || capabilities.canRecordRefund
-  const refundTitle = capabilities.canStripeRefund ? "Refund via Stripe" : "Record Refund"
+  const refundTitle = paymentRefundDialogTitle()
+  const refundMenuLabel = paymentRefundMenuLabel()
+  const refundConfirmLabel = paymentRefundConfirmLabel()
+  const refundDescription = paymentRefundDialogDescription({
+    remainingRefundable: capabilities.remainingRefundable,
+    canStripeRefund: capabilities.canStripeRefund,
+    stripeRefundBlockedReason: capabilities.stripeRefundBlockedReason,
+    formatMoney,
+  })
 
   function openRefundDialog() {
     setError(null)
@@ -191,7 +205,7 @@ export function DonationPaymentRowActions({
               }}
             >
               <RotateCcw className="mr-2 h-4 w-4" />
-              {capabilities.canStripeRefund ? "Refund" : "Record Refund"}
+              {refundMenuLabel}
             </DropdownMenuItem>
           ) : null}
           {capabilities.canAllocate && onLinkToPledge ? (
@@ -235,12 +249,7 @@ export function DonationPaymentRowActions({
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>{refundTitle}</DialogTitle>
-            <DialogDescription>
-              {capabilities.canStripeRefund
-                ? `Issue a refund through Stripe. Up to ${formatMoney(capabilities.remainingRefundable)} remaining.`
-                : capabilities.stripeRefundBlockedReason ||
-                  `Record a refund processed outside the app. Up to ${formatMoney(capabilities.remainingRefundable)} remaining.`}
-            </DialogDescription>
+            <DialogDescription>{refundDescription}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="flex gap-2">
@@ -293,11 +302,7 @@ export function DonationPaymentRowActions({
               Cancel
             </Button>
             <Button onClick={() => void handleRefund()} disabled={saving}>
-              {saving
-                ? "Processing..."
-                : capabilities.canStripeRefund
-                  ? "Refund"
-                  : "Record Refund"}
+              {saving ? "Processing..." : refundConfirmLabel}
             </Button>
           </DialogFooter>
         </DialogContent>

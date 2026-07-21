@@ -5,10 +5,13 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
   Copy,
+  ImageIcon,
   Link2,
   Loader2,
+  MoreHorizontal,
   Pencil,
   QrCode,
+  Archive,
   Trash2,
 } from "lucide-react"
 
@@ -21,70 +24,20 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import {
   deleteProgram,
   duplicateProgram,
 } from "@/lib/programs/program-catalog-actions"
 import { buildProgramRegistrationUrl } from "@/lib/programs/program-customer-url"
-
-function ActionIconButton({
-  label,
-  onClick,
-  href,
-  disabled,
-  isLoading,
-  children,
-  className,
-}: {
-  label: string
-  onClick?: () => void
-  href?: string
-  disabled?: boolean
-  isLoading?: boolean
-  children: React.ReactNode
-  className?: string
-}) {
-  const button = href ? (
-    <Button
-      variant="outline"
-      size="icon"
-      className={`h-8 w-8 ${className ?? ""}`}
-      asChild
-      disabled={disabled}
-    >
-      <Link href={href} aria-label={label}>
-        {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : children}
-      </Link>
-    </Button>
-  ) : (
-    <Button
-      type="button"
-      variant="outline"
-      size="icon"
-      className={`h-8 w-8 ${className ?? ""}`}
-      onClick={onClick}
-      disabled={disabled || isLoading}
-      aria-label={label}
-    >
-      {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : children}
-    </Button>
-  )
-
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>{button}</TooltipTrigger>
-      <TooltipContent>{label}</TooltipContent>
-    </Tooltip>
-  )
-}
 
 async function downloadQrCode(url: string, filename: string) {
   const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=512x512&data=${encodeURIComponent(url)}`
@@ -109,10 +62,20 @@ export function ProgramCardActions({
   programId,
   programName,
   programStatus,
+  editLabel = "Edit",
+  onEditFlyer,
+  onArchiveYear,
+  hideDelete = false,
 }: {
   programId: string
   programName: string
   programStatus: string
+  /** Primary open/edit label (department Overview uses "View / Edit"). */
+  editLabel?: string
+  onEditFlyer?: () => void
+  onArchiveYear?: () => void
+  /** Department year cards: use Archive instead of permanent Delete. */
+  hideDelete?: boolean
 }) {
   const router = useRouter()
   const canShareRegistration = programStatus === "active"
@@ -120,6 +83,7 @@ export function ProgramCardActions({
     "copy" | "delete" | "copyUrl" | "qr" | null
   >(null)
   const [feedback, setFeedback] = React.useState<string | null>(null)
+  const [deleteOpen, setDeleteOpen] = React.useState(false)
 
   function showFeedback(message: string) {
     setFeedback(message)
@@ -138,8 +102,7 @@ export function ProgramCardActions({
         return
       }
 
-      router.push(`/programs/${result.programId}/edit?created=1`)
-      router.refresh()
+      router.push(`/programs/${result.programId}`)
     } catch {
       showFeedback("Failed to copy program.")
     } finally {
@@ -159,6 +122,7 @@ export function ProgramCardActions({
         return
       }
 
+      setDeleteOpen(false)
       router.refresh()
     } catch {
       showFeedback("Failed to delete program.")
@@ -177,10 +141,7 @@ export function ProgramCardActions({
     setFeedback(null)
 
     try {
-      const url = buildProgramRegistrationUrl(
-        programId,
-        window.location.origin
-      )
+      const url = buildProgramRegistrationUrl(programId, window.location.origin)
       await navigator.clipboard.writeText(url)
       showFeedback("Registration link copied.")
     } catch {
@@ -200,10 +161,7 @@ export function ProgramCardActions({
     setFeedback(null)
 
     try {
-      const url = buildProgramRegistrationUrl(
-        programId,
-        window.location.origin
-      )
+      const url = buildProgramRegistrationUrl(programId, window.location.origin)
       const safeName = programName
         .trim()
         .toLowerCase()
@@ -218,96 +176,133 @@ export function ProgramCardActions({
     }
   }
 
+  const isBusy = pendingAction !== null
+
   return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap items-center gap-1.5">
-        <ActionIconButton
-          label="Edit program"
-          href={`/programs/${programId}/edit`}
-        >
-          <Pencil className="h-4 w-4" />
-        </ActionIconButton>
-
-        <AlertDialog>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <AlertDialogTrigger asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8 text-destructive hover:text-destructive"
-                  aria-label="Delete program"
-                  disabled={pendingAction === "delete"}
-                >
-                  {pendingAction === "delete" ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Trash2 className="h-4 w-4" />
-                  )}
-                </Button>
-              </AlertDialogTrigger>
-            </TooltipTrigger>
-            <TooltipContent>Delete program</TooltipContent>
-          </Tooltip>
-
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete {programName}?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This permanently removes the program. Programs with registrations
-                or waitlist entries cannot be deleted.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                onClick={() => void handleDeleteProgram()}
+    <div className="relative">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 shrink-0"
+            aria-label="Program actions"
+            disabled={isBusy}
+          >
+            {isBusy ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <MoreHorizontal className="h-4 w-4" />
+            )}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-52">
+          <DropdownMenuItem asChild>
+            <Link href={`/programs/${programId}`}>
+              <Pencil className="h-4 w-4" />
+              {editLabel}
+            </Link>
+          </DropdownMenuItem>
+          {onEditFlyer ? (
+            <DropdownMenuItem onClick={onEditFlyer}>
+              <ImageIcon className="h-4 w-4" />
+              Edit flyer
+            </DropdownMenuItem>
+          ) : null}
+          <DropdownMenuItem
+            disabled={pendingAction === "copy"}
+            onClick={() => void handleCopyProgram()}
+          >
+            <Copy className="h-4 w-4" />
+            Duplicate
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            disabled={!canShareRegistration || pendingAction === "copyUrl"}
+            onClick={() => void handleCopyRegistrationUrl()}
+            title={
+              canShareRegistration
+                ? undefined
+                : "Active programs only"
+            }
+          >
+            <Link2 className="h-4 w-4" />
+            Registration Link
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            disabled={!canShareRegistration || pendingAction === "qr"}
+            onClick={() => void handleDownloadQrCode()}
+            title={
+              canShareRegistration
+                ? undefined
+                : "Active programs only"
+            }
+          >
+            <QrCode className="h-4 w-4" />
+            Download QR Code
+          </DropdownMenuItem>
+          {onArchiveYear ? (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                variant="destructive"
+                onClick={onArchiveYear}
               >
+                <Archive className="h-4 w-4" />
+                Archive year
+              </DropdownMenuItem>
+            </>
+          ) : null}
+          {!hideDelete && !onArchiveYear ? (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                variant="destructive"
+                disabled={pendingAction === "delete"}
+                onSelect={() => setDeleteOpen(true)}
+              >
+                <Trash2 className="h-4 w-4" />
                 Delete
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+              </DropdownMenuItem>
+            </>
+          ) : null}
+        </DropdownMenuContent>
+      </DropdownMenu>
 
-        <ActionIconButton
-          label="Copy program"
-          onClick={() => void handleCopyProgram()}
-          isLoading={pendingAction === "copy"}
-        >
-          <Copy className="h-4 w-4" />
-        </ActionIconButton>
-
-        <ActionIconButton
-          label={
-            canShareRegistration
-              ? "Copy registration link"
-              : "Copy registration link (Active programs only)"
-          }
-          onClick={() => void handleCopyRegistrationUrl()}
-          isLoading={pendingAction === "copyUrl"}
-          disabled={!canShareRegistration}
-        >
-          <Link2 className="h-4 w-4" />
-        </ActionIconButton>
-
-        <ActionIconButton
-          label={
-            canShareRegistration
-              ? "Download QR code"
-              : "Download QR code (Active programs only)"
-          }
-          onClick={() => void handleDownloadQrCode()}
-          isLoading={pendingAction === "qr"}
-          disabled={!canShareRegistration}
-        >
-          <QrCode className="h-4 w-4" />
-        </ActionIconButton>
-      </div>
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {programName}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes the program. Programs with registrations or
+              waitlist entries cannot be deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={pendingAction === "delete"}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={pendingAction === "delete"}
+              onClick={(event) => {
+                event.preventDefault()
+                void handleDeleteProgram()
+              }}
+            >
+              {pendingAction === "delete" ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : null}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {feedback ? (
-        <p className="text-xs text-muted-foreground">{feedback}</p>
+        <p className="absolute right-0 top-full z-10 mt-1 w-48 text-right text-[10px] text-muted-foreground">
+          {feedback}
+        </p>
       ) : null}
     </div>
   )

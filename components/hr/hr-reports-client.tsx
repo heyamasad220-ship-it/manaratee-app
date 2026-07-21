@@ -295,7 +295,7 @@ export function HRReportsClient({ organizationId }: { organizationId: string | n
 
           <Card>
             <CardHeader>
-              <CardTitle>Recent Hires</CardTitle>
+              <CardTitle>Hires</CardTitle>
               <CardDescription>New employees in the selected period</CardDescription>
             </CardHeader>
             <CardContent className="p-0">

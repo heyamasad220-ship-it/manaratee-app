@@ -26,6 +26,7 @@ import {
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ProgramPromoCodesSettingsPanel } from "@/components/programs/program-promo-codes-settings-panel"
+import { ProgramsSettingsNav } from "@/components/programs/programs-settings-nav"
 
 type ProgramSettings = {
   default_capacity: number
@@ -186,6 +187,8 @@ export default function SettingsPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
           <p className="text-muted-foreground">Manage program and organization settings.</p>
         </div>
+
+        <ProgramsSettingsNav />
 
         {!tablesAvailable && (
           <Card className="border-amber-500/50 bg-amber-500/10">

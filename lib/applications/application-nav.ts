@@ -1,8 +1,9 @@
 import type { ModuleOwner } from "@/lib/applications/application-types"
 import {
-  PEOPLE_MANAGEMENT_APPLICATIONS_PATH,
+  HR_EMPLOYEE_APPLICATIONS_PATH,
   PROGRAMS_FINANCIAL_ASSISTANCE_PATH,
   VENDOR_HUB_APPLICATIONS_PATH,
+  hrCategoryApplicationsUrl,
 } from "@/lib/applications/application-routes"
 
 export type ApplicationNavItem = {
@@ -12,13 +13,13 @@ export type ApplicationNavItem = {
   permissionKey?: string
 }
 
-/** Organization workforce application hub (under global Settings). */
+/** @deprecated Settings Applications hub removed — use HR category Applications tabs. */
 export function hrApplicationNavItems(): ApplicationNavItem[] {
   return [
     {
-      label: "Applications",
-      href: PEOPLE_MANAGEMENT_APPLICATIONS_PATH,
-      matchPrefix: PEOPLE_MANAGEMENT_APPLICATIONS_PATH,
+      label: "Employment Applications",
+      href: hrCategoryApplicationsUrl({ applicationType: "employment" }),
+      matchPrefix: HR_EMPLOYEE_APPLICATIONS_PATH,
       permissionKey: "applications.view",
     },
   ]

@@ -1612,7 +1612,7 @@ export default function PledgesPage() {
       <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Record Payment</DialogTitle>
+            <DialogTitle>Receive Payment</DialogTitle>
             <DialogDescription>Add a payment for this pledge</DialogDescription>
           </DialogHeader>
 
@@ -1845,7 +1845,7 @@ export default function PledgesPage() {
       openRecordPaymentDialog(selectedPledge);
     }}
   >
-    Record Payment
+    Receive Payment
   </Button>
   <Button
     variant="outline"

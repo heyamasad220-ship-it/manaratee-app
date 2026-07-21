@@ -60,5 +60,5 @@ export async function replaceProgramFeeOptions({
   }
 
   revalidatePath(`/programs/${program_id}`)
-  revalidatePath(`/programs/${program_id}/edit`)
+  revalidatePath(`/programs/${program_id}/offerings`)
 }

@@ -421,6 +421,20 @@ export type HouseholdGivingReportRow = {
   outstanding_pledge_balance: number
 }
 
+export type GroupGivingReportRow = {
+  group_contact_id: string
+  group_name: string
+  primary_contact_name: string | null
+  member_count: number
+  group_gifts_total: number
+  member_gifts_total: number
+  total_donations: number
+  donation_count: number
+  last_donation_date: string | null
+  pledge_status: string | null
+  outstanding_pledge_balance: number
+}
+
 export type DonorSummaryReportFilters = Pick<
   DonorsPageInput,
   | "search"
@@ -680,6 +694,84 @@ export async function fetchHouseholdGivingReportPageAction(
   return {
     success: true as const,
     households,
+    total,
+    page,
+    pageSize,
+  }
+}
+
+type GroupGivingReportRpcRow = {
+  group_contact_id: string
+  group_name: string | null
+  primary_contact_name: string | null
+  member_count: number | string | null
+  group_gifts_total: number | string | null
+  member_gifts_total: number | string | null
+  total_donations: number | string | null
+  donation_count: number | string | null
+  last_donation_date: string | null
+  pledge_status: string | null
+  outstanding_pledge_balance: number | string | null
+  total_count: number | string | null
+}
+
+function mapGroupGivingReportRow(row: GroupGivingReportRpcRow): GroupGivingReportRow {
+  return {
+    group_contact_id: row.group_contact_id,
+    group_name: row.group_name || "Unnamed group",
+    primary_contact_name: row.primary_contact_name ?? null,
+    member_count: Number(row.member_count || 0),
+    group_gifts_total: Number(row.group_gifts_total || 0),
+    member_gifts_total: Number(row.member_gifts_total || 0),
+    total_donations: Number(row.total_donations || 0),
+    donation_count: Number(row.donation_count || 0),
+    last_donation_date: row.last_donation_date,
+    pledge_status: row.pledge_status ?? null,
+    outstanding_pledge_balance: Number(row.outstanding_pledge_balance || 0),
+  }
+}
+
+export async function fetchGroupGivingReportPageAction(
+  input: Pick<
+    DonorsPageInput,
+    "page" | "pageSize" | "search" | "dateFrom" | "dateTo" | "sortBy" | "sortAsc"
+  > = {}
+) {
+  const access = await requireDonationStaffAccess("view")
+  if (!access.ok) return { success: false as const, error: access.error }
+
+  const page = Math.max(1, input.page ?? 1)
+  const pageSize = Math.min(100, Math.max(1, input.pageSize ?? DONATIONS_PAGE_SIZE))
+  const sortBy = input.sortBy ?? "total_donations"
+  const sortAsc = input.sortAsc ?? sortBy === "full_name"
+
+  const { data, error } = await access.supabase.rpc("donation_group_giving_report", {
+    p_org_id: access.orgId,
+    p_date_from: input.dateFrom ?? null,
+    p_date_to: input.dateTo ?? null,
+    p_search: input.search ?? null,
+    p_sort_by: sortBy === "outstanding_pledge_balance" ? "total_donations" : sortBy,
+    p_sort_asc: sortAsc,
+    p_limit: pageSize,
+    p_offset: (page - 1) * pageSize,
+  })
+
+  if (error) {
+    return {
+      success: false as const,
+      error: error.message.includes("donation_group_giving_report")
+        ? "Group giving report is not available yet. Run migration scripts/166_group_giving_report.sql."
+        : error.message,
+    }
+  }
+
+  const rpcRows = (data || []) as GroupGivingReportRpcRow[]
+  const groups = rpcRows.map(mapGroupGivingReportRow)
+  const total = Number(rpcRows[0]?.total_count || 0)
+
+  return {
+    success: true as const,
+    groups,
     total,
     page,
     pageSize,

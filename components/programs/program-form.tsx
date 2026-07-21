@@ -380,6 +380,20 @@ export function ProgramForm(props: ProgramFormProps) {
     return program?.capacity ?? 0
   }
 
+  const createdParam = searchParams.get("created")
+  const offeringParam = searchParams.get("offering")
+  const tabParam = searchParams.get("tab")
+  const searchQueryWithoutCreated = React.useMemo(() => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.delete("created")
+    return params.toString()
+  }, [searchParams])
+  const capacityGroupsSignature = React.useMemo(
+    () => (isCreate ? "" : JSON.stringify(props.capacityGroups)),
+    [isCreate, props.capacityGroups]
+  )
+  const clearedCreatedQueryRef = React.useRef(false)
+
   React.useEffect(() => {
     if (program?.status) {
       setProgramStatus(program.status)
@@ -387,10 +401,14 @@ export function ProgramForm(props: ProgramFormProps) {
   }, [program?.status])
 
   React.useEffect(() => {
-    if (!isCreate) {
-      setCapacityGroups(props.capacityGroups)
+    if (isCreate || !capacityGroupsSignature) {
+      return
     }
-  }, [isCreate, props.capacityGroups])
+
+    setCapacityGroups(props.capacityGroups)
+    // Intentionally sync from server payload signature, not array identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- props.capacityGroups tracked via signature
+  }, [isCreate, capacityGroupsSignature])
 
   React.useEffect(() => {
     if (!gradesApplyForMinAge(minAge)) {
@@ -403,25 +421,29 @@ export function ProgramForm(props: ProgramFormProps) {
       return
     }
 
-    if (searchParams.get("offering")) {
+    if (offeringParam || tabParam === "offerings") {
       setActiveTab("offerings")
     }
-  }, [isCreate, searchParams])
+  }, [isCreate, offeringParam, tabParam])
 
   React.useEffect(() => {
-    if (isCreate || searchParams.get("created") !== "1") {
+    if (isCreate || createdParam !== "1" || !program?.id) {
       return
     }
 
+    if (clearedCreatedQueryRef.current) {
+      return
+    }
+
+    clearedCreatedQueryRef.current = true
     setShowCreatedBanner(true)
-    const params = new URLSearchParams(searchParams.toString())
-    params.delete("created")
-    const query = params.toString()
+
+    const query = searchQueryWithoutCreated
     router.replace(
-      `/programs/${program!.id}/edit${query ? `?${query}` : ""}`,
+      `/programs/${program.id}/edit${query ? `?${query}` : ""}`,
       { scroll: false }
     )
-  }, [isCreate, program, router, searchParams])
+  }, [isCreate, createdParam, program?.id, router, searchQueryWithoutCreated])
 
   function handleTabChange(value: string) {
     const nextTab = value as ProgramFormTab
@@ -574,8 +596,7 @@ export function ProgramForm(props: ProgramFormProps) {
     const nextTab = continueAfterSaveRef.current ? "offerings" : activeTab
     continueAfterSaveRef.current = false
 
-    router.replace(`/programs/${programId}/edit?tab=${nextTab}&created=1`)
-    router.refresh()
+    router.replace(`/programs/${programId}`)
   }
 
   async function handleEditSubmit(
@@ -837,7 +858,7 @@ export function ProgramForm(props: ProgramFormProps) {
           </TabsContent>
 
           {!isCreate ? (
-            <TabsContent forceMount value="offerings" className="mt-0 space-y-4">
+            <TabsContent value="offerings" className="mt-0 space-y-4">
               <ProgramOfferingsSection
                 program={program!}
                 offerings={props.offerings}

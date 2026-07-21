@@ -12,7 +12,8 @@ import {
 import type { ProgramStaffAssignmentRole } from "@/lib/programs/program-staff-assignment-types"
 
 function revalidateStaffAssignmentPaths(programId: string, contactId?: string) {
-  revalidatePath(`/programs/${programId}/edit`)
+  revalidatePath(`/programs/${programId}`)
+  revalidatePath(`/programs/${programId}/offerings`)
   revalidatePath("/my-classes")
   if (contactId) {
     revalidatePath(`/contacts/${contactId}`)

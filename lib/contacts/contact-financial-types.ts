@@ -55,6 +55,21 @@ export type ContactFinancialTimelineEvent = {
   /** Set when a gift was counted toward a group (individual donors only). */
   attributedGroupContactId?: string | null
   attributedGroupName?: string | null
+  /** Donation payment fields for report-style row actions on contact profile. */
+  paymentActionRow?: {
+    id: string
+    amount: number
+    refunded_amount: number | null
+    payment_date: string
+    source: string | null
+    source_type: string | null
+    status: string | null
+    memo: string | null
+    pledge_id: string | null
+    import_batch_id: string | null
+    stripe_payment_intent_id: string | null
+    stripe_charge_id: string | null
+  }
 }
 
 export type ContactFinancialSummaryPayload = {

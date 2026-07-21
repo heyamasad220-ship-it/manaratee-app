@@ -1,12 +1,14 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
 import {
   createDepartment,
   deleteDepartment,
   fetchDepartmentsWithProgramCounts,
   updateDepartment,
 } from "@/lib/departments/department-actions"
+import { workforceDepartmentDetailPath } from "@/lib/departments/department-paths"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import {
@@ -187,7 +189,14 @@ export function DepartmentsManager() {
                           style={{ backgroundColor: department.color || "#3b82f6" }}
                         />
                       </TableCell>
-                      <TableCell className="font-medium">{department.name}</TableCell>
+                      <TableCell className="font-medium">
+                        <Link
+                          href={workforceDepartmentDetailPath(department.id)}
+                          className="text-primary hover:underline"
+                        >
+                          {department.name}
+                        </Link>
+                      </TableCell>
                       <TableCell className="text-muted-foreground">
                         {department.description || "-"}
                       </TableCell>

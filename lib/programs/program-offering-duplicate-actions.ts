@@ -19,7 +19,8 @@ import { getProgramSessionsForOffering } from "@/lib/programs/program-session-qu
 
 function revalidateOfferingPaths(programId: string) {
   revalidatePath("/programs/catalog")
-  revalidatePath(`/programs/${programId}/edit`)
+  revalidatePath(`/programs/${programId}`)
+  revalidatePath(`/programs/${programId}/offerings`)
   revalidatePath(`/programs/${programId}/sessions`)
   revalidatePath(`/programs/${programId}/billing`)
   revalidatePath(`/customer/programs/${programId}`)

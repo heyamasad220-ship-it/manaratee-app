@@ -31,6 +31,7 @@ import type { LucideIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { isContactsListSegment, type ContactsListSegment } from "@/lib/contacts/contact-module-label"
 import { DONATIONS_SIDEBAR_CHILDREN } from "@/lib/navigation/donations-sidebar-children"
+import { normalizeModuleSlug } from "@/lib/modules/module-catalog"
 import {
   buildSubExpandKey,
   filterSubItemsByPermission,
@@ -86,7 +87,7 @@ const STATIC_SIDEBAR_MODULES: SidebarModuleRow[] = [
     route: "/event-management/overview",
     icon_name: "LayoutGrid",
     group_name: "Operations",
-    sort_order: 40,
+    sort_order: 50,
   },
   {
     name: "Membership",
@@ -94,45 +95,50 @@ const STATIC_SIDEBAR_MODULES: SidebarModuleRow[] = [
     route: "/membership",
     icon_name: "UserCheck",
     group_name: "People",
-    sort_order: 36,
+    sort_order: 25,
   },
   {
-    name: "Workforce",
+    name: "HR",
     slug: "workforce",
     route: "/workforce",
     icon_name: "Users",
     group_name: "People",
-    sort_order: 35,
+    sort_order: 20,
   },
 ]
 
+/** Staff sidebar module order (Dashboard is always first; Billing/Settings are pinned last). */
 const moduleSortOrderOverride: Record<string, number> = {
-  workforce: 35,
-  "event-management": 40,
-  membership: 36,
-  bookings: 41,
-  programs: 42,
-  "vendor-hub": 43,
-  spaces: 50,
+  contacts: 10,
+  workforce: 20,
+  membership: 25,
+  donations: 30,
+  programs: 40,
+  "event-management": 50,
+  bookings: 60,
+  "vendor-hub": 70,
+  spaces: 80,
 }
 
 function mergeSidebarModules(rows: SidebarModuleRow[]): SidebarModuleRow[] {
   const bySlug = new Map<string, SidebarModuleRow>()
 
   for (const row of rows) {
-    if (HIDDEN_SIDEBAR_MODULE_SLUGS.has(row.slug)) {
+    const slug = normalizeModuleSlug(row.slug)
+    if (HIDDEN_SIDEBAR_MODULE_SLUGS.has(slug)) {
       continue
     }
 
-    const staticRow = STATIC_SIDEBAR_MODULES.find((item) => item.slug === row.slug)
-    bySlug.set(row.slug, {
+    const staticRow = STATIC_SIDEBAR_MODULES.find((item) => item.slug === slug)
+    bySlug.set(slug, {
       ...staticRow,
       ...row,
-      name: row.name || staticRow?.name || row.slug,
+      slug,
+      name: row.name || staticRow?.name || slug,
       route: row.route || staticRow?.route || null,
       icon_name: row.icon_name || staticRow?.icon_name || null,
       group_name: row.group_name || staticRow?.group_name || null,
-      sort_order: moduleSortOrderOverride[row.slug] ?? row.sort_order ?? staticRow?.sort_order ?? null,
+      sort_order: moduleSortOrderOverride[slug] ?? row.sort_order ?? staticRow?.sort_order ?? null,
     })
   }
 
@@ -224,19 +230,11 @@ const subItemPermissionFallbacks: Record<string, string[]> = {
   "membership.manage": ["contacts.manage"],
 }
 
-const SIDEBAR_GROUP_ORDER = [
-  "People",
-  "Operations",
-  "Facilities",
-  "Financial",
-  "System",
-] as const
-
 const moduleDisplayNameMap: Record<string, string> = {
   workforce: WORKFORCE_MODULE_LABEL,
   hr: WORKFORCE_MODULE_LABEL,
   bookings: "Venue Rentals",
-  spaces: "Facilities",
+  spaces: "Facility Manager",
 }
 
 function resolveModuleNavSlug(slug: string) {
@@ -251,6 +249,7 @@ const moduleGroupOverride: Record<string, string> = {
 const moduleDefaultRouteOverride: Record<string, string> = {
   contacts: "/contacts/people",
   spaces: "/facilities/reservation-center",
+  programs: "/workforce/departments",
   workforce: "/workforce",
   hr: "/workforce",
 }
@@ -264,9 +263,29 @@ const moduleChildren: Record<string, SubItem[]> = {
   "event-management": [
     { label: "Dashboard", href: "/event-management/overview", matchPrefix: "/event-management/overview", permissionKey: "events.view" },
     { label: "Space Availability", href: "/facilities/availability", matchPrefix: "/facilities/availability", permissionKey: "events.view" },
-    { label: "Events", href: "/event-management", matchPrefix: "/event-management", permissionKey: "events.view" },
+    { label: "Events", href: "/event-management", matchPrefix: "/event-management", exact: true, permissionKey: "events.view" },
     { label: "Ticketing", href: "/event-management/ticketing", matchPrefix: "/event-management/ticketing", permissionKey: "ticketing.view" },
-    { label: "Reports", href: "/event-management/reports", matchPrefix: "/event-management/reports", permissionKey: "reports.view" },
+    {
+      label: "Reports",
+      href: "/event-management/reports",
+      matchPrefix: "/event-management/reports",
+      permissionKey: "reports.view",
+      children: [
+        {
+          label: "Overview",
+          href: "/event-management/reports",
+          matchPrefix: "/event-management/reports",
+          exact: true,
+          permissionKey: "reports.view",
+        },
+        {
+          label: "Childcare Registrations",
+          href: "/event-management/reports/childcare",
+          matchPrefix: "/event-management/reports/childcare",
+          permissionKey: "events.view",
+        },
+      ],
+    },
     { label: "Settings", href: "/event-management/settings/event-types", matchPrefix: "/event-management/settings", permissionKey: "events.manage" },
   ],
   spaces: [
@@ -277,12 +296,53 @@ const moduleChildren: Record<string, SubItem[]> = {
     { label: "Schedule", href: "/facilities/calendar", matchPrefix: "/facilities/calendar", permissionKey: "spaces.view" },
   ],
   programs: [
-    { label: "Catalog", href: "/programs/catalog", matchPrefix: "/programs/catalog", permissionKey: "programs.view" },
-    { label: "Registrations", href: "/programs/registrations", matchPrefix: "/programs/registrations", permissionKey: "programs.manage" },
-    { label: "Schedule", href: "/programs/schedule", matchPrefix: "/programs/schedule", permissionKey: "programs.view" },
-    { label: "Reports", href: "/programs/reports", matchPrefix: "/programs/reports", permissionKey: "reports.view" },
+    {
+      label: "Departments",
+      href: "/workforce/departments",
+      matchPrefix: "/workforce/departments",
+      permissionKey: "staff.view",
+    },
+    {
+      label: "Catalog",
+      href: "/programs/catalog",
+      matchPrefix: "/programs/catalog",
+      permissionKey: "programs.view",
+    },
+    {
+      label: "Schedule",
+      href: "/programs/schedule",
+      matchPrefix: "/programs/schedule",
+      permissionKey: "programs.view",
+    },
     programsFinancialAssistanceNavItem(),
-    { label: "Settings", href: "/programs/settings", matchPrefix: "/programs/settings", permissionKey: "programs.manage" },
+    {
+      label: "Reports",
+      href: "/programs/reports",
+      matchPrefix: "/programs/reports",
+      alsoMatchPrefixes: ["/programs/registrations"],
+      permissionKey: "reports.view",
+      children: [
+        {
+          label: "Overview",
+          href: "/programs/reports",
+          matchPrefix: "/programs/reports",
+          exact: true,
+          permissionKey: "reports.view",
+        },
+        {
+          label: "Registrations",
+          href: "/programs/registrations",
+          matchPrefix: "/programs/registrations",
+          permissionKey: "programs.manage",
+        },
+      ],
+    },
+    {
+      label: "Settings",
+      href: "/programs/settings",
+      matchPrefix: "/programs/settings",
+      permissionKey: "programs.manage",
+    },
   ],
   "vendor-hub": [
     { label: "Dashboard", href: "/vendor-hub", matchPrefix: "/vendor-hub", permissionKey: "vendor_hub.view" },
@@ -296,19 +356,26 @@ const moduleChildren: Record<string, SubItem[]> = {
     { label: "People", href: "/contacts/people", matchPrefix: "/contacts/people", contactListSegment: "people", permissionKey: "contacts.view" },
     { label: "Families", href: "/contacts/families", matchPrefix: "/contacts/families", contactListSegment: "families", permissionKey: "contacts.view" },
     { label: "Organizations", href: "/contacts/organizations", matchPrefix: "/contacts/organizations", contactListSegment: "organizations", permissionKey: "contacts.view" },
-    { label: "Groups", href: "/contacts/groups", matchPrefix: "/contacts/groups", contactListSegment: "groups", permissionKey: "contacts.view" },
     { label: "Reports", href: "/contacts/reports/directory", matchPrefix: "/contacts/reports", permissionKey: "contacts.view" },
     { label: "Settings", href: "/contacts/settings", matchPrefix: "/contacts/settings", permissionKey: "contacts.view" },
   ],
   membership: [
-    { label: "Overview", href: "/membership", matchPrefix: "/membership", permissionKey: "membership.view" },
+    { label: "Overview", href: "/membership", matchPrefix: "/membership", exact: true, permissionKey: "membership.view" },
     { label: "Members", href: "/membership/members", matchPrefix: "/membership/members", permissionKey: "membership.view" },
-    { label: "Teams", href: "/membership/teams", matchPrefix: "/membership/teams", permissionKey: "membership.view" },
+    { label: "Applications", href: "/membership/applications", matchPrefix: "/membership/applications", permissionKey: "applications.view" },
+    { label: "Groups", href: "/membership/groups", matchPrefix: "/membership/groups", permissionKey: "membership.view" },
     { label: "Settings", href: "/membership/settings", matchPrefix: "/membership/settings", permissionKey: "membership.manage" },
   ],
   donations: DONATIONS_SIDEBAR_CHILDREN,
   workforce: [
     {
+      label: "Overview",
+      href: "/workforce",
+      matchPrefix: "/workforce",
+      exact: true,
+      permissionKey: "staff.view",
+    },
+    {
       label: "Employees",
       href: "/workforce/employees",
       matchPrefix: "/workforce/employees",
@@ -324,12 +391,7 @@ const moduleChildren: Record<string, SubItem[]> = {
       label: "Childcare Providers",
       href: "/workforce/childcare",
       matchPrefix: "/workforce/childcare",
-      permissionKey: "staff.view",
-    },
-    {
-      label: "Childcare Registrations",
-      href: "/workforce/childcare/registrations",
-      matchPrefix: "/workforce/childcare/registrations",
+      exact: true,
       permissionKey: "staff.view",
     },
     {
@@ -340,13 +402,34 @@ const moduleChildren: Record<string, SubItem[]> = {
     },
     {
       label: "Settings",
-      href: "/workforce/settings",
+      href: "/workforce/settings/positions",
       matchPrefix: "/workforce/settings",
       permissionKey: "staff.view",
+      children: [
+        {
+          label: "Positions",
+          href: "/workforce/settings/positions",
+          matchPrefix: "/workforce/settings/positions",
+          permissionKey: "staff.view",
+        },
+        {
+          label: "Application Templates",
+          href: "/workforce/settings/application-templates",
+          matchPrefix: "/workforce/settings/application-templates",
+          permissionKey: "applications.view",
+        },
+      ],
     },
   ],
   hr: [
     {
+      label: "Overview",
+      href: "/workforce",
+      matchPrefix: "/workforce",
+      exact: true,
+      permissionKey: "staff.view",
+    },
+    {
       label: "Employees",
       href: "/workforce/employees",
       matchPrefix: "/workforce/employees",
@@ -362,12 +445,7 @@ const moduleChildren: Record<string, SubItem[]> = {
       label: "Childcare Providers",
       href: "/workforce/childcare",
       matchPrefix: "/workforce/childcare",
-      permissionKey: "staff.view",
-    },
-    {
-      label: "Childcare Registrations",
-      href: "/workforce/childcare/registrations",
-      matchPrefix: "/workforce/childcare/registrations",
+      exact: true,
       permissionKey: "staff.view",
     },
     {
@@ -378,9 +456,23 @@ const moduleChildren: Record<string, SubItem[]> = {
     },
     {
       label: "Settings",
-      href: "/workforce/settings",
+      href: "/workforce/settings/positions",
       matchPrefix: "/workforce/settings",
       permissionKey: "staff.view",
+      children: [
+        {
+          label: "Positions",
+          href: "/workforce/settings/positions",
+          matchPrefix: "/workforce/settings/positions",
+          permissionKey: "staff.view",
+        },
+        {
+          label: "Application Templates",
+          href: "/workforce/settings/application-templates",
+          matchPrefix: "/workforce/settings/application-templates",
+          permissionKey: "applications.view",
+        },
+      ],
     },
   ],
 }
@@ -409,34 +501,16 @@ function userCanAccessModule(
 function groupNavItemsForDisplay(navItems: NavItem[]) {
   const dashboardItems = navItems.filter((item) => item.label === "Dashboard")
   const footerItems = navItems.filter((item) => item.pinToBottom)
+  // Keep mergeSidebarModules / moduleSortOrderOverride order — do not regroup by People/Operations.
   const otherItems = navItems.filter((item) => item.label !== "Dashboard" && !item.pinToBottom)
-  const byGroup = new Map<string | null, NavItem[]>()
-
-  for (const item of otherItems) {
-    const group = item.group ?? null
-    const existing = byGroup.get(group) ?? []
-    existing.push(item)
-    byGroup.set(group, existing)
-  }
 
   const grouped: { group: string | null; items: NavItem[] }[] = []
 
   if (dashboardItems.length > 0) {
     grouped.push({ group: null, items: dashboardItems })
   }
-
-  for (const groupName of SIDEBAR_GROUP_ORDER) {
-    const items = byGroup.get(groupName)
-    if (items?.length) {
-      grouped.push({ group: groupName, items })
-      byGroup.delete(groupName)
-    }
-  }
-
-  for (const [group, items] of byGroup) {
-    if (items.length > 0) {
-      grouped.push({ group, items })
-    }
+  if (otherItems.length > 0) {
+    grouped.push({ group: null, items: otherItems })
   }
 
   return { grouped, footerItems }
@@ -454,6 +528,11 @@ function filterNavItemsByPermissions(items: NavItem[], permissionContext: UserPe
     .filter((item) => {
       if (item.requiresSuperAdmin && !permissionContext.isSuperAdmin) {
         return false
+      }
+      // Org-enabled modules are already filtered by /api/organizations/sidebar-modules.
+      // Always show them in the rail; sub-nav items remain permission-gated.
+      if (item.moduleSlug) {
+        return true
       }
       return userCanAccessModule(permissionContext, item.permissionKey, item.moduleSlug)
     })
@@ -490,20 +569,21 @@ function buildNavItems(rows: SidebarModuleRow[], permissionContext: UserPermissi
   const dynamicItems: NavItem[] = rows
     .filter((row) => row.route && row.slug !== "applications")
     .map((row) => {
-      const navSlug = resolveModuleNavSlug(row.slug)
+      const slug = normalizeModuleSlug(row.slug)
+      const navSlug = resolveModuleNavSlug(slug)
       const href = (moduleDefaultRouteOverride[navSlug] ?? row.route) || "/dashboard"
       const iconName = row.icon_name || "Boxes"
       const Icon = iconMap[iconName] || Boxes
       return {
-        label: moduleDisplayNameMap[navSlug] ?? moduleDisplayNameMap[row.slug] ?? row.name,
+        label: moduleDisplayNameMap[navSlug] ?? moduleDisplayNameMap[slug] ?? row.name,
         href,
         icon: Icon,
         matchPrefix: href,
         group: moduleGroupOverride[navSlug] ?? row.group_name,
-        permissionKey: modulePermissionMap[navSlug] ?? modulePermissionMap[row.slug],
-        moduleSlug: row.slug,
-        children: moduleChildren[navSlug] || moduleChildren[row.slug] || [
-          { label: "Overview", href, matchPrefix: href, permissionKey: modulePermissionMap[navSlug] ?? modulePermissionMap[row.slug] },
+        permissionKey: modulePermissionMap[navSlug] ?? modulePermissionMap[slug],
+        moduleSlug: slug,
+        children: moduleChildren[navSlug] || moduleChildren[slug] || [
+          { label: "Overview", href, matchPrefix: href, permissionKey: modulePermissionMap[navSlug] ?? modulePermissionMap[slug] },
         ],
       }
     })

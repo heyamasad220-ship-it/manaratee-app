@@ -1,0 +1,29 @@
+﻿Mode: EXECUTE
+Roster: c:/Users/danan/Downloads/QIL25-26.xlsx
+Payments: c:/Users/danan/Downloads/QIL25-26_Payments.csv
+
+=== EXECUTE COMPLETE ===
+{
+  "departmentId": "c5d6b286-0d48-431f-9b55-94a80d4821ef",
+  "programId": null,
+  "offerings": 9,
+  "contacts": 119,
+  "staff": 10,
+  "enrollments": 119,
+  "legacyUmbrellaRemoved": true,
+  "programIds": [
+    "5b678992-a0fc-48e6-b962-c405b0061a48",
+    "ef4177d4-a1b0-4fba-92f7-fed292136f27",
+    "476d9f8e-5d63-4be0-8961-270e4bc8b2e4",
+    "cf1cc580-d630-42ce-b221-bebe0930ab60",
+    "429830fd-9af0-4b20-90e8-1960d44267fa",
+    "cbcbbc58-c01f-4018-9cec-44d6a9db3bc3",
+    "c3f975a0-1997-4bfe-84d4-132358165730",
+    "86802728-b07d-4116-acbb-49f11f74bf88",
+    "25e9349e-7074-4cb9-8f8d-89dfa0c6822b"
+  ],
+  "programs": 9
+}
+Report: C:\Users\danan\Documents\ManarateeApp\scripts\reports\qil-import-2026-07-20.json
+Open Programs ΓåÆ Departments ΓåÆ Quran Institute for Ladies
+Payments: Programs ΓåÆ Reports ΓåÆ Registrations

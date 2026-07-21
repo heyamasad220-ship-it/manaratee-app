@@ -1,11 +1,8 @@
-import { Header } from "@/components/layout/header"
-import { ContactsCrmList } from "@/components/contacts/contacts-crm-list"
+import { redirect } from "next/navigation"
 
-export default function ContactsGroupsPage() {
-  return (
-    <>
-      <Header title="Groups" />
-      <ContactsCrmList lockedRecordType="group" showStats={false} />
-    </>
-  )
+import { DONATIONS_GROUP_GIVING_REPORT_PATH } from "@/lib/donations/donor-giving-report"
+
+/** CRM group list removed from Contacts — giving groups surface on Donors → Group Giving. */
+export default function ContactsGroupsRedirectPage() {
+  redirect(DONATIONS_GROUP_GIVING_REPORT_PATH)
 }

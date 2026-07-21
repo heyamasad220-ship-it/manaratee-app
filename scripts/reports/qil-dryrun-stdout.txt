@@ -1,0 +1,26 @@
+﻿Mode: DRY-RUN
+Roster: c:/Users/danan/Downloads/QIL25-26.xlsx
+Payments: c:/Users/danan/Downloads/QIL25-26_Payments.csv
+
+=== DRY-RUN SUMMARY ===
+{
+  "rosterRows": 119,
+  "uniqueStudents": 103,
+  "uniqueCourses": 9,
+  "uniqueTeachers": 10,
+  "succeededPayments": 321,
+  "succeededAmount": 32720,
+  "unmatchedPaymentCount": 12,
+  "unmatchedPaymentAmount": 2390,
+  "allocatedPaid": 27850,
+  "courseFeeTotal": 36800,
+  "overpaymentAmount": 2480
+}
+Courses (9): Tajweed/Advanced | Recitation Improvement | Memorization 1 | Memorization - Surat Al-Omran | Memorization - Surat Al-Baqara | Tajweed/Beginner | Shu'uba Narration | Tajweed/Osool | Memorization 2
+Teachers (10): Abeer Abu Kiwan | Alaa Elsarraj | Amneh Ismail | Fadia Salameh | Fathieh Alladin | Huda ElSeisy | Rajaa Eljaber | Souzan Ayoub | Wedad Atwan | Zohour Hawa
+Fuzzy name matches: 36
+Roster with no payments: 18
+Unmatched payment names: 10 people / $2390
+
+Report written: C:\Users\danan\Documents\ManarateeApp\scripts\reports\qil-import-2026-07-20.json
+Re-run with --execute to write to Supabase.

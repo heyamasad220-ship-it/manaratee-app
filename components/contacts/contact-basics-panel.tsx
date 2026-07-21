@@ -20,7 +20,6 @@ import {
 import { updateContactBasics } from "@/lib/contacts/contact-actions"
 import { updateContactPersonDetails } from "@/lib/contacts/contact-profile-admin-actions"
 import { ContactDiscountTagsField } from "@/components/contacts/contact-discount-tags-field"
-import { ContactGroupsField } from "@/components/contacts/contact-groups-field"
 import { cn } from "@/lib/utils"
 import {
   STATUS_OPTIONS,
@@ -329,11 +328,17 @@ export function ContactBasicsPanel({
               className={cn(
                 "grid gap-x-4",
                 isEditing ? "gap-y-3" : "gap-y-1",
-                !isEntity ? "sm:grid-cols-4" : "sm:grid-cols-2"
+                !isEntity ? "sm:grid-cols-3" : "sm:grid-cols-2"
               )}
             >
               <div className={isEditing ? "space-y-1.5" : undefined}>
                 {isEditing ? (
+                  isGroup ? (
+                    <>
+                      <FieldLabel>Record type</FieldLabel>
+                      <dd>Giving group</dd>
+                    </>
+                  ) : (
                   <>
                     <Label htmlFor="profile-contact-type">Record type</Label>
                     <Select
@@ -346,14 +351,18 @@ export function ContactBasicsPanel({
                       <SelectContent>
                         <SelectItem value="individual">Person</SelectItem>
                         <SelectItem value="organization">Organization</SelectItem>
-                        <SelectItem value="group">Group</SelectItem>
                       </SelectContent>
                     </Select>
                   </>
+                  )
                 ) : (
                   <>
                     <FieldLabel>Record type</FieldLabel>
-                    <dd>{getContactRecordTypeLabel(contactType)}</dd>
+                    <dd>
+                      {isGroup
+                        ? "Giving group"
+                        : getContactRecordTypeLabel(contactType)}
+                    </dd>
                   </>
                 )}
               </div>
@@ -382,10 +391,7 @@ export function ContactBasicsPanel({
                 )}
               </div>
               {!isEntity ? (
-                <>
-                  <ContactDiscountTagsField contactId={contact.id} editing={isEditing} />
-                  <ContactGroupsField contactId={contact.id} editing={isEditing} />
-                </>
+                <ContactDiscountTagsField contactId={contact.id} editing={isEditing} />
               ) : null}
             </div>
 
@@ -684,20 +690,28 @@ export function ContactBasicsPanel({
                 </div>
               </div>
               <div className="space-y-2 sm:max-w-xs">
-                <Label htmlFor="profile-contact-type">Record type</Label>
-                <Select
-                  value={contactType}
-                  onValueChange={(value) => setContactType(value as ContactRecordType)}
-                >
-                  <SelectTrigger id="profile-contact-type">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="individual">Person</SelectItem>
-                    <SelectItem value="organization">Organization</SelectItem>
-                    <SelectItem value="group">Group</SelectItem>
-                  </SelectContent>
-                </Select>
+                {isGroup ? (
+                  <>
+                    <Label>Record type</Label>
+                    <p className="text-sm text-muted-foreground">Giving group</p>
+                  </>
+                ) : (
+                  <>
+                    <Label htmlFor="profile-contact-type">Record type</Label>
+                    <Select
+                      value={contactType}
+                      onValueChange={(value) => setContactType(value as ContactRecordType)}
+                    >
+                      <SelectTrigger id="profile-contact-type">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="individual">Person</SelectItem>
+                        <SelectItem value="organization">Organization</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </>
+                )}
               </div>
               {isEntity ? (
                 <div className="space-y-2">
@@ -846,7 +860,9 @@ export function ContactBasicsPanel({
             <dl className="grid gap-4 sm:grid-cols-2">
               <div>
                 <dt className="font-medium text-muted-foreground">Record type</dt>
-                <dd>{getContactRecordTypeLabel(contactType)}</dd>
+                <dd>
+                  {isGroup ? "Giving group" : getContactRecordTypeLabel(contactType)}
+                </dd>
               </div>
               <div>
                 <dt className="font-medium text-muted-foreground">Email</dt>

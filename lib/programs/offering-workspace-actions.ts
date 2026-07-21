@@ -4,6 +4,9 @@ import { revalidatePath } from "next/cache"
 
 import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
+import { getOfferingWorkspaceDataForProgram } from "@/lib/programs/offering-workspace-queries"
+import { getOfferingsForProgram } from "@/lib/programs/program-offering-queries"
+import type { OfferingWorkspaceDataMap } from "@/lib/programs/offering-workspace-types"
 import { replaceProgramCapacityGroups } from "@/lib/programs/program-capacity-group-actions"
 import type { ProgramCapacityGroupInput } from "@/lib/programs/program-capacity-group-types"
 import { getTotalCapacityFromGroups } from "@/lib/programs/program-capacity-group-types"
@@ -33,13 +36,27 @@ function usesYouthCapacityGroups(minAge: number | null) {
 }
 
 function revalidateOfferingPaths(programId: string) {
-  revalidatePath(`/programs/${programId}/edit`)
+  revalidatePath(`/programs/${programId}`)
+  revalidatePath(`/programs/${programId}/offerings`)
   revalidatePath(`/programs/${programId}/sessions`)
   revalidatePath(`/programs/${programId}/billing`)
   revalidatePath("/programs/settings")
   revalidatePath("/customer/programs")
   revalidatePath(`/customer/programs/${programId}`)
   revalidatePath(`/customer/programs/${programId}/register`)
+}
+
+/** Lazy-load offering workspace bundles for the offerings workspace. */
+export async function loadOfferingWorkspaceDataForProgramAction(
+  programId: string
+): Promise<OfferingWorkspaceDataMap> {
+  const organizationId = await getSelectedOrganizationId()
+  if (!organizationId) {
+    return {}
+  }
+
+  const offerings = await getOfferingsForProgram(programId)
+  return getOfferingWorkspaceDataForProgram(programId, organizationId, offerings)
 }
 
 export async function saveOfferingSiblingDiscountRules(input: {

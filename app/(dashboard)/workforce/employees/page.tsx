@@ -1,6 +1,5 @@
 import { Header } from "@/components/layout/header"
 import { HrEmployeesPageClient } from "@/components/hr/hr-employees-page-client"
-import { ModuleApplicationsLink } from "@/components/applications/module-applications-link"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 
 export default async function HrEmployeesPage({
@@ -13,12 +12,7 @@ export default async function HrEmployeesPage({
 
   return (
     <>
-      <Header
-        title="Employees"
-        actions={
-          <ModuleApplicationsLink applicationType="employment" label="Employment Applications" />
-        }
-      />
+      <Header title="Employees" />
       <HrEmployeesPageClient
         organizationId={organizationId}
         initialTab={tab}

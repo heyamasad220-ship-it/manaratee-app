@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react"
 import Link from "next/link"
-import { ExternalLink, Loader2, Trash2, UserPlus, Users } from "lucide-react"
+import { ExternalLink, Loader2, Pencil, Trash2, UserPlus, Users } from "lucide-react"
 
 import { FamilyContactPicker } from "@/components/contacts/family-contact-picker"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -31,6 +31,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   addContactFamilyMember,
   removeContactFamilyMember,
+  updateContactFamilyMember,
   type ContactFamilyMemberRow,
 } from "@/lib/contacts/contact-profile-admin-actions"
 import {
@@ -91,6 +92,7 @@ export function ContactFamilyPanel({
 }: ContactFamilyPanelProps) {
   const currentReturnTo = useCurrentReturnTo()
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+  const [editingMember, setEditingMember] = useState<ContactFamilyMemberRow | null>(null)
   const [addMode, setAddMode] = useState<"create" | "link">("link")
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -100,6 +102,15 @@ export function ContactFamilyPanel({
     isPrimary: boolean
   } | null>(null)
   const [newMember, setNewMember] = useState({
+    firstName: "",
+    lastName: "",
+    gender: "",
+    dateOfBirth: "",
+    email: "",
+    phone: "",
+    relationship: "",
+  })
+  const [editMember, setEditMember] = useState({
     firstName: "",
     lastName: "",
     gender: "",
@@ -207,14 +218,61 @@ export function ContactFamilyPanel({
     })
   }
 
+  function openEditMember(member: ContactFamilyMemberRow) {
+    setError(null)
+    setEditingMember(member)
+    setEditMember({
+      firstName: member.firstName || "",
+      lastName: member.lastName || "",
+      gender: member.gender || "",
+      dateOfBirth: member.dateOfBirth || "",
+      email: member.email || "",
+      phone: member.phone || "",
+      relationship: member.relationship || "",
+    })
+  }
+
+  function handleEditMember() {
+    if (!editingMember) return
+
+    setError(null)
+    startTransition(async () => {
+      try {
+        await updateContactFamilyMember({
+          contactId,
+          relatedPersonId: editingMember.id,
+          firstName: editMember.firstName,
+          lastName: editMember.lastName,
+          gender: editMember.gender || null,
+          dateOfBirth: editMember.dateOfBirth || null,
+          email: editMember.email || null,
+          phone: editMember.phone || null,
+          relationship: editMember.relationship,
+        })
+        setEditingMember(null)
+        await onChanged()
+        const familyResult = await getFamilyForContactAction(contactId)
+        if (familyResult.success) {
+          setHousehold(familyResult.family)
+        }
+      } catch (editError) {
+        setError(
+          editError instanceof Error ? editError.message : "Could not update family member."
+        )
+      }
+    })
+  }
+
   function handleRemoveMember(member: ContactFamilyMemberRow) {
     const memberName = `${member.firstName} ${member.lastName}`.trim() || "this family member"
-    const message = [
-      `Remove ${memberName} from this household?`,
-      "",
-      "Their individual contact profile and all donations will stay on their record.",
-      "They will no longer appear in this household's giving totals.",
-    ].join("\n")
+    const message = member.contactId
+      ? [
+          `Remove ${memberName} from this household?`,
+          "",
+          "Their individual contact profile and all donations will stay on their record.",
+          "They will no longer appear in this household's giving totals.",
+        ].join("\n")
+      : `Remove ${memberName} from this household?`
 
     if (!window.confirm(message)) {
       return
@@ -296,8 +354,8 @@ export function ContactFamilyPanel({
               <Users className="mb-2 h-8 w-8 text-muted-foreground/50" />
               <p className="text-sm font-medium">No family members added</p>
               <p className="mt-1 max-w-md text-xs text-muted-foreground">
-                Link an existing donor or spouse contact, or create a new person for program
-                registration.
+                Link an existing contact who already has a profile, or create a new person for this
+                household without opening a separate contact page.
               </p>
               <Button
                 variant="outline"
@@ -381,15 +439,28 @@ export function ContactFamilyPanel({
                         </div>
                       </div>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="text-muted-foreground hover:text-destructive"
-                      onClick={() => handleRemoveMember(member)}
-                      disabled={isPending}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-muted-foreground hover:text-foreground"
+                        onClick={() => openEditMember(member)}
+                        disabled={isPending}
+                        aria-label={`Edit ${member.firstName} ${member.lastName}`.trim()}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-muted-foreground hover:text-destructive"
+                        onClick={() => handleRemoveMember(member)}
+                        disabled={isPending}
+                        aria-label={`Remove ${member.firstName} ${member.lastName}`.trim()}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 )
               })}
@@ -409,8 +480,8 @@ export function ContactFamilyPanel({
           <DialogHeader>
             <DialogTitle>Add family member</DialogTitle>
             <DialogDescription>
-              Link an existing contact (for example an imported spouse donor) or create a new
-              person record.
+              Link an existing contact who already has a profile, or create a new person for this
+              household only (no separate contact page until you link one later).
             </DialogDescription>
           </DialogHeader>
 
@@ -598,6 +669,157 @@ export function ContactFamilyPanel({
                 )}
               </Button>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(editingMember)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditingMember(null)
+            setError(null)
+          }
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit family member</DialogTitle>
+            <DialogDescription>
+              Update this household member’s details
+              {editingMember?.contactId
+                ? ". Changes also update their linked contact profile."
+                : " without creating a separate contact page."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="edit-family-first-name">First name</Label>
+                <Input
+                  id="edit-family-first-name"
+                  value={editMember.firstName}
+                  onChange={(event) =>
+                    setEditMember((current) => ({ ...current, firstName: event.target.value }))
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-family-last-name">Last name</Label>
+                <Input
+                  id="edit-family-last-name"
+                  value={editMember.lastName}
+                  onChange={(event) =>
+                    setEditMember((current) => ({ ...current, lastName: event.target.value }))
+                  }
+                />
+              </div>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="edit-family-email">Email</Label>
+                <Input
+                  id="edit-family-email"
+                  type="email"
+                  placeholder="Optional"
+                  value={editMember.email}
+                  onChange={(event) =>
+                    setEditMember((current) => ({ ...current, email: event.target.value }))
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-family-phone">Phone</Label>
+                <Input
+                  id="edit-family-phone"
+                  type="tel"
+                  placeholder="Optional"
+                  value={editMember.phone}
+                  onChange={(event) =>
+                    setEditMember((current) => ({ ...current, phone: event.target.value }))
+                  }
+                />
+              </div>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="edit-family-dob">Date of birth</Label>
+                <BirthDateInput
+                  id="edit-family-dob"
+                  value={editMember.dateOfBirth}
+                  onChange={(value) =>
+                    setEditMember((current) => ({ ...current, dateOfBirth: value }))
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-family-gender">Gender</Label>
+                <Select
+                  value={editMember.gender || undefined}
+                  onValueChange={(value) =>
+                    setEditMember((current) => ({ ...current, gender: value }))
+                  }
+                >
+                  <SelectTrigger id="edit-family-gender">
+                    <SelectValue placeholder="Select gender" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Male">Male</SelectItem>
+                    <SelectItem value="Female">Female</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-family-relationship">Relationship</Label>
+              <Select
+                value={editMember.relationship || undefined}
+                onValueChange={(value) =>
+                  setEditMember((current) => ({ ...current, relationship: value }))
+                }
+              >
+                <SelectTrigger id="edit-family-relationship">
+                  <SelectValue placeholder="Select relationship" />
+                </SelectTrigger>
+                <SelectContent>
+                  {relationshipOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {error ? (
+            <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {error}
+            </div>
+          ) : null}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setEditingMember(null)
+                setError(null)
+              }}
+              disabled={isPending}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleEditMember} disabled={isPending}>
+              {isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save changes"
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

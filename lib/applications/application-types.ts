@@ -100,7 +100,7 @@ export const MODULE_OWNER_LABELS: Record<ModuleOwner, string> = {
   programs: "Programs",
 }
 
-/** Shown on Workforce → Settings → Applications hub. */
+/** Hub types on Settings → Applications (Overview / Submissions). */
 export const WORKFORCE_APPLICATIONS_HUB_TYPES = [
   "volunteer",
   "committee_member",

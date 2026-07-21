@@ -59,10 +59,10 @@ export function HrTeamsOverview({ onManageTeams }: HrTeamsOverviewProps) {
   }
 
   const statCards = [
-    { label: "Total Teams", value: stats.totalTeams, icon: UsersRound },
-    { label: "Active Teams", value: stats.activeTeams, icon: Activity },
-    { label: "Team Members", value: stats.totalMembers, icon: Users },
-    { label: "Team Leaders", value: stats.teamLeaders, icon: Crown },
+    { label: "Total Groups", value: stats.totalTeams, icon: UsersRound },
+    { label: "Active Groups", value: stats.activeTeams, icon: Activity },
+    { label: "Group Members", value: stats.totalMembers, icon: Users },
+    { label: "Group Leaders", value: stats.teamLeaders, icon: Crown },
   ]
 
   const previewTeams = teams.slice(0, 6)
@@ -77,10 +77,10 @@ export function HrTeamsOverview({ onManageTeams }: HrTeamsOverviewProps) {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Teams at a Glance</CardTitle>
+          <CardTitle>Groups at a Glance</CardTitle>
           {onManageTeams ? (
             <Button variant="outline" size="sm" onClick={onManageTeams}>
-              Manage Teams
+              Manage Groups
               <ArrowRight className="ml-2 size-4" />
             </Button>
           ) : null}
@@ -89,7 +89,7 @@ export function HrTeamsOverview({ onManageTeams }: HrTeamsOverviewProps) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Team</TableHead>
+                <TableHead>Group</TableHead>
                 <TableHead>Description</TableHead>
                 <TableHead>Active Members</TableHead>
                 <TableHead>Status</TableHead>
@@ -100,13 +100,13 @@ export function HrTeamsOverview({ onManageTeams }: HrTeamsOverviewProps) {
               {loading ? (
                 <TableRow>
                   <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
-                    Loading teams...
+                    Loading groups...
                   </TableCell>
                 </TableRow>
               ) : previewTeams.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
-                    No teams yet. Create your first team in the Teams tab.
+                    No groups yet. Create your first group in the Groups tab.
                   </TableCell>
                 </TableRow>
               ) : (
@@ -118,7 +118,12 @@ export function HrTeamsOverview({ onManageTeams }: HrTeamsOverviewProps) {
                           className="inline-block size-3 rounded-full"
                           style={{ backgroundColor: team.color || "#6366f1" }}
                         />
-                        <span className="font-medium">{team.name}</span>
+                        <Link
+                          href={membershipTeamDetailPath(team.id)}
+                          className="font-medium text-primary hover:underline"
+                        >
+                          {team.name}
+                        </Link>
                       </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground">

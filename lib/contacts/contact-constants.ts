@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react"
 import {
   Baby,
+  BookOpen,
   Briefcase,
   Building2,
   Calendar,
@@ -42,17 +43,24 @@ export const CONTACT_GROUP_AFFILIATION_ROLES = CONTACT_ORGANIZATION_AFFILIATION_
 /** Workforce roles managed under Workforce module — not assigned via Contacts CRM. */
 export const CONTACT_WORKFORCE_ROLES = ["employee", "volunteer"] as const
 
-/** Activity-derived customer role (programs, events, venue rentals). */
+/** Activity-derived customer role (events/ticketing + venue rentals). */
 export const CONTACT_CUSTOMER_ROLE = "customer" as const
 
+/** Activity-derived Programs affiliation (enrollments: participant or parent registrant). */
+export const CONTACT_PROGRAM_PARTICIPANT_ROLE = "program_participant" as const
+
 /** Participation roles derived from enrollments, ticketing, rentals (not manual CRM picks). */
-export const CONTACT_PARTICIPATION_DERIVED_ROLES = [CONTACT_CUSTOMER_ROLE] as const
+export const CONTACT_PARTICIPATION_DERIVED_ROLES = [
+  CONTACT_CUSTOMER_ROLE,
+  CONTACT_PROGRAM_PARTICIPANT_ROLE,
+] as const
 
 /** All contact role values (including membership-derived member tag). */
 export const CONTACT_ROLE_VALUES = [
   ...CONTACT_PERSON_AFFILIATION_ROLES,
   MEMBERSHIP_DERIVED_ROLE,
   CONTACT_CUSTOMER_ROLE,
+  CONTACT_PROGRAM_PARTICIPANT_ROLE,
   ...CONTACT_WORKFORCE_ROLES,
 ] as const
 
@@ -61,6 +69,7 @@ export type ContactRoleValue = (typeof CONTACT_ROLE_VALUES)[number]
 export type ContactRoleLabel =
   | "Donor"
   | "Customer"
+  | "Programs"
   | "Volunteer"
   | "Employee"
   | "Member"
@@ -102,6 +111,7 @@ export type ContactStatus = "Active" | "Inactive"
 export const ROLE_VALUE_TO_LABEL: Record<ContactRoleValue, ContactRoleLabel> = {
   donor: "Donor",
   customer: "Customer",
+  program_participant: "Programs",
   volunteer: "Volunteer",
   employee: "Employee",
   member: "Member",
@@ -113,6 +123,7 @@ export const ROLE_VALUE_TO_LABEL: Record<ContactRoleValue, ContactRoleLabel> = {
 export const ROLE_LABEL_TO_VALUE: Record<ContactRoleLabel, ContactRoleValue> = {
   Donor: "donor",
   Customer: "customer",
+  Programs: "program_participant",
   Volunteer: "volunteer",
   Employee: "employee",
   Member: "member",
@@ -252,6 +263,7 @@ export function getEditableAllowedRolesForRecordType(
 export const ROLE_COLORS: Record<ContactRoleLabel, string> = {
   Donor: "bg-rose-100 text-rose-700",
   Customer: "bg-orange-100 text-orange-700",
+  Programs: "bg-blue-100 text-blue-700",
   Volunteer: "bg-emerald-100 text-emerald-700",
   Employee: "bg-sky-100 text-sky-700",
   Member: "bg-indigo-100 text-indigo-700",
@@ -263,6 +275,7 @@ export const ROLE_COLORS: Record<ContactRoleLabel, string> = {
 export const ROLE_ICONS: Record<ContactRoleLabel, LucideIcon> = {
   Donor: Heart,
   Customer: Building2,
+  Programs: BookOpen,
   Volunteer: Calendar,
   Employee: Briefcase,
   Member: UserCheck,
@@ -290,7 +303,10 @@ export function filterContactRoles(roles: string[]): ContactRoleValue[] {
 }
 
 export function mapRoleValue(role?: string | null): ContactRoleLabel | null {
-  if (role === "program_participant" || role === "event_attendee" || role === "venue_rental_customer") {
+  if (role === "program_participant") {
+    return "Programs"
+  }
+  if (role === "event_attendee" || role === "venue_rental_customer") {
     return "Customer"
   }
   if (role && isContactRole(role)) {

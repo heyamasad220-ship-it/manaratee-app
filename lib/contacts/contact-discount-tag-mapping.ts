@@ -18,6 +18,7 @@ function normalizeTagName(value: string): string {
 const ROLE_DISCOUNT_TAG_ALIASES: Record<ContactRoleValue, string[]> = {
   donor: ["donor"],
   customer: ["customer"],
+  program_participant: ["programs", "program participant", "program_participant"],
   volunteer: ["volunteer"],
   employee: ["employee", "staff"],
   member: ["member"],

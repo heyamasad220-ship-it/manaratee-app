@@ -40,6 +40,11 @@ const APPLICATION_PATHS = [
   "/applications/approved",
   "/applications/rejected",
   "/settings/applications",
+  "/workforce/employees",
+  "/workforce/volunteers",
+  "/workforce/childcare",
+  "/membership/applications",
+  "/workforce/settings/committee-applications",
 ]
 
 function revalidateApplicationPaths() {

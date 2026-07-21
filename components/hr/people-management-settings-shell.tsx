@@ -14,8 +14,7 @@ export function PeopleManagementSettingsShell({
       <div>
         <h2 className="text-xl font-semibold">Settings</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Manage {PEOPLE_MANAGEMENT_MODULE_LABEL.toLowerCase()} configuration for your
-          organization.
+          Manage {PEOPLE_MANAGEMENT_MODULE_LABEL} configuration for your organization.
         </p>
       </div>
 

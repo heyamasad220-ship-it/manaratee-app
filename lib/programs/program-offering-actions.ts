@@ -147,7 +147,8 @@ async function getProgramForOfferingActions(
 
 function revalidateProgramPaths(programId: string) {
   revalidatePath("/programs/catalog")
-  revalidatePath(`/programs/${programId}/edit`)
+  revalidatePath(`/programs/${programId}`)
+  revalidatePath(`/programs/${programId}/offerings`)
   revalidatePath(`/customer/programs/${programId}`)
   revalidatePath(`/customer/programs/${programId}/register`)
 }

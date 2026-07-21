@@ -36,3 +36,8 @@ export function getContactProfileModuleFlags(
     applications: slugs.has("applications"),
   }
 }
+
+/** Overview right-rail Financial Summary + Financial tab visibility. */
+export function showContactFinancialSurfaces(modules: ContactProfileModuleFlags) {
+  return modules.donations || modules.bookings || modules.programs || modules.membership
+}

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { describe, it } from "node:test"
 
-import { countAvailablePortals } from "./resolve-portal-permissions"
+import { countAvailablePortals, shouldShowPortalSwitcher } from "./resolve-portal-permissions"
 import { getActivePortalId } from "@/components/portal/portal-switcher"
 
 describe("countAvailablePortals", () => {
@@ -26,6 +26,68 @@ describe("countAvailablePortals", () => {
         hasAdminPortal: true,
       }),
       3
+    )
+  })
+})
+
+describe("shouldShowPortalSwitcher", () => {
+  it("hides when staff-only (admin + staff tools, no personal account)", () => {
+    assert.equal(
+      shouldShowPortalSwitcher({
+        hasPersonalPortal: false,
+        hasStaffToolsPortal: true,
+        hasTeachingPortal: false,
+        hasAdminPortal: true,
+      }),
+      false
+    )
+  })
+
+  it("hides when only admin portal", () => {
+    assert.equal(
+      shouldShowPortalSwitcher({
+        hasPersonalPortal: false,
+        hasStaffToolsPortal: false,
+        hasTeachingPortal: false,
+        hasAdminPortal: true,
+      }),
+      false
+    )
+  })
+
+  it("hides when only personal portal", () => {
+    assert.equal(
+      shouldShowPortalSwitcher({
+        hasPersonalPortal: true,
+        hasStaffToolsPortal: false,
+        hasTeachingPortal: false,
+        hasAdminPortal: false,
+      }),
+      false
+    )
+  })
+
+  it("shows when personal account and staff/admin access", () => {
+    assert.equal(
+      shouldShowPortalSwitcher({
+        hasPersonalPortal: true,
+        hasStaffToolsPortal: false,
+        hasTeachingPortal: false,
+        hasAdminPortal: true,
+      }),
+      true
+    )
+  })
+
+  it("shows when personal account and teaching portal", () => {
+    assert.equal(
+      shouldShowPortalSwitcher({
+        hasPersonalPortal: true,
+        hasStaffToolsPortal: false,
+        hasTeachingPortal: true,
+        hasAdminPortal: false,
+      }),
+      true
     )
   })
 })

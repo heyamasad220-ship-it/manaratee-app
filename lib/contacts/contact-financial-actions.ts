@@ -186,7 +186,7 @@ export async function loadContactFinancialSummaryAction(
       supabase
         .from("payments")
         .select(
-          "id, amount, refunded_amount, payment_date, source, source_type, status, pledge_id, memo, recurring_donation_plan_id, attributed_group_contact_id, stripe_payment_intent_id"
+          "id, amount, refunded_amount, payment_date, source, source_type, status, pledge_id, memo, recurring_donation_plan_id, attributed_group_contact_id, stripe_payment_intent_id, stripe_charge_id, import_batch_id"
         )
         .eq("organization_id", organizationId)
         .eq("donor_id", activeDonorId)
@@ -282,6 +282,20 @@ export async function loadContactFinancialSummaryAction(
         href: donationPaymentDetailHref(payment.id),
         attributedGroupContactId,
         attributedGroupName,
+        paymentActionRow: {
+          id: payment.id as string,
+          amount: Number(payment.amount || 0),
+          refunded_amount: (payment.refunded_amount as number | null) ?? null,
+          payment_date: payment.payment_date as string,
+          source: (payment.source as string | null) ?? null,
+          source_type: (payment.source_type as string | null) ?? null,
+          status: (payment.status as string | null) ?? null,
+          memo: (payment.memo as string | null) ?? null,
+          pledge_id: (payment.pledge_id as string | null) ?? null,
+          import_batch_id: (payment.import_batch_id as string | null) ?? null,
+          stripe_payment_intent_id: (payment.stripe_payment_intent_id as string | null) ?? null,
+          stripe_charge_id: (payment.stripe_charge_id as string | null) ?? null,
+        },
       })
     }
 

@@ -173,14 +173,14 @@ export function HrTeamsManager({
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <h2 className="text-base font-semibold">Teams</h2>
+            <h2 className="text-base font-semibold">Groups</h2>
             <p className="text-sm text-muted-foreground">
-              Groups that contacts can belong to with team-specific positions.
+              Groups that contacts can belong to with group-specific positions.
             </p>
           </div>
           <Button onClick={openAdd}>
             <Plus className="mr-2 size-4" />
-            Add Team
+            Add Group
           </Button>
         </div>
 
@@ -189,7 +189,7 @@ export function HrTeamsManager({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Team</TableHead>
+                  <TableHead>Group</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead>Members</TableHead>
                   <TableHead>Status</TableHead>
@@ -200,13 +200,13 @@ export function HrTeamsManager({
                 {loading ? (
                   <TableRow>
                     <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
-                      Loading teams...
+                      Loading groups...
                     </TableCell>
                   </TableRow>
                 ) : items.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
-                      No teams yet. Create a team to start assigning members.
+                      No groups yet. Create a group to start assigning members.
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -218,7 +218,12 @@ export function HrTeamsManager({
                             className="inline-block size-3 rounded-full"
                             style={{ backgroundColor: item.color || "#6366f1" }}
                           />
-                          <span className="font-medium">{item.name}</span>
+                          <Link
+                            href={membershipTeamDetailPath(item.id)}
+                            className="font-medium text-primary hover:underline"
+                          >
+                            {item.name}
+                          </Link>
                         </div>
                       </TableCell>
                       <TableCell className="text-muted-foreground">
@@ -273,19 +278,19 @@ export function HrTeamsManager({
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{form.id ? "Edit Team" : "Add Team"}</DialogTitle>
+            <DialogTitle>{form.id ? "Edit Group" : "Add Group"}</DialogTitle>
             <DialogDescription>
-              Teams group contacts with team-specific positions such as Team Leader or Member.
+              Groups organize contacts with group-specific positions such as Group Leader or Member.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-4 py-4">
             <div className="flex flex-col gap-2">
-              <Label htmlFor="team-name">Team Name</Label>
+              <Label htmlFor="team-name">Group Name</Label>
               <Input
                 id="team-name"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="e.g., Outreach Team"
+                placeholder="e.g., Usra Al-Ihsan"
               />
             </div>
             <div className="flex flex-col gap-2">
@@ -350,7 +355,7 @@ export function HrTeamsManager({
               Cancel
             </Button>
             <Button onClick={handleSave} disabled={saving}>
-              {saving ? "Saving..." : form.id ? "Save Changes" : "Add Team"}
+              {saving ? "Saving..." : form.id ? "Save Changes" : "Add Group"}
             </Button>
           </DialogFooter>
         </DialogContent>

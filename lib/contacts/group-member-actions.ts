@@ -12,6 +12,8 @@ import {
 } from "@/lib/contacts/group-membership-data"
 import type { ContactGroupSummary } from "@/lib/contacts/group-member-types"
 import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
+import { donationGroupHref } from "@/lib/donations/donation-group-path"
+import { DONATIONS_GROUP_GIVING_REPORT_PATH } from "@/lib/donations/donor-giving-report"
 import {
   requireContactsManageAccess,
   requireContactsViewAccess,
@@ -171,9 +173,9 @@ export async function addGroupMemberAction(input: {
     return { success: false as const, error: membership.error }
   }
 
-  revalidatePath(contactProfileHref(input.groupContactId))
+  revalidatePath(donationGroupHref(input.groupContactId))
   revalidatePath(contactProfileHref(input.memberContactId))
-  revalidatePath("/contacts/groups")
+  revalidatePath(DONATIONS_GROUP_GIVING_REPORT_PATH)
   return { success: true as const }
 }
 
@@ -200,8 +202,9 @@ export async function removeGroupMemberAction(membershipId: string) {
 
   if (error) return { success: false as const, error: error.message }
 
-  revalidatePath(contactProfileHref(row.group_contact_id as string))
+  revalidatePath(donationGroupHref(row.group_contact_id as string))
   revalidatePath(contactProfileHref(row.member_contact_id as string))
+  revalidatePath(DONATIONS_GROUP_GIVING_REPORT_PATH)
   return { success: true as const }
 }
 

@@ -616,7 +616,7 @@ export function ProgramBillingScheduleView({
       {bundle.overrides.length > 0 ? (
         <Card>
           <CardHeader>
-            <CardTitle>Recent Overrides</CardTitle>
+            <CardTitle>Overrides</CardTitle>
           </CardHeader>
           <CardContent>
             <Table>

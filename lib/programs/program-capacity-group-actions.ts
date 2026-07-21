@@ -86,7 +86,8 @@ export async function replaceProgramCapacityGroups({
   revalidatePath("/programs")
   revalidatePath("/programs/catalog")
   revalidatePath(`/programs/${program_id}`)
-  revalidatePath(`/programs/${program_id}/edit`)
+  revalidatePath(`/programs/${program_id}`)
+  revalidatePath(`/programs/${program_id}/offerings`)
   revalidatePath(`/customer/programs/${program_id}`)
   revalidatePath(`/customer/programs/${program_id}/register`)
 

@@ -123,13 +123,31 @@ person_tags.tag_id → discount_tags.id
 discount_tags.organization_id → organizations.id
 ```
 
-**Customer role (migration `137_customer_role_merge.sql`):** Unified `customer` role replaces legacy `program_participant`, `event_attendee`, and `venue_rental_customer`. Derivation: non-terminal program enrollment, completed ticket order, or venue rental with `billing_contact_id`. Sticky once earned. Org auto-sync settings for the old roles migrate to `customer`. Run after `136_payment_attributed_group.sql`. If `sync_contact_affiliations` fails with missing `billing_contact_id`, apply **`147_venue_rentals_billing_contact_id.sql`** (adds column from `054` when skipped).
+**Customer role (migration `137_customer_role_merge.sql`, split in `175`):** Migration 137 unified `program_participant`, `event_attendee`, and `venue_rental_customer` into `customer`. **`175_split_customer_programs_affiliation.sql`** restores **`program_participant`** (UI label **Programs**) for non-terminal enrollments where the contact is the **participant or registrant** (parents of minors). **`customer`** remains for completed ticket orders and qualifying venue rentals (billing contact) only. Both are sticky once earned. Org auto-sync: Programs → `programs` module; Customer → `event-management` / `ticketing` / `bookings`. If `sync_contact_affiliations` fails with missing `billing_contact_id`, apply **`147_venue_rentals_billing_contact_id.sql`**.
 
 **Participation roles (superseded by `137`):** Migration `101_contact_participation_roles.sql` originally added separate participation roles; `137` consolidates them into `customer`.
 
 **Contact record types (migration `132_contact_type_group.sql`):** `contacts.contact_type` CHECK — `individual` (person), `organization` (external entity), `group` (internal collective: halaqa, committee) with optional `primary_contact_name`. Group donor rows use `donors.donor_type = 'organization'`. Patch `sync_contact_affiliations` for groups: migration `133_sync_contact_affiliations_group.sql`.
 
+**Giving group category (migration `167_giving_group_category.sql`):** On `contacts` when `contact_type = group`: `giving_group_kind` (`membership_group` | `department` | `group_donation`), optional `linked_hr_team_id` → `hr_teams`, optional `linked_department_id` → `departments`. Drives workspace badge and Activity (department events).
+
+**Staff hourly rate (migration `168_staff_hourly_rate.sql`):** Optional `staff.hourly_rate` numeric for department/employee compensation. Used when adding employees from a department workspace.
+
+**Staff pay basis (migration `169_staff_pay_basis.sql`):** `staff.pay_basis` (`hourly` | `monthly`) and optional `staff.monthly_salary` for fixed monthly compensation.
+
+**Department operating finance (migration `170_department_operating_finance.sql`):** `department_staff_pay_entries` (staff × period hours/amount for a department), `department_babysitting_income_entries` / `department_babysitting_pay_entries` (legacy babysitting ledgers; UI removed — childcare fee income is on Students enrollments; childcare pay is on Payroll). Budget P&L uses student payments + approved payroll (not donations).
+
+**Department hour logs + payroll approval (migration `171_department_staff_hour_logs.sql`):** `department_staff_hour_logs` (daily hours by staff for a department — childcare providers may log to any department); pay entries gain `status` (`draft` | `pending` | `approved` | `rejected`), `period_start` / `period_end`, submit/approve fields. Budget payroll uses **approved** periods only.
+
+**Custom pay period keys (migration `172_pay_period_custom_key.sql`):** Relaxes `period_key` check so academic-year ranges like `2026-08-17_2026-08-31` are allowed (not only `YYYY-MM`).
+
+**Department budget periods (migration `173_department_budget_periods.sql`):** `department_budget_periods` stores custom start/end date ranges per department (different each year). Budget list aggregates student payments and approved payroll that overlap each range.
+
+**Enrollment uniqueness per offering (migration `174_enrollment_unique_per_offering.sql`):** Active enrollments are unique on `(organization_id, offering_id, participant_contact_id)` (and child_person equivalent), not per program — so one year program can have many course offerings and a student can enroll in multiple courses.
+
 **Group membership (migration `135_contact_group_members.sql`):** `contact_group_members` links individuals to group contacts (`group_contact_id`, `member_contact_id`, `status`). Group gifts on group Financial tab; member gifts attributed via `payments.attributed_group_contact_id` (migration **`136_payment_attributed_group.sql`**) roll up for group competition; auto-membership when a group is selected on a gift. UI: group **Group Members** on the contact summary; optional group picker on **Record Payment**. Person profiles do not show group badges or assign-to-group actions (July 2026). Contact profile summary combines financial KPIs + activity; personal info is under actions **View Details**. Server: `lib/contacts/group-members-load-action.ts`, `lib/contacts/group-membership-data.ts`, `lib/contacts/group-member-actions.ts`, `lib/contacts/group-giving-actions.ts`.
+
+**Group giving report (migration `166_group_giving_report.sql`):** RPC `donation_group_giving_report` powers **Donations → Reports → Donors → Group Giving**. Returns only groups with at least one non-voided gift in the date range (direct gift on the group contact or attributed member gift). Columns include group/member gift split, combined total, gift count, last gift, and group-contact pledge status.
 
 **Family households (migration `148_families_and_family_members.sql`):** `families` + `family_members` are relationship containers only — **no family FK on payments**. Active members (`end_date IS NULL`) roll up to household totals on `/contacts/families` and `/contacts/families/[id]`. Backfilled from `person_relationships`; staff add/remove on contact profile syncs membership via `lib/contacts/family-sync.ts`. Household donor report RPC: **`149_household_giving_report.sql`**. `person_relationships` remains for portal/program family checks until fully migrated.
 
@@ -178,7 +196,7 @@ npm run validate:contacts-security -- --post-m4   # after 111
 ## Programs Module
 
 * programs
-* departments
+* departments — RLS repair: `scripts/164_departments_rls_policies.sql` (org members can manage). App writes also authorize then use service role when needed.
 * age_groups
 * program_sessions
 * program_schedule_items

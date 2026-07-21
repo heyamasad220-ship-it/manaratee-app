@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
-import { findOrCreateContact, ensureHrExtensionRecords } from "@/lib/contacts/contact-actions"
+import { ensureHrExtensionRecords } from "@/lib/contacts/contact-actions"
 import { syncContactAffiliations } from "@/lib/contacts/contact-affiliation-sync"
 import type {
   VolunteerPerformance,
@@ -13,6 +13,8 @@ import type {
 
 export type SaveVolunteerInput = {
   id?: string
+  /** Required for new volunteers — contact must already exist. */
+  contactId?: string
   first_name: string
   last_name: string
   email?: string
@@ -32,20 +34,32 @@ export async function createVolunteer(input: SaveVolunteerInput) {
     throw new Error("No organization selected")
   }
 
-  if (!input.first_name.trim() || !input.last_name.trim()) {
-    throw new Error("First name and last name are required")
+  const contactId = input.contactId?.trim()
+  if (!contactId) {
+    throw new Error("Select a contact first. Create the person in Contacts if they do not exist yet.")
   }
 
-  const fullName = `${input.first_name.trim()} ${input.last_name.trim()}`.trim()
+  const { data: contact, error: contactError } = await supabase
+    .from("contacts")
+    .select("id, full_name, email, phone, contact_type")
+    .eq("id", contactId)
+    .eq("organization_id", organizationId)
+    .maybeSingle()
 
-  const { contactId } = await findOrCreateContact({
-    organizationId,
-    fullName,
-    email: input.email,
-    phone: input.phone,
-    contactType: "individual",
-    notes: input.notes,
-  })
+  if (contactError || !contact) {
+    throw new Error(contactError?.message || "Contact not found")
+  }
+
+  if (contact.contact_type && contact.contact_type !== "individual") {
+    throw new Error("Only individual contacts can be added as volunteers")
+  }
+
+  const fullName = (contact.full_name as string | null)?.trim() || "Unnamed Contact"
+  const nameParts = fullName.split(/\s+/).filter(Boolean)
+  const firstName = input.first_name.trim() || nameParts[0] || "Unnamed"
+  const lastName = input.last_name.trim() || nameParts.slice(1).join(" ") || ""
+  const email = input.email?.trim() || (contact.email as string | null) || undefined
+  const phone = input.phone?.trim() || (contact.phone as string | null) || undefined
 
   const { data: existingVolunteer } = await supabase
     .from("volunteers")
@@ -55,12 +69,7 @@ export async function createVolunteer(input: SaveVolunteerInput) {
     .maybeSingle()
 
   if (existingVolunteer) {
-    await syncContactAffiliations(contactId, organizationId, supabase)
-    revalidateVolunteerPaths()
-    return {
-      volunteerId: existingVolunteer.id as string,
-      contactId,
-    }
+    throw new Error("This contact is already a volunteer")
   }
 
   const { data, error } = await supabase
@@ -68,10 +77,10 @@ export async function createVolunteer(input: SaveVolunteerInput) {
     .insert({
       organization_id: organizationId,
       contact_id: contactId,
-      first_name: input.first_name.trim(),
-      last_name: input.last_name.trim(),
-      email: input.email?.trim() || null,
-      phone: input.phone?.trim() || null,
+      first_name: firstName,
+      last_name: lastName,
+      email: email || null,
+      phone: phone || null,
       status: input.status,
       join_date: input.join_date || new Date().toISOString().slice(0, 10),
       skills: input.skills,
@@ -88,8 +97,8 @@ export async function createVolunteer(input: SaveVolunteerInput) {
 
   await ensureHrExtensionRecords(organizationId, contactId, ["volunteer"], {
     fullName,
-    email: input.email,
-    phone: input.phone,
+    email,
+    phone,
   })
 
   await syncContactAffiliations(contactId, organizationId, supabase)

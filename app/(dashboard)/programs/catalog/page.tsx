@@ -2,8 +2,10 @@ import Link from "next/link"
 import {
   Archive,
   Calendar,
-  ImageIcon,
+  ChevronLeft,
+  ChevronRight,
   Plus,
+  Tag,
   Users,
 } from "lucide-react"
 
@@ -30,16 +32,28 @@ import {
   getProgramRegistrationAvailabilityLabel,
   isProgramAcceptingRegistration,
 } from "@/lib/programs/program-enrollment-availability"
+import { formatProgramAgeEligibility } from "@/lib/programs/program-eligibility-display"
 import { ProgramCatalogFilters } from "@/components/programs/program-catalog-filters"
 import { ProgramCardActions } from "@/components/programs/program-card-actions"
-import { ProgramStatusSelect } from "@/components/programs/program-status-select"
 import { cn } from "@/lib/utils"
+
+const PAGE_SIZE = 8
+
+const FLYER_PLACEHOLDER_COLORS = [
+  "bg-sky-500",
+  "bg-emerald-400",
+  "bg-violet-500",
+  "bg-amber-500",
+  "bg-rose-400",
+  "bg-indigo-500",
+] as const
 
 type PageSearchParams = {
   q?: string
   status?: string
   department?: string
   view?: string
+  page?: string
 }
 
 function getValue(value: string | string[] | undefined) {
@@ -67,7 +81,7 @@ function getEnrollmentColor(program: Program) {
   if (percent >= 90) return "bg-red-500"
   if (percent >= 70) return "bg-amber-500"
 
-  return "bg-green-500"
+  return "bg-emerald-500"
 }
 
 function matchesProgram(program: Program, filters: PageSearchParams) {
@@ -99,6 +113,68 @@ function getStatusBadgeVariant(status: string) {
   }
 }
 
+function getStatusBadgeClass(status: ProgramStatus) {
+  switch (status) {
+    case "active":
+      return "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-50"
+    case "paused":
+      return "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-50"
+    case "archived":
+      return "border-zinc-200 bg-zinc-100 text-zinc-600 hover:bg-zinc-100"
+    default:
+      return "border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-50"
+  }
+}
+
+function getStatusDotClass(status: ProgramStatus) {
+  switch (status) {
+    case "active":
+      return "bg-emerald-500"
+    case "paused":
+      return "bg-amber-500"
+    case "archived":
+      return "bg-zinc-400"
+    default:
+      return "bg-slate-400"
+  }
+}
+
+function getFlyerPlaceholderColor(programId: string) {
+  let hash = 0
+  for (let index = 0; index < programId.length; index += 1) {
+    hash = (hash + programId.charCodeAt(index) * (index + 1)) % 997
+  }
+  return FLYER_PLACEHOLDER_COLORS[hash % FLYER_PLACEHOLDER_COLORS.length]
+}
+
+function buildCatalogHref(filters: PageSearchParams, page: number) {
+  const params = new URLSearchParams()
+  if (filters.q?.trim()) params.set("q", filters.q.trim())
+  if (filters.status && filters.status !== "all") params.set("status", filters.status)
+  if (filters.department && filters.department !== "all") {
+    params.set("department", filters.department)
+  }
+  if (filters.view === "table") params.set("view", "table")
+  if (page > 1) params.set("page", String(page))
+  const query = params.toString()
+  return query ? `/programs/catalog?${query}` : "/programs/catalog"
+}
+
+function ProgramStatusBadge({ status }: { status: ProgramStatus }) {
+  return (
+    <Badge
+      variant="secondary"
+      className={cn(
+        "gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium",
+        getStatusBadgeClass(status)
+      )}
+    >
+      <span className={cn("h-1.5 w-1.5 rounded-full", getStatusDotClass(status))} />
+      {getProgramStatusLabel(status)}
+    </Badge>
+  )
+}
+
 function ProgramCard({
   program,
   offeringCount,
@@ -109,14 +185,18 @@ function ProgramCard({
   const percent = getEnrollmentPercent(program)
   const acceptingRegistration = isProgramAcceptingRegistration(program)
   const availabilityLabel = getProgramRegistrationAvailabilityLabel(program)
-  const ageLabel = program.age_groups?.length
-    ? program.age_groups.join(", ")
-    : "No age group"
+  const ageLabel = formatProgramAgeEligibility(program)
+  const audienceLabel = `${program.gender || "All"} • ${ageLabel}`
 
   return (
-    <Card className="overflow-hidden">
+    <Card className="overflow-hidden border-border/80 shadow-sm">
       <div className="flex gap-4 p-4">
-        <div className="aspect-[3/4] w-28 shrink-0 overflow-hidden rounded-md border bg-white sm:w-32">
+        <div
+          className={cn(
+            "relative aspect-square w-24 shrink-0 overflow-hidden rounded-lg sm:w-28",
+            !program.flyer_url && getFlyerPlaceholderColor(program.id)
+          )}
+        >
           {program.flyer_url ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -125,63 +205,64 @@ function ProgramCard({
               className="h-full w-full object-cover"
             />
           ) : (
-            <div className="flex h-full items-center justify-center bg-muted/40">
-              <ImageIcon className="h-8 w-8 text-muted-foreground/40" />
+            <div className="flex h-full items-center justify-center">
+              <span className="text-2xl font-semibold text-white/90">
+                {program.name.trim().charAt(0).toUpperCase() || "P"}
+              </span>
             </div>
           )}
         </div>
 
-        <div className="min-w-0 flex-1 space-y-2">
+        <div className="min-w-0 flex-1 space-y-3">
           <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <p className="text-base font-semibold leading-tight">{program.name}</p>
-              {program.subtitle ? (
-                <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
-                  {program.subtitle}
-                </p>
-              ) : null}
+            <div className="min-w-0 space-y-1.5">
+              <p className="text-base font-semibold leading-snug tracking-tight">
+                {program.name}
+              </p>
+              <ProgramStatusBadge status={program.status} />
             </div>
-            <ProgramStatusSelect
-              programId={program.id}
-              status={program.status}
-            />
+            <div className="relative shrink-0">
+              <ProgramCardActions
+                programId={program.id}
+                programName={program.name}
+                programStatus={program.status}
+              />
+            </div>
           </div>
 
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Calendar className="h-4 w-4 shrink-0" />
-            <span>
-              {formatDate(program.start_date)} - {formatDate(program.end_date)}
-            </span>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+          <div className="space-y-1.5 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 shrink-0" />
+              <span>
+                {formatDate(program.start_date)} - {formatDate(program.end_date)}
+              </span>
+            </div>
             <div className="flex items-center gap-2">
               <Users className="h-4 w-4 shrink-0" />
-              <span>{program.gender || "All"}</span>
+              <span className="truncate">{audienceLabel}</span>
             </div>
-            <span className="text-muted-foreground/40">·</span>
-            <span>{ageLabel}</span>
-            <span className="text-muted-foreground/40">·</span>
-            <span>
-              {offeringCount} offering{offeringCount === 1 ? "" : "s"}
-            </span>
+            <div className="flex items-center gap-2">
+              <Tag className="h-4 w-4 shrink-0" />
+              <span>
+                {offeringCount} offering{offeringCount === 1 ? "" : "s"}
+              </span>
+            </div>
           </div>
 
           <div>
             <div className="mb-1 flex justify-between text-sm">
               <span className="text-muted-foreground">Enrollment</span>
-              <span>
-                {program.enrolled}/{program.capacity}
-                {program.waitlist > 0 ? ` (+${program.waitlist} waitlist)` : ""}
+              <span className="font-medium tabular-nums">
+                {program.enrolled} / {program.capacity || 0}
               </span>
             </div>
 
             <p
               className={cn(
-                "mb-2 text-xs",
+                "mb-2 text-xs font-medium",
                 acceptingRegistration
                   ? "text-emerald-700"
-                  : "text-muted-foreground"
+                  : "text-foreground/80"
               )}
             >
               {availabilityLabel}
@@ -190,7 +271,7 @@ function ProgramCard({
             <div className="h-2 overflow-hidden rounded-full bg-muted">
               <div
                 className={cn(
-                  "h-full rounded-full",
+                  "h-full rounded-full transition-all",
                   acceptingRegistration
                     ? getEnrollmentColor(program)
                     : "bg-muted-foreground/30"
@@ -198,14 +279,6 @@ function ProgramCard({
                 style={{ width: `${percent}%` }}
               />
             </div>
-          </div>
-
-          <div className="flex justify-end pt-1">
-            <ProgramCardActions
-              programId={program.id}
-              programName={program.name}
-              programStatus={program.status}
-            />
           </div>
         </div>
       </div>
@@ -224,7 +297,7 @@ function ProgramsTable({ programs }: { programs: Program[] }) {
               <TableHead>Dates</TableHead>
               <TableHead>Enrollment</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead className="w-[280px]">Actions</TableHead>
+              <TableHead className="w-[72px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
 
@@ -268,6 +341,96 @@ function ProgramsTable({ programs }: { programs: Program[] }) {
   )
 }
 
+function CatalogPagination({
+  page,
+  totalPages,
+  totalCount,
+  pageSize,
+  filters,
+}: {
+  page: number
+  totalPages: number
+  totalCount: number
+  pageSize: number
+  filters: PageSearchParams
+}) {
+  if (totalCount === 0) return null
+
+  const start = (page - 1) * pageSize + 1
+  const end = Math.min(page * pageSize, totalCount)
+
+  return (
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-sm text-muted-foreground">
+        Showing {start} to {end} of {totalCount} program
+        {totalCount === 1 ? "" : "s"}
+      </p>
+
+      <div className="flex items-center gap-1">
+        <Button
+          variant="outline"
+          size="icon"
+          className="h-8 w-8"
+          disabled={page <= 1}
+          asChild={page > 1}
+        >
+          {page > 1 ? (
+            <Link href={buildCatalogHref(filters, page - 1)} aria-label="Previous page">
+              <ChevronLeft className="h-4 w-4" />
+            </Link>
+          ) : (
+            <span>
+              <ChevronLeft className="h-4 w-4" />
+            </span>
+          )}
+        </Button>
+
+        {Array.from({ length: totalPages }, (_, index) => {
+          const pageNumber = index + 1
+          const isActive = pageNumber === page
+          return (
+            <Button
+              key={pageNumber}
+              variant="outline"
+              size="icon"
+              className={cn(
+                "h-8 w-8",
+                isActive && "border-primary bg-primary/10 text-primary"
+              )}
+              asChild={!isActive}
+              disabled={isActive}
+            >
+              {isActive ? (
+                <span>{pageNumber}</span>
+              ) : (
+                <Link href={buildCatalogHref(filters, pageNumber)}>{pageNumber}</Link>
+              )}
+            </Button>
+          )
+        })}
+
+        <Button
+          variant="outline"
+          size="icon"
+          className="h-8 w-8"
+          disabled={page >= totalPages}
+          asChild={page < totalPages}
+        >
+          {page < totalPages ? (
+            <Link href={buildCatalogHref(filters, page + 1)} aria-label="Next page">
+              <ChevronRight className="h-4 w-4" />
+            </Link>
+          ) : (
+            <span>
+              <ChevronRight className="h-4 w-4" />
+            </span>
+          )}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 export default async function ProgramsPage({
   searchParams,
 }: {
@@ -280,6 +443,7 @@ export default async function ProgramsPage({
     status: getValue(resolvedSearchParams?.status) || "all",
     department: getValue(resolvedSearchParams?.department) || "all",
     view: getValue(resolvedSearchParams?.view) || "cards",
+    page: getValue(resolvedSearchParams?.page) || "1",
   }
 
   const [programs, departments] = await Promise.all([
@@ -294,6 +458,14 @@ export default async function ProgramsPage({
   )
 
   const viewMode = filters.view === "table" ? "table" : "cards"
+  const totalCount = filteredPrograms.length
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
+  const requestedPage = Math.max(1, Number.parseInt(filters.page || "1", 10) || 1)
+  const page = Math.min(requestedPage, totalPages)
+  const pagePrograms = filteredPrograms.slice(
+    (page - 1) * PAGE_SIZE,
+    page * PAGE_SIZE
+  )
 
   return (
     <>
@@ -316,19 +488,15 @@ export default async function ProgramsPage({
           </Button>
         </div>
 
-        <Card>
-          <CardContent className="p-4">
-            <ProgramCatalogFilters
-              departments={departments}
-              initialFilters={{
-                q: filters.q || "",
-                status: filters.status || "all",
-                department: filters.department || "all",
-                view: viewMode,
-              }}
-            />
-          </CardContent>
-        </Card>
+        <ProgramCatalogFilters
+          departments={departments}
+          initialFilters={{
+            q: filters.q || "",
+            status: filters.status || "all",
+            department: filters.department || "all",
+            view: viewMode,
+          }}
+        />
 
         {filteredPrograms.length === 0 ? (
           <Card className="flex flex-col items-center justify-center py-12">
@@ -346,17 +514,35 @@ export default async function ProgramsPage({
             </Button>
           </Card>
         ) : viewMode === "table" ? (
-          <ProgramsTable programs={filteredPrograms} />
+          <>
+            <ProgramsTable programs={pagePrograms} />
+            <CatalogPagination
+              page={page}
+              totalPages={totalPages}
+              totalCount={totalCount}
+              pageSize={PAGE_SIZE}
+              filters={filters}
+            />
+          </>
         ) : (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {filteredPrograms.map((program) => (
-              <ProgramCard
-                key={program.id}
-                program={program}
-                offeringCount={offeringCounts.get(program.id) || 0}
-              />
-            ))}
-          </div>
+          <>
+            <div className="grid gap-5 md:grid-cols-2">
+              {pagePrograms.map((program) => (
+                <ProgramCard
+                  key={program.id}
+                  program={program}
+                  offeringCount={offeringCounts.get(program.id) || 0}
+                />
+              ))}
+            </div>
+            <CatalogPagination
+              page={page}
+              totalPages={totalPages}
+              totalCount={totalCount}
+              pageSize={PAGE_SIZE}
+              filters={filters}
+            />
+          </>
         )}
       </div>
     </>

@@ -13,7 +13,7 @@ import type {
   PortalOption,
   UserPortalCapabilities,
 } from "@/lib/auth/portal-capabilities-types"
-import { countAvailablePortals } from "@/lib/auth/resolve-portal-permissions"
+import { shouldShowPortalSwitcher } from "@/lib/auth/resolve-portal-permissions"
 import { cn } from "@/lib/utils"
 
 type PortalSwitcherProps = {
@@ -108,7 +108,7 @@ export function PortalSwitcher({
 }: PortalSwitcherProps) {
   const options = buildPortalOptions(capabilities)
 
-  if (countAvailablePortals(capabilities) < 2) {
+  if (!shouldShowPortalSwitcher(capabilities)) {
     return null
   }
 

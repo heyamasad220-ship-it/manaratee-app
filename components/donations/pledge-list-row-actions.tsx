@@ -74,7 +74,7 @@ export function PledgeListRowActions({
               onRecordPayment()
             }}
           >
-            Record Payment
+            Receive Payment
           </DropdownMenuItem>
           {balanceRemaining > 0.009 ? (
             <DropdownMenuItem

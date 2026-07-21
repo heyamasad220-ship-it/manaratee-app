@@ -63,11 +63,11 @@ Status: Working
 Features:
 
 * Program CRUD
-* **Quick Create** + **Edit Program** tabbed setup (see `docs/programs-staff-setup-ui.md`)
+* **Quick Create** + program detail inline edit + offering manage (see `docs/programs-staff-setup-ui.md`)
 * Organization filtering
 * Program details
 * Eligibility rules (ages, grades, gender, capacity groups)
-* Registration types and fee plans (Edit Program)
+* Registration types and fee plans (offering manage)
 * Offering-scoped pricing (Phase 2A/2B)
 
 Pending:
@@ -170,6 +170,23 @@ Features:
 * Subscription filtering
 * Permission filtering
 * Dynamic visibility
+* Module order: Dashboard → Contacts → HR → Membership → Donations → …
+
+---
+
+## Membership
+
+Status: Implemented (sidebar + pages)
+
+Routes: `/membership`, `/membership/members`, `/membership/applications`, `/membership/groups`, `/membership/settings`, `/membership/benefits`
+
+**Applications:** Committee member submissions at `/membership/applications` (moved from HR Settings). Permission: `applications.view`.
+
+**Groups:** Member groups (formerly HR Teams) at `/membership/groups` — overview, groups list, group positions. Legacy `/membership/teams` redirects here. Permission: `membership.view`.
+
+**Giving collectives** (CRM `contact_type = group`) are not Contacts. Detail workspace: `/donations/groups/[id]` (Members, Group giving = campaign totals, Activity = events only — not individual gifts). Badge: Membership Group / Department / Group Donation via `giving_group_kind` (`scripts/167_giving_group_category.sql`). They appear on **Donations → Reports → Donors → Group Giving** (`/donations/reports/donors?view=group`). Legacy `/contacts/groups` and `/contacts/[id]` for groups redirect into Donations.
+
+Enable for orgs: Platform Admin modules toggle, or repair SQL `scripts/165_ensure_membership_sidebar.sql` (also `scripts/058_membership_module.sql`). Permissions: `membership.view` / `membership.manage` (sidebar falls back to contacts permissions).
 
 ---
 
@@ -210,11 +227,15 @@ North star: **One Contact · Many Roles · Many Activities · No Duplicate Ident
 |--------|----------|---------------------|
 | Donations — Stripe | `donors.contact_id` / payment metadata | Webhook processors (S-02/S-03) |
 | Donations — portal/pledges | `donors.contact_id` | Portal + staff pledge actions (S-05/S-06) |
-| Ticketing | `ticket_orders.contact_id` via `findOrCreateContact` | Order completion paths (S-07/S-08) |
-| Programs | `participant_contact_id` via `ensureContactForPerson` | Enrollment + waitlist promote (S-09/S-10) |
+| Programs | `participant_contact_id` / `registrant_contact_id` via `ensureContactForPerson` | Enrollment → **Programs** (`program_participant`); parents as registrant included (S-09/S-10; split in `175`) |
+| Ticketing / Venue | ticket order / rental billing contact | → **Customer** only (events + bookings; `175`) |
 | Volunteers | `volunteers.contact_id` | `createVolunteer`, `ensureVolunteerForContact` (S-11) |
 
-Routes: `/contacts/people` (default; `/contacts` redirects here), `/contacts/[id]`, `/contacts/families`, `/contacts/families/[id]`, `/contacts/organizations`, `/contacts/groups`, `/contacts/reports`, `/contacts/reports/directory`, `/contacts/settings`
+Routes: `/contacts/people` (default; `/contacts` redirects here), `/contacts/[id]`, `/contacts/families`, `/contacts/families/[id]`, `/contacts/organizations`, `/contacts/reports`, `/contacts/reports/directory`, `/contacts/settings`
+
+**Contact profile Overview:** Module-gated right rail with Quick Actions, Financial Summary, and Activity (`components/contacts/contact-profile-overview-rail.tsx`).
+
+**Groups** list is not under Contacts. Giving collectives use `/donations/groups/[id]` and roll up on **Donations → Reports → Donors → Group Giving**; `/contacts/groups` and group `/contacts/[id]` redirect into Donations. Member groups live under **Membership → Groups**.
 
 **Reports (Phase 1):** Contact Directory report with filters + CSV export (`lib/contacts/contact-report-actions.ts`, `components/contacts/contacts-directory-report-panel.tsx`). Donor giving reports stay under Donations.
 
@@ -245,7 +266,7 @@ Status: Working (contacts-based views with role filters)
 Routes:
 
 * `/hr/members`
-* `/hr/volunteers`
+* `/workforce/volunteers` (HR directory shell)
 * `/hr/teams`
 
 ---
@@ -254,15 +275,40 @@ Routes:
 
 Status: Working (simplified)
 
-Route: `/hr/employees`
+Route: `/workforce/employees`
 
-Tabs: Overview, Employees, Departments, Positions
+HR module sidebar includes **Overview** (`/workforce`), then Employees, Volunteers, Childcare Providers, Reports, Settings. **Departments** is under **Programs** (first item), not HR.
 
-Removed tabs (redirect to Overview or related pages):
+Roster-only employee list using the shared HR directory shell (Export, Add Employee, Employees | Applications | Archived tabs, KPI cards, filters, pagination). **Departments** is under Programs → Departments; Positions remain under **HR → Settings**.
 
+**Contact-first:** Add Employee requires selecting an existing contact (`HrContactPicker` → `createEmployeeFromContact`). Create the person in Contacts first if they are not found.
+
+Removed tabs (redirect to Employees or Settings):
+
+* Departments → `/workforce/departments` (sidebar: **Programs → Departments**; opens shared workspace `/workforce/departments/[id]`: **Overview** (year programs + flyer; Super Admin archive), Employees, Rosters, Offerings, Schedule, Payroll, Financial Summary; optional Group giving; Activity; **Reports** (archived years); apply SQL `169`/`170`/`171`/`172`/`173`/`174`; legacy settings path redirects to list). Historical QIL load: `scripts/import-qil-year.mjs`; consolidate course-as-programs → offerings: `scripts/migrate-qil-courses-to-offerings.mjs` (after `174`).
+* Positions → `/workforce/settings/positions`
 * Time Off, Work Schedule, Notifications, Teams, Applications
 
-Employment applications accessed via header link → filtered Submissions view.
+Employment applications accessed via the Applications directory tab → filtered Submissions view.
+
+Shared shell: `components/workforce/hr-directory-shell.tsx` (also used by Volunteers and Childcare Providers).
+
+### HR Settings
+
+Route: `/workforce/settings`
+
+Tabs/pages: Positions, Application Templates (`/workforce/settings` redirects to Positions). **Departments** lives under Programs (`/workforce/departments`); legacy `/workforce/settings/departments` redirects there.
+
+Key files:
+
+* `components/hr/people-management-settings-nav.tsx`
+* `app/(dashboard)/workforce/departments/page.tsx`
+* `app/(dashboard)/workforce/settings/positions/page.tsx`
+* `app/(dashboard)/workforce/settings/application-templates/page.tsx`
+
+Application Templates: HR application type cards (volunteer, employment, committee, childcare); form builder scaffold. Old `/settings/applications?tab=templates` redirects here.
+
+Committee Applications moved to **Membership → Applications** (`/membership/applications`).
 
 ---
 
@@ -270,14 +316,17 @@ Employment applications accessed via header link → filtered Submissions view.
 
 Status: Working (real data)
 
-Route: `/hr/childcare`
+**Providers:** `/workforce/childcare` (HR directory shell: Providers | Applications | Archived)  
+**Registrations:** `/event-management/reports/childcare` (Event Management → Reports)
 
 Data source: approved `childcare_provider` applications (not mock data).
 
 Key files:
 
-* `app/(dashboard)/hr/childcare/page.tsx`
+* `app/(dashboard)/workforce/childcare/page.tsx`
+* `app/(dashboard)/event-management/reports/childcare/page.tsx`
 * `components/hr/hr-childcare-panel.tsx`
+* `components/child-care/childcare-registrations-client.tsx`
 * `lib/hr/childcare-provider-actions.ts`
 
 Stats cards: Total Providers, Active Providers, Total Hours, Total Events Worked.
@@ -288,48 +337,37 @@ Header action: Provider Applications → filtered Submissions tab.
 
 ---
 
-### Applications (People Management hub)
+### Applications (HR / Membership)
 
-Status: Active Development
+Status: Working
 
-Canonical route: `/people-management/applications`
+Submissions are embedded on each category **Applications** view (not under HR Settings):
+
+| Type | Route |
+|------|-------|
+| Employment | `/workforce/employees?tab=applications` |
+| Volunteer | `/workforce/volunteers?tab=applications` |
+| Childcare provider | `/workforce/childcare?tab=applications` |
+| Committee member | `/membership/applications` |
 
 Permission: `applications.view`
 
-Tabs:
+Application Templates: **HR → Settings → Application Templates** (`/workforce/settings/application-templates`).
 
-| Tab | Purpose |
-|-----|---------|
-| Overview | Dashboard stats, status shortcuts, per-type submission counts |
-| Submissions | Search, filters, applications table, review links |
-| Templates | Application type cards; form builder scaffold (in progress) |
+Legacy redirects:
 
-URL query params:
-
-* `tab` — `overview` (default), `submissions`, `templates`
-* `status` — filters Submissions (e.g. `pending_review`, `approved`)
-* `application_type` — filters by type; opens Submissions tab when set
-
-Hub types on Overview/Submissions (employment excluded from default hub):
-
-* volunteer
-* committee_member
-* childcare_provider
-
-Employment still available via `?application_type=employment`.
-
-Redirects:
-
-* `/hr/applications`, `/settings/applications` → PM Applications
-* `/applications/pending|approved|rejected` → PM or `/applications/all` by module
-* Old Settings Applications tabs → appropriate PM or Employees pages
+* `/settings/applications`, `/people-management/applications`, `/hr/applications` → category Applications tab (by `application_type`)
+* `/settings/applications?tab=templates` → Application Templates
+* `/workforce/settings/committee-applications` → `/membership/applications`
 
 Key files:
 
-* `app/(dashboard)/people-management/applications/page.tsx`
-* `components/applications/people-management-applications-client.tsx`
+* `components/applications/hr-category-applications-panel.tsx`
 * `components/applications/applications-module-page.tsx`
-* `components/applications/application-templates-panel.tsx`
+* `lib/applications/application-routes.ts` (`hrCategoryApplicationsUrl`, `MEMBERSHIP_APPLICATIONS_PATH`)
+* `app/(dashboard)/settings/applications/page.tsx` (redirect only)
+* `app/(dashboard)/membership/applications/page.tsx`
+* `app/(dashboard)/workforce/settings/application-templates/page.tsx`
 
 Other modules:
 

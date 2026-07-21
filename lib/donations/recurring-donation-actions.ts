@@ -91,6 +91,24 @@ export async function updateRecurringPlanStatusAction(
   if (!access.ok) return { success: false as const, error: access.error }
   const { supabase, orgId } = access
 
+  const { data: existing, error: existingError } = await supabase
+    .from("recurring_donation_plans")
+    .select("id, status")
+    .eq("id", planId)
+    .eq("organization_id", orgId)
+    .maybeSingle()
+
+  if (existingError || !existing) {
+    return { success: false as const, error: existingError?.message || "Plan not found" }
+  }
+
+  if (String(existing.status) === "completed") {
+    return {
+      success: false as const,
+      error: "Completed plans cannot be changed. Create a new plan instead.",
+    }
+  }
+
   const patch: Record<string, unknown> = { status }
   if (status === "cancelled") {
     patch.end_date = new Date().toISOString().slice(0, 10)
@@ -115,6 +133,7 @@ export async function recordRecurringDonationPaymentAction(input: {
   paymentDate?: string
   source?: string
   memo?: string
+  attributedGroupContactId?: string | null
 }) {
   const access = await requireDonationStaffAccess("manage")
   if (!access.ok) return { success: false as const, error: access.error }
@@ -152,6 +171,7 @@ export async function recordRecurringDonationPaymentAction(input: {
       organization_id: orgId,
       donor_id: plan.donor_id,
       contact_id: plan.contact_id ?? donor?.contact_id ?? null,
+      attributed_group_contact_id: input.attributedGroupContactId || null,
       campaign_id: plan.campaign_id,
       category_id: plan.category_id,
       subcategory_id: plan.subcategory_id,
@@ -299,6 +319,24 @@ export async function updateRecurringDonationPlanAction(input: {
   if (!access.ok) return { success: false as const, error: access.error }
   const { supabase, orgId } = access
 
+  const { data: existing, error: existingError } = await supabase
+    .from("recurring_donation_plans")
+    .select("id, status, subcategory_id")
+    .eq("id", input.planId)
+    .eq("organization_id", orgId)
+    .maybeSingle()
+
+  if (existingError || !existing) {
+    return { success: false as const, error: existingError?.message || "Plan not found" }
+  }
+
+  if (String(existing.status) === "completed") {
+    return {
+      success: false as const,
+      error: "Completed plans cannot be updated. Create a new plan instead.",
+    }
+  }
+
   const patch: Record<string, unknown> = {}
 
   if (input.amount != null) {
@@ -323,14 +361,7 @@ export async function updateRecurringDonationPlanAction(input: {
   }
 
   if (input.subcategoryId) {
-    const { data: existingPlan } = await supabase
-      .from("recurring_donation_plans")
-      .select("subcategory_id")
-      .eq("id", input.planId)
-      .eq("organization_id", orgId)
-      .maybeSingle()
-
-    if (input.subcategoryId !== existingPlan?.subcategory_id) {
+    if (input.subcategoryId !== existing.subcategory_id) {
       const fundCheck = await validateOpenDonationFund(supabase, orgId, input.subcategoryId)
       if (!fundCheck.ok) {
         return { success: false as const, error: fundCheck.error }
@@ -358,13 +389,20 @@ export async function updateRecurringPlanPaymentMethodAction(input: {
 
   const { data: plan, error: planError } = await supabase
     .from("recurring_donation_plans")
-    .select("id, contact_id, donor_id")
+    .select("id, contact_id, donor_id, status")
     .eq("id", input.planId)
     .eq("organization_id", orgId)
     .maybeSingle()
 
   if (planError || !plan) {
     return { success: false as const, error: planError?.message || "Plan not found" }
+  }
+
+  if (String(plan.status) === "completed") {
+    return {
+      success: false as const,
+      error: "Completed plans cannot be updated. Create a new plan instead.",
+    }
   }
 
   if (input.contactPaymentMethodId) {

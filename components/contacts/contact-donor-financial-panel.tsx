@@ -151,6 +151,7 @@ export function ContactDonorFinancialPanel({
               <DonorPledgesTab
                 donorId={donorId}
                 donorName={donorName}
+                contactId={contactId}
                 embedded
                 onUpdated={() => void loadDonorData()}
               />

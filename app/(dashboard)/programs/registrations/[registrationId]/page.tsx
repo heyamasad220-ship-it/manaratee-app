@@ -295,9 +295,9 @@ export default async function RegistrationDetailPage({
                   </Button>
                 ) : null}
                 <Button variant="outline" asChild>
-                  <Link href={`/programs/${program.id}/edit`}>
+                  <Link href={`/programs/${program.id}`}>
                     <ExternalLink className="mr-2 h-4 w-4" />
-                    Edit Program
+                    View Program
                   </Link>
                 </Button>
               </div>

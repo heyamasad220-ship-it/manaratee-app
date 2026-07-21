@@ -1,3 +1,4 @@
+import { Suspense } from "react"
 import { Header } from "@/components/layout/header"
 import { HrChildcarePanel } from "@/components/hr/hr-childcare-panel"
 import { ModuleApplicationsLink } from "@/components/applications/module-applications-link"
@@ -17,7 +18,9 @@ export default async function HrChildcarePage() {
           />
         }
       />
-      <HrChildcarePanel providers={providers} stats={stats} />
+      <Suspense fallback={<div className="h-64 animate-pulse rounded-lg bg-muted" />}>
+        <HrChildcarePanel providers={providers} stats={stats} />
+      </Suspense>
     </div>
   )
 }

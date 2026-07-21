@@ -160,11 +160,12 @@ export function DonationMetricCard({
                   compact={compact}
                 />
               ) : null}
-              {description && !compact ? (
+              {description ? (
                 <div
                   className={cn(
                     "text-xs text-muted-foreground",
-                    value != null && value !== "" && "mt-1"
+                    value != null && value !== "" && (compact ? "mt-0.5" : "mt-1"),
+                    compact && "leading-tight"
                   )}
                 >
                   {description}

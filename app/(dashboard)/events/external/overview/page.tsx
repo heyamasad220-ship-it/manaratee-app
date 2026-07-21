@@ -229,11 +229,11 @@ export default function VenueRentalDashboardPage() {
 
         {/* Main Content Grid */}
         <div className="grid gap-4 sm:gap-6 lg:grid-cols-3">
-          {/* Recent Booking Requests */}
+          {/* Booking Requests */}
           <Card className="lg:col-span-2">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <div>
-                <CardTitle className="text-base font-semibold">Recent Booking Requests</CardTitle>
+                <CardTitle className="text-base font-semibold">Booking Requests</CardTitle>
                 <CardDescription>Latest requests requiring action</CardDescription>
               </div>
               <Button variant="ghost" size="sm" asChild>

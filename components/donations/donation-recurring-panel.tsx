@@ -53,6 +53,7 @@ import {
   TrendingUp,
   Pencil,
   CreditCard,
+  Eye,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import {
@@ -76,10 +77,12 @@ import {
   formatRecurringFrequencyLabel,
   formatRecurringStatusLabel,
 } from "@/lib/donations/recurring-donation-types"
+import { receivePaymentActionLabel } from "@/lib/donations/payment-admin-copy"
 import { getDonorProfilePath } from "@/lib/donations/donor-profile-path"
 import { TableColumnHeaderFilter, TableColumnHeaderSort } from "@/components/ui/table-column-header-filter"
 
-const TABLE_COLSPAN = 11
+const REPORT_TABLE_COLSPAN = 11
+const CONTACT_TABLE_COLSPAN = 9
 
 const AMOUNT_SORT_OPTIONS = [
   { value: "amount_desc", label: "Highest first" },
@@ -120,6 +123,15 @@ function formatCategoryFund(plan: RecurringPlanWithDonor) {
     return `${plan.category_name} / ${plan.fund_name}`
   }
   return plan.category_name || plan.fund_name || "—"
+}
+
+function formatRecurringPlanDescription(plan: RecurringPlanWithDonor) {
+  const frequencyLabel = formatRecurringFrequencyLabel(plan.frequency)
+  const base = `${frequencyLabel} Recurring Donation`
+  if (plan.campaign_name?.trim()) {
+    return `${base} — ${plan.campaign_name.trim()}`
+  }
+  return base
 }
 
 function formatPaymentsMade(plan: RecurringPlanWithDonor) {
@@ -164,6 +176,10 @@ function getRecurringStatusBadgeClass(status: string) {
     default:
       return "border-border bg-muted text-muted-foreground hover:bg-muted"
   }
+}
+
+function isCompletedRecurringPlan(plan: RecurringPlanWithDonor) {
+  return plan.status === "completed"
 }
 
 function dateSortValue(value: string | null) {
@@ -214,7 +230,18 @@ function parseOptionalCountInput(value: string) {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : null
 }
 
-export function DonationRecurringPanel({ embedded = false }: { embedded?: boolean }) {
+export function DonationRecurringPanel({
+  embedded = false,
+  donorId: scopedDonorId = null,
+  onPlansCountChange,
+  onUpdated,
+}: {
+  embedded?: boolean
+  /** When set, show only this donor’s plans (contact profile Payment Plans). */
+  donorId?: string | null
+  onPlansCountChange?: (count: number) => void
+  onUpdated?: () => void
+}) {
   const supabase = createClient()
   const pathname = usePathname()
   const [loading, setLoading] = useState(true)
@@ -230,7 +257,7 @@ export function DonationRecurringPanel({ embedded = false }: { embedded?: boolea
     actualRecurringRevenue: 0,
     upcomingThisMonth: 0,
   })
-  const [statusFilter, setStatusFilter] = useState("active")
+  const [statusFilter, setStatusFilter] = useState(scopedDonorId ? "all" : "active")
   const [categoryFundFilter, setCategoryFundFilter] = useState("all")
   const [frequencyFilter, setFrequencyFilter] = useState("all")
   const [sortKey, setSortKey] = useState<RecurringSortKey>("default")
@@ -239,6 +266,7 @@ export function DonationRecurringPanel({ embedded = false }: { embedded?: boolea
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showPaymentDialog, setShowPaymentDialog] = useState(false)
   const [showEditDialog, setShowEditDialog] = useState(false)
+  const [showViewDialog, setShowViewDialog] = useState(false)
   const [showCardDialog, setShowCardDialog] = useState(false)
   const [selectedPlan, setSelectedPlan] = useState<RecurringPlanWithDonor | null>(null)
   const [saving, setSaving] = useState(false)
@@ -267,12 +295,16 @@ export function DonationRecurringPanel({ embedded = false }: { embedded?: boolea
   const [attribution, setAttribution] = useState<DonationAttributionValue>(
     EMPTY_DONATION_ATTRIBUTION_VALUE
   )
-  const [donorId, setDonorId] = useState("")
+  const [donorId, setDonorId] = useState(scopedDonorId || "")
   const [amount, setAmount] = useState("")
   const [frequency, setFrequency] = useState<"daily" | "weekly" | "monthly" | "quarterly" | "annually">("monthly")
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10))
   const [notes, setNotes] = useState("")
   const [paymentSource, setPaymentSource] = useState("cash")
+
+  const isDonorScoped = Boolean(scopedDonorId)
+  const contactScopedColumns = isDonorScoped
+  const tableColSpan = contactScopedColumns ? CONTACT_TABLE_COLSPAN : REPORT_TABLE_COLSPAN
 
   async function loadData() {
     setLoading(true)
@@ -280,13 +312,25 @@ export function DonationRecurringPanel({ embedded = false }: { embedded?: boolea
     const result = await getRecurringDashboardAction()
     if (result.success) {
       setMetrics(result.metrics)
-      setPlans(result.plans)
+      const nextPlans = scopedDonorId
+        ? result.plans.filter((plan) => plan.donor_id === scopedDonorId)
+        : result.plans
+      setPlans(nextPlans)
+      onPlansCountChange?.(nextPlans.length)
     } else {
       setLoadError(result.error || "Could not load recurring donation plans")
       setPlans([])
+      onPlansCountChange?.(0)
     }
     setLoading(false)
   }
+
+  useEffect(() => {
+    if (scopedDonorId) {
+      setDonorId(scopedDonorId)
+      setStatusFilter("all")
+    }
+  }, [scopedDonorId])
 
   useEffect(() => {
     loadData()
@@ -304,6 +348,11 @@ export function DonationRecurringPanel({ embedded = false }: { embedded?: boolea
 
       setOrganizationId(profile.organization_id)
 
+      if (scopedDonorId) {
+        setDonorId(scopedDonorId)
+        return
+      }
+
       const { data: donorRows } = await supabase
         .from("donors")
         .select("id, full_name, email")
@@ -314,12 +363,17 @@ export function DonationRecurringPanel({ embedded = false }: { embedded?: boolea
     }
     loadFormOptions()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [scopedDonorId])
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDonorNameFilter(donorNameFilterInput.trim()), 300)
     return () => window.clearTimeout(timer)
   }, [donorNameFilterInput])
+
+  async function refreshAfterChange() {
+    await loadData()
+    onUpdated?.()
+  }
 
   const categoryFundOptions = useMemo(() => {
     const values = new Set<string>()
@@ -420,11 +474,11 @@ export function DonationRecurringPanel({ embedded = false }: { embedded?: boolea
     }
 
     setShowCreateDialog(false)
-    setDonorId("")
+    setDonorId(scopedDonorId || "")
     setAttribution(EMPTY_DONATION_ATTRIBUTION_VALUE)
     setAmount("")
     setNotes("")
-    await loadData()
+    await refreshAfterChange()
   }
 
   async function handleRecordPayment() {
@@ -444,7 +498,7 @@ export function DonationRecurringPanel({ embedded = false }: { embedded?: boolea
     setShowPaymentDialog(false)
     setSelectedPlan(null)
     alert(`Payment recorded. Next payment: ${result.nextPaymentDate}`)
-    await loadData()
+    await refreshAfterChange()
   }
 
   async function handleStatusChange(planId: string, status: "active" | "paused" | "cancelled" | "completed") {
@@ -453,10 +507,19 @@ export function DonationRecurringPanel({ embedded = false }: { embedded?: boolea
       alert(result.error || "Could not update status")
       return
     }
-    await loadData()
+    await refreshAfterChange()
+  }
+
+  function openViewPlan(plan: RecurringPlanWithDonor) {
+    setSelectedPlan(plan)
+    setShowViewDialog(true)
   }
 
   function openEditPlan(plan: RecurringPlanWithDonor) {
+    if (isCompletedRecurringPlan(plan)) {
+      openViewPlan(plan)
+      return
+    }
     setSelectedPlan(plan)
     setEditAmount(String(plan.amount))
     setEditFrequency(plan.frequency)
@@ -502,10 +565,14 @@ export function DonationRecurringPanel({ embedded = false }: { embedded?: boolea
 
     setShowEditDialog(false)
     setSelectedPlan(null)
-    await loadData()
+    await refreshAfterChange()
   }
 
   async function openChangeCard(plan: RecurringPlanWithDonor) {
+    if (isCompletedRecurringPlan(plan)) {
+      alert("Completed plans cannot be updated. Create a new plan instead.")
+      return
+    }
     setSelectedPlan(plan)
     setCardDialogError(null)
     setContactPaymentMethods([])
@@ -554,122 +621,153 @@ export function DonationRecurringPanel({ embedded = false }: { embedded?: boolea
 
     setShowCardDialog(false)
     setSelectedPlan(null)
-    await loadData()
+    await refreshAfterChange()
   }
 
   return (
     <>
-      {!embedded ? <Header title="Recurring Donations" /> : null}
-      <div className={embedded ? "space-y-6" : "space-y-6 p-6"}>
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold">Recurring Donation Plans</h2>
-            <p className="text-sm text-muted-foreground">
-              Ongoing giving commitments — not pledges. Stripe-linked plans bill automatically;
-              manual plans can still record payments here.
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={loadData}>
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Refresh
-            </Button>
-            <Button onClick={() => setShowCreateDialog(true)}>
+      {!embedded && !isDonorScoped ? <Header title="Recurring Donations" /> : null}
+      <div className={embedded || isDonorScoped ? (isDonorScoped ? "space-y-3" : "space-y-6") : "space-y-6 p-6"}>
+        {isDonorScoped ? (
+          <div className="flex justify-start">
+            <Button
+              size="sm"
+              onClick={() => {
+                if (scopedDonorId) setDonorId(scopedDonorId)
+                setShowCreateDialog(true)
+              }}
+            >
               <Plus className="mr-2 h-4 w-4" />
               New Plan
             </Button>
           </div>
-        </div>
+        ) : (
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold">Recurring Donation Plans</h2>
+              <p className="text-sm text-muted-foreground">
+                Ongoing giving commitments — not pledges. Stripe-linked plans bill automatically;
+                manual plans can still record payments here.
+              </p>
+            </div>
+            <div className="flex shrink-0 gap-2">
+              <Button variant="outline" onClick={() => void loadData()}>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Refresh
+              </Button>
+              <Button
+                onClick={() => {
+                  if (scopedDonorId) setDonorId(scopedDonorId)
+                  setShowCreateDialog(true)
+                }}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                New Plan
+              </Button>
+            </div>
+          </div>
+        )}
 
-        <DonationMetricCardGrid colorful columns={4}>
-          <DonationMetricCard
-            title="Active Recurring Donors"
-            value={metrics.activeDonorCount}
-            icon={Users}
-            accent="emerald"
-            description={`${metrics.activePlanCount} active plans`}
-          />
-          <DonationMetricCard
-            title="Monthly Recurring Revenue"
-            value={formatCurrency(metrics.monthlyRecurringRevenue)}
-            icon={DollarSign}
-            accent="blue"
-            description="Projected from active plans"
-          />
-          <DonationMetricCard
-            title="Annual Recurring Revenue"
-            value={formatCurrency(metrics.annualRecurringRevenue)}
-            icon={TrendingUp}
-            accent="purple"
-            description="MRR × 12"
-          />
-          <DonationMetricCard
-            title="Paused / Cancelled"
-            value={`${metrics.pausedPlanCount} / ${metrics.cancelledPlanCount}`}
-            icon={Pause}
-            accent="amber"
-            description={`${formatCurrency(metrics.actualRecurringRevenue)} received to date`}
-          />
-        </DonationMetricCardGrid>
+        {!isDonorScoped ? (
+          <DonationMetricCardGrid colorful columns={4}>
+            <DonationMetricCard
+              title="Active Recurring Donors"
+              value={metrics.activeDonorCount}
+              icon={Users}
+              accent="emerald"
+              description={`${metrics.activePlanCount} active plans`}
+            />
+            <DonationMetricCard
+              title="Monthly Recurring Revenue"
+              value={formatCurrency(metrics.monthlyRecurringRevenue)}
+              icon={DollarSign}
+              accent="blue"
+              description="Projected from active plans"
+            />
+            <DonationMetricCard
+              title="Annual Recurring Revenue"
+              value={formatCurrency(metrics.annualRecurringRevenue)}
+              icon={TrendingUp}
+              accent="purple"
+              description="MRR × 12"
+            />
+            <DonationMetricCard
+              title="Paused / Cancelled"
+              value={`${metrics.pausedPlanCount} / ${metrics.cancelledPlanCount}`}
+              icon={Pause}
+              accent="amber"
+              description={`${formatCurrency(metrics.actualRecurringRevenue)} received to date`}
+            />
+          </DonationMetricCardGrid>
+        ) : null}
 
         {loadError ? (
           <p className="text-sm text-destructive">{loadError}</p>
         ) : null}
 
         <Card>
-          <CardContent className="p-0 overflow-x-auto">
-            <Table>
+          <CardContent className="overflow-x-auto p-0">
+            <Table className={contactScopedColumns ? "table-fixed w-full min-w-[720px]" : undefined}>
               <TableHeader>
                 <TableRow>
-                  <TableHead>
-                    <TableColumnHeaderFilter
-                      label="Donor"
-                      active={Boolean(donorNameFilter)}
-                    >
-                      {({ close }) => (
-                        <Input
-                          placeholder="Search by donor name or email"
-                          value={donorNameFilterInput}
-                          onChange={(event) => setDonorNameFilterInput(event.target.value)}
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter") {
-                              setDonorNameFilter(donorNameFilterInput.trim())
-                              close()
-                            }
-                          }}
-                        />
-                      )}
-                    </TableColumnHeaderFilter>
-                  </TableHead>
-                  <TableHead>
-                    <TableColumnHeaderFilter
-                      label="Category / Fund"
-                      active={categoryFundFilter !== "all"}
-                    >
-                      {({ close }) => (
-                        <Select
-                          value={categoryFundFilter}
-                          onValueChange={(value) => {
-                            setCategoryFundFilter(value)
-                            close()
-                          }}
+                  {contactScopedColumns ? (
+                    <>
+                      <TableHead className="w-[88px]">Type</TableHead>
+                      <TableHead className="w-[22%]">Description</TableHead>
+                    </>
+                  ) : (
+                    <>
+                      <TableHead>
+                        <TableColumnHeaderFilter
+                          label="Donor"
+                          active={Boolean(donorNameFilter)}
                         >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All categories</SelectItem>
-                            {categoryFundOptions.map((option) => (
-                              <SelectItem key={option} value={option}>
-                                {option}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      )}
-                    </TableColumnHeaderFilter>
-                  </TableHead>
-                  <TableHead className="text-right">
+                          {({ close }) => (
+                            <Input
+                              placeholder="Search by donor name or email"
+                              value={donorNameFilterInput}
+                              onChange={(event) => setDonorNameFilterInput(event.target.value)}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter") {
+                                  setDonorNameFilter(donorNameFilterInput.trim())
+                                  close()
+                                }
+                              }}
+                            />
+                          )}
+                        </TableColumnHeaderFilter>
+                      </TableHead>
+                      <TableHead>
+                        <TableColumnHeaderFilter
+                          label="Category / Fund"
+                          active={categoryFundFilter !== "all"}
+                        >
+                          {({ close }) => (
+                            <Select
+                              value={categoryFundFilter}
+                              onValueChange={(value) => {
+                                setCategoryFundFilter(value)
+                                close()
+                              }}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All categories</SelectItem>
+                                {categoryFundOptions.map((option) => (
+                                  <SelectItem key={option} value={option}>
+                                    {option}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+                        </TableColumnHeaderFilter>
+                      </TableHead>
+                    </>
+                  )}
+                  <TableHead className={contactScopedColumns ? "w-[100px] text-right" : "text-right"}>
                     <div className="flex items-center justify-end gap-1">
                       <span className="font-medium">Amount</span>
                       <TableColumnHeaderSort
@@ -681,7 +779,7 @@ export function DonationRecurringPanel({ embedded = false }: { embedded?: boolea
                       />
                     </div>
                   </TableHead>
-                  <TableHead>
+                  <TableHead className={contactScopedColumns ? "w-[110px]" : undefined}>
                     <TableColumnHeaderFilter
                       label="Frequency"
                       active={frequencyFilter !== "all"}
@@ -709,11 +807,13 @@ export function DonationRecurringPanel({ embedded = false }: { embedded?: boolea
                       )}
                     </TableColumnHeaderFilter>
                   </TableHead>
-                  <TableHead>
+                  <TableHead className={contactScopedColumns ? "w-[120px]" : undefined}>
                     <div className="flex items-center gap-1">
-                      <span className="font-medium">Plan Start</span>
+                      <span className="font-medium">
+                        {contactScopedColumns ? "Start Date" : "Plan Start"}
+                      </span>
                       <TableColumnHeaderSort
-                        label="Plan Start"
+                        label={contactScopedColumns ? "Start Date" : "Plan Start"}
                         value={sortValueForColumn(sortKey, "start_", "start_desc")}
                         active={sortKey.startsWith("start_")}
                         options={[...PLAN_START_SORT_OPTIONS]}
@@ -721,22 +821,34 @@ export function DonationRecurringPanel({ embedded = false }: { embedded?: boolea
                       />
                     </div>
                   </TableHead>
-                  <TableHead>
-                    <div className="flex items-center gap-1">
-                      <span className="font-medium">Plan End</span>
-                      <TableColumnHeaderSort
-                        label="Plan End"
-                        value={sortValueForColumn(sortKey, "end_", "end_desc")}
-                        active={sortKey.startsWith("end_")}
-                        options={[...PLAN_END_SORT_OPTIONS]}
-                        onChange={(value) => setSortKey(value as RecurringSortKey)}
-                      />
-                    </div>
+                  {!contactScopedColumns ? (
+                    <>
+                      <TableHead>
+                        <div className="flex items-center gap-1">
+                          <span className="font-medium">Plan End</span>
+                          <TableColumnHeaderSort
+                            label="Plan End"
+                            value={sortValueForColumn(sortKey, "end_", "end_desc")}
+                            active={sortKey.startsWith("end_")}
+                            options={[...PLAN_END_SORT_OPTIONS]}
+                            onChange={(value) => setSortKey(value as RecurringSortKey)}
+                          />
+                        </div>
+                      </TableHead>
+                      <TableHead>Next Payment</TableHead>
+                    </>
+                  ) : null}
+                  <TableHead
+                    className={contactScopedColumns ? "w-[110px] text-right" : "text-right"}
+                  >
+                    Total Payments
                   </TableHead>
-                  <TableHead>Next Payment</TableHead>
-                  <TableHead className="text-right">Total Payments</TableHead>
-                  <TableHead className="text-right">Payments Made</TableHead>
-                  <TableHead>
+                  <TableHead
+                    className={contactScopedColumns ? "w-[110px] text-right" : "text-right"}
+                  >
+                    Payments Made
+                  </TableHead>
+                  <TableHead className={contactScopedColumns ? "w-[120px]" : undefined}>
                     <TableColumnHeaderFilter
                       label="Status"
                       active={statusFilter !== "active"}
@@ -763,50 +875,67 @@ export function DonationRecurringPanel({ embedded = false }: { embedded?: boolea
                       )}
                     </TableColumnHeaderFilter>
                   </TableHead>
-                  <TableHead className="w-[80px]" />
+                  <TableHead className="w-[52px]" />
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={TABLE_COLSPAN} className="py-8 text-center text-muted-foreground">
+                    <TableCell colSpan={tableColSpan} className="py-8 text-center text-muted-foreground">
                       Loading recurring plans...
                     </TableCell>
                   </TableRow>
                 ) : displayedPlans.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={TABLE_COLSPAN} className="py-8 text-center text-muted-foreground">
-                      No recurring donation plans found.
+                    <TableCell colSpan={tableColSpan} className="py-8 text-center text-muted-foreground">
+                      {contactScopedColumns
+                        ? "No recurring payments"
+                        : "No recurring donation plans found."}
                     </TableCell>
                   </TableRow>
                 ) : (
                   displayedPlans.map((plan) => (
                     <TableRow key={plan.id}>
-                      <TableCell className="font-medium">
-                        {plan.donor_name ? (
-                          <Link
-                            href={getDonorProfilePath(
-                              plan.donor_id,
-                              null,
-                              plan.contact_id,
-                              pathname
+                      {contactScopedColumns ? (
+                        <>
+                          <TableCell className="whitespace-nowrap">Donation</TableCell>
+                          <TableCell className="truncate font-medium">
+                            {formatRecurringPlanDescription(plan)}
+                          </TableCell>
+                        </>
+                      ) : (
+                        <>
+                          <TableCell className="font-medium">
+                            {plan.donor_name ? (
+                              <Link
+                                href={getDonorProfilePath(
+                                  plan.donor_id,
+                                  null,
+                                  plan.contact_id,
+                                  pathname
+                                )}
+                                className="text-primary hover:underline"
+                              >
+                                {plan.donor_name}
+                              </Link>
+                            ) : (
+                              "—"
                             )}
-                            className="text-primary hover:underline"
-                          >
-                            {plan.donor_name}
-                          </Link>
-                        ) : (
-                          "—"
-                        )}
-                      </TableCell>
-                      <TableCell className="max-w-[200px] truncate">
-                        {formatCategoryFund(plan)}
-                      </TableCell>
+                          </TableCell>
+                          <TableCell className="max-w-[200px] truncate">
+                            {formatCategoryFund(plan)}
+                          </TableCell>
+                        </>
+                      )}
                       <TableCell className="text-right">{formatCurrency(plan.amount)}</TableCell>
                       <TableCell>{formatRecurringFrequencyLabel(plan.frequency)}</TableCell>
                       <TableCell>{formatDate(plan.start_date)}</TableCell>
-                      <TableCell>{formatDate(plan.end_date)}</TableCell>
-                      <TableCell>{formatNextPaymentDate(plan)}</TableCell>
+                      {!contactScopedColumns ? (
+                        <>
+                          <TableCell>{formatDate(plan.end_date)}</TableCell>
+                          <TableCell>{formatNextPaymentDate(plan)}</TableCell>
+                        </>
+                      ) : null}
                       <TableCell className="text-right">
                         {formatCount(plan.total_payments)}
                       </TableCell>
@@ -831,48 +960,57 @@ export function DonationRecurringPanel({ embedded = false }: { embedded?: boolea
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => openEditPlan(plan)}>
-                              <Pencil className="mr-2 h-4 w-4" />
-                              Edit Plan
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => void openChangeCard(plan)}>
-                              <CreditCard className="mr-2 h-4 w-4" />
-                              Change Credit Card
-                            </DropdownMenuItem>
-                            {(plan.status === "active" ||
-                              plan.status === "paused" ||
-                              plan.status === "past_due") && (
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  setSelectedPlan(plan)
-                                  setShowPaymentDialog(true)
-                                }}
-                              >
-                                Record Payment
+                            {isCompletedRecurringPlan(plan) ? (
+                              <DropdownMenuItem onClick={() => openViewPlan(plan)}>
+                                <Eye className="mr-2 h-4 w-4" />
+                                View Details
                               </DropdownMenuItem>
-                            )}
-                            {plan.status === "active" && (
-                              <DropdownMenuItem
-                                onClick={() => handleStatusChange(plan.id, "paused")}
-                              >
-                                Pause Plan
-                              </DropdownMenuItem>
-                            )}
-                            {plan.status === "paused" && (
-                              <DropdownMenuItem
-                                onClick={() => handleStatusChange(plan.id, "active")}
-                              >
-                                Resume Plan
-                              </DropdownMenuItem>
-                            )}
-                            {(plan.status === "active" ||
-                              plan.status === "paused" ||
-                              plan.status === "past_due") && (
-                              <DropdownMenuItem
-                                onClick={() => handleStatusChange(plan.id, "cancelled")}
-                              >
-                                Cancel Plan
-                              </DropdownMenuItem>
+                            ) : (
+                              <>
+                                <DropdownMenuItem onClick={() => openEditPlan(plan)}>
+                                  <Pencil className="mr-2 h-4 w-4" />
+                                  Edit Plan
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => void openChangeCard(plan)}>
+                                  <CreditCard className="mr-2 h-4 w-4" />
+                                  Change Credit Card
+                                </DropdownMenuItem>
+                                {(plan.status === "active" ||
+                                  plan.status === "paused" ||
+                                  plan.status === "past_due") && (
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      setSelectedPlan(plan)
+                                      setShowPaymentDialog(true)
+                                    }}
+                                  >
+                                    Receive Payment
+                                  </DropdownMenuItem>
+                                )}
+                                {plan.status === "active" && (
+                                  <DropdownMenuItem
+                                    onClick={() => void handleStatusChange(plan.id, "paused")}
+                                  >
+                                    Pause Plan
+                                  </DropdownMenuItem>
+                                )}
+                                {plan.status === "paused" && (
+                                  <DropdownMenuItem
+                                    onClick={() => void handleStatusChange(plan.id, "active")}
+                                  >
+                                    Resume Plan
+                                  </DropdownMenuItem>
+                                )}
+                                {(plan.status === "active" ||
+                                  plan.status === "paused" ||
+                                  plan.status === "past_due") && (
+                                  <DropdownMenuItem
+                                    onClick={() => void handleStatusChange(plan.id, "cancelled")}
+                                  >
+                                    Cancel Plan
+                                  </DropdownMenuItem>
+                                )}
+                              </>
                             )}
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -896,21 +1034,23 @@ export function DonationRecurringPanel({ embedded = false }: { embedded?: boolea
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-4 py-2">
-            <div className="flex flex-col gap-2">
-              <Label>Donor</Label>
-              <Select value={donorId} onValueChange={setDonorId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select donor" />
-                </SelectTrigger>
-                <SelectContent>
-                  {donors.map((donor) => (
-                    <SelectItem key={donor.id} value={donor.id}>
-                      {donor.full_name || donor.email || donor.id}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {!isDonorScoped ? (
+              <div className="flex flex-col gap-2">
+                <Label>Donor</Label>
+                <Select value={donorId} onValueChange={setDonorId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select donor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {donors.map((donor) => (
+                      <SelectItem key={donor.id} value={donor.id}>
+                        {donor.full_name || donor.email || donor.id}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-2">
                 <Label>Amount</Label>
@@ -967,7 +1107,7 @@ export function DonationRecurringPanel({ embedded = false }: { embedded?: boolea
       <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Record Recurring Payment</DialogTitle>
+            <DialogTitle>Receive Payment</DialogTitle>
             <DialogDescription>
               Creates a canonical payment linked to this plan and advances the next payment date.
             </DialogDescription>
@@ -1003,7 +1143,7 @@ export function DonationRecurringPanel({ embedded = false }: { embedded?: boolea
               Cancel
             </Button>
             <Button onClick={handleRecordPayment} disabled={saving}>
-              {saving ? "Recording..." : "Record Payment"}
+              {saving ? "Processing..." : "Receive Payment"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1128,6 +1268,95 @@ export function DonationRecurringPanel({ embedded = false }: { embedded?: boolea
             <Button onClick={handleSaveEditPlan} disabled={saving}>
               {saving ? "Saving..." : "Save Changes"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={showViewDialog}
+        onOpenChange={(open) => {
+          setShowViewDialog(open)
+          if (!open) setSelectedPlan(null)
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Payment Plan Details</DialogTitle>
+            <DialogDescription>
+              Completed plans are read-only. Create a new plan if this donor wants to continue
+              giving on a schedule.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedPlan ? (
+            <div className="space-y-3 py-2 text-sm">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">Donor</p>
+                  <p>{selectedPlan.donor_name || selectedPlan.donor_email || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">Status</p>
+                  <Badge
+                    variant="outline"
+                    className={getRecurringStatusBadgeClass(selectedPlan.status)}
+                  >
+                    {formatRecurringStatusLabel(selectedPlan.status)}
+                  </Badge>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">Amount</p>
+                  <p>{formatCurrency(selectedPlan.amount)}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">Frequency</p>
+                  <p>{formatRecurringFrequencyLabel(selectedPlan.frequency)}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">Category / Fund</p>
+                  <p>{formatCategoryFund(selectedPlan)}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">Next Payment</p>
+                  <p>{formatNextPaymentDate(selectedPlan)}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">Plan Start</p>
+                  <p>{formatDate(selectedPlan.start_date)}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">Plan End</p>
+                  <p>{formatDate(selectedPlan.end_date)}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">Total Payments</p>
+                  <p>{formatCount(selectedPlan.total_payments)}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">Payments Made</p>
+                  <p>{formatPaymentsMade(selectedPlan)}</p>
+                </div>
+              </div>
+              {selectedPlan.notes ? (
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">Notes</p>
+                  <p className="whitespace-pre-wrap">{selectedPlan.notes}</p>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+          <DialogFooter className="gap-2 sm:justify-between">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowViewDialog(false)
+                if (scopedDonorId) setDonorId(scopedDonorId)
+                setShowCreateDialog(true)
+              }}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              New Plan
+            </Button>
+            <Button onClick={() => setShowViewDialog(false)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

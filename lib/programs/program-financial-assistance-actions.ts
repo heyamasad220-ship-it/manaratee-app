@@ -35,7 +35,7 @@ async function requireProgramsManagePermission() {
 
 function revalidateFinancialAssistancePaths(programId: string) {
   revalidatePath(PROGRAMS_FINANCIAL_ASSISTANCE_PATH)
-  revalidatePath(`/programs/${programId}/edit`)
+  revalidatePath(`/programs/${programId}`)
   revalidatePath(`/customer/programs/${programId}/financial-assistance`)
 }
 

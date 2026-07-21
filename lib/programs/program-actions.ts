@@ -336,7 +336,8 @@ export async function updateProgram(input: UpdateProgramInput) {
 
   revalidatePath("/programs")
   revalidatePath("/programs/catalog")
-  revalidatePath(`/programs/${input.id}/edit`)
+  revalidatePath(`/programs/${input.id}`)
+  revalidatePath(`/programs/${input.id}/offerings`)
   revalidatePath("/customer/programs")
   revalidatePath(`/customer/programs/${input.id}`)
   revalidatePath(`/customer/programs/${input.id}/register`)

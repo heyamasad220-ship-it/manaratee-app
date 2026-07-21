@@ -1,0 +1,132 @@
+﻿Mode: DRY-RUN
+{
+  "department": {
+    "id": "c5d6b286-0d48-431f-9b55-94a80d4821ef",
+    "name": "Quran Institute for Ladies"
+  },
+  "targetProgramName": "Quran Institute for Ladies 2025-2026",
+  "targetProgramId": null,
+  "courses": [
+    {
+      "programId": "5b678992-a0fc-48e6-b962-c405b0061a48",
+      "programName": "QIL ΓÇö Tajweed/Advanced",
+      "courseName": "Tajweed/Advanced",
+      "offerings": [
+        {
+          "id": "02fc4962-9314-45fa-9b87-55f0dbaceaec",
+          "name": "2025-2026",
+          "program_id": "5b678992-a0fc-48e6-b962-c405b0061a48"
+        }
+      ],
+      "enrollmentCount": 17
+    },
+    {
+      "programId": "ef4177d4-a1b0-4fba-92f7-fed292136f27",
+      "programName": "QIL ΓÇö Recitation Improvement",
+      "courseName": "Recitation Improvement",
+      "offerings": [
+        {
+          "id": "4d112a0c-05f8-463f-bf0d-61a7baa1c399",
+          "name": "2025-2026",
+          "program_id": "ef4177d4-a1b0-4fba-92f7-fed292136f27"
+        }
+      ],
+      "enrollmentCount": 40
+    },
+    {
+      "programId": "476d9f8e-5d63-4be0-8961-270e4bc8b2e4",
+      "programName": "QIL ΓÇö Memorization 1",
+      "courseName": "Memorization 1",
+      "offerings": [
+        {
+          "id": "07ee13cb-9bfb-4d58-afdb-2b98944f3a2e",
+          "name": "2025-2026",
+          "program_id": "476d9f8e-5d63-4be0-8961-270e4bc8b2e4"
+        }
+      ],
+      "enrollmentCount": 6
+    },
+    {
+      "programId": "cf1cc580-d630-42ce-b221-bebe0930ab60",
+      "programName": "QIL ΓÇö Memorization - Surat Al-Omran",
+      "courseName": "Memorization - Surat Al-Omran",
+      "offerings": [
+        {
+          "id": "1482445f-8194-4d11-9148-3d5b7b9233af",
+          "name": "2025-2026",
+          "program_id": "cf1cc580-d630-42ce-b221-bebe0930ab60"
+        }
+      ],
+      "enrollmentCount": 5
+    },
+    {
+      "programId": "429830fd-9af0-4b20-90e8-1960d44267fa",
+      "programName": "QIL ΓÇö Memorization - Surat Al-Baqara",
+      "courseName": "Memorization - Surat Al-Baqara",
+      "offerings": [
+        {
+          "id": "49487ac6-3cdf-4304-b362-de4cd02d5faf",
+          "name": "2025-2026",
+          "program_id": "429830fd-9af0-4b20-90e8-1960d44267fa"
+        }
+      ],
+      "enrollmentCount": 14
+    },
+    {
+      "programId": "cbcbbc58-c01f-4018-9cec-44d6a9db3bc3",
+      "programName": "QIL ΓÇö Tajweed/Beginner",
+      "courseName": "Tajweed/Beginner",
+      "offerings": [
+        {
+          "id": "f9dd0ae8-4375-44b7-9357-6d91251e8d1d",
+          "name": "2025-2026",
+          "program_id": "cbcbbc58-c01f-4018-9cec-44d6a9db3bc3"
+        }
+      ],
+      "enrollmentCount": 18
+    },
+    {
+      "programId": "c3f975a0-1997-4bfe-84d4-132358165730",
+      "programName": "QIL ΓÇö Shu'uba Narration",
+      "courseName": "Shu'uba Narration",
+      "offerings": [
+        {
+          "id": "e8d28ea4-e925-4555-a87f-72239c45dddc",
+          "name": "2025-2026",
+          "program_id": "c3f975a0-1997-4bfe-84d4-132358165730"
+        }
+      ],
+      "enrollmentCount": 5
+    },
+    {
+      "programId": "86802728-b07d-4116-acbb-49f11f74bf88",
+      "programName": "QIL ΓÇö Tajweed/Osool",
+      "courseName": "Tajweed/Osool",
+      "offerings": [
+        {
+          "id": "e869874a-11f6-4974-83bd-dbafb4fbc149",
+          "name": "2025-2026",
+          "program_id": "86802728-b07d-4116-acbb-49f11f74bf88"
+        }
+      ],
+      "enrollmentCount": 8
+    },
+    {
+      "programId": "25e9349e-7074-4cb9-8f8d-89dfa0c6822b",
+      "programName": "QIL ΓÇö Memorization 2",
+      "courseName": "Memorization 2",
+      "offerings": [
+        {
+          "id": "5e9b182d-d029-499c-bb1a-4f24ec3963f9",
+          "name": "2025-2026",
+          "program_id": "25e9349e-7074-4cb9-8f8d-89dfa0c6822b"
+        }
+      ],
+      "enrollmentCount": 5
+    }
+  ]
+}
+
+Report: C:\Users\danan\Documents\ManarateeApp\scripts\reports\qil-courses-to-offerings-2026-07-20.json
+1) Run scripts/174_enrollment_unique_per_offering.sql in Supabase
+2) Re-run with --execute

@@ -1,0 +1,66 @@
+{
+  "mode": "execute",
+  "department": {
+    "id": "c5d6b286-0d48-431f-9b55-94a80d4821ef",
+    "name": "Quran Institute for Ladies"
+  },
+  "targetProgramId": "88a39883-baa8-424b-91c0-93a309978c3b",
+  "targetProgramName": "Quran Institute for Ladies 2025-2026",
+  "migrated": [
+    {
+      "courseName": "Tajweed/Advanced",
+      "offeringId": "02fc4962-9314-45fa-9b87-55f0dbaceaec",
+      "fromProgramId": "5b678992-a0fc-48e6-b962-c405b0061a48",
+      "enrollments": 17
+    },
+    {
+      "courseName": "Recitation Improvement",
+      "offeringId": "4d112a0c-05f8-463f-bf0d-61a7baa1c399",
+      "fromProgramId": "ef4177d4-a1b0-4fba-92f7-fed292136f27",
+      "enrollments": 40
+    },
+    {
+      "courseName": "Memorization 1",
+      "offeringId": "07ee13cb-9bfb-4d58-afdb-2b98944f3a2e",
+      "fromProgramId": "476d9f8e-5d63-4be0-8961-270e4bc8b2e4",
+      "enrollments": 6
+    },
+    {
+      "courseName": "Memorization - Surat Al-Omran",
+      "offeringId": "1482445f-8194-4d11-9148-3d5b7b9233af",
+      "fromProgramId": "cf1cc580-d630-42ce-b221-bebe0930ab60",
+      "enrollments": 5
+    },
+    {
+      "courseName": "Memorization - Surat Al-Baqara",
+      "offeringId": "49487ac6-3cdf-4304-b362-de4cd02d5faf",
+      "fromProgramId": "429830fd-9af0-4b20-90e8-1960d44267fa",
+      "enrollments": 14
+    },
+    {
+      "courseName": "Tajweed/Beginner",
+      "offeringId": "f9dd0ae8-4375-44b7-9357-6d91251e8d1d",
+      "fromProgramId": "cbcbbc58-c01f-4018-9cec-44d6a9db3bc3",
+      "enrollments": 18
+    },
+    {
+      "courseName": "Shu'uba Narration",
+      "offeringId": "e8d28ea4-e925-4555-a87f-72239c45dddc",
+      "fromProgramId": "c3f975a0-1997-4bfe-84d4-132358165730",
+      "enrollments": 5
+    },
+    {
+      "courseName": "Tajweed/Osool",
+      "offeringId": "e869874a-11f6-4974-83bd-dbafb4fbc149",
+      "fromProgramId": "86802728-b07d-4116-acbb-49f11f74bf88",
+      "enrollments": 8
+    },
+    {
+      "courseName": "Memorization 2",
+      "offeringId": "5e9b182d-d029-499c-bb1a-4f24ec3963f9",
+      "fromProgramId": "25e9349e-7074-4cb9-8f8d-89dfa0c6822b",
+      "enrollments": 5
+    }
+  ],
+  "enrolledCount": 118
+}

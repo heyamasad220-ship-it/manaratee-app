@@ -3,8 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -18,10 +17,9 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ContactAddPledgeDialog } from "@/components/contacts/contact-add-pledge-dialog"
 import { ContactMergeDialog } from "@/components/contacts/contact-merge-dialog"
 import { ContactBasicsPanel } from "@/components/contacts/contact-basics-panel"
@@ -29,12 +27,10 @@ import { ContactReceivePaymentDialog } from "@/components/contacts/contact-recei
 import { ContactFamilyPanel } from "@/components/contacts/contact-family-panel"
 import { ContactEmployeePanel } from "@/components/contacts/contact-employee-panel"
 import { ContactFinancialPanel } from "@/components/contacts/contact-financial-panel"
-import { ContactProfileCollapsibleSection } from "@/components/contacts/contact-profile-collapsible-section"
 import { ContactGroupGivingOverview } from "@/components/contacts/contact-group-giving-overview"
 import { ContactGroupMembersPanel } from "@/components/contacts/contact-group-members-panel"
 import { ContactMembershipPanel } from "@/components/contacts/contact-membership-panel"
 import { ContactProgramEnrollmentsPanel } from "@/components/contacts/contact-program-enrollments-panel"
-import { ContactNotesPanel } from "@/components/contacts/contact-notes-panel"
 import { ContactTimelinePanel } from "@/components/contacts/contact-timeline-panel"
 import { ContactVendorEvaluationsPanel } from "@/components/contacts/contact-vendor-evaluations-panel"
 import { ContactVolunteerDetails } from "@/components/contacts/contact-volunteer-details"
@@ -42,19 +38,19 @@ import { ContactVolunteerPanel } from "@/components/contacts/contact-volunteer-p
 import { WorkforceCredentialsPanel } from "@/components/workforce/workforce-credentials-panel"
 import { ContactProgramAssignmentsPanel } from "@/components/contacts/contact-program-assignments-panel"
 import { ContactApplicationsPanel } from "@/components/contacts/contact-applications-panel"
+import { ContactProfileHeader } from "@/components/contacts/contact-profile-header"
+import {
+  ContactProfileOverviewActivityCard,
+  ContactProfileOverviewRail,
+} from "@/components/contacts/contact-profile-overview-rail"
 import { createClient } from "@/lib/supabase/client"
 import {
   type ContactRoleValue,
   filterContactRoles,
   getAllowedRolesForRecordType,
-  getContactRecordTypeLabel,
   isEntityContactType,
-  mapStatus,
   normalizeContactRecordType,
-  ROLE_COLORS,
-  ROLE_ICONS,
   ROLE_VALUE_TO_LABEL,
-  STATUS_COLORS,
 } from "@/lib/contacts/contact-constants"
 import { cn } from "@/lib/utils"
 import type { ContactProfileData } from "@/lib/contacts/contact-profile-data"
@@ -62,14 +58,21 @@ import type { ContactProfileExtendedData } from "@/lib/contacts/contact-profile-
 import type { ProgramStaffAssignmentWithDetails } from "@/lib/programs/program-staff-assignment-types"
 import { canHaveProgramStaffAssignments } from "@/lib/hr/staff-role-utils"
 import type { StaffSummaryForContact } from "@/lib/hr/staff-summary"
-import { getContactProfileModuleFlags } from "@/lib/contacts/contact-profile-module-access"
+import {
+  getContactProfileModuleFlags,
+  showContactFinancialSurfaces,
+} from "@/lib/contacts/contact-profile-module-access"
 import {
   contactsListSegmentForRecordType,
   getContactsListPathForSegment,
   isContactsListSegment,
   type ContactsListSegment,
 } from "@/lib/contacts/contact-module-label"
-import { contactProfileHref, normalizeContactProfileTab } from "@/lib/contacts/contact-profile-path"
+import {
+  contactProfileHref,
+  normalizeContactProfileTab,
+  type NormalizedContactProfileTab,
+} from "@/lib/contacts/contact-profile-path"
 import { STAFF_MAIN_CONTENT_STICKY_TOP_CLASS } from "@/lib/layout/staff-dashboard-chrome"
 import {
   isSafeReturnToPath,
@@ -77,15 +80,15 @@ import {
   RETURN_TO_QUERY_PARAM,
 } from "@/lib/navigation/return-to"
 import {
-  Briefcase,
-  Building2,
+  Activity,
+  ChevronDown,
   DollarSign,
   GitMerge,
   HandCoins,
+  Info,
   Loader2,
-  Mail,
-  MoreVertical,
-  Phone,
+  NotebookPen,
+  Plus,
   Store,
   Trash2,
   User,
@@ -93,27 +96,7 @@ import {
   Wrench,
 } from "lucide-react"
 
-const MODULE_TABS = ["participation", "workforce"] as const
-
-type ModuleTab = (typeof MODULE_TABS)[number]
-type ContactTab = "home" | ModuleTab
-
-type ProfileSection = "overview" | "activity"
-
-function normalizeProfileSection(value: string | null): ProfileSection {
-  if (value === "activity") return "activity"
-  // general / family / overview / details → Overview
-  return "overview"
-}
-
-function normalizeTab(value: string | null, availableModules: ModuleTab[]): ContactTab {
-  const normalized = normalizeContactProfileTab(value)
-  if (normalized === "participation" || normalized === "workforce") {
-    return availableModules.includes(normalized) ? normalized : "home"
-  }
-  // details / overview / financial / home → combined summary page
-  return "home"
-}
+type ContactTab = NormalizedContactProfileTab
 
 type ContactProfileClientProps = {
   contact: any
@@ -136,6 +119,25 @@ type ContactProfileClientProps = {
   onClose?: () => void
 }
 
+function formatCreatedDate(value: string | null | undefined) {
+  if (!value) return null
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  return date.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  })
+}
+
+function formatCurrencyCompact(amount: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(amount)
+}
+
 export function ContactProfileClient({
   contact,
   profileData,
@@ -148,7 +150,7 @@ export function ContactProfileClient({
   staffSummary,
   organizationId,
   enabledModuleSlugs = [],
-  onNotesChanged,
+  onNotesChanged: _onNotesChanged,
   onRolesUpdated,
   onContactUpdated,
   onExtendedDataChanged,
@@ -160,6 +162,7 @@ export function ContactProfileClient({
   const searchParams = useSearchParams()
   const supabase = useMemo(() => createClient(), [])
   const tabParam = searchParams.get("tab")
+  const sectionParam = searchParams.get("section")
   const isDialog = variant === "dialog"
   const [dialogEditMode, setDialogEditMode] = useState(defaultEdit)
   const isEditMode = isDialog ? dialogEditMode : searchParams.get("edit") === "1"
@@ -214,21 +217,21 @@ export function ContactProfileClient({
     return filtered.filter((role) => getAllowedRolesForRecordType(recordType).includes(role))
   }, [contact, recordType])
 
+  const roleLabels = useMemo(
+    () =>
+      roles
+        .map((role) => ROLE_VALUE_TO_LABEL[role])
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b)),
+    [roles]
+  )
+
   const hasRole = useCallback(
     (roleName: ContactRoleValue) => roles.includes(roleName),
     [roles]
   )
 
-  const roleLabels = useMemo(
-    () =>
-      roles
-        .map((role) => ROLE_VALUE_TO_LABEL[role])
-        .sort((a, b) => a.localeCompare(b)),
-    [roles]
-  )
-
   const isEntity = isEntityContactType(contact.contact_type)
-  const isOrganization = contact.contact_type === "organization"
   const isGroup = contact.contact_type === "group"
 
   const showDonorPanel = useMemo(() => {
@@ -243,13 +246,11 @@ export function ContactProfileClient({
     )
   }, [hasRole, isEntity, modules.donations, profileData])
 
-  const showParticipationTab =
-    !isEntity && (modules.programs || modules.membership)
+  const canShowProgramActions = !isEntity && modules.programs
+  const canShowMembershipContent = !isEntity && modules.membership
+  const canShowWorkforceContent = modules.workforce || modules.vendorHub
 
-  const showWorkforceTab = modules.workforce || modules.vendorHub
-
-  const showFinancialHome =
-    modules.donations || modules.bookings || modules.programs || modules.membership
+  const showFinancialTab = showContactFinancialSurfaces(modules)
 
   const showProgramAssignments = useMemo(() => {
     if (!modules.programs) return false
@@ -261,16 +262,28 @@ export function ContactProfileClient({
     })
   }, [modules.programs, programAssignments.length, roles, staffSummary])
 
-  const availableModuleTabs = useMemo(() => {
-    const tabs: ModuleTab[] = []
-    if (showParticipationTab) tabs.push("participation")
-    if (showWorkforceTab) tabs.push("workforce")
-    return tabs
-  }, [showParticipationTab, showWorkforceTab])
+  const hasWorkforceActivity = useMemo(() => {
+    if (!canShowWorkforceContent) return false
+    if (staffRecordId) return true
+    return (
+      hasRole("employee") ||
+      hasRole("volunteer") ||
+      hasRole("vendor") ||
+      hasRole("service_provider") ||
+      hasRole("childcare_provider")
+    )
+  }, [canShowWorkforceContent, hasRole, staffRecordId])
 
-  const [activeTab, setActiveTab] = useState<ContactTab>(() =>
-    normalizeTab(tabParam, availableModuleTabs)
-  )
+  function resolveAvailableTab(value: string | null | undefined): ContactTab {
+    const normalized = normalizeContactProfileTab(value)
+    if (normalized === "financial" && !showFinancialTab) return "overview"
+    return normalized
+  }
+
+  const [activeTab, setActiveTab] = useState<ContactTab>(() => {
+    if (sectionParam === "activity" || tabParam === "activity") return "activity"
+    return resolveAvailableTab(tabParam)
+  })
   const [showMergeDialog, setShowMergeDialog] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [showReceivePaymentDialog, setShowReceivePaymentDialog] = useState(false)
@@ -282,39 +295,15 @@ export function ContactProfileClient({
     setFinancialRefreshToken((current) => current + 1)
     await onContactUpdated()
   }
-  const sectionParam = searchParams.get("section")
-  const initialProfileSection = normalizeProfileSection(
-    tabParam === "activity" ? "activity" : sectionParam
-  )
-  const shouldOpenProfileFromUrl =
-    defaultEdit ||
-    searchParams.get("edit") === "1" ||
-    tabParam === "details" ||
-    tabParam === "activity" ||
-    sectionParam === "general" ||
-    sectionParam === "family" ||
-    sectionParam === "overview" ||
-    sectionParam === "activity"
-
-  const [overviewOpen, setOverviewOpen] = useState(
-    () =>
-      Boolean(shouldOpenProfileFromUrl && initialProfileSection === "overview") ||
-      defaultEdit ||
-      searchParams.get("edit") === "1"
-  )
-  const [notesActivityOpen, setNotesActivityOpen] = useState(
-    () => Boolean(shouldOpenProfileFromUrl && initialProfileSection === "activity")
-  )
 
   useEffect(() => {
-    if (tabParam === "activity") {
-      setActiveTab("home")
-      setNotesActivityOpen(true)
+    if (sectionParam === "activity" && (!tabParam || tabParam === "home" || tabParam === "overview")) {
+      setActiveTab("activity")
       if (!isDialog) {
         router.replace(
           contactProfileHref(contact.id, {
             ...profileHrefOptions,
-            section: "activity",
+            tab: "activity",
           }),
           { scroll: false }
         )
@@ -323,50 +312,30 @@ export function ContactProfileClient({
     }
 
     if (isEditMode) {
-      setActiveTab("home")
-      setOverviewOpen(true)
+      setActiveTab("overview")
       return
     }
 
     if (tabParam) {
-      setActiveTab(normalizeTab(tabParam, availableModuleTabs))
+      setActiveTab(resolveAvailableTab(tabParam))
     } else {
-      setActiveTab((current) =>
-        current === "participation" || current === "workforce"
-          ? availableModuleTabs.includes(current)
-            ? current
-            : "home"
-          : "home"
-      )
+      setActiveTab((current) => resolveAvailableTab(current))
     }
-
-    if (sectionParam === "activity") {
-      setNotesActivityOpen(true)
-    } else if (
-      sectionParam === "general" ||
-      sectionParam === "family" ||
-      sectionParam === "overview" ||
-      tabParam === "details"
-    ) {
-      setOverviewOpen(true)
-    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- resolveAvailableTab depends on module flags already in deps via show* flags
   }, [
-    availableModuleTabs,
     contact.id,
     isDialog,
     isEditMode,
     profileHrefOptions,
     router,
     sectionParam,
+    showFinancialTab,
     tabParam,
   ])
 
   useEffect(() => {
     if (isDialog) {
       setDialogEditMode(defaultEdit)
-      if (defaultEdit) {
-        setOverviewOpen(true)
-      }
     }
   }, [defaultEdit, isDialog, contact.id])
 
@@ -377,21 +346,18 @@ export function ContactProfileClient({
     const expectedList = contactsListSegmentForRecordType(recordType)
     if (fromQuery === expectedList) return
 
-    const tab = normalizeTab(tabParam, availableModuleTabs)
+    const tab = resolveAvailableTab(tabParam)
     router.replace(
       contactProfileHref(contact.id, {
         ...profileHrefOptions,
-        tab: tab === "home" ? undefined : tab,
-        section: notesActivityOpen && !overviewOpen ? "activity" : undefined,
+        tab: tab === "overview" ? undefined : tab,
       }),
       { scroll: false }
     )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    availableModuleTabs,
     contact.id,
     isDialog,
-    notesActivityOpen,
-    overviewOpen,
     profileHrefOptions,
     recordType,
     router,
@@ -401,8 +367,7 @@ export function ContactProfileClient({
 
   function setContactEditMode(edit: boolean) {
     if (edit) {
-      setActiveTab("home")
-      setOverviewOpen(true)
+      setActiveTab("overview")
       if (isDialog) {
         setDialogEditMode(true)
       }
@@ -414,11 +379,11 @@ export function ContactProfileClient({
       return
     }
 
-    // Clear deep-link ?edit=1 without treating edit as a separate page state.
     if (searchParams.get("edit") === "1") {
       router.replace(
         contactProfileHref(contact.id, {
           ...profileHrefOptions,
+          tab: "overview",
           edit: false,
         }),
         { scroll: false }
@@ -427,7 +392,7 @@ export function ContactProfileClient({
   }
 
   function handleTabChange(value: string) {
-    const tab = normalizeTab(value, availableModuleTabs)
+    const tab = resolveAvailableTab(value)
     setActiveTab(tab)
     if (isDialog) {
       if (dialogEditMode) setDialogEditMode(false)
@@ -436,7 +401,7 @@ export function ContactProfileClient({
     router.replace(
       contactProfileHref(contact.id, {
         ...profileHrefOptions,
-        tab: tab === "home" ? undefined : tab,
+        tab: tab === "overview" ? undefined : tab,
         edit: false,
       }),
       { scroll: false }
@@ -483,128 +448,86 @@ export function ContactProfileClient({
     router.push(backPath)
   }
 
-  const showStickyInFinancialPanel = activeTab === "home" && showFinancialHome
   const stickyTopClass = isDialog ? "top-0" : STAFF_MAIN_CONTENT_STICKY_TOP_CLASS
+  const createdLabel = formatCreatedDate(contact.created_at)
 
-  const identityHeader = (
-    <div className="space-y-2">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-        {isOrganization ? (
-          <Building2 className="h-5 w-5 shrink-0 text-muted-foreground" />
-        ) : isGroup ? (
-          <Users className="h-5 w-5 shrink-0 text-muted-foreground" />
-        ) : (
-          <User className="h-5 w-5 shrink-0 text-muted-foreground" />
-        )}
-        <h1 className="text-xl font-semibold">{contact.full_name || "Unnamed Contact"}</h1>
-        {roleLabels.length > 0 ? (
-          roleLabels.map((label) => {
-            const RoleIcon = ROLE_ICONS[label]
-            return (
-              <Badge
-                key={label}
-                variant="secondary"
-                className={cn("gap-1 font-normal", ROLE_COLORS[label])}
-              >
-                <RoleIcon className="h-3 w-3" />
-                {label}
-              </Badge>
-            )
-          })
-        ) : isEntity ? (
-          <Badge variant="outline" className="font-normal">
-            {getContactRecordTypeLabel(recordType)}
-          </Badge>
-        ) : null}
-        <Badge variant="secondary" className={STATUS_COLORS[mapStatus(contact.status)]}>
-          {mapStatus(contact.status)}
-        </Badge>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button size="sm" className="h-7 w-7 shrink-0 p-0">
-              <span className="sr-only">Contact actions</span>
-              <MoreVertical className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            {modules.donations ? (
-              <>
-                <DropdownMenuItem onClick={() => setShowReceivePaymentDialog(true)}>
-                  <DollarSign className="mr-2 h-4 w-4" />
-                  Receive Payment
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setShowAddPledgeDialog(true)}>
-                  <HandCoins className="mr-2 h-4 w-4" />
-                  Add Pledge
-                </DropdownMenuItem>
-              </>
-            ) : null}
-            {!isEntity ? (
-              <DropdownMenuItem onClick={() => setShowMergeDialog(true)}>
-                <GitMerge className="mr-2 h-4 w-4" />
-                Merge duplicate
-              </DropdownMenuItem>
-            ) : null}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              className="text-red-600 focus:text-red-600"
-              onClick={() => setShowDeleteDialog(true)}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Delete
+  const headerActions = (
+    <>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => {
+          setActiveTab("overview")
+          setContactEditMode(true)
+        }}
+      >
+        Edit Contact
+      </Button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="sm">
+            More
+            <ChevronDown className="ml-1.5 h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          {!isEntity ? (
+            <DropdownMenuItem onClick={() => setShowMergeDialog(true)}>
+              <GitMerge className="mr-2 h-4 w-4" />
+              Merge duplicate
             </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-        <div className="flex items-center gap-1.5">
-          <Phone className="h-3.5 w-3.5 shrink-0" />
-          {contact.phone ? (
-            <a href={`tel:${contact.phone}`} className="text-foreground hover:underline">
-              {contact.phone}
-            </a>
-          ) : (
-            <span>—</span>
-          )}
-        </div>
-        <div className="flex items-center gap-1.5">
-          <Mail className="h-3.5 w-3.5 shrink-0" />
-          {contact.email ? (
-            <a href={`mailto:${contact.email}`} className="text-foreground hover:underline">
-              {contact.email}
-            </a>
-          ) : (
-            <span>—</span>
-          )}
-        </div>
-      </div>
-    </div>
+          ) : null}
+          <DropdownMenuItem
+            className="text-red-600 focus:text-red-600"
+            onClick={() => setShowDeleteDialog(true)}
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            Delete
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button size="sm">
+            <Plus className="mr-1.5 h-4 w-4" />
+            New
+            <ChevronDown className="ml-1.5 h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          {modules.donations ? (
+            <>
+              <DropdownMenuItem onClick={() => setShowReceivePaymentDialog(true)}>
+                <DollarSign className="mr-2 h-4 w-4" />
+                Add Donation
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setShowAddPledgeDialog(true)}>
+                <HandCoins className="mr-2 h-4 w-4" />
+                Add Pledge
+              </DropdownMenuItem>
+            </>
+          ) : null}
+          <DropdownMenuItem
+            onClick={() => {
+              setActiveTab("overview")
+              setContactEditMode(true)
+            }}
+          >
+            <NotebookPen className="mr-2 h-4 w-4" />
+            Add Note
+          </DropdownMenuItem>
+          {canShowProgramActions ? (
+            <DropdownMenuItem asChild>
+              <Link href="/programs/registrations">
+                <Users className="mr-2 h-4 w-4" />
+                Register for Program
+              </Link>
+            </DropdownMenuItem>
+          ) : null}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </>
   )
-
-  const moduleTabs =
-    (showParticipationTab || showWorkforceTab) &&
-    (activeTab === "participation" || activeTab === "workforce" || activeTab === "home") ? (
-      <Tabs value={activeTab === "home" ? "home" : activeTab} onValueChange={handleTabChange}>
-        <TabsList className="flex h-auto flex-wrap justify-start gap-1">
-          <TabsTrigger value="home" className="gap-2">
-            <User className="size-4" />
-            Summary
-          </TabsTrigger>
-          {showParticipationTab ? (
-            <TabsTrigger value="participation" className="gap-2">
-              <Users className="size-4" />
-              Participation
-            </TabsTrigger>
-          ) : null}
-          {showWorkforceTab ? (
-            <TabsTrigger value="workforce" className="gap-2">
-              <Briefcase className="size-4" />
-              Workforce
-            </TabsTrigger>
-          ) : null}
-        </TabsList>
-      </Tabs>
-    ) : null
 
   return (
     <div className={isDialog ? "flex flex-col gap-6 p-4 sm:p-6" : "flex flex-col gap-6 p-6"}>
@@ -616,43 +539,67 @@ export function ContactProfileClient({
         </div>
       ) : null}
 
-      {!showStickyInFinancialPanel ? (
-        <div
-          className={cn(
-            "sticky z-40 -mx-6 space-y-4 border-b border-border bg-background px-6 pb-4 pt-1",
-            stickyTopClass
-          )}
-        >
-          {identityHeader}
-        </div>
-      ) : null}
+      <div
+        className={cn(
+          "sticky z-40 -mx-6 space-y-4 border-b border-border bg-background px-6 pb-4 pt-1",
+          stickyTopClass
+        )}
+      >
+        <ContactProfileHeader
+          contactName={contact.full_name || "Unnamed Contact"}
+          recordType={recordType}
+          status={contact.status}
+          roleLabels={roleLabels}
+          phone={contact.phone}
+          email={contact.email}
+          city={contact.city}
+          state={contact.state}
+          address={contact.address}
+          actions={headerActions}
+        />
 
-      {!showStickyInFinancialPanel ? moduleTabs : null}
+        <Tabs value={activeTab} onValueChange={handleTabChange}>
+          <TabsList className="flex h-auto flex-wrap justify-start gap-1">
+            <TabsTrigger value="overview" className="gap-2">
+              <User className="size-4" />
+              Overview
+            </TabsTrigger>
+            {showFinancialTab ? (
+              <TabsTrigger value="financial" className="gap-2">
+                <DollarSign className="size-4" />
+                Financial
+              </TabsTrigger>
+            ) : null}
+            <TabsTrigger value="activity" className="gap-2">
+              <Activity className="size-4" />
+              Activity
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
 
-      {activeTab === "home" ? (
-        <div className="space-y-6">
-          {isGroup ? (
-            <ContactGroupMembersPanel
-              groupContactId={contact.id}
-              groupName={contact.full_name || "Group"}
-            />
-          ) : null}
-          {isGroup && showDonorPanel && !profileLoading ? (
-            <ContactGroupGivingOverview
-              groupContactId={contact.id}
-              groupName={contact.full_name || "Group"}
-            />
-          ) : null}
+      {activeTab === "overview" ? (
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
+          <div className="space-y-6">
+            {isGroup ? (
+              <ContactGroupMembersPanel
+                groupContactId={contact.id}
+                groupName={contact.full_name || "Group"}
+              />
+            ) : null}
+            {isGroup && showDonorPanel && !profileLoading ? (
+              <ContactGroupGivingOverview
+                groupContactId={contact.id}
+                groupName={contact.full_name || "Group"}
+              />
+            ) : null}
 
-          {(() => {
-            const overviewSection = (
-              <ContactProfileCollapsibleSection
-                id="contact-section-overview"
-                title="Overview"
-                open={overviewOpen}
-                onOpenChange={setOverviewOpen}
-              >
-                <div className="space-y-6">
+            <div className="grid gap-6 xl:grid-cols-2">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-base">Contact Information</CardTitle>
+                </CardHeader>
+                <CardContent>
                   <ContactBasicsPanel
                     contact={contact}
                     personDetails={profileExtendedData?.personDetails ?? null}
@@ -662,91 +609,174 @@ export function ContactProfileClient({
                     layout="overview-general"
                     showEditButton
                   />
-                  {!isEntity ? (
-                    profileExtendedLoading ? (
+                </CardContent>
+              </Card>
+
+              {!isEntity ? (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Family</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {profileExtendedLoading ? (
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Loader2 className="h-4 w-4 animate-spin" />
                         Loading family members...
                       </div>
                     ) : (
-                      <div className="space-y-2">
-                        <h4 className="text-sm font-semibold">Family</h4>
-                        <ContactFamilyPanel
-                          contactId={contact.id}
-                          familyMembers={profileExtendedData?.familyMembers ?? []}
-                          onChanged={onExtendedDataChanged}
-                          embedded
-                        />
-                      </div>
-                    )
-                  ) : null}
-                </div>
-              </ContactProfileCollapsibleSection>
-            )
+                      <ContactFamilyPanel
+                        contactId={contact.id}
+                        familyMembers={profileExtendedData?.familyMembers ?? []}
+                        onChanged={onExtendedDataChanged}
+                        embedded
+                      />
+                    )}
+                  </CardContent>
+                </Card>
+              ) : null}
 
-            const notesActivitySection = (
-              <ContactProfileCollapsibleSection
-                id="contact-section-activity"
-                title="Notes & Activity"
-                open={notesActivityOpen}
-                onOpenChange={setNotesActivityOpen}
-              >
-                <div className="space-y-6">
-                  {!isEntity && modules.applications ? (
-                    <ContactApplicationsPanel contactId={contact.id} />
-                  ) : null}
-                  <ContactTimelinePanel
-                    items={profileData?.timeline ?? []}
-                    loading={profileLoading}
-                  />
-                  <ContactNotesPanel
-                    contactId={contact.id}
-                    notes={profileData?.notes ?? []}
-                    loading={profileLoading}
-                    onNotesChanged={onNotesChanged}
-                  />
-                </div>
-              </ContactProfileCollapsibleSection>
-            )
+              <ContactProfileOverviewActivityCard
+                profileLoading={profileLoading}
+                timeline={profileData?.timeline ?? []}
+                onOpenActivity={() => handleTabChange("activity")}
+              />
 
-            if (showFinancialHome) {
-              return (
-                <ContactFinancialPanel
-                  contactId={contact.id}
-                  contactName={contact.full_name || "Contact"}
-                  contactEmail={contact.email}
-                  contactPhone={contact.phone}
-                  donorId={profileData?.donorId}
-                  personId={contact.person_id ?? null}
-                  isGroup={isGroup}
-                  modules={modules}
-                  paymentMethods={profileExtendedData?.paymentMethods ?? []}
-                  paymentMethodsLoading={profileExtendedLoading}
-                  showPaymentMethods={!isGroup}
-                  hideIdentity
-                  stickyHeader={identityHeader}
-                  stickyTopClass={stickyTopClass}
-                  belowSticky={moduleTabs}
-                  leadingContent={overviewSection}
-                  trailingContent={notesActivitySection}
-                  refreshToken={financialRefreshToken}
-                />
-              )
+              {(modules.donations || modules.programs || modules.bookings || modules.membership) &&
+              !isGroup ? (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Related Activity</CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid gap-3 sm:grid-cols-2">
+                    {modules.donations ? (
+                      <button
+                        type="button"
+                        className="rounded-lg border border-border p-3 text-left transition hover:bg-muted/40"
+                        onClick={() => handleTabChange("financial")}
+                      >
+                        <p className="text-sm font-medium">Donations</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {profileLoading
+                            ? "Loading…"
+                            : profileData
+                              ? [
+                                  `${formatCurrencyCompact(profileData.donorStats.totalDonated)} lifetime`,
+                                  `${profileData.donorStats.donationCount} gifts`,
+                                  profileData.donorStats.lastDonationDate
+                                    ? `last ${formatCreatedDate(profileData.donorStats.lastDonationDate)}`
+                                    : null,
+                                ]
+                                  .filter(Boolean)
+                                  .join(" · ")
+                              : "View financial history"}
+                        </p>
+                      </button>
+                    ) : null}
+                    {modules.programs ? (
+                      <button
+                        type="button"
+                        className="rounded-lg border border-border p-3 text-left transition hover:bg-muted/40"
+                        onClick={() => handleTabChange("activity")}
+                      >
+                        <p className="text-sm font-medium">Programs</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {profileLoading
+                            ? "Loading…"
+                            : `${profileData?.enrollmentRecords?.length ?? 0} enrollments · View activity`}
+                        </p>
+                      </button>
+                    ) : null}
+                    {modules.bookings ? (
+                      <button
+                        type="button"
+                        className="rounded-lg border border-border p-3 text-left transition hover:bg-muted/40"
+                        onClick={() => handleTabChange("financial")}
+                      >
+                        <p className="text-sm font-medium">Venue Rentals</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {profileLoading
+                            ? "Loading…"
+                            : profileData
+                              ? [
+                                  `${profileData.rentalStats.rentalCount} rentals`,
+                                  profileData.rentalStats.lastRentalDate
+                                    ? `last ${formatCreatedDate(profileData.rentalStats.lastRentalDate)}`
+                                    : null,
+                                ]
+                                  .filter(Boolean)
+                                  .join(" · ")
+                              : "Open balances and rental activity on Financial"}
+                        </p>
+                      </button>
+                    ) : null}
+                    {modules.membership ? (
+                      <button
+                        type="button"
+                        className="rounded-lg border border-border p-3 text-left transition hover:bg-muted/40"
+                        onClick={() => handleTabChange("activity")}
+                      >
+                        <p className="text-sm font-medium">Membership</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {profileLoading
+                            ? "Loading…"
+                            : `${profileData?.activeTeamsCount ?? 0} groups · View activity`}
+                        </p>
+                      </button>
+                    ) : null}
+                  </CardContent>
+                </Card>
+              ) : null}
+            </div>
+          </div>
+
+          <ContactProfileOverviewRail
+            modules={modules}
+            profileLoading={profileLoading}
+            donorStats={profileData?.donorStats ?? null}
+            rentalStats={profileData?.rentalStats ?? null}
+            timeline={profileData?.timeline ?? []}
+            showFinancialSummary={showFinancialTab}
+            showRegisterAction={canShowProgramActions}
+            onAddDonation={
+              modules.donations ? () => setShowReceivePaymentDialog(true) : undefined
             }
-
-            return (
-              <div className="space-y-3">
-                {overviewSection}
-                {notesActivitySection}
-              </div>
-            )
-          })()}
+            onAddPledge={modules.donations ? () => setShowAddPledgeDialog(true) : undefined}
+            onAddNote={() => {
+              setActiveTab("overview")
+              setContactEditMode(true)
+            }}
+            onRegisterProgram={
+              canShowProgramActions ? () => router.push("/programs/registrations") : undefined
+            }
+            onOpenFinancial={() => handleTabChange("financial")}
+            onOpenActivity={() => handleTabChange("activity")}
+            showActivityFeed={false}
+          />
         </div>
       ) : null}
 
-      {activeTab === "participation" && showParticipationTab ? (
+      {activeTab === "financial" && showFinancialTab ? (
+        <ContactFinancialPanel
+          contactId={contact.id}
+          contactName={contact.full_name || "Contact"}
+          contactEmail={contact.email}
+          contactPhone={contact.phone}
+          donorId={profileData?.donorId}
+          personId={contact.person_id ?? null}
+          isGroup={isGroup}
+          modules={modules}
+          paymentMethods={profileExtendedData?.paymentMethods ?? []}
+          paymentMethodsLoading={profileExtendedLoading}
+          showPaymentMethods={!isGroup}
+          hideIdentity
+          stickyTopClass={stickyTopClass}
+          refreshToken={financialRefreshToken}
+        />
+      ) : null}
+
+      {activeTab === "activity" ? (
         <div className="space-y-6">
-          {modules.membership ? (
+          {canShowMembershipContent && (profileData?.activeTeamsCount ?? 0) > 0 ? (
             <ContactMembershipPanel
               contactId={contact.id}
               contactName={contact.full_name || "Unnamed Contact"}
@@ -754,14 +784,14 @@ export function ContactProfileClient({
               onMembershipChanged={onRolesUpdated}
             />
           ) : null}
-          {modules.programs ? (
+          {canShowProgramActions && (profileData?.enrollmentRecords?.length ?? 0) > 0 ? (
             <ContactProgramEnrollmentsPanel
               enrollments={profileData?.enrollmentRecords ?? []}
               loading={profileLoading}
             />
           ) : null}
-          {showProgramAssignments &&
-            (assignmentsLoading ? (
+          {showProgramAssignments && programAssignments.length > 0 ? (
+            assignmentsLoading ? (
               <Card>
                 <CardContent className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -773,97 +803,99 @@ export function ContactProfileClient({
                 contactId={contact.id}
                 assignments={programAssignments}
               />
-            ))}
+            )
+          ) : null}
+
+          {hasWorkforceActivity ? (
+            <>
+              {modules.workforce && staffRecordId ? (
+                <ContactEmployeePanel
+                  staffId={staffRecordId}
+                  organizationId={organizationId}
+                  contactRoles={roles}
+                />
+              ) : modules.workforce && hasRole("employee") ? (
+                <Card>
+                  <CardContent className="p-6 text-sm text-muted-foreground">
+                    This contact has an employee role but no linked staff record yet. Link or create a
+                    staff record from Workforce → Employees.
+                  </CardContent>
+                </Card>
+              ) : null}
+
+              {modules.workforce && hasRole("volunteer") ? (
+                <>
+                  <ContactVolunteerDetails contactId={contact.id} />
+                  <ContactVolunteerPanel
+                    contactId={contact.id}
+                    contactName={contact.full_name || "Unnamed Contact"}
+                    contactEmail={contact.email || ""}
+                    contactPhone={contact.phone || ""}
+                  />
+                </>
+              ) : null}
+
+              {modules.workforce &&
+              (hasRole("volunteer") ||
+                hasRole("employee") ||
+                hasRole("childcare_provider") ||
+                staffRecordId) ? (
+                <WorkforceCredentialsPanel contactId={contact.id} />
+              ) : null}
+
+              {modules.vendorHub && hasRole("vendor") ? (
+                <>
+                  <ContactVendorEvaluationsPanel contactId={contact.id} />
+                  <Card>
+                    <CardContent className="p-6">
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <Store className="h-5 w-5 text-amber-600" />
+                          <h2 className="text-lg font-semibold">Vendor</h2>
+                        </div>
+                        <Button variant="outline" size="sm" asChild>
+                          <Link href="/vendor-hub/network/vendors">Vendor Network</Link>
+                        </Button>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Booth assignments and vendor participation are managed in Vendor Hub.
+                      </p>
+                    </CardContent>
+                  </Card>
+                </>
+              ) : null}
+
+              {modules.workforce && hasRole("service_provider") ? (
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="mb-2 flex items-center gap-2">
+                      <Wrench className="h-5 w-5 text-purple-600" />
+                      <h2 className="text-lg font-semibold">Service Provider</h2>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Service agreements, invoices, and service history can appear here.
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : null}
+            </>
+          ) : null}
+
+          {!isEntity && modules.applications ? (
+            <ContactApplicationsPanel contactId={contact.id} />
+          ) : null}
+          <ContactTimelinePanel
+            items={profileData?.timeline ?? []}
+            loading={profileLoading}
+          />
         </div>
       ) : null}
 
-      {activeTab === "workforce" && showWorkforceTab ? (
-        <div className="space-y-6">
-          {modules.workforce && staffRecordId ? (
-            <ContactEmployeePanel
-              staffId={staffRecordId}
-              organizationId={organizationId}
-              contactRoles={roles}
-            />
-          ) : modules.workforce && hasRole("employee") ? (
-            <Card>
-              <CardContent className="p-6 text-sm text-muted-foreground">
-                This contact has an employee role but no linked staff record yet.
-                Link or create a staff record from Workforce → Employees.
-              </CardContent>
-            </Card>
-          ) : null}
-
-          {modules.workforce && hasRole("volunteer") ? (
-            <>
-              <ContactVolunteerDetails contactId={contact.id} />
-              <ContactVolunteerPanel
-                contactId={contact.id}
-                contactName={contact.full_name || "Unnamed Contact"}
-                contactEmail={contact.email || ""}
-                contactPhone={contact.phone || ""}
-              />
-            </>
-          ) : null}
-
-          {modules.workforce &&
-          (hasRole("volunteer") ||
-            hasRole("employee") ||
-            hasRole("childcare_provider") ||
-            staffRecordId) ? (
-            <WorkforceCredentialsPanel contactId={contact.id} />
-          ) : null}
-
-          {modules.vendorHub && hasRole("vendor") ? (
-            <>
-              <ContactVendorEvaluationsPanel contactId={contact.id} />
-              <Card>
-                <CardContent className="p-6">
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <Store className="h-5 w-5 text-amber-600" />
-                      <h2 className="text-lg font-semibold">Vendor</h2>
-                    </div>
-                    <Button variant="outline" size="sm" asChild>
-                      <Link href="/vendor-hub/network/vendors">Vendor Network</Link>
-                    </Button>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Booth assignments and vendor participation are managed in Vendor Hub.
-                  </p>
-                </CardContent>
-              </Card>
-            </>
-          ) : null}
-
-          {modules.workforce && hasRole("service_provider") ? (
-            <Card>
-              <CardContent className="p-6">
-                <div className="mb-2 flex items-center gap-2">
-                  <Wrench className="h-5 w-5 text-purple-600" />
-                  <h2 className="text-lg font-semibold">Service Provider</h2>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Service agreements, invoices, and service history can appear here.
-                </p>
-              </CardContent>
-            </Card>
-          ) : null}
-
-          {!staffRecordId &&
-          !hasRole("employee") &&
-          !hasRole("volunteer") &&
-          !hasRole("vendor") &&
-          !hasRole("service_provider") &&
-          !hasRole("childcare_provider") ? (
-            <Card>
-              <CardContent className="p-6 text-sm text-muted-foreground">
-                No workforce roles yet. Roles are added automatically from volunteer
-                roster, staff records, vendor applications, and related activity.
-              </CardContent>
-            </Card>
-          ) : null}
-        </div>
+      {createdLabel ? (
+        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Info className="h-3.5 w-3.5 shrink-0" />
+          This contact record was created on {createdLabel}.
+        </p>
       ) : null}
 
       <ContactMergeDialog

@@ -137,12 +137,26 @@ export async function computeDerivedAffiliations(
   }
 
   const terminalStatuses = PROGRAM_PARTICIPANT_TERMINAL_STATUSES.join(",")
-  const { count: programEnrollmentCount } = await supabase
+  const { count: programAsParticipantCount } = await supabase
     .from("program_enrollments")
     .select("id", { count: "exact", head: true })
     .eq("organization_id", organizationId)
     .eq("participant_contact_id", contactId)
     .not("status", "in", `(${terminalStatuses})`)
+
+  const { count: programAsRegistrantCount } = await supabase
+    .from("program_enrollments")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", organizationId)
+    .eq("registrant_contact_id", contactId)
+    .not("status", "in", `(${terminalStatuses})`)
+
+  if (
+    (programAsParticipantCount ?? 0) > 0 ||
+    (programAsRegistrantCount ?? 0) > 0
+  ) {
+    derived.add("program_participant")
+  }
 
   const { count: completedTicketOrderCount } = await supabase
     .from("ticket_orders")
@@ -169,11 +183,7 @@ export async function computeDerivedAffiliations(
     venueRentalCount = venueRentalResult.count ?? 0
   }
 
-  if (
-    (programEnrollmentCount ?? 0) > 0 ||
-    (completedTicketOrderCount ?? 0) > 0 ||
-    venueRentalCount > 0
-  ) {
+  if ((completedTicketOrderCount ?? 0) > 0 || venueRentalCount > 0) {
     derived.add("customer")
   }
 

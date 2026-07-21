@@ -9,9 +9,9 @@ export type MembershipOverviewStats = {
   pendingMembers: number
   lapsedMembers: number
   expiringSoon: number
-  teams: {
-    totalTeams: number
-    activeTeams: number
+  groups: {
+    totalGroups: number
+    activeGroups: number
     totalMembers: number
   }
 }
@@ -29,7 +29,7 @@ export async function fetchMembershipOverviewStats(): Promise<MembershipOverview
       pendingMembers: 0,
       lapsedMembers: 0,
       expiringSoon: 0,
-      teams: { totalTeams: 0, activeTeams: 0, totalMembers: 0 },
+      groups: { totalGroups: 0, activeGroups: 0, totalMembers: 0 },
     }
   }
 
@@ -71,9 +71,9 @@ export async function fetchMembershipOverviewStats(): Promise<MembershipOverview
 
   return {
     ...statusCounts,
-    teams: {
-      totalTeams: teamStats.totalTeams,
-      activeTeams: teamStats.activeTeams,
+    groups: {
+      totalGroups: teamStats.totalTeams,
+      activeGroups: teamStats.activeTeams,
       totalMembers: teamStats.totalMembers,
     },
   }

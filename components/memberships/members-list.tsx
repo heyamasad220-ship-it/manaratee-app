@@ -170,7 +170,7 @@ export function MembersList() {
           <h1 className="text-2xl font-semibold tracking-tight">Members</h1>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
             People with an active MAS membership — distinct from program participants.
-            Team assignment is optional and shown when present.
+            Group assignment is optional and shown when present.
           </p>
         </div>
         <Button onClick={() => setAddOpen(true)}>
@@ -245,7 +245,7 @@ export function MembersList() {
             </Select>
             <Select value={teamFilter} onValueChange={setTeamFilter}>
               <SelectTrigger className="w-full lg:w-[180px]">
-                <SelectValue placeholder="Team (optional)" />
+                <SelectValue placeholder="Group (optional)" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All members</SelectItem>
@@ -276,7 +276,7 @@ export function MembersList() {
                   <TableHead>Status</TableHead>
                   <TableHead>Since</TableHead>
                   <TableHead>Renews / ends</TableHead>
-                  <TableHead>Team (optional)</TableHead>
+                  <TableHead>Group (optional)</TableHead>
                   <TableHead className="text-right">Profile</TableHead>
                 </TableRow>
               </TableHeader>

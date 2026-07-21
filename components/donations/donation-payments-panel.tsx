@@ -605,7 +605,7 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
 
           <Button onClick={() => setShowAddDialog(true)}>
             <Plus className="mr-2 h-4 w-4" />
-            Record Payment
+            Receive Payment
           </Button>
         </div>
 
@@ -794,7 +794,7 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Record Payment</DialogTitle>
+            <DialogTitle>Receive Payment</DialogTitle>
             <DialogDescription>
               Add a standalone donation payment for this organization.
             </DialogDescription>
@@ -834,6 +834,8 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
                           value="No contact selected"
                           onSelect={() => {
                             setSelectedContactId(null);
+                            setSelectedGroupContactId(null);
+                            setSelectedGroupLabel("");
                             setDonorOpen(false);
                             setDonorSearch("");
                           }}
@@ -853,6 +855,8 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
                             value={contact.full_name || contact.email || contact.contactId}
                             onSelect={() => {
                               setSelectedContactId(contact.contactId);
+                              setSelectedGroupContactId(null);
+                              setSelectedGroupLabel("");
                               setDonorOpen(false);
                               setDonorSearch("");
                             }}
@@ -878,6 +882,7 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
             <DonationGroupPicker
               groupContactId={selectedGroupContactId}
               groupLabel={selectedGroupLabel}
+              memberContactId={selectedContactId}
               onChange={(groupContactId, label) => {
                 setSelectedGroupContactId(groupContactId);
                 setSelectedGroupLabel(label);

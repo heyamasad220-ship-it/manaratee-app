@@ -1,16 +1,22 @@
 import type { ContactsListSegment } from "@/lib/contacts/contact-module-label"
 import { isSafeReturnToPath, RETURN_TO_QUERY_PARAM } from "@/lib/navigation/return-to"
 
-/** Top-level profile surfaces. `financial` / `overview` / `details` are legacy aliases for home. */
+/** Top-level profile surfaces. Legacy aliases map to current tabs. */
 export type ContactProfileTab =
-  | "home"
-  | "details"
+  | "overview"
+  | "financial"
+  | "activity"
+  | "notes"
   | "participation"
   | "workforce"
-  | "financial"
-  | "overview"
+  /** @deprecated Use overview */
+  | "home"
+  /** @deprecated Use overview */
+  | "details"
 
 export type ContactProfileOverviewSection = "general" | "family" | "activity" | "overview"
+
+export type NormalizedContactProfileTab = "overview" | "financial" | "activity"
 
 type ContactProfileHrefOptions = {
   tab?: ContactProfileTab
@@ -22,11 +28,17 @@ type ContactProfileHrefOptions = {
 
 export function normalizeContactProfileTab(
   value: string | null | undefined
-): "home" | "participation" | "workforce" {
-  if (value === "participation") return "participation"
-  if (value === "workforce") return "workforce"
-  // overview / financial / details / home / activity / missing → combined summary (home)
-  return "home"
+): NormalizedContactProfileTab {
+  if (value === "financial") return "financial"
+  if (
+    value === "activity" ||
+    value === "participation" ||
+    value === "workforce"
+  ) {
+    return "activity"
+  }
+  // notes / home / overview / details / missing → Overview
+  return "overview"
 }
 
 export function contactProfileHref(
@@ -49,24 +61,18 @@ export function contactProfileHref(
     returnTo = tabOrOptions.returnTo
   }
 
-  const normalized = normalizeContactProfileTab(tab)
+  // Legacy section=activity → Activity tab
+  let normalized = normalizeContactProfileTab(tab)
+  if (section === "activity" && (!tab || tab === "home" || tab === "overview" || tab === "details")) {
+    normalized = "activity"
+  }
 
   const params = new URLSearchParams()
   if (list) {
     params.set("list", list)
   }
-  if (normalized === "participation" || normalized === "workforce") {
+  if (normalized !== "overview") {
     params.set("tab", normalized)
-  }
-
-  // Profile sections live on the home summary page
-  if (section === "activity") {
-    params.set("section", "activity")
-  } else if (section === "overview" || section === "general" || section === "family") {
-    // Overview is default when editing; omit unless explicitly overview deep-link needed
-    if (section === "overview") {
-      // no query needed for overview; edit flag alone opens it
-    }
   }
 
   if (edit) {
@@ -85,7 +91,7 @@ export function staffMemberProfileHref(input: {
   contactId?: string | null
 }): string {
   if (input.contactId) {
-    return contactProfileHref(input.contactId, "workforce")
+    return contactProfileHref(input.contactId, "activity")
   }
   return `/workforce/employees/${input.staffId}`
 }

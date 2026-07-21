@@ -241,15 +241,17 @@ const mapped: PlatformUser[] = users.map((user: any) => ({
                               Reset Password
                             </DropdownMenuItem>
 
-                            {user.status === "Active" ? (
-                              <DropdownMenuItem className="text-destructive">
-                                Deactivate
-                              </DropdownMenuItem>
-                            ) : (
-                              <DropdownMenuItem>
-                                Activate
-                              </DropdownMenuItem>
-                            )}
+                            {user.role !== "Owner" ? (
+                              user.status === "Active" ? (
+                                <DropdownMenuItem className="text-destructive">
+                                  Deactivate
+                                </DropdownMenuItem>
+                              ) : (
+                                <DropdownMenuItem>
+                                  Activate
+                                </DropdownMenuItem>
+                              )
+                            ) : null}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>

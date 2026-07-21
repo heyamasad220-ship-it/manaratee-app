@@ -82,7 +82,7 @@ export function DonationOpsPanel() {
 
         {data.recentFailedEmails.length > 0 ? (
           <div>
-            <p className="mb-2 font-medium">Recent failed emails</p>
+            <p className="mb-2 font-medium">Failed emails</p>
             <ul className="space-y-1 text-muted-foreground">
               {data.recentFailedEmails.map((row) => (
                 <li key={row.id}>
@@ -96,7 +96,7 @@ export function DonationOpsPanel() {
 
         {data.recentProcessorFailures.length > 0 ? (
           <div>
-            <p className="mb-2 font-medium">Recent Stripe processor failures</p>
+            <p className="mb-2 font-medium">Stripe processor failures</p>
             <ul className="space-y-1 text-muted-foreground">
               {data.recentProcessorFailures.map((row) => (
                 <li key={row.id}>

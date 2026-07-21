@@ -65,11 +65,11 @@ export function CarTagsWorkspace({
     <div className="space-y-6">
       <div className="no-print">
         <Link
-          href={`/programs/${programId}/edit`}
+          href={`/programs/${programId}`}
           className="mb-3 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="h-4 w-4" />
-          Back to Edit Program
+          Back to Program
         </Link>
 
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -83,7 +83,7 @@ export function CarTagsWorkspace({
           </div>
 
           <Button variant="outline" size="sm" asChild>
-            <Link href={`/programs/${programId}/edit`}>Edit Program</Link>
+            <Link href={`/programs/${programId}`}>View Program</Link>
           </Button>
         </div>
       </div>

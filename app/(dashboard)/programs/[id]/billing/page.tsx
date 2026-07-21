@@ -1,5 +1,12 @@
 import { redirect } from "next/navigation"
 
+import {
+  programOfferingManageHref,
+  programOfferingsIndexHref,
+} from "@/lib/programs/program-offering-paths"
+import { getOfferingsForProgram } from "@/lib/programs/program-offering-queries"
+import { getProgramById } from "@/lib/programs/program-queries"
+
 export default async function ProgramBillingPage({
   params,
   searchParams,
@@ -10,14 +17,23 @@ export default async function ProgramBillingPage({
   const { id } = await params
   const { offering: offeringParam } = await searchParams
 
-  const query = new URLSearchParams({
-    tab: "offerings",
-    workspaceTab: "pricing",
-  })
-
-  if (offeringParam) {
-    query.set("offering", offeringParam)
+  const program = await getProgramById(id)
+  if (!program) {
+    redirect("/programs/catalog")
   }
 
-  redirect(`/programs/${id}/edit?${query.toString()}`)
+  const offerings = await getOfferingsForProgram(id)
+  const selected =
+    (offeringParam
+      ? offerings.find((offering) => offering.id === offeringParam)
+      : null) ??
+    offerings.find((offering) => offering.status !== "archived") ??
+    offerings[0] ??
+    null
+
+  if (selected) {
+    redirect(programOfferingManageHref(id, selected.id, "fees"))
+  }
+
+  redirect(programOfferingsIndexHref(id))
 }

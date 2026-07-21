@@ -50,10 +50,10 @@ export function buildPaymentAdminCapabilities(
   let stripeRefundBlockedReason: string | null = null
   if (imported) {
     stripeRefundBlockedReason =
-      "This payment was imported. Refund the donor externally, then record a refund here."
+      "This payment was imported. Refund the donor externally, then apply the refund here."
   } else if (!processorStripe) {
     stripeRefundBlockedReason =
-      "Stripe refunds are only available for donations collected through the app."
+      "Card refunds through Stripe apply to donations collected in the app. Manual methods can still be refunded here."
   } else if (!stripeConfigured) {
     stripeRefundBlockedReason = "Stripe is not configured for this environment."
   }

@@ -1,0 +1,754 @@
+{
+  "importTag": "QIL_2025_26_V1",
+  "mode": "execute",
+  "generatedAt": "2026-07-20T21:48:46.707Z",
+  "totals": {
+    "rosterRows": 119,
+    "uniqueStudents": 103,
+    "uniqueCourses": 9,
+    "uniqueTeachers": 10,
+    "succeededPayments": 321,
+    "succeededAmount": 32720,
+    "unmatchedPaymentCount": 12,
+    "unmatchedPaymentAmount": 2390,
+    "allocatedPaid": 27850,
+    "courseFeeTotal": 36800,
+    "overpaymentAmount": 2480
+  },
+  "courses": [
+    {
+      "name": "Tajweed/Advanced",
+      "enrollmentCount": 17,
+      "teachers": [
+        "Abeer Abu Kiwan",
+        "Fathieh Alladin"
+      ]
+    },
+    {
+      "name": "Recitation Improvement",
+      "enrollmentCount": 40,
+      "teachers": [
+        "Alaa Elsarraj",
+        "Amneh Ismail",
+        "Huda ElSeisy",
+        "Rajaa Eljaber",
+        "Zohour Hawa"
+      ]
+    },
+    {
+      "name": "Memorization 1",
+      "enrollmentCount": 6,
+      "teachers": [
+        "Fadia Salameh"
+      ]
+    },
+    {
+      "name": "Memorization - Surat Al-Omran",
+      "enrollmentCount": 5,
+      "teachers": [
+        "Fadia Salameh"
+      ]
+    },
+    {
+      "name": "Memorization - Surat Al-Baqara",
+      "enrollmentCount": 15,
+      "teachers": [
+        "Fadia Salameh"
+      ]
+    },
+    {
+      "name": "Tajweed/Beginner",
+      "enrollmentCount": 18,
+      "teachers": [
+        "Fathieh Alladin",
+        "Souzan Ayoub"
+      ]
+    },
+    {
+      "name": "Shu'uba Narration",
+      "enrollmentCount": 5,
+      "teachers": [
+        "Huda ElSeisy"
+      ]
+    },
+    {
+      "name": "Tajweed/Osool",
+      "enrollmentCount": 8,
+      "teachers": [
+        "Wedad Atwan"
+      ]
+    },
+    {
+      "name": "Memorization 2",
+      "enrollmentCount": 5,
+      "teachers": [
+        "Wedad Atwan"
+      ]
+    }
+  ],
+  "teachers": [
+    "Abeer Abu Kiwan",
+    "Alaa Elsarraj",
+    "Amneh Ismail",
+    "Fadia Salameh",
+    "Fathieh Alladin",
+    "Huda ElSeisy",
+    "Rajaa Eljaber",
+    "Souzan Ayoub",
+    "Wedad Atwan",
+    "Zohour Hawa"
+  ],
+  "fuzzyMatches": [
+    {
+      "paymentName": "Suzanne Swelleh",
+      "rosterName": "Suzanne Jamal Sweileh",
+      "reason": "alias",
+      "amount": 270
+    },
+    {
+      "paymentName": "NoorElaine Abushaaban",
+      "rosterName": "Noor Abushaaban",
+      "reason": "alias",
+      "amount": 400
+    },
+    {
+      "paymentName": "Soha",
+      "rosterName": "Soha Musa",
+      "reason": "alias",
+      "amount": 50
+    },
+    {
+      "paymentName": "Hebah Qunies",
+      "rosterName": "Hebah Abu Shtaieh Qunies",
+      "reason": "first_last",
+      "amount": 200
+    },
+    {
+      "paymentName": "Aziza Owda",
+      "rosterName": "Aziza Odeh",
+      "reason": "alias",
+      "amount": 200
+    },
+    {
+      "paymentName": "Susan Basem Qalawi",
+      "rosterName": "Susan Qalawi",
+      "reason": "first_last",
+      "amount": 200
+    },
+    {
+      "paymentName": "Soha",
+      "rosterName": "Soha Musa",
+      "reason": "alias",
+      "amount": 50
+    },
+    {
+      "paymentName": "Soha",
+      "rosterName": "Soha Musa",
+      "reason": "alias",
+      "amount": 50
+    },
+    {
+      "paymentName": "Buthaynah Daglas",
+      "rosterName": "Buthaynah Alian (Daglas)",
+      "reason": "first_last",
+      "amount": 200
+    },
+    {
+      "paymentName": "Sarfraz Amin",
+      "rosterName": "Israa Alaomairi (Sarfraz Amin)",
+      "reason": "contains",
+      "amount": 200
+    },
+    {
+      "paymentName": "Soha",
+      "rosterName": "Soha Musa",
+      "reason": "alias",
+      "amount": 50
+    },
+    {
+      "paymentName": "Ghadeer Zarkani",
+      "rosterName": "Ghadeer Zakani",
+      "reason": "alias",
+      "amount": 100
+    },
+    {
+      "paymentName": "Soha",
+      "rosterName": "Soha Musa",
+      "reason": "alias",
+      "amount": 50
+    },
+    {
+      "paymentName": "Bandar A Hijaz",
+      "rosterName": "Bandar Hijaz",
+      "reason": "first_last",
+      "amount": 400
+    },
+    {
+      "paymentName": "Buthaynah Daglas",
+      "rosterName": "Buthaynah Alian (Daglas)",
+      "reason": "first_last",
+      "amount": 100
+    },
+    {
+      "paymentName": "Sabreen F I Taha",
+      "rosterName": "Sabreen Taha",
+      "reason": "first_last",
+      "amount": 50
+    },
+    {
+      "paymentName": "Ansam Abdelelah Izzat",
+      "rosterName": "Ansam Izzat",
+      "reason": "first_last",
+      "amount": 160
+    },
+    {
+      "paymentName": "Hebah Qunies",
+      "rosterName": "Hebah Abu Shtaieh Qunies",
+      "reason": "first_last",
+      "amount": 200
+    },
+    {
+      "paymentName": "Hebah Qunies",
+      "rosterName": "Hebah Abu Shtaieh Qunies",
+      "reason": "first_last",
+      "amount": 100
+    },
+    {
+      "paymentName": "Aziza Owda",
+      "rosterName": "Aziza Odeh",
+      "reason": "alias",
+      "amount": 200
+    },
+    {
+      "paymentName": "Bandar A Hijaz",
+      "rosterName": "Bandar Hijaz",
+      "reason": "first_last",
+      "amount": 400
+    },
+    {
+      "paymentName": "Buthaynah Daglas",
+      "rosterName": "Buthaynah Alian (Daglas)",
+      "reason": "first_last",
+      "amount": 100
+    },
+    {
+      "paymentName": "monaliza Fikri Elquadi",
+      "rosterName": "Monaliza Alqadi",
+      "reason": "alias",
+      "amount": 100
+    },
+    {
+      "paymentName": "Duaa kabbani",
+      "rosterName": "Duaa Qabbani",
+      "reason": "alias",
+      "amount": 100
+    },
+    {
+      "paymentName": "Sabreen F I Taha",
+      "rosterName": "Sabreen Taha",
+      "reason": "first_last",
+      "amount": 50
+    },
+    {
+      "paymentName": "Rowaida M Ramadan",
+      "rosterName": "Rowaida Ramadan",
+      "reason": "first_last",
+      "amount": 400
+    },
+    {
+      "paymentName": "Sarfraz Amin",
+      "rosterName": "Israa Alaomairi (Sarfraz Amin)",
+      "reason": "contains",
+      "amount": 100
+    },
+    {
+      "paymentName": "Sarfraz Amin",
+      "rosterName": "Israa Alaomairi (Sarfraz Amin)",
+      "reason": "contains",
+      "amount": 200
+    },
+    {
+      "paymentName": "Marwa Taissir Elgamal",
+      "rosterName": "Marwa Elgamal",
+      "reason": "first_last",
+      "amount": 100
+    },
+    {
+      "paymentName": "Birlanti abdalhamid Alsawfta",
+      "rosterName": "Birlanti Alsawfta",
+      "reason": "first_last",
+      "amount": 400
+    },
+    {
+      "paymentName": "Ansam Abdelelah Izzat",
+      "rosterName": "Ansam Izzat",
+      "reason": "first_last",
+      "amount": 40
+    },
+    {
+      "paymentName": "Sabreen F I Taha",
+      "rosterName": "Sabreen Taha",
+      "reason": "first_last",
+      "amount": 50
+    },
+    {
+      "paymentName": "Ansam Abdelelah Izzat",
+      "rosterName": "Ansam Izzat",
+      "reason": "first_last",
+      "amount": 100
+    },
+    {
+      "paymentName": "Susan Basem Qalawi",
+      "rosterName": "Susan Qalawi",
+      "reason": "first_last",
+      "amount": 200
+    },
+    {
+      "paymentName": "Imene Latreche",
+      "rosterName": "Imene Latrehe",
+      "reason": "alias",
+      "amount": 100
+    },
+    {
+      "paymentName": "Sabreen F I Taha",
+      "rosterName": "Sabreen Taha",
+      "reason": "first_last",
+      "amount": 50
+    }
+  ],
+  "rosterNoPayments": [
+    {
+      "studentName": "Wafaa Yarro",
+      "courses": [
+        "Tajweed/Advanced",
+        "Memorization - Surat Al-Baqara"
+      ],
+      "feeTotal": 500
+    },
+    {
+      "studentName": "Ayat Althamary",
+      "courses": [
+        "Recitation Improvement"
+      ],
+      "feeTotal": 400
+    },
+    {
+      "studentName": "Esraa Althamary",
+      "courses": [
+        "Recitation Improvement"
+      ],
+      "feeTotal": 400
+    },
+    {
+      "studentName": "Selwaan Mahmoud",
+      "courses": [
+        "Recitation Improvement"
+      ],
+      "feeTotal": 400
+    },
+    {
+      "studentName": "Hadeel Alsabbagh",
+      "courses": [
+        "Recitation Improvement"
+      ],
+      "feeTotal": 400
+    },
+    {
+      "studentName": "Bushra Saleh",
+      "courses": [
+        "Memorization 1"
+      ],
+      "feeTotal": 400
+    },
+    {
+      "studentName": "Israa Alaomairi",
+      "courses": [
+        "Memorization - Surat Al-Baqara"
+      ],
+      "feeTotal": 100
+    },
+    {
+      "studentName": "Jumana Alqadoor",
+      "courses": [
+        "Memorization - Surat Al-Baqara"
+      ],
+      "feeTotal": 100
+    },
+    {
+      "studentName": "Asmaa Mohammad",
+      "courses": [
+        "Tajweed/Beginner"
+      ],
+      "feeTotal": 100
+    },
+    {
+      "studentName": "Basma Ali",
+      "courses": [
+        "Tajweed/Advanced"
+      ],
+      "feeTotal": 400
+    },
+    {
+      "studentName": "Hebatullah Hasan",
+      "courses": [
+        "Tajweed/Advanced"
+      ],
+      "feeTotal": 400
+    },
+    {
+      "studentName": "Yasmeen Ali",
+      "courses": [
+        "Tajweed/Advanced"
+      ],
+      "feeTotal": 400
+    },
+    {
+      "studentName": "Azal Alharazi",
+      "courses": [
+        "Recitation Improvement"
+      ],
+      "feeTotal": 400
+    },
+    {
+      "studentName": "Sarah Aljahafi",
+      "courses": [
+        "Recitation Improvement"
+      ],
+      "feeTotal": 400
+    },
+    {
+      "studentName": "Eman Alarja",
+      "courses": [
+        "Tajweed/Beginner"
+      ],
+      "feeTotal": 100
+    },
+    {
+      "studentName": "Ruqaia Aljenabi",
+      "courses": [
+        "Tajweed/Beginner"
+      ],
+      "feeTotal": 100
+    },
+    {
+      "studentName": "Walaa Abdelghani",
+      "courses": [
+        "Tajweed/Beginner"
+      ],
+      "feeTotal": 100
+    },
+    {
+      "studentName": "Fathieh Duqqa",
+      "courses": [
+        "Recitation Improvement"
+      ],
+      "feeTotal": 400
+    }
+  ],
+  "unmatchedPayments": [
+    {
+      "customerName": "Hanan Ahmed",
+      "amount": 100,
+      "date": "2026-05-11",
+      "email": "hanoona8@hotmail.com"
+    },
+    {
+      "customerName": "Bushra Dweik",
+      "amount": 200,
+      "date": "2026-04-05",
+      "email": "bdweik@dcccd.edu"
+    },
+    {
+      "customerName": "ALTHAMARY NASSIR",
+      "amount": 1200,
+      "date": "2025-12-01",
+      "email": "salgahafi@risingstarsacad.com"
+    },
+    {
+      "customerName": "Bushra Dweik",
+      "amount": 200,
+      "date": "2025-11-27",
+      "email": "bdweik@dcccd.edu"
+    },
+    {
+      "customerName": "Yasmin Ali",
+      "amount": 200,
+      "date": "2025-11-06",
+      "email": "yasmin8333@yahoo.com"
+    },
+    {
+      "customerName": "Jomana Al kaddour",
+      "amount": 100,
+      "date": "2025-10-03",
+      "email": "ana.jomana@yahoo.com"
+    },
+    {
+      "customerName": "asmaa Ali ismail Mohamed",
+      "amount": 100,
+      "date": "2025-10-02",
+      "email": "asmaa.ali.15.2.2021@gmail.com"
+    },
+    {
+      "customerName": "Abdallah Asmar",
+      "amount": 20,
+      "date": "2025-09-25",
+      "email": "wallaabdelghani@yahoo.com"
+    },
+    {
+      "customerName": "Abdallah Asmar",
+      "amount": 100,
+      "date": "2025-09-25",
+      "email": "wallaabdelghani@yahoo.com"
+    },
+    {
+      "customerName": "Khaled Sabry Mohamed",
+      "amount": 20,
+      "date": "2025-09-19",
+      "email": "khaledsabry1990@gmail.com"
+    },
+    {
+      "customerName": "MHD AKRAM Ahmad",
+      "amount": 50,
+      "date": "2025-09-19",
+      "email": "akramkabbash@gmail.com"
+    },
+    {
+      "customerName": "Heba Jamal Matarieh",
+      "amount": 100,
+      "date": "2025-09-11",
+      "email": "hebajabuali11@gmail.com"
+    }
+  ],
+  "overpayments": [
+    {
+      "studentKey": "noha abdellatif",
+      "studentName": "Noha Abdellatif",
+      "email": "noha.el.hendy85@gmail.com",
+      "phone": "15136007328",
+      "courseName": "__OVERPAYMENT__",
+      "teacherName": null,
+      "courseFee": 0,
+      "amountPaid": 160,
+      "remaining": 0,
+      "paymentParts": [],
+      "status": "overpayment"
+    },
+    {
+      "studentKey": "sara kenana",
+      "studentName": "Sara Kenana",
+      "email": "saralifecoach20@gmail.com",
+      "phone": "15306402567",
+      "courseName": "__OVERPAYMENT__",
+      "teacherName": null,
+      "courseFee": 0,
+      "amountPaid": 400,
+      "remaining": 0,
+      "paymentParts": [],
+      "status": "overpayment"
+    },
+    {
+      "studentKey": "abeer qandil",
+      "studentName": "Abeer Qandil",
+      "email": "abeer_qandil@yahoo.com",
+      "phone": "17026012516",
+      "courseName": "__OVERPAYMENT__",
+      "teacherName": null,
+      "courseFee": 0,
+      "amountPaid": 100,
+      "remaining": 0,
+      "paymentParts": [],
+      "status": "overpayment"
+    },
+    {
+      "studentKey": "mona alnaeemi",
+      "studentName": "Mona Alnaeemi",
+      "email": "mona1137@yahoo.com",
+      "phone": "12147695789",
+      "courseName": "__OVERPAYMENT__",
+      "teacherName": null,
+      "courseFee": 0,
+      "amountPaid": 100,
+      "remaining": 0,
+      "paymentParts": [],
+      "status": "overpayment"
+    },
+    {
+      "studentKey": "muna hamadah",
+      "studentName": "Muna Hamadah",
+      "email": "muna.hamadah@gmail.com",
+      "phone": "17819995844",
+      "courseName": "__OVERPAYMENT__",
+      "teacherName": null,
+      "courseFee": 0,
+      "amountPaid": 50,
+      "remaining": 0,
+      "paymentParts": [],
+      "status": "overpayment"
+    },
+    {
+      "studentKey": "soumia bouhlal",
+      "studentName": "Soumia Bouhlal",
+      "email": "bsoumia85@gmail.com",
+      "phone": "12149986341",
+      "courseName": "__OVERPAYMENT__",
+      "teacherName": null,
+      "courseFee": 0,
+      "amountPaid": 100,
+      "remaining": 0,
+      "paymentParts": [],
+      "status": "overpayment"
+    },
+    {
+      "studentKey": "ghina ereksousi",
+      "studentName": "Ghina Ereksousi",
+      "email": "kokierek84@gmail.com",
+      "phone": "12248081118",
+      "courseName": "__OVERPAYMENT__",
+      "teacherName": null,
+      "courseFee": 0,
+      "amountPaid": 50,
+      "remaining": 0,
+      "paymentParts": [],
+      "status": "overpayment"
+    },
+    {
+      "studentKey": "narmeen gamal alfahal",
+      "studentName": "Narmeen gamal Alfahal",
+      "email": "narmeenjmal@gmail.com",
+      "phone": "17163678815",
+      "courseName": "__OVERPAYMENT__",
+      "teacherName": null,
+      "courseFee": 0,
+      "amountPaid": 150,
+      "remaining": 0,
+      "paymentParts": [],
+      "status": "overpayment"
+    },
+    {
+      "studentKey": "sarah yousif",
+      "studentName": "Sarah Yousif",
+      "email": "yousif.sarah06@gmail.com",
+      "phone": "16126445278",
+      "courseName": "__OVERPAYMENT__",
+      "teacherName": null,
+      "courseFee": 0,
+      "amountPaid": 50,
+      "remaining": 0,
+      "paymentParts": [],
+      "status": "overpayment"
+    },
+    {
+      "studentKey": "farah hashim",
+      "studentName": "Farah Hashim",
+      "email": "farahth.2012@yahoo.com",
+      "phone": "16192771893",
+      "courseName": "__OVERPAYMENT__",
+      "teacherName": null,
+      "courseFee": 0,
+      "amountPaid": 160,
+      "remaining": 0,
+      "paymentParts": [],
+      "status": "overpayment"
+    },
+    {
+      "studentKey": "ansam izzat",
+      "studentName": "Ansam Izzat",
+      "email": "ansamizzat@gmail.com",
+      "phone": "14696678733",
+      "courseName": "__OVERPAYMENT__",
+      "teacherName": null,
+      "courseFee": 0,
+      "amountPaid": 200,
+      "remaining": 0,
+      "paymentParts": [],
+      "status": "overpayment"
+    },
+    {
+      "studentKey": "lubna abdallah",
+      "studentName": "Lubna Abdallah",
+      "email": "lubna.abdallah27@gmail.com",
+      "phone": "14698917190",
+      "courseName": "__OVERPAYMENT__",
+      "teacherName": null,
+      "courseFee": 0,
+      "amountPaid": 160,
+      "remaining": 0,
+      "paymentParts": [],
+      "status": "overpayment"
+    },
+    {
+      "studentKey": "sabreen taha",
+      "studentName": "Sabreen Taha",
+      "email": "sab2008reen@live.com",
+      "phone": "17019345153",
+      "courseName": "__OVERPAYMENT__",
+      "teacherName": null,
+      "courseFee": 0,
+      "amountPaid": 100,
+      "remaining": 0,
+      "paymentParts": [],
+      "status": "overpayment"
+    },
+    {
+      "studentKey": "israa alaomairi sarfraz amin",
+      "studentName": "Israa Alaomairi (Sarfraz Amin)",
+      "email": "amin.sarfraz@gmail.com",
+      "phone": "15017661109",
+      "courseName": "__OVERPAYMENT__",
+      "teacherName": null,
+      "courseFee": 0,
+      "amountPaid": 100,
+      "remaining": 0,
+      "paymentParts": [],
+      "status": "overpayment"
+    },
+    {
+      "studentKey": "suhair younes",
+      "studentName": "Suhair Younes",
+      "email": "suhair.younes1970@gmail.com",
+      "phone": "12142266018",
+      "courseName": "__OVERPAYMENT__",
+      "teacherName": null,
+      "courseFee": 0,
+      "amountPaid": 200,
+      "remaining": 0,
+      "paymentParts": [],
+      "status": "overpayment"
+    },
+    {
+      "studentKey": "bandar hijaz",
+      "studentName": "Bandar Hijaz",
+      "email": "bandarabdel@yahoo.com",
+      "phone": "14699969879",
+      "courseName": "__OVERPAYMENT__",
+      "teacherName": null,
+      "courseFee": 0,
+      "amountPaid": 400,
+      "remaining": 0,
+      "paymentParts": [],
+      "status": "overpayment"
+    }
+  ],
+  "skippedStatusCount": 0,
+  "created": {
+    "departmentId": "c5d6b286-0d48-431f-9b55-94a80d4821ef",
+    "programId": null,
+    "offerings": 9,
+    "contacts": 119,
+    "staff": 10,
+    "enrollments": 119,
+    "legacyUmbrellaRemoved": true,
+    "programIds": [
+      "5b678992-a0fc-48e6-b962-c405b0061a48",
+      "ef4177d4-a1b0-4fba-92f7-fed292136f27",
+      "476d9f8e-5d63-4be0-8961-270e4bc8b2e4",
+      "cf1cc580-d630-42ce-b221-bebe0930ab60",
+      "429830fd-9af0-4b20-90e8-1960d44267fa",
+      "cbcbbc58-c01f-4018-9cec-44d6a9db3bc3",
+      "c3f975a0-1997-4bfe-84d4-132358165730",
+      "86802728-b07d-4116-acbb-49f11f74bf88",
+      "25e9349e-7074-4cb9-8f8d-89dfa0c6822b"
+    ],
+    "programs": 9
+  }
+}

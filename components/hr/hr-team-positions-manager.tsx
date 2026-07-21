@@ -139,9 +139,9 @@ export function HrTeamPositionsManager() {
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <h2 className="text-base font-semibold">Team Positions</h2>
+            <h2 className="text-base font-semibold">Group Positions</h2>
             <p className="text-sm text-muted-foreground">
-              Team-specific positions such as Team Leader or Assistant. These are separate from
+              Group-specific positions such as Group Leader or Assistant. These are separate from
               contact roles and employee job titles.
             </p>
           </div>
@@ -212,7 +212,7 @@ export function HrTeamPositionsManager() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{form.id ? "Edit Team Position" : "Add Team Position"}</DialogTitle>
+            <DialogTitle>{form.id ? "Edit Group Position" : "Add Group Position"}</DialogTitle>
             <DialogDescription>
               Positions are assigned per team membership, not as global contact roles.
             </DialogDescription>

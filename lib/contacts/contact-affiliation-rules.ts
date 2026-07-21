@@ -1,6 +1,6 @@
 import type { ContactRoleValue } from "@/lib/contacts/contact-constants"
 
-/** Terminal program enrollment statuses — do not confer customer from programs. */
+/** Terminal program enrollment statuses — do not confer Programs affiliation. */
 export const PROGRAM_PARTICIPANT_TERMINAL_STATUSES = [
   "cancelled",
   "withdrawn",
@@ -25,6 +25,7 @@ export const DERIVED_AFFILIATION_ROLES = [
   "vendor",
   "childcare_provider",
   "customer",
+  "program_participant",
 ] as const satisfies readonly ContactRoleValue[]
 
 export type DerivedAffiliationRole = (typeof DERIVED_AFFILIATION_ROLES)[number]
@@ -42,6 +43,7 @@ export const STICKY_DERIVED_ROLES: DerivedAffiliationRole[] = [
   "volunteer",
   "vendor",
   "customer",
+  "program_participant",
 ]
 
 /** Application types that trigger affiliation sync on submit or status change. */
@@ -69,7 +71,8 @@ export const AFFILIATION_ROLE_MODULE_SLUGS: Record<
   volunteer: ["workforce", "hr"],
   employee: ["workforce", "hr"],
   member: ["membership"],
-  customer: ["programs", "event-management", "ticketing", "bookings"],
+  program_participant: ["programs"],
+  customer: ["event-management", "ticketing", "bookings"],
 }
 
 function normalizeAffiliationModuleSlug(slug: string): string {
@@ -154,13 +157,23 @@ export const AFFILIATION_RULE_DEFINITIONS: AffiliationRuleDefinition[] = [
     moduleSlugs: AFFILIATION_ROLE_MODULE_SLUGS.member,
   },
   {
+    role: "program_participant",
+    label: "Programs",
+    trigger:
+      "Program enrollment as the participant, or as the registrant (parent/guardian of a minor)",
+    autoAdd: "Yes — on enrollment",
+    autoRemove: "Never — program history retained",
+    moduleList: "Programs → Registrations",
+    moduleSlugs: AFFILIATION_ROLE_MODULE_SLUGS.program_participant,
+  },
+  {
     role: "customer",
     label: "Customer",
     trigger:
-      "Program enrollment, completed ticket purchase, or linked venue rental (billing contact)",
-    autoAdd: "Yes — on registration, purchase, or rental request",
+      "Completed ticket purchase, or linked venue rental (billing contact)",
+    autoAdd: "Yes — on purchase or rental request",
     autoRemove: "Never — customer history retained",
-    moduleList: "Programs, Events → Ticketing, Bookings → Venue Rentals",
+    moduleList: "Events → Ticketing, Bookings → Venue Rentals",
     moduleSlugs: AFFILIATION_ROLE_MODULE_SLUGS.customer,
   },
 ]

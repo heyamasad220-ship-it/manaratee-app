@@ -170,8 +170,9 @@ export function EmployeeProfileClient({
     <div className="flex flex-col gap-6 p-6">
       {!employee.contact_id ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          This staff record is not linked to a contact yet. Link it from Workforce →
-          Employees to use the unified contact profile.
+          This employee is not linked to a contact. New employees must be created from an existing
+          contact under HR → Employees → Add Employee. For older records, create or find the person
+          in Contacts and re-add them as an employee, or ask an admin to link this staff row.
         </div>
       ) : null}
 

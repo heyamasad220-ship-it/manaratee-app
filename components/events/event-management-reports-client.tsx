@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import {
@@ -102,7 +103,9 @@ export function EventManagementReportsClient() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">Coming soon.</p>
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/event-management/reports/childcare">Open registrations</Link>
+              </Button>
             </CardContent>
           </Card>
           <Card>

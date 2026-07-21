@@ -286,7 +286,7 @@ export function EventManagementOverviewClient({
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base font-semibold">
-                  Recent Events
+                  Events
                 </CardTitle>
                 <Button variant="ghost" size="sm" asChild>
                   <Link href="/event-management" className="text-xs">

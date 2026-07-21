@@ -43,9 +43,9 @@ export function HrTeamsPageClient({
   return (
     <div className="flex flex-col gap-6 p-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Teams</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Groups</h1>
         <p className="text-sm text-muted-foreground">
-          Member teams and optional assignments. Team positions define roles within each group.
+          Member groups and optional assignments. Group positions define roles within each group.
         </p>
       </div>
 
@@ -57,11 +57,11 @@ export function HrTeamsPageClient({
           </TabsTrigger>
           <TabsTrigger value="teams" className="gap-2">
             <UsersRound className="size-4" />
-            Teams
+            Groups
           </TabsTrigger>
           <TabsTrigger value="positions" className="gap-2">
             <UserCog className="size-4" />
-            Team Positions
+            Group Positions
           </TabsTrigger>
         </TabsList>
 

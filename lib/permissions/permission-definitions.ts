@@ -119,7 +119,7 @@ export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
     label: "View Reports",
     description: "Can open reports.",
     group: "Reports",
-    moduleSlugs: ["reports"],
+    moduleSlugs: ["event-management", "programs", "reports"],
   },
   {
     key: "events.view",

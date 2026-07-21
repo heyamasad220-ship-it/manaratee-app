@@ -377,6 +377,7 @@ export async function saveOfferingFeePlans(input: {
     if (error) throw new Error(error.message)
   }
 
-  revalidatePath(`/programs/${input.programId}/edit`)
+  revalidatePath(`/programs/${input.programId}`)
+  revalidatePath(`/programs/${input.programId}/offerings`)
   revalidatePath(`/customer/programs/${input.programId}/register`)
 }
