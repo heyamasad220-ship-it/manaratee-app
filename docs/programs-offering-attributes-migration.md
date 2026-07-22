@@ -1,7 +1,7 @@
 # Programs architecture simplification (Program → Offering)
 
 **Status:** S1–S6 in repo (July 2026) — run `176` → `179`. Obsolete program eligibility/capacity columns kept for dual-read; drop later after RPCs fully move off them.  
-**Related:** [programs.md](./programs.md), [programs-architecture-reset-plan.md](./programs-architecture-reset-plan.md), [programs-registration-pipeline-design.md](./programs-registration-pipeline-design.md)
+**Related:** [programs.md](./programs.md), [programs-architecture-reset-plan.md](./programs-architecture-reset-plan.md), [programs-registration-pipeline-design.md](./programs-registration-pipeline-design.md), [programs-flexibility-contract.md](./programs-flexibility-contract.md) (inherit/override + QI / Education / camps matrix — planning)
 
 ---
 
@@ -163,17 +163,16 @@ Keep existing: `offering_type`, dates, enrollment window, status, `is_default`.
 - Offerings list may be empty; CTA **Add offering**.  
 - No requirement to create a default offering on save.
 
-### Offering manage tabs (target)
+### Offering manage tabs (current)
 
 | Tab | Content |
 |-----|---------|
-| Overview | Name, **Type**, status, term dates, delivery, attendance policy |
-| Registration | Registration mode + options; audience (adult/youth + ages/grades/gender); enrollment window |
-| Fees | Fee plans (unchanged direction) |
-| Schedule | **Only** schedule system (sessions + recurrence) |
+| Overview | Name, **Type**, **Delivery** (in person / online / hybrid), status, term dates, capacity summary |
+| Enrollment | Registration options + eligibility + capacity/waitlist; fee plans; sessions + weekly schedule; waitlist queue. **Financial assistance stays on the program.** |
 | Staff | Unchanged |
-| Capacity | Limited/unlimited, waitlist, capacity groups (moved here) |
-| Waitlist / Attendance / Care | Ops (existing stubs) — attendance **policy** on Overview/Registration |
+| Attendance | Attendance report + childcare |
+
+Legacy deep links (`?tab=registration|fees|schedule|waitlist|care`) normalize to Enrollment or Attendance.
 
 ### Remove / demote
 

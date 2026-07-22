@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Header } from "@/components/layout/header"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
@@ -13,11 +13,13 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
+  ClipboardCheck,
   CreditCard,
   DollarSign,
   Download,
   FileText,
   FolderOpen,
+  ListOrdered,
   Mail,
   MoreHorizontal,
   Phone,
@@ -31,6 +33,11 @@ import {
   XCircle,
 } from "lucide-react"
 
+import {
+  ProgramsAttendanceReportPanel,
+  ProgramsWaitlistReportPanel,
+} from "@/components/programs/programs-attendance-waitlist-report-panels"
+import { ProgramPaymentTransactionsPanel } from "@/components/programs/program-payment-transactions-panel"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -76,7 +83,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 
-type ReportTab = "overview" | "enrollment"
+type ReportTab = "overview" | "enrollment" | "transactions" | "attendance" | "waitlist"
 
 type Program = {
   id: string
@@ -252,9 +259,22 @@ function SortButton({
 
 export default function ProgramsReportsPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
 
-  const [activeTab, setActiveTab] = React.useState<ReportTab>("overview")
+  const initialTab = React.useMemo((): ReportTab => {
+    const tab = searchParams.get("tab")
+    if (
+      tab === "transactions" ||
+      tab === "attendance" ||
+      tab === "waitlist"
+    ) {
+      return tab
+    }
+    return "overview"
+  }, [searchParams])
+
+  const [activeTab, setActiveTab] = React.useState<ReportTab>(initialTab)
   const [loading, setLoading] = React.useState(true)
   const [tablesAvailable, setTablesAvailable] = React.useState(true)
 
@@ -275,6 +295,24 @@ export default function ProgramsReportsPage() {
     entry: Enrollment
   } | null>(null)
   const [message, setMessage] = React.useState("")
+
+  React.useEffect(() => {
+    setActiveTab(initialTab)
+  }, [initialTab])
+
+  function selectReportTab(value: string) {
+    if (value === "enrollment") {
+      router.push("/programs/registrations")
+      return
+    }
+    const next = value as ReportTab
+    setActiveTab(next)
+    if (next === "overview") {
+      router.replace("/programs/reports", { scroll: false })
+    } else {
+      router.replace(`/programs/reports?tab=${next}`, { scroll: false })
+    }
+  }
 
   React.useEffect(() => {
     void fetchReportsData()
@@ -544,13 +582,7 @@ export default function ProgramsReportsPage() {
 
         <Tabs
           value={activeTab}
-          onValueChange={(value) => {
-            if (value === "enrollment") {
-              router.push("/programs/registrations")
-              return
-            }
-            setActiveTab(value as ReportTab)
-          }}
+          onValueChange={selectReportTab}
           className="space-y-6"
         >
           <TabsList className="flex h-auto flex-wrap">
@@ -560,8 +592,20 @@ export default function ProgramsReportsPage() {
             </TabsTrigger>
             <TabsTrigger value="enrollment" className="gap-2">
               <FileText className="size-4" />
-              Payments
+              Registrations
               <Badge variant="secondary" className="ml-1">{enrollmentStats.total}</Badge>
+            </TabsTrigger>
+            <TabsTrigger value="transactions" className="gap-2">
+              <CreditCard className="size-4" />
+              Payment transactions
+            </TabsTrigger>
+            <TabsTrigger value="attendance" className="gap-2">
+              <ClipboardCheck className="size-4" />
+              Attendance
+            </TabsTrigger>
+            <TabsTrigger value="waitlist" className="gap-2">
+              <ListOrdered className="size-4" />
+              Waitlist
             </TabsTrigger>
           </TabsList>
 
@@ -595,10 +639,28 @@ export default function ProgramsReportsPage() {
 
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <QuickReport
-                title="Payments"
-                description="Program enrollments and payments"
+                title="Registrations"
+                description="Program enrollments and balances"
                 icon={<FileText className="size-5" />}
                 onClick={() => router.push("/programs/registrations")}
+              />
+              <QuickReport
+                title="Payment transactions"
+                description="Paid and refunded program payments"
+                icon={<CreditCard className="size-5" />}
+                onClick={() => selectReportTab("transactions")}
+              />
+              <QuickReport
+                title="Attendance"
+                description="Class attendance by offering"
+                icon={<ClipboardCheck className="size-5" />}
+                onClick={() => selectReportTab("attendance")}
+              />
+              <QuickReport
+                title="Waitlist"
+                description="Waitlist entries by offering"
+                icon={<ListOrdered className="size-5" />}
+                onClick={() => selectReportTab("waitlist")}
               />
               <QuickReport
                 title="Department Expenses"
@@ -644,6 +706,18 @@ export default function ProgramsReportsPage() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="transactions" className="space-y-6">
+            <ProgramPaymentTransactionsPanel />
+          </TabsContent>
+
+          <TabsContent value="attendance" className="space-y-6">
+            <ProgramsAttendanceReportPanel />
+          </TabsContent>
+
+          <TabsContent value="waitlist" className="space-y-6">
+            <ProgramsWaitlistReportPanel />
           </TabsContent>
         </Tabs>
 

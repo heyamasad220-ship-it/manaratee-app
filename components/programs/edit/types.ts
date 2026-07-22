@@ -8,4 +8,5 @@ export type ProgramWithExtraFields = Program & {
   visibility?: VisibilityType
   full_program_registration_enabled?: boolean
   session_registration_enabled?: boolean
+  single_session_registration_enabled?: boolean
 }

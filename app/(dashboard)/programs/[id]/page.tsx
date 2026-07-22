@@ -10,10 +10,13 @@ import type { ProgramWithExtraFields } from "@/components/programs/edit/types"
 
 export default async function ProgramDetailsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>
+  searchParams: Promise<{ tab?: string }>
 }) {
   const { id } = await params
+  const { tab } = await searchParams
 
   const [program, departments, offerings] = await Promise.all([
     getProgramById(id),
@@ -52,6 +55,7 @@ export default async function ProgramDetailsPage({
         departments={departments}
         departmentName={departmentName}
         visibility={visibility}
+        initialTab={tab}
         offerings={offerings.map((offering) => ({
           offering,
           enrolled: enrolledByOffering.get(offering.id) || 0,

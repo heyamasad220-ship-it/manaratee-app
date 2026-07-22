@@ -39,7 +39,7 @@ import {
 import {
   formatOfferingDateRange,
   isLegacyDefaultOfferingName,
-  isOfferingEnrollmentOpen,
+  isOfferingEnrollmentOpenForProgram,
 } from "@/lib/programs/program-offering-display"
 import type {
   ProgramOffering,
@@ -66,6 +66,9 @@ function emptyDraft(program: Program): ProgramOfferingInput {
     enrollment_open_date: program.enrollment_open_date,
     enrollment_close_date: program.enrollment_close_date,
     status: program.status === "draft" ? "draft" : "active",
+    attributes: {
+      delivery_format: "in_person",
+    },
   }
 }
 
@@ -78,6 +81,9 @@ function offeringToDraft(offering: ProgramOffering): ProgramOfferingInput {
     enrollment_open_date: offering.enrollment_open_date,
     enrollment_close_date: offering.enrollment_close_date,
     status: offering.status,
+    attributes: {
+      delivery_format: offering.delivery_format ?? "in_person",
+    },
   }
 }
 
@@ -487,7 +493,10 @@ export function ProgramOfferingsSection({
               </p>
             ) : (
               visibleOfferings.map((offering) => {
-                const enrollmentOpen = isOfferingEnrollmentOpen(offering, program)
+                const enrollmentOpen = isOfferingEnrollmentOpenForProgram(
+                  offering,
+                  program
+                )
 
                 return (
                   <div

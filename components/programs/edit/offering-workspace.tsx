@@ -20,7 +20,7 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { OfferingPricingPanel } from "@/components/programs/edit/offering-pricing-panel"
 import { OfferingRegistrationPanel } from "@/components/programs/edit/offering-registration-panel"
-import { OfferingStaffPanel } from "@/components/programs/edit/offering-staff-panel"
+import { OfferingOverviewStaffFields } from "@/components/programs/edit/offering-overview-staff-fields"
 import {
   OfferingSchedulePanel,
   OfferingSessionsPanel,
@@ -36,7 +36,11 @@ import type {
   ProgramOfferingInput,
   ProgramOfferingStatus,
 } from "@/lib/programs/program-offering-types"
-import { PROGRAM_OFFERING_STATUS_LABELS } from "@/lib/programs/program-offering-types"
+import {
+  OFFERING_DELIVERY_FORMAT_OPTIONS,
+  PROGRAM_OFFERING_STATUS_LABELS,
+} from "@/lib/programs/program-offering-types"
+import type { OfferingDeliveryFormat } from "@/lib/programs/program-offering-attributes"
 import type { Program } from "@/lib/programs/program-types"
 import type { ProgramStaffAssignmentWithDetails } from "@/lib/programs/program-staff-assignment-types"
 
@@ -60,20 +64,10 @@ const WORKSPACE_TABS = [
   { value: "registration", label: "Registration" },
   { value: "pricing", label: "Pricing" },
   { value: "sessions", label: "Sessions" },
-  { value: "staff", label: "Instructors & Staff" },
   { value: "schedule", label: "Schedule" },
 ] as const
 
 type WorkspaceTab = (typeof WORKSPACE_TABS)[number]["value"]
-
-function getNextWorkspaceTab(tab: WorkspaceTab): WorkspaceTab | null {
-  const index = WORKSPACE_TABS.findIndex((item) => item.value === tab)
-  if (index < 0 || index >= WORKSPACE_TABS.length - 1) {
-    return null
-  }
-
-  return WORKSPACE_TABS[index + 1]?.value ?? null
-}
 
 function preventFormSubmitOnEnter(event: React.KeyboardEvent) {
   if (event.key === "Enter") {
@@ -126,18 +120,8 @@ export function OfferingWorkspace({
     initialWorkspaceTab ?? "overview"
   )
 
-  const goToNextTab = React.useCallback(() => {
-    const nextTab = getNextWorkspaceTab(activeTab)
-    if (nextTab) {
-      setActiveTab(nextTab)
-    }
-  }, [activeTab])
-
-  async function handleOverviewNext() {
-    const saved = await onSaveOverview()
-    if (saved) {
-      goToNextTab()
-    }
+  async function handleOverviewSave() {
+    await onSaveOverview()
   }
 
   React.useEffect(() => {
@@ -178,12 +162,13 @@ export function OfferingWorkspace({
           </p>
         </div>
         <OfferingOverviewFields draft={draft} onDraftChange={onDraftChange} />
+        <OfferingFeaturePacksFields draft={draft} onDraftChange={onDraftChange} />
         {error ? <WorkspaceError message={error} /> : null}
         <OverviewFooter
           isCreating
           isSaving={isSaving}
           canSave={Boolean(draft.name.trim())}
-          onNext={() => void handleOverviewNext()}
+          onSave={() => void handleOverviewSave()}
           offering={null}
           onDelete={onDelete}
         />
@@ -227,14 +212,33 @@ export function OfferingWorkspace({
         </TabsList>
 
         <TabsContent value="overview" className="mt-0 space-y-4">
-          <div onKeyDown={preventFormSubmitOnEnter}>
+          <div onKeyDown={preventFormSubmitOnEnter} className="space-y-4">
             <OfferingOverviewFields draft={draft} onDraftChange={onDraftChange} />
+            <div className="grid gap-4 lg:grid-cols-2">
+              <OfferingFeaturePacksFields
+                draft={draft}
+                onDraftChange={onDraftChange}
+              />
+              <div className="space-y-3 rounded-md border p-3 h-full">
+                <p className="text-sm font-medium">Instructors &amp; Staff</p>
+                <OfferingOverviewStaffFields
+                  programId={program.id}
+                  offering={offering}
+                  assignments={workspaceData.staffAssignments}
+                  sessions={workspaceData.sessions}
+                  editing
+                  onAssignmentsChange={(assignments) =>
+                    onStaffAssignmentsChange?.(offering.id, assignments)
+                  }
+                />
+              </div>
+            </div>
             {error ? <WorkspaceError message={error} /> : null}
             <OverviewFooter
               isCreating={false}
               isSaving={isSaving}
               canSave={Boolean(draft.name.trim())}
-              onNext={() => void handleOverviewNext()}
+              onSave={() => void handleOverviewSave()}
               offering={offering}
               onDelete={onDelete}
             />
@@ -249,7 +253,6 @@ export function OfferingWorkspace({
             capacityGroups={capacityGroups}
             onCapacityGroupsChange={onCapacityGroupsChange}
             onRegistrationOptionsSaved={onRegistrationOptionsSaved}
-            onNavigateNext={goToNextTab}
           />
         </TabsContent>
 
@@ -259,7 +262,6 @@ export function OfferingWorkspace({
             offering={offering}
             workspaceData={workspaceData}
             registrationOptions={workspaceData.registrationOptions}
-            onNavigateNext={goToNextTab}
           />
         </TabsContent>
 
@@ -270,20 +272,6 @@ export function OfferingWorkspace({
             workspaceData={workspaceData}
             sessionRegistrationEnabled={sessionRegistrationEnabled}
           />
-          <WorkspaceTabNextFooter onNext={goToNextTab} />
-        </TabsContent>
-
-        <TabsContent value="staff" className="mt-0 space-y-4">
-          <OfferingStaffPanel
-            programId={program.id}
-            offering={offering}
-            assignments={workspaceData.staffAssignments}
-            sessions={workspaceData.sessions}
-            onAssignmentsChange={(assignments) =>
-              onStaffAssignmentsChange?.(offering.id, assignments)
-            }
-          />
-          <WorkspaceTabNextFooter onNext={goToNextTab} />
         </TabsContent>
 
         <TabsContent value="schedule" className="mt-0">
@@ -306,94 +294,169 @@ export function OfferingOverviewFields({
   onDraftChange: (draft: ProgramOfferingInput) => void
 }) {
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
-      <div className="space-y-1.5 sm:col-span-2">
-        <Label htmlFor="offering-name">Name</Label>
-        <Input
-          id="offering-name"
-          value={draft.name}
+    <div className="space-y-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="offering-name">Name</Label>
+          <Input
+            id="offering-name"
+            value={draft.name}
+            onChange={(event) =>
+              onDraftChange({ ...draft, name: event.target.value })
+            }
+            placeholder="Beginner ESL, June Camp, Piano Level 1"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="offering-type">Type</Label>
+          <select
+            id="offering-type"
+            value={draft.offering_type ?? "standard"}
+            onChange={(event) =>
+              onDraftChange({
+                ...draft,
+                offering_type: event.target
+                  .value as ProgramOfferingInput["offering_type"],
+              })
+            }
+            className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+          >
+            {OFFERING_TYPE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="offering-delivery">Delivery</Label>
+          <select
+            id="offering-delivery"
+            value={draft.attributes?.delivery_format ?? "in_person"}
+            onChange={(event) =>
+              onDraftChange({
+                ...draft,
+                attributes: {
+                  ...draft.attributes,
+                  delivery_format: event.target.value as OfferingDeliveryFormat,
+                },
+              })
+            }
+            className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+            title="Use separate offerings for on-site vs online when instructors or capacity differ."
+          >
+            {OFFERING_DELIVERY_FORMAT_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="offering-status">Status</Label>
+          <select
+            id="offering-status"
+            value={draft.status ?? "draft"}
+            onChange={(event) =>
+              onDraftChange({
+                ...draft,
+                status: event.target.value as ProgramOfferingStatus,
+              })
+            }
+            className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+            title="Use Archived to hide from customers without deleting."
+          >
+            {STATUS_OPTIONS.map((status) => (
+              <option key={status} value={status}>
+                {PROGRAM_OFFERING_STATUS_LABELS[status]}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:max-w-xl">
+        <div className="space-y-1.5">
+          <Label htmlFor="offering-start">Start date</Label>
+          <Input
+            id="offering-start"
+            type="date"
+            value={draft.start_date ?? ""}
+            onChange={(event) =>
+              onDraftChange({
+                ...draft,
+                start_date: event.target.value || null,
+              })
+            }
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="offering-end">End date</Label>
+          <Input
+            id="offering-end"
+            type="date"
+            value={draft.end_date ?? ""}
+            onChange={(event) =>
+              onDraftChange({
+                ...draft,
+                end_date: event.target.value || null,
+              })
+            }
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export function OfferingFeaturePacksFields({
+  draft,
+  onDraftChange,
+}: {
+  draft: ProgramOfferingInput
+  onDraftChange: (draft: ProgramOfferingInput) => void
+}) {
+  return (
+    <div className="space-y-3 rounded-md border p-3 h-full">
+      <p className="text-sm font-medium">Feature packs</p>
+      <label className="flex items-center justify-between gap-3 text-sm">
+        <span>Track attendance</span>
+        <input
+          type="checkbox"
+          className="size-4"
+          checked={Boolean(draft.attributes?.attendance_tracked)}
           onChange={(event) =>
-            onDraftChange({ ...draft, name: event.target.value })
+            onDraftChange({
+              ...draft,
+              attributes: {
+                ...draft.attributes,
+                attendance_tracked: event.target.checked,
+              },
+            })
           }
-          placeholder="Beginner ESL, June Camp, Piano Level 1"
         />
-      </div>
-
-      <div className="space-y-1.5">
-        <Label htmlFor="offering-type">Type</Label>
-        <select
-          id="offering-type"
-          value={draft.offering_type ?? "standard"}
+      </label>
+      <label className="flex items-center justify-between gap-3 text-sm">
+        <span>Childcare</span>
+        <input
+          type="checkbox"
+          className="size-4"
+          checked={Boolean(draft.attributes?.care_enabled)}
           onChange={(event) =>
             onDraftChange({
               ...draft,
-              offering_type: event.target
-                .value as ProgramOfferingInput["offering_type"],
-            })
-          }
-          className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-        >
-          {OFFERING_TYPE_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="space-y-1.5">
-        <Label htmlFor="offering-status">Status</Label>
-        <select
-          id="offering-status"
-          value={draft.status ?? "draft"}
-          onChange={(event) =>
-            onDraftChange({
-              ...draft,
-              status: event.target.value as ProgramOfferingStatus,
-            })
-          }
-          className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-        >
-          {STATUS_OPTIONS.map((status) => (
-            <option key={status} value={status}>
-              {PROGRAM_OFFERING_STATUS_LABELS[status]}
-            </option>
-          ))}
-        </select>
-        <p className="text-xs text-muted-foreground">
-          Use Archived to hide from customers without deleting.
-        </p>
-      </div>
-
-      <div className="space-y-1.5">
-        <Label htmlFor="offering-start">Start date</Label>
-        <Input
-          id="offering-start"
-          type="date"
-          value={draft.start_date ?? ""}
-          onChange={(event) =>
-            onDraftChange({
-              ...draft,
-              start_date: event.target.value || null,
+              attributes: {
+                ...draft.attributes,
+                care_enabled: event.target.checked,
+              },
             })
           }
         />
-      </div>
-
-      <div className="space-y-1.5">
-        <Label htmlFor="offering-end">End date</Label>
-        <Input
-          id="offering-end"
-          type="date"
-          value={draft.end_date ?? ""}
-          onChange={(event) =>
-            onDraftChange({
-              ...draft,
-              end_date: event.target.value || null,
-            })
-          }
-        />
-      </div>
+      </label>
     </div>
   )
 }
@@ -410,14 +473,14 @@ function OverviewFooter({
   isCreating,
   isSaving,
   canSave,
-  onNext,
+  onSave,
   offering,
   onDelete,
 }: {
   isCreating: boolean
   isSaving: boolean
   canSave: boolean
-  onNext: () => void
+  onSave: () => void
   offering: ProgramOffering | null
   onDelete: (offeringId: string) => Promise<void>
 }) {
@@ -460,7 +523,7 @@ function OverviewFooter({
           </AlertDialog>
         ) : null}
       </div>
-      <Button type="button" onClick={onNext} disabled={isSaving || !canSave}>
+      <Button type="button" onClick={onSave} disabled={isSaving || !canSave}>
         {isSaving ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -469,36 +532,7 @@ function OverviewFooter({
         ) : isCreating ? (
           "Create offering"
         ) : (
-          "Next"
-        )}
-      </Button>
-    </div>
-  )
-}
-
-function WorkspaceTabNextFooter({
-  isSaving = false,
-  disabled = false,
-  onNext,
-}: {
-  isSaving?: boolean
-  disabled?: boolean
-  onNext: () => void
-}) {
-  return (
-    <div className="flex justify-end border-t pt-4">
-      <Button
-        type="button"
-        onClick={onNext}
-        disabled={isSaving || disabled}
-      >
-        {isSaving ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Saving…
-          </>
-        ) : (
-          "Next"
+          "Save"
         )}
       </Button>
     </div>

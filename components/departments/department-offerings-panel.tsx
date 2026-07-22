@@ -1,69 +1,25 @@
 "use client"
 
-import { useCallback, useEffect, useState, useTransition } from "react"
-import Link from "next/link"
-import { BookOpen, ExternalLink, Loader2, Plus, Tag } from "lucide-react"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { Loader2 } from "lucide-react"
 
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+  ProgramCatalogFilters,
+  type CatalogFilters,
+} from "@/components/programs/program-catalog-filters"
+import { ProgramCatalogView } from "@/components/programs/program-catalog-view"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { StatCard, StatCardsRow } from "@/components/ui/stat-card"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import {
-  createDepartmentOfferingAction,
-  createDepartmentProgramAction,
-  fetchDepartmentOfferingsAction,
-  type DepartmentOfferingRow,
-  type DepartmentProgramOption,
-} from "@/lib/departments/department-offerings"
-import { programOfferingManageHref } from "@/lib/programs/program-offering-paths"
-import {
-  PROGRAM_OFFERING_STATUS_LABELS,
-  type ProgramOfferingStatus,
-  type ProgramOfferingType,
-} from "@/lib/programs/program-offering-types"
+  matchesProgramCatalogFilters,
+  PROGRAM_CATALOG_PAGE_SIZE,
+} from "@/lib/programs/program-catalog-helpers"
+import { fetchDepartmentProgramCatalogAction } from "@/lib/departments/department-program-catalog"
+import type { ProgramCatalogCapacity } from "@/lib/programs/program-catalog-capacity"
+import type { Program } from "@/lib/programs/program-types"
 
-function formatDate(value: string | null) {
-  if (!value) return "—"
-  return new Date(`${value}T00:00:00`).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  })
-}
-
-const OFFERING_TYPE_OPTIONS: { value: ProgramOfferingType; label: string }[] = [
-  { value: "academic_year", label: "Academic year" },
-  { value: "summer", label: "Summer" },
-  { value: "season", label: "Season" },
-  { value: "standard", label: "Standard" },
-  { value: "recurring", label: "Recurring" },
-]
-
+/**
+ * Department Offerings tab = same Programs Catalog UI, locked to this department.
+ * Opening a program uses the same detail / offering manage links as `/programs/catalog`.
+ */
 export function DepartmentOfferingsPanel({
   departmentId,
   departmentName,
@@ -73,24 +29,36 @@ export function DepartmentOfferingsPanel({
 }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [programs, setPrograms] = useState<DepartmentProgramOption[]>([])
-  const [offerings, setOfferings] = useState<DepartmentOfferingRow[]>([])
-  const [createOpen, setCreateOpen] = useState(false)
-  const [programOpen, setProgramOpen] = useState(false)
+  const [programs, setPrograms] = useState<Program[]>([])
+  const [offeringCounts, setOfferingCounts] = useState<Record<string, number>>(
+    {}
+  )
+  const [capacityByProgramId, setCapacityByProgramId] = useState<
+    Record<string, ProgramCatalogCapacity>
+  >({})
+  const [filters, setFilters] = useState<CatalogFilters>({
+    q: "",
+    status: "all",
+    department: departmentId,
+    view: "cards",
+  })
+  const [page, setPage] = useState(1)
 
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
-    const result = await fetchDepartmentOfferingsAction(departmentId)
+    const result = await fetchDepartmentProgramCatalogAction(departmentId)
     if (!result.success) {
       setError(result.error)
       setPrograms([])
-      setOfferings([])
+      setOfferingCounts({})
+      setCapacityByProgramId({})
       setLoading(false)
       return
     }
     setPrograms(result.programs)
-    setOfferings(result.offerings)
+    setOfferingCounts(result.offeringCounts)
+    setCapacityByProgramId(result.capacityByProgramId)
     setLoading(false)
   }, [departmentId])
 
@@ -98,441 +66,85 @@ export function DepartmentOfferingsPanel({
     void load()
   }, [load])
 
-  const activeOfferings = offerings.filter((row) => row.status === "active").length
-  const draftOfferings = offerings.filter((row) => row.status === "draft").length
-  const academicYear = offerings.filter((row) => row.offeringType === "academic_year").length
-  const seasonal = offerings.filter(
-    (row) => row.offeringType === "summer" || row.offeringType === "season"
-  ).length
-
-  return (
-    <div className="space-y-6">
-      {!loading && !error ? (
-        <StatCardsRow equal columns={6}>
-          <StatCard
-            layout="header"
-            fill
-            tone="blue"
-            label="Offerings"
-            value={offerings.length}
-            icon={BookOpen}
-            hint="All courses"
-          />
-          <StatCard
-            layout="header"
-            fill
-            tone="sky"
-            label="Programs"
-            value={programs.length}
-            icon={BookOpen}
-            hint="Parent programs"
-          />
-          <StatCard
-            layout="header"
-            fill
-            tone="emerald"
-            label="Active"
-            value={activeOfferings}
-            icon={Tag}
-            hint="Open for registration"
-          />
-          <StatCard
-            layout="header"
-            fill
-            tone="slate"
-            label="Draft"
-            value={draftOfferings}
-            icon={Tag}
-            hint="Not published"
-          />
-          <StatCard
-            layout="header"
-            fill
-            tone="violet"
-            label="Academic year"
-            value={academicYear}
-            icon={BookOpen}
-            hint="Year-long offerings"
-          />
-          <StatCard
-            layout="header"
-            fill
-            tone="amber"
-            label="Seasonal"
-            value={seasonal}
-            icon={Tag}
-            hint="Summer / season"
-          />
-        </StatCardsRow>
-      ) : null}
-
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 pb-2">
-          <div>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <BookOpen className="size-4" />
-              Offerings
-            </CardTitle>
-            <CardDescription>
-              Courses and seasonal runs for {departmentName}. Create offerings here each year;
-              Catalog under Programs reads from the same data. Open Manage for fees, registration,
-              and details.
-            </CardDescription>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" size="sm" variant="outline" onClick={() => setProgramOpen(true)}>
-              Add program
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              onClick={() => setCreateOpen(true)}
-              disabled={programs.length === 0}
-            >
-              <Plus className="mr-1.5 size-4" />
-              Add offering
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <p className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" />
-              Loading offerings...
-            </p>
-          ) : error ? (
-            <p className="py-6 text-sm text-destructive">{error}</p>
-          ) : programs.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">
-              No programs linked to this department yet. Add a program (for example &quot;
-              {departmentName} Courses&quot;), then add offerings like Tajweed Beginner for this
-              year.
-            </p>
-          ) : offerings.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">
-              No offerings yet. Add an offering for this academic year or season.
-            </p>
-          ) : (
-            <div className="overflow-x-auto rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Offering</TableHead>
-                    <TableHead>Program</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Dates</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="w-[100px]" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {offerings.map((row) => (
-                    <TableRow key={row.id}>
-                      <TableCell className="font-medium">{row.name}</TableCell>
-                      <TableCell className="text-muted-foreground">{row.programName}</TableCell>
-                      <TableCell className="capitalize text-muted-foreground">
-                        {row.offeringType.replace(/_/g, " ")}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {formatDate(row.startDate)} – {formatDate(row.endDate)}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className="font-normal">
-                          {PROGRAM_OFFERING_STATUS_LABELS[row.status] || row.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Button type="button" size="sm" variant="outline" asChild>
-                          <Link href={programOfferingManageHref(row.programId, row.id)}>
-                            Manage
-                            <ExternalLink className="ml-1.5 size-3.5" />
-                          </Link>
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <CreateOfferingDialog
-        open={createOpen}
-        onOpenChange={setCreateOpen}
-        departmentId={departmentId}
-        programs={programs}
-        onSaved={async () => {
-          setCreateOpen(false)
-          await load()
-        }}
-      />
-
-      <CreateProgramDialog
-        open={programOpen}
-        onOpenChange={setProgramOpen}
-        departmentId={departmentId}
-        departmentName={departmentName}
-        onSaved={async () => {
-          setProgramOpen(false)
-          await load()
-        }}
-      />
-    </div>
-  )
-}
-
-function CreateOfferingDialog({
-  open,
-  onOpenChange,
-  departmentId,
-  programs,
-  onSaved,
-}: {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  departmentId: string
-  programs: DepartmentProgramOption[]
-  onSaved: () => Promise<void>
-}) {
-  const [programId, setProgramId] = useState("")
-  const [name, setName] = useState("")
-  const [offeringType, setOfferingType] = useState<ProgramOfferingType>("academic_year")
-  const [startDate, setStartDate] = useState("")
-  const [endDate, setEndDate] = useState("")
-  const [status, setStatus] = useState<ProgramOfferingStatus>("draft")
-  const [error, setError] = useState<string | null>(null)
-  const [isPending, startTransition] = useTransition()
-
   useEffect(() => {
-    if (!open) return
-    setProgramId(programs[0]?.id || "")
-    setName("")
-    setOfferingType("academic_year")
-    setStartDate("")
-    setEndDate("")
-    setStatus("draft")
-    setError(null)
-  }, [open, programs])
+    setFilters((current) => ({
+      ...current,
+      department: departmentId,
+    }))
+    setPage(1)
+  }, [departmentId])
 
-  function handleSave() {
-    if (!programId) {
-      setError("Select a program.")
-      return
-    }
-    if (!name.trim()) {
-      setError("Enter an offering name.")
-      return
-    }
-    setError(null)
-    startTransition(async () => {
-      const result = await createDepartmentOfferingAction({
-        departmentId,
-        programId,
-        name,
-        offeringType,
-        startDate: startDate || null,
-        endDate: endDate || null,
-        status,
-      })
-      if (!result.success) {
-        setError(result.error)
-        return
-      }
-      await onSaved()
-    })
+  const filteredPrograms = useMemo(
+    () =>
+      programs.filter((program) =>
+        matchesProgramCatalogFilters(program, {
+          q: filters.q,
+          status: filters.status,
+          department: departmentId,
+        })
+      ),
+    [programs, filters.q, filters.status, departmentId]
+  )
+
+  const totalCount = filteredPrograms.length
+  const totalPages = Math.max(
+    1,
+    Math.ceil(totalCount / PROGRAM_CATALOG_PAGE_SIZE)
+  )
+  const safePage = Math.min(page, totalPages)
+  const pagePrograms = filteredPrograms.slice(
+    (safePage - 1) * PROGRAM_CATALOG_PAGE_SIZE,
+    safePage * PROGRAM_CATALOG_PAGE_SIZE
+  )
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center gap-2 rounded-lg border py-16 text-sm text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        Loading programs…
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        {error}
+      </p>
+    )
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Add offering</DialogTitle>
-          <DialogDescription>
-            Create a course or seasonal run for this year (for example Tajweed Beginner 2026–27).
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4 py-2">
-          {error ? (
-            <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-              {error}
-            </div>
-          ) : null}
-          <div className="space-y-2">
-            <Label>Program</Label>
-            <Select value={programId} onValueChange={setProgramId} disabled={isPending}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select program" />
-              </SelectTrigger>
-              <SelectContent>
-                {programs.map((program) => (
-                  <SelectItem key={program.id} value={program.id}>
-                    {program.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="offering-name">Offering name</Label>
-            <Input
-              id="offering-name"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              disabled={isPending}
-              placeholder="e.g. Tajweed Beginner 2026–27"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Type</Label>
-            <Select
-              value={offeringType}
-              onValueChange={(value) => setOfferingType(value as ProgramOfferingType)}
-              disabled={isPending}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {OFFERING_TYPE_OPTIONS.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="offering-start">Start date</Label>
-              <Input
-                id="offering-start"
-                type="date"
-                value={startDate}
-                onChange={(event) => setStartDate(event.target.value)}
-                disabled={isPending}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="offering-end">End date</Label>
-              <Input
-                id="offering-end"
-                type="date"
-                value={endDate}
-                onChange={(event) => setEndDate(event.target.value)}
-                disabled={isPending}
-              />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label>Status</Label>
-            <Select
-              value={status}
-              onValueChange={(value) => setStatus(value as ProgramOfferingStatus)}
-              disabled={isPending}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="draft">Draft</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="closed">Closed</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button type="button" onClick={handleSave} disabled={isPending}>
-            {isPending ? "Creating..." : "Create offering"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-function CreateProgramDialog({
-  open,
-  onOpenChange,
-  departmentId,
-  departmentName,
-  onSaved,
-}: {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  departmentId: string
-  departmentName: string
-  onSaved: () => Promise<void>
-}) {
-  const [name, setName] = useState(`${departmentName} Courses`)
-  const [error, setError] = useState<string | null>(null)
-  const [isPending, startTransition] = useTransition()
-
-  useEffect(() => {
-    if (!open) return
-    setName(`${departmentName} Courses`)
-    setError(null)
-  }, [open, departmentName])
-
-  function handleSave() {
-    if (!name.trim()) {
-      setError("Enter a program name.")
-      return
-    }
-    setError(null)
-    startTransition(async () => {
-      const result = await createDepartmentProgramAction({
-        departmentId,
-        name,
-      })
-      if (!result.success) {
-        setError(result.error)
-        return
+    <ProgramCatalogView
+      programs={pagePrograms}
+      offeringCounts={offeringCounts}
+      capacityByProgramId={capacityByProgramId}
+      viewMode={filters.view}
+      page={safePage}
+      totalPages={totalPages}
+      totalCount={totalCount}
+      pageSize={PROGRAM_CATALOG_PAGE_SIZE}
+      onPageChange={setPage}
+      createHref={`/programs/create?department=${departmentId}`}
+      showTitle
+      title="Programs"
+      description={`Same catalog as Programs → Catalog, filtered to ${departmentName}. Open a program to manage offerings, fees, and registration.`}
+      emptyTitle="No programs in this department"
+      emptyDescription="Create a program for this department, or assign an existing program’s department in program settings."
+      filters={
+        <ProgramCatalogFilters
+          departments={[]}
+          hideDepartmentFilter
+          initialFilters={filters}
+          onFiltersChange={(next) => {
+            setFilters({
+              ...next,
+              department: departmentId,
+            })
+            setPage(1)
+          }}
+        />
       }
-      await onSaved()
-    })
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Add program</DialogTitle>
-          <DialogDescription>
-            Programs group offerings under this department (for example &quot;{departmentName}{" "}
-            Courses&quot; or &quot;Qur&apos;an for Little Hearts&quot;).
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4 py-2">
-          {error ? (
-            <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-              {error}
-            </div>
-          ) : null}
-          <div className="space-y-2">
-            <Label htmlFor="program-name">Program name</Label>
-            <Input
-              id="program-name"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              disabled={isPending}
-            />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button type="button" onClick={handleSave} disabled={isPending}>
-            {isPending ? "Creating..." : "Create program"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    />
   )
 }

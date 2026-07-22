@@ -20,10 +20,8 @@ import {
   verifyParticipantInRegistrantFamily,
 } from "@/lib/programs/registration-contact-resolver"
 import { userHasActiveMembership } from "@/lib/memberships/membership-queries"
-import {
-  isEnrollmentWindowOpen,
-  isProgramPublishedForRegistration,
-} from "@/lib/programs/program-enrollment-availability"
+import { isProgramPublishedForRegistration } from "@/lib/programs/program-enrollment-availability"
+import { isOfferingEnrollmentOpenForProgram } from "@/lib/programs/program-offering-display"
 
 type RegisterForProgramRpcResult = {
   ok: boolean
@@ -422,10 +420,7 @@ export async function registerForProgram(formData: FormData) {
 
   const enrollmentOpen =
     isProgramPublishedForRegistration(program.status) &&
-    isEnrollmentWindowOpen(
-      offering.enrollment_open_date ?? program.enrollment_open_date,
-      offering.enrollment_close_date ?? program.enrollment_close_date
-    )
+    isOfferingEnrollmentOpenForProgram(offering, program)
 
   if (!enrollmentOpen) {
     redirect(`/customer/programs/${programId}?registration=unavailable`)

@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation"
 import {
   CalendarDays,
   ClipboardList,
-  DollarSign,
   Eye,
   Link2,
   Loader2,
@@ -15,15 +14,10 @@ import {
   Users,
 } from "lucide-react"
 
-import { OfferingOverviewFields } from "@/components/programs/edit/offering-workspace"
+import { OfferingOverviewFields, OfferingFeaturePacksFields } from "@/components/programs/edit/offering-workspace"
+import { OfferingOverviewStaffFields } from "@/components/programs/edit/offering-overview-staff-fields"
 import { OfferingPricingPanel } from "@/components/programs/edit/offering-pricing-panel"
 import { OfferingRegistrationPanel } from "@/components/programs/edit/offering-registration-panel"
-import { OfferingStaffPanel } from "@/components/programs/edit/offering-staff-panel"
-import {
-  OfferingAttendancePanel,
-  OfferingBeforeAfterCarePanel,
-  OfferingWaitlistPanel,
-} from "@/components/programs/offering-operations-report-panels"
 import {
   OfferingSchedulePanel,
   OfferingSessionsPanel,
@@ -49,15 +43,20 @@ import {
   getOfferingEnrollmentPercent,
 } from "@/lib/programs/program-catalog-capacity"
 import { updateProgramOffering } from "@/lib/programs/program-offering-actions"
-import { isOfferingEnrollmentOpen } from "@/lib/programs/program-offering-display"
-import { programOfferingManageHref } from "@/lib/programs/program-offering-paths"
+import { isOfferingEnrollmentOpenForProgram } from "@/lib/programs/program-offering-display"
 import {
+  normalizeOfferingManageTab,
+  OFFERING_MANAGE_TABS,
+  programOfferingManageHref,
+  type OfferingManageTab,
+} from "@/lib/programs/program-offering-paths"
+import {
+  OFFERING_DELIVERY_FORMAT_LABELS,
   PROGRAM_OFFERING_STATUS_LABELS,
   type ProgramOffering,
   type ProgramOfferingInput,
 } from "@/lib/programs/program-offering-types"
 import { isSessionManagementEnabled } from "@/lib/programs/program-registration-option-types"
-import type { ProgramStaffAssignmentWithDetails } from "@/lib/programs/program-staff-assignment-types"
 import type { Program } from "@/lib/programs/program-types"
 import { cn } from "@/lib/utils"
 
@@ -69,19 +68,6 @@ const OFFERING_TYPE_LABELS: Record<string, string> = {
   recurring: "Recurring",
 }
 
-const MANAGE_TABS = [
-  { value: "overview", label: "Overview" },
-  { value: "registration", label: "Registration" },
-  { value: "fees", label: "Fees" },
-  { value: "schedule", label: "Schedule" },
-  { value: "staff", label: "Staff" },
-  { value: "waitlist", label: "Waitlist" },
-  { value: "care", label: "Before & After Care" },
-  { value: "attendance", label: "Attendance" },
-] as const
-
-type ManageTab = (typeof MANAGE_TABS)[number]["value"]
-
 function offeringToDraft(offering: ProgramOffering): ProgramOfferingInput {
   return {
     name: offering.name,
@@ -91,6 +77,11 @@ function offeringToDraft(offering: ProgramOffering): ProgramOfferingInput {
     enrollment_open_date: offering.enrollment_open_date,
     enrollment_close_date: offering.enrollment_close_date,
     status: offering.status,
+    attributes: {
+      delivery_format: offering.delivery_format ?? "in_person",
+      attendance_tracked: offering.attendance_tracked ?? false,
+      care_enabled: offering.care_enabled ?? false,
+    },
   }
 }
 
@@ -126,18 +117,23 @@ export function OfferingManageClient({
   workspaceData: OfferingWorkspaceData
   capacityGroups: ProgramCapacityGroupInput[]
   enrolled: number
-  initialTab?: ManageTab
+  initialTab?: OfferingManageTab | string
 }) {
   const router = useRouter()
   const [selected, setSelected] = React.useState(initialSelected)
   const [workspaceData, setWorkspaceData] = React.useState(initialWorkspaceData)
   const [capacityGroups, setCapacityGroups] = React.useState(initialCapacityGroups)
-  const [activeTab, setActiveTab] = React.useState<ManageTab>(initialTab)
+  const [activeTab, setActiveTab] = React.useState<OfferingManageTab>(
+    normalizeOfferingManageTab(initialTab)
+  )
   const [editingOverview, setEditingOverview] = React.useState(false)
   const [draft, setDraft] = React.useState(() => offeringToDraft(initialSelected))
   const [isSaving, setIsSaving] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [feedback, setFeedback] = React.useState<string | null>(null)
+  const registrationSaveRef = React.useRef<(() => Promise<boolean>) | null>(
+    null
+  )
 
   React.useEffect(() => {
     setSelected(initialSelected)
@@ -145,7 +141,7 @@ export function OfferingManageClient({
     setCapacityGroups(initialCapacityGroups)
     setDraft(offeringToDraft(initialSelected))
     setEditingOverview(false)
-    setActiveTab(initialTab)
+    setActiveTab(normalizeOfferingManageTab(initialTab))
     setError(null)
   }, [
     initialSelected,
@@ -154,7 +150,7 @@ export function OfferingManageClient({
     initialTab,
   ])
 
-  const registrationOpen = isOfferingEnrollmentOpen(selected, program)
+  const registrationOpen = isOfferingEnrollmentOpenForProgram(selected, program)
   const enrollmentPercent = getOfferingEnrollmentPercent(enrolled, selected)
   const enrollmentLabel = formatOfferingEnrollmentLabel(enrolled, selected)
   const offeringCapacity =
@@ -164,13 +160,6 @@ export function OfferingManageClient({
   const sessionRegistrationEnabled = isSessionManagementEnabled(
     workspaceData.registrationOptions
   )
-  const activeComponents = workspaceData.feePlanComponents.filter(
-    (component) => component.is_active
-  )
-  const addonCharges = activeComponents.filter(
-    (component) => component.quantity_mode === "addon_selected"
-  ).length
-  const requiredCharges = Math.max(activeComponents.length - addonCharges, 0)
 
   function showMessage(message: string) {
     setFeedback(message)
@@ -178,7 +167,7 @@ export function OfferingManageClient({
   }
 
   function handleTabChange(value: string) {
-    const next = value as ManageTab
+    const next = normalizeOfferingManageTab(value)
     setActiveTab(next)
     const href = programOfferingManageHref(program.id, selected.id, next)
     router.replace(href, { scroll: false })
@@ -297,53 +286,9 @@ export function OfferingManageClient({
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">At a Glance</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-          <GlanceCard
-            icon={<ClipboardList className="h-4 w-4 text-emerald-600" />}
-            label="Registration"
-            value={registrationOpen ? "Open" : "Closed"}
-            valueClassName={
-              registrationOpen ? "text-emerald-700" : "text-muted-foreground"
-            }
-          />
-          <GlanceCard
-            icon={<Users className="h-4 w-4 text-violet-600" />}
-            label="Enrollment"
-            value={enrollmentLabel}
-            footer={
-              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full rounded-full bg-emerald-500"
-                  style={{ width: `${enrollmentPercent}%` }}
-                />
-              </div>
-            }
-          />
-          <GlanceCard
-            icon={<CalendarDays className="h-4 w-4 text-amber-600" />}
-            label="Sessions"
-            value={`${workspaceData.sessions.length} Scheduled`}
-          />
-          <GlanceCard
-            icon={<DollarSign className="h-4 w-4 text-sky-600" />}
-            label="Pricing"
-            value={`${requiredCharges} charge${requiredCharges === 1 ? "" : "s"}, ${addonCharges} add-on${addonCharges === 1 ? "" : "s"}`}
-          />
-          <GlanceCard
-            icon={<Users className="h-4 w-4 text-blue-600" />}
-            label="Staff"
-            value={`${workspaceData.staffAssignments.length} assigned`}
-          />
-        </CardContent>
-      </Card>
-
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="gap-6">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="gap-4">
         <TabsList>
-          {MANAGE_TABS.map((tab) => (
+          {OFFERING_MANAGE_TABS.map((tab) => (
             <TabsTrigger key={tab.value} value={tab.value}>
               {tab.label}
             </TabsTrigger>
@@ -358,6 +303,44 @@ export function OfferingManageClient({
           ) : null}
 
           <TabsContent value="overview" className="mt-0 space-y-4">
+            <TabGlanceRow className="sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4">
+              <GlanceCard
+                icon={<ClipboardList className="h-4 w-4 text-emerald-600" />}
+                label="Status"
+                value={PROGRAM_OFFERING_STATUS_LABELS[selected.status]}
+              />
+              <GlanceCard
+                icon={<CalendarDays className="h-4 w-4 text-amber-600" />}
+                label="Type"
+                value={
+                  OFFERING_TYPE_LABELS[selected.offering_type] ||
+                  selected.offering_type
+                }
+              />
+              <GlanceCard
+                icon={<ClipboardList className="h-4 w-4 text-sky-600" />}
+                label="Delivery"
+                value={
+                  OFFERING_DELIVERY_FORMAT_LABELS[
+                    selected.delivery_format ?? "in_person"
+                  ]
+                }
+              />
+              <GlanceCard
+                icon={<Users className="h-4 w-4 text-violet-600" />}
+                label="Enrollment"
+                value={enrollmentLabel}
+                footer={
+                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full rounded-full bg-emerald-500"
+                      style={{ width: `${enrollmentPercent}%` }}
+                    />
+                  </div>
+                }
+              />
+            </TabGlanceRow>
+
             <Card>
               <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
                 <div>
@@ -385,6 +368,28 @@ export function OfferingManageClient({
                 {editingOverview ? (
                   <>
                     <OfferingOverviewFields draft={draft} onDraftChange={setDraft} />
+                    <div className="grid gap-4 lg:grid-cols-2">
+                      <OfferingFeaturePacksFields
+                        draft={draft}
+                        onDraftChange={setDraft}
+                      />
+                      <div className="space-y-3 rounded-md border p-3 h-full">
+                        <p className="text-sm font-medium">Instructors &amp; Staff</p>
+                        <OfferingOverviewStaffFields
+                          programId={program.id}
+                          offering={selected}
+                          assignments={workspaceData.staffAssignments}
+                          sessions={workspaceData.sessions}
+                          editing
+                          onAssignmentsChange={(assignments) => {
+                            setWorkspaceData((current) => ({
+                              ...current,
+                              staffAssignments: assignments,
+                            }))
+                          }}
+                        />
+                      </div>
+                    </div>
                     <div className="flex justify-end gap-2">
                       <Button
                         type="button"
@@ -429,6 +434,14 @@ export function OfferingManageClient({
                       }
                     />
                     <DetailItem
+                      label="Delivery"
+                      value={
+                        OFFERING_DELIVERY_FORMAT_LABELS[
+                          selected.delivery_format ?? "in_person"
+                        ]
+                      }
+                    />
+                    <DetailItem
                       label="Start date"
                       value={formatDate(selected.start_date)}
                     />
@@ -452,6 +465,19 @@ export function OfferingManageClient({
                           : "Unlimited"
                       }
                     />
+                    <OfferingOverviewStaffFields
+                      programId={program.id}
+                      offering={selected}
+                      assignments={workspaceData.staffAssignments}
+                      sessions={workspaceData.sessions}
+                      editing={false}
+                      onAssignmentsChange={(assignments) => {
+                        setWorkspaceData((current) => ({
+                          ...current,
+                          staffAssignments: assignments,
+                        }))
+                      }}
+                    />
                     <DetailItem
                       label="Description"
                       value={program.description?.trim() || "—"}
@@ -463,88 +489,102 @@ export function OfferingManageClient({
             </Card>
           </TabsContent>
 
-          <TabsContent value="registration" className="mt-0">
-            <OfferingRegistrationPanel
-              program={program}
-              offering={selected}
-              workspaceData={workspaceData}
-              capacityGroups={capacityGroups}
-              enrolled={enrolled}
-              onCapacityGroupsChange={setCapacityGroups}
-              onRegistrationOptionsSaved={(_, registrationOptions) => {
-                setWorkspaceData((current) => ({
-                  ...current,
-                  registrationOptions,
-                }))
-              }}
-              onNavigateNext={() => handleTabChange("fees")}
-            />
-          </TabsContent>
+          <TabsContent value="enrollment" className="mt-0 space-y-6">
+            <TabGlanceRow>
+              <GlanceCard
+                icon={<ClipboardList className="h-4 w-4 text-emerald-600" />}
+                label="Registration"
+                value={registrationOpen ? "Open" : "Closed"}
+                valueClassName={
+                  registrationOpen ? "text-emerald-700" : "text-muted-foreground"
+                }
+              />
+              <GlanceCard
+                icon={<Users className="h-4 w-4 text-violet-600" />}
+                label="Enrollment"
+                value={enrollmentLabel}
+                footer={
+                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full rounded-full bg-emerald-500"
+                      style={{ width: `${enrollmentPercent}%` }}
+                    />
+                  </div>
+                }
+              />
+              <GlanceCard
+                icon={<CalendarDays className="h-4 w-4 text-amber-600" />}
+                label="Sessions"
+                value={`${workspaceData.sessions.length} scheduled`}
+              />
+            </TabGlanceRow>
 
-          <TabsContent value="fees" className="mt-0">
-            <OfferingPricingPanel
-              programId={program.id}
-              offering={selected}
-              workspaceData={workspaceData}
-              registrationOptions={workspaceData.registrationOptions}
-              onNavigateNext={() => handleTabChange("schedule")}
-            />
-          </TabsContent>
+            <section className="space-y-4">
+              <OfferingRegistrationPanel
+                program={program}
+                offering={selected}
+                workspaceData={workspaceData}
+                capacityGroups={capacityGroups}
+                enrolled={enrolled}
+                onCapacityGroupsChange={setCapacityGroups}
+                onRegistrationOptionsSaved={(_, registrationOptions) => {
+                  setWorkspaceData((current) => ({
+                    ...current,
+                    registrationOptions,
+                  }))
+                }}
+                showSaveButton={false}
+                saveHandlerRef={registrationSaveRef}
+              />
+            </section>
 
-          <TabsContent value="schedule" className="mt-0 space-y-4">
-            <OfferingSessionsPanel
-              programId={program.id}
-              offering={selected}
-              workspaceData={workspaceData}
-              sessionRegistrationEnabled={sessionRegistrationEnabled}
-            />
-            <OfferingSchedulePanel
-              programId={program.id}
-              offering={selected}
-              workspaceData={workspaceData}
-            />
-          </TabsContent>
+            <section className="space-y-4">
+              <OfferingPricingPanel
+                programId={program.id}
+                offering={selected}
+                workspaceData={workspaceData}
+                registrationOptions={workspaceData.registrationOptions}
+                onBeforeSave={async () => {
+                  if (!registrationSaveRef.current) return true
+                  return registrationSaveRef.current()
+                }}
+              />
+              <p className="text-xs text-muted-foreground">
+                Financial assistance is configured on the program, not on this
+                offering.
+              </p>
+            </section>
 
-          <TabsContent value="staff" className="mt-0">
-            <OfferingStaffPanel
-              programId={program.id}
-              offering={selected}
-              assignments={workspaceData.staffAssignments}
-              sessions={workspaceData.sessions}
-              onAssignmentsChange={(assignments: ProgramStaffAssignmentWithDetails[]) => {
-                setWorkspaceData((current) => ({
-                  ...current,
-                  staffAssignments: assignments,
-                }))
-              }}
-            />
-          </TabsContent>
-
-          <TabsContent value="waitlist" className="mt-0">
-            <OfferingWaitlistPanel
-              programId={program.id}
-              offeringId={selected.id}
-              offeringName={selected.name}
-            />
-          </TabsContent>
-
-          <TabsContent value="care" className="mt-0">
-            <OfferingBeforeAfterCarePanel
-              programId={program.id}
-              offeringId={selected.id}
-              offeringName={selected.name}
-            />
-          </TabsContent>
-
-          <TabsContent value="attendance" className="mt-0">
-            <OfferingAttendancePanel
-              programId={program.id}
-              offeringId={selected.id}
-              offeringName={selected.name}
-            />
+            <section className="space-y-4">
+              <OfferingSchedulePanel
+                programId={program.id}
+                offering={selected}
+                workspaceData={workspaceData}
+              />
+              <OfferingSessionsPanel
+                programId={program.id}
+                offering={selected}
+                workspaceData={workspaceData}
+                sessionRegistrationEnabled={sessionRegistrationEnabled}
+              />
+            </section>
           </TabsContent>
         </div>
       </Tabs>
+    </div>
+  )
+}
+
+function TabGlanceRow({
+  children,
+  className,
+}: {
+  children: React.ReactNode
+  className?: string
+}) {
+  return (
+    <div className={cn("grid gap-3 sm:grid-cols-2 xl:grid-cols-3", className)}>
+      {children}
     </div>
   )
 }

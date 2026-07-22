@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import type { Department } from "@/lib/departments/department-types"
 import { cn } from "@/lib/utils"
 
-type CatalogFilters = {
+export type CatalogFilters = {
   q: string
   status: string
   department: string
@@ -20,9 +20,16 @@ type CatalogFilters = {
 export function ProgramCatalogFilters({
   departments,
   initialFilters,
+  basePath = "/programs/catalog",
+  hideDepartmentFilter = false,
+  /** Controlled mode: call instead of pushing catalog URL (department embed). */
+  onFiltersChange,
 }: {
   departments: Department[]
   initialFilters: CatalogFilters
+  basePath?: string
+  hideDepartmentFilter?: boolean
+  onFiltersChange?: (next: CatalogFilters) => void
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -35,16 +42,19 @@ export function ProgramCatalogFilters({
 
   const pushFilters = useCallback(
     (next: Partial<CatalogFilters>) => {
-      const params = new URLSearchParams(searchParams.toString())
-
       const merged: CatalogFilters = {
-        q: next.q ?? params.get("q") ?? "",
-        status: next.status ?? params.get("status") ?? "all",
-        department: next.department ?? params.get("department") ?? "all",
-        view:
-          next.view ??
-          (params.get("view") === "table" ? "table" : "cards"),
+        q: next.q ?? query,
+        status: next.status ?? initialFilters.status,
+        department: next.department ?? initialFilters.department,
+        view: next.view ?? initialFilters.view,
       }
+
+      if (onFiltersChange) {
+        onFiltersChange(merged)
+        return
+      }
+
+      const params = new URLSearchParams(searchParams.toString())
 
       if (merged.q.trim()) {
         params.set("q", merged.q.trim())
@@ -70,22 +80,34 @@ export function ProgramCatalogFilters({
         params.delete("view")
       }
 
-      // Reset page when filters change
-      if (next.q !== undefined || next.status !== undefined || next.department !== undefined) {
+      if (
+        next.q !== undefined ||
+        next.status !== undefined ||
+        next.department !== undefined
+      ) {
         params.delete("page")
       }
 
       const queryString = params.toString()
       startTransition(() => {
-        router.push(
-          queryString ? `/programs/catalog?${queryString}` : "/programs/catalog"
-        )
+        router.push(queryString ? `${basePath}?${queryString}` : basePath)
       })
     },
-    [router, searchParams]
+    [
+      basePath,
+      initialFilters.department,
+      initialFilters.status,
+      initialFilters.view,
+      onFiltersChange,
+      query,
+      router,
+      searchParams,
+    ]
   )
 
   useEffect(() => {
+    if (onFiltersChange) return
+
     const timeout = window.setTimeout(() => {
       if (query === initialFilters.q) {
         return
@@ -95,7 +117,7 @@ export function ProgramCatalogFilters({
     }, 300)
 
     return () => window.clearTimeout(timeout)
-  }, [query, initialFilters.q, pushFilters])
+  }, [query, initialFilters.q, onFiltersChange, pushFilters])
 
   function buildViewHref(view: "cards" | "table") {
     const params = new URLSearchParams(searchParams.toString())
@@ -106,7 +128,7 @@ export function ProgramCatalogFilters({
     }
     params.delete("page")
     const queryString = params.toString()
-    return queryString ? `/programs/catalog?${queryString}` : "/programs/catalog"
+    return queryString ? `${basePath}?${queryString}` : basePath
   }
 
   const viewMode = initialFilters.view
@@ -123,7 +145,18 @@ export function ProgramCatalogFilters({
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => {
+              const next = event.target.value
+              setQuery(next)
+              if (onFiltersChange) {
+                onFiltersChange({
+                  q: next,
+                  status: initialFilters.status,
+                  department: initialFilters.department,
+                  view: initialFilters.view,
+                })
+              }
+            }}
             placeholder="Search programs..."
             className="h-10 bg-background pl-9"
           />
@@ -143,43 +176,76 @@ export function ProgramCatalogFilters({
           <option value="archived">Archived</option>
         </select>
 
-        <select
-          value={initialFilters.department || "all"}
-          onChange={(event) =>
-            pushFilters({ department: event.target.value, q: query })
-          }
-          className="h-10 rounded-md border bg-background px-3 text-sm"
-        >
-          <option value="all">All Departments</option>
-          {departments.map((department) => (
-            <option key={department.id} value={department.id}>
-              {department.name}
-            </option>
-          ))}
-        </select>
+        {!hideDepartmentFilter ? (
+          <select
+            value={initialFilters.department || "all"}
+            onChange={(event) =>
+              pushFilters({ department: event.target.value, q: query })
+            }
+            className="h-10 rounded-md border bg-background px-3 text-sm"
+          >
+            <option value="all">All Departments</option>
+            {departments.map((department) => (
+              <option key={department.id} value={department.id}>
+                {department.name}
+              </option>
+            ))}
+          </select>
+        ) : null}
       </div>
 
       <div className="inline-flex h-10 shrink-0 items-center rounded-md border bg-muted/40 p-0.5">
-        <Button
-          variant={viewMode === "cards" ? "default" : "ghost"}
-          size="icon"
-          className="h-9 w-9 rounded-[6px]"
-          asChild
-        >
-          <Link href={buildViewHref("cards")} aria-label="Cards view">
-            <LayoutGrid className="h-4 w-4" />
-          </Link>
-        </Button>
-        <Button
-          variant={viewMode === "table" ? "default" : "ghost"}
-          size="icon"
-          className="h-9 w-9 rounded-[6px]"
-          asChild
-        >
-          <Link href={buildViewHref("table")} aria-label="Table view">
-            <List className="h-4 w-4" />
-          </Link>
-        </Button>
+        {onFiltersChange ? (
+          <>
+            <Button
+              variant={viewMode === "cards" ? "default" : "ghost"}
+              size="icon"
+              className="h-9 w-9 rounded-[6px]"
+              type="button"
+              aria-label="Cards view"
+              onClick={() =>
+                pushFilters({ view: "cards", q: query })
+              }
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === "table" ? "default" : "ghost"}
+              size="icon"
+              className="h-9 w-9 rounded-[6px]"
+              type="button"
+              aria-label="Table view"
+              onClick={() =>
+                pushFilters({ view: "table", q: query })
+              }
+            >
+              <List className="h-4 w-4" />
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button
+              variant={viewMode === "cards" ? "default" : "ghost"}
+              size="icon"
+              className="h-9 w-9 rounded-[6px]"
+              asChild
+            >
+              <Link href={buildViewHref("cards")} aria-label="Cards view">
+                <LayoutGrid className="h-4 w-4" />
+              </Link>
+            </Button>
+            <Button
+              variant={viewMode === "table" ? "default" : "ghost"}
+              size="icon"
+              className="h-9 w-9 rounded-[6px]"
+              asChild
+            >
+              <Link href={buildViewHref("table")} aria-label="Table view">
+                <List className="h-4 w-4" />
+              </Link>
+            </Button>
+          </>
+        )}
       </div>
     </div>
   )

@@ -154,6 +154,9 @@ export async function createDepartmentOfferingAction(input: {
   startDate?: string | null
   endDate?: string | null
   status?: ProgramOfferingStatus
+  inheritDates?: boolean
+  inheritEligibility?: boolean
+  inheritEnrollment?: boolean
 }) {
   const organizationId = await getSelectedOrganizationId()
   if (!organizationId) {
@@ -176,6 +179,9 @@ export async function createDepartmentOfferingAction(input: {
     start_date: input.startDate || null,
     end_date: input.endDate || null,
     status: input.status ?? "draft",
+    inherit_dates: input.inheritDates ?? true,
+    inherit_eligibility: input.inheritEligibility ?? true,
+    inherit_enrollment: input.inheritEnrollment ?? true,
   }
 
   try {

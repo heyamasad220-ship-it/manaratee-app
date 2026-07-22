@@ -22,7 +22,7 @@ export function OfferingPricingSelector({
     }
 
     router.replace(
-      `/programs/${programId}/offerings/${offeringId}?tab=fees`,
+      `/programs/${programId}/offerings/${offeringId}?tab=enrollment`,
       { scroll: false }
     )
     router.refresh()

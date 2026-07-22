@@ -1,4 +1,6 @@
+import { resolveEffectiveOfferingDates } from "./program-offering-inherit"
 import type { ProgramOffering, ProgramOfferingStatus } from "./program-offering-types"
+import type { Program } from "./program-types"
 
 function dateOnly(value?: string | null) {
   if (!value) return null
@@ -33,6 +35,37 @@ export function isOfferingEnrollmentOpen(
   if (closeDate && today > closeDate) return false
 
   return true
+}
+
+/** Enrollment window using F1 inherit_dates resolution. */
+export function isOfferingEnrollmentOpenForProgram(
+  offering: ProgramOffering,
+  program: Pick<
+    Program,
+    | "start_date"
+    | "end_date"
+    | "enrollment_open_date"
+    | "enrollment_close_date"
+    | "program_type"
+    | "min_age"
+    | "max_age"
+    | "min_grade"
+    | "max_grade"
+    | "grade_levels"
+    | "gender"
+    | "require_guardian"
+    | "require_grade"
+    | "require_emergency_contact"
+    | "enable_waitlist"
+    | "waitlist_capacity"
+    | "waitlist_offer_deadline_days"
+  >
+) {
+  const dates = resolveEffectiveOfferingDates(offering, program)
+  return isOfferingEnrollmentOpen({
+    enrollment_open_date: dates.enrollment_open_date,
+    enrollment_close_date: dates.enrollment_close_date,
+  })
 }
 
 export function isLegacyDefaultOfferingName(name: string) {

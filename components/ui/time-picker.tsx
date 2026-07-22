@@ -1,9 +1,8 @@
 "use client"
 
-import { ChevronDown, ChevronUp } from "lucide-react"
+import * as React from "react"
 
 import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
 
 export function parseTime24(time: string) {
   if (!time) {
@@ -58,6 +57,20 @@ export function formatTimeDisplay(time24: string) {
   return `${hour12}:${String(minutes).padStart(2, "0")} ${period}`
 }
 
+const HOUR_OPTIONS = Array.from({ length: 12 }, (_, index) => index + 1)
+
+function buildMinuteOptions(minuteStep: number) {
+  const step = Math.max(1, Math.min(30, minuteStep))
+  const options: number[] = []
+  for (let minute = 0; minute < 60; minute += step) {
+    options.push(minute)
+  }
+  return options
+}
+
+const selectClassName =
+  "h-10 rounded-md border border-input bg-background px-2 text-sm tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+
 type TimePickerSpinnerProps = {
   value: string
   onChange: (value: string) => void
@@ -65,98 +78,81 @@ type TimePickerSpinnerProps = {
   className?: string
 }
 
-function SpinnerColumn({
-  label,
-  onIncrement,
-  onDecrement,
-}: {
-  label: string
-  onIncrement: () => void
-  onDecrement: () => void
-}) {
-  return (
-    <div className="flex flex-col items-center">
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="h-7 w-10 text-muted-foreground hover:text-foreground"
-        onClick={onIncrement}
-        aria-label={`Increase ${label}`}
-      >
-        <ChevronUp className="h-4 w-4" />
-      </Button>
-      <span className="min-w-10 select-none text-center text-lg font-medium tabular-nums">
-        {label}
-      </span>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="h-7 w-10 text-muted-foreground hover:text-foreground"
-        onClick={onDecrement}
-        aria-label={`Decrease ${label}`}
-      >
-        <ChevronDown className="h-4 w-4" />
-      </Button>
-    </div>
-  )
-}
-
+/** Full hour / minute / AM·PM selects so every option is visible (not the OS scroll slice). */
 export function TimePickerSpinner({
   value,
   onChange,
-  minuteStep = 1,
+  minuteStep = 5,
   className,
 }: TimePickerSpinnerProps) {
+  const id = React.useId()
   const { hours24, minutes } = parseTime24(value || "12:00")
   const { hour12, period } = to12HourParts(hours24)
+  const minuteOptions = buildMinuteOptions(minuteStep)
+  const nearestMinute =
+    minuteOptions.find((option) => option === minutes) ??
+    minuteOptions.reduce((best, option) =>
+      Math.abs(option - minutes) < Math.abs(best - minutes) ? option : best
+    )
 
-  function commit(nextHours24: number, nextMinutes: number) {
-    onChange(toTime24(nextHours24, nextMinutes))
-  }
-
-  function adjustHour(delta: number) {
-    commit(hours24 + delta, minutes)
-  }
-
-  function adjustMinute(delta: number) {
-    const totalMinutes = hours24 * 60 + minutes + delta * minuteStep
-    const wrapped = ((totalMinutes % (24 * 60)) + 24 * 60) % (24 * 60)
-    commit(Math.floor(wrapped / 60), wrapped % 60)
-  }
-
-  function adjustPeriod(delta: number) {
-    if (delta > 0) {
-      if (period === "AM") {
-        commit(hours24 + 12, minutes)
-      }
-      return
-    }
-
-    if (period === "PM") {
-      commit(hours24 - 12, minutes)
-    }
+  function commit(nextHour12: number, nextPeriod: "AM" | "PM", nextMinutes: number) {
+    onChange(toTime24(from12HourParts(nextHour12, nextPeriod), nextMinutes))
   }
 
   return (
-    <div className={cn("flex items-center justify-center gap-1 py-1", className)}>
-      <SpinnerColumn
-        label={String(hour12).padStart(2, "0")}
-        onIncrement={() => adjustHour(1)}
-        onDecrement={() => adjustHour(-1)}
-      />
-      <span className="pb-1 text-lg font-medium text-muted-foreground">:</span>
-      <SpinnerColumn
-        label={String(minutes).padStart(2, "0")}
-        onIncrement={() => adjustMinute(1)}
-        onDecrement={() => adjustMinute(-1)}
-      />
-      <SpinnerColumn
-        label={period}
-        onIncrement={() => adjustPeriod(1)}
-        onDecrement={() => adjustPeriod(-1)}
-      />
+    <div className={cn("flex items-center justify-center gap-2 py-1", className)}>
+      <label className="sr-only" htmlFor={`${id}-hour`}>
+        Hour
+      </label>
+      <select
+        id={`${id}-hour`}
+        className={cn(selectClassName, "w-16")}
+        value={hour12}
+        onChange={(event) =>
+          commit(Number(event.target.value), period, nearestMinute)
+        }
+      >
+        {HOUR_OPTIONS.map((hour) => (
+          <option key={hour} value={hour}>
+            {String(hour).padStart(2, "0")}
+          </option>
+        ))}
+      </select>
+
+      <span className="text-lg font-medium text-muted-foreground">:</span>
+
+      <label className="sr-only" htmlFor={`${id}-minute`}>
+        Minute
+      </label>
+      <select
+        id={`${id}-minute`}
+        className={cn(selectClassName, "w-16")}
+        value={nearestMinute}
+        onChange={(event) =>
+          commit(hour12, period, Number(event.target.value))
+        }
+      >
+        {minuteOptions.map((minute) => (
+          <option key={minute} value={minute}>
+            {String(minute).padStart(2, "0")}
+          </option>
+        ))}
+      </select>
+
+      <label className="sr-only" htmlFor={`${id}-period`}>
+        AM or PM
+      </label>
+      <select
+        id={`${id}-period`}
+        className={cn(selectClassName, "w-16")}
+        value={period}
+        onChange={(event) =>
+          commit(hour12, event.target.value as "AM" | "PM", nearestMinute)
+        }
+      >
+        <option value="AM">AM</option>
+        <option value="PM">PM</option>
+      </select>
     </div>
   )
 }

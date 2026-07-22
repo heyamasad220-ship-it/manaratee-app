@@ -381,7 +381,7 @@ TypeScript helpers: `lib/programs/program-lifecycle-types.ts`
 | Catalog | `/programs/catalog` | `programs.view` |
 | Schedule | `/programs/schedule` | `programs.view` |
 | Financial Assistance | `/programs/financial-assistance` | `applications.view` — Overview / Submissions / Templates + FA report + Payment Plans tabs |
-| Reports | `/programs/reports` | `reports.view` — Overview / Payments (→ `/programs/registrations`). Expenses → department workspace; Waitlist/Care/Attendance → offering manage |
+| Reports | `/programs/reports` | `reports.view` — Overview / Registrations / Payment transactions / Attendance / Waitlist (filter by offering). Expenses → department workspace; enable waitlist/attendance on offering |
 | Settings | `/programs/settings` (General + Service Needs) | `programs.manage` |
 
 ### Program management routes
@@ -393,9 +393,9 @@ TypeScript helpers: `lib/programs/program-lifecycle-types.ts`
 | `/programs/create` | **Quick Create** — basics + eligibility; redirects to `/programs/[id]` after save |
 | `/programs/[id]` | Program detail home (Overview inline edit + Offerings; Catalog → Edit) |
 | `/programs/[id]/offerings` | Redirects to first non-archived offering manage page (or program detail if none) |
-| `/programs/[id]/offerings/[offeringId]` | **Offering manage** — Overview / Registration / Fees / Schedule / Staff / Waitlist / Before & After Care / Attendance |
+| `/programs/[id]/offerings/[offeringId]` | **Offering manage** — Overview (includes staff assignment) / Enrollment (registration + fees + schedule; waitlist toggle). Attendance & Waitlist views → Reports |
 | `/programs/[id]/edit` | **Retired** — redirects to detail or offering manage (legacy deep links) |
-| `/programs/[id]/billing` | Redirects to offering Fees tab |
+| `/programs/[id]/billing` | Redirects to offering Enrollment tab (fees) |
 | `/programs/[id]/car-tags` | Printable car dismissal name tags (staff operations) |
 | `/programs/[id]/sessions` | Session management (standalone route; also in offering Schedule) |
 | `/programs/[id]/discounts` | Program discounts |
@@ -415,7 +415,7 @@ See **[programs-staff-setup-ui.md](./programs-staff-setup-ui.md)** for Quick Cre
 
 - **Quick Create** — name, dates, eligibility, capacity, visibility, draft/active.
 - **Program detail** — inline edit for publishing basics; offerings list.
-- **Offering manage** — Registration, Fees, Schedule, Staff per offering.
+- **Offering manage** — Overview (staff assignment), Enrollment (registration + fees + schedule; waitlist toggle). Attendance & Waitlist under Reports.
 
 ---
 
@@ -466,7 +466,7 @@ Organization context comes from `active_organization_id` cookie and `getMyOrgani
 | `program-eligibility-display.ts` | `lib/programs/` | Compact age/grade display helpers |
 | `program-register-session-fields.tsx` | `components/customer/` | Customer session picker |
 | `program-register-quote-preview.tsx` | `components/customer/` | Live quote preview |
-| `create-program-form.tsx` | `app/(dashboard)/programs/create/` | Quick Create form |
+| `program-form.tsx` | `components/programs/` | Create / edit program form |
 | `program-detail-client.tsx` | `components/programs/` | Program detail + inline basics edit |
 | `offering-manage-client.tsx` | `components/programs/` | Offering manage workspace |
 
@@ -575,7 +575,7 @@ Phase 2B creates the ledger Phase 3 checkout will use. **No Stripe in 2B.**
 - Wire `register_for_program` to create charges + `pending_payment`
 - Checkout expiry cron
 - Refunds / autopay
-- **Registration pipeline** (apply → evaluate/approve → waitlist/FA → register → Registrations + Payment transactions reports) — design only: [programs-registration-pipeline-design.md](./programs-registration-pipeline-design.md)
+- **Registration pipeline** (apply → evaluate/approve → waitlist/FA → register → reports) — **in progress** (SQL `182`, customer apply, DH Applications queue; waitlist/register gate next): [programs-registration-pipeline-design.md](./programs-registration-pipeline-design.md)
 - **Program → Offering attributes migration** — **S1–S6 in repo** (`176`–`179`); catalog Unlimited when no limited offerings — [programs-offering-attributes-migration.md](./programs-offering-attributes-migration.md)
 
 Legacy cart tables (`registration_carts`, `registration_orders`) remain unused; prefer `program_checkouts`.
@@ -585,7 +585,7 @@ Legacy cart tables (`registration_carts`, `registration_orders`) remain unused; 
 ## Related Documentation
 
 - [programs-offering-attributes-migration.md](./programs-offering-attributes-migration.md) — **Program identity vs Offering attributes (schema-first plan)**
-- [programs-registration-pipeline-design.md](./programs-registration-pipeline-design.md) — **apply / approve / waitlist / FA / register + reports (design, not built)**
+- [programs-registration-pipeline-design.md](./programs-registration-pipeline-design.md) — **apply / approve / waitlist / FA / register + reports (implementation started)**
 - [programs-staff-setup-ui.md](./programs-staff-setup-ui.md) — Quick Create + program detail + offering manage UI
 - [programs-architecture-reset-plan.md](./programs-architecture-reset-plan.md) — **workflow audit & refactor sequence (review before Phase 3)**
 - [programs-phase-2b-charge-ledger.md](./programs-phase-2b-charge-ledger.md) — charge ledger design

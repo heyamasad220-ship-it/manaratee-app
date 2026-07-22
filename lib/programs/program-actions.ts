@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 
+import { workforceDepartmentDetailPath } from "@/lib/departments/department-paths"
 import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { syncRegistrationOptionsFromProgramFlags } from "@/lib/programs/program-registration-option-actions"
@@ -132,6 +133,9 @@ export async function createProgram(input: CreateProgramInput) {
 
   revalidatePath("/programs")
   revalidatePath("/programs/catalog")
+  if (input.department_id) {
+    revalidatePath(workforceDepartmentDetailPath(input.department_id))
+  }
 
   return programId
 }
@@ -194,7 +198,8 @@ type UpdateProgramInput = {
 
   /**
    * When true (default), only identity + optional defaults + FA are written.
-   * Operational eligibility/capacity/registration/billing stay on offerings.
+   * Defaults include eligibility, dates, waitlist, and registration-type flags.
+   * Capacity and legacy billing stay offering-scoped (not written here).
    */
   identityAndDefaultsOnly?: boolean
 }
@@ -267,17 +272,21 @@ export async function updateProgram(input: UpdateProgramInput) {
     financial_assistance_instructions:
       input.financial_assistance_instructions || null,
 
+    // Program enrollment defaults (F2) — used when offerings inherit
+    full_program_registration_enabled:
+      input.full_program_registration_enabled ?? true,
+    session_registration_enabled:
+      input.session_registration_enabled ?? false,
+    single_session_registration_enabled:
+      input.single_session_registration_enabled ?? false,
+    enable_waitlist: input.enable_waitlist ?? false,
+    waitlist_capacity: input.waitlist_capacity ?? null,
+
     updated_at: new Date().toISOString(),
   }
 
   if (!identityAndDefaultsOnly) {
-    programPayload.full_program_registration_enabled =
-      input.full_program_registration_enabled ?? true
-    programPayload.session_registration_enabled =
-      input.session_registration_enabled ?? false
     programPayload.capacity = input.capacity || 0
-    programPayload.enable_waitlist = input.enable_waitlist
-    programPayload.waitlist_capacity = input.waitlist_capacity
     programPayload.billing_type = input.billing_type
     programPayload.tuition_amount = input.tuition_amount
     programPayload.deposit_amount = input.deposit_amount
@@ -314,6 +323,9 @@ export async function updateProgram(input: UpdateProgramInput) {
   revalidatePath("/customer/programs")
   revalidatePath(`/customer/programs/${input.id}`)
   revalidatePath(`/customer/programs/${input.id}/register`)
+  if (input.department_id) {
+    revalidatePath(workforceDepartmentDetailPath(input.department_id))
+  }
 }
 
 /** @deprecated Prefer createProgramOffering; kept for duplicate/year helpers. */

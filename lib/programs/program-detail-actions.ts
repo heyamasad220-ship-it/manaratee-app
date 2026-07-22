@@ -222,6 +222,7 @@ export async function updateProgramBasics(
         })
         .eq("organization_id", organizationId)
         .eq("program_id", input.programId)
+        .eq("inherit_dates", true)
         .neq("status", "archived")
     }
 
@@ -241,6 +242,155 @@ export async function updateProgramBasics(
         updateError instanceof Error
           ? updateError.message
           : "Failed to save program.",
+    }
+  }
+}
+
+export type ProgramEnrollmentDefaultsInput = {
+  programId: string
+  start_date: string | null
+  end_date: string | null
+  enrollment_open_date: string | null
+  enrollment_close_date: string | null
+  program_type: "adult" | "youth"
+  min_age: number | null
+  max_age: number | null
+  grade_levels: string[]
+  gender: string
+  full_program_registration_enabled: boolean
+  session_registration_enabled: boolean
+  single_session_registration_enabled: boolean
+  enable_waitlist: boolean
+  waitlist_capacity: number | null
+}
+
+/** F2: Save program enrollment defaults and snapshot onto inheriting offerings. */
+export async function saveProgramEnrollmentDefaults(
+  input: ProgramEnrollmentDefaultsInput
+): Promise<UpdateProgramBasicsResult> {
+  if (
+    input.min_age != null &&
+    input.max_age != null &&
+    input.min_age > input.max_age
+  ) {
+    return {
+      success: false,
+      error: "Minimum age cannot be greater than maximum age.",
+    }
+  }
+
+  const supabase = await createClient()
+  const organizationId = await getSelectedOrganizationId()
+
+  if (!organizationId) {
+    return { success: false, error: "No organization selected." }
+  }
+
+  const { data, error } = await supabase
+    .from("programs")
+    .select("*")
+    .eq("id", input.programId)
+    .eq("organization_id", organizationId)
+    .single()
+
+  if (error || !data) {
+    return { success: false, error: "Program not found." }
+  }
+
+  const program = data as Record<string, unknown> & {
+    id: string
+    name: string
+    subtitle?: string | null
+    description?: string | null
+    department_id?: string | null
+    flyer_url?: string | null
+    background_color?: string | null
+    status?: string | null
+    visibility?: "public" | "private" | "members_only"
+    min_grade?: string | null
+    max_grade?: string | null
+    require_guardian?: boolean
+    require_grade?: boolean
+    require_emergency_contact?: boolean
+    financial_assistance_enabled?: boolean
+    financial_assistance_open?: boolean
+    financial_assistance_close_date?: string | null
+    financial_assistance_instructions?: string | null
+  }
+
+  const gradeLevels =
+    input.program_type === "adult" ? [] : input.grade_levels
+  const requireGuardian = input.program_type !== "adult"
+
+  try {
+    await updateProgram({
+      id: program.id,
+      name: program.name,
+      subtitle: program.subtitle ?? null,
+      description: (program.description as string) ?? "",
+      department_id: program.department_id ?? null,
+      flyer_url: program.flyer_url ?? null,
+      background_color: program.background_color ?? null,
+      start_date: emptyToNull(input.start_date),
+      end_date: emptyToNull(input.end_date),
+      enrollment_open_date: emptyToNull(input.enrollment_open_date),
+      enrollment_close_date: emptyToNull(input.enrollment_close_date),
+      age_groups: getAgeGroupLabelsFromMinMax(input.min_age, input.max_age),
+      grade_levels: gradeLevels,
+      gender: emptyToNull(input.gender) || "All",
+      status: program.status ?? "draft",
+      program_type: input.program_type,
+      min_age: input.min_age,
+      max_age: input.max_age,
+      min_grade: program.min_grade ?? null,
+      max_grade: program.max_grade ?? null,
+      require_guardian: requireGuardian,
+      require_grade: program.require_grade ?? false,
+      require_emergency_contact: program.require_emergency_contact ?? true,
+      visibility: program.visibility ?? "public",
+      financial_assistance_enabled:
+        program.financial_assistance_enabled ?? false,
+      financial_assistance_open: program.financial_assistance_open ?? false,
+      financial_assistance_close_date:
+        program.financial_assistance_close_date ?? null,
+      financial_assistance_instructions:
+        program.financial_assistance_instructions ?? null,
+      full_program_registration_enabled:
+        input.full_program_registration_enabled,
+      session_registration_enabled: input.session_registration_enabled,
+      single_session_registration_enabled:
+        input.single_session_registration_enabled,
+      enable_waitlist: input.enable_waitlist,
+      waitlist_capacity: input.waitlist_capacity,
+      identityAndDefaultsOnly: true,
+    })
+
+    const { syncInheritingOfferingsFromProgram } = await import(
+      "@/lib/programs/program-offering-actions"
+    )
+    await syncInheritingOfferingsFromProgram({
+      organizationId,
+      programId: input.programId,
+    })
+
+    revalidatePath(`/programs/${input.programId}`)
+    revalidatePath("/programs/catalog")
+    revalidatePath("/programs")
+    if (program.department_id) {
+      revalidatePath(
+        workforceDepartmentDetailPath(program.department_id as string)
+      )
+    }
+
+    return { success: true }
+  } catch (saveError) {
+    console.error("[saveProgramEnrollmentDefaults]", saveError)
+    return {
+      success: false,
+      error:
+        saveError instanceof Error
+          ? saveError.message
+          : "Failed to save program defaults.",
     }
   }
 }

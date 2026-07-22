@@ -15,7 +15,9 @@ import {
 
 import { ProgramBasicsSection } from "@/components/programs/edit/program-basics-section"
 import type { VisibilityType } from "@/components/programs/edit/types"
+import { ProgramDefaultsSettingsPanel } from "@/components/programs/program-defaults-settings-panel"
 import { ProgramDetailHeaderActions } from "@/components/programs/program-detail-header-actions"
+import { ProgramEnrollmentsReportPanel } from "@/components/programs/program-enrollments-report-panel"
 import { ProgramStatusSelect } from "@/components/programs/program-status-select"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -30,6 +32,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
 import {
   Table,
   TableBody,
@@ -38,6 +41,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { Department } from "@/lib/departments/department-types"
 import {
   getProgramRegistrationAvailabilityLabel,
@@ -47,13 +51,17 @@ import { formatProgramAgeEligibility } from "@/lib/programs/program-eligibility-
 import { updateProgramBasics } from "@/lib/programs/program-detail-actions"
 import {
   formatOfferingDateRange,
-  isOfferingEnrollmentOpen,
+  isOfferingEnrollmentOpenForProgram,
 } from "@/lib/programs/program-offering-display"
 import { formatOfferingEnrollmentLabel } from "@/lib/programs/program-catalog-capacity"
 import {
+  OFFERING_DELIVERY_FORMAT_LABELS,
+  OFFERING_DELIVERY_FORMAT_OPTIONS,
   PROGRAM_OFFERING_STATUS_LABELS,
   type ProgramOffering,
 } from "@/lib/programs/program-offering-types"
+import type { OfferingDeliveryFormat } from "@/lib/programs/program-offering-attributes"
+import { DEFAULT_NEW_OFFERING_INHERIT_FLAGS } from "@/lib/programs/program-offering-inherit"
 import { programOfferingManageHref } from "@/lib/programs/program-offering-paths"
 import { getProgramStatusLabel, type ProgramStatus } from "@/lib/programs/program-status"
 import type { Program } from "@/lib/programs/program-types"
@@ -76,9 +84,34 @@ const FLYER_PLACEHOLDER_COLORS = [
   "bg-indigo-500",
 ] as const
 
+const PROGRAM_DETAIL_TABS = [
+  "overview",
+  "settings",
+  "offerings",
+  "reports",
+] as const
+
+type ProgramDetailTab = (typeof PROGRAM_DETAIL_TABS)[number]
+
+function normalizeProgramDetailTab(value: string | null | undefined): ProgramDetailTab {
+  if (value && (PROGRAM_DETAIL_TABS as readonly string[]).includes(value)) {
+    return value as ProgramDetailTab
+  }
+  return "overview"
+}
+
 function formatDate(value: string | null | undefined) {
   if (!value) return "TBD"
-  return new Date(`${value}T00:00:00`).toLocaleDateString(undefined, {
+
+  // Date-only columns (YYYY-MM-DD) need a local midnight parse.
+  // Timestamps (created_at, etc.) are already ISO and must not get T00:00:00 appended.
+  const parsed = /^\d{4}-\d{2}-\d{2}$/.test(value)
+    ? new Date(`${value}T00:00:00`)
+    : new Date(value)
+
+  if (Number.isNaN(parsed.getTime())) return "—"
+
+  return parsed.toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -146,15 +179,20 @@ export function ProgramDetailClient({
   departmentName,
   visibility,
   offerings,
+  initialTab = "overview",
 }: {
   program: Program
   departments: Department[]
   departmentName: string | null
   visibility: string | null
   offerings: ProgramDetailOfferingRow[]
+  initialTab?: string
 }) {
   const router = useRouter()
   const [editingOverview, setEditingOverview] = React.useState(false)
+  const [detailTab, setDetailTab] = React.useState(() =>
+    normalizeProgramDetailTab(initialTab)
+  )
   const [programStatus, setProgramStatus] = React.useState(program.status)
   const [isSaving, setIsSaving] = React.useState(false)
   const [saveError, setSaveError] = React.useState<string | null>(null)
@@ -177,6 +215,7 @@ export function ProgramDetailClient({
   function startEditingOverview() {
     setSaveError(null)
     setProgramStatus(program.status)
+    setDetailTab("overview")
     setEditingOverview(true)
   }
 
@@ -267,39 +306,99 @@ export function ProgramDetailClient({
         />
       </div>
 
-      <div className="space-y-6">
-        <OverviewCard
-          program={program}
-          departments={departments}
-          departmentName={departmentName}
-          visibility={visibility}
-          offeringCount={activeOfferings.length}
-          audienceLabel={audienceLabel}
-          availabilityLabel={availabilityLabel}
-          acceptingRegistration={acceptingRegistration}
-          editing={editingOverview}
-          programStatus={programStatus}
-          onProgramStatusChange={setProgramStatus}
-          isSaving={isSaving}
-          saveError={saveError}
-          formRef={overviewFormRef}
-          onStartEdit={startEditingOverview}
-          onCancelEdit={() => {
-            setEditingOverview(false)
-            setSaveError(null)
-            setProgramStatus(program.status)
-          }}
-          onSave={handleSaveOverview}
-        />
-        {!editingOverview ? (
+      <Tabs
+        value={editingOverview ? "overview" : detailTab}
+        onValueChange={(value) => {
+          if (editingOverview) return
+          const next = normalizeProgramDetailTab(value)
+          setDetailTab(next)
+          const url = new URL(window.location.href)
+          if (next === "overview") {
+            url.searchParams.delete("tab")
+          } else {
+            url.searchParams.set("tab", next)
+          }
+          router.replace(`${url.pathname}${url.search}`, { scroll: false })
+        }}
+        className="space-y-4"
+      >
+        <TabsList className="h-auto w-full flex-wrap justify-start gap-1 bg-transparent p-0">
+          <TabsTrigger
+            value="overview"
+            className="rounded-md border border-transparent px-3 py-1.5 data-[state=active]:border-border data-[state=active]:bg-background data-[state=active]:shadow-sm"
+          >
+            Overview
+          </TabsTrigger>
+          <TabsTrigger
+            value="settings"
+            disabled={editingOverview}
+            className="rounded-md border border-transparent px-3 py-1.5 data-[state=active]:border-border data-[state=active]:bg-background data-[state=active]:shadow-sm"
+          >
+            Settings
+          </TabsTrigger>
+          <TabsTrigger
+            value="offerings"
+            disabled={editingOverview}
+            className="rounded-md border border-transparent px-3 py-1.5 data-[state=active]:border-border data-[state=active]:bg-background data-[state=active]:shadow-sm"
+          >
+            Offerings
+          </TabsTrigger>
+          <TabsTrigger
+            value="reports"
+            disabled={editingOverview}
+            className="rounded-md border border-transparent px-3 py-1.5 data-[state=active]:border-border data-[state=active]:bg-background data-[state=active]:shadow-sm"
+          >
+            Reports
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="mt-0 space-y-6">
+          <OverviewCard
+            program={program}
+            departments={departments}
+            departmentName={departmentName}
+            visibility={visibility}
+            offeringCount={activeOfferings.length}
+            audienceLabel={audienceLabel}
+            availabilityLabel={availabilityLabel}
+            acceptingRegistration={acceptingRegistration}
+            editing={editingOverview}
+            programStatus={programStatus}
+            onProgramStatusChange={setProgramStatus}
+            isSaving={isSaving}
+            saveError={saveError}
+            formRef={overviewFormRef}
+            onStartEdit={startEditingOverview}
+            onCancelEdit={() => {
+              setEditingOverview(false)
+              setSaveError(null)
+              setProgramStatus(program.status)
+            }}
+            onSave={handleSaveOverview}
+          />
+        </TabsContent>
+
+        <TabsContent value="settings" className="mt-0">
+          <ProgramDefaultsSettingsPanel program={program} />
+        </TabsContent>
+
+        <TabsContent value="offerings" className="mt-0">
           <OfferingsPanel
             program={program}
             rows={activeOfferings}
             archivedCount={archivedOfferings.length}
             showArchived={archivedOfferings}
           />
-        ) : null}
-      </div>
+        </TabsContent>
+
+        <TabsContent value="reports" className="mt-0">
+          <ProgramEnrollmentsReportPanel
+            programId={program.id}
+            programName={program.name}
+            offerings={offerings.map((row) => row.offering)}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
@@ -519,8 +618,28 @@ function OfferingsPanel({
   const router = useRouter()
   const [addOpen, setAddOpen] = React.useState(false)
   const [offeringName, setOfferingName] = React.useState("")
+  const [deliveryFormat, setDeliveryFormat] =
+    React.useState<OfferingDeliveryFormat>("in_person")
+  const [inheritDates, setInheritDates] = React.useState(
+    DEFAULT_NEW_OFFERING_INHERIT_FLAGS.inherit_dates
+  )
+  const [inheritEligibility, setInheritEligibility] = React.useState(
+    DEFAULT_NEW_OFFERING_INHERIT_FLAGS.inherit_eligibility
+  )
+  const [inheritEnrollment, setInheritEnrollment] = React.useState(
+    DEFAULT_NEW_OFFERING_INHERIT_FLAGS.inherit_enrollment
+  )
   const [creating, setCreating] = React.useState(false)
   const [createError, setCreateError] = React.useState<string | null>(null)
+
+  function resetCreateForm() {
+    setOfferingName("")
+    setDeliveryFormat("in_person")
+    setInheritDates(DEFAULT_NEW_OFFERING_INHERIT_FLAGS.inherit_dates)
+    setInheritEligibility(DEFAULT_NEW_OFFERING_INHERIT_FLAGS.inherit_eligibility)
+    setInheritEnrollment(DEFAULT_NEW_OFFERING_INHERIT_FLAGS.inherit_enrollment)
+    setCreateError(null)
+  }
 
   async function handleCreateOffering() {
     const name = offeringName.trim()
@@ -544,9 +663,15 @@ function OfferingsPanel({
         enrollment_open_date: program.enrollment_open_date,
         enrollment_close_date: program.enrollment_close_date,
         status: program.status === "draft" ? "draft" : "active",
+        inherit_dates: inheritDates,
+        inherit_eligibility: inheritEligibility,
+        inherit_enrollment: inheritEnrollment,
+        attributes: {
+          delivery_format: deliveryFormat,
+        },
       })
       setAddOpen(false)
-      setOfferingName("")
+      resetCreateForm()
       router.push(programOfferingManageHref(program.id, created.id as string))
       router.refresh()
     } catch (error) {
@@ -596,22 +721,33 @@ function OfferingsPanel({
               <TableHeader>
                 <TableRow>
                   <TableHead>Offering</TableHead>
+                  <TableHead>Delivery</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Dates</TableHead>
                   <TableHead>Enrollment</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {rows.map(({ offering, enrolled }) => {
-                  const enrollmentOpen = isOfferingEnrollmentOpen(offering)
+                  const enrollmentOpen = isOfferingEnrollmentOpenForProgram(
+                    offering,
+                    program
+                  )
+                  const dateRange = formatOfferingDateRange(
+                    offering.inherit_dates
+                      ? program.start_date
+                      : offering.start_date,
+                    offering.inherit_dates
+                      ? program.end_date
+                      : offering.end_date
+                  )
                   return (
                     <TableRow key={offering.id}>
                       <TableCell className="font-medium">
                         <Link
                           href={programOfferingManageHref(program.id, offering.id)}
-                          className="hover:text-foreground hover:underline"
+                          className="text-sky-600 hover:text-sky-700 hover:underline"
                         >
                           {offering.name}
                         </Link>
@@ -622,11 +758,25 @@ function OfferingsPanel({
                         ) : null}
                       </TableCell>
                       <TableCell>
+                        {
+                          OFFERING_DELIVERY_FORMAT_LABELS[
+                            offering.delivery_format ?? "in_person"
+                          ]
+                        }
+                      </TableCell>
+                      <TableCell>
                         {OFFERING_TYPE_LABELS[offering.offering_type] ||
                           offering.offering_type}
                       </TableCell>
                       <TableCell>
-                        {formatOfferingDateRange(offering.start_date, offering.end_date)}
+                        <div className="space-y-0.5">
+                          <p>{dateRange}</p>
+                          {offering.inherit_dates === true ? (
+                            <p className="text-xs text-muted-foreground">
+                              From program
+                            </p>
+                          ) : null}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="space-y-1">
@@ -650,13 +800,6 @@ function OfferingsPanel({
                           {PROGRAM_OFFERING_STATUS_LABELS[offering.status]}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="outline" size="sm" asChild>
-                          <Link href={programOfferingManageHref(program.id, offering.id)}>
-                            Manage
-                          </Link>
-                        </Button>
-                      </TableCell>
                     </TableRow>
                   )
                 })}
@@ -675,7 +818,7 @@ function OfferingsPanel({
                 <li key={offering.id}>
                   <Link
                     href={programOfferingManageHref(program.id, offering.id)}
-                    className="hover:text-foreground hover:underline"
+                    className="text-sky-600 hover:text-sky-700 hover:underline"
                   >
                     {offering.name}
                   </Link>
@@ -685,24 +828,88 @@ function OfferingsPanel({
           </div>
         ) : null}
 
-        <Dialog open={addOpen} onOpenChange={setAddOpen}>
-          <DialogContent>
+        <Dialog open={addOpen} onOpenChange={(open) => {
+          setAddOpen(open)
+          if (!open) resetCreateForm()
+        }}>
+          <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle>Add offering</DialogTitle>
               <DialogDescription>
-                Customers register for offerings. Registration, fees, and
-                schedule are configured on the offering after you create it.
+                Create a class or track. Program defaults are used unless you
+                turn off inherit below. Fees and schedule are set after create.
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-2 py-2">
-              <Label htmlFor="detail-offering-name">Name</Label>
-              <Input
-                id="detail-offering-name"
-                value={offeringName}
-                onChange={(event) => setOfferingName(event.target.value)}
-                placeholder="e.g. Beginner Quran"
-                disabled={creating}
-              />
+            <div className="space-y-4 py-2">
+              <div className="space-y-2">
+                <Label htmlFor="detail-offering-name">Name</Label>
+                <Input
+                  id="detail-offering-name"
+                  value={offeringName}
+                  onChange={(event) => setOfferingName(event.target.value)}
+                  placeholder="e.g. Tajweed Beginner — Centre"
+                  disabled={creating}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="detail-offering-delivery">Delivery</Label>
+                <select
+                  id="detail-offering-delivery"
+                  value={deliveryFormat}
+                  onChange={(event) =>
+                    setDeliveryFormat(
+                      event.target.value as OfferingDeliveryFormat
+                    )
+                  }
+                  disabled={creating}
+                  className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                >
+                  {OFFERING_DELIVERY_FORMAT_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-muted-foreground">
+                  Create separate offerings for on-site and online when
+                  instructors or capacity differ.
+                </p>
+              </div>
+
+              <div className="space-y-3 rounded-md border p-3">
+                <div>
+                  <p className="text-sm font-medium">Use program defaults</p>
+                  <p className="text-xs text-muted-foreground">
+                    Turn off a group only when this offering needs different
+                    dates, eligibility, or enrollment settings.
+                  </p>
+                </div>
+                <label className="flex items-center justify-between gap-3 text-sm">
+                  <span>Dates &amp; enrollment window</span>
+                  <Switch
+                    checked={inheritDates}
+                    onCheckedChange={setInheritDates}
+                    disabled={creating}
+                  />
+                </label>
+                <label className="flex items-center justify-between gap-3 text-sm">
+                  <span>Eligibility (age / gender)</span>
+                  <Switch
+                    checked={inheritEligibility}
+                    onCheckedChange={setInheritEligibility}
+                    disabled={creating}
+                  />
+                </label>
+                <label className="flex items-center justify-between gap-3 text-sm">
+                  <span>Enrollment types &amp; waitlist</span>
+                  <Switch
+                    checked={inheritEnrollment}
+                    onCheckedChange={setInheritEnrollment}
+                    disabled={creating}
+                  />
+                </label>
+              </div>
+
               {createError ? (
                 <p className="text-sm text-destructive">{createError}</p>
               ) : null}

@@ -187,6 +187,9 @@ export async function duplicateProgramOffering(
       enrollment_open_date: source.enrollment_open_date,
       enrollment_close_date: source.enrollment_close_date,
       status: offeringStatus,
+      inherit_dates: source.inherit_dates ?? false,
+      inherit_eligibility: source.inherit_eligibility ?? false,
+      inherit_enrollment: source.inherit_enrollment ?? false,
       audience_type: source.audience_type ?? "youth",
       min_age: source.min_age ?? null,
       max_age: source.max_age ?? null,
@@ -204,6 +207,7 @@ export async function duplicateProgramOffering(
       waitlist_offer_deadline_days: source.waitlist_offer_deadline_days ?? null,
       registration_mode: source.registration_mode ?? "required",
       attendance_tracked: source.attendance_tracked ?? false,
+      care_enabled: source.care_enabled ?? false,
       delivery_format: source.delivery_format ?? "in_person",
     })
     .select("*")

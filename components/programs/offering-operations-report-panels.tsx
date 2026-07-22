@@ -148,9 +148,10 @@ function SimpleTable({
   )
 }
 
-/** Temporary offering-level panels moved from Programs → Reports (to clean up later). */
+/** Waitlist view — filter by offering when `offering_id` is set (Reports). */
 export function OfferingWaitlistPanel({
   programId,
+  offeringId,
   offeringName,
 }: {
   programId: string
@@ -165,17 +166,32 @@ export function OfferingWaitlistPanel({
     let cancelled = false
     async function load() {
       setLoading(true)
-      const { data, error } = await supabase
+      let query = supabase
         .from("program_waitlist")
-        .select("id, child_name, parent_name, status, position, added_date")
+        .select("id, child_name, parent_name, status, position, added_date, offering_id")
         .eq("program_id", programId)
         .order("position")
+
+      if (offeringId) {
+        query = query.or(`offering_id.eq.${offeringId},offering_id.is.null`)
+      }
+
+      const { data, error } = await query
       if (!cancelled) {
         if (error) {
           console.warn("program_waitlist could not be loaded:", error.message)
           setItems([])
         } else {
-          setItems((data || []) as WaitlistRow[])
+          const rows = (data || []) as Array<WaitlistRow & { offering_id?: string | null }>
+          // Prefer offering-scoped rows; include legacy null offering_id for this program.
+          setItems(
+            rows.filter(
+              (row) =>
+                !offeringId ||
+                row.offering_id === offeringId ||
+                row.offering_id == null
+            )
+          )
         }
         setLoading(false)
       }
@@ -184,14 +200,14 @@ export function OfferingWaitlistPanel({
     return () => {
       cancelled = true
     }
-  }, [programId, supabase])
+  }, [programId, offeringId, supabase])
 
   return (
     <div className="space-y-6">
       <div>
         <h3 className="text-base font-semibold">Waitlist</h3>
         <p className="text-sm text-muted-foreground">
-          Waitlist for {offeringName} (program-level queue for now).
+          Waitlist entries for {offeringName}.
         </p>
       </div>
       <div className="grid gap-4 sm:grid-cols-4">
@@ -214,7 +230,7 @@ export function OfferingWaitlistPanel({
       </div>
       <SimpleTable
         loading={loading}
-        empty="No waitlist entries for this program yet."
+        empty="No waitlist entries for this offering yet."
         headers={["Participant", "Parent", "Position", "Added", "Status"]}
         rows={items.map((item) => [
           item.child_name,
@@ -287,25 +303,25 @@ export function OfferingBeforeAfterCarePanel({
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-base font-semibold">Before &amp; After Care</h3>
+        <h3 className="text-base font-semibold">Childcare</h3>
         <p className="text-sm text-muted-foreground">
-          Care check-in records for {offeringName}.
+          Childcare check-in records for {offeringName}.
         </p>
       </div>
       <div className="grid gap-4 sm:grid-cols-3">
-        <MetricCard label="Care Records" value={items.length} />
+        <MetricCard label="Records" value={items.length} />
         <MetricCard
-          label="Before Care"
+          label="Before care"
           value={items.filter((item) => item.before_check_in).length}
         />
         <MetricCard
-          label="After Care"
+          label="After care"
           value={items.filter((item) => item.after_check_out).length}
         />
       </div>
       <SimpleTable
         loading={loading}
-        empty="No before or after care records found."
+        empty="No childcare records found."
         headers={["Participant", "Date", "Before Check-In", "After Check-Out"]}
         rows={items.map((item) => [
           item.enrollment?.child_name || "-",
@@ -429,6 +445,107 @@ export function OfferingAttendancePanel({
             checkedIn > 0 ? `${checkedIn}` : "-",
           ]
         })}
+      />
+    </div>
+  )
+}
+
+type ClassAttendanceRow = {
+  id: string
+  attendance_date: string
+  status: string
+  enrollment?: { child_name?: string | null } | null
+}
+
+/** F5/F7: Class attendance marks from program_attendance (teacher My Classes). */
+export function OfferingClassAttendancePanel({
+  offeringId,
+  offeringName,
+}: {
+  offeringId: string
+  offeringName: string
+}) {
+  const supabase = createClient()
+  const [loading, setLoading] = React.useState(true)
+  const [items, setItems] = React.useState<ClassAttendanceRow[]>([])
+  const [selectedDate, setSelectedDate] = React.useState(() => {
+    const now = new Date()
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`
+  })
+
+  React.useEffect(() => {
+    let cancelled = false
+    async function load() {
+      setLoading(true)
+      const { data, error } = await supabase
+        .from("program_attendance")
+        .select(
+          `
+          id,
+          attendance_date,
+          status,
+          enrollment:enrollment_id ( child_name )
+        `
+        )
+        .eq("offering_id", offeringId)
+        .eq("attendance_date", selectedDate)
+        .order("created_at", { ascending: true })
+
+      if (!cancelled) {
+        if (error) {
+          console.warn("program_attendance could not be loaded:", error.message)
+          setItems([])
+        } else {
+          setItems((data || []) as ClassAttendanceRow[])
+        }
+        setLoading(false)
+      }
+    }
+    void load()
+    return () => {
+      cancelled = true
+    }
+  }, [offeringId, selectedDate, supabase])
+
+  const present = items.filter((row) => row.status === "present").length
+  const absent = items.filter((row) => row.status === "absent").length
+  const other = items.length - present - absent
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h3 className="text-base font-semibold">Class attendance</h3>
+          <p className="text-sm text-muted-foreground">
+            Marks teachers saved for {offeringName} (My Classes).
+          </p>
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-muted-foreground" htmlFor="class-att-date">
+            Date
+          </label>
+          <input
+            id="class-att-date"
+            type="date"
+            value={selectedDate}
+            onChange={(event) => setSelectedDate(event.target.value)}
+            className="h-9 rounded-md border bg-background px-3 text-sm"
+          />
+        </div>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <MetricCard label="Present" value={present} />
+        <MetricCard label="Absent" value={absent} />
+        <MetricCard label="Late / Excused" value={other} />
+      </div>
+      <SimpleTable
+        loading={loading}
+        empty="No class attendance saved for this date yet."
+        headers={["Participant", "Status"]}
+        rows={items.map((item) => [
+          item.enrollment?.child_name || "-",
+          item.status.replace(/_/g, " "),
+        ])}
       />
     </div>
   )

@@ -123,7 +123,7 @@ export default async function ProgramSessionsPage({
   }
 
   const editProgramHref = selectedOffering
-    ? `/programs/${program.id}/offerings/${selectedOffering.id}?tab=schedule`
+    ? `/programs/${program.id}/offerings/${selectedOffering.id}?tab=enrollment`
     : `/programs/${program.id}`
 
   return (

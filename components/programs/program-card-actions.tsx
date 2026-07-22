@@ -62,7 +62,7 @@ export function ProgramCardActions({
   programId,
   programName,
   programStatus,
-  editLabel = "Edit",
+  editLabel = "View Details",
   onEditFlyer,
   onArchiveYear,
   hideDelete = false,
@@ -70,7 +70,7 @@ export function ProgramCardActions({
   programId: string
   programName: string
   programStatus: string
-  /** Primary open/edit label (department Overview uses "View / Edit"). */
+  /** Primary open label (department Overview uses "View / Edit"). */
   editLabel?: string
   onEditFlyer?: () => void
   onArchiveYear?: () => void

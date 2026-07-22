@@ -32,7 +32,6 @@ export const OfferingRegistrationCapacitySection = React.forwardRef<
     capacityGroups: ProgramCapacityGroupInput[]
     onCapacityGroupsChange: (groups: ProgramCapacityGroupInput[]) => void
     enableWaitlist: boolean
-    onEnableWaitlistChange: (enabled: boolean) => void
     waitlistCapacity: string
     onWaitlistCapacityChange: (value: string) => void
     enrolled?: number
@@ -50,7 +49,6 @@ export const OfferingRegistrationCapacitySection = React.forwardRef<
     capacityGroups,
     onCapacityGroupsChange,
     enableWaitlist,
-    onEnableWaitlistChange,
     waitlistCapacity,
     onWaitlistCapacityChange,
     enrolled,
@@ -126,46 +124,26 @@ export const OfferingRegistrationCapacitySection = React.forwardRef<
               </div>
             )}
 
-            <div className="space-y-3 border-t pt-4">
-              <label className="flex items-start gap-3 rounded-md border p-3">
-                <input
-                  type="checkbox"
-                  checked={enableWaitlist}
+            {enableWaitlist ? (
+              <div className="space-y-1.5 border-t pt-4">
+                <Label htmlFor="waitlist-capacity">Waitlist capacity</Label>
+                <Input
+                  id="waitlist-capacity"
+                  type="number"
+                  min="0"
+                  value={waitlistCapacity}
                   onChange={(event) =>
-                    onEnableWaitlistChange(event.target.checked)
+                    onWaitlistCapacityChange(event.target.value)
                   }
-                  className="mt-0.5"
+                  placeholder="Optional"
+                  className="h-9 max-w-xs"
                 />
-                <div>
-                  <p className="text-sm font-medium">Enable waitlist</p>
-                  <p className="text-xs text-muted-foreground">
-                    When full program registration reaches capacity, customers
-                    can join the waitlist.
-                  </p>
-                </div>
-              </label>
-
-              {enableWaitlist ? (
-                <div className="grid gap-3 md:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="waitlist-capacity">
-                      Waitlist capacity
-                    </Label>
-                    <Input
-                      id="waitlist-capacity"
-                      type="number"
-                      min="0"
-                      value={waitlistCapacity}
-                      onChange={(event) =>
-                        onWaitlistCapacityChange(event.target.value)
-                      }
-                      placeholder="Optional"
-                      className="h-9"
-                    />
-                  </div>
-                </div>
-              ) : null}
-            </div>
+                <p className="text-xs text-muted-foreground">
+                  Optional limit for waitlisted registrations. Leave blank for
+                  no waitlist cap.
+                </p>
+              </div>
+            ) : null}
           </div>
         </EditSectionCard>
       ) : null}

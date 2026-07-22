@@ -29,6 +29,8 @@ export type ProgramOfferingAttributes = {
   waitlist_offer_deadline_days: number | null
   registration_mode: OfferingRegistrationMode
   attendance_tracked: boolean
+  /** F4: show childcare admin tools for this offering. */
+  care_enabled: boolean
   delivery_format: OfferingDeliveryFormat
 }
 
@@ -70,6 +72,7 @@ export const OFFERING_ATTRIBUTE_COLUMNS = [
   "waitlist_offer_deadline_days",
   "registration_mode",
   "attendance_tracked",
+  "care_enabled",
   "delivery_format",
 ] as const
 
@@ -130,6 +133,7 @@ export function attributesFromProgramRow(
       sessionRegistrationEnabled: program.session_registration_enabled,
     }),
     attendance_tracked: false,
+    care_enabled: false,
     delivery_format: "in_person",
   }
 }
@@ -172,6 +176,7 @@ export function attributesFromOfferingRow(
       (row.registration_mode as OfferingRegistrationMode | undefined) ??
       "required",
     attendance_tracked: Boolean(row.attendance_tracked),
+    care_enabled: Boolean(row.care_enabled),
     delivery_format:
       (row.delivery_format as OfferingDeliveryFormat | undefined) ?? "in_person",
   }

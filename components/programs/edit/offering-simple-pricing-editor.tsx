@@ -240,13 +240,16 @@ export function OfferingSimplePricingEditor({
   offering,
   workspaceData,
   registrationOptions,
-  onNavigateNext,
+  showSaveButton = true,
+  onBeforeSave,
 }: {
   programId: string
   offering: ProgramOffering
   workspaceData: OfferingWorkspaceData
   registrationOptions: ProgramRegistrationOption[]
-  onNavigateNext?: () => void
+  showSaveButton?: boolean
+  /** Run before pricing save (e.g. registration settings on manage Enrollment). */
+  onBeforeSave?: () => Promise<boolean>
 }) {
   const router = useRouter()
   const feePlanStateRef = React.useRef<FeePlanEditorState>(
@@ -317,12 +320,20 @@ export function OfferingSimplePricingEditor({
     setSuccess(false)
   }
 
-  async function handleNext() {
+  async function handleSave() {
     setIsSaving(true)
     setError(null)
     setSuccess(false)
 
     try {
+      if (onBeforeSave) {
+        const ok = await onBeforeSave()
+        if (!ok) {
+          setIsSaving(false)
+          return
+        }
+      }
+
       await saveOfferingPricing({
         programId,
         offeringId: offering.id,
@@ -332,7 +343,6 @@ export function OfferingSimplePricingEditor({
       })
       setSuccess(true)
       router.refresh()
-      onNavigateNext?.()
     } catch (saveError) {
       setError(
         saveError instanceof Error ? saveError.message : "Failed to save pricing."
@@ -573,18 +583,24 @@ export function OfferingSimplePricingEditor({
         </p>
       ) : null}
 
-      <div className="flex justify-end border-t pt-4">
-        <Button type="button" onClick={() => void handleNext()} disabled={isSaving}>
-          {isSaving ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Saving…
-            </>
-          ) : (
-            "Next"
-          )}
-        </Button>
-      </div>
+      {showSaveButton ? (
+        <div className="flex justify-end border-t pt-4">
+          <Button
+            type="button"
+            onClick={() => void handleSave()}
+            disabled={isSaving}
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Saving…
+              </>
+            ) : (
+              "Save"
+            )}
+          </Button>
+        </div>
+      ) : null}
     </div>
   )
 }

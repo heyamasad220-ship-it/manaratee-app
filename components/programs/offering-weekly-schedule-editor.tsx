@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { TimeInput } from "@/components/ui/time-input"
 import {
   Select,
   SelectContent,
@@ -68,8 +69,8 @@ type ScheduleDraft = {
   recurring: boolean
 }
 
-const emptyDraft = (): ScheduleDraft => ({
-  title: "",
+const emptyDraft = (defaultTitle = ""): ScheduleDraft => ({
+  title: defaultTitle,
   day_of_week: "monday",
   days_of_week: ["monday"],
   start_time: "09:00",
@@ -119,7 +120,7 @@ export function OfferingWeeklyScheduleEditor({
 
   function openCreate() {
     setEditingId(null)
-    setDraft(emptyDraft())
+    setDraft(emptyDraft(offeringName))
     setError(null)
     setOpen(true)
   }
@@ -132,11 +133,7 @@ export function OfferingWeeklyScheduleEditor({
   }
 
   async function handleSave() {
-    const title = draft.title.trim()
-    if (!title) {
-      setError("Title is required.")
-      return
-    }
+    const title = draft.title.trim() || offeringName.trim() || "Weekly time"
     if (!draft.start_time || !draft.end_time) {
       setError("Start and end time are required.")
       return
@@ -230,10 +227,10 @@ export function OfferingWeeklyScheduleEditor({
         <div className="flex items-start gap-3">
           <CalendarDays className="mt-0.5 h-5 w-5 text-muted-foreground" />
           <div className="space-y-1">
-            <p className="text-sm font-medium">Weekly schedule</p>
+            <p className="text-sm font-medium">Edit weekly times</p>
             <p className="text-sm text-muted-foreground">
-              Recurring class times for {offeringName}. Sessions (terms / camps)
-              are listed above when session registration is on.
+              Add or change recurring days, times, and locations for{" "}
+              {offeringName}.
             </p>
           </div>
         </div>
@@ -322,7 +319,7 @@ export function OfferingWeeklyScheduleEditor({
 
           <div className="grid gap-4 py-2">
             <div className="space-y-2">
-              <Label htmlFor="schedule-title">Title</Label>
+              <Label htmlFor="schedule-title">Title (optional)</Label>
               <Input
                 id="schedule-title"
                 value={draft.title}
@@ -332,8 +329,11 @@ export function OfferingWeeklyScheduleEditor({
                     title: event.target.value,
                   }))
                 }
-                placeholder="e.g. Quran class"
+                placeholder={offeringName || "Uses offering name if blank"}
               />
+              <p className="text-xs text-muted-foreground">
+                Defaults to the offering name when left blank.
+              </p>
             </div>
 
             {!editingId ? (
@@ -403,28 +403,28 @@ export function OfferingWeeklyScheduleEditor({
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label htmlFor="schedule-start">Start</Label>
-                <Input
+                <TimeInput
                   id="schedule-start"
-                  type="time"
                   value={draft.start_time}
-                  onChange={(event) =>
+                  minuteStep={5}
+                  onChange={(nextValue) =>
                     setDraft((current) => ({
                       ...current,
-                      start_time: event.target.value,
+                      start_time: nextValue || "09:00",
                     }))
                   }
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="schedule-end">End</Label>
-                <Input
+                <TimeInput
                   id="schedule-end"
-                  type="time"
                   value={draft.end_time}
-                  onChange={(event) =>
+                  minuteStep={5}
+                  onChange={(nextValue) =>
                     setDraft((current) => ({
                       ...current,
-                      end_time: event.target.value,
+                      end_time: nextValue || "10:00",
                     }))
                   }
                 />

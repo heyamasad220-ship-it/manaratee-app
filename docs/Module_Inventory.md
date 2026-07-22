@@ -67,7 +67,8 @@ Features:
 * Organization filtering
 * Program details
 * Eligibility rules (ages, grades, gender, capacity groups)
-* Registration types and fee plans (offering manage)
+* Registration model, eligibility, capacity, and fee plans (offering manage → Enrollment)
+* Program detail **Reports** — enrollments across offerings (filter + CSV)
 * Offering-scoped pricing (Phase 2A/2B)
 
 Pending:
@@ -285,7 +286,7 @@ Roster-only employee list using the shared HR directory shell (Export, Add Emplo
 
 Removed tabs (redirect to Employees or Settings):
 
-* Departments → `/workforce/departments` (sidebar: **Programs → Departments**; opens shared workspace `/workforce/departments/[id]`: **Overview** (year programs + flyer; Super Admin archive), Employees, Rosters, Offerings, Schedule, Payroll, Financial Summary; optional Group giving; Activity; **Reports** (archived years); apply SQL `169`/`170`/`171`/`172`/`173`/`174`; legacy settings path redirects to list). Historical QIL load: `scripts/import-qil-year.mjs`; consolidate course-as-programs → offerings: `scripts/migrate-qil-courses-to-offerings.mjs` (after `174`).
+* Departments → `/workforce/departments` (sidebar: **Programs → Departments**; opens shared workspace `/workforce/departments/[id]`: **Overview** (year programs + flyer; Super Admin archive), Employees, Rosters, **Offerings** (same Programs Catalog UI for that department), Schedule, Payroll, Financial Summary; optional Group giving; Activity; **Reports** (archived years); apply SQL `169`/`170`/`171`/`172`/`173`/`174`; legacy settings path redirects to list). Historical QIL load: `scripts/import-qil-year.mjs`; consolidate course-as-programs → offerings: `scripts/migrate-qil-courses-to-offerings.mjs` (after `174`).
 * Positions → `/workforce/settings/positions`
 * Time Off, Work Schedule, Notifications, Teams, Applications
 

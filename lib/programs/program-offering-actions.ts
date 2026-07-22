@@ -8,6 +8,7 @@ import {
   attributesFromProgramRow,
   mergeOfferingAttributes,
 } from "@/lib/programs/program-offering-attributes"
+import { DEFAULT_NEW_OFFERING_INHERIT_FLAGS } from "@/lib/programs/program-offering-inherit"
 import type {
   ProgramOfferingInput,
   ProgramOfferingType,
@@ -15,7 +16,7 @@ import type {
 import { syncRegistrationOptionsFromProgramFlags } from "@/lib/programs/program-registration-option-actions"
 
 const PROGRAM_ATTRIBUTE_SELECT =
-  "id, organization_id, start_date, end_date, enrollment_open_date, enrollment_close_date, status, full_program_registration_enabled, session_registration_enabled, program_type, min_age, max_age, min_grade, max_grade, grade_levels, gender, require_guardian, require_grade, require_emergency_contact, capacity, enable_waitlist, waitlist_capacity, waitlist_offer_deadline_days"
+  "id, organization_id, start_date, end_date, enrollment_open_date, enrollment_close_date, status, full_program_registration_enabled, session_registration_enabled, single_session_registration_enabled, program_type, min_age, max_age, min_grade, max_grade, grade_levels, gender, require_guardian, require_grade, require_emergency_contact, capacity, enable_waitlist, waitlist_capacity, waitlist_offer_deadline_days"
 
 type CreateDefaultOfferingInput = {
   organizationId: string
@@ -56,6 +57,7 @@ export async function createDefaultOffering(input: CreateDefaultOfferingInput) {
       enrollment_open_date: input.enrollmentOpenDate ?? null,
       enrollment_close_date: input.enrollmentCloseDate ?? null,
       status: offeringStatus,
+      ...DEFAULT_NEW_OFFERING_INHERIT_FLAGS,
       ...attributes,
     })
     .select("id")
@@ -83,15 +85,33 @@ export async function syncDefaultOfferingDates(input: {
   const offeringStatus =
     input.programStatus === "draft" ? "draft" : "active"
 
+  // Snapshot dates onto offerings that inherit dates (F1). Default offering
+  // still syncs when it is the only/legacy path and inherit may be false.
+  const datePatch = {
+    start_date: input.startDate ?? null,
+    end_date: input.endDate ?? null,
+    enrollment_open_date: input.enrollmentOpenDate ?? null,
+    enrollment_close_date: input.enrollmentCloseDate ?? null,
+    updated_at: new Date().toISOString(),
+  }
+
+  const { error: inheritError } = await supabase
+    .from("program_offerings")
+    .update(datePatch)
+    .eq("organization_id", input.organizationId)
+    .eq("program_id", input.programId)
+    .eq("inherit_dates", true)
+
+  if (inheritError) {
+    console.error("syncDefaultOfferingDates inherit:", inheritError)
+    throw new Error("Failed to sync inheriting offering dates")
+  }
+
   const { error } = await supabase
     .from("program_offerings")
     .update({
-      start_date: input.startDate ?? null,
-      end_date: input.endDate ?? null,
-      enrollment_open_date: input.enrollmentOpenDate ?? null,
-      enrollment_close_date: input.enrollmentCloseDate ?? null,
+      ...datePatch,
       status: offeringStatus,
-      updated_at: new Date().toISOString(),
     })
     .eq("organization_id", input.organizationId)
     .eq("program_id", input.programId)
@@ -219,6 +239,14 @@ export async function createProgramOffering(
       enrollment_close_date:
         input.enrollment_close_date ?? program.enrollment_close_date,
       status: offeringStatus,
+      inherit_dates:
+        input.inherit_dates ?? DEFAULT_NEW_OFFERING_INHERIT_FLAGS.inherit_dates,
+      inherit_eligibility:
+        input.inherit_eligibility ??
+        DEFAULT_NEW_OFFERING_INHERIT_FLAGS.inherit_eligibility,
+      inherit_enrollment:
+        input.inherit_enrollment ??
+        DEFAULT_NEW_OFFERING_INHERIT_FLAGS.inherit_enrollment,
       ...attributes,
     })
     .select("*")
@@ -233,8 +261,14 @@ export async function createProgramOffering(
     organizationId: program.organization_id as string,
     programId,
     offeringId: data.id as string,
-    fullProgramEnabled: program.full_program_registration_enabled ?? true,
-    sessionRegistrationEnabled: program.session_registration_enabled ?? false,
+    fullProgramEnabled:
+      attributes.registration_mode === "none"
+        ? false
+        : (program.full_program_registration_enabled ?? true),
+    sessionRegistrationEnabled:
+      attributes.registration_mode === "none"
+        ? false
+        : (program.session_registration_enabled ?? false),
     singleSessionEnabled: false,
     dropInEnabled: false,
   })
@@ -270,6 +304,15 @@ export async function updateProgramOffering(
       enrollment_open_date: input.enrollment_open_date ?? null,
       enrollment_close_date: input.enrollment_close_date ?? null,
       status: input.status ?? "draft",
+      ...(input.attributes?.delivery_format
+        ? { delivery_format: input.attributes.delivery_format }
+        : {}),
+      ...(input.attributes?.attendance_tracked !== undefined
+        ? { attendance_tracked: input.attributes.attendance_tracked }
+        : {}),
+      ...(input.attributes?.care_enabled !== undefined
+        ? { care_enabled: input.attributes.care_enabled }
+        : {}),
       updated_at: new Date().toISOString(),
     })
     .eq("id", offeringId)
@@ -379,4 +422,137 @@ export async function deleteProgramOffering(offeringId: string) {
   }
 
   revalidateProgramPaths(offering.program_id as string)
+}
+
+/**
+ * F2: Snapshot program defaults onto offerings that still inherit each group.
+ * Also refreshes registration options when inherit_enrollment is true.
+ */
+export async function syncInheritingOfferingsFromProgram(input: {
+  organizationId: string
+  programId: string
+}) {
+  const supabase = await createClient()
+
+  const { data: program, error: programError } = await supabase
+    .from("programs")
+    .select(PROGRAM_ATTRIBUTE_SELECT)
+    .eq("id", input.programId)
+    .eq("organization_id", input.organizationId)
+    .maybeSingle()
+
+  if (programError || !program) {
+    console.error("syncInheritingOfferingsFromProgram program:", programError)
+    throw new Error("Failed to load program for inherit sync")
+  }
+
+  const attributes = attributesFromProgramRow(program)
+  const now = new Date().toISOString()
+
+  const { error: datesError } = await supabase
+    .from("program_offerings")
+    .update({
+      start_date: program.start_date ?? null,
+      end_date: program.end_date ?? null,
+      enrollment_open_date: program.enrollment_open_date ?? null,
+      enrollment_close_date: program.enrollment_close_date ?? null,
+      updated_at: now,
+    })
+    .eq("organization_id", input.organizationId)
+    .eq("program_id", input.programId)
+    .eq("inherit_dates", true)
+    .neq("status", "archived")
+
+  if (datesError) {
+    console.error("syncInheritingOfferingsFromProgram dates:", datesError)
+    throw new Error("Failed to sync inheriting offering dates")
+  }
+
+  const { error: eligibilityError } = await supabase
+    .from("program_offerings")
+    .update({
+      audience_type: attributes.audience_type,
+      min_age: attributes.min_age,
+      max_age: attributes.max_age,
+      min_grade: attributes.min_grade,
+      max_grade: attributes.max_grade,
+      grade_levels: attributes.grade_levels,
+      gender: attributes.gender,
+      require_guardian: attributes.require_guardian,
+      require_grade: attributes.require_grade,
+      require_emergency_contact: attributes.require_emergency_contact,
+      updated_at: now,
+    })
+    .eq("organization_id", input.organizationId)
+    .eq("program_id", input.programId)
+    .eq("inherit_eligibility", true)
+    .neq("status", "archived")
+
+  if (eligibilityError) {
+    console.error(
+      "syncInheritingOfferingsFromProgram eligibility:",
+      eligibilityError
+    )
+    throw new Error("Failed to sync inheriting offering eligibility")
+  }
+
+  const { error: enrollmentError } = await supabase
+    .from("program_offerings")
+    .update({
+      enable_waitlist: attributes.enable_waitlist,
+      waitlist_capacity: attributes.waitlist_capacity,
+      waitlist_offer_deadline_days: attributes.waitlist_offer_deadline_days,
+      registration_mode: attributes.registration_mode,
+      updated_at: now,
+    })
+    .eq("organization_id", input.organizationId)
+    .eq("program_id", input.programId)
+    .eq("inherit_enrollment", true)
+    .neq("status", "archived")
+
+  if (enrollmentError) {
+    console.error(
+      "syncInheritingOfferingsFromProgram enrollment:",
+      enrollmentError
+    )
+    throw new Error("Failed to sync inheriting offering enrollment")
+  }
+
+  const { data: inheritingEnrollment, error: listError } = await supabase
+    .from("program_offerings")
+    .select("id")
+    .eq("organization_id", input.organizationId)
+    .eq("program_id", input.programId)
+    .eq("inherit_enrollment", true)
+    .neq("status", "archived")
+
+  if (listError) {
+    console.error("syncInheritingOfferingsFromProgram list:", listError)
+    throw new Error("Failed to list inheriting offerings")
+  }
+
+  const fullProgramEnabled = Boolean(
+    program.full_program_registration_enabled ?? true
+  )
+  const sessionRegistrationEnabled = Boolean(
+    program.session_registration_enabled
+  )
+  const singleSessionEnabled = Boolean(
+    (program as { single_session_registration_enabled?: boolean })
+      .single_session_registration_enabled
+  )
+
+  for (const row of inheritingEnrollment || []) {
+    await syncRegistrationOptionsFromProgramFlags({
+      organizationId: input.organizationId,
+      programId: input.programId,
+      offeringId: row.id as string,
+      fullProgramEnabled,
+      sessionRegistrationEnabled,
+      singleSessionEnabled,
+      dropInEnabled: false,
+    })
+  }
+
+  revalidateProgramPaths(input.programId)
 }

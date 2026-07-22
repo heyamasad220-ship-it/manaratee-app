@@ -10,13 +10,15 @@ export function OfferingPricingPanel({
   offering,
   workspaceData,
   registrationOptions,
-  onNavigateNext,
+  showSaveButton = true,
+  onBeforeSave,
 }: {
   programId: string
   offering: ProgramOffering
   workspaceData: OfferingWorkspaceData
   registrationOptions: ProgramRegistrationOption[]
-  onNavigateNext?: () => void
+  showSaveButton?: boolean
+  onBeforeSave?: () => Promise<boolean>
 }) {
   return (
     <OfferingSimplePricingEditor
@@ -24,7 +26,8 @@ export function OfferingPricingPanel({
       offering={offering}
       workspaceData={workspaceData}
       registrationOptions={registrationOptions}
-      onNavigateNext={onNavigateNext}
+      showSaveButton={showSaveButton}
+      onBeforeSave={onBeforeSave}
     />
   )
 }

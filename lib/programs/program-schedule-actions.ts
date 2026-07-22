@@ -29,7 +29,7 @@ type CreateRecurringScheduleInput = Omit<ScheduleItemInput, "day_of_week"> & {
 function revalidateSchedulePaths(programId: string, offeringId: string) {
   revalidatePath(`/programs/${programId}`)
   revalidatePath(`/programs/${programId}/offerings`)
-  revalidatePath(programOfferingManageHref(programId, offeringId, "schedule"))
+  revalidatePath(programOfferingManageHref(programId, offeringId, "enrollment"))
   revalidatePath(`/customer/programs/${programId}`)
   revalidatePath("/programs/schedule")
   revalidatePath("/facilities/calendar")
@@ -390,5 +390,5 @@ export async function resolveProgramScheduleRedirect(
     return `/programs/${programId}`
   }
 
-  return programOfferingManageHref(programId, offering.id as string, "schedule")
+  return programOfferingManageHref(programId, offering.id as string, "enrollment")
 }

@@ -152,6 +152,7 @@ Unified Applications engine
 Programs Module
 Registrations
 Financial Assistance
+**Programs flexibility contract** — **F1–F7** (`180`–`181`). See [`docs/programs-flexibility-contract.md`](./programs-flexibility-contract.md).
 **Stripe Connect Express** for org donation payouts (implemented June 2026)
 **Platform subscription billing via Stripe** (orgs paying Manaratee — pending)
 Customer Experience

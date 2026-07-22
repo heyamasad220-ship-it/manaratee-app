@@ -196,7 +196,8 @@ npm run validate:contacts-security -- --post-m4   # after 111
 ## Programs Module
 
 * programs — optional defaults; `capacity` temporarily = sum of limited offerings (S2 sync; catalog may also read offerings live in S6). S4: staff saves no longer write operational eligibility/capacity/`billing_*` as SSOT. **S5:** `program_type` CHECK adult|youth only (`179_drop_program_type_family.sql`; family backfilled to youth). Obsolete eligibility/capacity columns retained pending RPC cutover.
-* program_offerings — S1 attribute columns; S4 registration panel writes here only. Programs may have **zero** offerings; first created offering is `is_default`. Audience adult|youth. Catalog enrollment display uses offering `capacity_mode` / `capacity` (S6).
+* program_offerings — S1 attribute columns; S4 registration panel writes here only. **F1 (`180`):** `inherit_dates`, `inherit_eligibility`, `inherit_enrollment` (existing rows overridden/`false`; new offerings default `true`). **F4 (`181`):** `care_enabled`. Programs may have **zero** offerings; first created offering is `is_default`. Audience adult|youth. Catalog enrollment display uses offering `capacity_mode` / `capacity` (S6).
+* program_attendance — **F5 (`181`):** per enrollment/day status (`present`/`absent`/`late`/`excused`); teachers mark from `/my-classes/[offeringId]`.
 * program_capacity_groups — S2 `offering_id` required (`177`); `program_id` retained for queries
 * program_schedule_items — S3 `offering_id` required (`178`); weekly class times edited on offering Schedule tab
 * departments — RLS repair: `scripts/164_departments_rls_policies.sql` (org members can manage). App writes also authorize then use service role when needed.
@@ -240,6 +241,7 @@ program_payment_plans.enrollment_id → program_enrollments.id
 * program_enrollments
 * program_enrollment_sessions
 * program_waitlist
+* program_applications
 
 Key relationships:
 
@@ -252,6 +254,14 @@ registration_cart_item_fees.cart_item_id → registration_cart_items.id
 registration_cart_item_fees.fee_option_id → program_fee_options.id
 registration_orders.organization_id → organizations.id
 registration_orders.cart_id → registration_carts.id
+
+program_applications.program_id → programs.id
+program_applications.offering_id → program_offerings.id
+program_applications.approved_offering_id → program_offerings.id
+program_applications.registrant_contact_id → contacts.id
+program_applications.participant_contact_id → contacts.id
+program_applications.enrollment_id → program_enrollments.id
+program_applications.waitlist_id → program_waitlist.id
 
 program_enrollments.program_id → programs.id
 program_enrollments.session_id → program_sessions.id
@@ -270,9 +280,12 @@ program_enrollment_sessions.program_id → programs.id
 program_enrollment_sessions.organization_id → organizations.id
 
 program_waitlist.program_id → programs.id
+program_waitlist.offering_id → program_offerings.id
 program_waitlist.child_person_id → people.id
 program_waitlist.lunch_option_id → program_lunch_options.id
 ```
+
+> **Registration pipeline (July 2026):** Run `scripts/182_program_registration_applications.sql` for `program_applications` and waitlist `offering_id` / offer deadline columns. See [programs-registration-pipeline-design.md](./programs-registration-pipeline-design.md).
 
 ---
 

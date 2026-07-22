@@ -51,15 +51,15 @@ export default async function EditProgramPage({
       const manageTab =
         workspaceTab === "staff"
           ? "staff"
-          : workspaceTab === "pricing" || tab === "pricing"
-            ? "fees"
-            : workspaceTab === "sessions" || tab === "sessions"
-              ? "schedule"
-              : workspaceTab === "registration" || tab === "registration"
-                ? "registration"
-                : workspaceTab === "schedule"
-                  ? "schedule"
-                  : undefined
+          : workspaceTab === "pricing" ||
+              tab === "pricing" ||
+              workspaceTab === "registration" ||
+              tab === "registration" ||
+              workspaceTab === "sessions" ||
+              tab === "sessions" ||
+              workspaceTab === "schedule"
+            ? "enrollment"
+            : undefined
       redirect(programOfferingManageHref(id, selected.id, manageTab))
     }
 

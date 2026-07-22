@@ -5,6 +5,9 @@ import { OfferingManageClient } from "@/components/programs/offering-manage-clie
 import { getDepartments } from "@/lib/departments/department-queries"
 import { getOfferingWorkspaceData } from "@/lib/programs/offering-workspace-queries"
 import { getOfferingCapacityGroups } from "@/lib/programs/program-capacity-group-queries"
+import {
+  normalizeOfferingManageTab,
+} from "@/lib/programs/program-offering-paths"
 import { getOfferingsForProgram } from "@/lib/programs/program-offering-queries"
 import { getProgramById } from "@/lib/programs/program-queries"
 import { getOfferingEnrollmentCount } from "@/lib/programs/program-staff-assignment-queries"
@@ -46,20 +49,7 @@ export default async function ManageProgramOfferingPage({
     departments.find((department) => department.id === program.department_id)
       ?.name ?? null
 
-  const allowedTabs = [
-    "overview",
-    "registration",
-    "fees",
-    "schedule",
-    "staff",
-    "waitlist",
-    "care",
-    "attendance",
-  ] as const
-  const tabParam = resolvedSearch?.tab
-  const initialTab = allowedTabs.includes(tabParam as (typeof allowedTabs)[number])
-    ? (tabParam as (typeof allowedTabs)[number])
-    : "overview"
+  const initialTab = normalizeOfferingManageTab(resolvedSearch?.tab)
 
   return (
     <>

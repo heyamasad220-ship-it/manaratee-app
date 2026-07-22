@@ -9,6 +9,7 @@ import {
   Briefcase,
   CalendarClock,
   CalendarDays,
+  ClipboardCheck,
   DollarSign,
   FileBarChart,
   Heart,
@@ -23,6 +24,7 @@ import {
   Wallet,
 } from "lucide-react"
 
+import { DepartmentApplicationsPanel } from "@/components/departments/department-applications-panel"
 import { DepartmentBudgetPanel } from "@/components/departments/department-budget-panel"
 import { DepartmentExpensesPanel } from "@/components/departments/department-expenses-panel"
 import { DepartmentGroupGivingPanel } from "@/components/departments/department-group-giving-panel"
@@ -883,6 +885,10 @@ export function DepartmentGroupWorkspaceClient({
               <BookOpen className="size-4" />
               Offerings
             </TabsTrigger>
+            <TabsTrigger value="applications" className="gap-2">
+              <ClipboardCheck className="size-4" />
+              Applications
+            </TabsTrigger>
             <TabsTrigger value="schedule" className="gap-2">
               <CalendarClock className="size-4" />
               Schedule
@@ -936,6 +942,13 @@ export function DepartmentGroupWorkspaceClient({
 
         {resolvedTab === "offerings" ? (
           <DepartmentOfferingsPanel
+            departmentId={department.id}
+            departmentName={displayName}
+          />
+        ) : null}
+
+        {resolvedTab === "applications" ? (
+          <DepartmentApplicationsPanel
             departmentId={department.id}
             departmentName={displayName}
           />

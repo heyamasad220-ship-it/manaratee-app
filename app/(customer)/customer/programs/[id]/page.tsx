@@ -291,7 +291,7 @@ export default async function CustomerProgramDetailsPage({
   const singleOffering =
     offerings.length === 1 ? offerings[0] : null
 
-  function getOfferingRegisterLabel(offering: ProgramOffering) {
+  function getOfferingApplyLabel(offering: ProgramOffering) {
     if (offering.status === "closed") {
       return "Registration closed"
     }
@@ -300,10 +300,10 @@ export default async function CustomerProgramDetailsPage({
       return "Not open yet"
     }
 
-    return "Register"
+    return "Apply"
   }
 
-  function isOfferingRegisterDisabled(offering: ProgramOffering) {
+  function isOfferingApplyDisabled(offering: ProgramOffering) {
     return (
       offering.status === "closed" ||
       !isOfferingEnrollmentOpen(offering, program)
@@ -352,7 +352,7 @@ export default async function CustomerProgramDetailsPage({
                 (offerings.length === 0 &&
                   (enrollmentLabel === "Closed" || enrollmentLabel === "Full")) ||
                 (singleOffering
-                  ? isOfferingRegisterDisabled(singleOffering)
+                  ? isOfferingApplyDisabled(singleOffering)
                   : false)
               }
               asChild={
@@ -361,7 +361,7 @@ export default async function CustomerProgramDetailsPage({
                   offerings.length === 0 &&
                   (enrollmentLabel === "Closed" || enrollmentLabel === "Full")
                 ) &&
-                !(singleOffering && isOfferingRegisterDisabled(singleOffering))
+                !(singleOffering && isOfferingApplyDisabled(singleOffering))
               }
             >
               {offerings.length > 1 ? (
@@ -374,19 +374,19 @@ export default async function CustomerProgramDetailsPage({
                       : "Program Full"}
                   </span>
                 ) : (
-                  <Link href={`/customer/programs/${program.id}/register`}>
-                    Register
+                  <Link href={`/customer/programs/${program.id}/apply`}>
+                    Apply
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
                 )
               ) : singleOffering ? (
-                isOfferingRegisterDisabled(singleOffering) ? (
-                  <span>{getOfferingRegisterLabel(singleOffering)}</span>
+                isOfferingApplyDisabled(singleOffering) ? (
+                  <span>{getOfferingApplyLabel(singleOffering)}</span>
                 ) : (
                   <Link
-                    href={`/customer/programs/${program.id}/register?offering=${singleOffering.id}`}
+                    href={`/customer/programs/${program.id}/apply?offering=${singleOffering.id}`}
                   >
-                    Register
+                    Apply
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
                 )
@@ -403,14 +403,14 @@ export default async function CustomerProgramDetailsPage({
               </CardTitle>
               <CardDescription>
                 {offerings.length === 1
-                  ? "Register for the available offering under this program."
-                  : "Select the level, camp, or track you want to register for."}
+                  ? "Apply for the available offering under this program."
+                  : "Select the level, camp, or track you want to apply for."}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {offerings.map((offering) => {
-                  const disabled = isOfferingRegisterDisabled(offering)
+                  const disabled = isOfferingApplyDisabled(offering)
 
                   return (
                     <Card key={offering.id} className="shadow-none">
@@ -419,7 +419,7 @@ export default async function CustomerProgramDetailsPage({
                           <CardTitle className="text-lg">{offering.name}</CardTitle>
                           <Badge variant={disabled ? "secondary" : "default"}>
                             {disabled
-                              ? getOfferingRegisterLabel(offering)
+                              ? getOfferingApplyLabel(offering)
                               : "Open"}
                           </Badge>
                         </div>
@@ -437,12 +437,12 @@ export default async function CustomerProgramDetailsPage({
                           asChild={!disabled}
                         >
                           {disabled ? (
-                            <span>{getOfferingRegisterLabel(offering)}</span>
+                            <span>{getOfferingApplyLabel(offering)}</span>
                           ) : (
                             <Link
-                              href={`/customer/programs/${program.id}/register?offering=${offering.id}`}
+                              href={`/customer/programs/${program.id}/apply?offering=${offering.id}`}
                             >
-                              Register
+                              Apply
                               <ArrowRight className="ml-2 h-4 w-4" />
                             </Link>
                           )}
@@ -454,7 +454,7 @@ export default async function CustomerProgramDetailsPage({
               </div>
               {openOfferings.length === 0 ? (
                 <p className="mt-4 text-sm text-muted-foreground">
-                  No offerings are open for registration right now.
+                  No offerings are open for applications right now.
                 </p>
               ) : null}
             </CardContent>

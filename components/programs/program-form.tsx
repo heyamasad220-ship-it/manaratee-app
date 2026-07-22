@@ -115,6 +115,8 @@ type ProgramFormCreateProps = {
   mode: "create"
   departments: Department[]
   organizationId: string
+  /** Prefill department from `?department=` (e.g. department workspace Create). */
+  defaultDepartmentId?: string | null
 }
 
 export type ProgramFormProps = ProgramFormEditProps | ProgramFormCreateProps
@@ -303,6 +305,10 @@ export function ProgramForm(props: ProgramFormProps) {
   })
 
   const program = isCreate ? null : props.program
+  const basicsProgramDefaults =
+    isCreate && props.defaultDepartmentId
+      ? { department_id: props.defaultDepartmentId }
+      : program
   const typedProgram = program as ProgramWithExtraFields | null
   const initialAgeBounds = React.useMemo(
     () => (program ? parseProgramAgeBounds(program) : { minAge: null, maxAge: null }),
@@ -735,7 +741,7 @@ export function ProgramForm(props: ProgramFormProps) {
 
           <TabsContent forceMount value="basics" className="mt-0 space-y-4">
             <ProgramBasicsSection
-              program={program}
+              program={basicsProgramDefaults}
               programId={program?.id}
               departments={props.departments}
               status={programStatus}

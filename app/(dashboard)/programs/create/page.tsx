@@ -3,7 +3,18 @@ import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-orga
 import { getDepartments } from "@/lib/departments/department-queries"
 import { ProgramForm } from "@/components/programs/program-form"
 
-export default async function CreateProgramPage() {
+function getValue(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value
+}
+
+export default async function CreateProgramPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>
+}) {
+  const resolved = await searchParams
+  const defaultDepartmentId = getValue(resolved?.department) || null
+
   const [departments, organizationId] = await Promise.all([
     getDepartments(),
     getSelectedOrganizationId(),
@@ -13,6 +24,10 @@ export default async function CreateProgramPage() {
     throw new Error("No organization selected")
   }
 
+  const departmentExists =
+    defaultDepartmentId &&
+    departments.some((department) => department.id === defaultDepartmentId)
+
   return (
     <>
       <Header title="Programs" />
@@ -20,6 +35,7 @@ export default async function CreateProgramPage() {
         mode="create"
         departments={departments}
         organizationId={organizationId}
+        defaultDepartmentId={departmentExists ? defaultDepartmentId : null}
       />
     </>
   )

@@ -205,6 +205,9 @@ export async function saveOfferingRegistrationPanel(input: {
   capacityGroups: ProgramCapacityGroupInput[]
   enable_waitlist: boolean
   waitlist_capacity: number | null
+  inherit_dates?: boolean
+  inherit_eligibility?: boolean
+  inherit_enrollment?: boolean
 }): Promise<ProgramRegistrationOption[]> {
   if (
     input.min_age !== null &&
@@ -280,6 +283,9 @@ export async function saveOfferingRegistrationPanel(input: {
       registration_mode: registrationMode,
       enrollment_open_date: input.enrollment_open_date || null,
       enrollment_close_date: input.enrollment_close_date || null,
+      inherit_dates: input.inherit_dates ?? false,
+      inherit_eligibility: input.inherit_eligibility ?? false,
+      inherit_enrollment: input.inherit_enrollment ?? false,
       updated_at: new Date().toISOString(),
     })
     .eq("id", input.offeringId)

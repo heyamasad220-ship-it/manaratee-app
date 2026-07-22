@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { usePathname, useRouter } from "next/navigation"
 
 import { createClient } from "@/lib/supabase/client"
+import { getBrowserAuthUser } from "@/lib/supabase/browser-auth-user"
 import { getCurrentOrganizationContext, clearSelectedOrganizationIdCache } from "@/lib/current-organization"
 import { isOrganizationSystemAdmin } from "@/lib/organizations/organization-system-admin"
 import {
@@ -24,9 +25,7 @@ export function DashboardAccessGuard() {
     async function enforceFacilitiesScope() {
       clearSelectedOrganizationIdCache()
       const supabase = createClient()
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+      const user = await getBrowserAuthUser(supabase)
 
       if (!user) {
         if (!cancelled) setChecked(true)

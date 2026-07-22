@@ -5,6 +5,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { ChevronDown, LogOut, User } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { getBrowserAuthUser } from "@/lib/supabase/browser-auth-user"
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -29,7 +30,6 @@ interface UserProfile {
 }
 
 export function UserMenu() {
-  const supabase = createClient()
   const pathname = usePathname()
 
   const [profile, setProfile] = useState<UserProfile | null>(null)
@@ -37,12 +37,12 @@ export function UserMenu() {
     useState<UserPortalCapabilities | null>(null)
 
   useEffect(() => {
-    async function loadUser() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+    let cancelled = false
+    const supabase = createClient()
 
-      if (!user) return
+    async function loadUser() {
+      const user = await getBrowserAuthUser(supabase)
+      if (cancelled || !user) return
 
       const { data: profileData } = await supabase
         .from("profiles")
@@ -50,24 +50,35 @@ export function UserMenu() {
         .eq("id", user.id)
         .maybeSingle()
 
+      if (cancelled) return
+
       setProfile({
         full_name: profileData?.full_name || null,
         email: user.email || null,
       })
 
       const orgId = await getCurrentOrganizationId()
+      if (cancelled) return
+
       const capabilities = await fetchUserPortalCapabilities(
         supabase,
         user.id,
         orgId
       )
+      if (cancelled) return
+
       setPortalCapabilities(capabilities)
     }
 
-    loadUser()
-  }, [supabase])
+    void loadUser()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   async function handleLogout() {
+    const supabase = createClient()
     await supabase.auth.signOut()
     window.location.href = "/login"
   }

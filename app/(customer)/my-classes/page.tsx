@@ -70,7 +70,7 @@ export default async function MyClassesPage() {
                 </div>
                 <Button variant="outline" size="sm" asChild>
                   <Link href={`/my-classes/${assignment.offering_id}`}>
-                    View roster
+                    Open class
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
                 </Button>

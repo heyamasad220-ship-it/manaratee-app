@@ -36,7 +36,7 @@ Staff UI has been partially cleaned (Edit Program tabs, Quick Create), but **pro
 | **Staff entry** | `/programs/create` (not `/programs/new`) |
 | **Main tables** | `programs`, `program_offerings` (via `ensureDefaultOffering`), `program_registration_options` (via `syncRegistrationOptionsFromProgramFlags`) |
 | **Main functions** | `createProgram`, `replaceProgramCapacityGroups`, `ensureDefaultOffering`, `syncRegistrationOptionsFromProgramFlags` |
-| **Main UI** | `create-program-form.tsx`, shared sections in `components/programs/edit/*` |
+| **Main UI** | `program-form.tsx`, shared sections in `components/programs/edit/*` |
 | **Authoritative data** | Program row: name, dates, eligibility, capacity, visibility, status |
 | **Legacy / hidden** | No fee plans, billing schedule, or FA at create time (correct) |
 | **After create** | Redirect to `/programs/[id]/edit?created=1` |

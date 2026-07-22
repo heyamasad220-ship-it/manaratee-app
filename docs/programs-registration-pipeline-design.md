@@ -1,7 +1,21 @@
 # Program registration pipeline (design)
 
-**Status:** Design agreed (July 2026) — implementation not started.  
+**Status:** Implementation started (July 2026) — steps 1–3 in progress.  
 **Scope:** Going forward only. Existing enrollments (e.g. QIL) are treated as already past this pipeline.
+
+**SQL:** Run `scripts/182_program_registration_applications.sql` after `180`–`181`.
+
+### Built so far
+
+| Piece | Status |
+|--------|--------|
+| Reports: **Registrations** rename + **Payment transactions** tab | Done |
+| `program_applications` table + waitlist offering/offer columns | Done (SQL `182`) |
+| Customer apply (`/customer/programs/[id]/apply`) + returning auto-approve | Done |
+| Department workspace **Applications** tab (approve / not approve) | Done (approve other offering next) |
+| Waitlist on full + offer deadline | Not yet |
+| Gate Register on approved + seat/offer; fee on register | Not yet |
+| FA only after approval | Not yet |
 
 This document defines apply → evaluate/approve → waitlist/FA (optional) → register → reports, so Registrations and Payment transactions stay distinct.
 
@@ -153,15 +167,13 @@ Route note: `/programs/registrations` can remain the Registrations list URL; tra
 
 ---
 
-## Data notes (implementation later)
+## Data notes
 
-- Prefer explicit **application** entity (or clear enrollment statuses) so “applied / approved” is not confused with “registered with fee”.
-- Waitlist rows only for **approved** applicants when capacity is full.
+- Table: **`program_applications`** (`scripts/182_program_registration_applications.sql`).
+- Waitlist rows only for **approved** applicants when capacity is full (`program_waitlist.offering_id`, `offered_at`, `offer_expires_at`).
 - Fee / charge schedule created **on register**, not on approve.
-- Returning vs new stored on the application.
+- Returning vs new stored on the application (`applicant_type`).
 - Migration: no backfill of apply/evaluate for historical rows; mark existing as registered.
-
-SQL and table changes TBD after schema review (`program_enrollments`, `program_waitlist`, applications, charges).
 
 ---
 

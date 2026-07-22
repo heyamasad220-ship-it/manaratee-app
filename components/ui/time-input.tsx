@@ -25,7 +25,7 @@ export function TimeInput({
   placeholder = "Select time",
   disabled,
   required,
-  minuteStep = 1,
+  minuteStep = 5,
 }: {
   id?: string
   name?: string

@@ -1,9 +1,8 @@
 "use client"
 
 import * as React from "react"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Loader2, Plus, Trash2, UserRound } from "lucide-react"
+import { Loader2, Pencil, Plus, Trash2, UserRound } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -17,14 +16,6 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
 import {
   createProgramStaffAssignment,
   removeProgramStaffAssignment,
@@ -40,24 +31,33 @@ import {
 import type { ProgramOffering } from "@/lib/programs/program-offering-types"
 import type { ProgramSession } from "@/lib/programs/program-session-types"
 
-export function OfferingStaffPanel({
+const ADDITIONAL_ROLES = OFFERING_STAFF_ROLE_OPTIONS.filter(
+  (role) => role !== "primary_instructor"
+)
+
+/**
+ * Compact staff controls for Offering Overview (view + edit).
+ * Primary instructor is a core overview field; extra staff can be added while editing.
+ */
+export function OfferingOverviewStaffFields({
   programId,
   offering,
   assignments: initialAssignments,
   sessions,
+  editing,
   onAssignmentsChange,
 }: {
   programId: string
   offering: ProgramOffering
   assignments: ProgramStaffAssignmentWithDetails[]
   sessions: ProgramSession[]
+  editing: boolean
   onAssignmentsChange?: (
     assignments: ProgramStaffAssignmentWithDetails[]
   ) => void
 }) {
   const router = useRouter()
-  const [assignments, setAssignments] =
-    React.useState(initialAssignments)
+  const [assignments, setAssignments] = React.useState(initialAssignments)
   const [isDialogOpen, setIsDialogOpen] = React.useState(false)
   const [isSaving, setIsSaving] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
@@ -68,7 +68,7 @@ export function OfferingStaffPanel({
   const [isSearching, setIsSearching] = React.useState(false)
   const [selectedContactId, setSelectedContactId] = React.useState("")
   const [assignmentRole, setAssignmentRole] =
-    React.useState<ProgramStaffAssignmentRole>("assistant_instructor")
+    React.useState<ProgramStaffAssignmentRole>("primary_instructor")
   const [sessionId, setSessionId] = React.useState("")
 
   React.useEffect(() => {
@@ -76,22 +76,17 @@ export function OfferingStaffPanel({
   }, [initialAssignments])
 
   React.useEffect(() => {
-    if (!isDialogOpen) {
-      return
-    }
-
+    if (!isDialogOpen) return
     const timeout = window.setTimeout(() => {
       void loadContacts(contactSearch)
     }, 250)
-
     return () => window.clearTimeout(timeout)
   }, [contactSearch, isDialogOpen])
 
   async function loadContacts(search: string) {
     setIsSearching(true)
     try {
-      const results = await searchProgramStaffContactsAction(search)
-      setContactResults(results)
+      setContactResults(await searchProgramStaffContactsAction(search))
     } catch (searchError) {
       setError(
         searchError instanceof Error
@@ -125,7 +120,6 @@ export function OfferingStaffPanel({
 
     setIsSaving(true)
     setError(null)
-
     try {
       const nextAssignments = await createProgramStaffAssignment({
         programId,
@@ -152,7 +146,6 @@ export function OfferingStaffPanel({
   async function handleRemove(assignmentId: string) {
     setIsSaving(true)
     setError(null)
-
     try {
       const nextAssignments = await removeProgramStaffAssignment({
         programId,
@@ -176,119 +169,135 @@ export function OfferingStaffPanel({
     (item) =>
       item.assignment_role === "primary_instructor" && !item.session_id
   )
+  const additionalStaff = assignments.filter(
+    (item) =>
+      !(item.assignment_role === "primary_instructor" && !item.session_id)
+  )
+
+  if (!editing) {
+    return (
+      <>
+        <div className="space-y-1">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Primary instructor
+          </p>
+          <p className="text-sm font-medium">
+            {primaryInstructor?.contact_name || "Not assigned"}
+          </p>
+        </div>
+        {additionalStaff.length > 0 ? (
+          <div className="space-y-1 sm:col-span-2">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Additional staff
+            </p>
+            <p className="text-sm font-medium">
+              {additionalStaff
+                .map(
+                  (item) =>
+                    `${item.contact_name} (${PROGRAM_STAFF_ASSIGNMENT_ROLE_LABELS[item.assignment_role]})`
+                )
+                .join(", ")}
+            </p>
+          </div>
+        ) : null}
+      </>
+    )
+  }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h3 className="text-base font-semibold">Instructors &amp; Staff</h3>
-        <p className="text-sm text-muted-foreground">
-          Assign employees and volunteers from Workforce to{" "}
-          {offering.name}. Assignments save immediately.
-        </p>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <QuickAssignCard
-          title="Primary instructor"
-          description={
-            primaryInstructor
-              ? primaryInstructor.contact_name
-              : "Not assigned"
-          }
-          actionLabel={primaryInstructor ? "Change" : "Assign"}
-          onAction={() => openDialog("primary_instructor")}
-          disabled={isSaving}
-        />
-        <QuickAssignCard
-          title="Assistants"
-          description={`${assignments.filter((item) => item.assignment_role === "assistant_instructor").length} assigned`}
-          actionLabel="Add"
-          onAction={() => openDialog("assistant_instructor")}
-          disabled={isSaving}
-        />
-        <QuickAssignCard
-          title="Volunteers"
-          description={`${assignments.filter((item) => item.assignment_role === "volunteer").length} assigned`}
-          actionLabel="Add"
-          onAction={() => openDialog("volunteer")}
-          disabled={isSaving}
-        />
-        <QuickAssignCard
-          title="Coordinator"
-          description={`${assignments.filter((item) => item.assignment_role === "coordinator").length} assigned`}
-          actionLabel="Add"
-          onAction={() => openDialog("coordinator")}
-          disabled={isSaving}
-        />
-      </div>
-
-      {assignments.length === 0 ? (
-        <div className="rounded-lg border border-dashed bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground">
-          No staff assigned yet. Use the cards above to assign people from
-          Contacts.
+    <div className="space-y-3 h-full">
+      <div className="space-y-1.5">
+        <Label>Primary instructor</Label>
+        <div className="flex flex-wrap items-center gap-1">
+          <p className="min-w-0 flex-1 text-sm font-medium">
+            {primaryInstructor?.contact_name || "Not assigned"}
+          </p>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 shrink-0"
+            disabled={isSaving}
+            aria-label={
+              primaryInstructor
+                ? "Edit primary instructor"
+                : "Assign primary instructor"
+            }
+            onClick={() => openDialog("primary_instructor")}
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+          {primaryInstructor ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 shrink-0 text-destructive hover:text-destructive"
+              disabled={isSaving}
+              aria-label="Remove primary instructor"
+              onClick={() => void handleRemove(primaryInstructor.id)}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          ) : null}
         </div>
-      ) : (
-        <div className="rounded-lg border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Scope</TableHead>
-                <TableHead className="w-[80px] text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {assignments.map((assignment) => (
-                <TableRow key={assignment.id}>
-                  <TableCell>
-                    <div className="font-medium">{assignment.contact_name}</div>
-                    {assignment.contact_email ? (
-                      <div className="text-xs text-muted-foreground">
-                        {assignment.contact_email}
-                      </div>
-                    ) : null}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="secondary">
+      </div>
+
+      <div className="space-y-2">
+        <Button
+          type="button"
+          size="sm"
+          disabled={isSaving}
+          onClick={() => openDialog("assistant_instructor")}
+        >
+          <Plus className="mr-1.5 h-3.5 w-3.5" />
+          Add Staff
+        </Button>
+
+        {additionalStaff.length > 0 ? (
+          <ul className="divide-y rounded-md border">
+            {additionalStaff.map((assignment) => (
+              <li
+                key={assignment.id}
+                className="flex items-center justify-between gap-3 px-3 py-2"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">
+                    {assignment.contact_name}
+                  </p>
+                  <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                    <Badge variant="secondary" className="font-normal">
                       {
                         PROGRAM_STAFF_ASSIGNMENT_ROLE_LABELS[
                           assignment.assignment_role
                         ]
                       }
                     </Badge>
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {assignment.session_name
-                      ? assignment.session_name
-                      : "Entire offering"}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="text-destructive hover:text-destructive"
-                      onClick={() => void handleRemove(assignment.id)}
-                      disabled={isSaving}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      )}
-
-      <p className="text-xs text-muted-foreground">
-        Need someone new? Add them in{" "}
-        <Link href="/workforce" className="underline underline-offset-2">
-          Workforce
-        </Link>{" "}
-        with an Employee or Volunteer role first.
-      </p>
+                    {assignment.session_name ? (
+                      <span className="text-xs text-muted-foreground">
+                        {assignment.session_name}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-0.5">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-destructive hover:text-destructive"
+                    disabled={isSaving}
+                    aria-label={`Remove ${assignment.contact_name}`}
+                    onClick={() => void handleRemove(assignment.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
 
       {error && !isDialogOpen ? (
         <p className="text-sm text-destructive">{error}</p>
@@ -297,40 +306,46 @@ export function OfferingStaffPanel({
       <Dialog open={isDialogOpen} onOpenChange={(open) => !open && closeDialog()}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Assign staff</DialogTitle>
+            <DialogTitle>
+              {assignmentRole === "primary_instructor"
+                ? "Assign primary instructor"
+                : "Add staff"}
+            </DialogTitle>
             <DialogDescription>
               Search for a contact with an Employee or Volunteer role.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="staff-role">Role</Label>
-              <select
-                id="staff-role"
-                value={assignmentRole}
-                onChange={(event) =>
-                  setAssignmentRole(
-                    event.target.value as ProgramStaffAssignmentRole
-                  )
-                }
-                className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-              >
-                {OFFERING_STAFF_ROLE_OPTIONS.map((role) => (
-                  <option key={role} value={role}>
-                    {PROGRAM_STAFF_ASSIGNMENT_ROLE_LABELS[role]}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {assignmentRole !== "primary_instructor" ? (
+              <div className="space-y-2">
+                <Label htmlFor="overview-staff-role">Role</Label>
+                <select
+                  id="overview-staff-role"
+                  value={assignmentRole}
+                  onChange={(event) =>
+                    setAssignmentRole(
+                      event.target.value as ProgramStaffAssignmentRole
+                    )
+                  }
+                  className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                >
+                  {ADDITIONAL_ROLES.map((role) => (
+                    <option key={role} value={role}>
+                      {PROGRAM_STAFF_ASSIGNMENT_ROLE_LABELS[role]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
 
             {sessions.length > 0 &&
             (assignmentRole === "substitute" ||
               assignmentRole === "assistant_instructor") ? (
               <div className="space-y-2">
-                <Label htmlFor="staff-session">Session (optional)</Label>
+                <Label htmlFor="overview-staff-session">Session (optional)</Label>
                 <select
-                  id="staff-session"
+                  id="overview-staff-session"
                   value={sessionId}
                   onChange={(event) => setSessionId(event.target.value)}
                   className="h-9 w-full rounded-md border bg-background px-3 text-sm"
@@ -346,9 +361,9 @@ export function OfferingStaffPanel({
             ) : null}
 
             <div className="space-y-2">
-              <Label htmlFor="staff-search">Search contacts</Label>
+              <Label htmlFor="overview-staff-search">Search contacts</Label>
               <Input
-                id="staff-search"
+                id="overview-staff-search"
                 value={contactSearch}
                 onChange={(event) => setContactSearch(event.target.value)}
                 placeholder="Name or email"
@@ -373,7 +388,7 @@ export function OfferingStaffPanel({
                   >
                     <input
                       type="radio"
-                      name="staff-contact"
+                      name="overview-staff-contact"
                       checked={selectedContactId === contact.id}
                       onChange={() => setSelectedContactId(contact.id)}
                       className="mt-1"
@@ -394,9 +409,7 @@ export function OfferingStaffPanel({
               )}
             </div>
 
-            {error ? (
-              <p className="text-sm text-destructive">{error}</p>
-            ) : null}
+            {error ? <p className="text-sm text-destructive">{error}</p> : null}
           </div>
 
           <DialogFooter>
@@ -423,37 +436,6 @@ export function OfferingStaffPanel({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
-  )
-}
-
-function QuickAssignCard({
-  title,
-  description,
-  actionLabel,
-  onAction,
-  disabled,
-}: {
-  title: string
-  description: string
-  actionLabel: string
-  onAction: () => void
-  disabled?: boolean
-}) {
-  return (
-    <div className="rounded-lg border bg-muted/20 p-4">
-      <p className="text-sm font-medium">{title}</p>
-      <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className="mt-3"
-        onClick={onAction}
-        disabled={disabled}
-      >
-        {actionLabel}
-      </Button>
     </div>
   )
 }
