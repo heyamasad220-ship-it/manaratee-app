@@ -55,6 +55,10 @@ import {
   assignChildcareEventProvider,
 } from "@/lib/child-care/childcare-registration-actions"
 import {
+  estimateHoursFromTimeRange,
+  logChildcareEventHoursAction,
+} from "@/lib/child-care/childcare-event-hours"
+import {
   formatChildcareDate,
   formatChildcareTimeRange,
 } from "@/lib/child-care/childcare-registration-format"
@@ -82,11 +86,13 @@ export function ChildcareRegistrationsClient({
   initialRegistrations,
   initialStats,
   providers,
+  departments = [],
 }: {
   initialEvents: ChildcareEventSummary[]
   initialRegistrations: ChildcareRegistration[]
   initialStats: ChildcareRegistrationStats
   providers: ChildcareProviderPickerOption[]
+  departments?: Array<{ id: string; name: string }>
 }) {
   const router = useRouter()
   const [events, setEvents] = React.useState(initialEvents)
@@ -98,8 +104,15 @@ export function ChildcareRegistrationsClient({
   const [statusFilter, setStatusFilter] = React.useState("all")
   const [showAddDialog, setShowAddDialog] = React.useState(false)
   const [showAddEventDialog, setShowAddEventDialog] = React.useState(false)
+  const [logHoursEvent, setLogHoursEvent] = React.useState<ChildcareEventSummary | null>(
+    null
+  )
+  const [logHours, setLogHours] = React.useState("")
+  const [logNotes, setLogNotes] = React.useState("")
+  const [logDepartmentId, setLogDepartmentId] = React.useState("")
   const [isSaving, setIsSaving] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
+  const [logSuccess, setLogSuccess] = React.useState<string | null>(null)
 
   const [registrationForm, setRegistrationForm] = React.useState({
     childcare_event_id: "",
@@ -251,11 +264,62 @@ export function ChildcareRegistrationsClient({
     }
   }
 
+  function openLogHoursDialog(event: ChildcareEventSummary) {
+    const suggested = estimateHoursFromTimeRange(event.start_time, event.end_time)
+    setError(null)
+    setLogSuccess(null)
+    setLogHoursEvent(event)
+    setLogHours(suggested != null ? String(suggested) : "")
+    setLogNotes("")
+    setLogDepartmentId(event.linked_department_id || "")
+  }
+
+  async function handleLogHours() {
+    if (!logHoursEvent) return
+    setIsSaving(true)
+    setError(null)
+    setLogSuccess(null)
+    try {
+      const parsed = Number(logHours)
+      const needsDepartment = !logHoursEvent.linked_department_id
+      if (needsDepartment && !logDepartmentId) {
+        setError("Select a department so hours can post to payroll.")
+        return
+      }
+      const result = await logChildcareEventHoursAction({
+        childcareEventId: logHoursEvent.id,
+        hours: Number.isFinite(parsed) && parsed > 0 ? parsed : null,
+        notes: logNotes || null,
+        departmentId: logDepartmentId || logHoursEvent.linked_department_id || null,
+      })
+      if (!result.success) {
+        setError(result.error)
+        return
+      }
+      const deptName =
+        departments.find((d) => d.id === result.departmentId)?.name ||
+        logHoursEvent.linked_department_name ||
+        "department"
+      setLogSuccess(`Hours logged to ${deptName} payroll.`)
+      setLogHoursEvent(null)
+      router.refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not log hours.")
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
         {error ? (
           <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
             {error}
+          </div>
+        ) : null}
+        {logSuccess ? (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+            {logSuccess}
           </div>
         ) : null}
 
@@ -381,6 +445,25 @@ export function ChildcareRegistrationsClient({
                         <p className="text-xs text-muted-foreground">
                           Currently: {event.assigned_provider_name}
                         </p>
+                      ) : null}
+                      {event.linked_department_name ? (
+                        <p className="text-xs text-muted-foreground">
+                          Department: {event.linked_department_name}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">Standalone session</p>
+                      )}
+                      {event.assigned_provider_contact_id ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="mt-2 w-full"
+                          disabled={isSaving}
+                          onClick={() => openLogHoursDialog(event)}
+                        >
+                          Log hours
+                        </Button>
                       ) : null}
                     </div>
                   </div>
@@ -740,6 +823,99 @@ export function ChildcareRegistrationsClient({
             >
               {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Add Event
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(logHoursEvent)}
+        onOpenChange={(open) => {
+          if (!open) setLogHoursEvent(null)
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Log provider hours</DialogTitle>
+            <DialogDescription>
+              {logHoursEvent
+                ? `Post hours for ${logHoursEvent.assigned_provider_name || "provider"} on ${logHoursEvent.name} to department payroll.`
+                : "Post hours to department payroll."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-4 py-4">
+            {logHoursEvent?.linked_department_id ? (
+              <p className="text-sm text-muted-foreground">
+                Department: {logHoursEvent.linked_department_name || "Linked department"}
+              </p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="log-department">Department</Label>
+                <Select value={logDepartmentId} onValueChange={setLogDepartmentId}>
+                  <SelectTrigger id="log-department">
+                    <SelectValue placeholder="Select department" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {departments.map((department) => (
+                      <SelectItem key={department.id} value={department.id}>
+                        {department.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {departments.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    No departments found. Create one under Workforce first.
+                  </p>
+                ) : null}
+              </div>
+            )}
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="log-hours">Hours</Label>
+              <Input
+                id="log-hours"
+                type="number"
+                min={0.25}
+                step={0.25}
+                value={logHours}
+                onChange={(e) => setLogHours(e.target.value)}
+                placeholder="e.g. 2"
+              />
+              {logHoursEvent ? (
+                <p className="text-xs text-muted-foreground">
+                  Session time:{" "}
+                  {logHoursEvent.start_time && logHoursEvent.end_time
+                    ? `${logHoursEvent.start_time} - ${logHoursEvent.end_time}`
+                    : logHoursEvent.start_time ||
+                      logHoursEvent.end_time ||
+                      "not set"}
+                </p>
+              ) : null}
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="log-notes">Notes (optional)</Label>
+              <Input
+                id="log-notes"
+                value={logNotes}
+                onChange={(e) => setLogNotes(e.target.value)}
+                placeholder="Extra context for payroll"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLogHoursEvent(null)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleLogHours}
+              disabled={
+                isSaving ||
+                (!logHoursEvent?.linked_department_id &&
+                  (!logDepartmentId || departments.length === 0))
+              }
+            >
+              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Log hours
             </Button>
           </DialogFooter>
         </DialogContent>

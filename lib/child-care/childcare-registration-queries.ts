@@ -53,7 +53,7 @@ export async function getChildcareRegistrationsBundle(
     supabase
       .from("childcare_events")
       .select(
-        "id, organization_id, name, event_date, start_time, end_time, capacity, notes, is_active, assigned_provider_contact_id"
+        "id, organization_id, name, event_date, start_time, end_time, capacity, notes, is_active, assigned_provider_contact_id, source_type, source_id"
       )
       .eq("organization_id", orgId)
       .eq("is_active", true)
@@ -136,9 +136,53 @@ export async function getChildcareRegistrationsBundle(
     }
   }
 
+  const internalEventIds = Array.from(
+    new Set(
+      (eventsResult.data || [])
+        .filter((row) => (row.source_type as string | null) === "internal_event")
+        .map((row) => row.source_id as string | null)
+        .filter((id): id is string => Boolean(id))
+    )
+  )
+
+  const departmentByInternalEventId = new Map<
+    string,
+    { id: string; name: string }
+  >()
+  if (internalEventIds.length > 0) {
+    const { data: internalEvents } = await supabase
+      .from("internal_events")
+      .select("id, department_id, departments:department_id ( id, name )")
+      .eq("organization_id", orgId)
+      .in("id", internalEventIds)
+
+    for (const row of internalEvents || []) {
+      const dept = row.departments as
+        | { id?: string; name?: string | null }
+        | { id?: string; name?: string | null }[]
+        | null
+      const deptRow = Array.isArray(dept) ? dept[0] : dept
+      const departmentId =
+        (deptRow?.id as string | undefined) ||
+        (row.department_id as string | null) ||
+        null
+      if (!departmentId) continue
+      departmentByInternalEventId.set(row.id as string, {
+        id: departmentId,
+        name: deptRow?.name?.trim() || "Department",
+      })
+    }
+  }
+
   const events: ChildcareEventSummary[] = (eventsResult.data || []).map((row) => {
     const assignedProviderContactId =
       (row.assigned_provider_contact_id as string | null) ?? null
+    const sourceType = (row.source_type as string | null) || "standalone"
+    const sourceId = (row.source_id as string | null) || null
+    const linked =
+      sourceType === "internal_event" && sourceId
+        ? departmentByInternalEventId.get(sourceId) || null
+        : null
 
     return {
       id: row.id as string,
@@ -151,10 +195,14 @@ export async function getChildcareRegistrationsBundle(
       notes: (row.notes as string | null) ?? null,
       is_active: Boolean(row.is_active),
       assigned_provider_contact_id: assignedProviderContactId,
+      source_type: sourceType,
+      source_id: sourceId,
       registered_count: countByEvent[row.id as string] ?? 0,
       assigned_provider_name: assignedProviderContactId
         ? providerNameByContactId.get(assignedProviderContactId) ?? "Assigned provider"
         : null,
+      linked_department_id: linked?.id ?? null,
+      linked_department_name: linked?.name ?? null,
     }
   })
 
@@ -182,7 +230,7 @@ export async function getChildcareForInternalEvent(internalEventId: string): Pro
   const { data: childcareEventRow, error: eventError } = await supabase
     .from("childcare_events")
     .select(
-      "id, organization_id, name, event_date, start_time, end_time, capacity, notes, is_active, assigned_provider_contact_id"
+      "id, organization_id, name, event_date, start_time, end_time, capacity, notes, is_active, assigned_provider_contact_id, source_type, source_id"
     )
     .eq("organization_id", orgId)
     .eq("source_type", "internal_event")
@@ -258,6 +306,25 @@ export async function getChildcareForInternalEvent(internalEventId: string): Pro
       registration.status === "waitlisted"
   ).length
 
+  let linkedDepartmentId: string | null = null
+  let linkedDepartmentName: string | null = null
+  const { data: internalEvent } = await supabase
+    .from("internal_events")
+    .select("department_id, departments:department_id (id, name)")
+    .eq("id", internalEventId)
+    .eq("organization_id", orgId)
+    .maybeSingle()
+
+  if (internalEvent?.department_id) {
+    linkedDepartmentId = internalEvent.department_id as string
+    const dept = internalEvent.departments as
+      | { id?: string; name?: string | null }
+      | { id?: string; name?: string | null }[]
+      | null
+    const deptRow = Array.isArray(dept) ? dept[0] : dept
+    linkedDepartmentName = deptRow?.name?.trim() || "Department"
+  }
+
   const childcareEvent: ChildcareEventSummary = {
     id: childcareEventId,
     organization_id: childcareEventRow.organization_id as string,
@@ -269,8 +336,12 @@ export async function getChildcareForInternalEvent(internalEventId: string): Pro
     notes: (childcareEventRow.notes as string | null) ?? null,
     is_active: Boolean(childcareEventRow.is_active),
     assigned_provider_contact_id: assignedProviderContactId,
+    source_type: (childcareEventRow.source_type as string | null) || "internal_event",
+    source_id: (childcareEventRow.source_id as string | null) || internalEventId,
     registered_count: registeredCount,
     assigned_provider_name: assignedProviderName,
+    linked_department_id: linkedDepartmentId,
+    linked_department_name: linkedDepartmentName,
   }
 
   return { childcareEvent, registrations }

@@ -171,8 +171,23 @@ Features:
 * Subscription filtering
 * Permission filtering
 * Dynamic visibility
-* Module order: Dashboard → Contacts → HR → Membership → Donations → …
-* Pinned footer: Billing (super admin) → **Reports** (`/reports`, `reports.view`) → Settings
+* Module order: Dashboard → Contacts → HR → Membership → Fund Development → Finance → …
+* Pinned footer: Billing (super admin SaaS subscription) → **Reports** (`/reports`, `reports.view`) → Settings
+
+---
+
+## Finance
+
+Status: In progress
+
+Operational finance (not SaaS Billing):
+
+* `/finance` → `/finance/payroll`
+* Org payroll queue of department-approved pay entries (teachers + childcare)
+* Mark paid (`finance.manage`) after `scripts/187_finance_module_and_payroll_paid.sql`
+* Permissions: `finance.view` / `finance.manage`
+
+Planned: event/program labels on childcare hours, payouts/AP beyond payroll.
 
 ---
 

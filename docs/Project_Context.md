@@ -189,7 +189,7 @@ Sidebar (People Management / HR):
 * Volunteers
 * Child Care
 * Reports
-* Settings → `/hr/settings` (Discount Policies only); HR org settings at `/workforce/settings` (Positions, Application Templates). **Departments** lives under **HR** in the sidebar (`/workforce/departments`: Overview, Employees, Rosters, Applications, Schedule, Financial [Payroll / Expenses / Financial Summary], Reports for archived years; Group giving when a donations group is linked; Activity = department events not individual gifts).
+* Settings → `/hr/settings` (Discount Policies only); HR org settings at `/workforce/settings` (Positions, Application Templates). **Departments** lives under **HR** in the sidebar (`/workforce/departments`: Overview, Employees, Rosters, Applications, Schedule, Financial [Payroll / Expenses / Financial Summary], Reports for archived years; Group giving when a donations group is linked; Activity = department events not individual gifts). **Finance** sidebar module (`/finance/payroll`) processes approved payroll org-wide (Mark paid); SaaS **Billing** stays in the footer.
 
 Membership sidebar includes **Groups** (`/membership/groups` — member groups / former HR Teams). Giving collectives are under Donations (`/donations/groups/[id]`, Group Giving report) — badge can link a collective to a Membership Group or Department, otherwise **Group Donation**.
 

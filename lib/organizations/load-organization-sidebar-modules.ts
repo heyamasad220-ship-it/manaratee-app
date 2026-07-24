@@ -48,6 +48,13 @@ const SIDEBAR_MODULE_DEFAULTS: Record<
     group_name: "Financial",
     sort_order: 30,
   },
+  finance: {
+    name: "Finance",
+    route: "/finance/payroll",
+    icon_name: "Wallet",
+    group_name: "Financial",
+    sort_order: 35,
+  },
   programs: {
     name: "Programs",
     route: "/programs/catalog",

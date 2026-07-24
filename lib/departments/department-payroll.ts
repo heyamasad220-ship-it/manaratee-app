@@ -13,7 +13,7 @@ import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 
 export type StaffPayBasis = "hourly" | "monthly"
-export type PayPeriodStatus = "draft" | "pending" | "approved" | "rejected"
+export type PayPeriodStatus = "draft" | "pending" | "approved" | "rejected" | "paid"
 
 export type DepartmentPayPeriodRow = {
   id: string | null
@@ -51,6 +51,9 @@ export type DepartmentHourLogRow = {
   workDate: string
   hours: number
   notes: string | null
+  childcareEventId?: string | null
+  eventName?: string | null
+  source?: string | null
 }
 
 function isMissingTableError(message: string | undefined) {
@@ -431,7 +434,7 @@ async function syncPayPeriodFromHours(input: {
     periodEnd = bounds.periodEnd
   }
 
-  if (existingStatus === "approved") {
+  if (existingStatus === "approved" || existingStatus === "paid") {
     return { ok: true as const, skippedApproved: true, periodKey }
   }
 
@@ -494,6 +497,8 @@ export async function logDepartmentStaffHoursAction(input: {
   workDate: string
   hours: number
   notes?: string | null
+  childcareEventId?: string | null
+  source?: "manual" | "childcare_event"
 }) {
   const canManage = await canManageDepartment(input.departmentId)
   const canView = await canViewDepartment(input.departmentId)
@@ -550,26 +555,88 @@ export async function logDepartmentStaffHoursAction(input: {
   }
 
   const periodKey = periodKeyFromWorkDate(input.workDate)
+  const childcareEventId = input.childcareEventId?.trim() || null
+  const source = childcareEventId
+    ? "childcare_event"
+    : input.source === "childcare_event"
+      ? "childcare_event"
+      : "manual"
 
-  const { error: logError } = await access.supabase.from("department_staff_hour_logs").upsert(
-    {
-      organization_id: access.organizationId,
-      department_id: input.departmentId,
-      staff_id: input.staffId,
-      work_date: input.workDate,
-      hours: roundMoney(hours),
-      notes: input.notes?.trim() || null,
-      created_by: access.userId,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "organization_id,department_id,staff_id,work_date" }
-  )
+  const payload = {
+    organization_id: access.organizationId,
+    department_id: input.departmentId,
+    staff_id: input.staffId,
+    work_date: input.workDate,
+    hours: roundMoney(hours),
+    notes: input.notes?.trim() || null,
+    childcare_event_id: childcareEventId,
+    source,
+    created_by: access.userId,
+    updated_at: new Date().toISOString(),
+  }
+
+  let logError: { message: string } | null = null
+
+  if (childcareEventId) {
+    const { data: existingEventLog } = await access.supabase
+      .from("department_staff_hour_logs")
+      .select("id")
+      .eq("organization_id", access.organizationId)
+      .eq("department_id", input.departmentId)
+      .eq("staff_id", input.staffId)
+      .eq("childcare_event_id", childcareEventId)
+      .maybeSingle()
+
+    if (existingEventLog?.id) {
+      const { error } = await access.supabase
+        .from("department_staff_hour_logs")
+        .update(payload)
+        .eq("id", existingEventLog.id as string)
+        .eq("organization_id", access.organizationId)
+      logError = error
+    } else {
+      const { error } = await access.supabase
+        .from("department_staff_hour_logs")
+        .insert(payload)
+      logError = error
+    }
+  } else {
+    const { data: existingManual } = await access.supabase
+      .from("department_staff_hour_logs")
+      .select("id")
+      .eq("organization_id", access.organizationId)
+      .eq("department_id", input.departmentId)
+      .eq("staff_id", input.staffId)
+      .eq("work_date", input.workDate)
+      .is("childcare_event_id", null)
+      .maybeSingle()
+
+    if (existingManual?.id) {
+      const { error } = await access.supabase
+        .from("department_staff_hour_logs")
+        .update(payload)
+        .eq("id", existingManual.id as string)
+        .eq("organization_id", access.organizationId)
+      logError = error
+    } else {
+      const { error } = await access.supabase
+        .from("department_staff_hour_logs")
+        .insert(payload)
+      logError = error
+    }
+  }
 
   if (logError) {
     if (isMissingTableError(logError.message)) {
       return {
         success: false as const,
         error: "Run scripts/171_department_staff_hour_logs.sql in Supabase first.",
+      }
+    }
+    if (/childcare_event_id|column .* does not exist/i.test(logError.message)) {
+      return {
+        success: false as const,
+        error: "Run scripts/188_hour_logs_childcare_event.sql in Supabase first.",
       }
     }
     return { success: false as const, error: logError.message }
@@ -589,6 +656,7 @@ export async function logDepartmentStaffHoursAction(input: {
   }
 
   revalidatePath(workforceDepartmentDetailPath(input.departmentId))
+  revalidatePath("/finance/payroll")
   return { success: true as const, periodKey: synced.periodKey || periodKey }
 }
 
@@ -758,8 +826,14 @@ export async function submitPayPeriodAction(input: {
     }
   }
 
-  if (entry.status === "approved") {
-    return { success: false as const, error: "This pay period is already approved." }
+  if (entry.status === "approved" || entry.status === "paid") {
+    return {
+      success: false as const,
+      error:
+        entry.status === "paid"
+          ? "This pay period is already paid."
+          : "This pay period is already approved.",
+    }
   }
 
   const { error: updateError } = await access.supabase
@@ -851,6 +925,13 @@ export async function updatePayPeriodEntryAction(input: {
 
   if (error || !entry || entry.department_id !== input.departmentId) {
     return { success: false as const, error: "Pay period not found." }
+  }
+
+  if ((entry.status as string) === "paid") {
+    return {
+      success: false as const,
+      error: "Paid payroll entries cannot be edited. Contact Finance if a correction is needed.",
+    }
   }
 
   const payBasis =
@@ -1154,7 +1235,17 @@ export async function fetchStaffHourLogsAction(input: {
   }
   const { data, error } = await access.supabase
     .from("department_staff_hour_logs")
-    .select("id, work_date, hours, notes")
+    .select(
+      `
+      id,
+      work_date,
+      hours,
+      notes,
+      childcare_event_id,
+      source,
+      childcare_event:childcare_event_id ( name )
+    `
+    )
     .eq("organization_id", access.organizationId)
     .eq("department_id", input.departmentId)
     .eq("staff_id", input.staffId)
@@ -1166,20 +1257,55 @@ export async function fetchStaffHourLogsAction(input: {
     if (isMissingTableError(error.message)) {
       return { success: true as const, logs: [] as DepartmentHourLogRow[], migrationRequired: true }
     }
+    // Pre-188: columns missing — fall back to basic select.
+    if (/childcare_event/i.test(error.message)) {
+      const fallback = await access.supabase
+        .from("department_staff_hour_logs")
+        .select("id, work_date, hours, notes")
+        .eq("organization_id", access.organizationId)
+        .eq("department_id", input.departmentId)
+        .eq("staff_id", input.staffId)
+        .gte("work_date", periodStart)
+        .lte("work_date", periodEnd)
+        .order("work_date", { ascending: false })
+      if (fallback.error) {
+        return { success: false as const, error: fallback.error.message }
+      }
+      return {
+        success: true as const,
+        migrationRequired: true,
+        logs: (fallback.data || []).map(
+          (row): DepartmentHourLogRow => ({
+            id: row.id as string,
+            workDate: row.work_date as string,
+            hours: Number(row.hours || 0),
+            notes: (row.notes as string | null) ?? null,
+          })
+        ),
+      }
+    }
     return { success: false as const, error: error.message }
   }
 
   return {
     success: true as const,
     migrationRequired: false,
-    logs: (data || []).map(
-      (row): DepartmentHourLogRow => ({
+    logs: (data || []).map((row): DepartmentHourLogRow => {
+      const event = row.childcare_event as
+        | { name?: string | null }
+        | { name?: string | null }[]
+        | null
+      const eventRow = Array.isArray(event) ? event[0] : event
+      return {
         id: row.id as string,
         workDate: row.work_date as string,
         hours: Number(row.hours || 0),
         notes: (row.notes as string | null) ?? null,
-      })
-    ),
+        childcareEventId: (row.childcare_event_id as string | null) ?? null,
+        eventName: eventRow?.name?.trim() || null,
+        source: (row.source as string | null) ?? null,
+      }
+    }),
   }
 }
 
@@ -1205,7 +1331,7 @@ export async function fetchDepartmentPayrollMatrix(departmentId: string) {
   >()
 
   for (const row of list.rows) {
-    if (row.status !== "approved") continue
+    if (row.status !== "approved" && row.status !== "paid") continue
     const labelDate = /^\d{4}-\d{2}$/.test(row.periodKey)
       ? `${row.periodKey}-01`
       : row.periodStart

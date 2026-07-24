@@ -27,6 +27,7 @@ import {
   Baby,
   UserCheck,
   BarChart3,
+  Wallet,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -107,6 +108,14 @@ const STATIC_SIDEBAR_MODULES: SidebarModuleRow[] = [
     group_name: "People",
     sort_order: 20,
   },
+  {
+    name: "Finance",
+    slug: "finance",
+    route: "/finance/payroll",
+    icon_name: "Wallet",
+    group_name: "Financial",
+    sort_order: 35,
+  },
 ]
 
 /** Staff sidebar module order (Dashboard is always first; Billing/Settings are pinned last). */
@@ -115,6 +124,7 @@ const moduleSortOrderOverride: Record<string, number> = {
   workforce: 20,
   membership: 25,
   donations: 30,
+  finance: 35,
   programs: 40,
   "event-management": 50,
   bookings: 60,
@@ -197,6 +207,7 @@ const iconMap: Record<string, LucideIcon> = {
   ClipboardList,
   Baby,
   UserCheck,
+  Wallet,
 }
 
 const modulePermissionMap: Record<string, string> = {
@@ -208,6 +219,7 @@ const modulePermissionMap: Record<string, string> = {
   applications: "applications.view",
   contacts: "contacts.view",
   membership: "membership.view",
+  finance: "finance.view",
   reports: "reports.view",
   ticketing: "ticketing.view",
   bookings: "bookings.view",
@@ -220,6 +232,7 @@ const modulePermissionMap: Record<string, string> = {
 const modulePermissionFallbacks: Record<string, string[]> = {
   "event-management": ["programs.view", "ticketing.view", "ticketing.manage"],
   membership: ["contacts.view"],
+  finance: ["donations.view", "staff.view"],
 }
 
 const subItemPermissionFallbacks: Record<string, string[]> = {
@@ -230,6 +243,8 @@ const subItemPermissionFallbacks: Record<string, string[]> = {
   "ticketing.manage": ["events.manage", "programs.manage"],
   "membership.view": ["contacts.view"],
   "membership.manage": ["contacts.manage"],
+  "finance.view": ["donations.view", "staff.view"],
+  "finance.manage": ["donations.manage", "staff.manage"],
 }
 
 const moduleDisplayNameMap: Record<string, string> = {
@@ -356,6 +371,14 @@ const moduleChildren: Record<string, SubItem[]> = {
     { label: "Settings", href: "/membership/settings", matchPrefix: "/membership/settings", permissionKey: "membership.manage" },
   ],
   donations: DONATIONS_SIDEBAR_CHILDREN,
+  finance: [
+    {
+      label: "Payroll",
+      href: "/finance/payroll",
+      matchPrefix: "/finance/payroll",
+      permissionKey: "finance.view",
+    },
+  ],
   workforce: [
     {
       label: "Overview",

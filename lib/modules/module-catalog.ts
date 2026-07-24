@@ -20,6 +20,7 @@ export const PRODUCT_MODULE_SLUGS = [
   "vendor-hub",
   "bookings",
   "donations",
+  "finance",
   "workforce",
   "membership",
 ] as const
@@ -60,6 +61,7 @@ export const SUBSCRIPTION_BUNDLES: SubscriptionBundle[] = [
       "vendor-hub",
       "bookings",
       "donations",
+      "finance",
       "workforce",
       "membership",
     ],

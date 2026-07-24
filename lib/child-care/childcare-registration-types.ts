@@ -15,11 +15,16 @@ export interface ChildcareEvent {
   notes: string | null
   is_active: boolean
   assigned_provider_contact_id: string | null
+  source_type?: string | null
+  source_id?: string | null
 }
 
 export interface ChildcareEventSummary extends ChildcareEvent {
   registered_count: number
   assigned_provider_name: string | null
+  /** Resolved from linked internal event when present. */
+  linked_department_id?: string | null
+  linked_department_name?: string | null
 }
 
 export interface ChildcareRegistration {

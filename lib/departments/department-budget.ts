@@ -185,7 +185,9 @@ export async function fetchDepartmentBudgetSummary(
     throw new Error(periodsResult.error.message)
   }
 
-  const approvedPay = payroll.rows.filter((row) => row.status === "approved")
+  const approvedPay = payroll.rows.filter(
+    (row) => row.status === "approved" || row.status === "paid"
+  )
 
   const tuitionByMonth = new Map<string, number>()
   for (const enrollment of tuition.rows) {

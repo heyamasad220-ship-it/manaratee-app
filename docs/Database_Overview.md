@@ -139,9 +139,9 @@ discount_tags.organization_id → organizations.id
 
 **Staff pay basis (migration `169_staff_pay_basis.sql`):** `staff.pay_basis` (`hourly` | `monthly`) and optional `staff.monthly_salary` for fixed monthly compensation.
 
-**Department operating finance (migration `170_department_operating_finance.sql`):** `department_staff_pay_entries` (staff × period hours/amount for a department), `department_babysitting_income_entries` / `department_babysitting_pay_entries` (legacy babysitting ledgers; UI removed — childcare fee income is on Students enrollments; childcare pay is on Payroll). Budget P&L uses student payments + approved payroll (not donations).
+**Department operating finance (migration `170_department_operating_finance.sql`):** `department_staff_pay_entries` (staff × period hours/amount for a department), `department_babysitting_income_entries` / `department_babysitting_pay_entries` (legacy babysitting ledgers; UI removed — childcare fee income is on Students enrollments; childcare pay is on Payroll). Budget P&L uses student payments + approved/paid payroll (not donations).
 
-**Department hour logs + payroll approval (migration `171_department_staff_hour_logs.sql`):** `department_staff_hour_logs` (daily hours by staff for a department — childcare providers may log to any department); pay entries gain `status` (`draft` | `pending` | `approved` | `rejected`), `period_start` / `period_end`, submit/approve fields. Budget payroll uses **approved** periods only.
+**Department hour logs + payroll approval (migration `171_department_staff_hour_logs.sql` + `187_finance_module_and_payroll_paid.sql` + `188_hour_logs_childcare_event.sql`):** `department_staff_hour_logs` (daily hours by staff for a department — childcare providers may log to any department; optional `childcare_event_id` / `source`); pay entries gain `status` (`draft` | `pending` | `approved` | `rejected` | `paid`), `period_start` / `period_end`, submit/approve fields, and Finance `paid_at`. Budget payroll uses **approved** and **paid** periods. Org Finance queue: `/finance/payroll`.
 
 **Custom pay period keys (migration `172_pay_period_custom_key.sql`):** Relaxes `period_key` check so academic-year ranges like `2026-08-17_2026-08-31` are allowed (not only `YYYY-MM`).
 

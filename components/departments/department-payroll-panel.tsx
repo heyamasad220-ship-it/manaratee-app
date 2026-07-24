@@ -77,12 +77,14 @@ function statusBadge(status: DepartmentPayPeriodRow["status"]) {
     pending: "bg-amber-100 text-amber-900",
     approved: "bg-emerald-100 text-emerald-800",
     rejected: "bg-red-100 text-red-800",
+    paid: "bg-sky-100 text-sky-900",
   }
   const labels: Record<DepartmentPayPeriodRow["status"], string> = {
     draft: "Draft",
     pending: "Pending approval",
     approved: "Approved",
     rejected: "Rejected",
+    paid: "Paid",
   }
   return (
     <Badge variant="secondary" className={cn("font-normal capitalize", styles[status])}>
@@ -162,7 +164,7 @@ export function DepartmentPayrollPanel({
   const pendingCount = rows.filter((row) => row.status === "pending").length
   const draftCount = rows.filter((row) => row.status === "draft").length
   const approvedTotal = rows
-    .filter((row) => row.status === "approved")
+    .filter((row) => row.status === "approved" || row.status === "paid")
     .reduce((sum, row) => sum + Number(row.amount || 0), 0)
   const hoursTotal = rows
     .filter((row) => row.payBasis === "hourly")
@@ -511,8 +513,15 @@ export function DepartmentPayrollPanel({
                 ) : (
                   <ul className="max-h-56 space-y-1 overflow-y-auto rounded-md border p-2">
                     {detailLogs.map((log) => (
-                      <li key={log.id} className="flex justify-between gap-2">
-                        <span>{formatDate(log.workDate)}</span>
+                      <li key={log.id} className="flex justify-between gap-2 text-sm">
+                        <span>
+                          {formatDate(log.workDate)}
+                          {log.eventName ? (
+                            <span className="text-muted-foreground"> · {log.eventName}</span>
+                          ) : log.notes ? (
+                            <span className="text-muted-foreground"> · {log.notes}</span>
+                          ) : null}
+                        </span>
                         <span className="tabular-nums">{log.hours} hrs</span>
                       </li>
                     ))}
