@@ -1,17 +1,11 @@
 import { redirect } from "next/navigation"
+import { hrOverviewHref } from "@/lib/hr/hr-overview-path"
 
 export default async function InstructorsPage({
   searchParams,
 }: {
   searchParams: Promise<{ tab?: string }>
 }) {
-  const { tab } = await searchParams
-  const pageTab =
-    tab === "assignments" || tab === "documents"
-      ? tab
-      : tab === "overview" || !tab
-        ? "employees"
-        : "employees"
-
-  redirect(`/workforce/employees?tab=${pageTab}`)
+  await searchParams
+  redirect(hrOverviewHref({ tab: "employees" }))
 }

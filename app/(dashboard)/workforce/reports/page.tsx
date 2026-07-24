@@ -1,15 +1,7 @@
-import { Header } from "@/components/layout/header"
-import { HRReportsClient } from "@/components/hr/hr-reports-client"
-import { PEOPLE_MANAGEMENT_MODULE_LABEL } from "@/lib/hr/hr-module-label"
-import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
+import { redirect } from "next/navigation"
+import { HR_OVERVIEW_PATH } from "@/lib/hr/hr-overview-path"
 
-export default async function HRReportsPage() {
-  const organizationId = await getSelectedOrganizationId()
-
-  return (
-    <>
-      <Header title={`${PEOPLE_MANAGEMENT_MODULE_LABEL} Reports`} />
-      <HRReportsClient organizationId={organizationId} />
-    </>
-  )
+/** HR Reports hub removed — metrics live on Overview. */
+export default function WorkforceReportsRedirectPage() {
+  redirect(HR_OVERVIEW_PATH)
 }

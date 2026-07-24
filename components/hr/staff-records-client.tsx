@@ -9,7 +9,7 @@ import { staffMemberProfileHref } from "@/lib/contacts/contact-profile-path"
 import { syncStaffContactAffiliationsByContactId } from "@/lib/hr/staff-affiliation-actions"
 import { createEmployeeFromContact } from "@/lib/contacts/contact-actions"
 import { fetchApplicationDashboardStats } from "@/lib/applications/application-actions"
-import { HR_EMPLOYEE_APPLICATIONS_PATH } from "@/lib/applications/application-routes"
+import { hrCategoryApplicationsUrl, HR_EMPLOYEE_APPLICATIONS_PATH } from "@/lib/applications/application-routes"
 import { HrCategoryApplicationsPanel } from "@/components/applications/hr-category-applications-panel"
 import { HrContactPicker } from "@/components/hr/hr-contact-picker"
 import {
@@ -43,7 +43,6 @@ import {
   Trash2,
   Clock,
   Calendar,
-  Plane,
   ChevronLeft,
   ChevronRight,
   User,
@@ -56,6 +55,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
+import {
+  hrOverviewHref,
+  parseHrDirectoryView,
+} from "@/lib/hr/hr-overview-path"
+import { HrPositionsManager } from "@/components/hr/hr-positions-manager"
 
 type StaffType = "full_time" | "part_time" | "temporary" | "contract" | "seasonal"
 type StaffStatus = "active" | "inactive" | "on_leave" | "pending"
@@ -142,12 +146,16 @@ export function StaffRecordsClient({
   const [departments, setDepartments] = useState<Department[]>([])
   const [hrPositions, setHrPositions] = useState<HrPositionOption[]>([])
 
-  const [directoryTab, setDirectoryTab] = useState<"employees" | "applications" | "archived">(
-    () => (searchParams.get("tab") === "applications" ? "applications" : "employees")
-  )
+  const [directoryTab, setDirectoryTab] = useState<
+    "employees" | "applications" | "positions"
+  >(() => {
+    const view = parseHrDirectoryView(searchParams, { legacyTabParam: true })
+    if (view === "applications" || view === "positions") return view
+    return "employees"
+  })
   const [searchQuery, setSearchQuery] = useState("")
   const [typeFilter, setTypeFilter] = useState("all")
-  const [statusFilter, setStatusFilter] = useState("all")
+  const [statusFilter, setStatusFilter] = useState<"active" | "inactive">("active")
   const [departmentFilter, setDepartmentFilter] = useState("all")
   const [positionFilter, setPositionFilter] = useState("all")
   const [page, setPage] = useState(1)
@@ -184,11 +192,11 @@ export function StaffRecordsClient({
   }, [])
 
   useEffect(() => {
-    const tab = searchParams.get("tab")
-    if (tab === "applications") {
+    const view = parseHrDirectoryView(searchParams, { legacyTabParam: true })
+    if (view === "applications") {
       setDirectoryTab("applications")
-    } else if (tab === "archived") {
-      setDirectoryTab("archived")
+    } else if (view === "positions") {
+      setDirectoryTab("positions")
     } else {
       setDirectoryTab("employees")
     }
@@ -198,18 +206,22 @@ export function StaffRecordsClient({
     setPage(1)
   }, [directoryTab, searchQuery, typeFilter, statusFilter, departmentFilter, positionFilter])
 
-  function setDirectoryTabAndUrl(tabId: "employees" | "applications" | "archived") {
+  function setDirectoryTabAndUrl(tabId: "employees" | "applications" | "positions") {
     setDirectoryTab(tabId)
     if (tabId === "applications") {
-      router.replace(`${HR_EMPLOYEE_APPLICATIONS_PATH}?tab=applications`, { scroll: false })
+      router.replace(hrOverviewHref({ tab: "employees", view: "applications" }), {
+        scroll: false,
+      })
       return
     }
-    if (tabId === "archived") {
-      router.replace(`${HR_EMPLOYEE_APPLICATIONS_PATH}?tab=archived`, { scroll: false })
+    if (tabId === "positions") {
+      router.replace(hrOverviewHref({ tab: "employees", view: "positions" }), { scroll: false })
       return
     }
-    router.replace(HR_EMPLOYEE_APPLICATIONS_PATH, { scroll: false })
+    router.replace(hrOverviewHref({ tab: "employees" }), { scroll: false })
   }
+
+  const isRosterView = directoryTab === "employees"
 
   async function fetchPageData() {
     if (!organizationId) {
@@ -393,23 +405,22 @@ export function StaffRecordsClient({
   }
 
   const directoryStaff = useMemo(() => {
-    if (directoryTab === "archived") {
+    if (statusFilter === "inactive") {
       return staff.filter((person) => person.status === "inactive")
     }
     return staff.filter((person) => person.status !== "inactive")
-  }, [staff, directoryTab])
+  }, [staff, statusFilter])
 
   const stats = useMemo(() => {
-    const base = directoryTab === "archived" ? directoryStaff : staff.filter((p) => p.status !== "inactive")
+    const base = staff.filter((p) => p.status !== "inactive")
     const total = base.length
     return {
       total,
       fullTime: base.filter((person) => person.staff_type === "full_time").length,
       partTime: base.filter((person) => person.staff_type === "part_time").length,
       seasonal: base.filter((person) => person.staff_type === "seasonal").length,
-      onLeave: base.filter((person) => person.status === "on_leave").length,
     }
-  }, [staff, directoryStaff, directoryTab])
+  }, [staff])
 
   const filteredStaff = useMemo(() => {
     return directoryStaff.filter((person) => {
@@ -426,10 +437,6 @@ export function StaffRecordsClient({
         person.hr_job_role_name?.toLowerCase().includes(search)
 
       const matchesType = typeFilter === "all" || person.staff_type === typeFilter
-      const matchesStatus =
-        directoryTab === "archived" ||
-        statusFilter === "all" ||
-        person.status === statusFilter
 
       const personAssignments = assignments.filter((assignment) => assignment.staff_id === person.id)
       const matchesDepartment =
@@ -442,19 +449,15 @@ export function StaffRecordsClient({
         person.position_id === positionFilter ||
         person.position_name === positionFilter
 
-      return Boolean(
-        matchesSearch && matchesType && matchesStatus && matchesDepartment && matchesPosition
-      )
+      return Boolean(matchesSearch && matchesType && matchesDepartment && matchesPosition)
     })
   }, [
     directoryStaff,
     assignments,
     searchQuery,
     typeFilter,
-    statusFilter,
     departmentFilter,
     positionFilter,
-    directoryTab,
   ])
 
   const pageCount = Math.max(1, Math.ceil(filteredStaff.length / PAGE_SIZE))
@@ -544,15 +547,15 @@ export function StaffRecordsClient({
       <HrDirectoryShell
         title="Employees"
         description="Manage your organization's employees. Employees are linked to their contact profiles."
-        onExport={directoryTab === "applications" ? undefined : handleExport}
+        onExport={isRosterView ? handleExport : undefined}
         exportDisabled={filteredStaff.length === 0}
         primaryAction={
-          directoryTab === "applications" ? undefined : (
+          isRosterView ? (
           <Button type="button" onClick={() => setIsAddStaffOpen(true)}>
             <UserPlus className="mr-2 size-4" />
             Add Employee
           </Button>
-          )
+          ) : undefined
         }
         tabs={[
           { id: "employees", label: "Employees" },
@@ -561,17 +564,21 @@ export function StaffRecordsClient({
             label: "Applications",
             count: applicationsCount,
           },
-          { id: "archived", label: "Archived" },
+          { id: "positions", label: "Positions" },
         ]}
         activeTab={directoryTab}
         onTabChange={(tabId) => {
-          if (tabId === "employees" || tabId === "applications" || tabId === "archived") {
+          if (
+            tabId === "employees" ||
+            tabId === "applications" ||
+            tabId === "positions"
+          ) {
             setDirectoryTabAndUrl(tabId)
           }
         }}
         stats={
-          directoryTab === "applications" ? undefined : (
-          <StatCardsRow equal columns={5}>
+          isRosterView ? (
+          <StatCardsRow equal columns={4}>
             <StatCard
               layout="header"
               fill
@@ -608,20 +615,11 @@ export function StaffRecordsClient({
               hint={percentOf(stats.seasonal, stats.total)}
               icon={Calendar}
             />
-            <StatCard
-              layout="header"
-              fill
-              tone="amber"
-              label="On Leave"
-              value={stats.onLeave}
-              hint={percentOf(stats.onLeave, stats.total)}
-              icon={Plane}
-            />
           </StatCardsRow>
-          )
+          ) : undefined
         }
         filters={
-          directoryTab === "applications" ? undefined : (
+          isRosterView ? (
           <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-3 lg:flex-row lg:items-center">
             <div className="relative min-w-0 flex-1">
               <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -671,24 +669,25 @@ export function StaffRecordsClient({
                 ))}
               </SelectContent>
             </Select>
-            {directoryTab === "employees" ? (
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-full lg:w-[160px]">
-                  <SelectValue placeholder="All Statuses" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="on_leave">On Leave</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                </SelectContent>
-              </Select>
-            ) : null}
+            <Select
+              value={statusFilter}
+              onValueChange={(value) =>
+                setStatusFilter(value as "active" | "inactive")
+              }
+            >
+              <SelectTrigger className="w-full lg:w-[160px]">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-          )
+          ) : undefined
         }
         footer={
-          directoryTab === "applications" ? undefined : (
+          isRosterView ? (
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-muted-foreground">
               Showing {pageStart} to {pageEnd} of {filteredStaff.length} employees.
@@ -738,7 +737,7 @@ export function StaffRecordsClient({
               <span className="ml-2 text-sm text-muted-foreground">{PAGE_SIZE} / page</span>
             </div>
           </div>
-          )
+          ) : undefined
         }
       >
         {directoryTab === "applications" ? (
@@ -754,6 +753,8 @@ export function StaffRecordsClient({
               description="Review employment application submissions."
             />
           </Suspense>
+        ) : directoryTab === "positions" ? (
+          <HrPositionsManager />
         ) : !organizationId ? (
           <Card>
             <CardContent className="p-6 text-sm text-muted-foreground">

@@ -177,27 +177,23 @@ Label constant: `lib/hr/hr-module-label.ts` → `PEOPLE_MANAGEMENT_MODULE_LABEL`
 
 Routes remain under `/hr/*` / `/workforce/*` for now. Application submissions live on each category’s Applications view (not a Settings hub):
 
-* Employment → `/workforce/employees?tab=applications`
-* Volunteer → `/workforce/volunteers?tab=applications`
-* Childcare → `/workforce/childcare?tab=applications`
+* Employment → `/workforce?tab=employees&view=applications`
+* Volunteer → `/workforce?tab=volunteers&view=applications` (customer apply: `/customer/apply/volunteer`)
+* Childcare → `/workforce?tab=childcare&view=applications` (customer apply: `/customer/apply/childcare`)
 * Committee → `/membership/applications`
 
-Sidebar (People Management / HR):
+Sidebar (HR):
 
-* Overview → `/workforce`
-* Employees
-* Volunteers
-* Child Care
-* Reports
-* Settings → `/hr/settings` (Discount Policies only); HR org settings at `/workforce/settings` (Positions, Application Templates). **Departments** lives under **HR** in the sidebar (`/workforce/departments`: Overview, Employees, Rosters, Applications, Schedule, Financial [Payroll / Expenses / Financial Summary], Reports for archived years; Group giving when a donations group is linked; Activity = department events not individual gifts). **Finance** sidebar module (`/finance/payroll`) processes approved payroll org-wide (Mark paid); SaaS **Billing** stays in the footer.
+* Overview → `/workforce` (tabs: Overview, Departments, Employees, Volunteers, Childcare Providers, Payroll). Overview tab shows headcount metrics and employees by department. Employees includes Positions (`?view=positions`). **Payroll** (`?tab=payroll`) is the org queue to Mark paid (formerly Finance sidebar). Sidebar: HR is a direct link to Overview (no flyout). Legacy `/finance` / `/finance/payroll` and `/workforce/reports` redirect into HR.
+* Discount Policies → `/hr/settings` (Membership Benefits redirect path may apply). Department **list** is Overview → Departments (`/workforce?tab=departments`); department **workspace** remains `/workforce/departments/[id]` (Overview, Rosters, Applications, Schedule, Financial [Payroll / Expenses / Financial Summary — employees under Payroll], Reports for archived years; Group giving when a donations group is linked; Activity = department events not individual gifts). SaaS **Billing** stays in the footer.
 
 Membership sidebar includes **Groups** (`/membership/groups` — member groups / former HR Teams). Giving collectives are under Donations (`/donations/groups/[id]`, Group Giving report) — badge can link a collective to a Membership Group or Department, otherwise **Group Donation**.
 
-Employees, Volunteers, and Childcare Providers use a shared directory UI (`HrDirectoryShell`): roster | Applications | Archived, KPI cards, export, and pagination. Adding employees/volunteers is contact-first (search Contacts; create contact first if missing).
+Employees, Volunteers, and Childcare Providers use a shared directory UI (`HrDirectoryShell`): roster | Applications (Positions on Employees), KPI cards, Active/Inactive status filter (default Active), export, and pagination. Adding employees/volunteers is contact-first (search Contacts; create contact first if missing).
 
 Other modules link to Applications with filters:
 
 * Vendor Hub → `/applications/all?application_type=vendor`
 * Programs → Financial Assistance filter
-* Employment applications → `/workforce/employees?tab=applications`
+* Employment applications → `/workforce?tab=employees&view=applications`
 * Committee applications → `/membership/applications`

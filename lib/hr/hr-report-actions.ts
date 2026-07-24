@@ -12,6 +12,7 @@ import type {
 } from "@/lib/hr/hr-report-types"
 
 function revalidateHrReports() {
+  revalidatePath("/workforce")
   revalidatePath("/workforce/reports")
 }
 

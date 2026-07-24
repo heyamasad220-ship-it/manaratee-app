@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
+import { hrOverviewHref } from "@/lib/hr/hr-overview-path"
 
-/** Departments moved to HR → Departments (`/workforce/departments`). */
 export default function WorkforceSettingsDepartmentsRedirectPage() {
-  redirect("/workforce/departments")
+  redirect(hrOverviewHref({ tab: "departments" }))
 }

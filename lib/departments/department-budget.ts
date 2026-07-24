@@ -1,6 +1,10 @@
 "use server"
 
 import {
+  loadDepartmentOpenPrograms,
+  periodOverlapsOpenPrograms,
+} from "@/lib/departments/department-active-programs"
+import {
   canManageDepartment,
   canViewDepartment,
 } from "@/lib/departments/department-access"
@@ -160,7 +164,7 @@ export async function fetchDepartmentBudgetSummary(
   }
 
   const supabase = await createClient()
-  const [tuition, payroll, periodsResult] = await Promise.all([
+  const [tuition, payroll, periodsResult, openPrograms] = await Promise.all([
     fetchDepartmentStudentPaymentsMatrix(departmentId),
     fetchDepartmentPayrollList(departmentId, { scope: "all-approved-for-budget" }),
     supabase
@@ -169,6 +173,7 @@ export async function fetchDepartmentBudgetSummary(
       .eq("organization_id", organizationId)
       .eq("department_id", departmentId)
       .order("period_start", { ascending: true }),
+    loadDepartmentOpenPrograms(organizationId, departmentId),
   ])
 
   if (periodsResult.error) {
@@ -187,6 +192,14 @@ export async function fetchDepartmentBudgetSummary(
 
   const approvedPay = payroll.rows.filter(
     (row) => row.status === "approved" || row.status === "paid"
+  )
+
+  const openPeriodRows = (periodsResult.data || []).filter((row) =>
+    periodOverlapsOpenPrograms(
+      row.period_start as string,
+      row.period_end as string,
+      openPrograms
+    )
   )
 
   const tuitionByMonth = new Map<string, number>()
@@ -217,7 +230,7 @@ export async function fetchDepartmentBudgetSummary(
     )
   }
 
-  const periods: DepartmentBudgetPeriodTotals[] = (periodsResult.data || []).map(
+  const periods: DepartmentBudgetPeriodTotals[] = openPeriodRows.map(
     (row) => {
       const periodStart = row.period_start as string
       const periodEnd = row.period_end as string

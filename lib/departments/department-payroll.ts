@@ -5,6 +5,10 @@ import {
   roundMoney,
 } from "@/lib/departments/department-period-helpers"
 import {
+  loadDepartmentOpenPrograms,
+  periodOverlapsOpenPrograms,
+} from "@/lib/departments/department-active-programs"
+import {
   canManageDepartment,
   canViewDepartment,
 } from "@/lib/departments/department-access"
@@ -656,6 +660,7 @@ export async function logDepartmentStaffHoursAction(input: {
   }
 
   revalidatePath(workforceDepartmentDetailPath(input.departmentId))
+  revalidatePath("/workforce")
   revalidatePath("/finance/payroll")
   return { success: true as const, periodKey: synced.periodKey || periodKey }
 }
@@ -1051,7 +1056,11 @@ export async function deletePayPeriodEntryAction(input: {
 
 export async function fetchDepartmentPayrollList(
   departmentId: string,
-  options?: { scope?: "visible" | "all-approved-for-budget" }
+  options?: {
+    scope?: "visible" | "all-approved-for-budget"
+    /** When true (default), only pay periods that overlap open year/season dates. */
+    openYearsOnly?: boolean
+  }
 ): Promise<{
   rows: DepartmentPayPeriodRow[]
   migrationRequired: boolean
@@ -1075,6 +1084,15 @@ export async function fetchDepartmentPayrollList(
       )
     : null
   const selfStaffId = selfRow ? (selfRow.id as string) : null
+
+  const openYearsOnly = options?.openYearsOnly !== false
+  const openPrograms = openYearsOnly
+    ? await loadDepartmentOpenPrograms(access.organizationId, departmentId)
+    : null
+
+  if (openYearsOnly && openPrograms && openPrograms.length === 0) {
+    return { rows: [], migrationRequired: false, canApprove, selfStaffId }
+  }
 
   const eligible = await loadPayrollEligibleStaff(
     access.supabase,
@@ -1121,50 +1139,55 @@ export async function fetchDepartmentPayrollList(
     }
   }
 
-  const rows: DepartmentPayPeriodRow[] = (entries || []).map((entry) => {
-    const staff = staffById.get(entry.staff_id as string)
-    const bounds =
-      entry.period_start && entry.period_end
-        ? {
-            periodStart: entry.period_start as string,
-            periodEnd: entry.period_end as string,
-          }
-        : periodBounds(entry.period_key as string)
+  const rows: DepartmentPayPeriodRow[] = (entries || [])
+    .map((entry) => {
+      const staff = staffById.get(entry.staff_id as string)
+      const bounds =
+        entry.period_start && entry.period_end
+          ? {
+              periodStart: entry.period_start as string,
+              periodEnd: entry.period_end as string,
+            }
+          : periodBounds(entry.period_key as string)
 
-    const payBasis: StaffPayBasis =
-      (entry.pay_basis as string) === "monthly" ||
-      (staff?.pay_basis as string) === "monthly"
-        ? "monthly"
-        : "hourly"
+      const payBasis: StaffPayBasis =
+        (entry.pay_basis as string) === "monthly" ||
+        (staff?.pay_basis as string) === "monthly"
+          ? "monthly"
+          : "hourly"
 
-    return {
-      id: entry.id as string,
-      staffId: entry.staff_id as string,
-      fullName: staff ? staffDisplayName(staff) : "Employee",
-      positionName: staff ? positionLabel(staff) : null,
-      isChildcareProvider: staff ? isChildcareProviderStaff(staff) : false,
-      payBasis,
-      hourlyRate:
-        entry.hourly_rate == null
-          ? staff?.hourly_rate == null
-            ? null
-            : Number(staff.hourly_rate)
-          : Number(entry.hourly_rate),
-      monthlySalary:
-        entry.monthly_salary == null
-          ? staff?.monthly_salary == null
-            ? null
-            : Number(staff.monthly_salary)
-          : Number(entry.monthly_salary),
-      periodKey: entry.period_key as string,
-      periodStart: bounds.periodStart,
-      periodEnd: bounds.periodEnd,
-      hoursWorked:
-        entry.hours_worked == null ? null : Number(entry.hours_worked),
-      amount: roundMoney(Number(entry.amount || 0)),
-      status: (entry.status as PayPeriodStatus) || "draft",
-    }
-  })
+      return {
+        id: entry.id as string,
+        staffId: entry.staff_id as string,
+        fullName: staff ? staffDisplayName(staff) : "Employee",
+        positionName: staff ? positionLabel(staff) : null,
+        isChildcareProvider: staff ? isChildcareProviderStaff(staff) : false,
+        payBasis,
+        hourlyRate:
+          entry.hourly_rate == null
+            ? staff?.hourly_rate == null
+              ? null
+              : Number(staff.hourly_rate)
+            : Number(entry.hourly_rate),
+        monthlySalary:
+          entry.monthly_salary == null
+            ? staff?.monthly_salary == null
+              ? null
+              : Number(staff.monthly_salary)
+            : Number(entry.monthly_salary),
+        periodKey: entry.period_key as string,
+        periodStart: bounds.periodStart,
+        periodEnd: bounds.periodEnd,
+        hoursWorked:
+          entry.hours_worked == null ? null : Number(entry.hours_worked),
+        amount: roundMoney(Number(entry.amount || 0)),
+        status: (entry.status as PayPeriodStatus) || "draft",
+      }
+    })
+    .filter((row) => {
+      if (!openPrograms) return true
+      return periodOverlapsOpenPrograms(row.periodStart, row.periodEnd, openPrograms)
+    })
 
   // Teachers without manage permission only see their own rows (UI list).
   // Budget aggregation uses scope all-approved-for-budget (caller filters approved).

@@ -1,6 +1,8 @@
 "use client"
 
 import { useEffect, useState, type ElementType } from "react"
+import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { format, parseISO } from "date-fns"
 import {
   Pencil,
@@ -42,6 +44,14 @@ import {
 } from "@/lib/customer/customer-profile-nav"
 import { ContactPaymentMethodsPanel } from "@/components/contacts/contact-payment-methods-panel"
 import type { ContactPaymentMethodRow } from "@/lib/contacts/contact-payment-method-actions"
+import {
+  fetchContactApplications,
+} from "@/lib/applications/application-actions"
+import {
+  APPLICATION_STATUS_LABELS,
+  type ApplicationStatus as DbApplicationStatus,
+} from "@/lib/applications/application-types"
+import { CUSTOMER_CHILDCARE_APPLY_PATH, CUSTOMER_VOLUNTEER_APPLY_PATH } from "@/lib/applications/application-routes"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -133,8 +143,6 @@ function calculateAge(dateOfBirth: string): number {
   return age
 }
 
-type ApplicationStatus = "Pending" | "Under Review" | "Approved" | "Rejected"
-
 type ApplicationType = {
   id: string
   name: string
@@ -142,17 +150,47 @@ type ApplicationType = {
   icon: string
   isActive: boolean
   requirements: string[]
+  href?: string
 }
 
 type UserApplication = {
   id: string
   applicationTypeId: string
   applicationTypeName: string
-  status: ApplicationStatus
+  status: DbApplicationStatus
   submittedAt: string
 }
 
-const applicationTypes: ApplicationType[] = []
+const applicationTypes: ApplicationType[] = [
+  {
+    id: "volunteer",
+    name: "Volunteer",
+    description:
+      "Join our volunteer team and help with events, programs, and community activities.",
+    icon: "Heart",
+    isActive: true,
+    requirements: [
+      "Background check consent",
+      "Availability schedule",
+      "Areas of interest",
+    ],
+    href: CUSTOMER_VOLUNTEER_APPLY_PATH,
+  },
+  {
+    id: "childcare_provider",
+    name: "Childcare Provider",
+    description:
+      "Apply to become a babysitter or childcare provider for community events and programs.",
+    icon: "Baby",
+    isActive: true,
+    requirements: [
+      "CPR and First Aid certification preferred",
+      "Background check consent",
+      "References from previous childcare experience",
+    ],
+    href: CUSTOMER_CHILDCARE_APPLY_PATH,
+  },
+]
 
 const iconMap: Record<string, ElementType> = {
   Store,
@@ -163,11 +201,16 @@ const iconMap: Record<string, ElementType> = {
   Briefcase,
 }
 
-const statusStyles: Record<ApplicationStatus, { variant: "default" | "secondary" | "outline" | "destructive"; className: string }> = {
-  Pending: { variant: "secondary", className: "bg-amber-100 text-amber-700" },
-  "Under Review": { variant: "secondary", className: "bg-blue-100 text-blue-700" },
-  Approved: { variant: "secondary", className: "bg-emerald-100 text-emerald-700" },
-  Rejected: { variant: "destructive", className: "" },
+const statusStyles: Record<
+  DbApplicationStatus,
+  { variant: "default" | "secondary" | "outline" | "destructive"; className: string }
+> = {
+  draft: { variant: "outline", className: "" },
+  submitted: { variant: "secondary", className: "bg-amber-100 text-amber-700" },
+  pending_review: { variant: "secondary", className: "bg-blue-100 text-blue-700" },
+  approved: { variant: "secondary", className: "bg-emerald-100 text-emerald-700" },
+  rejected: { variant: "destructive", className: "" },
+  withdrawn: { variant: "outline", className: "" },
 }
 
 function splitFullName(fullName: string | null | undefined) {
@@ -202,6 +245,7 @@ function formatRelationship(value: string) {
 
 export function CustomerProfilePage({ section }: CustomerProfilePageProps) {
   const supabase = createClient()
+  const router = useRouter()
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -277,18 +321,53 @@ export function CustomerProfilePage({ section }: CustomerProfilePageProps) {
       setEditData(loadedProfile)
       setFamilyMembers(result.familyMembers)
       setPaymentMethods(result.paymentMethods || [])
-      setUserApplications([])
       setEnabledModuleSlugs(result.enabledModuleSlugs || [])
       setNotifications(createDefaultCustomerNotificationSettings())
+
+      try {
+        const apps = await fetchContactApplications(data.id)
+        setUserApplications(
+          apps.map((app) => ({
+            id: app.id,
+            applicationTypeId: app.application_type,
+            applicationTypeName:
+              applicationTypes.find((type) => type.id === app.application_type)?.name ||
+              app.application_type,
+            status: app.status,
+            submittedAt: app.submitted_at || app.created_at,
+          }))
+        )
+      } catch (error) {
+        console.error("Customer applications load error:", error)
+        setUserApplications([])
+      }
+
       setLoading(false)
     }
 
     loadProfile()
   }, [])
 
-  const availableApplicationTypes = applicationTypes.filter(
-    (appType) => appType.isActive && !userApplications.some((ua) => ua.applicationTypeId === appType.id)
-  )
+  const availableApplicationTypes = applicationTypes.filter((appType) => {
+    if (!appType.isActive) return false
+    return !userApplications.some(
+      (ua) =>
+        ua.applicationTypeId === appType.id &&
+        (ua.status === "submitted" ||
+          ua.status === "pending_review" ||
+          ua.status === "approved")
+    )
+  })
+
+  function openApplyDialog(appType: ApplicationType) {
+    if (appType.href) {
+      router.push(appType.href)
+      return
+    }
+    setSelectedAppType(appType)
+    setApplicationAnswers({})
+    setIsApplyDialogOpen(true)
+  }
 
   function handleEdit() {
     setEditData({ ...profile })
@@ -477,12 +556,6 @@ export function CustomerProfilePage({ section }: CustomerProfilePageProps) {
     }
   }
 
-  function openApplyDialog(appType: ApplicationType) {
-    setSelectedAppType(appType)
-    setApplicationAnswers({})
-    setIsApplyDialogOpen(true)
-  }
-
   function handleApplicationAnswerChange(requirement: string, value: string) {
     setApplicationAnswers((prev) => ({ ...prev, [requirement]: value }))
   }
@@ -495,7 +568,7 @@ export function CustomerProfilePage({ section }: CustomerProfilePageProps) {
       id: `ua-${Date.now()}`,
       applicationTypeId: selectedAppType.id,
       applicationTypeName: selectedAppType.name,
-      status: "Pending",
+      status: "pending_review",
       submittedAt: new Date().toISOString(),
     }
 
@@ -701,7 +774,7 @@ export function CustomerProfilePage({ section }: CustomerProfilePageProps) {
       {section === "applications" ? (
       <div className="flex flex-col gap-6">
       <Card className="border border-border shadow-sm">
-        <CardHeader><CardTitle className="flex items-center gap-2 text-base font-semibold"><Users className="h-4 w-4" />Applications</CardTitle><CardDescription>Apply to become a vendor, volunteer, or take on other roles in our community.</CardDescription></CardHeader>
+        <CardHeader><CardTitle className="flex items-center gap-2 text-base font-semibold"><Users className="h-4 w-4" />Applications</CardTitle><CardDescription>Apply to become a volunteer, childcare provider, or take on other community roles.</CardDescription></CardHeader>
         <CardContent className="flex flex-col gap-6">
           {userApplications.length > 0 && (
             <div className="flex flex-col gap-3">
@@ -711,7 +784,7 @@ export function CustomerProfilePage({ section }: CustomerProfilePageProps) {
                   const appType = applicationTypes.find((at) => at.id === application.applicationTypeId)
                   const IconComponent = appType ? iconMap[appType.icon] : Users
                   const statusStyle = statusStyles[application.status]
-                  return <div key={application.id} className="flex items-center justify-between rounded-lg border border-border bg-muted/30 p-3"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10"><IconComponent className="h-5 w-5 text-primary" /></div><div className="flex flex-col gap-0.5"><span className="text-sm font-medium text-foreground">{application.applicationTypeName}</span><span className="text-xs text-muted-foreground">Submitted {format(parseISO(application.submittedAt), "MMM d, yyyy")}</span></div></div><Badge variant={statusStyle.variant} className={statusStyle.className}>{application.status === "Pending" && <Clock className="mr-1 h-3 w-3" />}{application.status === "Under Review" && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}{application.status === "Approved" && <CheckCircle2 className="mr-1 h-3 w-3" />}{application.status === "Rejected" && <XCircle className="mr-1 h-3 w-3" />}{application.status}</Badge></div>
+                  return <div key={application.id} className="flex items-center justify-between rounded-lg border border-border bg-muted/30 p-3"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10"><IconComponent className="h-5 w-5 text-primary" /></div><div className="flex flex-col gap-0.5"><span className="text-sm font-medium text-foreground">{application.applicationTypeName}</span><span className="text-xs text-muted-foreground">Submitted {format(parseISO(application.submittedAt), "MMM d, yyyy")}</span></div></div><Badge variant={statusStyle.variant} className={statusStyle.className}>{application.status === "pending_review" || application.status === "submitted" ? <Clock className="mr-1 h-3 w-3" /> : null}{application.status === "approved" ? <CheckCircle2 className="mr-1 h-3 w-3" /> : null}{application.status === "rejected" ? <XCircle className="mr-1 h-3 w-3" /> : null}{APPLICATION_STATUS_LABELS[application.status]}</Badge></div>
                 })}
               </div>
               {availableApplicationTypes.length > 0 && <Separator className="my-2" />}
@@ -728,8 +801,21 @@ export function CustomerProfilePage({ section }: CustomerProfilePageProps) {
                 })}
               </div>
             </div>
-          ) : (
+          ) : userApplications.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-6 text-center"><CheckCircle2 className="mb-2 h-8 w-8 text-emerald-500" /><p className="text-sm font-medium text-foreground">No applications available yet</p><p className="text-xs text-muted-foreground">Available applications will appear here once they are connected.</p></div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              You already have active applications on file. Open an application type above to
+              check status, or visit{" "}
+              <Link href={CUSTOMER_VOLUNTEER_APPLY_PATH} className="underline">
+                Volunteer
+              </Link>{" "}
+              /{" "}
+              <Link href={CUSTOMER_CHILDCARE_APPLY_PATH} className="underline">
+                Childcare
+              </Link>
+              .
+            </p>
           )}
         </CardContent>
       </Card>

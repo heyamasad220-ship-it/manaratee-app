@@ -1,4 +1,8 @@
 import { redirect } from "next/navigation"
+import {
+  hrEmployeePositionsHref,
+  hrOverviewHref,
+} from "@/lib/hr/hr-overview-path"
 
 export default async function HRSettingsRedirectPage({
   searchParams,
@@ -8,10 +12,10 @@ export default async function HRSettingsRedirectPage({
   const { tab } = await searchParams
 
   if (tab === "departments") {
-    redirect("/workforce/departments")
+    redirect(hrOverviewHref({ tab: "departments" }))
   }
   if (tab === "positions") {
-    redirect("/workforce/settings/positions")
+    redirect(hrEmployeePositionsHref())
   }
 
   const query = tab ? `?tab=${encodeURIComponent(tab)}` : ""

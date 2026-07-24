@@ -1,8 +1,9 @@
-import { notFound } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
 
 import { Header } from "@/components/layout/header"
 import { ProgramDetailClient } from "@/components/programs/program-detail-client"
 import { getDepartments } from "@/lib/departments/department-queries"
+import { departmentGroupWorkspaceHref } from "@/lib/donations/donation-group-path"
 import { getOfferingsForProgram } from "@/lib/programs/program-offering-queries"
 import { getProgramById } from "@/lib/programs/program-queries"
 import { getOfferingEnrollmentCount } from "@/lib/programs/program-staff-assignment-queries"
@@ -26,6 +27,32 @@ export default async function ProgramDetailsPage({
 
   if (!program) {
     notFound()
+  }
+
+  // Year/season enrollments report merged into HR → Departments → Enrollments.
+  if (tab === "reports" && program.department_id) {
+    redirect(
+      departmentGroupWorkspaceHref(program.department_id, {
+        tab: "rosters",
+        yearProgramId: program.id,
+      })
+    )
+  }
+  if (tab === "reports") {
+    redirect(`/programs/${program.id}`)
+  }
+
+  // Programs (offerings) list lives on the department Programs tab.
+  if (tab === "offerings" && program.department_id) {
+    redirect(
+      departmentGroupWorkspaceHref(program.department_id, {
+        tab: "programs",
+        yearProgramId: program.id,
+      })
+    )
+  }
+  if (tab === "offerings") {
+    redirect(`/programs/${program.id}`)
   }
 
   const enrollmentCounts = await Promise.all(

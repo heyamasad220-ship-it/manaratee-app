@@ -187,8 +187,8 @@ export function FinancePayrollQueuePanel() {
             </CardTitle>
             <CardDescription>
               Approved department payroll (teachers and childcare providers) ready
-              for Finance to process. SaaS subscription Billing stays under
-              Billing in the sidebar footer.
+              to mark paid. SaaS subscription Billing stays under Billing in the
+              sidebar footer.
             </CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -235,7 +235,7 @@ export function FinancePayrollQueuePanel() {
           ) : rows.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
               No pay entries in this view. Department heads approve payroll first;
-              approved lines appear here for Finance.
+              approved lines appear here.
             </p>
           ) : (
             <div className="overflow-x-auto rounded-md border">

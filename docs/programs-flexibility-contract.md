@@ -148,7 +148,7 @@ Columns **QI / Edu / Camp** = how often that layer is the *primary* place staff 
 
 | Report | Scope | QI | Edu | Camp | Notes |
 |--------|-------|----|-----|------|-------|
-| Enrolled students | Program (+ filter by offering) | ● | ● | ● | Roster across classes/weeks |
+| Enrolled students | Department Rosters (+ year/season & program filters) | ● | ● | ● | Roster across classes; was year/season Reports |
 | Capacity / fill / waitlist | Program + offering | ● | ● | ● | Groups matter for camps |
 | Payments / FA | Program (existing) | ● | ● | ○ | Stay on current FA / billing paths |
 
@@ -201,9 +201,9 @@ Columns **QI / Edu / Camp** = how often that layer is the *primary* place staff 
 
 **SQL:** `180` (inherit flags), `181` (care pack + `program_attendance`), **`183`** (assigned staff roster RLS).
 
-**Key F2–F6 files:** `program-defaults-settings-panel.tsx`, `program-detail-client.tsx`, `my-class-detail-client.tsx`, `program-attendance-queries.ts`, `program-attendance-actions.ts`, `program-enrollments-report-panel.tsx`, offering Overview feature packs.
+**Key F2–F6 files:** `program-defaults-settings-panel.tsx`, `program-detail-client.tsx`, `my-class-detail-client.tsx`, `program-attendance-queries.ts`, `program-attendance-actions.ts`, department Rosters (`department-participants-panel.tsx` — enrollments report merged from year/season Reports), offering Overview feature packs.
 
-**F7 polish (July 2026):** Department Add offering inherit toggles; customer registration uses effective inherit dates; program detail `?tab=settings|offerings|reports`; class attendance marks viewed under **Programs → Reports → Attendance** (`OfferingClassAttendancePanel`).
+**F7 polish (July 2026):** Department Add offering inherit toggles; customer registration uses effective inherit dates; program detail `?tab=settings|offerings` (Reports enrollments → department Rosters); class attendance marks viewed under **Programs → Reports → Attendance** (`OfferingClassAttendancePanel`).
 
 ---
 

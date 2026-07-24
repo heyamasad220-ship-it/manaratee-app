@@ -20,7 +20,11 @@ import {
 import type { VolunteerStatus } from "@/lib/volunteers/volunteer-types"
 import { formatStatusLabel } from "@/lib/volunteers/volunteer-utils"
 import { fetchApplicationDashboardStats } from "@/lib/applications/application-actions"
-import { HR_VOLUNTEER_APPLICATIONS_PATH } from "@/lib/applications/application-routes"
+import { HR_VOLUNTEER_APPLICATIONS_PATH, CUSTOMER_VOLUNTEER_APPLY_PATH } from "@/lib/applications/application-routes"
+import {
+  hrOverviewHref,
+  parseHrDirectoryView,
+} from "@/lib/hr/hr-overview-path"
 import { HrCategoryApplicationsPanel } from "@/components/applications/hr-category-applications-panel"
 import { HrContactPicker } from "@/components/hr/hr-contact-picker"
 import {
@@ -128,9 +132,13 @@ export function VolunteersList() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [search, setSearch] = useState("")
-  const [statusFilter, setStatusFilter] = useState<VolunteerStatus | "all">("all")
-  const [directoryTab, setDirectoryTab] = useState<"volunteers" | "applications" | "archived">(
-    () => (searchParams.get("tab") === "applications" ? "applications" : "volunteers")
+  const [statusFilter, setStatusFilter] = useState<"active" | "inactive">("active")
+  const [directoryTab, setDirectoryTab] = useState<"volunteers" | "applications">(
+    () => {
+      const view = parseHrDirectoryView(searchParams, { legacyTabParam: true })
+      if (view === "applications") return view
+      return "volunteers"
+    }
   )
   const [applicationsCount, setApplicationsCount] = useState(0)
   const [page, setPage] = useState(1)
@@ -144,27 +152,23 @@ export function VolunteersList() {
   })
 
   useEffect(() => {
-    const tab = searchParams.get("tab")
-    if (tab === "applications") {
+    const view = parseHrDirectoryView(searchParams, { legacyTabParam: true })
+    if (view === "applications") {
       setDirectoryTab("applications")
-    } else if (tab === "archived") {
-      setDirectoryTab("archived")
     } else {
       setDirectoryTab("volunteers")
     }
   }, [searchParams])
 
-  function setDirectoryTabAndUrl(tabId: "volunteers" | "applications" | "archived") {
+  function setDirectoryTabAndUrl(tabId: "volunteers" | "applications") {
     setDirectoryTab(tabId)
     if (tabId === "applications") {
-      router.replace(`${HR_VOLUNTEER_APPLICATIONS_PATH}?tab=applications`, { scroll: false })
+      router.replace(hrOverviewHref({ tab: "volunteers", view: "applications" }), {
+        scroll: false,
+      })
       return
     }
-    if (tabId === "archived") {
-      router.replace(`${HR_VOLUNTEER_APPLICATIONS_PATH}?tab=archived`, { scroll: false })
-      return
-    }
-    router.replace(HR_VOLUNTEER_APPLICATIONS_PATH, { scroll: false })
+    router.replace(hrOverviewHref({ tab: "volunteers" }), { scroll: false })
   }
 
   const loadRows = useCallback(async () => {
@@ -213,18 +217,11 @@ export function VolunteersList() {
   }, [rows])
 
   const filteredRows = useMemo(() => {
-    let result = rows
-
-    if (directoryTab === "archived") {
-      result = result.filter((row) => row.status === "inactive")
-    } else if (statusFilter === "all") {
-      result = result.filter((row) => row.status !== "inactive")
-    } else {
-      result = result.filter((row) => row.status === statusFilter)
+    if (statusFilter === "inactive") {
+      return rows.filter((row) => row.status === "inactive")
     }
-
-    return result
-  }, [rows, directoryTab, statusFilter])
+    return rows.filter((row) => row.status !== "inactive")
+  }, [rows, statusFilter])
 
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE))
   const currentPage = Math.min(page, totalPages)
@@ -291,10 +288,26 @@ export function VolunteersList() {
         exportDisabled={loading || filteredRows.length === 0}
         primaryAction={
           directoryTab === "applications" ? undefined : (
-            <Button type="button" onClick={() => setAddOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Volunteer
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={async () => {
+                  try {
+                    const url = `${window.location.origin}${CUSTOMER_VOLUNTEER_APPLY_PATH}`
+                    await navigator.clipboard.writeText(url)
+                  } catch (error) {
+                    console.error("Could not copy apply link:", error)
+                  }
+                }}
+              >
+                Copy apply link
+              </Button>
+              <Button type="button" onClick={() => setAddOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Volunteer
+              </Button>
+            </div>
           )
         }
         tabs={[
@@ -304,11 +317,10 @@ export function VolunteersList() {
             label: "Applications",
             count: applicationsCount,
           },
-          { id: "archived", label: "Archived" },
         ]}
         activeTab={directoryTab}
         onTabChange={(tabId) => {
-          if (tabId === "volunteers" || tabId === "applications" || tabId === "archived") {
+          if (tabId === "volunteers" || tabId === "applications") {
             setDirectoryTabAndUrl(tabId)
           }
         }}
@@ -366,26 +378,20 @@ export function VolunteersList() {
                   onChange={(event) => setSearch(event.target.value)}
                 />
               </div>
-              {directoryTab === "volunteers" ? (
-                <Select
+              <Select
                   value={statusFilter}
                   onValueChange={(value) =>
-                    setStatusFilter(value as VolunteerStatus | "all")
+                    setStatusFilter(value as "active" | "inactive")
                   }
                 >
                   <SelectTrigger className="w-full sm:w-[180px]">
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All statuses</SelectItem>
-                    {STATUS_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
                   </SelectContent>
                 </Select>
-              ) : null}
             </div>
           )
         }

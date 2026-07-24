@@ -6,7 +6,7 @@ export const DONATIONS_GROUPS_BASE_PATH = "/donations/groups"
 
 export type GroupWorkspaceTab =
   | "overview"
-  | "employees"
+  | "programs"
   | "rosters"
   | "applications"
   | "schedule"
@@ -14,9 +14,18 @@ export type GroupWorkspaceTab =
   | "group-giving"
   | "activity"
   | "reports"
+  | "settings"
 
 /** Sub-tabs under Department → Financial. */
 export type DepartmentFinanceSection = "payroll" | "expenses" | "budget"
+
+/** Sub-tabs under Department → Settings. */
+export type DepartmentSettingsSection =
+  | "general"
+  | "registration"
+  | "notifications"
+  | "promo-codes"
+  | "service-needs"
 
 export function donationGroupHref(
   groupContactId: string,
@@ -45,6 +54,9 @@ export function departmentGroupWorkspaceHref(
   options?: {
     tab?: GroupWorkspaceTab
     finance?: DepartmentFinanceSection
+    settingsSection?: DepartmentSettingsSection
+    /** Prefill Programs / Enrollments year/season filter (open program id). */
+    yearProgramId?: string
     returnTo?: string
   }
 ): string {
@@ -59,6 +71,16 @@ export function departmentGroupWorkspaceHref(
   ) {
     params.set("section", options.finance)
   }
+  if (
+    options?.tab === "settings" &&
+    options.settingsSection &&
+    options.settingsSection !== "general"
+  ) {
+    params.set("section", options.settingsSection)
+  }
+  if (options?.yearProgramId) {
+    params.set("year", options.yearProgramId)
+  }
   if (options?.returnTo && isSafeReturnToPath(options.returnTo)) {
     params.set(RETURN_TO_QUERY_PARAM, options.returnTo)
   }
@@ -72,14 +94,19 @@ export function mapDonationTabToWorkspaceTab(
 ): GroupWorkspaceTab {
   if (
     tab === "overview" ||
-    tab === "employees" ||
+    tab === "programs" ||
     tab === "rosters" ||
     tab === "applications" ||
     tab === "schedule" ||
     tab === "activity" ||
-    tab === "reports"
+    tab === "reports" ||
+    tab === "settings"
   ) {
     return tab
+  }
+  // Legacy Employees tab → Financial / Payroll.
+  if (tab === "employees") {
+    return "financial"
   }
   // Legacy Years/Seasons catalog tab → Overview (years live there now).
   if (tab === "offerings") {
@@ -94,8 +121,8 @@ export function mapDonationTabToWorkspaceTab(
   ) {
     return "financial"
   }
-  // Legacy Students / Tuition Transactions / participants → Rosters.
-  if (tab === "payments" || tab === "participants") {
+  // Enrollments UI label; URL stays ?tab=rosters (and enrollments alias).
+  if (tab === "enrollments" || tab === "payments" || tab === "participants") {
     return "rosters"
   }
   // Donation Members / Financial map to department Group giving.
@@ -110,16 +137,21 @@ export function parseDepartmentWorkspaceTab(
 ): GroupWorkspaceTab {
   if (
     tab === "overview" ||
-    tab === "employees" ||
+    tab === "programs" ||
     tab === "rosters" ||
     tab === "applications" ||
     tab === "schedule" ||
     tab === "financial" ||
     tab === "group-giving" ||
     tab === "activity" ||
-    tab === "reports"
+    tab === "reports" ||
+    tab === "settings"
   ) {
     return tab
+  }
+  // Legacy Employees tab → Financial / Payroll.
+  if (tab === "employees") {
+    return "financial"
   }
   // Legacy Years/Seasons catalog tab → Overview.
   if (tab === "offerings") {
@@ -134,8 +166,8 @@ export function parseDepartmentWorkspaceTab(
   ) {
     return "financial"
   }
-  // Legacy Students / Tuition Transactions / participants → Rosters.
-  if (tab === "payments" || tab === "participants") {
+  // Enrollments UI label; URL stays ?tab=rosters (and enrollments alias).
+  if (tab === "enrollments" || tab === "payments" || tab === "participants") {
     return "rosters"
   }
   // Legacy Members → Group giving (donation “financial” stays group-giving via mapDonation).
@@ -155,6 +187,20 @@ export function parseDepartmentFinanceSection(
   if (section === "expenses") return "expenses"
   if (section === "budget") return "budget"
   return "payroll"
+}
+
+export function parseDepartmentSettingsSection(
+  section: string | null | undefined
+): DepartmentSettingsSection {
+  if (
+    section === "registration" ||
+    section === "notifications" ||
+    section === "promo-codes" ||
+    section === "service-needs"
+  ) {
+    return section
+  }
+  return "general"
 }
 
 export function donationGroupGivingListHref(returnTo?: string) {

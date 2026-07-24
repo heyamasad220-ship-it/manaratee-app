@@ -80,6 +80,8 @@ const HIDDEN_SIDEBAR_MODULE_SLUGS = new Set([
   "hr",
   "reports",
   "applications",
+  // Payroll queue lives under HR → Payroll (`/workforce?tab=payroll`).
+  "finance",
 ])
 
 /** Ensures Event Management appears before SQL migration 038 is applied. */
@@ -107,14 +109,6 @@ const STATIC_SIDEBAR_MODULES: SidebarModuleRow[] = [
     icon_name: "Users",
     group_name: "People",
     sort_order: 20,
-  },
-  {
-    name: "Finance",
-    slug: "finance",
-    route: "/finance/payroll",
-    icon_name: "Wallet",
-    group_name: "Financial",
-    sort_order: 35,
   },
 ]
 
@@ -272,13 +266,6 @@ const moduleDefaultRouteOverride: Record<string, string> = {
   hr: "/workforce",
 }
 
-const departmentsNavItem: SubItem = {
-  label: "Departments",
-  href: "/workforce/departments",
-  matchPrefix: "/workforce/departments",
-  permissionKey: "staff.view",
-}
-
 const moduleChildren: Record<string, SubItem[]> = {
   bookings: [
     { label: "Dashboard", href: "/bookings/overview", matchPrefix: "/bookings/overview", permissionKey: "bookings.view" },
@@ -343,8 +330,8 @@ const moduleChildren: Record<string, SubItem[]> = {
     },
     {
       label: "Settings",
-      href: "/programs/settings",
-      matchPrefix: "/programs/settings",
+      href: "/workforce?tab=departments",
+      matchPrefix: "/workforce/departments",
       permissionKey: "programs.manage",
     },
   ],
@@ -371,124 +358,9 @@ const moduleChildren: Record<string, SubItem[]> = {
     { label: "Settings", href: "/membership/settings", matchPrefix: "/membership/settings", permissionKey: "membership.manage" },
   ],
   donations: DONATIONS_SIDEBAR_CHILDREN,
-  finance: [
-    {
-      label: "Payroll",
-      href: "/finance/payroll",
-      matchPrefix: "/finance/payroll",
-      permissionKey: "finance.view",
-    },
-  ],
-  workforce: [
-    {
-      label: "Overview",
-      href: "/workforce",
-      matchPrefix: "/workforce",
-      exact: true,
-      permissionKey: "staff.view",
-    },
-    departmentsNavItem,
-    {
-      label: "Employees",
-      href: "/workforce/employees",
-      matchPrefix: "/workforce/employees",
-      permissionKey: "staff.view",
-    },
-    {
-      label: "Volunteers",
-      href: "/workforce/volunteers",
-      matchPrefix: "/workforce/volunteers",
-      permissionKey: "staff.view",
-    },
-    {
-      label: "Childcare Providers",
-      href: "/workforce/childcare",
-      matchPrefix: "/workforce/childcare",
-      exact: true,
-      permissionKey: "staff.view",
-    },
-    {
-      label: "Reports",
-      href: "/workforce/reports",
-      matchPrefix: "/workforce/reports",
-      permissionKey: "reports.view",
-    },
-    {
-      label: "Settings",
-      href: "/workforce/settings/positions",
-      matchPrefix: "/workforce/settings",
-      permissionKey: "staff.view",
-      children: [
-        {
-          label: "Positions",
-          href: "/workforce/settings/positions",
-          matchPrefix: "/workforce/settings/positions",
-          permissionKey: "staff.view",
-        },
-        {
-          label: "Application Templates",
-          href: "/workforce/settings/application-templates",
-          matchPrefix: "/workforce/settings/application-templates",
-          permissionKey: "applications.view",
-        },
-      ],
-    },
-  ],
-  hr: [
-    {
-      label: "Overview",
-      href: "/workforce",
-      matchPrefix: "/workforce",
-      exact: true,
-      permissionKey: "staff.view",
-    },
-    departmentsNavItem,
-    {
-      label: "Employees",
-      href: "/workforce/employees",
-      matchPrefix: "/workforce/employees",
-      permissionKey: "staff.view",
-    },
-    {
-      label: "Volunteers",
-      href: "/workforce/volunteers",
-      matchPrefix: "/workforce/volunteers",
-      permissionKey: "staff.view",
-    },
-    {
-      label: "Childcare Providers",
-      href: "/workforce/childcare",
-      matchPrefix: "/workforce/childcare",
-      exact: true,
-      permissionKey: "staff.view",
-    },
-    {
-      label: "Reports",
-      href: "/workforce/reports",
-      matchPrefix: "/workforce/reports",
-      permissionKey: "reports.view",
-    },
-    {
-      label: "Settings",
-      href: "/workforce/settings/positions",
-      matchPrefix: "/workforce/settings",
-      permissionKey: "staff.view",
-      children: [
-        {
-          label: "Positions",
-          href: "/workforce/settings/positions",
-          matchPrefix: "/workforce/settings/positions",
-          permissionKey: "staff.view",
-        },
-        {
-          label: "Application Templates",
-          href: "/workforce/settings/application-templates",
-          matchPrefix: "/workforce/settings/application-templates",
-          permissionKey: "applications.view",
-        },
-      ],
-    },
-  ],
+  // No flyout — HR goes straight to Overview (`/workforce`).
+  workforce: [],
+  hr: [],
 }
 
 function userCanAccess(permissionContext: UserPermissionContext, permissionKey?: string) {

@@ -1,29 +1,27 @@
-import { Header } from "@/components/layout/header"
-import { HrEmployeesPageClient } from "@/components/hr/hr-employees-page-client"
-import { ModuleApplicationsLink } from "@/components/applications/module-applications-link"
-import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
+import { redirect } from "next/navigation"
+import { hrOverviewHref } from "@/lib/hr/hr-overview-path"
 
-export default async function HrEmployeesPage({
+function directoryApplicationsView(params: {
+  tab?: string
+  view?: string
+}): "applications" | null {
+  if (params.view === "applications" || params.tab === "applications") {
+    return "applications"
+  }
+  return null
+}
+
+export default async function HrEmployeesAliasPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; staffTab?: string }>
+  searchParams: Promise<{ tab?: string; view?: string }>
 }) {
-  const { tab, staffTab } = await searchParams
-  const organizationId = await getSelectedOrganizationId()
+  const params = await searchParams
 
-  return (
-    <>
-      <Header
-        title="Employees"
-        actions={
-          <ModuleApplicationsLink applicationType="employment" label="Employment Applications" />
-        }
-      />
-      <HrEmployeesPageClient
-        organizationId={organizationId}
-        initialTab={tab}
-        initialStaffTab={staffTab}
-      />
-    </>
+  redirect(
+    hrOverviewHref({
+      tab: "employees",
+      view: directoryApplicationsView(params),
+    })
   )
 }

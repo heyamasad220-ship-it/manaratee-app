@@ -1,8 +1,23 @@
 "use client"
 
-import { useCallback, useEffect, useState, useTransition } from "react"
-import { Check, Clock, FileText, Loader2, Pencil, Plus, Send, Trash2, Users, Wallet, X } from "lucide-react"
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
+import Link from "next/link"
+import {
+  Check,
+  Clock,
+  FileText,
+  Loader2,
+  Pencil,
+  Plus,
+  Send,
+  Trash2,
+  UserMinus,
+  Users,
+  Wallet,
+  X,
+} from "lucide-react"
 
+import { HrContactPicker } from "@/components/hr/hr-contact-picker"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -33,6 +48,14 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
+import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
+import type { DepartmentStaffMember } from "@/lib/departments/department-actions"
+import {
+  addEmployeeToDepartmentAction,
+  listHrPositionsForDepartmentFormAction,
+  removeStaffFromDepartmentAction,
+  updateDepartmentEmployeeAction,
+} from "@/lib/departments/department-staff-actions"
 import {
   approvePayPeriodAction,
   createPayPeriodForAllEmployeesAction,
@@ -71,6 +94,33 @@ function formatPeriodRange(start: string, end: string) {
   return `${formatDate(start)} – ${formatDate(end)}`
 }
 
+function formatPayRate(input: {
+  payBasis: "hourly" | "monthly"
+  hourlyRate: number | null
+  monthlySalary: number | null
+}) {
+  if (input.payBasis === "monthly") {
+    return input.monthlySalary == null
+      ? "Monthly"
+      : `${formatCurrency(input.monthlySalary)}/mo`
+  }
+  return input.hourlyRate == null
+    ? "Hourly"
+    : `${formatCurrency(input.hourlyRate)}/hr`
+}
+
+const STAFF_TYPE_OPTIONS = [
+  { value: "full_time", label: "Full time" },
+  { value: "part_time", label: "Part time" },
+  { value: "temporary", label: "Temporary" },
+  { value: "contract", label: "Contract" },
+  { value: "seasonal", label: "Seasonal" },
+] as const
+
+type MergedRow =
+  | { kind: "pay"; pay: DepartmentPayPeriodRow; member: DepartmentStaffMember | null }
+  | { kind: "staff"; member: DepartmentStaffMember }
+
 function statusBadge(status: DepartmentPayPeriodRow["status"]) {
   const styles: Record<DepartmentPayPeriodRow["status"], string> = {
     draft: "bg-muted text-muted-foreground",
@@ -96,9 +146,13 @@ function statusBadge(status: DepartmentPayPeriodRow["status"]) {
 export function DepartmentPayrollPanel({
   departmentId,
   departmentName,
+  staff,
+  onStaffChanged,
 }: {
   departmentId: string
   departmentName: string
+  staff: DepartmentStaffMember[]
+  onStaffChanged: () => Promise<void> | void
 }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -111,7 +165,22 @@ export function DepartmentPayrollPanel({
   const [editRow, setEditRow] = useState<DepartmentPayPeriodRow | null>(null)
   const [detailRow, setDetailRow] = useState<DepartmentPayPeriodRow | null>(null)
   const [detailLogs, setDetailLogs] = useState<DepartmentHourLogRow[]>([])
+  const [employeeDialogOpen, setEmployeeDialogOpen] = useState(false)
+  const [editingMember, setEditingMember] = useState<DepartmentStaffMember | null>(null)
+  const [selectedContactId, setSelectedContactId] = useState<string | null>(null)
+  const [selectedContactLabel, setSelectedContactLabel] = useState("")
+  const [staffType, setStaffType] = useState<string>("full_time")
+  const [employmentStatus, setEmploymentStatus] = useState<string>("active")
+  const [positionId, setPositionId] = useState<string>("")
+  const [employeePayBasis, setEmployeePayBasis] = useState<"hourly" | "monthly">("hourly")
+  const [hourlyRate, setHourlyRate] = useState("")
+  const [monthlySalary, setMonthlySalary] = useState("")
+  const [positions, setPositions] = useState<Array<{ id: string; name: string }>>([])
+  const [positionsLoading, setPositionsLoading] = useState(false)
+  const [employeeError, setEmployeeError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+
+  const isEditingEmployee = Boolean(editingMember)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -133,6 +202,41 @@ export function DepartmentPayrollPanel({
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    if (!employeeDialogOpen) return
+    let cancelled = false
+    async function loadPositions() {
+      setPositionsLoading(true)
+      const result = await listHrPositionsForDepartmentFormAction()
+      if (!cancelled) {
+        if (result.success) setPositions(result.positions)
+        else setPositions([])
+        setPositionsLoading(false)
+      }
+    }
+    void loadPositions()
+    return () => {
+      cancelled = true
+    }
+  }, [employeeDialogOpen])
+
+  const staffById = useMemo(() => {
+    return new Map(staff.map((member) => [member.staffId, member]))
+  }, [staff])
+
+  const mergedRows: MergedRow[] = useMemo(() => {
+    const payRows: MergedRow[] = rows.map((pay) => ({
+      kind: "pay",
+      pay,
+      member: staffById.get(pay.staffId) ?? null,
+    }))
+    const staffIdsWithPay = new Set(rows.map((row) => row.staffId))
+    const staffOnly: MergedRow[] = staff
+      .filter((member) => !staffIdsWithPay.has(member.staffId))
+      .map((member) => ({ kind: "staff", member }))
+    return [...payRows, ...staffOnly]
+  }, [rows, staff, staffById])
 
   async function openDetail(row: DepartmentPayPeriodRow) {
     setDetailRow(row)
@@ -161,6 +265,149 @@ export function DepartmentPayrollPanel({
     })
   }
 
+  function resetEmployeeForm() {
+    setEditingMember(null)
+    setSelectedContactId(null)
+    setSelectedContactLabel("")
+    setStaffType("full_time")
+    setEmploymentStatus("active")
+    setPositionId("")
+    setEmployeePayBasis("hourly")
+    setHourlyRate("")
+    setMonthlySalary("")
+    setEmployeeError(null)
+  }
+
+  function openAddEmployee() {
+    resetEmployeeForm()
+    setEmployeeDialogOpen(true)
+  }
+
+  function openEditEmployee(member: DepartmentStaffMember) {
+    setEditingMember(member)
+    setSelectedContactId(member.contactId)
+    setSelectedContactLabel(member.fullName)
+    setStaffType(member.staffType || "full_time")
+    setEmploymentStatus(member.employmentStatus || "active")
+    setPositionId(member.positionId || "")
+    setEmployeePayBasis(member.payBasis || "hourly")
+    setHourlyRate(member.hourlyRate == null ? "" : String(member.hourlyRate))
+    setMonthlySalary(member.monthlySalary == null ? "" : String(member.monthlySalary))
+    setEmployeeError(null)
+    setEmployeeDialogOpen(true)
+  }
+
+  function parseMoneyInput(value: string, label: string): number | null | undefined {
+    const trimmed = value.trim()
+    if (!trimmed) return null
+    const parsed = Number(trimmed)
+    if (Number.isNaN(parsed) || parsed < 0) {
+      setEmployeeError(`Enter a valid ${label} (0 or greater), or leave it blank.`)
+      return undefined
+    }
+    return parsed
+  }
+
+  function handleSaveEmployee() {
+    const parsedRate = parseMoneyInput(hourlyRate, "hourly rate")
+    if (parsedRate === undefined) return
+    const parsedSalary = parseMoneyInput(monthlySalary, "monthly salary")
+    if (parsedSalary === undefined) return
+
+    const selectedPosition = positions.find((item) => item.id === positionId)
+
+    if (isEditingEmployee && editingMember) {
+      setEmployeeError(null)
+      startTransition(async () => {
+        const result = await updateDepartmentEmployeeAction({
+          departmentId,
+          staffId: editingMember.staffId,
+          staff_type: staffType as
+            | "full_time"
+            | "part_time"
+            | "temporary"
+            | "contract"
+            | "seasonal",
+          status: employmentStatus as "active" | "inactive" | "on_leave" | "pending",
+          position_id: positionId || null,
+          position_name: selectedPosition?.name || null,
+          pay_basis: employeePayBasis,
+          hourly_rate: parsedRate,
+          monthly_salary: parsedSalary,
+        })
+
+        if (!result.success) {
+          setEmployeeError(result.error)
+          return
+        }
+
+        setEmployeeDialogOpen(false)
+        resetEmployeeForm()
+        await onStaffChanged()
+        await load()
+      })
+      return
+    }
+
+    if (!selectedContactId) {
+      setEmployeeError("Select a contact first. Create them in Contacts if they are not listed.")
+      return
+    }
+
+    setEmployeeError(null)
+    startTransition(async () => {
+      const result = await addEmployeeToDepartmentAction({
+        departmentId,
+        contactId: selectedContactId,
+        staff_type: staffType as
+          | "full_time"
+          | "part_time"
+          | "temporary"
+          | "contract"
+          | "seasonal",
+        status: employmentStatus as "active" | "inactive" | "on_leave" | "pending",
+        position_id: positionId || null,
+        position_name: selectedPosition?.name || null,
+        pay_basis: employeePayBasis,
+        hourly_rate: parsedRate,
+        monthly_salary: parsedSalary,
+      })
+
+      if (!result.success) {
+        setEmployeeError(result.error)
+        return
+      }
+
+      setEmployeeDialogOpen(false)
+      resetEmployeeForm()
+      await onStaffChanged()
+      await load()
+    })
+  }
+
+  function handleRemoveEmployee(member: DepartmentStaffMember) {
+    if (
+      !window.confirm(
+        `Remove ${member.fullName} from this department? They remain an employee in HR.`
+      )
+    ) {
+      return
+    }
+
+    startTransition(async () => {
+      const result = await removeStaffFromDepartmentAction({
+        departmentId,
+        staffId: member.staffId,
+      })
+      if (!result.success) {
+        alert(result.error)
+        return
+      }
+      await onStaffChanged()
+      await load()
+    })
+  }
+
   const pendingCount = rows.filter((row) => row.status === "pending").length
   const draftCount = rows.filter((row) => row.status === "draft").length
   const approvedTotal = rows
@@ -179,10 +426,10 @@ export function DepartmentPayrollPanel({
             layout="header"
             fill
             tone="blue"
-            label="Pay lines"
-            value={rows.length}
-            icon={Wallet}
-            hint="All period rows"
+            label="Employees"
+            value={staff.length}
+            icon={Users}
+            hint="Assigned to department"
           />
           <StatCard
             layout="header"
@@ -226,7 +473,7 @@ export function DepartmentPayrollPanel({
             tone="violet"
             label="Childcare"
             value={childcareCount}
-            icon={Users}
+            icon={Wallet}
             hint="Provider lines"
           />
         </StatCardsRow>
@@ -237,15 +484,20 @@ export function DepartmentPayrollPanel({
           <div>
             <CardTitle className="flex items-center gap-2 text-base">
               <Wallet className="size-4" />
-              Payroll
+              Employees & Payroll
             </CardTitle>
             <CardDescription>
-              Teachers and childcare providers log hours by date (providers pick which department
-              the hours belong to). Department heads create a pay period for everyone and approve
-              lines for {departmentName}.
+              Department employees and pay periods for {departmentName}. Email and phone live on
+              the contact page.
             </CardDescription>
           </div>
           <div className="flex flex-wrap gap-2">
+            {canApprove ? (
+              <Button type="button" size="sm" variant="outline" onClick={openAddEmployee}>
+                <Plus className="mr-1.5 size-4" />
+                Add employee
+              </Button>
+            ) : null}
             <Button type="button" size="sm" onClick={() => setLogOpen(true)}>
               <Plus className="mr-1.5 size-4" />
               Log hours
@@ -279,17 +531,19 @@ export function DepartmentPayrollPanel({
                   ranges also need <code className="text-xs">172</code>.
                 </p>
               ) : null}
-              {rows.length === 0 ? (
+              {mergedRows.length === 0 ? (
                 <p className="py-8 text-center text-sm text-muted-foreground">
-                  No pay periods yet. Create a custom date range for all employees and childcare
-                  providers (for example Aug 17–Aug 31), then log hours into that period.
+                  No employees or pay periods yet. Add an employee, then create a pay period and
+                  log hours.
                 </p>
               ) : (
                 <div className="overflow-x-auto rounded-md border">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Employee</TableHead>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Position</TableHead>
+                        <TableHead>Pay</TableHead>
                         <TableHead>Hours</TableHead>
                         <TableHead>Pay period</TableHead>
                         <TableHead className="text-right">Total payment</TableHead>
@@ -298,87 +552,108 @@ export function DepartmentPayrollPanel({
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {rows.map((row) => (
-                        <TableRow key={row.id || `${row.staffId}-${row.periodKey}`}>
-                          <TableCell className="font-medium">
-                            <button
-                              type="button"
-                              className="text-left text-primary hover:underline"
-                              onClick={() => void openDetail(row)}
-                            >
-                              {row.fullName}
-                            </button>
-                            <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
-                              {row.isChildcareProvider || row.positionName ? (
-                                <Badge variant="outline" className="font-normal text-xs">
-                                  {row.positionName || "Childcare provider"}
-                                </Badge>
-                              ) : null}
-                              <span className="text-xs text-muted-foreground capitalize">
-                                {row.payBasis === "monthly"
-                                  ? "Monthly salary"
-                                  : row.hourlyRate != null
-                                    ? `${formatCurrency(row.hourlyRate)}/hr`
-                                    : "Hourly"}
-                              </span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="tabular-nums text-muted-foreground">
-                            {row.payBasis === "monthly"
-                              ? "—"
-                              : row.hoursWorked == null
+                      {mergedRows.map((item) => {
+                        if (item.kind === "staff") {
+                          const member = item.member
+                          return (
+                            <TableRow key={`staff-${member.staffId}`}>
+                              <TableCell className="font-medium">
+                                {member.contactId ? (
+                                  <Link
+                                    href={contactProfileHref(member.contactId)}
+                                    className="text-primary hover:underline"
+                                  >
+                                    {member.fullName}
+                                  </Link>
+                                ) : (
+                                  member.fullName
+                                )}
+                              </TableCell>
+                              <TableCell className="text-muted-foreground">
+                                {member.positionName || "—"}
+                              </TableCell>
+                              <TableCell className="tabular-nums text-muted-foreground">
+                                {formatPayRate(member)}
+                              </TableCell>
+                              <TableCell className="text-muted-foreground">—</TableCell>
+                              <TableCell className="text-muted-foreground">—</TableCell>
+                              <TableCell className="text-right text-muted-foreground">—</TableCell>
+                              <TableCell className="capitalize text-muted-foreground">
+                                {member.employmentStatus || "—"}
+                              </TableCell>
+                              <TableCell>
+                                {canApprove ? (
+                                  <div className="flex flex-wrap justify-end gap-1">
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      disabled={isPending}
+                                      onClick={() => openEditEmployee(member)}
+                                    >
+                                      <Pencil className="mr-1 size-3.5" />
+                                      Edit
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      className="text-destructive hover:text-destructive"
+                                      disabled={isPending}
+                                      onClick={() => handleRemoveEmployee(member)}
+                                    >
+                                      <UserMinus className="mr-1 size-3.5" />
+                                      Remove
+                                    </Button>
+                                  </div>
+                                ) : null}
+                              </TableCell>
+                            </TableRow>
+                          )
+                        }
+
+                        const row = item.pay
+                        const member = item.member
+                        const positionLabel =
+                          row.positionName ||
+                          (row.isChildcareProvider ? "Childcare provider" : null)
+
+                        return (
+                          <TableRow key={row.id || `${row.staffId}-${row.periodKey}`}>
+                            <TableCell className="font-medium">
+                              <button
+                                type="button"
+                                className="text-left text-primary hover:underline"
+                                onClick={() => void openDetail(row)}
+                              >
+                                {row.fullName}
+                              </button>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {positionLabel || "—"}
+                            </TableCell>
+                            <TableCell className="tabular-nums text-muted-foreground">
+                              {formatPayRate(row)}
+                            </TableCell>
+                            <TableCell className="tabular-nums text-muted-foreground">
+                              {row.payBasis === "monthly"
                                 ? "—"
-                                : `${row.hoursWorked} hrs`}
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {formatPeriodRange(row.periodStart, row.periodEnd)}
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums font-medium">
-                            {formatCurrency(row.amount)}
-                          </TableCell>
-                          <TableCell>{statusBadge(row.status)}</TableCell>
-                          <TableCell>
-                            <div className="flex flex-wrap justify-end gap-1">
-                              {(row.status === "draft" || row.status === "rejected") &&
-                              row.id &&
-                              (canApprove || row.staffId === selfStaffId) ? (
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="outline"
-                                  disabled={isPending}
-                                  onClick={() =>
-                                    runAction(() =>
-                                      submitPayPeriodAction({
-                                        departmentId,
-                                        payEntryId: row.id!,
-                                      })
-                                    )
-                                  }
-                                >
-                                  <Send className="mr-1 size-3.5" />
-                                  Submit
-                                </Button>
-                              ) : null}
-                              {canApprove && row.status === "pending" && row.id ? (
-                                <>
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    disabled={isPending}
-                                    onClick={() =>
-                                      runAction(() =>
-                                        approvePayPeriodAction({
-                                          departmentId,
-                                          payEntryId: row.id!,
-                                          approve: true,
-                                        })
-                                      )
-                                    }
-                                  >
-                                    <Check className="mr-1 size-3.5" />
-                                    Approve
-                                  </Button>
+                                : row.hoursWorked == null
+                                  ? "—"
+                                  : `${row.hoursWorked} hrs`}
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {formatPeriodRange(row.periodStart, row.periodEnd)}
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums font-medium">
+                              {formatCurrency(row.amount)}
+                            </TableCell>
+                            <TableCell>{statusBadge(row.status)}</TableCell>
+                            <TableCell>
+                              <div className="flex flex-wrap justify-end gap-1">
+                                {(row.status === "draft" || row.status === "rejected") &&
+                                row.id &&
+                                (canApprove || row.staffId === selfStaffId) ? (
                                   <Button
                                     type="button"
                                     size="sm"
@@ -386,59 +661,109 @@ export function DepartmentPayrollPanel({
                                     disabled={isPending}
                                     onClick={() =>
                                       runAction(() =>
-                                        approvePayPeriodAction({
+                                        submitPayPeriodAction({
                                           departmentId,
                                           payEntryId: row.id!,
-                                          approve: false,
                                         })
                                       )
                                     }
                                   >
-                                    <X className="mr-1 size-3.5" />
-                                    Reject
+                                    <Send className="mr-1 size-3.5" />
+                                    Submit
                                   </Button>
-                                </>
-                              ) : null}
-                              {canApprove && row.id ? (
-                                <>
+                                ) : null}
+                                {canApprove && row.status === "pending" && row.id ? (
+                                  <>
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      disabled={isPending}
+                                      onClick={() =>
+                                        runAction(() =>
+                                          approvePayPeriodAction({
+                                            departmentId,
+                                            payEntryId: row.id!,
+                                            approve: true,
+                                          })
+                                        )
+                                      }
+                                    >
+                                      <Check className="mr-1 size-3.5" />
+                                      Approve
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      disabled={isPending}
+                                      onClick={() =>
+                                        runAction(() =>
+                                          approvePayPeriodAction({
+                                            departmentId,
+                                            payEntryId: row.id!,
+                                            approve: false,
+                                          })
+                                        )
+                                      }
+                                    >
+                                      <X className="mr-1 size-3.5" />
+                                      Reject
+                                    </Button>
+                                  </>
+                                ) : null}
+                                {canApprove && row.id ? (
+                                  <>
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      disabled={isPending}
+                                      onClick={() => setEditRow(row)}
+                                    >
+                                      <Pencil className="mr-1 size-3.5" />
+                                      Edit pay
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      className="text-destructive hover:text-destructive"
+                                      disabled={isPending}
+                                      onClick={() => {
+                                        const confirmed = window.confirm(
+                                          `Delete pay entry for ${row.fullName} (${formatPeriodRange(row.periodStart, row.periodEnd)})?\n\nThis cannot be undone.`
+                                        )
+                                        if (!confirmed) return
+                                        runAction(() =>
+                                          deletePayPeriodEntryAction({
+                                            departmentId,
+                                            payEntryId: row.id!,
+                                          })
+                                        )
+                                      }}
+                                    >
+                                      <Trash2 className="mr-1 size-3.5" />
+                                      Delete
+                                    </Button>
+                                  </>
+                                ) : null}
+                                {canApprove && member ? (
                                   <Button
                                     type="button"
                                     size="sm"
-                                    variant="outline"
+                                    variant="ghost"
                                     disabled={isPending}
-                                    onClick={() => setEditRow(row)}
+                                    title="Edit employment details"
+                                    onClick={() => openEditEmployee(member)}
                                   >
-                                    <Pencil className="mr-1 size-3.5" />
-                                    Edit
+                                    <Users className="size-3.5" />
                                   </Button>
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="outline"
-                                    className="text-destructive hover:text-destructive"
-                                    disabled={isPending}
-                                    onClick={() => {
-                                      const confirmed = window.confirm(
-                                        `Delete pay entry for ${row.fullName} (${formatPeriodRange(row.periodStart, row.periodEnd)})?\n\nThis cannot be undone.`
-                                      )
-                                      if (!confirmed) return
-                                      runAction(() =>
-                                        deletePayPeriodEntryAction({
-                                          departmentId,
-                                          payEntryId: row.id!,
-                                        })
-                                      )
-                                    }}
-                                  >
-                                    <Trash2 className="mr-1 size-3.5" />
-                                    Delete
-                                  </Button>
-                                </>
-                              ) : null}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                                ) : null}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })}
                     </TableBody>
                   </Table>
                 </div>
@@ -447,6 +772,201 @@ export function DepartmentPayrollPanel({
           )}
         </CardContent>
       </Card>
+
+      <Dialog
+        open={employeeDialogOpen}
+        onOpenChange={(open) => {
+          setEmployeeDialogOpen(open)
+          if (!open) resetEmployeeForm()
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {isEditingEmployee ? "Edit employee" : "Add employee"}
+            </DialogTitle>
+            <DialogDescription>
+              {isEditingEmployee
+                ? `Update employment details for ${editingMember?.fullName || "this employee"} in ${departmentName}. Contact name and email are edited on the contact page.`
+                : `Choose an existing contact. If they are already an employee, they are assigned to ${departmentName}. Otherwise a new employee record is created for this department. Create the person in Contacts first if they are missing.`}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {employeeError ? (
+              <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {employeeError}
+              </div>
+            ) : null}
+
+            {isEditingEmployee ? (
+              <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm">
+                <p className="font-medium">{editingMember?.fullName}</p>
+                {editingMember?.contactId ? (
+                  <Link
+                    href={contactProfileHref(editingMember.contactId)}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    Open contact page
+                  </Link>
+                ) : null}
+              </div>
+            ) : (
+              <HrContactPicker
+                selectedContactId={selectedContactId}
+                selectedLabel={selectedContactLabel}
+                onChange={(contact) => {
+                  setSelectedContactId(contact.contactId)
+                  const name = contact.full_name?.trim() || "Unnamed"
+                  const detail = contact.email || contact.phone
+                  setSelectedContactLabel(detail ? `${name} (${detail})` : name)
+                }}
+                onClear={() => {
+                  setSelectedContactId(null)
+                  setSelectedContactLabel("")
+                }}
+                disabled={isPending}
+              />
+            )}
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Employment type</Label>
+                <Select value={staffType} onValueChange={setStaffType} disabled={isPending}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STAFF_TYPE_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select
+                  value={employmentStatus}
+                  onValueChange={setEmploymentStatus}
+                  disabled={isPending}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                    <SelectItem value="on_leave">On leave</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Position</Label>
+                <Select
+                  value={positionId || "none"}
+                  onValueChange={(value) => setPositionId(value === "none" ? "" : value)}
+                  disabled={isPending || positionsLoading}
+                >
+                  <SelectTrigger>
+                    <SelectValue
+                      placeholder={positionsLoading ? "Loading..." : "Select position"}
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No position</SelectItem>
+                    {positions.map((position) => (
+                      <SelectItem key={position.id} value={position.id}>
+                        {position.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Pay basis</Label>
+                <Select
+                  value={employeePayBasis}
+                  onValueChange={(value) =>
+                    setEmployeePayBasis(value as "hourly" | "monthly")
+                  }
+                  disabled={isPending}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="hourly">Hourly</SelectItem>
+                    <SelectItem value="monthly">Monthly salary</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              {employeePayBasis === "hourly" ? (
+                <div className="space-y-2">
+                  <Label htmlFor="dept-hourly-rate">Hourly rate</Label>
+                  <Input
+                    id="dept-hourly-rate"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    inputMode="decimal"
+                    placeholder="0.00"
+                    value={hourlyRate}
+                    onChange={(event) => setHourlyRate(event.target.value)}
+                    disabled={isPending}
+                  />
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label htmlFor="dept-monthly-salary">Monthly salary</Label>
+                  <Input
+                    id="dept-monthly-salary"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    inputMode="decimal"
+                    placeholder="0.00"
+                    value={monthlySalary}
+                    onChange={(event) => setMonthlySalary(event.target.value)}
+                    disabled={isPending}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setEmployeeDialogOpen(false)}
+              disabled={isPending}
+            >
+              Cancel
+            </Button>
+            <Button type="button" onClick={handleSaveEmployee} disabled={isPending}>
+              {isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : isEditingEmployee ? (
+                "Save changes"
+              ) : (
+                "Add to department"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <LogHoursDialog
         open={logOpen}

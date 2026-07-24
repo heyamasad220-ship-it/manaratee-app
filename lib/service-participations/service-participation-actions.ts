@@ -283,7 +283,7 @@ export async function updateProgramServiceRequirements(input: {
   }
 
   revalidatePath(`/programs/${input.programId}`)
-  revalidatePath("/programs/settings/service-needs")
+  revalidatePath("/workforce?tab=departments")
   revalidatePath("/customer/opportunities")
 }
 

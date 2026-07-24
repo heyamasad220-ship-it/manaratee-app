@@ -249,7 +249,7 @@ export function ProgramCardActions({
                 onClick={onArchiveYear}
               >
                 <Archive className="h-4 w-4" />
-                Archive year
+                Archive
               </DropdownMenuItem>
             </>
           ) : null}

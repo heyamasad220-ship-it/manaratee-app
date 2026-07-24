@@ -5,17 +5,13 @@ import { usePathname } from "next/navigation"
 
 import { cn } from "@/lib/utils"
 
+/** Legacy nav — Programs Settings now lives on each department. */
 const settingsTabs = [
   {
-    label: "General",
-    href: "/programs/settings",
+    label: "Departments",
+    href: "/workforce?tab=departments",
     isActive: (pathname: string) =>
-      pathname === "/programs/settings" || pathname.startsWith("/programs/settings?"),
-  },
-  {
-    label: "Service Needs",
-    href: "/programs/settings/service-needs",
-    isActive: (pathname: string) => pathname.startsWith("/programs/settings/service-needs"),
+      pathname.startsWith("/workforce") || pathname.startsWith("/programs/settings"),
   },
 ] as const
 

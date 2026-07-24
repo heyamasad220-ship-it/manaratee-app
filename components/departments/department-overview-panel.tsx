@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState, useTransition } from "react"
 import Link from "next/link"
 import {
-  BookOpen,
   DollarSign,
   GraduationCap,
   Loader2,
@@ -259,16 +258,11 @@ export function DepartmentOverviewPanel({
   }
 
   const copySources = [...bundle.openPrograms, ...bundle.archivedPrograms]
-  const openOfferings = bundle.openPrograms.reduce(
-    (sum, program) => sum + program.offeringCount,
-    0
-  )
-  const openEnrolled = bundle.openPrograms.reduce((sum, program) => sum + program.enrolled, 0)
 
   return (
     <div className="space-y-6">
       {overview ? (
-        <StatCardsRow equal columns={6}>
+        <StatCardsRow equal columns={5}>
           <StatCard
             layout="header"
             fill
@@ -276,7 +270,7 @@ export function DepartmentOverviewPanel({
             label="Students"
             value={overview.studentsCount}
             icon={GraduationCap}
-            hint="Enrolled students"
+            hint="Open years only"
           />
           <StatCard
             layout="header"
@@ -294,7 +288,7 @@ export function DepartmentOverviewPanel({
             label="Revenue"
             value={formatMoney(overview.revenue)}
             icon={DollarSign}
-            hint="From Programs billing"
+            hint="Open years · Programs billing"
           />
           <StatCard
             layout="header"
@@ -313,17 +307,6 @@ export function DepartmentOverviewPanel({
             value={formatNet(overview.net)}
             icon={TrendingUp}
             hint="Revenue − expenses"
-          />
-          <StatCard
-            layout="header"
-            fill
-            tone="violet"
-            label={YEAR_SEASON_LABEL_PLURAL}
-            value={bundle.openPrograms.length}
-            icon={BookOpen}
-            hint={
-              `${programCountPhrase(openOfferings)} · ${openEnrolled} enrolled`
-            }
           />
         </StatCardsRow>
       ) : null}
@@ -484,7 +467,7 @@ export function DepartmentOverviewPanel({
             href={departmentGroupWorkspaceHref(departmentId, { tab: "reports" })}
             className="underline underline-offset-2"
           >
-            Reports
+            Archive
           </Link>
           .
         </p>
@@ -621,7 +604,7 @@ export function DepartmentOverviewPanel({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Archive year</DialogTitle>
+            <DialogTitle>Archive</DialogTitle>
             <DialogDescription>
               This makes {archiveTarget?.name} read-only and moves it to Reports. Confirm
               payments and payroll are complete before continuing.
@@ -653,7 +636,7 @@ export function DepartmentOverviewPanel({
               disabled={isPending || confirmName.trim() !== (archiveTarget?.name || "").trim()}
             >
               {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Archive year
+              Archive
             </Button>
           </DialogFooter>
         </DialogContent>

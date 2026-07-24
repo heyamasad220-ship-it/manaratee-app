@@ -383,7 +383,7 @@ Programs module (Catalog first). **Departments** is under **HR** (`/workforce/de
 | Schedule | `/programs/schedule` | `programs.view` |
 | Financial Assistance | `/programs/financial-assistance` | `applications.view` — Overview / Submissions / Templates + FA report + Payment Plans tabs |
 | Reports | `/programs/reports` | `reports.view` — Overview / Registrations / Payment transactions / Attendance / Waitlist (department + active offering filters). Expenses → department workspace; enable waitlist/attendance on offering |
-| Settings | `/programs/settings` (General + Service Needs) | `programs.manage` |
+| Settings | Departments list → department **Settings** (`/workforce?tab=departments`, then `?tab=settings`) | `programs.manage` |
 
 ### Program management routes
 
@@ -405,8 +405,8 @@ Programs module (Catalog first). **Departments** is under **HR** (`/workforce/de
 | `/programs/registrations/[type]/[id]` | Enrollment or waitlist detail |
 | `/programs/schedule` | Cross-program schedule view |
 | `/programs/reports` | Reports |
-| `/programs/settings` | Module settings (General, Promo Codes, etc.) |
-| `/programs/settings/service-needs` | Per-program volunteer / childcare / vendor service needs (temporary home; still saved on the selected program) |
+| `/programs/settings` | Redirects to `/workforce?tab=departments` (settings live on each department) |
+| `/programs/settings/service-needs` | Redirects to `/workforce?tab=departments` |
 
 ### Staff setup flow
 

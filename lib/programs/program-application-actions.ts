@@ -11,6 +11,7 @@ import type {
   ProgramApplicationStatus,
   ProgramApplicationWithDetails,
 } from "@/lib/programs/program-application-types"
+import { DEPARTMENT_OPEN_PROGRAM_STATUSES } from "@/lib/departments/department-active-programs"
 import { workforceDepartmentDetailPath } from "@/lib/departments/department-paths"
 
 function mapApplication(row: Record<string, unknown>): ProgramApplication {
@@ -184,11 +185,13 @@ export async function getSubmittedApplicationsForDepartment(
 
   const supabase = await createClient()
 
+  // Open years only — archived-year applications belong under Archive reports.
   const { data: programs, error: programsError } = await supabase
     .from("programs")
     .select("id, name")
     .eq("organization_id", organizationId)
     .eq("department_id", departmentId)
+    .in("status", [...DEPARTMENT_OPEN_PROGRAM_STATUSES])
 
   if (programsError || !programs?.length) {
     return []

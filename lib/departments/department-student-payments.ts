@@ -139,7 +139,12 @@ export async function fetchDepartmentStudentPaymentsMatrix(
     ])
   )
 
-  let enrollmentsQuery = supabase
+  // Open years only — do not include archived-year enrollments via department_id.
+  if (programIds.length === 0) {
+    return { months: [], rows: [], migrationRequired: false }
+  }
+
+  const { data: enrollmentRows, error: enrollmentsError } = await supabase
     .from("program_enrollments")
     .select(
       `
@@ -168,28 +173,15 @@ export async function fetchDepartmentStudentPaymentsMatrix(
     `
     )
     .eq("organization_id", organizationId)
+    .in("program_id", programIds)
     .in("status", [...ACTIVE_ENROLLMENT_STATUSES])
     .order("child_name", { ascending: true })
-
-  if (programIds.length > 0) {
-    enrollmentsQuery = enrollmentsQuery.or(
-      `department_id.eq.${departmentId},program_id.in.(${programIds.join(",")})`
-    )
-  } else {
-    enrollmentsQuery = enrollmentsQuery.eq("department_id", departmentId)
-  }
-
-  const { data: enrollmentRows, error: enrollmentsError } = await enrollmentsQuery
 
   if (enrollmentsError) {
     throw new Error(enrollmentsError.message || "Could not load enrollments.")
   }
 
-  const enrollments = (enrollmentRows || []).filter((row) => {
-    const enrollmentDept = row.department_id as string | null
-    const programId = row.program_id as string
-    return enrollmentDept === departmentId || programIds.includes(programId)
-  })
+  const enrollments = enrollmentRows || []
 
   if (enrollments.length === 0) {
     return { months: [], rows: [], migrationRequired: false }

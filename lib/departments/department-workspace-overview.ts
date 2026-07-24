@@ -50,7 +50,9 @@ export async function fetchDepartmentWorkspaceOverview(
     fetchDepartmentPayrollList(departmentId, { scope: "all-approved-for-budget" }),
   ])
 
-  const studentsCount = tuition.rows.length
+  const studentsCount = new Set(
+    tuition.rows.map((row) => row.studentName.trim().toLowerCase()).filter(Boolean)
+  ).size
   const staffCount = detail?.staff.length ?? 0
   const revenue = roundMoney(
     tuition.rows.reduce((sum, row) => sum + Number(row.received || 0), 0)

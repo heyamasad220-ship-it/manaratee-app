@@ -21,6 +21,7 @@ interface ChildcareApplicationFormProps {
   onSubmit: (data: ChildcareApplicationData) => void
   onCancel: () => void
   isSubmitting: boolean
+  initialData?: Partial<ChildcareApplicationData>
 }
 
 const initialFormData: ChildcareApplicationData = {
@@ -57,9 +58,27 @@ const initialFormData: ChildcareApplicationData = {
   additionalNotes: "",
 }
 
-export function ChildcareApplicationForm({ onSubmit, onCancel, isSubmitting }: ChildcareApplicationFormProps) {
+export function ChildcareApplicationForm({
+  onSubmit,
+  onCancel,
+  isSubmitting,
+  initialData,
+}: ChildcareApplicationFormProps) {
   const [currentStep, setCurrentStep] = useState(1)
-  const [formData, setFormData] = useState<ChildcareApplicationData>(initialFormData)
+  const [formData, setFormData] = useState<ChildcareApplicationData>({
+    ...initialFormData,
+    ...initialData,
+    availability: {
+      ...initialFormData.availability,
+      ...(initialData?.availability || {}),
+    },
+    ageGroupsExperience: initialData?.ageGroupsExperience || [],
+    servicesOffered: initialData?.servicesOffered || [],
+    references:
+      initialData?.references && initialData.references.length > 0
+        ? initialData.references
+        : initialFormData.references,
+  })
   const totalSteps = 5
 
   function handleInputChange(field: keyof ChildcareApplicationData, value: string | boolean) {

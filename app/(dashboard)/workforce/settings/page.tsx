@@ -1,12 +1,14 @@
 import { redirect } from "next/navigation"
-
+import {
+  hrEmployeePositionsHref,
+  hrOverviewHref,
+} from "@/lib/hr/hr-overview-path"
 import {
   MEMBERSHIP_BENEFITS_PATH,
   MEMBERSHIP_TEAMS_PATH,
 } from "@/lib/memberships/membership-module-label"
 
-const HR_SETTINGS_DEFAULT = "/workforce/settings/positions"
-
+/** HR Settings hub removed — Positions live under Employees. */
 export default async function HRSettingsPage({
   searchParams,
 }: {
@@ -20,20 +22,20 @@ export default async function HRSettingsPage({
   }
 
   if (tab === "departments") {
-    redirect("/workforce/departments")
+    redirect(hrOverviewHref({ tab: "departments" }))
   }
 
-  if (tab === "positions") {
-    redirect("/workforce/settings/positions")
+  if (tab === "positions" || !tab) {
+    redirect(hrEmployeePositionsHref())
   }
 
   if (tab === "time-off" || tab === "work-schedule" || tab === "notifications") {
-    redirect("/workforce/employees")
+    redirect(hrOverviewHref({ tab: "employees" }))
   }
 
   if (tab === "discount-policies") {
     redirect(MEMBERSHIP_BENEFITS_PATH)
   }
 
-  redirect(HR_SETTINGS_DEFAULT)
+  redirect(hrEmployeePositionsHref())
 }

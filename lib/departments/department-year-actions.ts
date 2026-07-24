@@ -531,15 +531,38 @@ export type DepartmentYearReport = {
   status: string
   studentsCount: number
   offeringsCount: number
+  teachersCount: number
+  /** Aggregate student collections only — no per-student payment detail (FA confidentiality). */
   totalPaymentsReceived: number
   totalCourseFees: number
   remainingBalance: number
-  roster: Array<{
+  totalPayrollPaid: number
+  totalExpenses: number
+  net: number
+  /** Roster-style: one row per student × course (no fee/paid columns). */
+  students: Array<{
     studentName: string
     courseName: string
-    amountPaid: number
-    courseFee: number
   }>
+  /** Course instructors plus staff with overlapping approved/paid payroll. */
+  teachers: Array<{
+    teacherName: string
+    courseName: string
+    amountPaid: number
+  }>
+}
+
+function periodsOverlap(
+  periodStart: string | null,
+  periodEnd: string | null,
+  rangeStart: string | null,
+  rangeEnd: string | null
+) {
+  if (!rangeStart && !rangeEnd) return true
+  if (!periodStart || !periodEnd) return true
+  const start = rangeStart || "0000-01-01"
+  const end = rangeEnd || "9999-12-31"
+  return periodStart <= end && periodEnd >= start
 }
 
 export async function fetchDepartmentYearReportAction(
@@ -570,12 +593,17 @@ export async function fetchDepartmentYearReportAction(
       return { success: false, error: "Year program not found." }
     }
 
+    const startDate = (program.start_date as string | null) ?? null
+    const endDate = (program.end_date as string | null) ?? null
+
     const { data: offerings } = await supabase
       .from("program_offerings")
       .select("id, name")
       .eq("organization_id", organizationId)
       .eq("program_id", programId)
+      .order("name")
 
+    const offeringIds = (offerings || []).map((o) => o.id as string)
     const offeringNameById = new Map(
       (offerings || []).map((o) => [o.id as string, (o.name as string) || "Course"])
     )
@@ -586,6 +614,7 @@ export async function fetchDepartmentYearReportAction(
       .eq("organization_id", organizationId)
       .eq("program_id", programId)
       .in("status", ["pending_payment", "pending", "enrolled", "active", "completed"])
+      .order("child_name")
 
     const enrollmentIds = (enrollments || []).map((e) => e.id as string)
     let paidByEnrollment = new Map<string, number>()
@@ -611,41 +640,228 @@ export async function fetchDepartmentYearReportAction(
       }
     }
 
-    const roster = (enrollments || []).map((row) => {
+    const students = (enrollments || []).map((row) => ({
+      studentName: (row.child_name as string) || "Student",
+      courseName: offeringNameById.get(row.offering_id as string) || "Course",
+    }))
+
+    let totalPaymentsReceived = 0
+    let totalCourseFees = 0
+    for (const row of enrollments || []) {
       const eid = row.id as string
       const courseFee = feeByEnrollment.get(eid) ?? Number(row.total_amount || 0)
       const amountPaid = paidByEnrollment.get(eid) ?? Number(row.amount_paid || 0)
-      return {
-        studentName: (row.child_name as string) || "Student",
-        courseName:
-          offeringNameById.get(row.offering_id as string) || "Course",
-        amountPaid: roundMoney(amountPaid),
-        courseFee: roundMoney(courseFee),
-      }
-    })
+      totalCourseFees = roundMoney(totalCourseFees + courseFee)
+      totalPaymentsReceived = roundMoney(totalPaymentsReceived + amountPaid)
+    }
 
-    const totalPaymentsReceived = roundMoney(
-      roster.reduce((sum, row) => sum + row.amountPaid, 0)
+    const studentNames = new Set(students.map((r) => r.studentName.toLowerCase()))
+
+    // Teachers: all course instructors for this year + anyone with overlapping payroll.
+    // (Previously only one instructor per course was kept, so paid co-teachers / unassigned
+    // paid staff were missing from the Archive report.)
+    const teachersByKey = new Map<
+      string,
+      { teacherName: string; contactId: string | null; courses: Set<string> }
+    >()
+
+    const teacherKey = (name: string, contactId: string | null) =>
+      contactId ? `c:${contactId}` : `n:${name.trim().toLowerCase()}`
+
+    if (offeringIds.length > 0) {
+      const { data: assignments } = await supabase
+        .from("program_staff_assignments")
+        .select(
+          `
+          offering_id,
+          contact_id,
+          assignment_role,
+          is_active,
+          contact:contact_id ( full_name )
+        `
+        )
+        .eq("organization_id", organizationId)
+        .in("offering_id", offeringIds)
+        .order("created_at", { ascending: true })
+
+      for (const row of assignments || []) {
+        if (row.is_active === false) continue
+        const role = (row.assignment_role as string) || ""
+        if (
+          role &&
+          role !== "primary_instructor" &&
+          role !== "instructor" &&
+          role !== "teacher"
+        ) {
+          continue
+        }
+        const contact = row.contact as { full_name?: string | null } | null
+        const name = contact?.full_name?.trim()
+        if (!name) continue
+        const contactId = (row.contact_id as string | null) ?? null
+        const offeringId = row.offering_id as string
+        const key = teacherKey(name, contactId)
+        const courseName = offeringNameById.get(offeringId) || "Course"
+        const existing = teachersByKey.get(key)
+        if (existing) {
+          existing.courses.add(courseName)
+        } else {
+          teachersByKey.set(key, {
+            teacherName: name,
+            contactId,
+            courses: new Set([courseName]),
+          })
+        }
+      }
+    }
+
+    const paidByContactId = new Map<string, number>()
+    const paidByStaffName = new Map<string, number>()
+    const paidStaffByKey = new Map<
+      string,
+      { name: string; contactId: string | null; amount: number }
+    >()
+
+    const { data: deptPayEntries } = await supabase
+      .from("department_staff_pay_entries")
+      .select(
+        `
+        amount,
+        status,
+        period_start,
+        period_end,
+        staff:staff_id ( first_name, last_name, contact_id )
+      `
+      )
+      .eq("organization_id", organizationId)
+      .eq("department_id", departmentId)
+      .in("status", ["approved", "paid"])
+
+    let totalPayrollPaid = 0
+    for (const entry of deptPayEntries || []) {
+      if (
+        !periodsOverlap(
+          (entry.period_start as string | null) ?? null,
+          (entry.period_end as string | null) ?? null,
+          startDate,
+          endDate
+        )
+      ) {
+        continue
+      }
+      const amount = Number(entry.amount || 0)
+      totalPayrollPaid = roundMoney(totalPayrollPaid + amount)
+      const staff = entry.staff as {
+        first_name?: string | null
+        last_name?: string | null
+        contact_id?: string | null
+      } | null
+      const contactId = staff?.contact_id || null
+      const name = `${staff?.first_name || ""} ${staff?.last_name || ""}`.trim()
+      if (contactId) {
+        paidByContactId.set(
+          contactId,
+          roundMoney((paidByContactId.get(contactId) || 0) + amount)
+        )
+      }
+      if (name) {
+        const nameKey = name.toLowerCase()
+        paidByStaffName.set(
+          nameKey,
+          roundMoney((paidByStaffName.get(nameKey) || 0) + amount)
+        )
+      }
+      const key = teacherKey(name || "Staff", contactId)
+      const existingPaid = paidStaffByKey.get(key)
+      if (existingPaid) {
+        existingPaid.amount = roundMoney(existingPaid.amount + amount)
+      } else {
+        paidStaffByKey.set(key, {
+          name: name || "Staff",
+          contactId,
+          amount,
+        })
+      }
+    }
+
+    const assignedContactIds = new Set(
+      [...teachersByKey.values()]
+        .map((row) => row.contactId)
+        .filter((id): id is string => Boolean(id))
     )
-    const totalCourseFees = roundMoney(
-      roster.reduce((sum, row) => sum + row.courseFee, 0)
+    const assignedNames = new Set(
+      [...teachersByKey.values()].map((row) => row.teacherName.trim().toLowerCase())
     )
-    const studentNames = new Set(roster.map((r) => r.studentName.toLowerCase()))
+
+    for (const paid of paidStaffByKey.values()) {
+      if (paid.contactId && assignedContactIds.has(paid.contactId)) continue
+      if (assignedNames.has(paid.name.trim().toLowerCase())) continue
+      const key = teacherKey(paid.name, paid.contactId)
+      teachersByKey.set(key, {
+        teacherName: paid.name,
+        contactId: paid.contactId,
+        courses: new Set(),
+      })
+    }
+
+    const teachers: DepartmentYearReport["teachers"] = [...teachersByKey.values()]
+      .map((row) => {
+        let amountPaid = 0
+        if (row.contactId && paidByContactId.has(row.contactId)) {
+          amountPaid = paidByContactId.get(row.contactId) || 0
+        } else {
+          amountPaid = paidByStaffName.get(row.teacherName.trim().toLowerCase()) || 0
+        }
+        return {
+          teacherName: row.teacherName,
+          courseName:
+            row.courses.size > 0
+              ? [...row.courses].sort((a, b) => a.localeCompare(b)).join(", ")
+              : "—",
+          amountPaid,
+        }
+      })
+      .sort((a, b) => a.teacherName.localeCompare(b.teacherName))
+
+    // Expenses: department or this year program, within year dates when available.
+    const { data: expenseRows } = await supabase
+      .from("program_expenses")
+      .select("amount, expense_date, department_id, program_id")
+      .eq("organization_id", organizationId)
+
+    let totalExpenses = 0
+    for (const row of expenseRows || []) {
+      const forDept =
+        row.department_id === departmentId || row.program_id === programId
+      if (!forDept) continue
+      const expenseDate = (row.expense_date as string | null) ?? null
+      if (expenseDate && startDate && expenseDate < startDate) continue
+      if (expenseDate && endDate && expenseDate > endDate) continue
+      totalExpenses = roundMoney(totalExpenses + Number(row.amount || 0))
+    }
+
+    const remainingBalance = roundMoney(totalCourseFees - totalPaymentsReceived)
+    const net = roundMoney(totalPaymentsReceived - totalPayrollPaid - totalExpenses)
 
     return {
       success: true,
       report: {
         programId: program.id as string,
         programName: (program.name as string) || "Program",
-        startDate: (program.start_date as string | null) ?? null,
-        endDate: (program.end_date as string | null) ?? null,
+        startDate,
+        endDate,
         status: (program.status as string) || "active",
         studentsCount: studentNames.size,
         offeringsCount: (offerings || []).length,
+        teachersCount: teachers.length,
         totalPaymentsReceived,
         totalCourseFees,
-        remainingBalance: roundMoney(totalCourseFees - totalPaymentsReceived),
-        roster,
+        remainingBalance,
+        totalPayrollPaid,
+        totalExpenses,
+        net,
+        students,
+        teachers,
       },
     }
   } catch (error) {

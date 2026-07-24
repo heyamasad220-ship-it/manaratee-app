@@ -387,6 +387,7 @@ export async function markFinancePayrollPaidAction(input: {
     return { success: false as const, error: error.message }
   }
 
+  revalidatePath("/workforce")
   revalidatePath("/finance")
   revalidatePath("/finance/payroll")
   return {

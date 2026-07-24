@@ -265,7 +265,8 @@ export function InternalEventChildcareTab({
             <DialogDescription>
               Hours go to {event.departments?.name || "the event department"} payroll for{" "}
               {childcareEvent?.assigned_provider_name || "the assigned provider"}, linked to this
-              event. After department approval, Finance can mark them paid.
+              event. After department approval, payroll can be marked paid under HR →
+              Payroll.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">

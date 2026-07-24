@@ -9,6 +9,7 @@ import {
 } from "@/lib/hr/hr-report-types"
 import { PEOPLE_MANAGEMENT_MODULE_LABEL } from "@/lib/hr/hr-module-label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { StatCard, StatCardsRow } from "@/components/ui/stat-card"
 import {
   Select,
   SelectContent,
@@ -24,7 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Users, Calendar, Clock, Building2 } from "lucide-react"
+import { Users, Building2, HeartHandshake, Baby } from "lucide-react"
 
 function getRangeStart(dateRange: DateRangeKey) {
   const start = new Date()
@@ -35,24 +36,20 @@ function getRangeStart(dateRange: DateRangeKey) {
   return start.toISOString().slice(0, 10)
 }
 
-function formatDisplayDate(value: string | null) {
-  if (!value) return "-"
-  return new Date(`${value.slice(0, 10)}T00:00:00`).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  })
-}
-
 function isDateInRange(value: string, rangeStart: string) {
   return value.slice(0, 10) >= rangeStart
 }
 
-function staffFullName(staff: ReportStaffMember) {
-  return `${staff.first_name} ${staff.last_name}`.trim()
-}
-
-export function HRReportsClient({ organizationId }: { organizationId: string | null }) {
+/** People headcount dashboard for HR → Overview (formerly Reports). */
+export function HrOverviewDashboard({
+  organizationId,
+  volunteerCount = 0,
+  childcareProviderCount = 0,
+}: {
+  organizationId: string | null
+  volunteerCount?: number
+  childcareProviderCount?: number
+}) {
   const supabase = createClient()
 
   const [resolvedOrganizationId, setResolvedOrganizationId] = useState<string | null>(organizationId)
@@ -115,8 +112,8 @@ export function HRReportsClient({ organizationId }: { organizationId: string | n
       )
       setDepartmentCount(departmentsResult.count || 0)
     } catch (error: any) {
-      console.error("HR reports load error:", error)
-      alert(error?.message || `Could not load ${PEOPLE_MANAGEMENT_MODULE_LABEL.toLowerCase()} reports.`)
+      console.error("HR overview load error:", error)
+      alert(error?.message || `Could not load ${PEOPLE_MANAGEMENT_MODULE_LABEL.toLowerCase()} overview.`)
     } finally {
       setLoading(false)
     }
@@ -128,11 +125,9 @@ export function HRReportsClient({ organizationId }: { organizationId: string | n
 
   const activeStaff = useMemo(() => staff.filter((person) => person.status === "active"), [staff])
 
-  const recentHires = useMemo(
+  const newHiresThisPeriod = useMemo(
     () =>
-      staff
-        .filter((person) => person.hire_date && isDateInRange(person.hire_date, rangeStart))
-        .sort((a, b) => (b.hire_date || "").localeCompare(a.hire_date || "")),
+      staff.filter((person) => person.hire_date && isDateInRange(person.hire_date, rangeStart)).length,
     [staff, rangeStart]
   )
 
@@ -150,44 +145,40 @@ export function HRReportsClient({ organizationId }: { organizationId: string | n
   const overviewStats = useMemo(() => {
     return {
       totalEmployees: activeStaff.length,
-      newHires: recentHires.length,
+      newHires: newHiresThisPeriod,
       departments: departmentCount,
       avgPerDepartment:
         departmentCount > 0 ? Math.round((activeStaff.length / departmentCount) * 10) / 10 : 0,
     }
-  }, [activeStaff, recentHires, departmentCount])
+  }, [activeStaff, newHiresThisPeriod, departmentCount])
 
   if (loading) {
     return (
-      <div className="space-y-6 p-6">
-        <div className="flex flex-wrap gap-4 [&>*]:w-fit">
+      <div className="space-y-6">
+        <StatCardsRow equal columns={4}>
           {Array.from({ length: 4 }).map((_, index) => (
             <div key={index} className="h-28 animate-pulse rounded-lg bg-muted" />
           ))}
-        </div>
+        </StatCardsRow>
         <div className="h-64 animate-pulse rounded-lg bg-muted" />
       </div>
     )
   }
 
   return (
-    <div className="p-6">
-      {!resolvedOrganizationId && (
-        <Card className="mb-6">
+    <div className="flex flex-col gap-6">
+      {!resolvedOrganizationId ? (
+        <Card>
           <CardContent className="p-6 text-sm text-muted-foreground">
-            No organization ID was found. {PEOPLE_MANAGEMENT_MODULE_LABEL} reports cannot load until an organization is selected.
+            No organization ID was found. Overview cannot load until an organization is selected.
           </CardContent>
         </Card>
-      )}
+      ) : null}
 
-      <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h2 className="text-lg font-semibold">Overview</h2>
-          <p className="text-sm text-muted-foreground">
-            High-level people metrics. Additional report types will be added later.
-          </p>
-        </div>
-
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-muted-foreground">
+          Headcount for the selected period.
+        </p>
         <Select value={dateRange} onValueChange={(value) => setDateRange(value as DateRangeKey)}>
           <SelectTrigger className="w-[150px]">
             <SelectValue />
@@ -201,134 +192,86 @@ export function HRReportsClient({ organizationId }: { organizationId: string | n
         </Select>
       </div>
 
-      <div className="flex flex-col gap-6">
-        <div className="flex flex-wrap gap-4 [&>*]:w-fit">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Active Employees
-              </CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{overviewStats.totalEmployees}</div>
-              <p className="text-xs text-muted-foreground">
-                {overviewStats.newHires} new hire{overviewStats.newHires === 1 ? "" : "s"} this period
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Departments</CardTitle>
-              <Building2 className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{overviewStats.departments}</div>
-              <p className="text-xs text-muted-foreground">
-                {overviewStats.avgPerDepartment} avg employees/dept
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Attendance Rate
-              </CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">—</div>
-              <p className="text-xs text-muted-foreground">Coming soon</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Time Off Used</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">—</div>
-              <p className="text-xs text-muted-foreground">Coming soon</p>
-            </CardContent>
-          </Card>
-        </div>
+      <StatCardsRow equal columns={4}>
+        <StatCard
+          layout="header"
+          fill
+          tone="blue"
+          label="Active Employees"
+          value={overviewStats.totalEmployees}
+          hint={`${overviewStats.newHires} new hire${overviewStats.newHires === 1 ? "" : "s"} this period`}
+          icon={Users}
+        />
+        <StatCard
+          layout="header"
+          fill
+          tone="emerald"
+          label="Departments"
+          value={overviewStats.departments}
+          hint={`${overviewStats.avgPerDepartment} avg employees/dept`}
+          icon={Building2}
+        />
+        <StatCard
+          layout="header"
+          fill
+          tone="violet"
+          label="Volunteers"
+          value={volunteerCount}
+          hint="Contact affiliations"
+          icon={HeartHandshake}
+        />
+        <StatCard
+          layout="header"
+          fill
+          tone="amber"
+          label="Childcare Providers"
+          value={childcareProviderCount}
+          hint="Active providers"
+          icon={Baby}
+        />
+      </StatCardsRow>
 
-        <div className="grid gap-6 lg:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Employees by Department</CardTitle>
-              <CardDescription>Active employee headcount by department</CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Department</TableHead>
-                    <TableHead>Employees</TableHead>
-                    <TableHead className="text-right">% of Total</TableHead>
+      <Card>
+        <CardHeader>
+          <CardTitle>Employees by Department</CardTitle>
+          <CardDescription>Active employee headcount by department</CardDescription>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Department</TableHead>
+                <TableHead>Employees</TableHead>
+                <TableHead className="text-right">% of Total</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {employeesByDepartment.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={3} className="py-8 text-center text-muted-foreground">
+                    No active employees yet. Add employees under Employees.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                employeesByDepartment.map((row) => (
+                  <TableRow key={row.department}>
+                    <TableCell className="font-medium">{row.department}</TableCell>
+                    <TableCell>{row.count}</TableCell>
+                    <TableCell className="text-right">
+                      {overviewStats.totalEmployees > 0
+                        ? `${Math.round((row.count / overviewStats.totalEmployees) * 100)}%`
+                        : "0%"}
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {employeesByDepartment.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={3} className="py-8 text-center text-muted-foreground">
-                        No active employees yet. Add employees under {PEOPLE_MANAGEMENT_MODULE_LABEL} → Employees.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    employeesByDepartment.map((row) => (
-                      <TableRow key={row.department}>
-                        <TableCell className="font-medium">{row.department}</TableCell>
-                        <TableCell>{row.count}</TableCell>
-                        <TableCell className="text-right">
-                          {overviewStats.totalEmployees > 0
-                            ? `${Math.round((row.count / overviewStats.totalEmployees) * 100)}%`
-                            : "0%"}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Hires</CardTitle>
-              <CardDescription>New employees in the selected period</CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Department</TableHead>
-                    <TableHead>Start Date</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {recentHires.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={3} className="py-8 text-center text-muted-foreground">
-                        No hires in this period.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    recentHires.map((person) => (
-                      <TableRow key={person.id}>
-                        <TableCell className="font-medium">{staffFullName(person)}</TableCell>
-                        <TableCell>{person.department_name || "Unassigned"}</TableCell>
-                        <TableCell>{formatDisplayDate(person.hire_date)}</TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
   )
 }
+
+/** @deprecated Use HrOverviewDashboard — Reports hub removed. */
+export const HRReportsClient = HrOverviewDashboard

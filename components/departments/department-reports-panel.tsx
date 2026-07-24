@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { ArrowLeft, FileBarChart, Loader2, RefreshCw } from "lucide-react"
+import { ArrowLeft, Download, FileBarChart, Loader2, RefreshCw } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -29,6 +29,58 @@ function formatMoney(value: number) {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(value)
+}
+
+function csvEscape(value: string | number | null | undefined) {
+  const text = value == null ? "" : String(value)
+  if (/[",\n]/.test(text)) return `"${text.replace(/"/g, '""')}"`
+  return text
+}
+
+function downloadYearReportCsv(report: DepartmentYearReport) {
+  const lines: string[] = []
+  lines.push("Section,Field,Value")
+  lines.push(`Summary,Year,${csvEscape(report.programName)}`)
+  lines.push(`Summary,Status,${csvEscape(report.status)}`)
+  lines.push(`Summary,Start,${csvEscape(report.startDate)}`)
+  lines.push(`Summary,End,${csvEscape(report.endDate)}`)
+  lines.push(`Summary,Students,${report.studentsCount}`)
+  lines.push(`Summary,Courses,${report.offeringsCount}`)
+  lines.push(`Summary,Teachers,${report.teachersCount}`)
+  lines.push(`Summary,Course fees (total),${report.totalCourseFees}`)
+  lines.push(`Summary,Collected (aggregate),${report.totalPaymentsReceived}`)
+  lines.push(`Summary,Remaining balance (aggregate),${report.remainingBalance}`)
+  lines.push(`Summary,Payroll paid,${report.totalPayrollPaid}`)
+  lines.push(`Summary,Expenses,${report.totalExpenses}`)
+  lines.push(`Summary,Net (collected - payroll - expenses),${report.net}`)
+  lines.push("")
+  lines.push("Students,Student,Course")
+  for (const row of report.students) {
+    lines.push(
+      ["Students", csvEscape(row.studentName), csvEscape(row.courseName)].join(",")
+    )
+  }
+  lines.push("")
+  lines.push("Teachers,Teacher,Courses,Total paid (year)")
+  for (const row of report.teachers) {
+    lines.push(
+      [
+        "Teachers",
+        csvEscape(row.teacherName),
+        csvEscape(row.courseName),
+        row.amountPaid,
+      ].join(",")
+    )
+  }
+
+  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" })
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement("a")
+  anchor.href = url
+  const safeName = report.programName.replace(/[^\w\-]+/g, "_").slice(0, 60)
+  anchor.download = `${safeName || "year"}-report.csv`
+  anchor.click()
+  URL.revokeObjectURL(url)
 }
 
 export function DepartmentReportsPanel({
@@ -96,7 +148,7 @@ export function DepartmentReportsPanel({
           }}
         >
           <ArrowLeft className="mr-1.5 h-4 w-4" />
-          Back to archived years
+          Back to archive
         </Button>
 
         {reportLoading || !report ? (
@@ -106,16 +158,22 @@ export function DepartmentReportsPanel({
           </div>
         ) : (
           <>
-            <div className="space-y-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-lg font-semibold tracking-tight">{report.programName}</h2>
-                <Badge variant="secondary" className="capitalize">
-                  {report.status}
-                </Badge>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="text-lg font-semibold tracking-tight">{report.programName}</h2>
+                  <Badge variant="secondary" className="capitalize">
+                    {report.status}
+                  </Badge>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Read-only year report · {report.startDate || "—"} → {report.endDate || "—"}
+                </p>
               </div>
-              <p className="text-sm text-muted-foreground">
-                Read-only year report · {report.startDate || "—"} → {report.endDate || "—"}
-              </p>
+              <Button type="button" variant="outline" onClick={() => downloadYearReportCsv(report)}>
+                <Download className="mr-2 h-4 w-4" />
+                Export CSV
+              </Button>
             </div>
 
             <StatCardsRow equal columns={4}>
@@ -136,16 +194,17 @@ export function DepartmentReportsPanel({
               <StatCard
                 layout="header"
                 fill
-                tone="emerald"
-                label="Payments received"
-                value={formatMoney(report.totalPaymentsReceived)}
+                tone="violet"
+                label="Teachers"
+                value={report.teachersCount}
               />
               <StatCard
                 layout="header"
                 fill
-                tone={report.remainingBalance > 0 ? "amber" : "emerald"}
-                label="Remaining"
-                value={formatMoney(report.remainingBalance)}
+                tone={report.net >= 0 ? "emerald" : "amber"}
+                label="Net"
+                value={formatMoney(report.net)}
+                hint="Collected − payroll − expenses"
               />
             </StatCardsRow>
 
@@ -153,17 +212,57 @@ export function DepartmentReportsPanel({
               <CardHeader>
                 <CardTitle className="text-base">Financial summary</CardTitle>
                 <CardDescription>
-                  Course fees {formatMoney(report.totalCourseFees)} · Received{" "}
-                  {formatMoney(report.totalPaymentsReceived)} · Balance{" "}
-                  {formatMoney(report.remainingBalance)}
+                  Totals only. Student payment detail is omitted for confidentiality.
                 </CardDescription>
               </CardHeader>
+              <CardContent>
+                <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  <div>
+                    <dt className="text-xs text-muted-foreground">Course fees</dt>
+                    <dd className="text-sm font-medium tabular-nums">
+                      {formatMoney(report.totalCourseFees)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground">Collected (aggregate)</dt>
+                    <dd className="text-sm font-medium tabular-nums">
+                      {formatMoney(report.totalPaymentsReceived)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground">Remaining balance</dt>
+                    <dd className="text-sm font-medium tabular-nums">
+                      {formatMoney(report.remainingBalance)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground">Payroll paid</dt>
+                    <dd className="text-sm font-medium tabular-nums">
+                      {formatMoney(report.totalPayrollPaid)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground">Expenses</dt>
+                    <dd className="text-sm font-medium tabular-nums">
+                      {formatMoney(report.totalExpenses)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground">Net</dt>
+                    <dd className="text-sm font-medium tabular-nums">
+                      {formatMoney(report.net)}
+                    </dd>
+                  </div>
+                </dl>
+              </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Students</CardTitle>
-                <CardDescription>Roster snapshot for this archived year.</CardDescription>
+                <CardDescription>
+                  Roster-style enrollments (student × course). No payment columns.
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <Table>
@@ -171,26 +270,58 @@ export function DepartmentReportsPanel({
                     <TableRow>
                       <TableHead>Student</TableHead>
                       <TableHead>Course</TableHead>
-                      <TableHead className="text-right">Fee</TableHead>
-                      <TableHead className="text-right">Paid</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {report.roster.length === 0 ? (
+                    {report.students.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={4} className="text-muted-foreground">
+                        <TableCell colSpan={2} className="text-muted-foreground">
                           No enrollments.
                         </TableCell>
                       </TableRow>
                     ) : (
-                      report.roster.map((row, index) => (
+                      report.students.map((row, index) => (
                         <TableRow key={`${row.studentName}-${row.courseName}-${index}`}>
                           <TableCell>{row.studentName}</TableCell>
                           <TableCell>{row.courseName}</TableCell>
-                          <TableCell className="text-right">
-                            {formatMoney(row.courseFee)}
-                          </TableCell>
-                          <TableCell className="text-right">
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Teachers</CardTitle>
+                <CardDescription>
+                  Course instructors plus anyone with approved/paid payroll in this
+                  year&apos;s dates. Multiple courses are listed together.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Teacher</TableHead>
+                      <TableHead>Courses</TableHead>
+                      <TableHead className="text-right">Total paid</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {report.teachers.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={3} className="text-muted-foreground">
+                          No teachers or payroll for this year.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      report.teachers.map((row, index) => (
+                        <TableRow key={`${row.teacherName}-${index}`}>
+                          <TableCell>{row.teacherName}</TableCell>
+                          <TableCell>{row.courseName}</TableCell>
+                          <TableCell className="text-right tabular-nums">
                             {formatMoney(row.amountPaid)}
                           </TableCell>
                         </TableRow>
@@ -208,44 +339,6 @@ export function DepartmentReportsPanel({
 
   return (
     <div className="space-y-6">
-      <StatCardsRow equal columns={3}>
-        <StatCard
-          layout="header"
-          fill
-          tone="violet"
-          label="Archived years"
-          value={archived.length}
-          icon={FileBarChart}
-          hint="Closed academic years"
-        />
-        <StatCard
-          layout="header"
-          fill
-          tone="blue"
-          label="Enrollments"
-          value={archived.reduce((sum, program) => sum + program.enrolled, 0)}
-          icon={FileBarChart}
-          hint="Across archived years"
-        />
-        <StatCard
-          layout="header"
-          fill
-          tone="sky"
-          label="Courses"
-          value={archived.reduce((sum, program) => sum + program.offeringCount, 0)}
-          icon={FileBarChart}
-          hint="Programs in archives"
-        />
-      </StatCardsRow>
-
-      <div>
-        <h2 className="text-lg font-semibold tracking-tight">Reports</h2>
-        <p className="text-sm text-muted-foreground">
-          Archived academic years. Open a year for a read-only students and payments
-          report.
-        </p>
-      </div>
-
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
       {archived.length === 0 ? (
@@ -275,7 +368,11 @@ export function DepartmentReportsPanel({
                     {program.offeringCount} courses
                   </p>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => void openReport(program.id)}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void openReport(program.id)}
+                >
                   <FileBarChart className="mr-1.5 h-4 w-4" />
                   Open report
                 </Button>

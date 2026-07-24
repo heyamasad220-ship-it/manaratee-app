@@ -70,6 +70,7 @@ Features:
 * Registration model, eligibility, capacity, and fee plans (offering manage → Enrollment)
 * Program detail **Reports** — enrollments across offerings (filter + CSV)
 * Offering-scoped pricing (Phase 2A/2B)
+* **Department Settings** (`?tab=settings` on department workspace): General / Registration / Notifications stubs (`department_program_settings`); department-wide promo codes (`discount_codes.department_id`); Service Needs for that department’s years. Legacy `/programs/settings*` → `/workforce?tab=departments`. Run **`scripts/190_department_settings_promo_codes.sql`**.
 
 Pending:
 
@@ -171,23 +172,27 @@ Features:
 * Subscription filtering
 * Permission filtering
 * Dynamic visibility
-* Module order: Dashboard → Contacts → HR → Membership → Fund Development → Finance → …
+* Module order: Dashboard → Contacts → HR → Membership → Fund Development → …
+
 * Pinned footer: Billing (super admin SaaS subscription) → **Reports** (`/reports`, `reports.view`) → Settings
 
 ---
 
-## Finance
+## Finance / Payroll
 
-Status: In progress
+Status: Working (under HR)
 
-Operational finance (not SaaS Billing):
+Org payroll queue lives on **HR → Payroll** (`/workforce?tab=payroll`) — not a main sidebar module.
 
-* `/finance` → `/finance/payroll`
-* Org payroll queue of department-approved pay entries (teachers + childcare)
+* Ready to pay / Paid queue for department-approved pay entries (teachers + childcare)
 * Mark paid (`finance.manage`) after `scripts/187_finance_module_and_payroll_paid.sql`
-* Permissions: `finance.view` / `finance.manage`
+* Permissions: `finance.view` / `finance.manage` (panel); page requires `staff.view`
+* Legacy `/finance` and `/finance/payroll` redirect to the HR Payroll tab
+* SaaS **Billing** remains in the sidebar footer
 
-Planned: event/program labels on childcare hours, payouts/AP beyond payroll.
+Key files: `components/finance/finance-payroll-queue-panel.tsx`, `lib/finance/org-payroll-queue.ts`, `lib/hr/hr-overview-path.ts` (`hrPayrollHref`)
+
+Future: broader org finance (AP/GL) could restore a Finance module; not planned soon.
 
 ---
 
@@ -303,7 +308,7 @@ Status: Working (contacts-based views with role filters)
 Routes:
 
 * `/hr/members`
-* `/workforce/volunteers` (HR directory shell)
+* `/workforce/volunteers` → redirects to `/workforce?tab=volunteers` (HR directory shell)
 * `/hr/teams`
 
 ---
@@ -312,40 +317,38 @@ Routes:
 
 Status: Working (simplified)
 
-Route: `/workforce/employees`
+Route: `/workforce` (Employees tab: `?tab=employees`)
 
-HR module sidebar includes **Overview** (`/workforce`), **Departments**, Employees, Volunteers, Childcare Providers, Reports, Settings.
+HR module sidebar is a **direct link to Overview** (`/workforce` with tabs: Overview, Departments, Employees, Volunteers, Childcare Providers, **Payroll**). No flyout. Reports and Settings hubs removed — metrics live on the Overview tab; Positions under Employees → Positions; org payroll queue under Payroll.
 
-Roster-only employee list using the shared HR directory shell (Export, Add Employee, Employees | Applications | Archived tabs, KPI cards, filters, pagination). **Departments** is under **HR → Departments**; Positions remain under **HR → Settings**.
+Roster-only employee list using the shared HR directory shell (Export, Add Employee, Employees | Applications | Positions tabs, KPI cards, Active/Inactive status filter defaulting to Active, pagination), embedded under **HR → Overview → Employees**.
 
 **Contact-first:** Add Employee requires selecting an existing contact (`HrContactPicker` → `createEmployeeFromContact`). Create the person in Contacts first if they are not found.
 
-Removed tabs (redirect to Employees or Settings):
+Removed tabs (redirect to Overview):
 
-* Departments → `/workforce/departments` (sidebar: **HR → Departments**; opens shared workspace `/workforce/departments/[id]`: **Overview** (years/seasons + flyer; Super Admin archive), Employees, Rosters, Applications, Schedule, **Financial** (Payroll / Expenses / Financial Summary), optional Group giving, Activity, **Reports** (archived years); apply SQL `169`/`170`/`171`/`172`/`173`/`174`/`186`; scoped access via `lib/departments/department-access.ts` for department heads; legacy settings path redirects to list). Historical QIL load: `scripts/import-qil-year.mjs`; consolidate course-as-programs → offerings: `scripts/migrate-qil-courses-to-offerings.mjs` (after `174`).
-* Positions → `/workforce/settings/positions`
+* Departments → `/workforce?tab=departments` (department workspace still at `/workforce/departments/[id]`: **Overview** (years/seasons + flyer; Super Admin archive), **Programs** (`?tab=programs` — offerings for open years; year filter + Add Program; year/season `?tab=offerings` redirects here), **Enrollments** (UI label; URL `?tab=rosters` or `?tab=enrollments`; year/program filters, parent/guardian, Export CSV; year/season `?tab=reports` redirects here), Applications, Schedule, **Financial** (Payroll / Expenses / Financial Summary — employees managed under Payroll, merged columns, no email/phone; legacy `?tab=employees` → Payroll), optional Group giving, Activity, **Settings** (`?tab=settings` — General / Registration / Notifications stubs; department-wide Promo Codes; Service Needs; `&section=…`), **Archive** (archived closeout: students, teachers, financial totals, CSV); apply SQL `169`/`170`/`171`/`172`/`173`/`174`/`186`/`190`; scoped access via `lib/departments/department-access.ts` for department heads; legacy settings path redirects to Overview Departments tab). Historical QIL load: `scripts/import-qil-year.mjs`; consolidate course-as-programs → offerings: `scripts/migrate-qil-courses-to-offerings.mjs` (after `174`).
+* Positions → `/workforce?tab=employees&view=positions`
 * Time Off, Work Schedule, Notifications, Teams, Applications
 
-Employment applications accessed via the Applications directory tab → filtered Submissions view.
+Employment applications: `/workforce?tab=employees&view=applications`.  
+Positions (job titles): `/workforce?tab=employees&view=positions`.
 
-Shared shell: `components/workforce/hr-directory-shell.tsx` (also used by Volunteers and Childcare Providers).
+Shared shell: `components/workforce/hr-directory-shell.tsx` (also used by Volunteers and Childcare Providers). Overview shell: `components/hr/hr-overview-client.tsx`.
 
 ### HR Settings
 
-Route: `/workforce/settings`
-
-Tabs/pages: Positions, Application Templates (`/workforce/settings` redirects to Positions). **Departments** lives under HR (`/workforce/departments`); legacy `/workforce/settings/departments` redirects there.
+**Removed.** The HR sidebar Settings item is gone. Positions live under Employees → Positions. Legacy `/workforce/settings` and `/workforce/settings/positions` redirect to `/workforce?tab=employees&view=positions`. Application Templates hub also removed (category Applications tabs). Departments remain under Overview.
 
 Key files:
 
-* `components/hr/people-management-settings-nav.tsx`
-* `app/(dashboard)/workforce/departments/page.tsx`
-* `app/(dashboard)/workforce/settings/positions/page.tsx`
-* `app/(dashboard)/workforce/settings/application-templates/page.tsx`
+* `components/hr/hr-positions-manager.tsx`
+* `components/hr/hr-overview-client.tsx`
+* `components/hr/staff-records-client.tsx`
+* `app/(dashboard)/workforce/page.tsx`
+* `app/(dashboard)/workforce/settings/positions/page.tsx` (redirect only)
 
-Application Templates: HR application type cards (volunteer, employment, committee, childcare); form builder scaffold. Old `/settings/applications?tab=templates` redirects here.
-
-Committee Applications moved to **Membership → Applications** (`/membership/applications`).
+Committee Applications live under **Membership → Applications** (`/membership/applications`).
 
 ---
 
@@ -353,7 +356,10 @@ Committee Applications moved to **Membership → Applications** (`/membership/ap
 
 Status: Working (real data)
 
-**Providers:** `/workforce/childcare` (HR directory shell: Providers | Applications | Archived)  
+**Providers:** `/workforce?tab=childcare` (HR Overview directory shell: Providers | Applications; Active/Inactive filter)  
+**Customer apply:**
+* Volunteer → `/customer/apply/volunteer` (Profile → Applications; **Copy apply link** on Volunteers). Approve creates/links a `volunteers` roster row.
+* Childcare → `/customer/apply/childcare` (Profile → Applications; **Copy apply link** on providers). Approving creates/links a childcare `staff` row for payroll hour logging.
 **Registrations:** `/event-management/reports/childcare` (Event Management → Reports)
 
 Data source: approved `childcare_provider` applications (not mock data).
@@ -382,19 +388,19 @@ Submissions are embedded on each category **Applications** view (not under HR Se
 
 | Type | Route |
 |------|-------|
-| Employment | `/workforce/employees?tab=applications` |
-| Volunteer | `/workforce/volunteers?tab=applications` |
-| Childcare provider | `/workforce/childcare?tab=applications` |
+| Employment | `/workforce?tab=employees&view=applications` |
+| Volunteer | `/workforce?tab=volunteers&view=applications` |
+| Childcare | `/workforce?tab=childcare&view=applications` |
 | Committee member | `/membership/applications` |
 
 Permission: `applications.view`
 
-Application Templates: **HR → Settings → Application Templates** (`/workforce/settings/application-templates`).
+Application Templates hub removed — review under category Applications tabs. HR Settings sidebar removed; Positions live under Employees → Positions (`/workforce?tab=employees&view=positions`).
 
 Legacy redirects:
 
 * `/settings/applications`, `/people-management/applications`, `/hr/applications` → category Applications tab (by `application_type`)
-* `/settings/applications?tab=templates` → Application Templates
+* `/settings/applications?tab=templates`, `/workforce/settings/application-templates` → `/workforce`
 * `/workforce/settings/committee-applications` → `/membership/applications`
 
 Key files:
@@ -404,7 +410,7 @@ Key files:
 * `lib/applications/application-routes.ts` (`hrCategoryApplicationsUrl`, `MEMBERSHIP_APPLICATIONS_PATH`)
 * `app/(dashboard)/settings/applications/page.tsx` (redirect only)
 * `app/(dashboard)/membership/applications/page.tsx`
-* `app/(dashboard)/workforce/settings/application-templates/page.tsx`
+* `app/(dashboard)/workforce/settings/application-templates/page.tsx` (redirect only)
 
 Other modules:
 
@@ -435,6 +441,6 @@ Redirects from old tab URLs (`?tab=general`, `?tab=roles`, `?tab=discount-polici
 
 ### People Management Reports
 
-Status: Partial
+**Removed as a separate hub.** Headcount metrics (Active Employees, Departments, Volunteers, Childcare Providers), employees-by-department, and recent hires live on **HR → Overview** (`/workforce`). Attendance Rate and Time Off placeholders were dropped. Legacy `/hr/reports` and `/workforce/reports` redirect to `/workforce`.
 
-Route: `/hr/reports`
+Key file: `components/hr/hr-reports-client.tsx` (`HrOverviewDashboard`)

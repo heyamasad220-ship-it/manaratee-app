@@ -18,6 +18,8 @@ import {
   VENDOR_ORG_APPLICATION_TYPE,
 } from "@/lib/vendor-hub/vendor-participation-model"
 import { VENDOR_HUB_ROUTES } from "@/lib/vendor-hub/vendor-hub-routes"
+import { ensureChildcareStaffFromApprovedApplication } from "@/lib/hr/ensure-childcare-staff-from-application"
+import { ensureVolunteerFromApprovedApplication } from "@/lib/volunteers/ensure-volunteer-from-application"
 import {
   buildTypeRegistry,
   normalizeModuleOwner,
@@ -40,6 +42,7 @@ const APPLICATION_PATHS = [
   "/applications/approved",
   "/applications/rejected",
   "/settings/applications",
+  "/workforce",
   "/workforce/employees",
   "/workforce/volunteers",
   "/workforce/childcare",
@@ -397,6 +400,52 @@ export async function submitApplication(input: SubmitApplicationInput) {
     }
   }
 
+  if (input.applicationType === "childcare_provider") {
+    const { data: existingChildcareApps } = await supabase
+      .from("applications")
+      .select("id, status")
+      .eq("organization_id", organizationId)
+      .eq("contact_id", contactId)
+      .eq("application_type", "childcare_provider")
+      .in("status", ["submitted", "pending_review", "approved"])
+      .limit(1)
+
+    if (existingChildcareApps && existingChildcareApps.length > 0) {
+      const status = normalizeLegacyStatus(String(existingChildcareApps[0].status))
+      if (status === "approved") {
+        throw new Error(
+          "You are already an approved childcare provider for this organization."
+        )
+      }
+      throw new Error(
+        "You already have a childcare provider application under review for this organization."
+      )
+    }
+  }
+
+  if (input.applicationType === "volunteer") {
+    const { data: existingVolunteerApps } = await supabase
+      .from("applications")
+      .select("id, status")
+      .eq("organization_id", organizationId)
+      .eq("contact_id", contactId)
+      .eq("application_type", "volunteer")
+      .in("status", ["submitted", "pending_review", "approved"])
+      .limit(1)
+
+    if (existingVolunteerApps && existingVolunteerApps.length > 0) {
+      const status = normalizeLegacyStatus(String(existingVolunteerApps[0].status))
+      if (status === "approved") {
+        throw new Error(
+          "You are already an approved volunteer for this organization."
+        )
+      }
+      throw new Error(
+        "You already have a volunteer application under review for this organization."
+      )
+    }
+  }
+
   await attachAuthUserToContactIfLoggedIn({
     supabase,
     contactId,
@@ -438,6 +487,9 @@ export async function submitApplication(input: SubmitApplicationInput) {
 
   revalidateApplicationPaths()
   revalidatePath(`/contacts/${contactId}`)
+  revalidatePath("/customer/profile/applications")
+  revalidatePath("/customer/apply/childcare")
+  revalidatePath("/customer/apply/volunteer")
 
   if (
     (AFFILIATION_APPLICATION_TYPES as readonly string[]).includes(input.applicationType)
@@ -542,6 +594,38 @@ export async function updateApplicationStatus(input: UpdateApplicationStatusInpu
   }
 
   const updatedApplication = mapApplicationRow(data)
+
+  if (
+    input.status === "approved" &&
+    existing.application_type === "childcare_provider" &&
+    existing.contact_id
+  ) {
+    await ensureChildcareStaffFromApprovedApplication({
+      supabase,
+      organizationId,
+      contactId: existing.contact_id,
+      applicantName: updatedApplication.applicant_name,
+      applicantEmail: updatedApplication.applicant_email,
+      applicantPhone: updatedApplication.applicant_phone,
+      formData: updatedApplication.form_data,
+    })
+  }
+
+  if (
+    input.status === "approved" &&
+    existing.application_type === "volunteer" &&
+    existing.contact_id
+  ) {
+    await ensureVolunteerFromApprovedApplication({
+      supabase,
+      organizationId,
+      contactId: existing.contact_id,
+      applicantName: updatedApplication.applicant_name,
+      applicantEmail: updatedApplication.applicant_email,
+      applicantPhone: updatedApplication.applicant_phone,
+      formData: updatedApplication.form_data,
+    })
+  }
 
   await syncVendorHubParticipantFromApplication({
     application: updatedApplication,

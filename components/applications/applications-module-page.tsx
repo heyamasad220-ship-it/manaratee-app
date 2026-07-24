@@ -38,7 +38,10 @@ import {
 } from "@/lib/applications/application-actions"
 import {
   applicationsPageUrl,
+  HR_COMMITTEE_APPLICATIONS_PATH,
+  hrCategoryApplicationsUrl,
   isHrCategoryApplicationsPath,
+  MEMBERSHIP_APPLICATIONS_PATH,
   peopleManagementApplicationsUrl,
   PROGRAMS_FINANCIAL_ASSISTANCE_PATH,
   VENDOR_HUB_APPLICATIONS_PATH,
@@ -108,12 +111,19 @@ function buildPageUrl(
     isHrCategoryApplicationsPath(basePath)
   ) {
     const path = options.embeddedSyncPath || basePath
-    const params = new URLSearchParams()
-    params.set(options.embeddedTabQueryKey ?? "tab", "applications")
-    if (options.statusTab && options.statusTab !== "all") {
-      params.set("status", options.statusTab)
+    if (path === MEMBERSHIP_APPLICATIONS_PATH || path === HR_COMMITTEE_APPLICATIONS_PATH) {
+      const params = new URLSearchParams()
+      params.set(options.embeddedTabQueryKey ?? "tab", "applications")
+      if (options.statusTab && options.statusTab !== "all") {
+        params.set("status", options.statusTab)
+      }
+      return `${path}?${params.toString()}`
     }
-    return `${path}?${params.toString()}`
+
+    return hrCategoryApplicationsUrl({
+      applicationType: options.applicationType ?? "employment",
+      status: options.statusTab,
+    })
   }
 
   if (

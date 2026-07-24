@@ -3,6 +3,7 @@
 import * as React from "react"
 import { useRouter } from "next/navigation"
 import { StaffRecordsClient } from "@/components/hr/staff-records-client"
+import { hrEmployeePositionsHref } from "@/lib/hr/hr-overview-path"
 
 const legacyEmployeesTabValues = [
   "overview",
@@ -30,18 +31,17 @@ export function HrEmployeesPageClient({
 
   React.useEffect(() => {
     if (initialTab === "departments") {
-      router.replace("/workforce/departments")
+      router.replace("/workforce?tab=departments")
       return
     }
     if (initialTab === "positions") {
-      router.replace("/workforce/settings/positions")
+      router.replace(hrEmployeePositionsHref())
       return
     }
     if (
       initialTab &&
-      initialTab !== "employees" &&
       initialTab !== "applications" &&
-      initialTab !== "archived" &&
+      initialTab !== "employees" &&
       legacyEmployeesTabValues.includes(
         initialTab as (typeof legacyEmployeesTabValues)[number]
       )

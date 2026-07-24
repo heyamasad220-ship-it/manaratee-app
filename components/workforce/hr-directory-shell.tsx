@@ -64,6 +64,8 @@ export function HrDirectoryShell({
         </div>
       </div>
 
+      {stats}
+
       <div className="flex gap-0 border-b border-border">
         {tabs.map((tab) => {
           const isActive = tab.id === activeTab
@@ -106,7 +108,6 @@ export function HrDirectoryShell({
         })}
       </div>
 
-      {stats}
       {filters}
       {children}
       {footer}

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation"
+import { hrOverviewHref } from "@/lib/hr/hr-overview-path"
 
 export default function HRDepartmentsPage() {
-  redirect("/workforce/departments")
+  redirect(hrOverviewHref({ tab: "departments" }))
 }

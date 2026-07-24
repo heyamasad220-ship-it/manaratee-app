@@ -1,8 +1,5 @@
 import { redirect } from "next/navigation"
-import {
-  HR_APPLICATION_TEMPLATES_PATH,
-  peopleManagementApplicationsUrl,
-} from "@/lib/applications/application-routes"
+import { peopleManagementApplicationsUrl } from "@/lib/applications/application-routes"
 import { statusTabIdFromQueryParam } from "@/lib/applications/application-status-tabs"
 import { PERMISSIONS, requirePermission } from "@/lib/permissions/permissions"
 
@@ -20,8 +17,9 @@ export default async function SettingsApplicationsPage({
 
   const { tab, status, application_type } = await searchParams
 
+  // Templates hub removed — send legacy links to HR Overview.
   if (tab === "templates") {
-    redirect(HR_APPLICATION_TEMPLATES_PATH)
+    redirect("/workforce")
   }
 
   redirect(

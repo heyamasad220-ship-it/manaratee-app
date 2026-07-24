@@ -22,7 +22,15 @@ type DepartmentExpenseRow = {
   amount: number | null
   expense_date: string | null
   department_id: string | null
-  program?: { id: string; name: string | null; department_id: string | null } | null
+  program_id?: string | null
+  program?: {
+    id: string
+    name: string | null
+    department_id: string | null
+    status: string | null
+    start_date: string | null
+    end_date: string | null
+  } | null
 }
 
 function formatCurrency(value: number | null | undefined) {
@@ -42,6 +50,21 @@ function formatDate(value: string | null | undefined) {
   })
 }
 
+function dateWithinOpenPrograms(
+  date: string | null,
+  programs: Array<{ start_date: string | null; end_date: string | null }>
+) {
+  if (programs.length === 0) return false
+  const dated = programs.filter((program) => program.start_date || program.end_date)
+  if (dated.length === 0) return true
+  if (!date) return true
+  return dated.some((program) => {
+    if (program.start_date && date < program.start_date) return false
+    if (program.end_date && date > program.end_date) return false
+    return true
+  })
+}
+
 /** Temporary department expenses view moved from Programs → Reports (to clean up later). */
 export function DepartmentExpensesPanel({
   departmentId,
@@ -58,22 +81,42 @@ export function DepartmentExpensesPanel({
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
-    const { data, error: queryError } = await supabase
-      .from("program_expenses")
-      .select(`
-        id,
-        vendor,
-        category,
-        amount,
-        expense_date,
-        department_id,
-        program:program_id (
-          id,
-          name,
-          department_id
-        )
-      `)
-      .order("expense_date", { ascending: false })
+
+    const [{ data: openPrograms, error: programsError }, { data, error: queryError }] =
+      await Promise.all([
+        supabase
+          .from("programs")
+          .select("id, start_date, end_date")
+          .eq("department_id", departmentId)
+          .in("status", ["draft", "active", "paused"]),
+        supabase
+          .from("program_expenses")
+          .select(`
+            id,
+            vendor,
+            category,
+            amount,
+            expense_date,
+            department_id,
+            program_id,
+            program:program_id (
+              id,
+              name,
+              department_id,
+              status,
+              start_date,
+              end_date
+            )
+          `)
+          .order("expense_date", { ascending: false }),
+      ])
+
+    if (programsError) {
+      setError(programsError.message)
+      setItems([])
+      setLoading(false)
+      return
+    }
 
     if (queryError) {
       console.warn("program_expenses could not be loaded:", queryError.message)
@@ -83,9 +126,17 @@ export function DepartmentExpensesPanel({
       return
     }
 
+    const openProgramList = openPrograms || []
+    const openProgramIds = new Set(openProgramList.map((row) => row.id as string))
+
+    // Open years only — archived-year expenses belong under Archive reports.
     const rows = ((data || []) as DepartmentExpenseRow[]).filter((row) => {
-      if (row.department_id === departmentId) return true
-      return row.program?.department_id === departmentId
+      const programId = row.program_id || row.program?.id || null
+      if (programId) {
+        return openProgramIds.has(programId)
+      }
+      if (row.department_id !== departmentId) return false
+      return dateWithinOpenPrograms(row.expense_date, openProgramList)
     })
     setItems(rows)
     setLoading(false)

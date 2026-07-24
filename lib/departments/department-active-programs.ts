@@ -7,6 +7,14 @@ export const DEPARTMENT_OPEN_PROGRAM_STATUSES = ["draft", "active", "paused"] as
 export type DepartmentOpenProgramStatus =
   (typeof DEPARTMENT_OPEN_PROGRAM_STATUSES)[number]
 
+export type DepartmentOpenProgram = {
+  id: string
+  name: string
+  status: string
+  startDate: string | null
+  endDate: string | null
+}
+
 export type DepartmentYearProgramRow = {
   id: string
   name: string
@@ -20,17 +28,64 @@ export type DepartmentYearProgramRow = {
   gender: string | null
 }
 
+function periodsOverlap(
+  periodStart: string | null,
+  periodEnd: string | null,
+  rangeStart: string | null,
+  rangeEnd: string | null
+) {
+  if (!rangeStart && !rangeEnd) return true
+  if (!periodStart || !periodEnd) return true
+  const start = rangeStart || "0000-01-01"
+  const end = rangeEnd || "9999-12-31"
+  return periodStart <= end && periodEnd >= start
+}
+
 /**
- * Load department programs that are not archived (active academic years).
+ * True when a pay/budget period belongs to any open year/season.
+ * If open years have no dates, rows are kept (cannot date-filter).
+ * If there are no open years, returns false.
+ */
+export function periodOverlapsOpenPrograms(
+  periodStart: string | null,
+  periodEnd: string | null,
+  programs: Array<{ startDate: string | null; endDate: string | null }>
+): boolean {
+  if (programs.length === 0) return false
+  const dated = programs.filter((program) => program.startDate || program.endDate)
+  if (dated.length === 0) return true
+  return dated.some((program) =>
+    periodsOverlap(periodStart, periodEnd, program.startDate, program.endDate)
+  )
+}
+
+/** True when a calendar date falls within any open year/season. */
+export function dateWithinOpenPrograms(
+  date: string | null,
+  programs: Array<{ startDate: string | null; endDate: string | null }>
+): boolean {
+  if (programs.length === 0) return false
+  const dated = programs.filter((program) => program.startDate || program.endDate)
+  if (dated.length === 0) return true
+  if (!date) return true
+  return dated.some((program) => {
+    if (program.startDate && date < program.startDate) return false
+    if (program.endDate && date > program.endDate) return false
+    return true
+  })
+}
+
+/**
+ * Load department programs that are not archived (open academic years).
  */
 export async function loadDepartmentOpenPrograms(
   organizationId: string,
   departmentId: string
-): Promise<Array<{ id: string; name: string; status: string }>> {
+): Promise<DepartmentOpenProgram[]> {
   const supabase = await createClient()
   const { data, error } = await supabase
     .from("programs")
-    .select("id, name, status")
+    .select("id, name, status, start_date, end_date")
     .eq("organization_id", organizationId)
     .eq("department_id", departmentId)
     .in("status", [...DEPARTMENT_OPEN_PROGRAM_STATUSES])
@@ -42,6 +97,8 @@ export async function loadDepartmentOpenPrograms(
     id: row.id as string,
     name: (row.name as string) || "Program",
     status: (row.status as string) || "active",
+    startDate: (row.start_date as string | null) ?? null,
+    endDate: (row.end_date as string | null) ?? null,
   }))
 }
 

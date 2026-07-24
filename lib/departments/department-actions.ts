@@ -33,7 +33,7 @@ export type DepartmentWithProgramCount = {
 function revalidateDepartmentPaths(departmentId?: string) {
   revalidatePath("/programs")
   revalidatePath("/programs/catalog")
-  revalidatePath("/programs/settings")
+  revalidatePath("/workforce?tab=departments")
   revalidatePath("/workforce/settings")
   revalidatePath("/workforce/departments")
   revalidatePath("/workforce/employees")

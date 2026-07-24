@@ -1,54 +1,42 @@
+import { Suspense } from "react"
 import { Header } from "@/components/layout/header"
-import { StatCard, StatCardsRow } from "@/components/ui/stat-card"
-import { Baby, HeartHandshake, Users } from "lucide-react"
+import { HrOverviewClient } from "@/components/hr/hr-overview-client"
+import { fetchChildcareProvidersData } from "@/lib/hr/childcare-provider-actions"
 import { fetchPeopleManagementOverview } from "@/lib/hr/hr-overview-actions"
-import { PEOPLE_MANAGEMENT_MODULE_LABEL } from "@/lib/hr/hr-module-label"
+import { WORKFORCE_MODULE_LABEL } from "@/lib/hr/hr-module-label"
+import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
+import { PERMISSIONS, requirePermission } from "@/lib/permissions/permissions"
 
-export default async function WorkforceOverviewPage() {
-  const overview = await fetchPeopleManagementOverview()
+export default async function WorkforceOverviewPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>
+}) {
+  await requirePermission(PERMISSIONS.STAFF_VIEW)
 
-  const stats = [
-    {
-      label: "Total Employees",
-      value: overview.employees.totalEmployees,
-      icon: Users,
-    },
-    {
-      label: "Total Volunteers",
-      value: overview.volunteerContacts,
-      icon: HeartHandshake,
-    },
-    {
-      label: "Total Childcare Providers",
-      value: overview.childcareProviders,
-      icon: Baby,
-    },
-  ]
+  const { tab } = await searchParams
+  const [overview, organizationId, childcare] = await Promise.all([
+    fetchPeopleManagementOverview(),
+    getSelectedOrganizationId(),
+    fetchChildcareProvidersData(),
+  ])
 
   return (
     <>
-      <Header title={PEOPLE_MANAGEMENT_MODULE_LABEL} />
-      <div className="p-6">
-        <div className="flex flex-col gap-6">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Overview</h1>
-            <p className="text-sm text-muted-foreground">
-              Workforce headcount at a glance.
-            </p>
-          </div>
-
-          <StatCardsRow>
-            {stats.map((stat) => (
-              <StatCard
-                key={stat.label}
-                label={stat.label}
-                value={stat.value}
-                icon={stat.icon}
-              />
-            ))}
-          </StatCardsRow>
-        </div>
-      </div>
+      <Header title={WORKFORCE_MODULE_LABEL} />
+      <Suspense fallback={<div className="h-64 animate-pulse rounded-lg bg-muted m-6" />}>
+        <HrOverviewClient
+          organizationId={organizationId}
+          overviewStats={{
+            employees: overview.employees.totalEmployees,
+            volunteers: overview.volunteerContacts,
+            childcareProviders: overview.childcareProviders,
+          }}
+          childcareProviders={childcare.providers}
+          childcareStats={childcare.stats}
+          initialTab={tab}
+        />
+      </Suspense>
     </>
   )
 }

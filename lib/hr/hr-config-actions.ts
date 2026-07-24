@@ -23,8 +23,8 @@ export type HrJobRole = {
 }
 
 function revalidateHrSettingsPaths() {
+  revalidatePath("/workforce")
   revalidatePath("/workforce/settings")
-  revalidatePath("/workforce/employees")
   revalidatePath("/workforce/employees")
 }
 

@@ -86,14 +86,21 @@ function formatDate(value: string | null) {
   })
 }
 
+type ProgramPromoCodesEditorProps = {
+  organizationId: string
+  /** Preferred: department-wide codes across all years. */
+  departmentId?: string
+  /** Legacy: program/year-scoped codes. Ignored when departmentId is set. */
+  programId?: string
+}
+
 export function ProgramPromoCodesEditor({
+  departmentId,
   programId,
   organizationId,
-}: {
-  programId: string
-  organizationId: string
-}) {
+}: ProgramPromoCodesEditorProps) {
   const supabase = createClient()
+  const scopeLabel = departmentId ? "department" : "program"
 
   const [loading, setLoading] = React.useState(true)
   const [saving, setSaving] = React.useState(false)
@@ -102,16 +109,30 @@ export function ProgramPromoCodesEditor({
   const [editingDiscount, setEditingDiscount] = React.useState(emptyDiscount)
 
   const fetchDiscountCodes = React.useCallback(async () => {
+    if (!departmentId && !programId) {
+      setDiscountCodes([])
+      setLoading(false)
+      return
+    }
+
     setLoading(true)
 
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from("discount_codes")
         .select(
           "id, code, description, discount_type, discount_value, starts_at, expires_at, max_uses, used_count, active"
         )
-        .eq("program_id", programId)
+        .eq("organization_id", organizationId)
         .order("created_at", { ascending: false })
+
+      if (departmentId) {
+        query = query.eq("department_id", departmentId)
+      } else if (programId) {
+        query = query.eq("program_id", programId)
+      }
+
+      const { data, error } = await query
 
       if (error) {
         console.warn("discount_codes could not be loaded:", error.message)
@@ -123,7 +144,7 @@ export function ProgramPromoCodesEditor({
     } finally {
       setLoading(false)
     }
-  }, [programId, supabase])
+  }, [departmentId, organizationId, programId, supabase])
 
   React.useEffect(() => {
     void fetchDiscountCodes()
@@ -151,13 +172,16 @@ export function ProgramPromoCodesEditor({
 
   async function handleSaveDiscount() {
     if (!editingDiscount.code.trim()) return
+    if (!departmentId && !programId) return
 
     setSaving(true)
 
     try {
       const payload = {
         organization_id: organizationId,
-        program_id: programId,
+        ...(departmentId
+          ? { department_id: departmentId, program_id: null as string | null }
+          : { program_id: programId as string }),
         code: editingDiscount.code.trim().toUpperCase(),
         description: editingDiscount.description.trim() || null,
         discount_type: editingDiscount.discount_type,
@@ -169,15 +193,27 @@ export function ProgramPromoCodesEditor({
         updated_at: new Date().toISOString(),
       }
 
-      const { error } = editingDiscount.id
-        ? await supabase
-            .from("discount_codes")
-            .update(payload)
-            .eq("id", editingDiscount.id)
-            .eq("program_id", programId)
-        : await supabase
-            .from("discount_codes")
-            .insert({ ...payload, used_count: 0 })
+      let error: { message: string } | null = null
+
+      if (editingDiscount.id) {
+        let updateQuery = supabase
+          .from("discount_codes")
+          .update(payload)
+          .eq("id", editingDiscount.id)
+          .eq("organization_id", organizationId)
+
+        if (departmentId) {
+          updateQuery = updateQuery.eq("department_id", departmentId)
+        } else if (programId) {
+          updateQuery = updateQuery.eq("program_id", programId)
+        }
+
+        ;({ error } = await updateQuery)
+      } else {
+        ;({ error } = await supabase
+          .from("discount_codes")
+          .insert({ ...payload, used_count: 0 }))
+      }
 
       if (error) throw error
 
@@ -198,11 +234,19 @@ export function ProgramPromoCodesEditor({
     const confirmed = window.confirm("Delete this promo code?")
     if (!confirmed) return
 
-    const { error } = await supabase
+    let deleteQuery = supabase
       .from("discount_codes")
       .delete()
       .eq("id", id)
-      .eq("program_id", programId)
+      .eq("organization_id", organizationId)
+
+    if (departmentId) {
+      deleteQuery = deleteQuery.eq("department_id", departmentId)
+    } else if (programId) {
+      deleteQuery = deleteQuery.eq("program_id", programId)
+    }
+
+    const { error } = await deleteQuery
 
     if (error) {
       console.error("Delete promo code error:", error)
@@ -220,7 +264,7 @@ export function ProgramPromoCodesEditor({
           <div>
             <h2 className="text-base font-semibold">Promo Codes</h2>
             <p className="text-sm text-muted-foreground">
-              Create and manage registration promo codes for this program.
+              Create and manage registration promo codes for this {scopeLabel}.
             </p>
           </div>
 
@@ -318,7 +362,7 @@ export function ProgramPromoCodesEditor({
             <DialogDescription>
               {editingDiscount.id
                 ? "Update this promo code."
-                : "Create a new promo code for this program."}
+                : `Create a new promo code for this ${scopeLabel}.`}
             </DialogDescription>
           </DialogHeader>
 

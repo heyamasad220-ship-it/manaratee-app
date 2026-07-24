@@ -17,7 +17,11 @@ import type {
   ChildcareProviderStats,
 } from "@/lib/hr/childcare-provider-actions"
 import { fetchApplicationDashboardStats } from "@/lib/applications/application-actions"
-import { HR_CHILDCARE_APPLICATIONS_PATH } from "@/lib/applications/application-routes"
+import { HR_CHILDCARE_APPLICATIONS_PATH, CUSTOMER_CHILDCARE_APPLY_PATH } from "@/lib/applications/application-routes"
+import {
+  hrOverviewHref,
+  parseHrDirectoryView,
+} from "@/lib/hr/hr-overview-path"
 import { HrCategoryApplicationsPanel } from "@/components/applications/hr-category-applications-panel"
 import { HrDirectoryShell } from "@/components/workforce/hr-directory-shell"
 import { StatCard, StatCardsRow } from "@/components/ui/stat-card"
@@ -127,9 +131,13 @@ export function HrChildcarePanel({ providers, stats }: HrChildcarePanelProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [search, setSearch] = useState("")
-  const [statusFilter, setStatusFilter] = useState("all")
-  const [directoryTab, setDirectoryTab] = useState<"providers" | "applications" | "archived">(
-    () => (searchParams.get("tab") === "applications" ? "applications" : "providers")
+  const [statusFilter, setStatusFilter] = useState<"Active" | "Inactive">("Active")
+  const [directoryTab, setDirectoryTab] = useState<"providers" | "applications">(
+    () => {
+      const view = parseHrDirectoryView(searchParams, { legacyTabParam: true })
+      if (view === "applications") return view
+      return "providers"
+    }
   )
   const [applicationsCount, setApplicationsCount] = useState(0)
   const [page, setPage] = useState(1)
@@ -149,11 +157,9 @@ export function HrChildcarePanel({ providers, stats }: HrChildcarePanelProps) {
   }, [])
 
   useEffect(() => {
-    const tab = searchParams.get("tab")
-    if (tab === "applications") {
+    const view = parseHrDirectoryView(searchParams, { legacyTabParam: true })
+    if (view === "applications") {
       setDirectoryTab("applications")
-    } else if (tab === "archived") {
-      setDirectoryTab("archived")
     } else {
       setDirectoryTab("providers")
     }
@@ -163,29 +169,22 @@ export function HrChildcarePanel({ providers, stats }: HrChildcarePanelProps) {
     setPage(1)
   }, [search, statusFilter, directoryTab])
 
-  function setDirectoryTabAndUrl(tabId: "providers" | "applications" | "archived") {
+  function setDirectoryTabAndUrl(tabId: "providers" | "applications") {
     setDirectoryTab(tabId)
     if (tabId === "applications") {
-      router.replace(`${HR_CHILDCARE_APPLICATIONS_PATH}?tab=applications`, { scroll: false })
+      router.replace(hrOverviewHref({ tab: "childcare", view: "applications" }), {
+        scroll: false,
+      })
       return
     }
-    if (tabId === "archived") {
-      router.replace(`${HR_CHILDCARE_APPLICATIONS_PATH}?tab=archived`, { scroll: false })
-      return
-    }
-    router.replace(HR_CHILDCARE_APPLICATIONS_PATH, { scroll: false })
+    router.replace(hrOverviewHref({ tab: "childcare" }), { scroll: false })
   }
 
   const filtered = useMemo(() => {
-    let result = providers
-
-    if (directoryTab === "archived") {
-      result = result.filter((provider) => provider.status === "Inactive")
-    } else if (statusFilter === "all") {
-      result = result.filter((provider) => provider.status !== "Inactive")
-    } else {
-      result = result.filter((provider) => provider.status === statusFilter)
-    }
+    let result =
+      statusFilter === "Inactive"
+        ? providers.filter((provider) => provider.status === "Inactive")
+        : providers.filter((provider) => provider.status !== "Inactive")
 
     const query = search.trim().toLowerCase()
     if (query) {
@@ -198,7 +197,7 @@ export function HrChildcarePanel({ providers, stats }: HrChildcarePanelProps) {
     }
 
     return result
-  }, [providers, directoryTab, statusFilter, search])
+  }, [providers, statusFilter, search])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const currentPage = Math.min(page, totalPages)
@@ -220,10 +219,26 @@ export function HrChildcarePanel({ providers, stats }: HrChildcarePanelProps) {
         exportDisabled={filtered.length === 0}
         primaryAction={
           directoryTab === "applications" ? undefined : (
-            <Button type="button" onClick={() => setDirectoryTabAndUrl("applications")}>
-              <Plus className="mr-2 h-4 w-4" />
-              Review Applications
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={async () => {
+                  try {
+                    const url = `${window.location.origin}${CUSTOMER_CHILDCARE_APPLY_PATH}`
+                    await navigator.clipboard.writeText(url)
+                  } catch (error) {
+                    console.error("Could not copy apply link:", error)
+                  }
+                }}
+              >
+                Copy apply link
+              </Button>
+              <Button type="button" onClick={() => setDirectoryTabAndUrl("applications")}>
+                <Plus className="mr-2 h-4 w-4" />
+                Review Applications
+              </Button>
+            </div>
           )
         }
         tabs={[
@@ -233,11 +248,10 @@ export function HrChildcarePanel({ providers, stats }: HrChildcarePanelProps) {
             label: "Applications",
             count: applicationsCount,
           },
-          { id: "archived", label: "Archived" },
         ]}
         activeTab={directoryTab}
         onTabChange={(tabId) => {
-          if (tabId === "providers" || tabId === "applications" || tabId === "archived") {
+          if (tabId === "providers" || tabId === "applications") {
             setDirectoryTabAndUrl(tabId)
           }
         }}
@@ -291,18 +305,20 @@ export function HrChildcarePanel({ providers, stats }: HrChildcarePanelProps) {
                   onChange={(event) => setSearch(event.target.value)}
                 />
               </div>
-              {directoryTab === "providers" ? (
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-full sm:w-[180px]">
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="Active">Active</SelectItem>
-                    <SelectItem value="Inactive">Inactive</SelectItem>
-                  </SelectContent>
-                </Select>
-              ) : null}
+              <Select
+                value={statusFilter}
+                onValueChange={(value) =>
+                  setStatusFilter(value as "Active" | "Inactive")
+                }
+              >
+                <SelectTrigger className="w-full sm:w-[180px]">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Active">Active</SelectItem>
+                  <SelectItem value="Inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           )
         }

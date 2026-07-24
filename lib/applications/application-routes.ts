@@ -1,18 +1,30 @@
 import type { ApplicationStatus, ModuleOwner } from "@/lib/applications/application-types"
 import { isWorkforceModuleOwner } from "@/lib/applications/application-types"
 import type { ApplicationStatusTabId } from "@/lib/applications/application-status-tabs"
+import {
+  hrOverviewHref,
+  hrOverviewTabFromApplicationType,
+  HR_OVERVIEW_PATH,
+} from "@/lib/hr/hr-overview-path"
 
 /** @deprecated Hub removed — redirects to HR category Applications tabs. */
 export const PEOPLE_MANAGEMENT_APPLICATIONS_PATH = "/settings/applications"
-export const HR_APPLICATION_TEMPLATES_PATH = "/workforce/settings/application-templates"
-export const HR_EMPLOYEE_APPLICATIONS_PATH = "/workforce/employees"
-export const HR_VOLUNTEER_APPLICATIONS_PATH = "/workforce/volunteers"
-export const HR_CHILDCARE_APPLICATIONS_PATH = "/workforce/childcare"
+/** @deprecated Templates hub removed — redirects resolve to HR Overview. */
+export const HR_APPLICATION_TEMPLATES_PATH = "/workforce"
+/** Base overview path; use hrCategoryApplicationsUrl for Applications deep links. */
+export const HR_EMPLOYEE_APPLICATIONS_PATH = HR_OVERVIEW_PATH
+export const HR_VOLUNTEER_APPLICATIONS_PATH = HR_OVERVIEW_PATH
+export const HR_CHILDCARE_APPLICATIONS_PATH = HR_OVERVIEW_PATH
 /** @deprecated Use MEMBERSHIP_APPLICATIONS_PATH — committee apps live under Membership. */
 export const HR_COMMITTEE_APPLICATIONS_PATH = "/workforce/settings/committee-applications"
 export const MEMBERSHIP_APPLICATIONS_PATH = "/membership/applications"
 export const VENDOR_HUB_APPLICATIONS_PATH = "/vendor-hub/events"
 export const PROGRAMS_FINANCIAL_ASSISTANCE_PATH = "/programs/financial-assistance"
+
+/** Customer portal childcare provider application intake. */
+export const CUSTOMER_CHILDCARE_APPLY_PATH = "/customer/apply/childcare"
+/** Customer portal volunteer application intake. */
+export const CUSTOMER_VOLUNTEER_APPLY_PATH = "/customer/apply/volunteer"
 
 /** @deprecated Sign-Ups applications moved back under People Management */
 export const SIGN_UPS_APPLICATIONS_PATH = "/people-management/applications"
@@ -33,43 +45,55 @@ export function hrCategoryApplicationsPath(
 ): string {
   switch (applicationType) {
     case "employment":
-      return HR_EMPLOYEE_APPLICATIONS_PATH
     case "volunteer":
-      return HR_VOLUNTEER_APPLICATIONS_PATH
     case "childcare_provider":
-      return HR_CHILDCARE_APPLICATIONS_PATH
+      return HR_OVERVIEW_PATH
     case "committee_member":
       return MEMBERSHIP_APPLICATIONS_PATH
     default:
-      return HR_EMPLOYEE_APPLICATIONS_PATH
+      return HR_OVERVIEW_PATH
   }
 }
 
 export function isHrCategoryApplicationsPath(path: string) {
   return (
-    path === HR_EMPLOYEE_APPLICATIONS_PATH ||
-    path === HR_VOLUNTEER_APPLICATIONS_PATH ||
-    path === HR_CHILDCARE_APPLICATIONS_PATH ||
+    path === HR_OVERVIEW_PATH ||
+    path === "/workforce/employees" ||
+    path === "/workforce/volunteers" ||
+    path === "/workforce/childcare" ||
     path === MEMBERSHIP_APPLICATIONS_PATH ||
     path === HR_COMMITTEE_APPLICATIONS_PATH
   )
 }
 
-/** HR category Applications tab URL, e.g. /workforce/employees?tab=applications */
+/** HR category Applications tab URL, e.g. /workforce?tab=employees&view=applications */
 export function hrCategoryApplicationsUrl(options?: {
   applicationType?: string | null
   status?: ApplicationStatusTabId | ApplicationStatus | ApplicationStatus[]
 }) {
-  const path = hrCategoryApplicationsPath(options?.applicationType)
-  const params = new URLSearchParams()
-  params.set("tab", "applications")
-
-  if (options?.status && options.status !== "all") {
-    const value = Array.isArray(options.status) ? options.status.join(",") : options.status
-    params.set("status", value)
+  if (options?.applicationType === "committee_member") {
+    const params = new URLSearchParams()
+    params.set("tab", "applications")
+    if (options?.status && options.status !== "all") {
+      const value = Array.isArray(options.status) ? options.status.join(",") : options.status
+      params.set("status", value)
+    }
+    return `${MEMBERSHIP_APPLICATIONS_PATH}?${params.toString()}`
   }
 
-  return `${path}?${params.toString()}`
+  const overviewTab = hrOverviewTabFromApplicationType(options?.applicationType)
+  const status =
+    options?.status && options.status !== "all"
+      ? Array.isArray(options.status)
+        ? options.status.join(",")
+        : options.status
+      : null
+
+  return hrOverviewHref({
+    tab: overviewTab,
+    view: "applications",
+    status,
+  })
 }
 
 export function applicationsPageUrl(
@@ -131,14 +155,15 @@ export function programsFinancialAssistanceUrl(options?: {
   return applicationsPageUrl(PROGRAMS_FINANCIAL_ASSISTANCE_PATH, options)
 }
 
-/** Resolves to the matching HR category Applications tab (or templates settings). */
+/** Resolves to the matching HR category Applications tab. */
 export function peopleManagementApplicationsUrl(options?: {
   pageTab?: ApplicationsPageTab
   status?: ApplicationStatusTabId | ApplicationStatus | ApplicationStatus[]
   applicationType?: string
 }) {
+  // Legacy templates hub removed.
   if (options?.pageTab === "templates") {
-    return HR_APPLICATION_TEMPLATES_PATH
+    return HR_OVERVIEW_PATH
   }
 
   return hrCategoryApplicationsUrl({

@@ -1,11 +1,7 @@
 import { redirect } from "next/navigation"
+import { hrPayrollHref } from "@/lib/hr/hr-overview-path"
 
-import { requireOrganizationModule } from "@/lib/modules/dashboard-module-access-server"
-import { requirePermission } from "@/lib/permissions/permissions"
-import { PERMISSIONS } from "@/lib/permissions/permission-keys"
-
-export default async function FinanceIndexPage() {
-  await requireOrganizationModule("finance")
-  await requirePermission(PERMISSIONS.FINANCE_VIEW)
-  redirect("/finance/payroll")
+/** Finance module sidebar removed — payroll lives under HR → Payroll. */
+export default function FinanceIndexPage() {
+  redirect(hrPayrollHref())
 }

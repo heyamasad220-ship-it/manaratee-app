@@ -14,15 +14,35 @@ import {
   shouldCloseEnrollmentForStatus,
 } from "@/lib/programs/program-enrollment-availability"
 
-function isMissingAgeColumnError(error: { message?: string; code?: string }) {
+function isMissingProgramColumnError(error: { message?: string; code?: string }) {
   const message = (error.message || "").toLowerCase()
 
   return (
     error.code === "PGRST204" ||
-    message.includes("min_age") ||
-    message.includes("max_age") ||
-    message.includes("schema cache")
+    message.includes("schema cache") ||
+    (message.includes("could not find") && message.includes("column"))
   )
+}
+
+function omitUnavailableProgramColumns<T extends Record<string, unknown>>(
+  payload: T,
+  error: { message?: string }
+): T {
+  const message = (error.message || "").toLowerCase()
+  const next = { ...payload }
+
+  if (message.includes("min_age") || message.includes("max_age")) {
+    delete next.min_age
+    delete next.max_age
+  }
+  if (message.includes("single_session_registration_enabled")) {
+    delete next.single_session_registration_enabled
+  }
+  if (message.includes("drop_in_registration_enabled")) {
+    delete next.drop_in_registration_enabled
+  }
+
+  return next
 }
 
 type CreateProgramInput = {
@@ -295,18 +315,18 @@ export async function updateProgram(input: UpdateProgramInput) {
     programPayload.payment_due_day = input.payment_due_day
   }
 
+  let payload: Record<string, unknown> = { ...programPayload }
   let { error } = await supabase
     .from("programs")
-    .update(programPayload)
+    .update(payload)
     .eq("id", input.id)
     .eq("organization_id", organizationId)
 
-  if (error && isMissingAgeColumnError(error)) {
-    const { min_age: _minAge, max_age: _maxAge, ...withoutAgeBounds } =
-      programPayload
+  for (let attempt = 0; attempt < 3 && error && isMissingProgramColumnError(error); attempt++) {
+    payload = omitUnavailableProgramColumns(payload, error)
     ;({ error } = await supabase
       .from("programs")
-      .update(withoutAgeBounds)
+      .update(payload)
       .eq("id", input.id)
       .eq("organization_id", organizationId))
   }

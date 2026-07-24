@@ -1,17 +1,27 @@
-import { Suspense } from "react"
-import { Header } from "@/components/layout/header"
-import { HrChildcarePanel } from "@/components/hr/hr-childcare-panel"
-import { fetchChildcareProvidersData } from "@/lib/hr/childcare-provider-actions"
+import { redirect } from "next/navigation"
+import { hrOverviewHref } from "@/lib/hr/hr-overview-path"
 
-export default async function HrChildcarePage() {
-  const { providers, stats } = await fetchChildcareProvidersData()
+function directoryApplicationsView(params: {
+  tab?: string
+  view?: string
+}): "applications" | null {
+  if (params.view === "applications" || params.tab === "applications") {
+    return "applications"
+  }
+  return null
+}
 
-  return (
-    <div className="flex flex-1 flex-col">
-      <Header title="Childcare Providers" />
-      <Suspense fallback={<div className="h-64 animate-pulse rounded-lg bg-muted" />}>
-        <HrChildcarePanel providers={providers} stats={stats} />
-      </Suspense>
-    </div>
+export default async function HrChildcarePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string; view?: string }>
+}) {
+  const params = await searchParams
+
+  redirect(
+    hrOverviewHref({
+      tab: "childcare",
+      view: directoryApplicationsView(params),
+    })
   )
 }

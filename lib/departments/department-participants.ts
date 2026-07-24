@@ -1,34 +1,66 @@
 "use server"
 
+import { DEPARTMENT_OPEN_PROGRAM_STATUSES } from "@/lib/departments/department-active-programs"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { contactLabel, loadContactsByIds } from "@/lib/programs/registration-display-helpers"
 import { createClient } from "@/lib/supabase/server"
 
-const ACTIVE_ENROLLMENT_STATUSES = [
+const DEFAULT_ENROLLMENT_STATUSES = [
   "pending_payment",
   "pending",
   "enrolled",
   "active",
   "completed",
+  "waitlisted",
 ] as const
 
 export type DepartmentParticipantRow = {
   enrollmentId: string
   studentName: string
   studentContactId: string | null
+  parentName: string | null
+  parentEmail: string | null
+  parentPhone: string | null
   teacherName: string | null
   courseName: string
+  yearSeasonName: string
   programId: string
   offeringId: string | null
   status: string | null
   registeredAt: string | null
 }
 
+export type DepartmentParticipantYearOption = {
+  id: string
+  name: string
+}
+
+export type DepartmentParticipantCourseOption = {
+  id: string
+  name: string
+  programId: string
+}
+
+export type DepartmentParticipantsBundle = {
+  participants: DepartmentParticipantRow[]
+  years: DepartmentParticipantYearOption[]
+  courses: DepartmentParticipantCourseOption[]
+}
+
+export type DepartmentParticipantsFilters = {
+  programId?: string | null
+  offeringId?: string | null
+  includeInactive?: boolean
+}
+
 export async function fetchDepartmentParticipants(
-  departmentId: string
-): Promise<DepartmentParticipantRow[]> {
+  departmentId: string,
+  filters: DepartmentParticipantsFilters = {}
+): Promise<DepartmentParticipantsBundle> {
   const organizationId = await getSelectedOrganizationId()
-  if (!organizationId) return []
+  if (!organizationId) {
+    return { participants: [], years: [], courses: [] }
+  }
 
   const supabase = await createClient()
 
@@ -37,16 +69,44 @@ export async function fetchDepartmentParticipants(
     .select("id, name")
     .eq("organization_id", organizationId)
     .eq("department_id", departmentId)
-    .in("status", ["draft", "active", "paused"])
+    .in("status", [...DEPARTMENT_OPEN_PROGRAM_STATUSES])
+    .order("start_date", { ascending: false, nullsFirst: false })
+    .order("name", { ascending: true })
 
   if (programsError) {
     throw new Error(programsError.message || "Could not load department programs.")
   }
 
-  const programIds = (programs || []).map((row) => row.id as string)
-  const programNameById = new Map(
-    (programs || []).map((row) => [row.id as string, (row.name as string) || "Program"])
-  )
+  const years: DepartmentParticipantYearOption[] = (programs || []).map((row) => ({
+    id: row.id as string,
+    name: (row.name as string) || "Year/Season",
+  }))
+  const programIds = years.map((row) => row.id)
+  const programNameById = new Map(years.map((row) => [row.id, row.name]))
+
+  if (programIds.length === 0) {
+    return { participants: [], years: [], courses: [] }
+  }
+
+  const scopedProgramIds =
+    filters.programId && programIds.includes(filters.programId)
+      ? [filters.programId]
+      : programIds
+
+  const { data: offeringRows } = await supabase
+    .from("program_offerings")
+    .select("id, name, program_id, status")
+    .eq("organization_id", organizationId)
+    .in("program_id", scopedProgramIds)
+    .order("name", { ascending: true })
+
+  const courses: DepartmentParticipantCourseOption[] = (offeringRows || [])
+    .filter((row) => (row.status as string) !== "archived")
+    .map((row) => ({
+      id: row.id as string,
+      name: (row.name as string) || "Course",
+      programId: row.program_id as string,
+    }))
 
   let enrollmentsQuery = supabase
     .from("program_enrollments")
@@ -57,10 +117,12 @@ export async function fetchDepartmentParticipants(
       offering_id,
       child_name,
       participant_contact_id,
+      parent_name,
+      parent_email,
+      parent_phone,
       status,
       enrollment_date,
       created_at,
-      department_id,
       offering:offering_id (
         id,
         name
@@ -68,15 +130,15 @@ export async function fetchDepartmentParticipants(
     `
     )
     .eq("organization_id", organizationId)
-    .in("status", [...ACTIVE_ENROLLMENT_STATUSES])
+    .in("program_id", scopedProgramIds)
     .order("created_at", { ascending: false })
 
-  if (programIds.length > 0) {
-    enrollmentsQuery = enrollmentsQuery.or(
-      `department_id.eq.${departmentId},program_id.in.(${programIds.join(",")})`
-    )
-  } else {
-    enrollmentsQuery = enrollmentsQuery.eq("department_id", departmentId)
+  if (filters.offeringId) {
+    enrollmentsQuery = enrollmentsQuery.eq("offering_id", filters.offeringId)
+  }
+
+  if (!filters.includeInactive) {
+    enrollmentsQuery = enrollmentsQuery.in("status", [...DEFAULT_ENROLLMENT_STATUSES])
   }
 
   const { data: enrollmentRows, error: enrollmentsError } = await enrollmentsQuery
@@ -85,13 +147,10 @@ export async function fetchDepartmentParticipants(
     throw new Error(enrollmentsError.message || "Could not load participants.")
   }
 
-  const enrollments = (enrollmentRows || []).filter((row) => {
-    const enrollmentDept = row.department_id as string | null
-    const programId = row.program_id as string
-    return enrollmentDept === departmentId || programIds.includes(programId)
-  })
-
-  if (enrollments.length === 0) return []
+  const enrollments = enrollmentRows || []
+  if (enrollments.length === 0) {
+    return { participants: [], years, courses }
+  }
 
   const offeringIds = [
     ...new Set(
@@ -145,7 +204,7 @@ export async function fetchDepartmentParticipants(
       .filter((id): id is string => Boolean(id))
   )
 
-  const rows: DepartmentParticipantRow[] = enrollments.map((row) => {
+  const participants: DepartmentParticipantRow[] = enrollments.map((row) => {
     const offering = row.offering as { id: string; name: string | null } | null
     const programId = row.program_id as string
     const offeringId = (row.offering_id as string | null) ?? null
@@ -159,8 +218,12 @@ export async function fetchDepartmentParticipants(
         row.child_name as string
       ),
       studentContactId: (row.participant_contact_id as string | null) ?? null,
+      parentName: (row.parent_name as string | null) ?? null,
+      parentEmail: (row.parent_email as string | null) ?? null,
+      parentPhone: (row.parent_phone as string | null) ?? null,
       teacherName: offeringId ? teacherByOfferingId.get(offeringId) || null : null,
       courseName: offering?.name?.trim() || programNameById.get(programId) || "Course",
+      yearSeasonName: programNameById.get(programId) || "Year/Season",
       programId,
       offeringId,
       status: (row.status as string | null) ?? null,
@@ -171,14 +234,17 @@ export async function fetchDepartmentParticipants(
     }
   })
 
-  rows.sort((a, b) => a.studentName.localeCompare(b.studentName))
-  return rows
+  participants.sort((a, b) => a.studentName.localeCompare(b.studentName))
+  return { participants, years, courses }
 }
 
-export async function fetchDepartmentParticipantsAction(departmentId: string) {
+export async function fetchDepartmentParticipantsAction(
+  departmentId: string,
+  filters: DepartmentParticipantsFilters = {}
+) {
   try {
-    const participants = await fetchDepartmentParticipants(departmentId)
-    return { success: true as const, participants }
+    const bundle = await fetchDepartmentParticipants(departmentId, filters)
+    return { success: true as const, ...bundle }
   } catch (error) {
     return {
       success: false as const,

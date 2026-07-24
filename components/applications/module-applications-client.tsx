@@ -3,10 +3,9 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import type { LucideIcon } from "lucide-react"
-import { LayoutGrid, FileText, Layers } from "lucide-react"
+import { LayoutGrid, FileText } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ApplicationsModulePage } from "@/components/applications/applications-module-page"
-import { ApplicationTemplatesPanel } from "@/components/applications/application-templates-panel"
 import {
   applicationsPageUrl,
   type ApplicationsPageTab,
@@ -14,7 +13,7 @@ import {
 import type { ApplicationStatusTabId } from "@/lib/applications/application-status-tabs"
 import type { ModuleOwner } from "@/lib/applications/application-types"
 
-const builtInPageTabs = ["overview", "submissions", "templates"] as const
+const builtInPageTabs = ["overview", "submissions"] as const
 
 export type ModuleApplicationsExtraTab = {
   value: string
@@ -27,11 +26,9 @@ function normalizePageTab(
   tabParam: string | null,
   searchParams: URLSearchParams,
   {
-    allowTemplates = true,
     allowOverview = true,
     extraTabValues = [],
   }: {
-    allowTemplates?: boolean
     allowOverview?: boolean
     extraTabValues?: string[]
   } = {}
@@ -40,10 +37,12 @@ function normalizePageTab(
     return tabParam
   }
 
+  // Legacy templates tab → submissions / overview.
+  if (tabParam === "templates") {
+    return allowOverview ? "overview" : "submissions"
+  }
+
   if (tabParam && builtInPageTabs.includes(tabParam as (typeof builtInPageTabs)[number])) {
-    if (tabParam === "templates" && !allowTemplates) {
-      return allowOverview ? "overview" : "submissions"
-    }
     if (tabParam === "overview" && !allowOverview) {
       return "submissions"
     }
@@ -61,12 +60,11 @@ export function ModuleApplicationsClient({
   moduleOwner,
   basePath,
   title,
-  description = "Review submissions, track status, and configure application templates.",
+  description = "Review submissions and track application status.",
   lockedApplicationType,
   hubApplicationTypes,
   overviewLeadingContent,
   vendorHubEventId,
-  showTemplatesTab = true,
   showOverviewTab = true,
   extraTabs = [],
 }: {
@@ -79,8 +77,6 @@ export function ModuleApplicationsClient({
   overviewLeadingContent?: ReactNode
   /** When set, application review links include bazaar event context for participation sync. */
   vendorHubEventId?: string
-  /** HR templates live under HR → Settings → Application Templates. */
-  showTemplatesTab?: boolean
   /** People Management Applications is submissions-only. */
   showOverviewTab?: boolean
   /** Extra page tabs (e.g. Programs Financial Assistance report panels). */
@@ -92,11 +88,10 @@ export function ModuleApplicationsClient({
   const extraTabValues = useMemo(() => extraTabs.map((tab) => tab.value), [extraTabs])
   const tabOptions = useMemo(
     () => ({
-      allowTemplates: showTemplatesTab,
       allowOverview: showOverviewTab,
       extraTabValues,
     }),
-    [showTemplatesTab, showOverviewTab, extraTabValues]
+    [showOverviewTab, extraTabValues]
   )
   const [activeTab, setActiveTab] = useState<ApplicationsPageTab>(() =>
     normalizePageTab(searchParams.get("tab"), searchParams, tabOptions)
@@ -110,7 +105,7 @@ export function ModuleApplicationsClient({
   const applicationTypeFromUrl =
     lockedApplicationType ?? searchParams.get("application_type") ?? undefined
 
-  const showTabBar = showOverviewTab || showTemplatesTab || extraTabs.length > 0
+  const showTabBar = showOverviewTab || extraTabs.length > 0
 
   useEffect(() => {
     setMounted(true)
@@ -195,12 +190,6 @@ export function ModuleApplicationsClient({
               <FileText className="size-4" />
               Submissions
             </TabsTrigger>
-            {showTemplatesTab ? (
-              <TabsTrigger value="templates" className="gap-2">
-                <Layers className="size-4" />
-                Templates
-              </TabsTrigger>
-            ) : null}
             {extraTabs.map((tab) => {
               const Icon = tab.icon
               return (
@@ -233,18 +222,6 @@ export function ModuleApplicationsClient({
           <TabsContent value="submissions" className="mt-0">
             {activeTab === "submissions" && submissionsPage}
           </TabsContent>
-
-          {showTemplatesTab ? (
-            <TabsContent value="templates" className="mt-0">
-              {activeTab === "templates" && (
-                <ApplicationTemplatesPanel
-                  moduleOwner={moduleOwner}
-                  basePath={basePath}
-                  hubApplicationTypes={resolvedHubTypes}
-                />
-              )}
-            </TabsContent>
-          ) : null}
 
           {extraTabs.map((tab) => (
             <TabsContent key={tab.value} value={tab.value} className="mt-0">

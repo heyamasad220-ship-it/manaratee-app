@@ -46,7 +46,7 @@ function revalidateOfferingPaths(programId: string) {
   revalidatePath(`/programs/${programId}/offerings`)
   revalidatePath(`/programs/${programId}/sessions`)
   revalidatePath(`/programs/${programId}/billing`)
-  revalidatePath("/programs/settings")
+  revalidatePath("/workforce?tab=departments")
   revalidatePath("/customer/programs")
   revalidatePath(`/customer/programs/${programId}`)
   revalidatePath(`/customer/programs/${programId}/register`)
