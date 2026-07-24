@@ -26,10 +26,8 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { InternalEventParticipationsPanel } from "@/components/events/internal-event-participations-panel"
-import {
-  estimateHoursFromTimeRange,
-  logChildcareEventHoursAction,
-} from "@/lib/child-care/childcare-event-hours"
+import { logChildcareEventHoursAction } from "@/lib/child-care/childcare-event-hours"
+import { estimateHoursFromTimeRange } from "@/lib/child-care/childcare-event-hours-utils"
 import {
   CHILDCARE_REGISTRATION_STATUS_LABELS,
   type ChildcareEventSummary,

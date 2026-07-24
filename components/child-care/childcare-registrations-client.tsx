@@ -54,10 +54,8 @@ import {
   updateChildcareRegistrationStatus,
   assignChildcareEventProvider,
 } from "@/lib/child-care/childcare-registration-actions"
-import {
-  estimateHoursFromTimeRange,
-  logChildcareEventHoursAction,
-} from "@/lib/child-care/childcare-event-hours"
+import { logChildcareEventHoursAction } from "@/lib/child-care/childcare-event-hours"
+import { estimateHoursFromTimeRange } from "@/lib/child-care/childcare-event-hours-utils"
 import {
   formatChildcareDate,
   formatChildcareTimeRange,
