@@ -6,8 +6,6 @@ import { userCanAccessOfferingRoster } from "@/lib/auth/portal-capabilities"
 import { createClient } from "@/lib/supabase/server"
 import type { ProgramAttendanceStatus } from "@/lib/programs/program-attendance-types"
 
-export { getOfferingAttendanceForDate } from "@/lib/programs/program-attendance-queries"
-
 export async function upsertOfferingAttendanceMarks(input: {
   userId: string
   organizationId: string

@@ -543,7 +543,6 @@ export function ChildcareRegistrationsClient({
             )}
           </CardContent>
         </Card>
-      </div>
 
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
         <DialogContent>
