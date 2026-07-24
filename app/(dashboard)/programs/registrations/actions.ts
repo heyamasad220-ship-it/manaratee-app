@@ -147,6 +147,7 @@ export async function removeWaitlistEntryAction(formData: FormData) {
   })
 
   revalidatePath("/programs/registrations")
+  revalidatePath("/programs/reports")
   revalidatePath(redirectTo)
   redirect(redirectTo)
 }
@@ -168,6 +169,7 @@ export async function promoteWaitlistAction(formData: FormData) {
   })
 
   revalidatePath("/programs/registrations")
+  revalidatePath("/programs/reports")
   revalidatePath(`/programs/registrations/waitlist/${waitlistId}`)
 
   if (result.enrollment_id) {

@@ -10,6 +10,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  filterManuallyAssignableDiscountTags,
+  filterSystemManagedDiscountTags,
+} from "@/lib/discount-tags/discount-tag-assignment"
 import { setPersonDiscountTag } from "@/lib/people/person-tag-actions"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
@@ -36,7 +40,10 @@ export function ContactDiscountTagsField({
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [availableTags, setAvailableTags] = useState<DiscountTagOption[]>([])
-  const [selectedTagId, setSelectedTagId] = useState<string | null>(null)
+  const [assignedTags, setAssignedTags] = useState<DiscountTagOption[]>([])
+  const [selectedManualTagId, setSelectedManualTagId] = useState<string | null>(
+    null
+  )
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -52,6 +59,8 @@ export function ContactDiscountTagsField({
         throw new Error(tagsError.message)
       }
 
+      const catalog = (tags || []) as DiscountTagOption[]
+
       const { data: contact, error: contactError } = await supabase
         .from("contacts")
         .select("person_id")
@@ -62,26 +71,41 @@ export function ContactDiscountTagsField({
         throw new Error(contactError.message)
       }
 
-      let nextSelected: string | null = null
+      let assigned: DiscountTagOption[] = []
       if (contact?.person_id) {
         const { data: personTags, error: personTagsError } = await supabase
           .from("person_tags")
-          .select("tag_id")
+          .select("tag_id, discount_tags:tag_id ( id, name )")
           .eq("person_id", contact.person_id)
 
         if (personTagsError) {
           throw new Error(personTagsError.message)
         }
 
-        nextSelected = (personTags?.[0]?.tag_id as string | undefined) ?? null
+        assigned = (personTags || [])
+          .map((row) => {
+            const tagRel = row.discount_tags as
+              | { id?: string; name?: string }
+              | { id?: string; name?: string }[]
+              | null
+            const tag = Array.isArray(tagRel) ? tagRel[0] : tagRel
+            if (!tag?.id || !tag.name) return null
+            return { id: tag.id, name: tag.name }
+          })
+          .filter((row): row is DiscountTagOption => Boolean(row))
       }
 
-      setAvailableTags(tags || [])
-      setSelectedTagId(nextSelected)
+      const manualAssigned =
+        filterManuallyAssignableDiscountTags(assigned)[0] || null
+
+      setAvailableTags(catalog)
+      setAssignedTags(assigned)
+      setSelectedManualTagId(manualAssigned?.id ?? null)
     } catch (loadError) {
       console.error("Error loading discount tags:", loadError)
       setAvailableTags([])
-      setSelectedTagId(null)
+      setAssignedTags([])
+      setSelectedManualTagId(null)
     } finally {
       setLoading(false)
     }
@@ -93,52 +117,74 @@ export function ContactDiscountTagsField({
 
   async function handleChange(value: string) {
     const nextTagId = value === NONE_VALUE ? null : value
-    const previous = selectedTagId
-    setSelectedTagId(nextTagId)
+    const previous = selectedManualTagId
+    setSelectedManualTagId(nextTagId)
     setSaving(true)
     try {
       await setPersonDiscountTag(contactId, nextTagId)
+      await load()
     } catch (error) {
       console.error("Error updating discount tag:", error)
-      setSelectedTagId(previous)
+      setSelectedManualTagId(previous)
       alert(error instanceof Error ? error.message : "Could not update discount tag")
     } finally {
       setSaving(false)
     }
   }
 
-  const selectedName =
-    availableTags.find((tag) => tag.id === selectedTagId)?.name ?? null
+  const systemAssigned = filterSystemManagedDiscountTags(assignedTags)
+  const manualOptions = filterManuallyAssignableDiscountTags(availableTags)
+  const displayNames =
+    assignedTags.length > 0
+      ? assignedTags.map((tag) => tag.name).join(", ")
+      : null
 
   if (!editing) {
     return (
       <div className={cn(className)}>
         <dt className="text-xs font-medium text-muted-foreground">Discount tag</dt>
-        <dd>{selectedName || "—"}</dd>
+        <dd>{displayNames || "—"}</dd>
       </div>
     )
   }
 
   return (
-    <div className={cn("space-y-1.5", className)}>
-      <Label htmlFor="profile-discount-tag">Discount tag</Label>
-      <Select
-        value={selectedTagId ?? NONE_VALUE}
-        onValueChange={(value) => void handleChange(value)}
-        disabled={loading || saving}
-      >
-        <SelectTrigger id="profile-discount-tag">
-          <SelectValue placeholder={loading ? "Loading..." : "Select tag"} />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={NONE_VALUE}>None</SelectItem>
-          {availableTags.map((tag) => (
-            <SelectItem key={tag.id} value={tag.id}>
-              {tag.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+    <div className={cn("space-y-2", className)}>
+      <div className="space-y-1.5">
+        <Label htmlFor="profile-discount-tag">Discount tag</Label>
+        <Select
+          value={selectedManualTagId ?? NONE_VALUE}
+          onValueChange={(value) => void handleChange(value)}
+          disabled={loading || saving}
+        >
+          <SelectTrigger id="profile-discount-tag">
+            <SelectValue placeholder={loading ? "Loading..." : "Select tag"} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={NONE_VALUE}>None</SelectItem>
+            {manualOptions.map((tag) => (
+              <SelectItem key={tag.id} value={tag.id}>
+                {tag.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground">
+          Donor and custom tags can be set here. Employee, Member, and Full-Time
+          Employee tags are applied automatically from Workforce or Membership.
+        </p>
+      </div>
+
+      {systemAssigned.length > 0 ? (
+        <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm">
+          <p className="text-xs font-medium text-muted-foreground">
+            Automatic tags
+          </p>
+          <p className="text-foreground">
+            {systemAssigned.map((tag) => tag.name).join(", ")}
+          </p>
+        </div>
+      ) : null}
     </div>
   )
 }

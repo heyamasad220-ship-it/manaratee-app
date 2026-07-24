@@ -42,7 +42,7 @@ const SIDEBAR_MODULE_DEFAULTS: Record<
     sort_order: 25,
   },
   donations: {
-    name: "Donations",
+    name: "Fund Development",
     route: "/donations",
     icon_name: "Heart",
     group_name: "Financial",

@@ -10,7 +10,7 @@ import { createClient } from "@supabase/supabase-js"
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..")
 const ORG_ID = "e057e00a-e4e3-4adf-9af5-f465db1894be"
 const PROGRAM_NAME = "Quran Institute for Ladies 2025-2026"
-const ENROLLMENT_DATE = "2025-08-31"
+const ENROLLMENT_DATE = "2025-09-01"
 
 function loadEnvLocal() {
   const path = resolve(root, ".env.local")

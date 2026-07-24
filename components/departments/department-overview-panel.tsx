@@ -52,6 +52,11 @@ import {
   type DepartmentWorkspaceOverview,
 } from "@/lib/departments/department-workspace-overview"
 import { departmentGroupWorkspaceHref } from "@/lib/donations/donation-group-path"
+import {
+  YEAR_SEASON_LABEL,
+  YEAR_SEASON_LABEL_PLURAL,
+  programCountPhrase,
+} from "@/lib/programs/program-display-labels"
 import { getProgramStatusLabel, type ProgramStatus } from "@/lib/programs/program-status"
 import { cn } from "@/lib/utils"
 
@@ -313,13 +318,11 @@ export function DepartmentOverviewPanel({
             layout="header"
             fill
             tone="violet"
-            label="Programs"
+            label={YEAR_SEASON_LABEL_PLURAL}
             value={bundle.openPrograms.length}
             icon={BookOpen}
             hint={
-              openOfferings === 1
-                ? `1 offering · ${openEnrolled} enrolled`
-                : `${openOfferings} offerings · ${openEnrolled} enrolled`
+              `${programCountPhrase(openOfferings)} · ${openEnrolled} enrolled`
             }
           />
         </StatCardsRow>
@@ -327,12 +330,14 @@ export function DepartmentOverviewPanel({
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-lg font-semibold tracking-tight">Programs</h2>
+          <h2 className="text-lg font-semibold tracking-tight">
+            {YEAR_SEASON_LABEL_PLURAL}
+          </h2>
         </div>
         {bundle.canManageYears ? (
           <Button onClick={openCreate}>
             <Plus className="mr-2 h-4 w-4" />
-            Add Program
+            Add {YEAR_SEASON_LABEL}
           </Button>
         ) : null}
       </div>
@@ -340,7 +345,7 @@ export function DepartmentOverviewPanel({
       {bundle.openPrograms.length === 0 ? (
         <Card>
           <CardHeader>
-            <CardTitle>No Open Programs</CardTitle>
+            <CardTitle>No Open {YEAR_SEASON_LABEL_PLURAL}</CardTitle>
           </CardHeader>
         </Card>
       ) : (
@@ -444,8 +449,7 @@ export function DepartmentOverviewPanel({
                       <div className="flex items-center gap-2">
                         <Tag className="h-4 w-4 shrink-0" />
                         <span>
-                          {program.offeringCount} offering
-                          {program.offeringCount === 1 ? "" : "s"}
+                          {programCountPhrase(program.offeringCount)}
                         </span>
                       </div>
                     </div>
@@ -489,15 +493,16 @@ export function DepartmentOverviewPanel({
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Add Program</DialogTitle>
+            <DialogTitle>Add {YEAR_SEASON_LABEL}</DialogTitle>
             <DialogDescription>
-              Creates a program under this department. Optionally copy courses and
-              teachers from a previous year (rosters stay empty).
+              Creates a {YEAR_SEASON_LABEL.toLowerCase()} under this department.
+              Optionally copy courses and teachers from a previous year (rosters
+              stay empty).
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="year-name">Program name</Label>
+              <Label htmlFor="year-name">{YEAR_SEASON_LABEL} name</Label>
               <Input
                 id="year-name"
                 value={newName}

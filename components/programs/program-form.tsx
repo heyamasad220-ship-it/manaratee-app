@@ -45,13 +45,18 @@ import type { InvalidFeePlanLink } from "@/lib/programs/program-fee-plan-queries
 import type { ProgramRegistrationOption } from "@/lib/programs/program-registration-option-types"
 import type { Program } from "@/lib/programs/program-types"
 import {
+  PROGRAM_LABEL_PLURAL,
+  YEAR_SEASON_LABEL,
+  YEAR_SEASON_LABEL_PLURAL,
+} from "@/lib/programs/program-display-labels"
+import {
   getAgeGroupLabelsFromMinMax,
   parseProgramAgeBounds,
 } from "@/lib/programs/program-eligibility-display"
 
 const PROGRAM_FORM_TABS = [
   { value: "basics", label: "General", editOnly: false },
-  { value: "offerings", label: "Offerings", editOnly: true },
+  { value: "offerings", label: "Programs", editOnly: true },
 ] as const
 
 type ProgramFormTab = (typeof PROGRAM_FORM_TABS)[number]["value"]
@@ -476,7 +481,7 @@ export function ProgramForm(props: ProgramFormProps) {
     payload: ReturnType<typeof buildFormPayload>
   ) {
     if (!payload.name.trim()) {
-      setSaveError("Program name is required.")
+      setSaveError(`${YEAR_SEASON_LABEL} name is required.`)
       continueAfterSaveRef.current = false
       return
     }
@@ -534,7 +539,7 @@ export function ProgramForm(props: ProgramFormProps) {
     payload: ReturnType<typeof buildFormPayload>
   ) {
     if (!payload.name.trim()) {
-      setSaveError("Program name is required.")
+      setSaveError(`${YEAR_SEASON_LABEL} name is required.`)
       continueAfterSaveRef.current = false
       return
     }
@@ -659,8 +664,8 @@ export function ProgramForm(props: ProgramFormProps) {
         error instanceof Error
           ? error.message
           : isCreate
-            ? "Failed to create program. Please try again."
-            : "Failed to save program. Please try again."
+            ? `Failed to create ${YEAR_SEASON_LABEL.toLowerCase()}. Please try again.`
+            : `Failed to save ${YEAR_SEASON_LABEL.toLowerCase()}. Please try again.`
       )
     } finally {
       setIsSaving(false)
@@ -668,10 +673,12 @@ export function ProgramForm(props: ProgramFormProps) {
   }
 
   const backHref = "/programs/catalog"
-  const pageTitle = isCreate ? "Create Program" : "Edit Program"
+  const pageTitle = isCreate
+    ? `Create ${YEAR_SEASON_LABEL}`
+    : `Edit ${YEAR_SEASON_LABEL}`
   const pageDescription = isCreate
-    ? "Work through each tab in order. Save a tab before moving on. New programs start as Draft."
-    : "Save each tab as you go. The program stays Draft until you set status to Active on the General tab."
+    ? `Work through each tab in order. Save a tab before moving on. New ${YEAR_SEASON_LABEL_PLURAL.toLowerCase()} start as Draft.`
+    : `Save each tab as you go. The ${YEAR_SEASON_LABEL.toLowerCase()} stays Draft until you set status to Active on the General tab.`
   const isLastTab =
     activeTab === visibleTabs[visibleTabs.length - 1]?.value
 
@@ -684,7 +691,9 @@ export function ProgramForm(props: ProgramFormProps) {
             className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" />
-            {isCreate ? "Back to Programs" : "Back to Program"}
+            {isCreate
+              ? `Back to ${YEAR_SEASON_LABEL_PLURAL}`
+              : `Back to ${YEAR_SEASON_LABEL}`}
           </Link>
 
           <div className="ml-auto">
@@ -710,8 +719,9 @@ export function ProgramForm(props: ProgramFormProps) {
           <p className="mt-1 text-sm text-muted-foreground">{pageDescription}</p>
           {showCreatedBanner ? (
             <p className="mt-3 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
-              Program created. Add offerings — these are what customers register
-              for (for example, Beginner ESL or June Camp).
+              {YEAR_SEASON_LABEL} created. Add {PROGRAM_LABEL_PLURAL.toLowerCase()}{" "}
+              — these are what customers register for (for example, Beginner ESL
+              or June Camp).
             </p>
           ) : null}
           {saveError ? (
@@ -721,7 +731,7 @@ export function ProgramForm(props: ProgramFormProps) {
           ) : null}
           {saveSuccess ? (
             <p className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-              Program saved successfully.
+              {YEAR_SEASON_LABEL} saved successfully.
             </p>
           ) : null}
         </div>
@@ -767,8 +777,8 @@ export function ProgramForm(props: ProgramFormProps) {
                   onProgramGenderChange={setProgramGender}
                 />
                 <p className="text-xs text-muted-foreground">
-                  These are optional defaults for new offerings. Registration,
-                  capacity, fees, and schedule are set on each offering after
+                  These are optional defaults for new programs. Registration,
+                  capacity, fees, and schedule are set on each program after
                   you create one.
                 </p>
                 <EnrollmentSettingsSection program={program} />

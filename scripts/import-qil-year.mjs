@@ -30,7 +30,7 @@ const DEPARTMENT_NAME = "Qur'an Institute for Ladies"
 const PROGRAM_NAME = "Quran Institute for Ladies 2025-2026"
 const PROGRAM_START = "2025-08-17"
 /** Display / registration date on imported enrollments (Programs → Reports → Registrations). */
-const ENROLLMENT_DATE = "2025-08-31"
+const ENROLLMENT_DATE = "2025-09-01"
 const PROGRAM_END = "2026-05-31"
 
 /** Payment customer name → roster student name (spelling / family payer aliases). */

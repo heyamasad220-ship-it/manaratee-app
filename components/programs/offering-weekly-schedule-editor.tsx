@@ -242,7 +242,7 @@ export function OfferingWeeklyScheduleEditor({
 
       {items.length === 0 ? (
         <p className="py-4 text-center text-sm text-muted-foreground">
-          No weekly times yet. Add a day and time for this offering.
+          No weekly times yet. Add a day and time for this program.
         </p>
       ) : (
         <div className="overflow-x-auto rounded-md border bg-background">
@@ -329,10 +329,10 @@ export function OfferingWeeklyScheduleEditor({
                     title: event.target.value,
                   }))
                 }
-                placeholder={offeringName || "Uses offering name if blank"}
+                placeholder={offeringName || "Uses program name if blank"}
               />
               <p className="text-xs text-muted-foreground">
-                Defaults to the offering name when left blank.
+                Defaults to the program name when left blank.
               </p>
             </div>
 

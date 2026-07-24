@@ -27,6 +27,11 @@ import {
   type ProgramCatalogCapacity,
 } from "@/lib/programs/program-catalog-capacity"
 import {
+  YEAR_SEASON_LABEL,
+  YEAR_SEASON_LABEL_PLURAL,
+  programCountPhrase,
+} from "@/lib/programs/program-display-labels"
+import {
   formatProgramCatalogDate,
   getProgramCatalogEnrollmentColor,
   getProgramCatalogEnrollmentPercent,
@@ -142,7 +147,7 @@ function ProgramCard({
             <div className="flex items-center gap-2">
               <Tag className="h-4 w-4 shrink-0" />
               <span>
-                {offeringCount} offering{offeringCount === 1 ? "" : "s"}
+                {programCountPhrase(offeringCount)}
               </span>
             </div>
           </div>
@@ -200,7 +205,7 @@ function ProgramsTable({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Program</TableHead>
+              <TableHead>{YEAR_SEASON_LABEL}</TableHead>
               <TableHead>Dates</TableHead>
               <TableHead>Enrollment</TableHead>
               <TableHead>Status</TableHead>
@@ -407,13 +412,13 @@ export function ProgramCatalogView({
   buildPageHref,
   onPageChange,
   createHref = "/programs/create",
-  createLabel = "Create Program",
-  emptyTitle = "No programs found",
-  emptyDescription = "Create a program or adjust your filters.",
+  createLabel = `Create ${YEAR_SEASON_LABEL}`,
+  emptyTitle = `No ${YEAR_SEASON_LABEL_PLURAL.toLowerCase()} found`,
+  emptyDescription = `Create a ${YEAR_SEASON_LABEL.toLowerCase()} or adjust your filters.`,
   filters,
   showTitle = true,
-  title = "Programs",
-  description = "Manage programs, classes, camps, and activities.",
+  title = YEAR_SEASON_LABEL_PLURAL,
+  description = `Manage ${YEAR_SEASON_LABEL_PLURAL.toLowerCase()}, classes, camps, and activities.`,
 }: ProgramCatalogViewProps) {
   return (
     <div className="flex flex-col gap-6">

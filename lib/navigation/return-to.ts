@@ -33,7 +33,7 @@ export function getReturnToLabel(path: string): string {
   if (pathname.startsWith("/donations/reports")) return "Reports"
   if (pathname.startsWith("/donations/payments")) return "Reports"
   if (pathname.startsWith("/donations/donors")) return "Donors"
-  if (pathname.startsWith("/donations")) return "Donations"
+  if (pathname.startsWith("/donations")) return "Fund Development"
   if (pathname.startsWith("/contacts/people")) return "People"
   if (pathname.startsWith("/contacts/organizations")) return "Organizations"
   if (pathname.startsWith("/contacts/groups")) return "Group Giving"

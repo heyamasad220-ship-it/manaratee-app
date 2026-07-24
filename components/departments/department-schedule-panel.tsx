@@ -111,7 +111,7 @@ export function DepartmentSchedulePanel({
             layout="header"
             fill
             tone="sky"
-            label="Programs"
+            label="Years/Seasons"
             value={programsCount}
             icon={CalendarClock}
             hint="With schedule"
@@ -217,8 +217,8 @@ export function DepartmentSchedulePanel({
                         <TableHead>Day</TableHead>
                         <TableHead>Time</TableHead>
                         <TableHead>Title</TableHead>
+                        <TableHead>Year/Season</TableHead>
                         <TableHead>Program</TableHead>
-                        <TableHead>Offering</TableHead>
                         <TableHead>Location</TableHead>
                         <TableHead>Instructor</TableHead>
                       </TableRow>
@@ -260,7 +260,7 @@ export function DepartmentSchedulePanel({
             <CardContent>
               {summary.sessions.length === 0 ? (
                 <p className="py-6 text-center text-sm text-muted-foreground">
-                  No sessions yet. Open an offering&apos;s Schedule tab to add terms.
+                  No sessions yet. Open a program&apos;s Schedule tab to add terms.
                 </p>
               ) : (
                 <div className="overflow-x-auto rounded-md border">
@@ -268,8 +268,8 @@ export function DepartmentSchedulePanel({
                     <TableHeader>
                       <TableRow>
                         <TableHead>Session</TableHead>
-                        <TableHead>Offering</TableHead>
                         <TableHead>Program</TableHead>
+                        <TableHead>Year/Season</TableHead>
                         <TableHead>Dates</TableHead>
                         <TableHead>Enrollment</TableHead>
                         <TableHead>Status</TableHead>

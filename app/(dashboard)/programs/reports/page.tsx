@@ -612,7 +612,7 @@ export default function ProgramsReportsPage() {
           <TabsContent value="overview" className="space-y-6">
             <div className="flex flex-wrap gap-4 [&>*]:w-fit">
               <SummaryCard
-                title="Active Programs"
+                title="Active Years/Seasons"
                 value={overviewStats.activePrograms}
                 icon={<FileText className="size-5" />}
                 className="bg-blue-100 text-blue-600"
@@ -640,7 +640,7 @@ export default function ProgramsReportsPage() {
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <QuickReport
                 title="Registrations"
-                description="Program enrollments and balances"
+                description="Year/Season enrollments and balances"
                 icon={<FileText className="size-5" />}
                 onClick={() => router.push("/programs/registrations")}
               />
@@ -672,7 +672,7 @@ export default function ProgramsReportsPage() {
                 title="Financial Assistance"
                 description="Applications and payment plans"
                 icon={<FileText className="size-5" />}
-                onClick={() => router.push("/programs/financial-assistance")}
+                onClick={() => router.push("/programs/financial-assistance?tab=reports")}
               />
               <QuickReport
                 title="Payment Plans"
@@ -896,10 +896,10 @@ function ReportFilters({
 
           <Select value={programFilter} onValueChange={setProgramFilter}>
             <SelectTrigger className="w-full sm:w-[210px]">
-              <SelectValue placeholder="Program" />
+              <SelectValue placeholder="Year/Season" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Programs</SelectItem>
+              <SelectItem value="all">All Years/Seasons</SelectItem>
               {programs.map((program) => (
                 <SelectItem key={program.id} value={program.id}>
                   {program.name}

@@ -10,18 +10,19 @@ export type ProgramPaymentTransactionRow = {
   enrollmentId: string
   programId: string
   programName: string
+  departmentId: string | null
   offeringId: string | null
   offeringName: string | null
   participantName: string
   amount: number
-  status: "Succeeded" | "Failed" | "Refunded"
+  status: "Succeeded" | "Failed" | "Refunded" | "Voided"
   paidAt: string | null
   label: string | null
 }
 
 /**
  * Org-wide program payment ledger for Reports → Payment transactions.
- * Uses paid/refunded charge schedule rows (same idea as contact Financial).
+ * Uses paid/void/refunded charge schedule rows (same idea as contact Financial).
  */
 export async function getProgramPaymentTransactions(filters?: {
   programId?: string | null
@@ -44,6 +45,7 @@ export async function getProgramPaymentTransactions(filters?: {
       due_date,
       status,
       label,
+      updated_at,
       charge:charge_id (
         id,
         enrollment_id,
@@ -53,14 +55,14 @@ export async function getProgramPaymentTransactions(filters?: {
           offering_id,
           child_name,
           participant_contact_id,
-          program:program_id ( name ),
+          program:program_id ( name, department_id ),
           offering:offering_id ( name )
         )
       )
     `
     )
     .eq("organization_id", organizationId)
-    .in("status", ["paid", "refunded"])
+    .in("status", ["paid", "void", "refunded"])
     .order("paid_at", { ascending: false })
     .limit(limit)
 
@@ -92,23 +94,23 @@ export async function getProgramPaymentTransactions(filters?: {
     if (filters?.programId && programId !== filters.programId) continue
 
     const programRel = enrollment.program as
-      | { name?: string }
-      | { name?: string }[]
+      | { name?: string; department_id?: string | null }
+      | { name?: string; department_id?: string | null }[]
       | null
     const offeringRel = enrollment.offering as
       | { name?: string }
       | { name?: string }[]
       | null
-    const programName = Array.isArray(programRel)
-      ? programRel[0]?.name
-      : programRel?.name
-    const offeringName = Array.isArray(offeringRel)
-      ? offeringRel[0]?.name
-      : offeringRel?.name
+    const program = Array.isArray(programRel) ? programRel[0] : programRel
+    const offering = Array.isArray(offeringRel) ? offeringRel[0] : offeringRel
 
     const statusRaw = String(schedule.status || "").toLowerCase()
     const status: ProgramPaymentTransactionRow["status"] =
-      statusRaw === "refunded" ? "Refunded" : "Succeeded"
+      statusRaw === "void"
+        ? "Voided"
+        : statusRaw === "refunded"
+          ? "Refunded"
+          : "Succeeded"
 
     rows.push({
       id: `${schedule.id}`,
@@ -116,14 +118,16 @@ export async function getProgramPaymentTransactions(filters?: {
       chargeId: (charge?.id as string) || "",
       enrollmentId: (enrollment.id as string) || (charge?.enrollment_id as string),
       programId,
-      programName: programName || "Program",
+      programName: program?.name || "Program",
+      departmentId: (program?.department_id as string | null | undefined) ?? null,
       offeringId: (enrollment.offering_id as string | null) ?? null,
-      offeringName: offeringName || null,
+      offeringName: offering?.name || null,
       participantName: (enrollment.child_name as string) || "Participant",
       amount: Number(schedule.amount || 0),
       status,
       paidAt:
         (schedule.paid_at as string | null) ||
+        (schedule.updated_at as string | null) ||
         (schedule.due_date as string | null) ||
         null,
       label: (schedule.label as string | null) ?? null,

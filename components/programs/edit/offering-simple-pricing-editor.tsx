@@ -549,7 +549,7 @@ export function OfferingSimplePricingEditor({
       {showBillingSchedule ? (
         <EditSectionCard
           title="Billing Schedule"
-          description="Monthly billing calendar generated from offering dates and payment structure."
+          description="Monthly billing calendar generated from program dates and payment structure."
         >
           {billingMigrationRequired ? (
             <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-4 text-sm text-amber-950">
@@ -558,7 +558,7 @@ export function OfferingSimplePricingEditor({
             </div>
           ) : !billingBundle ? (
             <p className="text-sm text-muted-foreground">
-              Set offering start and end dates on the Overview tab to generate
+              Set program start and end dates on the Overview tab to generate
               the billing calendar.
             </p>
           ) : (

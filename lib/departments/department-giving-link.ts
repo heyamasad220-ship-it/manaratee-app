@@ -1,6 +1,11 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
+import {
+  canManageDepartment,
+  canViewDepartment,
+  getDepartmentHeadshipForCurrentUser,
+} from "@/lib/departments/department-access"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { hasPermission } from "@/lib/permissions/permissions"
 import { PERMISSIONS } from "@/lib/permissions/permission-keys"
@@ -34,6 +39,13 @@ async function requireOrg() {
   return organizationId
 }
 
+async function canViewDepartmentGivingPair(departmentId: string) {
+  return (
+    (await canViewDepartment(departmentId)) ||
+    (await hasPermission(PERMISSIONS.CONTACTS_VIEW))
+  )
+}
+
 export async function findGivingGroupForDepartmentAction(
   departmentId: string
 ): Promise<
@@ -41,7 +53,7 @@ export async function findGivingGroupForDepartmentAction(
   | { success: false; error: string }
 > {
   const canView =
-    (await hasPermission(PERMISSIONS.STAFF_VIEW)) ||
+    (await canViewDepartment(departmentId)) ||
     (await hasPermission(PERMISSIONS.CONTACTS_VIEW))
   if (!canView) {
     return { success: false, error: "Not authorized." }
@@ -162,8 +174,9 @@ export async function findDepartmentForGivingGroupAction(
   | { success: false; error: string }
 > {
   const canView =
+    (await hasPermission(PERMISSIONS.CONTACTS_VIEW)) ||
     (await hasPermission(PERMISSIONS.STAFF_VIEW)) ||
-    (await hasPermission(PERMISSIONS.CONTACTS_VIEW))
+    Boolean(await getDepartmentHeadshipForCurrentUser())
   if (!canView) {
     return { success: false, error: "Not authorized." }
   }
@@ -218,6 +231,9 @@ export async function findDepartmentForGivingGroupAction(
       .maybeSingle()
 
     if (department) {
+      if (!(await canViewDepartmentGivingPair(department.id as string))) {
+        return { success: true, pair: null }
+      }
       return {
         success: true,
         pair: {
@@ -243,6 +259,9 @@ export async function findDepartmentForGivingGroupAction(
 
   if ((departments || []).length === 1) {
     const department = departments![0]
+    if (!(await canViewDepartmentGivingPair(department.id as string))) {
+      return { success: true, pair: null }
+    }
     return {
       success: true,
       pair: {
@@ -268,7 +287,7 @@ export async function ensureDepartmentGivingLinkAction(input: {
 }): Promise<{ success: true } | { success: false; error: string }> {
   const canManage =
     (await hasPermission(PERMISSIONS.CONTACTS_MANAGE)) ||
-    (await hasPermission(PERMISSIONS.STAFF_MANAGE))
+    (await canManageDepartment(input.departmentId))
   if (!canManage) {
     return { success: false, error: "Not authorized to link department and giving group." }
   }

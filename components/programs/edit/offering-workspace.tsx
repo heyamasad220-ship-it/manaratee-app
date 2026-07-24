@@ -146,7 +146,7 @@ export function OfferingWorkspace({
   if (!isCreating && !offering) {
     return (
       <p className="text-sm text-muted-foreground">
-        Select an offering from the list or add a new one.
+        Select a program from the list or add a new one.
       </p>
     )
   }
@@ -155,9 +155,9 @@ export function OfferingWorkspace({
     return (
       <div className="space-y-4" onKeyDown={preventFormSubmitOnEnter}>
         <div>
-          <h3 className="text-sm font-semibold">New offering</h3>
+          <h3 className="text-sm font-semibold">New program</h3>
           <p className="text-xs text-muted-foreground">
-            Create the offering first, then configure registration, pricing, and
+            Create the program first, then configure registration, pricing, and
             sessions.
           </p>
         </div>
@@ -179,7 +179,7 @@ export function OfferingWorkspace({
   if (!offering || !workspaceData) {
     return (
       <p className="text-sm text-muted-foreground">
-        Loading offering workspace…
+        Loading program workspace…
       </p>
     )
   }
@@ -189,9 +189,7 @@ export function OfferingWorkspace({
       <div>
         <h3 className="text-sm font-semibold">{offering.name}</h3>
         <p className="text-xs text-muted-foreground">
-          {offering.is_default
-            ? "Default offering · manage all settings below"
-            : "Manage registration, pricing, sessions, and more for this offering"}
+          Manage registration, pricing, sessions, and more for this program
         </p>
         {hasUnsavedOverview && activeTab === "overview" ? (
           <p className="mt-1 text-xs text-amber-700">Unsaved overview changes</p>
@@ -345,7 +343,7 @@ export function OfferingOverviewFields({
               })
             }
             className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-            title="Use separate offerings for on-site vs online when instructors or capacity differ."
+            title="Use separate programs for on-site vs online when instructors or capacity differ."
           >
             {OFFERING_DELIVERY_FORMAT_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
@@ -505,8 +503,8 @@ function OverviewFooter({
               <AlertDialogHeader>
                 <AlertDialogTitle>Delete {offering.name}?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This permanently removes the offering, its registration
-                  options, and linked pricing setup. Offerings with registrations
+                  This permanently removes the program, its registration
+                  options, and linked pricing setup. Programs with registrations
                   cannot be deleted — use Archived instead.
                 </AlertDialogDescription>
               </AlertDialogHeader>
@@ -516,7 +514,7 @@ function OverviewFooter({
                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   onClick={() => void onDelete(offering.id)}
                 >
-                  Delete offering
+                  Delete program
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
@@ -530,7 +528,7 @@ function OverviewFooter({
             Saving…
           </>
         ) : isCreating ? (
-          "Create offering"
+          "Create program"
         ) : (
           "Save"
         )}

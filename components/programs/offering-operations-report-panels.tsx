@@ -1,10 +1,21 @@
 "use client"
 
 import * as React from "react"
-import { createClient } from "@/lib/supabase/client"
-import { cn } from "@/lib/utils"
+import Link from "next/link"
+import {
+  Eye,
+  Loader2,
+  MoreHorizontal,
+  UserPlus,
+  UserX,
+} from "lucide-react"
 
+import {
+  promoteWaitlistAction,
+  removeWaitlistEntryAction,
+} from "@/app/(dashboard)/programs/registrations/actions"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
@@ -13,6 +24,13 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
   Table,
   TableBody,
   TableCell,
@@ -20,14 +38,22 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { createClient } from "@/lib/supabase/client"
+import { canPromoteWaitlist } from "@/lib/programs/program-lifecycle-types"
+import { cn } from "@/lib/utils"
 
 type WaitlistRow = {
   id: string
   child_name: string
+  child_age: number | null
   parent_name: string | null
+  parent_email: string | null
+  parent_phone: string | null
   status: string
   position: number | null
   added_date: string | null
+  offer_expiry: string | null
+  offering_id?: string | null
 }
 
 type CareRow = {
@@ -45,7 +71,7 @@ type EnrollmentRow = {
 }
 
 function formatDate(value: string | null | undefined) {
-  if (!value) return "-"
+  if (!value) return "—"
   return new Date(`${value.slice(0, 10)}T00:00:00`).toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
@@ -58,21 +84,36 @@ function getPercent(part: number, whole: number) {
   return Math.round((part / whole) * 100)
 }
 
+function formatStatusLabel(status: string) {
+  return status.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase())
+}
+
 function getStatusBadge(status: string) {
   switch (status) {
     case "converted":
     case "offered":
+    case "accepted":
       return (
-        <Badge className="bg-violet-500/10 text-violet-600 hover:bg-violet-500/20">{status}</Badge>
+        <Badge className="bg-violet-500/10 text-violet-600 hover:bg-violet-500/20">
+          {formatStatusLabel(status)}
+        </Badge>
       )
     case "waiting":
       return (
-        <Badge className="bg-sky-500/10 text-sky-600 hover:bg-sky-500/20">{status}</Badge>
+        <Badge className="bg-sky-500/10 text-sky-600 hover:bg-sky-500/20">
+          {formatStatusLabel(status)}
+        </Badge>
       )
     case "expired":
-      return <Badge className="bg-zinc-500/10 text-zinc-600 hover:bg-zinc-500/20">{status}</Badge>
+    case "removed":
+    case "declined":
+      return (
+        <Badge className="bg-zinc-500/10 text-zinc-600 hover:bg-zinc-500/20">
+          {formatStatusLabel(status)}
+        </Badge>
+      )
     default:
-      return <Badge variant="secondary">{status}</Badge>
+      return <Badge variant="secondary">{formatStatusLabel(status)}</Badge>
   }
 }
 
@@ -161,40 +202,71 @@ export function OfferingWaitlistPanel({
   const supabase = createClient()
   const [loading, setLoading] = React.useState(true)
   const [items, setItems] = React.useState<WaitlistRow[]>([])
+  const [programMeta, setProgramMeta] = React.useState<{
+    capacity: number
+    enrolled: number
+  } | null>(null)
+
+  const reportsHref = "/programs/reports?tab=waitlist"
 
   React.useEffect(() => {
     let cancelled = false
     async function load() {
       setLoading(true)
-      let query = supabase
+
+      let waitlistQuery = supabase
         .from("program_waitlist")
-        .select("id, child_name, parent_name, status, position, added_date, offering_id")
+        .select(
+          "id, child_name, child_age, parent_name, parent_email, parent_phone, status, position, added_date, offer_expiry, offering_id"
+        )
         .eq("program_id", programId)
-        .order("position")
+        .order("position", { ascending: true, nullsFirst: false })
 
       if (offeringId) {
-        query = query.or(`offering_id.eq.${offeringId},offering_id.is.null`)
+        waitlistQuery = waitlistQuery.or(
+          `offering_id.eq.${offeringId},offering_id.is.null`
+        )
       }
 
-      const { data, error } = await query
-      if (!cancelled) {
-        if (error) {
-          console.warn("program_waitlist could not be loaded:", error.message)
-          setItems([])
-        } else {
-          const rows = (data || []) as Array<WaitlistRow & { offering_id?: string | null }>
-          // Prefer offering-scoped rows; include legacy null offering_id for this program.
-          setItems(
-            rows.filter(
-              (row) =>
-                !offeringId ||
-                row.offering_id === offeringId ||
-                row.offering_id == null
-            )
+      const [waitlistResult, programResult] = await Promise.all([
+        waitlistQuery,
+        supabase
+          .from("programs")
+          .select("capacity, enrolled")
+          .eq("id", programId)
+          .maybeSingle(),
+      ])
+
+      if (cancelled) return
+
+      if (waitlistResult.error) {
+        console.warn(
+          "program_waitlist could not be loaded:",
+          waitlistResult.error.message
+        )
+        setItems([])
+      } else {
+        const rows = (waitlistResult.data || []) as WaitlistRow[]
+        setItems(
+          rows.filter(
+            (row) =>
+              !offeringId ||
+              row.offering_id === offeringId ||
+              row.offering_id == null
           )
-        }
-        setLoading(false)
+        )
       }
+
+      if (!programResult.error && programResult.data) {
+        setProgramMeta({
+          capacity: Number(programResult.data.capacity) || 0,
+          enrolled: Number(programResult.data.enrolled) || 0,
+        })
+      } else {
+        setProgramMeta(null)
+      }
+
+      setLoading(false)
     }
     void load()
     return () => {
@@ -203,43 +275,172 @@ export function OfferingWaitlistPanel({
   }, [programId, offeringId, supabase])
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h3 className="text-base font-semibold">Waitlist</h3>
-        <p className="text-sm text-muted-foreground">
-          Waitlist entries for {offeringName}.
-        </p>
-      </div>
-      <div className="grid gap-4 sm:grid-cols-4">
-        <MetricCard label="Total" value={items.length} />
-        <MetricCard
-          label="Waiting"
-          value={items.filter((item) => item.status === "waiting").length}
-          valueClassName="text-sky-500"
-        />
-        <MetricCard
-          label="Offered"
-          value={items.filter((item) => item.status === "offered").length}
-          valueClassName="text-violet-500"
-        />
-        <MetricCard
-          label="Expired"
-          value={items.filter((item) => item.status === "expired").length}
-          valueClassName="text-zinc-500"
-        />
-      </div>
-      <SimpleTable
-        loading={loading}
-        empty="No waitlist entries for this offering yet."
-        headers={["Participant", "Parent", "Position", "Added", "Status"]}
-        rows={items.map((item) => [
-          item.child_name,
-          item.parent_name || "-",
-          item.position == null ? "-" : String(item.position),
-          formatDate(item.added_date),
-          getStatusBadge(item.status),
-        ])}
-      />
+    <div className="rounded-lg border">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Participant</TableHead>
+            <TableHead>Parent / Contact</TableHead>
+            <TableHead className="w-24">Position</TableHead>
+            <TableHead>Added</TableHead>
+            <TableHead>Offer expires</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead className="w-12 text-right">
+              <span className="sr-only">Actions</span>
+            </TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {loading ? (
+            <TableRow>
+              <TableCell
+                colSpan={7}
+                className="py-10 text-center text-muted-foreground"
+              >
+                <span className="inline-flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading waitlist…
+                </span>
+              </TableCell>
+            </TableRow>
+          ) : items.length === 0 ? (
+            <TableRow>
+              <TableCell
+                colSpan={7}
+                className="py-10 text-center text-muted-foreground"
+              >
+                No waitlist entries for {offeringName} yet.
+              </TableCell>
+            </TableRow>
+          ) : (
+            items.map((item) => {
+              const canPromote = programMeta
+                ? canPromoteWaitlist(item.status, programMeta)
+                : ["waiting", "offered"].includes(item.status)
+
+              return (
+                <TableRow key={item.id}>
+                  <TableCell>
+                    <div className="font-medium">{item.child_name}</div>
+                    {item.child_age != null ? (
+                      <div className="text-xs text-muted-foreground">
+                        Age {item.child_age}
+                      </div>
+                    ) : null}
+                  </TableCell>
+                  <TableCell>
+                    <div className="text-sm">{item.parent_name || "—"}</div>
+                    {item.parent_email ? (
+                      <div className="text-xs text-muted-foreground">
+                        {item.parent_email}
+                      </div>
+                    ) : null}
+                    {item.parent_phone ? (
+                      <div className="text-xs text-muted-foreground">
+                        {item.parent_phone}
+                      </div>
+                    ) : null}
+                  </TableCell>
+                  <TableCell>
+                    {item.position == null ? "—" : `#${item.position}`}
+                  </TableCell>
+                  <TableCell>{formatDate(item.added_date)}</TableCell>
+                  <TableCell>{formatDate(item.offer_expiry)}</TableCell>
+                  <TableCell>{getStatusBadge(item.status)}</TableCell>
+                  <TableCell className="text-right">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`Actions for ${item.child_name}`}
+                        >
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem asChild>
+                          <Link
+                            href={`/programs/registrations/waitlist/${item.id}`}
+                            className="flex items-center gap-2"
+                          >
+                            <Eye className="h-4 w-4" />
+                            View details
+                          </Link>
+                        </DropdownMenuItem>
+                        {canPromote ? (
+                          <form action={promoteWaitlistAction}>
+                            <input
+                              type="hidden"
+                              name="waitlist_id"
+                              value={item.id}
+                            />
+                            <input
+                              type="hidden"
+                              name="redirect_to"
+                              value={reportsHref}
+                            />
+                            <DropdownMenuItem asChild>
+                              <button
+                                type="submit"
+                                className="flex w-full cursor-default items-center gap-2"
+                              >
+                                <UserPlus className="h-4 w-4" />
+                                Promote to registration
+                              </button>
+                            </DropdownMenuItem>
+                          </form>
+                        ) : null}
+                        <DropdownMenuSeparator />
+                        {item.status !== "removed" ? (
+                          <form action={removeWaitlistEntryAction}>
+                            <input
+                              type="hidden"
+                              name="waitlist_id"
+                              value={item.id}
+                            />
+                            <input
+                              type="hidden"
+                              name="redirect_to"
+                              value={reportsHref}
+                            />
+                            <DropdownMenuItem asChild>
+                              <button
+                                type="submit"
+                                className="flex w-full cursor-default items-center gap-2 text-destructive"
+                                onClick={(event) => {
+                                  if (
+                                    !window.confirm(
+                                      `Remove ${item.child_name} from the waitlist?`
+                                    )
+                                  ) {
+                                    event.preventDefault()
+                                  }
+                                }}
+                              >
+                                <UserX className="h-4 w-4" />
+                                Remove from waitlist
+                              </button>
+                            </DropdownMenuItem>
+                          </form>
+                        ) : null}
+                        <DropdownMenuItem asChild>
+                          <Link
+                            href={`/programs/${programId}`}
+                            className="flex items-center gap-2"
+                          >
+                            View program
+                          </Link>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              )
+            })
+          )}
+        </TableBody>
+      </Table>
     </div>
   )
 }

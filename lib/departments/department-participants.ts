@@ -58,6 +58,7 @@ export async function fetchDepartmentParticipants(
       child_name,
       participant_contact_id,
       status,
+      enrollment_date,
       created_at,
       department_id,
       offering:offering_id (
@@ -163,7 +164,10 @@ export async function fetchDepartmentParticipants(
       programId,
       offeringId,
       status: (row.status as string | null) ?? null,
-      registeredAt: (row.created_at as string | null) ?? null,
+      registeredAt:
+        (row.enrollment_date as string | null) ||
+        (row.created_at as string | null) ||
+        null,
     }
   })
 

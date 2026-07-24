@@ -11,8 +11,8 @@
 |--------|--------|
 | Reports: **Registrations** rename + **Payment transactions** tab | Done |
 | `program_applications` table + waitlist offering/offer columns | Done (SQL `182`) |
-| Customer apply (`/customer/programs/[id]/apply`) + returning auto-approve | Done |
-| Department workspace **Applications** tab (approve / not approve) | Done (approve other offering next) |
+| Customer apply (`/customer/programs/[id]/apply`) + New/Returning type | Done (all applications await evaluation) |
+| Department workspace **Applications** tab (approve / not approve + batch) | Done (approve other offering next) |
 | Waitlist on full + offer deadline | Not yet |
 | Gate Register on approved + seat/offer; fee on register | Not yet |
 | FA only after approval | Not yet |
@@ -24,7 +24,7 @@ This document defines apply → evaluate/approve → waitlist/FA (optional) → 
 ## Goals
 
 1. Separate **application / approval** from **registered enrollment with fees**.
-2. New students need evaluation; returning students can register after auto-approval.
+2. Everyone applies (new and returning); the department evaluates before registration.
 3. Capacity: approved applicants go to **waitlist** when full; seat opens → **auto offer with deadline**.
 4. Financial assistance is **optional** after approval (including while waitlisted).
 5. **Register** creates the course **fee** immediately.
@@ -50,8 +50,9 @@ Exact permission keys to map during implementation (`programs.manage`, `applicat
 
 On apply (customer or staff):
 
-- **Returning student** → application is **auto-approved** for the selected offering → eligible to **register** (or auto waitlist if full).
-- **New student** → stays as an **application** only → cannot register until after evaluation and **Approved**.
+- **Returning** or **New** is recorded on the application (shown to directors in the queue).
+- **All applicants** stay `submitted` until a director approves (or not).
+- After **Approved**, the student can **register** for the program (waitlist-on-full still pending).
 
 Self-declared on the form; staff/admin can correct if needed.
 
@@ -65,12 +66,10 @@ Suggested statuses (names can be refined in implementation):
 
 | Status | Meaning |
 |--------|---------|
-| `submitted` | New-student application awaiting evaluation |
-| `approved` | Approved for an offering (returning auto, or DH after eval) |
+| `submitted` | Application awaiting department evaluation |
+| `approved` | Approved for an offering (director evaluate / batch approve) |
 | `not_approved` | Rejected for the applied offering (comms outside app, or DH re-targets another offering) |
 | `withdrawn` | Applicant or staff cancelled |
-
-Optional sub-state for new students: `pending_evaluation` vs `submitted` (same queue for DH).
 
 **Approve into different offering:** DH rejects current offering and approves the same person for another offering in one staff action (or equivalent two-step that ends in `approved` on the new offering).
 
@@ -188,8 +187,8 @@ Route note: `/programs/registrations` can remain the Registrations list URL; tra
 ## Implementation order (suggested)
 
 1. Rename Reports tab **Payments → Registrations**; add empty/ stub **Payment transactions** tab wired to real payment rows.
-2. Application create (customer + staff) with returning/new; auto-approve returning.
-3. Department head approve / not approve / approve other offering.
+2. Application create (customer + staff) with returning/new; all await evaluation (no auto-approve).
+3. Department head approve / not approve / batch approve / approve other offering.
 4. Waitlist on approve-when-full; auto offer + deadline.
 5. Gate **Register** on approved + seat or accepted offer; create fee on register.
 6. FA entry only after approval; optional path into register.

@@ -3,6 +3,7 @@
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { isBillingSchemaMissingError } from "@/lib/programs/program-billing-schema"
 import type { ChargeScheduleStatus } from "@/lib/programs/program-billing-types"
+import { periodKeyClampedToProgramYear } from "@/lib/programs/program-year-attribution"
 import { contactLabel, loadContactsByIds } from "@/lib/programs/registration-display-helpers"
 import { createClient } from "@/lib/supabase/server"
 
@@ -115,7 +116,7 @@ export async function fetchDepartmentStudentPaymentsMatrix(
 
   const { data: programs, error: programsError } = await supabase
     .from("programs")
-    .select("id, name, department_id")
+    .select("id, name, department_id, start_date, end_date")
     .eq("organization_id", organizationId)
     .eq("department_id", departmentId)
     .in("status", ["draft", "active", "paused"])
@@ -127,6 +128,15 @@ export async function fetchDepartmentStudentPaymentsMatrix(
   const programIds = (programs || []).map((row) => row.id as string)
   const programNameById = new Map(
     (programs || []).map((row) => [row.id as string, (row.name as string) || "Program"])
+  )
+  const programDatesById = new Map(
+    (programs || []).map((row) => [
+      row.id as string,
+      {
+        start: (row.start_date as string | null) || null,
+        end: (row.end_date as string | null) || null,
+      },
+    ])
   )
 
   let enrollmentsQuery = supabase
@@ -339,13 +349,6 @@ export async function fetchDepartmentStudentPaymentsMatrix(
       .filter((id): id is string => Boolean(id))
   )
 
-  const months: DepartmentPaymentMonthColumn[] = [...periodKeySet]
-    .sort()
-    .map((periodKey) => ({
-      periodKey,
-      label: shortMonthLabel(periodKey),
-    }))
-
   const rows: DepartmentStudentPaymentRow[] = enrollments.map((row) => {
     const charge = row.program_charges as {
       id: string
@@ -384,13 +387,21 @@ export async function fetchDepartmentStudentPaymentsMatrix(
     let childcareFee = 0
 
     for (const item of scheduleItems) {
+      const programDates = programDatesById.get(programId)
       let periodKey: string | null = null
       if (item.billing_period_id) {
         periodKey = periodIdToKey.get(item.billing_period_id) ?? null
       }
       if (!periodKey) {
-        periodKey = periodKeyFromDate(item.due_date)
+        // Late cash still attributes inside the year/season window.
+        periodKey = periodKeyClampedToProgramYear(
+          item.due_date,
+          programDates?.start,
+          programDates?.end
+        )
       }
+
+      if (periodKey) periodKeySet.add(periodKey)
 
       if (item.kind === "childcare") {
         childcareFee = roundMoney(childcareFee + item.amount)
@@ -460,6 +471,21 @@ export async function fetchDepartmentStudentPaymentsMatrix(
   })
 
   rows.sort((a, b) => a.studentName.localeCompare(b.studentName))
+
+  const monthKeys = new Set<string>()
+  for (const row of rows) {
+    for (const key of Object.keys(row.months)) monthKeys.add(key)
+    for (const key of Object.keys(row.childcareMonths)) monthKeys.add(key)
+  }
+  // Keep billing-period months even if empty (column headers for the year).
+  for (const key of periodKeySet) monthKeys.add(key)
+
+  const months: DepartmentPaymentMonthColumn[] = [...monthKeys]
+    .sort()
+    .map((periodKey) => ({
+      periodKey,
+      label: shortMonthLabel(periodKey),
+    }))
 
   return { months, rows, migrationRequired }
 }

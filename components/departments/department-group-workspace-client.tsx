@@ -5,7 +5,6 @@ import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
   ArrowLeft,
-  BookOpen,
   Briefcase,
   CalendarClock,
   CalendarDays,
@@ -28,7 +27,6 @@ import { DepartmentApplicationsPanel } from "@/components/departments/department
 import { DepartmentBudgetPanel } from "@/components/departments/department-budget-panel"
 import { DepartmentExpensesPanel } from "@/components/departments/department-expenses-panel"
 import { DepartmentGroupGivingPanel } from "@/components/departments/department-group-giving-panel"
-import { DepartmentOfferingsPanel } from "@/components/departments/department-offerings-panel"
 import { DepartmentOverviewPanel } from "@/components/departments/department-overview-panel"
 import { DepartmentParticipantsPanel } from "@/components/departments/department-participants-panel"
 import { DepartmentPayrollPanel } from "@/components/departments/department-payroll-panel"
@@ -90,6 +88,7 @@ import { WORKFORCE_DEPARTMENTS_PATH } from "@/lib/departments/department-paths"
 import {
   departmentGroupWorkspaceHref,
   donationGroupGivingListHref,
+  parseDepartmentFinanceSection,
   parseDepartmentWorkspaceTab,
   type GroupWorkspaceTab,
 } from "@/lib/donations/donation-group-path"
@@ -692,7 +691,12 @@ export function DepartmentGroupWorkspaceClient({
   const [refreshToken, setRefreshToken] = useState(0)
 
   const returnTo = searchParams.get(RETURN_TO_QUERY_PARAM)
-  const activeTab = parseDepartmentWorkspaceTab(searchParams.get("tab"))
+  const rawTab = searchParams.get("tab")
+  const activeTab = parseDepartmentWorkspaceTab(rawTab)
+  const financeSection = parseDepartmentFinanceSection(
+    rawTab,
+    searchParams.get("section")
+  )
 
   const backHref =
     entryPoint === "donations"
@@ -785,6 +789,19 @@ export function DepartmentGroupWorkspaceClient({
     router.replace(
       departmentGroupWorkspaceHref(departmentId, {
         tab: safeTab,
+        finance: safeTab === "financial" ? financeSection : undefined,
+        returnTo: returnTo && isSafeReturnToPath(returnTo) ? returnTo : undefined,
+      }),
+      { scroll: false }
+    )
+  }
+
+  function handleFinanceSectionChange(section: string) {
+    const next = parseDepartmentFinanceSection("financial", section)
+    router.replace(
+      departmentGroupWorkspaceHref(departmentId, {
+        tab: "financial",
+        finance: next,
         returnTo: returnTo && isSafeReturnToPath(returnTo) ? returnTo : undefined,
       }),
       { scroll: false }
@@ -881,10 +898,6 @@ export function DepartmentGroupWorkspaceClient({
               <Users className="size-4" />
               Rosters
             </TabsTrigger>
-            <TabsTrigger value="offerings" className="gap-2">
-              <BookOpen className="size-4" />
-              Offerings
-            </TabsTrigger>
             <TabsTrigger value="applications" className="gap-2">
               <ClipboardCheck className="size-4" />
               Applications
@@ -893,17 +906,9 @@ export function DepartmentGroupWorkspaceClient({
               <CalendarClock className="size-4" />
               Schedule
             </TabsTrigger>
-            <TabsTrigger value="payroll" className="gap-2">
-              <Wallet className="size-4" />
-              Payroll
-            </TabsTrigger>
-            <TabsTrigger value="expenses" className="gap-2">
-              <DollarSign className="size-4" />
-              Expenses
-            </TabsTrigger>
-            <TabsTrigger value="budget" className="gap-2">
+            <TabsTrigger value="financial" className="gap-2">
               <PieChart className="size-4" />
-              Financial Summary
+              Financial
             </TabsTrigger>
             {hasGiving ? (
               <TabsTrigger value="group-giving" className="gap-2">
@@ -940,13 +945,6 @@ export function DepartmentGroupWorkspaceClient({
           />
         ) : null}
 
-        {resolvedTab === "offerings" ? (
-          <DepartmentOfferingsPanel
-            departmentId={department.id}
-            departmentName={displayName}
-          />
-        ) : null}
-
         {resolvedTab === "applications" ? (
           <DepartmentApplicationsPanel
             departmentId={department.id}
@@ -961,25 +959,49 @@ export function DepartmentGroupWorkspaceClient({
           />
         ) : null}
 
-        {resolvedTab === "payroll" ? (
-          <DepartmentPayrollPanel
-            departmentId={department.id}
-            departmentName={displayName}
-          />
-        ) : null}
+        {resolvedTab === "financial" ? (
+          <div className="space-y-4">
+            <Tabs
+              value={financeSection}
+              onValueChange={handleFinanceSectionChange}
+            >
+              <TabsList className="flex h-auto flex-wrap justify-start gap-1">
+                <TabsTrigger value="payroll" className="gap-2">
+                  <Wallet className="size-4" />
+                  Payroll
+                </TabsTrigger>
+                <TabsTrigger value="expenses" className="gap-2">
+                  <DollarSign className="size-4" />
+                  Expenses
+                </TabsTrigger>
+                <TabsTrigger value="budget" className="gap-2">
+                  <PieChart className="size-4" />
+                  Financial Summary
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
 
-        {resolvedTab === "expenses" ? (
-          <DepartmentExpensesPanel
-            departmentId={department.id}
-            departmentName={displayName}
-          />
-        ) : null}
+            {financeSection === "payroll" ? (
+              <DepartmentPayrollPanel
+                departmentId={department.id}
+                departmentName={displayName}
+              />
+            ) : null}
 
-        {resolvedTab === "budget" ? (
-          <DepartmentBudgetPanel
-            departmentId={department.id}
-            departmentName={displayName}
-          />
+            {financeSection === "expenses" ? (
+              <DepartmentExpensesPanel
+                departmentId={department.id}
+                departmentName={displayName}
+              />
+            ) : null}
+
+            {financeSection === "budget" ? (
+              <DepartmentBudgetPanel
+                departmentId={department.id}
+                departmentName={displayName}
+              />
+            ) : null}
+          </div>
         ) : null}
 
         {resolvedTab === "group-giving" && pair ? (

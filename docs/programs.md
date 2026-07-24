@@ -49,12 +49,12 @@ The Programs module lets organizations create and manage programs (camps, classe
 
 ### Core concepts
 
-- **Program** — Top-level entity (name, dates, eligibility, capacity, billing metadata).
-- **Offering** — A sellable instance of a program (e.g. “Summer 2026”). Each program has a default offering; sessions and registration options belong to an offering.
+- **Year/Season** (DB: `programs`) — Top-level year container (name, dates, eligibility defaults, capacity metadata). Staff UI label: **Year/Season**.
+- **Program** (DB: `program_offerings`) — A sellable class/instance customers register for (e.g. “Beginner Tajweed — Centre”). Staff UI label: **Program** (formerly Offering). Sessions and registration options belong to an offering row. Shared label helpers: `lib/programs/program-display-labels.ts`.
 - **Registration option** — How a customer registers: `full_program`, `selected_sessions`, `single_session`, or `drop_in`.
 - **Fee plan** — Offering-scoped pricing configuration (tuition, lunch, extended care, discounts). Drives the quote engine.
 - **Enrollment** — A registration record linking registrant/participant **contacts** to a program offering.
-- **Waitlist** — Holds customers when program capacity is full (if waitlist enabled).
+- **Waitlist** — Holds customers when capacity is full (if waitlist enabled).
 
 ---
 
@@ -375,13 +375,14 @@ TypeScript helpers: `lib/programs/program-lifecycle-types.ts`
 
 ### Sidebar navigation (`components/layout/sidebar.tsx`)
 
+Programs module (Catalog first). **Departments** is under **HR** (`/workforce/departments`), not Programs.
+
 | Nav item | Route | Permission |
 |----------|-------|------------|
-| Departments | `/workforce/departments` | `staff.view` |
 | Catalog | `/programs/catalog` | `programs.view` |
 | Schedule | `/programs/schedule` | `programs.view` |
 | Financial Assistance | `/programs/financial-assistance` | `applications.view` — Overview / Submissions / Templates + FA report + Payment Plans tabs |
-| Reports | `/programs/reports` | `reports.view` — Overview / Registrations / Payment transactions / Attendance / Waitlist (filter by offering). Expenses → department workspace; enable waitlist/attendance on offering |
+| Reports | `/programs/reports` | `reports.view` — Overview / Registrations / Payment transactions / Attendance / Waitlist (department + active offering filters). Expenses → department workspace; enable waitlist/attendance on offering |
 | Settings | `/programs/settings` (General + Service Needs) | `programs.manage` |
 
 ### Program management routes
@@ -393,14 +394,14 @@ TypeScript helpers: `lib/programs/program-lifecycle-types.ts`
 | `/programs/create` | **Quick Create** — basics + eligibility; redirects to `/programs/[id]` after save |
 | `/programs/[id]` | Program detail home (Overview inline edit + Offerings; Catalog → Edit) |
 | `/programs/[id]/offerings` | Redirects to first non-archived offering manage page (or program detail if none) |
-| `/programs/[id]/offerings/[offeringId]` | **Offering manage** — Overview (includes staff assignment) / Enrollment (registration + fees + schedule; waitlist toggle). Attendance & Waitlist views → Reports |
+| `/programs/[id]/offerings/[offeringId]` | **Offering manage** — Overview (staff + schedule) / Enrollment (registration + fees; waitlist toggle). Attendance & Waitlist views → Reports |
 | `/programs/[id]/edit` | **Retired** — redirects to detail or offering manage (legacy deep links) |
 | `/programs/[id]/billing` | Redirects to offering Enrollment tab (fees) |
 | `/programs/[id]/car-tags` | Printable car dismissal name tags (staff operations) |
 | `/programs/[id]/sessions` | Session management (standalone route; also in offering Schedule) |
 | `/programs/[id]/discounts` | Program discounts |
 | `/programs/instructors` | Instructor assignments |
-| `/programs/registrations` | Enrollment + waitlist queue |
+| `/programs/registrations` | Registration balances (Fee / Received / Balance; status Paid / Open / Refunded) |
 | `/programs/registrations/[type]/[id]` | Enrollment or waitlist detail |
 | `/programs/schedule` | Cross-program schedule view |
 | `/programs/reports` | Reports |
@@ -415,7 +416,7 @@ See **[programs-staff-setup-ui.md](./programs-staff-setup-ui.md)** for Quick Cre
 
 - **Quick Create** — name, dates, eligibility, capacity, visibility, draft/active.
 - **Program detail** — inline edit for publishing basics; offerings list.
-- **Offering manage** — Overview (staff assignment), Enrollment (registration + fees + schedule; waitlist toggle). Attendance & Waitlist under Reports.
+- **Offering manage** — Overview (staff + schedule), Enrollment (registration + fees; waitlist toggle). Attendance & Waitlist under Reports.
 
 ---
 

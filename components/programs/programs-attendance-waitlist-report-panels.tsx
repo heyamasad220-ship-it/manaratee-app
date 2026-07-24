@@ -10,6 +10,11 @@ import {
 } from "@/components/programs/offering-operations-report-panels"
 import { Card, CardContent } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
+import {
+  PROGRAM_LABEL,
+  PROGRAM_LABEL_PLURAL,
+  YEAR_SEASON_LABEL,
+} from "@/lib/programs/program-display-labels"
 import { createClient } from "@/lib/supabase/client"
 
 export type ReportOfferingOption = {
@@ -17,9 +22,16 @@ export type ReportOfferingOption = {
   name: string
   programId: string
   programName: string
+  departmentId: string | null
+  departmentName: string | null
   attendanceTracked: boolean
   careEnabled: boolean
   waitlistEnabled: boolean
+}
+
+export type ReportDepartmentOption = {
+  id: string
+  name: string
 }
 
 async function loadReportOfferings(): Promise<ReportOfferingOption[]> {
@@ -35,10 +47,10 @@ async function loadReportOfferings(): Promise<ReportOfferingOption[]> {
       care_enabled,
       enable_waitlist,
       status,
-      program:program_id ( name )
+      program:program_id ( name, department_id )
     `
     )
-    .neq("status", "archived")
+    .eq("status", "active")
     .order("name", { ascending: true })
 
   if (error) {
@@ -46,13 +58,53 @@ async function loadReportOfferings(): Promise<ReportOfferingOption[]> {
     return []
   }
 
+  const departmentIds = Array.from(
+    new Set(
+      (data || [])
+        .map((row) => {
+          const program = row.program as { department_id?: string | null } | null
+          return program?.department_id || null
+        })
+        .filter((id): id is string => Boolean(id))
+    )
+  )
+
+  const departmentNameById = new Map<string, string>()
+  if (departmentIds.length > 0) {
+    const { data: departments, error: departmentsError } = await supabase
+      .from("departments")
+      .select("id, name")
+      .in("id", departmentIds)
+
+    if (departmentsError) {
+      console.warn(
+        "Could not load departments for reports:",
+        departmentsError.message
+      )
+    } else {
+      for (const department of departments || []) {
+        departmentNameById.set(
+          department.id as string,
+          (department.name as string) || "Department"
+        )
+      }
+    }
+  }
+
   return (data || []).map((row) => {
-    const program = row.program as { name?: string } | null
+    const program = row.program as
+      | { name?: string; department_id?: string | null }
+      | null
+    const departmentId = program?.department_id ?? null
     return {
       id: row.id as string,
-      name: (row.name as string) || "Offering",
+      name: (row.name as string) || PROGRAM_LABEL,
       programId: row.program_id as string,
-      programName: program?.name || "Program",
+      programName: program?.name || YEAR_SEASON_LABEL,
+      departmentId,
+      departmentName: departmentId
+        ? departmentNameById.get(departmentId) || null
+        : null,
       attendanceTracked: Boolean(row.attendance_tracked),
       careEnabled: Boolean(row.care_enabled),
       waitlistEnabled: Boolean(row.enable_waitlist),
@@ -60,37 +112,80 @@ async function loadReportOfferings(): Promise<ReportOfferingOption[]> {
   })
 }
 
-function OfferingFilterSelect({
+function departmentsFromOfferings(
+  offerings: ReportOfferingOption[]
+): ReportDepartmentOption[] {
+  const byId = new Map<string, string>()
+  for (const offering of offerings) {
+    if (!offering.departmentId) continue
+    if (!byId.has(offering.departmentId)) {
+      byId.set(
+        offering.departmentId,
+        offering.departmentName || "Department"
+      )
+    }
+  }
+  return Array.from(byId.entries())
+    .map(([id, name]) => ({ id, name }))
+    .sort((a, b) => a.name.localeCompare(b.name))
+}
+
+function ReportFilters({
+  departments,
+  departmentId,
+  onDepartmentChange,
   offerings,
-  value,
-  onChange,
+  offeringId,
+  onOfferingChange,
   loading,
 }: {
+  departments: ReportDepartmentOption[]
+  departmentId: string
+  onDepartmentChange: (departmentId: string) => void
   offerings: ReportOfferingOption[]
-  value: string
-  onChange: (offeringId: string) => void
+  offeringId: string
+  onOfferingChange: (offeringId: string) => void
   loading: boolean
 }) {
   return (
-    <div className="space-y-1.5 sm:max-w-md">
-      <Label htmlFor="report-offering-filter">Offering</Label>
-      <select
-        id="report-offering-filter"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        disabled={loading || offerings.length === 0}
-        className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-      >
-        {offerings.length === 0 ? (
-          <option value="">No offerings</option>
-        ) : (
-          offerings.map((offering) => (
-            <option key={offering.id} value={offering.id}>
-              {offering.programName} · {offering.name}
+    <div className="flex w-full flex-col gap-3 sm:max-w-xl sm:flex-row sm:items-end">
+      <div className="min-w-0 flex-1 space-y-1.5">
+        <Label htmlFor="report-department-filter">Department</Label>
+        <select
+          id="report-department-filter"
+          value={departmentId}
+          onChange={(event) => onDepartmentChange(event.target.value)}
+          disabled={loading || departments.length === 0}
+          className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+        >
+          <option value="">All departments</option>
+          {departments.map((department) => (
+            <option key={department.id} value={department.id}>
+              {department.name}
             </option>
-          ))
-        )}
-      </select>
+          ))}
+        </select>
+      </div>
+      <div className="min-w-0 flex-1 space-y-1.5">
+        <Label htmlFor="report-offering-filter">{PROGRAM_LABEL}</Label>
+        <select
+          id="report-offering-filter"
+          value={offeringId}
+          onChange={(event) => onOfferingChange(event.target.value)}
+          disabled={loading || offerings.length === 0}
+          className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+        >
+          {offerings.length === 0 ? (
+            <option value="">No active {PROGRAM_LABEL_PLURAL.toLowerCase()}</option>
+          ) : (
+            offerings.map((offering) => (
+              <option key={offering.id} value={offering.id}>
+                {offering.name}
+              </option>
+            ))
+          )}
+        </select>
+      </div>
     </div>
   )
 }
@@ -98,6 +193,7 @@ function OfferingFilterSelect({
 function useReportOfferings() {
   const [loading, setLoading] = React.useState(true)
   const [offerings, setOfferings] = React.useState<ReportOfferingOption[]>([])
+  const [departmentId, setDepartmentId] = React.useState("")
   const [selectedId, setSelectedId] = React.useState("")
 
   React.useEffect(() => {
@@ -119,36 +215,77 @@ function useReportOfferings() {
     }
   }, [])
 
-  const selected = offerings.find((row) => row.id === selectedId) || null
+  const departments = React.useMemo(
+    () => departmentsFromOfferings(offerings),
+    [offerings]
+  )
+
+  const filteredOfferings = React.useMemo(() => {
+    if (!departmentId) return offerings
+    return offerings.filter(
+      (offering) => offering.departmentId === departmentId
+    )
+  }, [offerings, departmentId])
+
+  React.useEffect(() => {
+    if (filteredOfferings.length === 0) {
+      setSelectedId("")
+      return
+    }
+    setSelectedId((current) => {
+      if (current && filteredOfferings.some((row) => row.id === current)) {
+        return current
+      }
+      return filteredOfferings[0]?.id || ""
+    })
+  }, [filteredOfferings])
+
+  const selected =
+    filteredOfferings.find((row) => row.id === selectedId) || null
+
+  function handleDepartmentChange(nextDepartmentId: string) {
+    setDepartmentId(nextDepartmentId)
+  }
 
   return {
     loading,
-    offerings,
+    departments,
+    departmentId,
+    setDepartmentId: handleDepartmentChange,
+    offerings: filteredOfferings,
     selected,
     selectedId,
     setSelectedId,
   }
 }
 
-/** Programs → Reports → Attendance (filter by offering). */
+/** Programs → Reports → Attendance (filter by department + offering). */
 export function ProgramsAttendanceReportPanel() {
-  const { loading, offerings, selected, selectedId, setSelectedId } =
-    useReportOfferings()
+  const {
+    loading,
+    departments,
+    departmentId,
+    setDepartmentId,
+    offerings,
+    selected,
+    selectedId,
+    setSelectedId,
+  } = useReportOfferings()
 
   if (loading) {
     return (
       <div className="flex items-center justify-center gap-2 rounded-lg border py-16 text-sm text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" />
-        Loading offerings…
+        Loading programs…
       </div>
     )
   }
 
-  if (!selected) {
+  if (offerings.length === 0 && !departmentId) {
     return (
       <Card>
         <CardContent className="py-10 text-center text-sm text-muted-foreground">
-          No offerings available. Create an offering first, then enable
+          No active programs available. Create a program first, then enable
           attendance under Overview → Feature packs.
         </CardContent>
       </Card>
@@ -164,63 +301,86 @@ export function ProgramsAttendanceReportPanel() {
             Attendance
           </h2>
           <p className="text-sm text-muted-foreground">
-            Review class attendance by offering. Enable tracking on the offering
+            Review class attendance by program. Enable tracking on the program
             Overview → Feature packs.
           </p>
         </div>
-        <OfferingFilterSelect
+        <ReportFilters
+          departments={departments}
+          departmentId={departmentId}
+          onDepartmentChange={setDepartmentId}
           offerings={offerings}
-          value={selectedId}
-          onChange={setSelectedId}
+          offeringId={selectedId}
+          onOfferingChange={setSelectedId}
           loading={loading}
         />
       </div>
 
-      {selected.attendanceTracked ? (
-        <OfferingClassAttendancePanel
-          offeringId={selected.id}
-          offeringName={selected.name}
-        />
+      {!selected ? (
+        <Card>
+          <CardContent className="py-10 text-center text-sm text-muted-foreground">
+            No active programs in this department.
+          </CardContent>
+        </Card>
       ) : (
-        <div className="rounded-lg border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
-          Attendance tracking is off for{" "}
-          <span className="font-medium text-foreground">{selected.name}</span>.
-          Enable it on the offering Overview → Feature packs so teachers can
-          mark attendance in My Classes.
-        </div>
-      )}
+        <>
+          {selected.attendanceTracked ? (
+            <OfferingClassAttendancePanel
+              offeringId={selected.id}
+              offeringName={selected.name}
+            />
+          ) : (
+            <div className="rounded-lg border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+              Attendance tracking is off for{" "}
+              <span className="font-medium text-foreground">
+                {selected.name}
+              </span>
+              . Enable it on the program Overview → Feature packs so teachers
+              can mark attendance in My Classes.
+            </div>
+          )}
 
-      {selected.careEnabled ? (
-        <OfferingBeforeAfterCarePanel
-          programId={selected.programId}
-          offeringId={selected.id}
-          offeringName={selected.name}
-        />
-      ) : null}
+          {selected.careEnabled ? (
+            <OfferingBeforeAfterCarePanel
+              programId={selected.programId}
+              offeringId={selected.id}
+              offeringName={selected.name}
+            />
+          ) : null}
+        </>
+      )}
     </div>
   )
 }
 
-/** Programs → Reports → Waitlist (filter by offering). */
+/** Programs → Reports → Waitlist (filter by department + offering). */
 export function ProgramsWaitlistReportPanel() {
-  const { loading, offerings, selected, selectedId, setSelectedId } =
-    useReportOfferings()
+  const {
+    loading,
+    departments,
+    departmentId,
+    setDepartmentId,
+    offerings,
+    selected,
+    selectedId,
+    setSelectedId,
+  } = useReportOfferings()
 
   if (loading) {
     return (
       <div className="flex items-center justify-center gap-2 rounded-lg border py-16 text-sm text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" />
-        Loading offerings…
+        Loading programs…
       </div>
     )
   }
 
-  if (!selected) {
+  if (offerings.length === 0 && !departmentId) {
     return (
       <Card>
         <CardContent className="py-10 text-center text-sm text-muted-foreground">
-          No offerings available. Create an offering and turn on waitlist under
-          Enrollment when capacity is limited.
+          No active programs available. Create a program and turn on waitlist
+          under Enrollment when capacity is limited.
         </CardContent>
       </Card>
     )
@@ -235,32 +395,47 @@ export function ProgramsWaitlistReportPanel() {
             Waitlist
           </h2>
           <p className="text-sm text-muted-foreground">
-            View waitlist entries by offering. Turn waitlist on or off under the
-            offering Enrollment settings.
+            View waitlist entries by program. Turn waitlist on or off under the
+            program Enrollment settings.
           </p>
         </div>
-        <OfferingFilterSelect
+        <ReportFilters
+          departments={departments}
+          departmentId={departmentId}
+          onDepartmentChange={setDepartmentId}
           offerings={offerings}
-          value={selectedId}
-          onChange={setSelectedId}
+          offeringId={selectedId}
+          onOfferingChange={setSelectedId}
           loading={loading}
         />
       </div>
 
-      {!selected.waitlistEnabled ? (
-        <div className="rounded-lg border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
-          Waitlist is off for{" "}
-          <span className="font-medium text-foreground">{selected.name}</span>.
-          Enable it on the offering Enrollment tab when you want a queue for
-          full classes.
-        </div>
-      ) : null}
+      {!selected ? (
+        <Card>
+          <CardContent className="py-10 text-center text-sm text-muted-foreground">
+            No active programs in this department.
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          {!selected.waitlistEnabled ? (
+            <div className="rounded-lg border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+              Waitlist is off for{" "}
+              <span className="font-medium text-foreground">
+                {selected.name}
+              </span>
+              . Enable it on the program Enrollment tab when you want a queue
+              for full classes.
+            </div>
+          ) : null}
 
-      <OfferingWaitlistPanel
-        programId={selected.programId}
-        offeringId={selected.id}
-        offeringName={selected.name}
-      />
+          <OfferingWaitlistPanel
+            programId={selected.programId}
+            offeringId={selected.id}
+            offeringName={selected.name}
+          />
+        </>
+      )}
     </div>
   )
 }

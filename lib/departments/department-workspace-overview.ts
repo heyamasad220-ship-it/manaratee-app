@@ -1,12 +1,11 @@
 "use server"
 
 import { fetchDepartmentDetail } from "@/lib/departments/department-actions"
+import { canViewDepartment } from "@/lib/departments/department-access"
 import { roundMoney } from "@/lib/departments/department-period-helpers"
 import { fetchDepartmentPayrollList } from "@/lib/departments/department-payroll"
 import { fetchDepartmentStudentPaymentsMatrix } from "@/lib/departments/department-student-payments"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
-import { PERMISSIONS } from "@/lib/permissions/permission-keys"
-import { hasPermission } from "@/lib/permissions/permissions"
 import { createClient } from "@/lib/supabase/server"
 
 export type DepartmentWorkspaceOverview = {
@@ -29,7 +28,7 @@ function todayIsoDate() {
 export async function fetchDepartmentWorkspaceOverview(
   departmentId: string
 ): Promise<DepartmentWorkspaceOverview> {
-  const canView = await hasPermission(PERMISSIONS.STAFF_VIEW)
+  const canView = await canViewDepartment(departmentId)
   if (!canView) {
     throw new Error("You do not have permission to view this department.")
   }

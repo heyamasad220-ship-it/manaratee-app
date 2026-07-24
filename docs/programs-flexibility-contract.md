@@ -197,12 +197,11 @@ Columns **QI / Edu / Camp** = how often that layer is the *primary* place staff 
 | **F2** | Program defaults settings UI + seed new offerings from defaults | **Done** — Program detail → **Settings**; `saveProgramEnrollmentDefaults` + `syncInheritingOfferingsFromProgram` |
 | **F3** | Slim offering create/edit + Customize toggles | **Done** — Add offering inherit switches; Enrollment tab Customize (use program …) |
 | **F4** | Feature-pack visibility (capacity groups, care, attendance) | **Done** — Overview packs: `attendance_tracked`, `care_enabled`; care panel gated; youth capacity groups unchanged (auto) |
-| **F5** | Teacher class page (roster → attendance) | **Done** — `/my-classes/[offeringId]` roster + attendance when tracked (`program_attendance`, SQL `181`) |
-| **F6** | Program enrollment reports across offerings | **Done** — Program detail → **Reports**; offering filter + CSV (`program-enrollment-report.ts`) |
+| **F5** | Teacher class page (roster → attendance) | **Done** — `/my-classes/[offeringId]` roster + attendance when tracked (`program_attendance`, SQL `181`); assigned-staff enrollment SELECT via **`183`** |
 
-**SQL:** `180` (inherit flags), `181` (care pack + `program_attendance`).
+**SQL:** `180` (inherit flags), `181` (care pack + `program_attendance`), **`183`** (assigned staff roster RLS).
 
-**Key F2–F6 files:** `program-defaults-settings-panel.tsx`, `program-detail-client.tsx`, `my-class-detail-client.tsx`, `program-attendance-actions.ts`, `program-enrollments-report-panel.tsx`, offering Overview feature packs.
+**Key F2–F6 files:** `program-defaults-settings-panel.tsx`, `program-detail-client.tsx`, `my-class-detail-client.tsx`, `program-attendance-queries.ts`, `program-attendance-actions.ts`, `program-enrollments-report-panel.tsx`, offering Overview feature packs.
 
 **F7 polish (July 2026):** Department Add offering inherit toggles; customer registration uses effective inherit dates; program detail `?tab=settings|offerings|reports`; class attendance marks viewed under **Programs → Reports → Attendance** (`OfferingClassAttendancePanel`).
 

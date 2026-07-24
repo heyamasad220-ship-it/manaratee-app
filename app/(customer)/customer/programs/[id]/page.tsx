@@ -399,11 +399,11 @@ export default async function CustomerProgramDetailsPage({
           <Card className="shadow-sm">
             <CardHeader>
               <CardTitle>
-                {offerings.length === 1 ? "Offering" : "Choose an offering"}
+                {offerings.length === 1 ? "Program" : "Choose a program"}
               </CardTitle>
               <CardDescription>
                 {offerings.length === 1
-                  ? "Apply for the available offering under this program."
+                  ? "Apply for the available program under this year/season."
                   : "Select the level, camp, or track you want to apply for."}
               </CardDescription>
             </CardHeader>
@@ -454,7 +454,7 @@ export default async function CustomerProgramDetailsPage({
               </div>
               {openOfferings.length === 0 ? (
                 <p className="mt-4 text-sm text-muted-foreground">
-                  No offerings are open for applications right now.
+                  No programs are open for applications right now.
                 </p>
               ) : null}
             </CardContent>

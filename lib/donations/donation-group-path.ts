@@ -8,15 +8,15 @@ export type GroupWorkspaceTab =
   | "overview"
   | "employees"
   | "rosters"
-  | "offerings"
   | "applications"
   | "schedule"
-  | "payroll"
-  | "expenses"
-  | "budget"
+  | "financial"
   | "group-giving"
   | "activity"
   | "reports"
+
+/** Sub-tabs under Department → Financial. */
+export type DepartmentFinanceSection = "payroll" | "expenses" | "budget"
 
 export function donationGroupHref(
   groupContactId: string,
@@ -44,12 +44,20 @@ export function departmentGroupWorkspaceHref(
   departmentId: string,
   options?: {
     tab?: GroupWorkspaceTab
+    finance?: DepartmentFinanceSection
     returnTo?: string
   }
 ): string {
   const params = new URLSearchParams()
   if (options?.tab && options.tab !== "overview") {
     params.set("tab", options.tab)
+  }
+  if (
+    options?.tab === "financial" &&
+    options.finance &&
+    options.finance !== "payroll"
+  ) {
+    params.set("section", options.finance)
   }
   if (options?.returnTo && isSafeReturnToPath(options.returnTo)) {
     params.set(RETURN_TO_QUERY_PARAM, options.returnTo)
@@ -66,16 +74,25 @@ export function mapDonationTabToWorkspaceTab(
     tab === "overview" ||
     tab === "employees" ||
     tab === "rosters" ||
-    tab === "offerings" ||
     tab === "applications" ||
     tab === "schedule" ||
-    tab === "payroll" ||
-    tab === "expenses" ||
-    tab === "budget" ||
     tab === "activity" ||
     tab === "reports"
   ) {
     return tab
+  }
+  // Legacy Years/Seasons catalog tab → Overview (years live there now).
+  if (tab === "offerings") {
+    return "overview"
+  }
+  // Legacy top-level finance tabs → Financial parent.
+  if (
+    tab === "payroll" ||
+    tab === "expenses" ||
+    tab === "budget" ||
+    tab === "babysitting"
+  ) {
+    return "financial"
   }
   // Legacy Students / Tuition Transactions / participants → Rosters.
   if (tab === "payments" || tab === "participants") {
@@ -84,10 +101,6 @@ export function mapDonationTabToWorkspaceTab(
   // Donation Members / Financial map to department Group giving.
   if (tab === "members" || tab === "financial" || tab === "group-giving") {
     return "group-giving"
-  }
-  // Legacy Babysitting tab removed — childcare pay is on Payroll.
-  if (tab === "babysitting") {
-    return "payroll"
   }
   return "overview"
 }
@@ -99,31 +112,49 @@ export function parseDepartmentWorkspaceTab(
     tab === "overview" ||
     tab === "employees" ||
     tab === "rosters" ||
-    tab === "offerings" ||
     tab === "applications" ||
     tab === "schedule" ||
-    tab === "payroll" ||
-    tab === "expenses" ||
-    tab === "budget" ||
+    tab === "financial" ||
     tab === "group-giving" ||
     tab === "activity" ||
     tab === "reports"
   ) {
     return tab
   }
+  // Legacy Years/Seasons catalog tab → Overview.
+  if (tab === "offerings") {
+    return "overview"
+  }
+  // Legacy top-level Payroll / Expenses / Financial Summary → Financial.
+  if (
+    tab === "payroll" ||
+    tab === "expenses" ||
+    tab === "budget" ||
+    tab === "babysitting"
+  ) {
+    return "financial"
+  }
   // Legacy Students / Tuition Transactions / participants → Rosters.
   if (tab === "payments" || tab === "participants") {
     return "rosters"
   }
-  // Legacy Financial / Members → Group giving.
-  if (tab === "financial" || tab === "members") {
+  // Legacy Members → Group giving (donation “financial” stays group-giving via mapDonation).
+  if (tab === "members") {
     return "group-giving"
   }
-  // Legacy Babysitting → Payroll (childcare providers).
-  if (tab === "babysitting") {
-    return "payroll"
-  }
   return "overview"
+}
+
+export function parseDepartmentFinanceSection(
+  tab: string | null | undefined,
+  section: string | null | undefined
+): DepartmentFinanceSection {
+  if (tab === "expenses") return "expenses"
+  if (tab === "budget") return "budget"
+  if (tab === "payroll" || tab === "babysitting") return "payroll"
+  if (section === "expenses") return "expenses"
+  if (section === "budget") return "budget"
+  return "payroll"
 }
 
 export function donationGroupGivingListHref(returnTo?: string) {

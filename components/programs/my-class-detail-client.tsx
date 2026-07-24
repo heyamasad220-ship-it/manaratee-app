@@ -175,17 +175,15 @@ export function MyClassDetailClient({
         <p className="mt-1 text-sm text-muted-foreground">
           Class roster
           {attendanceTracked ? " and attendance" : ""} for your assigned
-          offering.
+          program.
         </p>
         {myAssignments.length > 0 ? (
           <div className="mt-3 flex flex-wrap gap-2">
             {myAssignments.map((assignment) => (
               <Badge key={assignment.id} variant="secondary">
-                {
-                  PROGRAM_STAFF_ASSIGNMENT_ROLE_LABELS[
-                    assignment.assignment_role
-                  ]
-                }
+                {PROGRAM_STAFF_ASSIGNMENT_ROLE_LABELS[
+                  assignment.assignment_role
+                ] ?? assignment.assignment_role}
                 {assignment.session_name ? ` · ${assignment.session_name}` : ""}
               </Badge>
             ))}
@@ -207,7 +205,7 @@ export function MyClassDetailClient({
         <CardContent>
           {roster.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
-              No active enrollments for this offering yet.
+              No active enrollments for this program yet.
             </p>
           ) : (
             <div className="rounded-lg border">
@@ -387,8 +385,8 @@ export function MyClassDetailClient({
       ) : (
         <Card>
           <CardContent className="py-6 text-sm text-muted-foreground">
-            Attendance tracking is not enabled for this offering. An
-            administrator can turn it on under the offering Overview → Feature
+            Attendance tracking is not enabled for this program. An
+            administrator can turn it on under the program Overview → Feature
             packs.
           </CardContent>
         </Card>

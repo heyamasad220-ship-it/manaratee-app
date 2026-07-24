@@ -143,8 +143,8 @@ export function findActiveModuleWithChildren(
   pathname: string,
   profileListSegment: ContactsListSegment | null
 ): NavItem | null {
-  // Prefer a module whose child matches the path (e.g. Programs → Departments at
-  // /workforce/departments) over a broader module prefix match (e.g. HR /workforce).
+  // Prefer a module whose child matches the path (e.g. HR → Departments at
+  // /workforce/departments) over a broader module prefix match.
   for (const item of navItems) {
     if (
       item.children?.some((child) =>

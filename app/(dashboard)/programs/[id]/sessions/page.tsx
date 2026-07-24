@@ -29,6 +29,11 @@ import {
 import { getProgramById } from "@/lib/programs/program-queries"
 import { getProgramSessionsForOffering } from "@/lib/programs/program-session-queries"
 import { createProgramSession } from "@/lib/programs/program-session-actions"
+import {
+  PROGRAM_LABEL,
+  PROGRAM_LABEL_PLURAL,
+  YEAR_SEASON_LABEL,
+} from "@/lib/programs/program-display-labels"
 
 function formatDate(date?: string | null) {
   if (!date) return "Not set"
@@ -139,7 +144,7 @@ export default async function ProgramSessionsPage({
                 className="mb-3 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
               >
                 <ArrowLeft className="h-4 w-4" />
-                Back to Offerings
+                Back to {PROGRAM_LABEL_PLURAL}
               </Link>
 
               <h1 className="text-2xl font-semibold tracking-tight">
@@ -149,13 +154,15 @@ export default async function ProgramSessionsPage({
               <p className="mt-1 text-sm text-muted-foreground">
                 {selectedOffering
                   ? `Manage sessions for ${selectedOffering.name} under ${program.name}.`
-                  : `Manage sessions for ${program.name}. Add an offering first.`}
+                  : `Manage sessions for ${program.name}. Add a ${PROGRAM_LABEL.toLowerCase()} first.`}
               </p>
             </div>
 
             <Button asChild variant="outline">
               <Link href={editProgramHref}>
-                {selectedOffering ? "Manage Offering" : "View Program"}
+                {selectedOffering
+                  ? `Manage ${PROGRAM_LABEL}`
+                  : `View ${YEAR_SEASON_LABEL}`}
               </Link>
             </Button>
           </div>
@@ -168,8 +175,10 @@ export default async function ProgramSessionsPage({
             />
           ) : (
             <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
-              No offerings are configured for this program. Add an offering from
-              the program page before creating sessions.
+              No {PROGRAM_LABEL_PLURAL.toLowerCase()} are configured for this{" "}
+              {YEAR_SEASON_LABEL.toLowerCase()}. Add a{" "}
+              {PROGRAM_LABEL.toLowerCase()} from the{" "}
+              {YEAR_SEASON_LABEL.toLowerCase()} page before creating sessions.
             </div>
           )}
 

@@ -88,7 +88,6 @@ const STAFF_TYPE_BADGE_CLASS: Record<string, string> = {
 
 type Department = { id: string; name: string }
 type HrPositionOption = { id: string; name: string }
-type HrJobRoleOption = { id: string; name: string }
 
 type StaffMember = {
   id: string
@@ -142,7 +141,6 @@ export function StaffRecordsClient({
   const [assignments, setAssignments] = useState<StaffAssignment[]>([])
   const [departments, setDepartments] = useState<Department[]>([])
   const [hrPositions, setHrPositions] = useState<HrPositionOption[]>([])
-  const [hrJobRoles, setHrJobRoles] = useState<HrJobRoleOption[]>([])
 
   const [directoryTab, setDirectoryTab] = useState<"employees" | "applications" | "archived">(
     () => (searchParams.get("tab") === "applications" ? "applications" : "employees")
@@ -219,7 +217,6 @@ export function StaffRecordsClient({
       setAssignments([])
       setDepartments([])
       setHrPositions([])
-      setHrJobRoles([])
       setLoading(false)
       return
     }
@@ -245,16 +242,6 @@ export function StaffRecordsClient({
 
       if (positionsError && positionsError.code !== "42P01") throw positionsError
       setHrPositions((positionsData || []) as HrPositionOption[])
-
-      const { data: jobRolesData, error: jobRolesError } = await supabase
-        .from("hr_job_roles")
-        .select("id, name")
-        .eq("organization_id", organizationId)
-        .eq("is_active", true)
-        .order("name")
-
-      if (jobRolesError && jobRolesError.code !== "42P01") throw jobRolesError
-      setHrJobRoles((jobRolesData || []) as HrJobRoleOption[])
 
       const { data: staffData, error: staffError } = await supabase
         .from("staff")
@@ -1028,41 +1015,14 @@ export function StaffRecordsClient({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Role</Label>
-                <Select
-                  value={newStaff.hr_job_role_id || "none"}
-                  onValueChange={(value) =>
-                    setNewStaff({
-                      ...newStaff,
-                      hr_job_role_id: value === "none" ? "" : value,
-                    })
-                  }
-                  disabled={savingStaff}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No role</SelectItem>
-                    {hrJobRoles.map((role) => (
-                      <SelectItem key={role.id} value={role.id}>
-                        {role.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Start Date</Label>
-                <Input
-                  type="date"
-                  value={newStaff.hire_date}
-                  onChange={(event) => setNewStaff({ ...newStaff, hire_date: event.target.value })}
-                  disabled={savingStaff}
-                />
-              </div>
+            <div className="space-y-2">
+              <Label>Start Date</Label>
+              <Input
+                type="date"
+                value={newStaff.hire_date}
+                onChange={(event) => setNewStaff({ ...newStaff, hire_date: event.target.value })}
+                disabled={savingStaff}
+              />
             </div>
           </div>
 

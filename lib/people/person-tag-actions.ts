@@ -2,6 +2,10 @@
 
 import { revalidatePath } from "next/cache"
 
+import {
+  isSystemManagedDiscountTagName,
+  systemManagedDiscountTagAssignError,
+} from "@/lib/discount-tags/discount-tag-assignment"
 import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 
@@ -71,6 +75,29 @@ export async function ensurePersonForContact(
   return person.id as string
 }
 
+async function assertTagIsManuallyAssignable(
+  organizationId: string,
+  tagId: string
+) {
+  const supabase = await createClient()
+  const { data: tag, error } = await supabase
+    .from("discount_tags")
+    .select("id, name")
+    .eq("organization_id", organizationId)
+    .eq("id", tagId)
+    .maybeSingle()
+
+  if (error || !tag) {
+    throw new Error(error?.message || "Discount tag not found")
+  }
+
+  if (isSystemManagedDiscountTagName(tag.name as string)) {
+    throw new Error(systemManagedDiscountTagAssignError(tag.name as string))
+  }
+
+  return tag
+}
+
 export async function addPersonTag(contactId: string, tagId: string) {
   const supabase = await createClient()
   const organizationId = await getSelectedOrganizationId()
@@ -79,6 +106,7 @@ export async function addPersonTag(contactId: string, tagId: string) {
     throw new Error("No organization selected")
   }
 
+  await assertTagIsManuallyAssignable(organizationId, tagId)
   const personId = await ensurePersonForContact(contactId)
 
   const { error } = await supabase.from("person_tags").insert({
@@ -102,6 +130,20 @@ export async function removePersonTag(contactId: string, tagId: string) {
     throw new Error("No organization selected")
   }
 
+  const { data: tag } = await supabase
+    .from("discount_tags")
+    .select("id, name")
+    .eq("organization_id", organizationId)
+    .eq("id", tagId)
+    .maybeSingle()
+
+  if (tag && isSystemManagedDiscountTagName(tag.name as string)) {
+    throw new Error(
+      systemManagedDiscountTagAssignError(tag.name as string) +
+        " Remove the workforce or membership status instead."
+    )
+  }
+
   const personId = await ensurePersonForContact(contactId)
 
   const { error } = await supabase
@@ -118,8 +160,14 @@ export async function removePersonTag(contactId: string, tagId: string) {
   revalidatePath(`/contacts/${contactId}`)
 }
 
-/** Replace all person discount tags with a single selection (or none). */
-export async function setPersonDiscountTag(contactId: string, tagId: string | null) {
+/**
+ * Replace manually assignable discount tags with a single selection (or none).
+ * Preserves system-managed tags (FTE / Employee / Member / Volunteer).
+ */
+export async function setPersonDiscountTag(
+  contactId: string,
+  tagId: string | null
+) {
   const supabase = await createClient()
   const organizationId = await getSelectedOrganizationId()
 
@@ -127,16 +175,45 @@ export async function setPersonDiscountTag(contactId: string, tagId: string | nu
     throw new Error("No organization selected")
   }
 
+  if (tagId) {
+    await assertTagIsManuallyAssignable(organizationId, tagId)
+  }
+
   const personId = await ensurePersonForContact(contactId)
 
-  const { error: deleteError } = await supabase
+  const { data: existingRows, error: existingError } = await supabase
     .from("person_tags")
-    .delete()
+    .select("tag_id, discount_tags:tag_id ( id, name )")
     .eq("organization_id", organizationId)
     .eq("person_id", personId)
 
-  if (deleteError) {
-    throw new Error(deleteError.message)
+  if (existingError) {
+    throw new Error(existingError.message)
+  }
+
+  const manualTagIdsToRemove: string[] = []
+  for (const row of existingRows || []) {
+    const tagRel = row.discount_tags as
+      | { id?: string; name?: string }
+      | { id?: string; name?: string }[]
+      | null
+    const tag = Array.isArray(tagRel) ? tagRel[0] : tagRel
+    const name = tag?.name || ""
+    if (isSystemManagedDiscountTagName(name)) continue
+    if (row.tag_id) manualTagIdsToRemove.push(row.tag_id as string)
+  }
+
+  if (manualTagIdsToRemove.length > 0) {
+    const { error: deleteError } = await supabase
+      .from("person_tags")
+      .delete()
+      .eq("organization_id", organizationId)
+      .eq("person_id", personId)
+      .in("tag_id", manualTagIdsToRemove)
+
+    if (deleteError) {
+      throw new Error(deleteError.message)
+    }
   }
 
   if (!tagId) {

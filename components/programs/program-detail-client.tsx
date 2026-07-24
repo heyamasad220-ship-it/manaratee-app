@@ -63,6 +63,12 @@ import {
 import type { OfferingDeliveryFormat } from "@/lib/programs/program-offering-attributes"
 import { DEFAULT_NEW_OFFERING_INHERIT_FLAGS } from "@/lib/programs/program-offering-inherit"
 import { programOfferingManageHref } from "@/lib/programs/program-offering-paths"
+import {
+  PROGRAM_LABEL,
+  PROGRAM_LABEL_PLURAL,
+  YEAR_SEASON_LABEL,
+  programCountPhrase,
+} from "@/lib/programs/program-display-labels"
 import { getProgramStatusLabel, type ProgramStatus } from "@/lib/programs/program-status"
 import type { Program } from "@/lib/programs/program-types"
 import { cn } from "@/lib/utils"
@@ -224,7 +230,7 @@ export function ProgramDetailClient({
     const formData = new FormData(event.currentTarget)
     const name = String(formData.get("name") || "").trim()
     if (!name) {
-      setSaveError("Program name is required.")
+      setSaveError(`${YEAR_SEASON_LABEL} name is required.`)
       return
     }
 
@@ -295,7 +301,7 @@ export function ProgramDetailClient({
             </Badge>
           </div>
           <p className="text-muted-foreground">
-            Manage program details, offerings, and settings.
+            Manage year/season details, programs, and settings.
           </p>
         </div>
 
@@ -341,7 +347,7 @@ export function ProgramDetailClient({
             disabled={editingOverview}
             className="rounded-md border border-transparent px-3 py-1.5 data-[state=active]:border-border data-[state=active]:bg-background data-[state=active]:shadow-sm"
           >
-            Offerings
+            {PROGRAM_LABEL_PLURAL}
           </TabsTrigger>
           <TabsTrigger
             value="reports"
@@ -550,7 +556,7 @@ function OverviewCard({
             <div className="flex items-center gap-2">
               <Tag className="h-4 w-4 shrink-0" />
               <span>
-                {offeringCount} Offering{offeringCount === 1 ? "" : "s"}
+                {programCountPhrase(offeringCount)}
               </span>
             </div>
             <p
@@ -644,7 +650,7 @@ function OfferingsPanel({
   async function handleCreateOffering() {
     const name = offeringName.trim()
     if (!name) {
-      setCreateError("Offering name is required.")
+      setCreateError(`${PROGRAM_LABEL} name is required.`)
       return
     }
 
@@ -676,7 +682,7 @@ function OfferingsPanel({
       router.refresh()
     } catch (error) {
       setCreateError(
-        error instanceof Error ? error.message : "Could not create offering."
+        error instanceof Error ? error.message : `Could not create ${PROGRAM_LABEL.toLowerCase()}.`
       )
     } finally {
       setCreating(false)
@@ -688,21 +694,25 @@ function OfferingsPanel({
       <CardContent className="space-y-4 p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h2 className="text-lg font-semibold tracking-tight">Offerings</h2>
+            <h2 className="text-lg font-semibold tracking-tight">
+              {PROGRAM_LABEL_PLURAL}
+            </h2>
             <p className="text-sm text-muted-foreground">
-              Manage offerings, pricing, sessions, and staff assignments.
+              Manage {PROGRAM_LABEL_PLURAL.toLowerCase()}, pricing, sessions, and
+              staff assignments.
             </p>
           </div>
           <Button size="sm" type="button" onClick={() => setAddOpen(true)}>
             <Plus className="mr-1.5 h-4 w-4" />
-            Add Offering
+            Add {PROGRAM_LABEL}
           </Button>
         </div>
 
         {rows.length === 0 ? (
           <div className="rounded-md border border-dashed px-4 py-8 text-center">
             <p className="text-sm text-muted-foreground">
-              No offerings yet. Add an offering to open registration, fees, and
+              No {PROGRAM_LABEL_PLURAL.toLowerCase()} yet. Add a{" "}
+              {PROGRAM_LABEL.toLowerCase()} to open registration, fees, and
               schedule.
             </p>
             <Button
@@ -712,7 +722,7 @@ function OfferingsPanel({
               onClick={() => setAddOpen(true)}
             >
               <Plus className="mr-1.5 h-4 w-4" />
-              Add first offering
+              Add first {PROGRAM_LABEL.toLowerCase()}
             </Button>
           </div>
         ) : (
@@ -720,7 +730,7 @@ function OfferingsPanel({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Offering</TableHead>
+                  <TableHead>{PROGRAM_LABEL}</TableHead>
                   <TableHead>Delivery</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Dates</TableHead>
@@ -751,11 +761,6 @@ function OfferingsPanel({
                         >
                           {offering.name}
                         </Link>
-                        {offering.is_default ? (
-                          <span className="ml-2 text-xs text-muted-foreground">
-                            Default
-                          </span>
-                        ) : null}
                       </TableCell>
                       <TableCell>
                         {
@@ -773,7 +778,7 @@ function OfferingsPanel({
                           <p>{dateRange}</p>
                           {offering.inherit_dates === true ? (
                             <p className="text-xs text-muted-foreground">
-                              From program
+                              From {YEAR_SEASON_LABEL.toLowerCase()}
                             </p>
                           ) : null}
                         </div>
@@ -834,10 +839,11 @@ function OfferingsPanel({
         }}>
           <DialogContent className="max-w-lg">
             <DialogHeader>
-              <DialogTitle>Add offering</DialogTitle>
+              <DialogTitle>Add {PROGRAM_LABEL.toLowerCase()}</DialogTitle>
               <DialogDescription>
-                Create a class or track. Program defaults are used unless you
-                turn off inherit below. Fees and schedule are set after create.
+                Create a class or track. {YEAR_SEASON_LABEL} defaults are used
+                unless you turn off inherit below. Fees and schedule are set after
+                create.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-2">
@@ -871,17 +877,20 @@ function OfferingsPanel({
                   ))}
                 </select>
                 <p className="text-xs text-muted-foreground">
-                  Create separate offerings for on-site and online when
-                  instructors or capacity differ.
+                  Create separate {PROGRAM_LABEL_PLURAL.toLowerCase()} for on-site
+                  and online when instructors or capacity differ.
                 </p>
               </div>
 
               <div className="space-y-3 rounded-md border p-3">
                 <div>
-                  <p className="text-sm font-medium">Use program defaults</p>
+                  <p className="text-sm font-medium">
+                    Use {YEAR_SEASON_LABEL.toLowerCase()} defaults
+                  </p>
                   <p className="text-xs text-muted-foreground">
-                    Turn off a group only when this offering needs different
-                    dates, eligibility, or enrollment settings.
+                    Turn off a group only when this{" "}
+                    {PROGRAM_LABEL.toLowerCase()} needs different dates,
+                    eligibility, or enrollment settings.
                   </p>
                 </div>
                 <label className="flex items-center justify-between gap-3 text-sm">
@@ -928,7 +937,7 @@ function OfferingsPanel({
                 onClick={() => void handleCreateOffering()}
                 disabled={creating}
               >
-                {creating ? "Creating…" : "Create offering"}
+                {creating ? "Creating…" : `Create ${PROGRAM_LABEL.toLowerCase()}`}
               </Button>
             </DialogFooter>
           </DialogContent>

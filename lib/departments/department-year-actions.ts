@@ -6,6 +6,10 @@ import {
   loadDepartmentOpenPrograms,
   type DepartmentYearProgramRow,
 } from "@/lib/departments/department-active-programs"
+import {
+  canManageDepartment,
+  canViewDepartment,
+} from "@/lib/departments/department-access"
 import { workforceDepartmentDetailPath } from "@/lib/departments/department-paths"
 import { roundMoney } from "@/lib/departments/department-period-helpers"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
@@ -40,9 +44,9 @@ async function resolveOrgRoleName(
   return (data?.name as string | null) ?? null
 }
 
-async function canManageDepartmentYears() {
+async function canManageDepartmentYears(departmentId: string) {
   const allowed =
-    (await hasPermission(PERMISSIONS.STAFF_MANAGE)) ||
+    (await canManageDepartment(departmentId)) ||
     (await hasPermission(PERMISSIONS.PROGRAMS_MANAGE))
   return allowed
 }
@@ -130,7 +134,7 @@ export async function fetchDepartmentYearProgramsAction(
   | { success: false; error: string }
 > {
   try {
-    const canView = await hasPermission(PERMISSIONS.STAFF_VIEW)
+    const canView = await canViewDepartment(departmentId)
     if (!canView) {
       return { success: false, error: "You do not have permission to view this department." }
     }
@@ -180,7 +184,7 @@ export async function fetchDepartmentYearProgramsAction(
       await Promise.all([
         mapProgramsWithOfferingCounts(organizationId, open),
         mapProgramsWithOfferingCounts(organizationId, archived),
-        canManageDepartmentYears(),
+        canManageDepartmentYears(departmentId),
         canArchiveDepartmentYears(),
       ])
 
@@ -211,7 +215,7 @@ export async function createDepartmentYearProgramAction(
   input: CreateDepartmentYearInput
 ): Promise<{ success: true; programId: string } | { success: false; error: string }> {
   try {
-    if (!(await canManageDepartmentYears())) {
+    if (!(await canManageDepartmentYears(input.departmentId))) {
       return { success: false, error: "You do not have permission to create a year program." }
     }
 
@@ -406,7 +410,7 @@ export async function updateDepartmentYearFlyerAction(input: {
   flyerUrl: string | null
 }): Promise<{ success: true } | { success: false; error: string }> {
   try {
-    if (!(await canManageDepartmentYears())) {
+    if (!(await canManageDepartmentYears(input.departmentId))) {
       return { success: false, error: "You do not have permission to update the flyer." }
     }
 
@@ -546,7 +550,7 @@ export async function fetchDepartmentYearReportAction(
   | { success: false; error: string }
 > {
   try {
-    const canView = await hasPermission(PERMISSIONS.STAFF_VIEW)
+    const canView = await canViewDepartment(departmentId)
     if (!canView) {
       return { success: false, error: "You do not have permission to view reports." }
     }

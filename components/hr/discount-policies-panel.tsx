@@ -71,9 +71,13 @@ export function DiscountPoliciesPanel({ tags }: { tags: DiscountTag[] }) {
           <div>
             <p className="text-sm font-medium text-blue-800">Discount tags</p>
             <p className="text-sm text-blue-700">
-              Discount tags identify groups such as members, staff, volunteers, or scholarship
-              recipients. Assign a tag on a contact Overview (Edit). Matching role tags can also be
-              added automatically from activity. Program discount rules use these tags at checkout.
+              Discount tags identify groups such as members, staff, volunteers, or
+              scholarship recipients. Assign a tag on a contact Overview (Edit).
+              Matching role tags can also sync from activity.{" "}
+              <strong>Full-Time Employee</strong> is special: active full-time staff
+              get that tag automatically and receive the org employee benefit (default
+              50% off) on <strong>programs</strong> and <strong>venue rentals</strong>
+              — not ticketing.
             </p>
           </div>
         </CardContent>

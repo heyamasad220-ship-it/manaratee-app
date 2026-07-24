@@ -187,7 +187,7 @@ export function ProgramCardActions({
             variant="ghost"
             size="icon"
             className="h-8 w-8 shrink-0"
-            aria-label="Program actions"
+            aria-label="Year/Season actions"
             disabled={isBusy}
           >
             {isBusy ? (

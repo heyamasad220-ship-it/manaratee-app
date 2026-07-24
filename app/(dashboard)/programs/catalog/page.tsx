@@ -1,6 +1,7 @@
 import { Header } from "@/components/layout/header"
 import { ProgramCatalogFilters } from "@/components/programs/program-catalog-filters"
 import { ProgramCatalogView } from "@/components/programs/program-catalog-view"
+import { YEAR_SEASON_LABEL_PLURAL } from "@/lib/programs/program-display-labels"
 import { getDepartments } from "@/lib/departments/department-queries"
 import {
   buildProgramCatalogHref,
@@ -71,7 +72,7 @@ export default async function ProgramsPage({
 
   return (
     <>
-      <Header title="Programs" />
+      <Header title={YEAR_SEASON_LABEL_PLURAL} />
 
       <div className="p-6">
         <ProgramCatalogView

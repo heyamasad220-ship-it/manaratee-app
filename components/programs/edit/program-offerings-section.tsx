@@ -52,6 +52,12 @@ import type { OfferingWorkspaceDataMap } from "@/lib/programs/offering-workspace
 import type { ProgramCapacityGroupInput } from "@/lib/programs/program-capacity-group-types"
 import type { ProgramRegistrationOption } from "@/lib/programs/program-registration-option-types"
 import type { ProgramStaffAssignmentWithDetails } from "@/lib/programs/program-staff-assignment-types"
+import {
+  PROGRAM_LABEL,
+  PROGRAM_LABEL_PLURAL,
+  YEAR_SEASON_LABEL,
+  programCountPhrase,
+} from "@/lib/programs/program-display-labels"
 import type { Program } from "@/lib/programs/program-types"
 import { cn } from "@/lib/utils"
 
@@ -189,7 +195,7 @@ export function ProgramOfferingsSection({
         setError(
           loadError instanceof Error
             ? loadError.message
-            : "Failed to load offering details."
+            : `Failed to load ${PROGRAM_LABEL.toLowerCase()} details.`
         )
       })
       .finally(() => {
@@ -351,7 +357,7 @@ export function ProgramOfferingsSection({
       setError(
         saveError instanceof Error
           ? saveError.message
-          : "Failed to save offering"
+          : `Failed to save ${PROGRAM_LABEL.toLowerCase()}`
       )
       return false
     } finally {
@@ -381,7 +387,7 @@ export function ProgramOfferingsSection({
 
     const name = duplicateName.trim()
     if (!name) {
-      setError("Offering name is required")
+      setError(`${PROGRAM_LABEL} name is required`)
       return
     }
 
@@ -405,7 +411,7 @@ export function ProgramOfferingsSection({
       setError(
         duplicateError instanceof Error
           ? duplicateError.message
-          : "Failed to duplicate offering"
+          : `Failed to duplicate ${PROGRAM_LABEL.toLowerCase()}`
       )
     } finally {
       setIsDuplicating(false)
@@ -442,7 +448,7 @@ export function ProgramOfferingsSection({
       setError(
         deleteError instanceof Error
           ? deleteError.message
-          : "Failed to delete offering"
+          : `Failed to delete ${PROGRAM_LABEL.toLowerCase()}`
       )
     } finally {
       setIsSaving(false)
@@ -451,35 +457,35 @@ export function ProgramOfferingsSection({
 
   return (
     <EditSectionCard
-      title="Offerings"
-      description="Select an offering to manage registration, pricing, sessions, and more — all in one place."
+      title={PROGRAM_LABEL_PLURAL}
+      description={`Select a ${PROGRAM_LABEL.toLowerCase()} to manage registration, pricing, sessions, and more — all in one place.`}
     >
       <div className="space-y-4">
         {showLegacyBanner ? (
           <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
-            This program uses a single default offering. Rename it (for example,
-            &quot;Beginner ESL&quot; or &quot;June Camp&quot;) or add more
-            offerings below.
+            This {YEAR_SEASON_LABEL.toLowerCase()} uses a single default{" "}
+            {PROGRAM_LABEL.toLowerCase()}. Rename it (for example,
+            &quot;Beginner ESL&quot; or &quot;June Camp&quot;) or add more{" "}
+            {PROGRAM_LABEL_PLURAL.toLowerCase()} below.
           </div>
         ) : null}
 
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">
-              {offerings.length} offering{offerings.length === 1 ? "" : "s"} ·{" "}
-              {activeCount} active
+              {programCountPhrase(offerings.length)} · {activeCount} active
             </p>
             <label className="flex items-center gap-2 text-xs text-muted-foreground">
               <Checkbox
                 checked={showArchived}
                 onCheckedChange={(checked) => setShowArchived(checked === true)}
               />
-              Show archived offerings
+              Show archived {PROGRAM_LABEL_PLURAL.toLowerCase()}
             </label>
           </div>
           <Button type="button" size="sm" onClick={startCreate}>
             <Plus className="mr-1 h-4 w-4" />
-            Add offering
+            Add {PROGRAM_LABEL.toLowerCase()}
           </Button>
         </div>
 
@@ -488,8 +494,8 @@ export function ProgramOfferingsSection({
             {visibleOfferings.length === 0 ? (
               <p className="px-2 py-4 text-sm text-muted-foreground">
                 {offerings.length === 0
-                  ? "No offerings yet. Add the first offering customers can register for."
-                  : "No visible offerings. Turn on archived offerings or add a new one."}
+                  ? `No ${PROGRAM_LABEL_PLURAL.toLowerCase()} yet. Add the first ${PROGRAM_LABEL.toLowerCase()} customers can register for.`
+                  : `No visible ${PROGRAM_LABEL_PLURAL.toLowerCase()}. Turn on archived ${PROGRAM_LABEL_PLURAL.toLowerCase()} or add a new one.`}
               </p>
             ) : (
               visibleOfferings.map((offering) => {
@@ -540,7 +546,6 @@ export function ProgramOfferingsSection({
                             : enrollmentOpen
                               ? "Registration open"
                               : "Not open"}
-                          {offering.is_default ? " · Default" : ""}
                         </p>
                       </button>
 
@@ -553,7 +558,7 @@ export function ProgramOfferingsSection({
                           onClick={() => openDuplicateDialog(offering)}
                           disabled={isSaving || isDuplicating}
                           aria-label={`Duplicate ${offering.name}`}
-                          title="Duplicate offering"
+                          title={`Duplicate ${PROGRAM_LABEL.toLowerCase()}`}
                         >
                           <Copy className="h-4 w-4" />
                         </Button>
@@ -566,7 +571,7 @@ export function ProgramOfferingsSection({
                           onClick={() => selectOffering(offering)}
                           disabled={isSaving}
                           aria-label={`Edit ${offering.name}`}
-                          title="Edit offering"
+                          title={`Edit ${PROGRAM_LABEL.toLowerCase()}`}
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -581,7 +586,7 @@ export function ProgramOfferingsSection({
                                 className="h-8 w-8 text-destructive hover:text-destructive"
                                 disabled={isSaving}
                                 aria-label={`Delete ${offering.name}`}
-                                title="Delete offering"
+                                title={`Delete ${PROGRAM_LABEL.toLowerCase()}`}
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
@@ -592,10 +597,11 @@ export function ProgramOfferingsSection({
                                   Delete {offering.name}?
                                 </AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  This permanently removes the offering, its
-                                  registration options, and linked pricing setup.
-                                  Offerings with registrations cannot be deleted
-                                  — use Archived instead.
+                                  This permanently removes the{" "}
+                                  {PROGRAM_LABEL.toLowerCase()}, its
+                                  registration options, and linked pricing setup.{" "}
+                                  {PROGRAM_LABEL_PLURAL} with registrations cannot
+                                  be deleted — use Archived instead.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
@@ -604,7 +610,7 @@ export function ProgramOfferingsSection({
                                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                   onClick={() => void handleDelete(offering.id)}
                                 >
-                                  Delete offering
+                                  Delete {PROGRAM_LABEL.toLowerCase()}
                                 </AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>
@@ -622,7 +628,7 @@ export function ProgramOfferingsSection({
             {workspaceLoading ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Loading offering details…
+                Loading {PROGRAM_LABEL.toLowerCase()} details…
               </div>
             ) : (
               <OfferingWorkspace
@@ -666,15 +672,17 @@ export function ProgramOfferingsSection({
         >
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Duplicate offering</DialogTitle>
+              <DialogTitle>Duplicate {PROGRAM_LABEL.toLowerCase()}</DialogTitle>
               <DialogDescription>
                 Copy registration options, pricing, sessions, and billing schedule
-                from {duplicateTarget?.name}. Program-level settings such as
-                eligibility and capacity groups stay shared.
+                from {duplicateTarget?.name}. {YEAR_SEASON_LABEL}-level settings
+                such as eligibility and capacity groups stay shared.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-2">
-              <Label htmlFor="duplicate-offering-name">New offering name</Label>
+              <Label htmlFor="duplicate-offering-name">
+                New {PROGRAM_LABEL.toLowerCase()} name
+              </Label>
               <Input
                 id="duplicate-offering-name"
                 value={duplicateName}
@@ -709,7 +717,7 @@ export function ProgramOfferingsSection({
                     Duplicating…
                   </>
                 ) : (
-                  "Duplicate offering"
+                  `Duplicate ${PROGRAM_LABEL.toLowerCase()}`
                 )}
               </Button>
             </DialogFooter>

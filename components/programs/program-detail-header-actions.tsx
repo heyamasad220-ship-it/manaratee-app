@@ -12,6 +12,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
+  PROGRAM_LABEL_PLURAL,
+  YEAR_SEASON_LABEL,
+} from "@/lib/programs/program-display-labels"
+import {
   buildProgramCustomerUrl,
   buildProgramRegistrationUrl,
 } from "@/lib/programs/program-customer-url"
@@ -76,10 +80,10 @@ export function ProgramDetailHeaderActions({
             }}
           >
             <Pencil className="mr-2 h-4 w-4" />
-            Edit program
+            Edit {YEAR_SEASON_LABEL.toLowerCase()}
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => router.push(`/programs/${programId}/offerings`)}>
-            Manage offerings
+            Manage {PROGRAM_LABEL_PLURAL.toLowerCase()}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

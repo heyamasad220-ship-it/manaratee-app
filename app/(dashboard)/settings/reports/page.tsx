@@ -1,10 +1,6 @@
-import { PlaceholderPage } from "@/components/layout/placeholder-page"
+import { redirect } from "next/navigation"
 
-export default function ReportsPage() {
-  return (
-    <PlaceholderPage
-      title="Reports"
-      description="View analytics, reports, and export data. Coming soon."
-    />
-  )
+/** Legacy Settings → Reports placeholder; org Reports lives at `/reports`. */
+export default function SettingsReportsRedirectPage() {
+  redirect("/reports")
 }

@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState, useTransition } from "react"
-import { Check, Clock, FileText, Loader2, Plus, Send, Users, Wallet, X } from "lucide-react"
+import { Check, Clock, FileText, Loader2, Pencil, Plus, Send, Trash2, Users, Wallet, X } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -36,11 +36,13 @@ import { Textarea } from "@/components/ui/textarea"
 import {
   approvePayPeriodAction,
   createPayPeriodForAllEmployeesAction,
+  deletePayPeriodEntryAction,
   fetchDepartmentPayrollListAction,
   fetchStaffHourLogsAction,
   listPayrollHourLogOptionsAction,
   logDepartmentStaffHoursAction,
   submitPayPeriodAction,
+  updatePayPeriodEntryAction,
   type DepartmentHourLogRow,
   type DepartmentPayPeriodRow,
   type PayrollDepartmentOption,
@@ -104,6 +106,7 @@ export function DepartmentPayrollPanel({
   const [migrationRequired, setMigrationRequired] = useState(false)
   const [logOpen, setLogOpen] = useState(false)
   const [salaryOpen, setSalaryOpen] = useState(false)
+  const [editRow, setEditRow] = useState<DepartmentPayPeriodRow | null>(null)
   const [detailRow, setDetailRow] = useState<DepartmentPayPeriodRow | null>(null)
   const [detailLogs, setDetailLogs] = useState<DepartmentHourLogRow[]>([])
   const [isPending, startTransition] = useTransition()
@@ -289,7 +292,7 @@ export function DepartmentPayrollPanel({
                         <TableHead>Pay period</TableHead>
                         <TableHead className="text-right">Total payment</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead className="w-[200px]" />
+                        <TableHead className="w-[280px]" />
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -394,6 +397,42 @@ export function DepartmentPayrollPanel({
                                   </Button>
                                 </>
                               ) : null}
+                              {canApprove && row.id ? (
+                                <>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={isPending}
+                                    onClick={() => setEditRow(row)}
+                                  >
+                                    <Pencil className="mr-1 size-3.5" />
+                                    Edit
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    className="text-destructive hover:text-destructive"
+                                    disabled={isPending}
+                                    onClick={() => {
+                                      const confirmed = window.confirm(
+                                        `Delete pay entry for ${row.fullName} (${formatPeriodRange(row.periodStart, row.periodEnd)})?\n\nThis cannot be undone.`
+                                      )
+                                      if (!confirmed) return
+                                      runAction(() =>
+                                        deletePayPeriodEntryAction({
+                                          departmentId,
+                                          payEntryId: row.id!,
+                                        })
+                                      )
+                                    }}
+                                  >
+                                    <Trash2 className="mr-1 size-3.5" />
+                                    Delete
+                                  </Button>
+                                </>
+                              ) : null}
                             </div>
                           </TableCell>
                         </TableRow>
@@ -423,6 +462,19 @@ export function DepartmentPayrollPanel({
         departmentId={departmentId}
         onSaved={async () => {
           setSalaryOpen(false)
+          await load()
+        }}
+      />
+
+      <EditPayPeriodDialog
+        open={Boolean(editRow)}
+        row={editRow}
+        departmentId={departmentId}
+        onOpenChange={(open) => {
+          if (!open) setEditRow(null)
+        }}
+        onSaved={async () => {
+          setEditRow(null)
           await load()
         }}
       />
@@ -771,6 +823,144 @@ function CreatePayPeriodDialog({
           </Button>
           <Button type="button" onClick={handleSave} disabled={isPending}>
             {isPending ? "Creating..." : "Create for all"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function EditPayPeriodDialog({
+  open,
+  row,
+  departmentId,
+  onOpenChange,
+  onSaved,
+}: {
+  open: boolean
+  row: DepartmentPayPeriodRow | null
+  departmentId: string
+  onOpenChange: (open: boolean) => void
+  onSaved: () => Promise<void>
+}) {
+  const [hours, setHours] = useState("")
+  const [amount, setAmount] = useState("")
+  const [error, setError] = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
+
+  useEffect(() => {
+    if (!row || !open) return
+    setHours(row.hoursWorked == null ? "" : String(row.hoursWorked))
+    setAmount(String(row.amount ?? ""))
+    setError(null)
+  }, [row, open])
+
+  function handleHoursChange(value: string) {
+    setHours(value)
+    if (!row || row.payBasis !== "hourly" || row.hourlyRate == null) return
+    const parsed = Number(value)
+    if (!Number.isFinite(parsed) || value.trim() === "") return
+    setAmount(String(Math.round(parsed * row.hourlyRate * 100) / 100))
+  }
+
+  function handleSave() {
+    if (!row?.id) return
+    const parsedAmount = Number(amount)
+    if (!Number.isFinite(parsedAmount) || parsedAmount < 0) {
+      setError("Enter a valid payment amount.")
+      return
+    }
+
+    let hoursWorked: number | null = null
+    if (row.payBasis === "hourly") {
+      if (hours.trim() === "") {
+        hoursWorked = null
+      } else {
+        const parsedHours = Number(hours)
+        if (!Number.isFinite(parsedHours) || parsedHours < 0) {
+          setError("Enter valid hours.")
+          return
+        }
+        hoursWorked = parsedHours
+      }
+    }
+
+    setError(null)
+    startTransition(async () => {
+      const result = await updatePayPeriodEntryAction({
+        departmentId,
+        payEntryId: row.id!,
+        hoursWorked: row.payBasis === "hourly" ? hoursWorked : null,
+        amount: parsedAmount,
+      })
+      if (!result.success) {
+        setError(result.error || "Could not save.")
+        return
+      }
+      await onSaved()
+    })
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Edit pay entry</DialogTitle>
+          <DialogDescription>
+            {row
+              ? `${row.fullName} · ${formatPeriodRange(row.periodStart, row.periodEnd)}`
+              : null}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          {error ? (
+            <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {error}
+            </div>
+          ) : null}
+          {row?.payBasis === "hourly" ? (
+            <div className="space-y-2">
+              <Label htmlFor="edit-hours">Hours</Label>
+              <Input
+                id="edit-hours"
+                type="number"
+                min={0}
+                step="0.01"
+                value={hours}
+                onChange={(event) => handleHoursChange(event.target.value)}
+                disabled={isPending}
+              />
+              {row.hourlyRate != null ? (
+                <p className="text-xs text-muted-foreground">
+                  Rate {formatCurrency(row.hourlyRate)}/hr — amount updates when hours change.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+          <div className="space-y-2">
+            <Label htmlFor="edit-amount">Total payment</Label>
+            <Input
+              id="edit-amount"
+              type="number"
+              min={0}
+              step="0.01"
+              value={amount}
+              onChange={(event) => setAmount(event.target.value)}
+              disabled={isPending}
+            />
+          </div>
+          {row ? (
+            <p className="text-xs text-muted-foreground">
+              Status stays {row.status}. Editing does not change approval status.
+            </p>
+          ) : null}
+        </div>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button type="button" onClick={handleSave} disabled={isPending || !row?.id}>
+            {isPending ? "Saving..." : "Save"}
           </Button>
         </DialogFooter>
       </DialogContent>

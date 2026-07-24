@@ -91,7 +91,7 @@ export function RegistrationOptionsSection({
   return (
     <EditSectionCard
       title="Registration Options"
-      description="Default registration types for this program. Fine-tune each offering on the Offerings tab."
+      description="Default registration types for this year/season. Fine-tune each program on the Programs tab."
     >
       <div className="space-y-3">
         {REGISTRATION_OPTION_ITEMS.map((item) => (

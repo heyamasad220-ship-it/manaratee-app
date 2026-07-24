@@ -11,6 +11,7 @@ import {
 } from "@/lib/contacts/contact-affiliation-rules"
 import { loadAffiliationAutoSyncFlags } from "@/lib/contacts/contact-affiliation-settings"
 import { syncContactDiscountTags } from "@/lib/contacts/contact-discount-tag-sync"
+import { syncFullTimeEmployeeBenefitTag } from "@/lib/benefits/employee-benefit"
 
 function isMissingDbColumnError(
   error: { code?: string; message?: string } | null,
@@ -242,6 +243,7 @@ export async function syncContactAffiliations(
   }
 
   await syncContactDiscountTags(contactId, organizationId, supabase)
+  await syncFullTimeEmployeeBenefitTag(contactId, organizationId, supabase)
 
   if (revalidate) {
     revalidateAffiliationPaths()

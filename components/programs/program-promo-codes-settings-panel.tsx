@@ -150,7 +150,7 @@ export function ProgramPromoCodesSettingsPanel() {
         setError(
           loadError instanceof Error
             ? loadError.message
-            : "Failed to load offerings."
+            : "Failed to load programs."
         )
         setOfferings([])
         setSelectedOfferingId("")
@@ -252,7 +252,7 @@ export function ProgramPromoCodesSettingsPanel() {
       <CardContent className="space-y-8">
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
-            <Label htmlFor="promo-codes-program">Program</Label>
+            <Label htmlFor="promo-codes-program">Year/Season</Label>
             <Select value={selectedProgramId} onValueChange={setSelectedProgramId}>
               <SelectTrigger id="promo-codes-program">
                 <SelectValue placeholder="Select a program" />
@@ -275,7 +275,7 @@ export function ProgramPromoCodesSettingsPanel() {
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="promo-codes-offering">Offering</Label>
+            <Label htmlFor="promo-codes-offering">Program</Label>
             <Select
               value={selectedOfferingId}
               onValueChange={setSelectedOfferingId}
@@ -284,7 +284,7 @@ export function ProgramPromoCodesSettingsPanel() {
               <SelectTrigger id="promo-codes-offering">
                 <SelectValue
                   placeholder={
-                    loadingOfferings ? "Loading offerings..." : "Select an offering"
+                    loadingOfferings ? "Loading programs..." : "Select a program"
                   }
                 />
               </SelectTrigger>

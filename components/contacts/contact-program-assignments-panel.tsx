@@ -26,7 +26,7 @@ export function ContactProgramAssignmentsPanel({
       <CardHeader>
         <CardTitle>Program assignments</CardTitle>
         <CardDescription>
-          Offerings and sessions where this person is assigned as staff.
+          Programs and sessions where this person is assigned as staff.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -57,7 +57,7 @@ export function ContactProgramAssignmentsPanel({
                     <span className="text-xs text-muted-foreground">
                       {assignment.session_name
                         ? "Session assignment"
-                        : "Offering assignment"}
+                        : "Program assignment"}
                     </span>
                   </div>
                 </div>

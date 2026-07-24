@@ -72,6 +72,15 @@ export function DepartmentBudgetPanel({
   }, [load])
 
   const periods = summary?.periods ?? summary?.byMonth ?? []
+  const monthly = summary?.monthly ?? []
+  const monthlyTotals = monthly.reduce(
+    (acc, row) => ({
+      studentTuition: acc.studentTuition + row.studentTuition,
+      teacherSalaries: acc.teacherSalaries + row.teacherSalaries,
+      profit: acc.profit + row.profit,
+    }),
+    { studentTuition: 0, teacherSalaries: 0, profit: 0 }
+  )
 
   return (
     <div className="space-y-6">
@@ -248,6 +257,70 @@ export function DepartmentBudgetPanel({
           )}
         </CardContent>
       </Card>
+
+      {!loading && !error && summary && monthly.length > 0 ? (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">By month</CardTitle>
+            <CardDescription>
+              Calendar-month view of student payments and approved payroll
+              {periods.length > 0 ? " across your budget periods" : ""}.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Month</TableHead>
+                    <TableHead className="text-right">Student payments</TableHead>
+                    <TableHead className="text-right">Payroll</TableHead>
+                    <TableHead className="text-right">Profit</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {monthly.map((row) => (
+                    <TableRow key={row.periodKey}>
+                      <TableCell className="font-medium">{row.label}</TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatCurrency(row.studentTuition)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-muted-foreground">
+                        {formatCurrency(row.teacherSalaries)}
+                      </TableCell>
+                      <TableCell
+                        className={cn(
+                          "text-right tabular-nums font-medium",
+                          row.profit < 0 ? "text-red-700" : "text-emerald-700"
+                        )}
+                      >
+                        {formatCurrency(row.profit)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  <TableRow className="bg-muted/40 font-semibold">
+                    <TableCell>Total</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatCurrency(monthlyTotals.studentTuition)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                      {formatCurrency(monthlyTotals.teacherSalaries)}
+                    </TableCell>
+                    <TableCell
+                      className={cn(
+                        "text-right tabular-nums",
+                        monthlyTotals.profit < 0 ? "text-red-700" : "text-emerald-700"
+                      )}
+                    >
+                      {formatCurrency(monthlyTotals.profit)}
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <CreateBudgetPeriodDialog
         open={createOpen}

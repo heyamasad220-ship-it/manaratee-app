@@ -1,12 +1,14 @@
 "use server"
 
+import {
+  canManageDepartment,
+  canViewDepartment,
+} from "@/lib/departments/department-access"
 import { workforceDepartmentDetailPath } from "@/lib/departments/department-paths"
 import { roundMoney } from "@/lib/departments/department-period-helpers"
 import { fetchDepartmentPayrollList } from "@/lib/departments/department-payroll"
 import { fetchDepartmentStudentPaymentsMatrix } from "@/lib/departments/department-student-payments"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
-import { PERMISSIONS } from "@/lib/permissions/permission-keys"
-import { hasPermission } from "@/lib/permissions/permissions"
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 
@@ -20,10 +22,20 @@ export type DepartmentBudgetPeriodTotals = {
   profit: number
 }
 
+export type DepartmentBudgetMonthTotals = {
+  periodKey: string
+  label: string
+  studentTuition: number
+  teacherSalaries: number
+  profit: number
+}
+
 export type DepartmentBudgetSummary = {
   periods: DepartmentBudgetPeriodTotals[]
   /** @deprecated use periods — kept for older callers */
   byMonth: DepartmentBudgetPeriodTotals[]
+  /** Calendar-month breakdown (student payments − approved payroll). */
+  monthly: DepartmentBudgetMonthTotals[]
   totals: {
     studentTuition: number
     teacherSalaries: number
@@ -31,6 +43,12 @@ export type DepartmentBudgetSummary = {
   }
   canManage: boolean
   migrationRequired: boolean
+}
+
+const emptyTotals = {
+  studentTuition: 0,
+  teacherSalaries: 0,
+  profit: 0,
 }
 
 function isMissingTableError(message: string | undefined) {
@@ -50,6 +68,17 @@ function formatPeriodLabel(start: string, end: string) {
       day: "numeric",
     })
   return `${fmt(start)} – ${fmt(end)}`
+}
+
+function formatMonthLabel(periodKey: string) {
+  const match = /^(\d{4})-(\d{2})$/.exec(periodKey)
+  if (!match) return periodKey
+  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, 1))
+  return date.toLocaleString("en-US", {
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  })
 }
 
 /** YYYY-MM calendar month overlaps [rangeStart, rangeEnd] (inclusive dates). */
@@ -73,6 +102,36 @@ function rangesOverlap(
   return aStart <= bEnd && aEnd >= bStart
 }
 
+function monthKeysBetween(rangeStart: string, rangeEnd: string): string[] {
+  if (
+    !/^\d{4}-\d{2}-\d{2}$/.test(rangeStart) ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(rangeEnd) ||
+    rangeEnd < rangeStart
+  ) {
+    return []
+  }
+  const keys: string[] = []
+  let year = Number(rangeStart.slice(0, 4))
+  let month = Number(rangeStart.slice(5, 7))
+  const endYear = Number(rangeEnd.slice(0, 4))
+  const endMonth = Number(rangeEnd.slice(5, 7))
+  while (year < endYear || (year === endYear && month <= endMonth)) {
+    keys.push(`${year}-${String(month).padStart(2, "0")}`)
+    month += 1
+    if (month > 12) {
+      month = 1
+      year += 1
+    }
+  }
+  return keys
+}
+
+function payEntryMonthKey(entry: { periodKey: string; periodStart: string }) {
+  if (/^\d{4}-\d{2}$/.test(entry.periodKey)) return entry.periodKey
+  const fromStart = entry.periodStart?.slice(0, 7)
+  return /^\d{4}-\d{2}$/.test(fromStart || "") ? fromStart! : null
+}
+
 /**
  * Operating Budget P&L for a department (not Group giving donations).
  * Periods are custom start/end ranges you create (different each year).
@@ -82,18 +141,19 @@ function rangesOverlap(
 export async function fetchDepartmentBudgetSummary(
   departmentId: string
 ): Promise<DepartmentBudgetSummary> {
-  const allowed = await hasPermission(PERMISSIONS.STAFF_VIEW)
+  const allowed = await canViewDepartment(departmentId)
   if (!allowed) {
     throw new Error("You do not have permission to view the budget.")
   }
 
-  const canManage = await hasPermission(PERMISSIONS.STAFF_MANAGE)
+  const canManage = await canManageDepartment(departmentId)
   const organizationId = await getSelectedOrganizationId()
   if (!organizationId) {
     return {
       periods: [],
       byMonth: [],
-      totals: { studentTuition: 0, teacherSalaries: 0, profit: 0 },
+      monthly: [],
+      totals: { ...emptyTotals },
       canManage: false,
       migrationRequired: false,
     }
@@ -116,7 +176,8 @@ export async function fetchDepartmentBudgetSummary(
       return {
         periods: [],
         byMonth: [],
-        totals: { studentTuition: 0, teacherSalaries: 0, profit: 0 },
+        monthly: [],
+        totals: { ...emptyTotals },
         canManage,
         migrationRequired: true,
       }
@@ -125,6 +186,34 @@ export async function fetchDepartmentBudgetSummary(
   }
 
   const approvedPay = payroll.rows.filter((row) => row.status === "approved")
+
+  const tuitionByMonth = new Map<string, number>()
+  for (const enrollment of tuition.rows) {
+    for (const [monthKey, cell] of Object.entries(enrollment.months)) {
+      if (!/^\d{4}-\d{2}$/.test(monthKey)) continue
+      tuitionByMonth.set(
+        monthKey,
+        roundMoney(Number(tuitionByMonth.get(monthKey) || 0) + Number(cell?.amount || 0))
+      )
+    }
+    for (const [monthKey, amount] of Object.entries(enrollment.childcareMonths || {})) {
+      if (!/^\d{4}-\d{2}$/.test(monthKey)) continue
+      tuitionByMonth.set(
+        monthKey,
+        roundMoney(Number(tuitionByMonth.get(monthKey) || 0) + Number(amount || 0))
+      )
+    }
+  }
+
+  const payrollByMonth = new Map<string, number>()
+  for (const entry of approvedPay) {
+    const monthKey = payEntryMonthKey(entry)
+    if (!monthKey) continue
+    payrollByMonth.set(
+      monthKey,
+      roundMoney(Number(payrollByMonth.get(monthKey) || 0) + entry.amount)
+    )
+  }
 
   const periods: DepartmentBudgetPeriodTotals[] = (periodsResult.data || []).map(
     (row) => {
@@ -186,16 +275,42 @@ export async function fetchDepartmentBudgetSummary(
       teacherSalaries: roundMoney(acc.teacherSalaries + period.teacherSalaries),
       profit: roundMoney(acc.profit + period.profit),
     }),
-    {
-      studentTuition: 0,
-      teacherSalaries: 0,
-      profit: 0,
-    }
+    { ...emptyTotals }
   )
+
+  let monthKeys: string[]
+  if (periods.length > 0) {
+    const rangeStart = periods.reduce(
+      (min, p) => (p.periodStart < min ? p.periodStart : min),
+      periods[0].periodStart
+    )
+    const rangeEnd = periods.reduce(
+      (max, p) => (p.periodEnd > max ? p.periodEnd : max),
+      periods[0].periodEnd
+    )
+    monthKeys = monthKeysBetween(rangeStart, rangeEnd)
+  } else {
+    monthKeys = [
+      ...new Set([...tuitionByMonth.keys(), ...payrollByMonth.keys()]),
+    ].sort()
+  }
+
+  const monthly: DepartmentBudgetMonthTotals[] = monthKeys.map((periodKey) => {
+    const studentTuition = roundMoney(Number(tuitionByMonth.get(periodKey) || 0))
+    const teacherSalaries = roundMoney(Number(payrollByMonth.get(periodKey) || 0))
+    return {
+      periodKey,
+      label: formatMonthLabel(periodKey),
+      studentTuition,
+      teacherSalaries,
+      profit: roundMoney(studentTuition - teacherSalaries),
+    }
+  })
 
   return {
     periods,
     byMonth: periods,
+    monthly,
     totals,
     canManage,
     migrationRequired:
@@ -222,7 +337,7 @@ export async function createDepartmentBudgetPeriodAction(input: {
   periodStart: string
   periodEnd: string
 }) {
-  const allowed = await hasPermission(PERMISSIONS.STAFF_MANAGE)
+  const allowed = await canManageDepartment(input.departmentId)
   if (!allowed) {
     return {
       success: false as const,
@@ -284,7 +399,7 @@ export async function deleteDepartmentBudgetPeriodAction(input: {
   departmentId: string
   periodId: string
 }) {
-  const allowed = await hasPermission(PERMISSIONS.STAFF_MANAGE)
+  const allowed = await canManageDepartment(input.departmentId)
   if (!allowed) {
     return {
       success: false as const,

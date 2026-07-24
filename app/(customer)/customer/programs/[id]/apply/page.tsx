@@ -189,8 +189,8 @@ export default async function ProgramApplyPage({
             Apply · {program.name}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Tell us if the student is returning or new. Returning students are
-            auto-approved; new students are reviewed by the department.
+            Tell us if the student is returning or new. All applications are
+            reviewed by the department before registration.
           </p>
         </div>
       </div>

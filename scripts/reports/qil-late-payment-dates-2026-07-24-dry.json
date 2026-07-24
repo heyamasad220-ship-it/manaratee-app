@@ -1,0 +1,125 @@
+{
+  "mode": "dry-run",
+  "generatedAt": "2026-07-24T00:11:29.698Z",
+  "program": {
+    "id": "88a39883-baa8-424b-91c0-93a309978c3b",
+    "name": "Quran Institute for Ladies 2025-2026"
+  },
+  "cutoff": "2026-04-30",
+  "targetDate": "2026-04-15",
+  "count": 14,
+  "rows": [
+    {
+      "id": "1b9b53f5-b726-4204-99ea-8dff7063b534",
+      "label": "Payment 2026-05-01",
+      "amount": 200,
+      "status": "paid",
+      "due_date": "2026-05-01",
+      "paid_at": "2026-05-01T12:00:00+00:00"
+    },
+    {
+      "id": "eccd603c-8778-4785-9a58-9a41fa4bd484",
+      "label": "Course fee",
+      "amount": 400,
+      "status": "paid",
+      "due_date": "2025-08-17",
+      "paid_at": "2026-07-22T18:28:23.62+00:00"
+    },
+    {
+      "id": "28f0e42e-daa7-4bee-b4db-0aa492ed7a7f",
+      "label": "Course fee",
+      "amount": 400,
+      "status": "paid",
+      "due_date": "2025-08-17",
+      "paid_at": "2026-07-23T13:22:14.767+00:00"
+    },
+    {
+      "id": "9e96a43c-b132-4d53-8e5c-29069875a3c7",
+      "label": "Course fee",
+      "amount": 100,
+      "status": "paid",
+      "due_date": "2025-08-17",
+      "paid_at": "2026-07-22T19:39:24.622+00:00"
+    },
+    {
+      "id": "89e1a986-bbca-4862-a898-ea80e5614050",
+      "label": "Course fee",
+      "amount": 100,
+      "status": "paid",
+      "due_date": "2025-08-17",
+      "paid_at": "2026-07-22T19:39:57.258+00:00"
+    },
+    {
+      "id": "43b66a36-3463-4618-8615-15e7f3f69e7c",
+      "label": "Course fee",
+      "amount": 100,
+      "status": "paid",
+      "due_date": "2025-08-17",
+      "paid_at": "2026-07-22T18:37:30.578+00:00"
+    },
+    {
+      "id": "fca202d3-b57a-43c3-94d8-9340d273e1d9",
+      "label": "Course fee",
+      "amount": 200,
+      "status": "paid",
+      "due_date": "2025-08-17",
+      "paid_at": "2026-07-22T19:33:05.937+00:00"
+    },
+    {
+      "id": "6ff71e94-3a41-4979-85de-679f171ae7dc",
+      "label": "Course fee",
+      "amount": 400,
+      "status": "paid",
+      "due_date": "2025-08-17",
+      "paid_at": "2026-07-22T18:27:56.941+00:00"
+    },
+    {
+      "id": "1c5090e7-253c-4ca5-a32e-00e3b40c8726",
+      "label": "Course fee",
+      "amount": 400,
+      "status": "paid",
+      "due_date": "2025-08-17",
+      "paid_at": "2026-07-22T18:28:15.164+00:00"
+    },
+    {
+      "id": "0e8f422a-21d9-452c-a605-51214c8453c8",
+      "label": "Course fee",
+      "amount": 400,
+      "status": "paid",
+      "due_date": "2025-08-17",
+      "paid_at": "2026-07-22T18:37:09.292+00:00"
+    },
+    {
+      "id": "95b4862b-23cb-40d5-a8ba-155d67eeffc9",
+      "label": "Course fee",
+      "amount": 100,
+      "status": "paid",
+      "due_date": "2025-08-17",
+      "paid_at": "2026-07-22T19:24:57.352+00:00"
+    },
+    {
+      "id": "4a638eaf-8a50-442e-8df2-af7f16a57ad1",
+      "label": "Course fee",
+      "amount": 100,
+      "status": "paid",
+      "due_date": "2025-08-17",
+      "paid_at": "2026-07-22T19:38:15.759+00:00"
+    },
+    {
+      "id": "8eb14207-e95b-4228-b008-9462e15699e4",
+      "label": "Course fee",
+      "amount": 100,
+      "status": "void",
+      "due_date": "2025-08-17",
+      "paid_at": "2026-07-22T19:39:41.761+00:00"
+    },
+    {
+      "id": "65f93865-620a-42b2-9088-fab42710a382",
+      "label": "Course fee",
+      "amount": 200,
+      "status": "paid",
+      "due_date": "2025-08-17",
+      "paid_at": "2026-07-23T12:45:25.472+00:00"
+    }
+  ]
+}

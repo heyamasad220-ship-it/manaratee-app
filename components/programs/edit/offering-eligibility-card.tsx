@@ -49,7 +49,7 @@ export function OfferingEligibilityCard({
   return (
     <EditSectionCard
       title="Eligibility"
-      description="Define who can register for this offering."
+      description="Define who can register for this program."
     >
       {onInheritEligibilityChange ? (
         <div className="mb-4">

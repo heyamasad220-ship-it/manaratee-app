@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server"
 import { createServiceRoleClient } from "@/lib/supabase/service-role"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { getDepartments } from "@/lib/departments/department-queries"
+import { canViewDepartment } from "@/lib/departments/department-access"
 import { hasPermission, PERMISSIONS } from "@/lib/permissions/permissions"
 
 type CreateDepartmentInput = {
@@ -242,7 +243,7 @@ export type DepartmentDetail = {
 export async function fetchDepartmentDetail(
   departmentId: string
 ): Promise<DepartmentDetail | null> {
-  const allowed = await hasPermission(PERMISSIONS.STAFF_VIEW)
+  const allowed = await canViewDepartment(departmentId)
   if (!allowed) {
     throw new Error("You do not have permission to view departments.")
   }

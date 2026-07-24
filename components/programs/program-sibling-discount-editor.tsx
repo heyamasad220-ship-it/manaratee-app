@@ -189,7 +189,7 @@ export function ProgramSiblingDiscountEditor({
         </div>
       ) : (
         <p className="text-sm text-muted-foreground">
-          No sibling discount configured for this offering.
+          No sibling discount configured for this program.
         </p>
       )}
     </div>

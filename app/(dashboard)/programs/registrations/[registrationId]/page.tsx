@@ -34,6 +34,10 @@ import {
 } from "@/components/ui/table"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import {
+  PROGRAM_LABEL,
+  YEAR_SEASON_LABEL,
+} from "@/lib/programs/program-display-labels"
+import {
   contactLabel,
   canEditEnrollmentCharges,
   loadContactsByIds,
@@ -275,7 +279,7 @@ export default async function RegistrationDetailPage({
                 ) : null}
               </div>
               <p className="mt-2 text-muted-foreground">
-                {participantName} · {program?.name || "Unknown Program"}
+                {participantName} · {program?.name || `Unknown ${YEAR_SEASON_LABEL}`}
               </p>
               <p className="text-xs text-muted-foreground">
                 ID {enrollment.id}
@@ -297,7 +301,7 @@ export default async function RegistrationDetailPage({
                 <Button variant="outline" asChild>
                   <Link href={`/programs/${program.id}`}>
                     <ExternalLink className="mr-2 h-4 w-4" />
-                    View Program
+                    View {YEAR_SEASON_LABEL}
                   </Link>
                 </Button>
               </div>
@@ -425,14 +429,15 @@ export default async function RegistrationDetailPage({
 
           <Card>
             <CardHeader>
-              <CardTitle>Program Context</CardTitle>
+              <CardTitle>{YEAR_SEASON_LABEL} Context</CardTitle>
               <CardDescription>
-                Program, offering, and registration option for this record.
+                {YEAR_SEASON_LABEL}, {PROGRAM_LABEL.toLowerCase()}, and
+                registration option for this record.
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-5 sm:grid-cols-2">
-              <DetailItem label="Program" value={program?.name} />
-              <DetailItem label="Offering" value={offeringLabel} />
+              <DetailItem label={YEAR_SEASON_LABEL} value={program?.name} />
+              <DetailItem label={PROGRAM_LABEL} value={offeringLabel} />
               <DetailItem
                 label="Registration Option"
                 value={registrationOptionLabel}
@@ -444,7 +449,7 @@ export default async function RegistrationDetailPage({
               {program ? (
                 <>
                   <DetailItem
-                    label="Program Dates"
+                    label={`${YEAR_SEASON_LABEL} Dates`}
                     value={`${formatDate(program.start_date)} – ${formatDate(program.end_date)}`}
                   />
                   <DetailItem

@@ -6,10 +6,12 @@ import {
   roundMoney,
   type DepartmentPeriodColumn,
 } from "@/lib/departments/department-period-helpers"
+import {
+  canManageDepartment,
+  canViewDepartment,
+} from "@/lib/departments/department-access"
 import { workforceDepartmentDetailPath } from "@/lib/departments/department-paths"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
-import { PERMISSIONS } from "@/lib/permissions/permission-keys"
-import { hasPermission } from "@/lib/permissions/permissions"
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 
@@ -55,7 +57,7 @@ async function requireOrg() {
 export async function fetchDepartmentBabysittingMatrix(
   departmentId: string
 ): Promise<DepartmentBabysittingMatrix> {
-  const allowed = await hasPermission(PERMISSIONS.STAFF_VIEW)
+  const allowed = await canViewDepartment(departmentId)
   if (!allowed) {
     throw new Error("You do not have permission to view babysitting.")
   }
@@ -178,7 +180,7 @@ export async function upsertBabysittingIncomeAction(input: {
   periodKey: string
   amount: number
 }) {
-  const allowed = await hasPermission(PERMISSIONS.STAFF_MANAGE)
+  const allowed = await canManageDepartment(input.departmentId)
   if (!allowed) {
     return { success: false as const, error: "You do not have permission to edit babysitting." }
   }
@@ -221,7 +223,7 @@ export async function upsertBabysitterPayAction(input: {
   amount: number
   hoursWorked?: number | null
 }) {
-  const allowed = await hasPermission(PERMISSIONS.STAFF_MANAGE)
+  const allowed = await canManageDepartment(input.departmentId)
   if (!allowed) {
     return { success: false as const, error: "You do not have permission to edit babysitting." }
   }

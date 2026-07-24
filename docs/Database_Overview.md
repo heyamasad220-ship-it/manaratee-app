@@ -93,6 +93,7 @@ organization_modules.module_id → modules.id
 * person_relationships
 * person_tags
 * discount_tags
+* organization_employee_benefits
 
 Key relationships:
 
@@ -110,6 +111,8 @@ contact_group_members.organization_id → organizations.id
 contact_payment_methods.contact_id → contacts.id
 contact_payment_methods.organization_id → organizations.id
 organization_affiliation_settings.organization_id → organizations.id
+organization_employee_benefits.organization_id → organizations.id
+organization_employee_benefits.discount_tag_id → discount_tags.id
 person_relationships.organization_id → organizations.id
 person_relationships.person_id → people.id
 person_relationships.related_person_id → people.id
@@ -123,6 +126,7 @@ person_tags.tag_id → discount_tags.id
 discount_tags.organization_id → organizations.id
 ```
 
+**Employee benefit (migration `184`):** `organization_employee_benefits` defaults to 50% off for active full-time staff on programs + venue rentals (`applies_to_ticketing = false`). Quote engine wraps `compute_program_registration_quote` to apply the benefit when the registrant or participant is active FTE.
 **Customer role (migration `137_customer_role_merge.sql`, split in `175`):** Migration 137 unified `program_participant`, `event_attendee`, and `venue_rental_customer` into `customer`. **`175_split_customer_programs_affiliation.sql`** restores **`program_participant`** (UI label **Programs**) for non-terminal enrollments where the contact is the **participant or registrant** (parents of minors). **`customer`** remains for completed ticket orders and qualifying venue rentals (billing contact) only. Both are sticky once earned. Org auto-sync: Programs → `programs` module; Customer → `event-management` / `ticketing` / `bookings`. If `sync_contact_affiliations` fails with missing `billing_contact_id`, apply **`147_venue_rentals_billing_contact_id.sql`**.
 
 **Participation roles (superseded by `137`):** Migration `101_contact_participation_roles.sql` originally added separate participation roles; `137` consolidates them into `customer`.
@@ -198,6 +202,7 @@ npm run validate:contacts-security -- --post-m4   # after 111
 * programs — optional defaults; `capacity` temporarily = sum of limited offerings (S2 sync; catalog may also read offerings live in S6). S4: staff saves no longer write operational eligibility/capacity/`billing_*` as SSOT. **S5:** `program_type` CHECK adult|youth only (`179_drop_program_type_family.sql`; family backfilled to youth). Obsolete eligibility/capacity columns retained pending RPC cutover.
 * program_offerings — S1 attribute columns; S4 registration panel writes here only. **F1 (`180`):** `inherit_dates`, `inherit_eligibility`, `inherit_enrollment` (existing rows overridden/`false`; new offerings default `true`). **F4 (`181`):** `care_enabled`. Programs may have **zero** offerings; first created offering is `is_default`. Audience adult|youth. Catalog enrollment display uses offering `capacity_mode` / `capacity` (S6).
 * program_attendance — **F5 (`181`):** per enrollment/day status (`present`/`absent`/`late`/`excused`); teachers mark from `/my-classes/[offeringId]`.
+* program_enrollments — **`183`:** assigned offering staff (via `program_staff_assignments` + `contacts.auth_user_id`) may SELECT enrollments for their offerings so personal-portal teachers can load `/my-classes/[offeringId]` roster (org-member and “own enrollment” policies remain).
 * program_capacity_groups — S2 `offering_id` required (`177`); `program_id` retained for queries
 * program_schedule_items — S3 `offering_id` required (`178`); weekly class times edited on offering Schedule tab
 * departments — RLS repair: `scripts/164_departments_rls_policies.sql` (org members can manage). App writes also authorize then use service role when needed.
@@ -291,9 +296,10 @@ program_waitlist.lunch_option_id → program_lunch_options.id
 
 ## Financial Assistance
 
-* program_financial_assistance
+* program_financial_assistance (customer applications)
 * program_financial_assistance_documents
 * program_financial_assistance_status_history
+* **program_enrollment_fa_awards** (staff Mark financial assistance awards — original fee, assisted fee, plan) — run **`scripts/185_program_enrollment_fa_awards.sql`**
 
 Key relationships:
 
@@ -301,6 +307,10 @@ Key relationships:
 program_financial_assistance.enrollment_id → program_enrollments.id
 program_financial_assistance_documents.financial_assistance_id → program_financial_assistance.id
 program_financial_assistance_status_history.financial_assistance_id → program_financial_assistance.id
+program_enrollment_fa_awards.enrollment_id → program_enrollments.id
+program_enrollment_fa_awards.program_id → programs.id
+program_enrollment_fa_awards.offering_id → program_offerings.id
+program_enrollment_fa_awards.participant_contact_id → contacts.id
 ```
 
 ---

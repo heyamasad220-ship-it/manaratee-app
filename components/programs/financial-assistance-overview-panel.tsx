@@ -194,10 +194,11 @@ export function FinancialAssistanceOverviewPanel({
     <div className="space-y-4">
       <div className="rounded-lg border bg-card">
         <div className="border-b px-4 py-3">
-          <h3 className="text-sm font-semibold">Program Settings</h3>
+          <h3 className="text-sm font-semibold">Year/Season Settings</h3>
           <p className="mt-1 text-xs text-muted-foreground">
-            Enable or disable financial assistance for active and draft programs.
-            Select a program below to edit application details.
+            Enable or disable financial assistance for active and draft
+            years/seasons. Select a year/season below to edit application
+            details.
           </p>
         </div>
 
@@ -205,7 +206,7 @@ export function FinancialAssistanceOverviewPanel({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Program</TableHead>
+                <TableHead>Year/Season</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Enabled</TableHead>
                 <TableHead>Applications</TableHead>

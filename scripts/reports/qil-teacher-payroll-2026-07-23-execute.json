@@ -1,0 +1,431 @@
+{
+  "importTag": "QIL_TEACHER_PAYROLL_2526_V1",
+  "mode": "execute",
+  "generatedAt": "2026-07-23T23:34:16.034Z",
+  "csvPath": "c:\\Users\\danan\\Downloads\\QIL-Teacher_Payments_2526.csv",
+  "organizationId": "e057e00a-e4e3-4adf-9af5-f465db1894be",
+  "department": {
+    "id": "c5d6b286-0d48-431f-9b55-94a80d4821ef",
+    "name": "Quran Institute for Ladies"
+  },
+  "periods": [
+    "2025-09",
+    "2025-10",
+    "2025-11",
+    "2025-12",
+    "2026-01",
+    "2026-02",
+    "2026-03",
+    "2026-04"
+  ],
+  "teachers": [
+    {
+      "csvName": "Fadia Salameh",
+      "matchedStaff": "Fadia Salameh",
+      "staffId": "5af62c38-191c-4bc5-adea-8f78b721f219",
+      "payBasis": "monthly",
+      "hourlyRate": null,
+      "monthlySalary": 1635.68,
+      "months": [
+        {
+          "periodKey": "2025-09",
+          "hours": null,
+          "amount": 1635.68
+        },
+        {
+          "periodKey": "2025-10",
+          "hours": null,
+          "amount": 1635.68
+        },
+        {
+          "periodKey": "2025-11",
+          "hours": null,
+          "amount": 1635.68
+        },
+        {
+          "periodKey": "2025-12",
+          "hours": null,
+          "amount": 1635.68
+        },
+        {
+          "periodKey": "2026-01",
+          "hours": null,
+          "amount": 1635.68
+        },
+        {
+          "periodKey": "2026-02",
+          "hours": null,
+          "amount": 1635.68
+        },
+        {
+          "periodKey": "2026-03",
+          "hours": null,
+          "amount": 1635.68
+        },
+        {
+          "periodKey": "2026-04",
+          "hours": null,
+          "amount": 1635.68
+        }
+      ]
+    },
+    {
+      "csvName": "Fathieh Alaeddin",
+      "matchedStaff": "Fathieh Alladin",
+      "staffId": "9369060f-1e03-42da-a9ab-4cfab6ca8fe0",
+      "payBasis": "hourly",
+      "hourlyRate": 20,
+      "monthlySalary": null,
+      "months": [
+        {
+          "periodKey": "2025-09",
+          "hours": 25,
+          "amount": 500
+        },
+        {
+          "periodKey": "2025-10",
+          "hours": 30,
+          "amount": 600
+        },
+        {
+          "periodKey": "2025-11",
+          "hours": 20,
+          "amount": 400
+        },
+        {
+          "periodKey": "2025-12",
+          "hours": 18,
+          "amount": 360
+        },
+        {
+          "periodKey": "2026-01",
+          "hours": 16,
+          "amount": 320
+        },
+        {
+          "periodKey": "2026-02",
+          "hours": 18.3,
+          "amount": 366
+        },
+        {
+          "periodKey": "2026-03",
+          "hours": 12,
+          "amount": 240
+        },
+        {
+          "periodKey": "2026-04",
+          "hours": 26,
+          "amount": 520
+        }
+      ]
+    },
+    {
+      "csvName": "Amneh ismail",
+      "matchedStaff": "Amneh Ismail",
+      "staffId": "16829432-d77f-44d3-9b49-efa86a40b0ee",
+      "payBasis": "hourly",
+      "hourlyRate": 20,
+      "monthlySalary": null,
+      "months": [
+        {
+          "periodKey": "2025-09",
+          "hours": 8,
+          "amount": 160
+        },
+        {
+          "periodKey": "2025-10",
+          "hours": 10,
+          "amount": 200
+        },
+        {
+          "periodKey": "2025-11",
+          "hours": 13,
+          "amount": 260
+        },
+        {
+          "periodKey": "2025-12",
+          "hours": 12,
+          "amount": 240
+        },
+        {
+          "periodKey": "2026-01",
+          "hours": 17.3,
+          "amount": 346
+        },
+        {
+          "periodKey": "2026-02",
+          "hours": 18,
+          "amount": 360
+        },
+        {
+          "periodKey": "2026-03",
+          "hours": 9,
+          "amount": 180
+        },
+        {
+          "periodKey": "2026-04",
+          "hours": 13.3,
+          "amount": 266
+        }
+      ]
+    },
+    {
+      "csvName": "Wedad Atwan",
+      "matchedStaff": "Wedad Atwan",
+      "staffId": "27f22b4b-00a8-4267-ae3d-9c5a889e81c1",
+      "payBasis": "hourly",
+      "hourlyRate": 20,
+      "monthlySalary": null,
+      "months": [
+        {
+          "periodKey": "2025-09",
+          "hours": 22,
+          "amount": 440
+        },
+        {
+          "periodKey": "2025-10",
+          "hours": 25.5,
+          "amount": 510
+        },
+        {
+          "periodKey": "2025-11",
+          "hours": 28,
+          "amount": 560
+        },
+        {
+          "periodKey": "2025-12",
+          "hours": 26,
+          "amount": 520
+        },
+        {
+          "periodKey": "2026-01",
+          "hours": 24.1,
+          "amount": 482
+        },
+        {
+          "periodKey": "2026-02",
+          "hours": 30.19,
+          "amount": 603.8
+        },
+        {
+          "periodKey": "2026-03",
+          "hours": 16.45,
+          "amount": 329
+        },
+        {
+          "periodKey": "2026-04",
+          "hours": 52.55,
+          "amount": 1051
+        }
+      ]
+    },
+    {
+      "csvName": "Abeer Abu Kawan",
+      "matchedStaff": "Abeer Abu Kiwan",
+      "staffId": "2eb3afed-44bb-435a-9e7b-ec8179a15e53",
+      "payBasis": "hourly",
+      "hourlyRate": 20,
+      "monthlySalary": null,
+      "months": [
+        {
+          "periodKey": "2025-09",
+          "hours": 14,
+          "amount": 280
+        },
+        {
+          "periodKey": "2025-10",
+          "hours": 12,
+          "amount": 240
+        },
+        {
+          "periodKey": "2025-11",
+          "hours": 12,
+          "amount": 240
+        },
+        {
+          "periodKey": "2025-12",
+          "hours": 11.35,
+          "amount": 227
+        },
+        {
+          "periodKey": "2026-01",
+          "hours": 26,
+          "amount": 520
+        },
+        {
+          "periodKey": "2026-02",
+          "hours": 13.45,
+          "amount": 269
+        },
+        {
+          "periodKey": "2026-03",
+          "hours": 5.5,
+          "amount": 110
+        },
+        {
+          "periodKey": "2026-04",
+          "hours": 18.15,
+          "amount": 363
+        }
+      ]
+    },
+    {
+      "csvName": "Souzan Ayoub",
+      "matchedStaff": "Souzan Ayoub",
+      "staffId": "d9f000ad-e203-4abf-a0bb-b582fa1f3d83",
+      "payBasis": "hourly",
+      "hourlyRate": 20,
+      "monthlySalary": null,
+      "months": [
+        {
+          "periodKey": "2025-09",
+          "hours": 13,
+          "amount": 260
+        },
+        {
+          "periodKey": "2025-10",
+          "hours": 13,
+          "amount": 260
+        },
+        {
+          "periodKey": "2025-11",
+          "hours": 8,
+          "amount": 160
+        },
+        {
+          "periodKey": "2025-12",
+          "hours": 12,
+          "amount": 240
+        },
+        {
+          "periodKey": "2026-01",
+          "hours": 14,
+          "amount": 280
+        },
+        {
+          "periodKey": "2026-02",
+          "hours": 12,
+          "amount": 240
+        },
+        {
+          "periodKey": "2026-03",
+          "hours": 10,
+          "amount": 200
+        },
+        {
+          "periodKey": "2026-04",
+          "hours": 16,
+          "amount": 320
+        }
+      ]
+    },
+    {
+      "csvName": "Rajaa Aljaber",
+      "matchedStaff": "Rajaa Eljaber",
+      "staffId": "972a5cbd-f2bf-4557-8ffd-ddc114eb7da8",
+      "payBasis": "hourly",
+      "hourlyRate": 20,
+      "monthlySalary": null,
+      "months": [
+        {
+          "periodKey": "2025-09",
+          "hours": 14.35,
+          "amount": 287
+        },
+        {
+          "periodKey": "2025-10",
+          "hours": 14.45,
+          "amount": 289
+        },
+        {
+          "periodKey": "2025-11",
+          "hours": 15,
+          "amount": 300
+        },
+        {
+          "periodKey": "2025-12",
+          "hours": 8.15,
+          "amount": 163
+        },
+        {
+          "periodKey": "2026-01",
+          "hours": 12.3,
+          "amount": 246
+        },
+        {
+          "periodKey": "2026-02",
+          "hours": 8.3,
+          "amount": 166
+        },
+        {
+          "periodKey": "2026-03",
+          "hours": 5,
+          "amount": 100
+        },
+        {
+          "periodKey": "2026-04",
+          "hours": 7,
+          "amount": 140
+        }
+      ]
+    },
+    {
+      "csvName": "Zohor Hawa",
+      "matchedStaff": "Zohour Hawa",
+      "staffId": "e9b7ffc0-ca84-470d-9a8c-dd83c8f472c0",
+      "payBasis": "hourly",
+      "hourlyRate": 20,
+      "monthlySalary": null,
+      "months": [
+        {
+          "periodKey": "2025-09",
+          "hours": 9,
+          "amount": 180
+        },
+        {
+          "periodKey": "2025-10",
+          "hours": 9,
+          "amount": 180
+        },
+        {
+          "periodKey": "2025-11",
+          "hours": 2,
+          "amount": 40
+        },
+        {
+          "periodKey": "2025-12",
+          "hours": 6,
+          "amount": 120
+        },
+        {
+          "periodKey": "2026-01",
+          "hours": 10,
+          "amount": 200
+        },
+        {
+          "periodKey": "2026-02",
+          "hours": 7.3,
+          "amount": 146
+        },
+        {
+          "periodKey": "2026-03",
+          "hours": 6,
+          "amount": 120
+        },
+        {
+          "periodKey": "2026-04",
+          "hours": 9,
+          "amount": 180
+        }
+      ]
+    }
+  ],
+  "unmatched": [],
+  "totals": {
+    "teachersMatched": 8,
+    "teachersUnmatched": 0,
+    "payEntries": 64,
+    "amountSum": 29965.24,
+    "staffUpdates": 8
+  }
+}

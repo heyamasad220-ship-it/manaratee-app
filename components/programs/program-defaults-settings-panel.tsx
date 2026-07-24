@@ -27,7 +27,7 @@ const ENROLLMENT_TYPE_OPTIONS = [
   {
     id: "full_program" as const,
     label: "Entire Program",
-    description: "Customers register for the entire offering.",
+    description: "Customers register for the entire program.",
   },
   {
     id: "selected_sessions" as const,
@@ -43,7 +43,7 @@ const ENROLLMENT_TYPE_OPTIONS = [
 
 /**
  * F2: Program-level enrollment defaults (dates, eligibility, types, waitlist).
- * Offerings inherit these unless customized.
+ * Programs inherit these unless customized.
  */
 export function ProgramDefaultsSettingsPanel({
   program,
@@ -169,14 +169,14 @@ export function ProgramDefaultsSettingsPanel({
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-sky-100 bg-sky-50/60 px-4 py-3 text-sm text-sky-950">
-        Set these once for the program year/season. New offerings inherit them.
-        Existing offerings keep their own values unless they still have inherit
+        Set these once for the year/season. New programs inherit them.
+        Existing programs keep their own values unless they still have inherit
         turned on.
       </div>
 
       <EditSectionCard
-        title="Program dates & enrollment window"
-        description="Default term and registration window for offerings that inherit dates."
+        title="Year/Season dates & enrollment window"
+        description="Default term and registration window for programs that inherit dates."
       >
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div className="space-y-1.5">
@@ -224,7 +224,7 @@ export function ProgramDefaultsSettingsPanel({
 
       <EditSectionCard
         title="Audience"
-        description="Adult vs youth default for inheriting offerings."
+        description="Adult vs youth default for inheriting programs."
       >
         <div className="max-w-xs space-y-1.5">
           <Label htmlFor="defaults-audience">Audience</Label>
@@ -255,7 +255,7 @@ export function ProgramDefaultsSettingsPanel({
 
       <EditSectionCard
         title="Enrollment types"
-        description="Default registration types for offerings that inherit enrollment settings."
+        description="Default registration types for programs that inherit enrollment settings."
       >
         <div className="space-y-2">
           {ENROLLMENT_TYPE_OPTIONS.map((option) => (
@@ -284,7 +284,7 @@ export function ProgramDefaultsSettingsPanel({
 
       <EditSectionCard
         title="Waitlist"
-        description="Default waitlist policy for inheriting offerings."
+        description="Default waitlist policy for inheriting programs."
       >
         <div className="flex flex-wrap items-end gap-6">
           <div className="space-y-1.5">
@@ -324,7 +324,7 @@ export function ProgramDefaultsSettingsPanel({
       ) : null}
       {success ? (
         <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-          Defaults saved. Offerings that still inherit these settings were
+          Defaults saved. Programs that still inherit these settings were
           updated.
         </p>
       ) : null}

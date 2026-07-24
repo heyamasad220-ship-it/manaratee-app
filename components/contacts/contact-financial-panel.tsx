@@ -141,10 +141,13 @@ function isRefundEvent(event: ContactFinancialTimelineEvent) {
 }
 
 function isPaidTransaction(event: ContactFinancialTimelineEvent) {
+  const status = (event.status || "").toLowerCase()
   return (
     event.amount != null &&
     event.filterCategory !== "pledges" &&
-    !isRefundEvent(event)
+    !isRefundEvent(event) &&
+    status !== "voided" &&
+    status !== "failed"
   )
 }
 

@@ -43,7 +43,7 @@ export function OfferingPricingSelector({
 
   return (
     <div className="space-y-1.5">
-      <Label htmlFor="pricing-offering">Offering</Label>
+      <Label htmlFor="pricing-offering">Program</Label>
       <select
         id="pricing-offering"
         value={selectedOfferingId}
@@ -58,7 +58,7 @@ export function OfferingPricingSelector({
         ))}
       </select>
       <p className="text-xs text-muted-foreground">
-        Each offering has its own fee plans. Save after editing each one.
+        Each program has its own fee plans. Save after editing each one.
       </p>
     </div>
   )

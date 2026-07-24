@@ -202,15 +202,15 @@ export function ProgramBillingScheduleView({
           <CardDescription>
             Canonical monthly calendar for {bundle.offering.name}. Late
             enrollments only receive charges from their join month through the
-            offering end date.
+            program end date.
           </CardDescription>
         </CardHeader>
         <CardContent>
           {bundle.billing_periods.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               {readOnly
-                ? "Billing periods will appear after migration 021 is applied and the offering has start/end dates."
-                : "No billing periods yet. Set offering start and end dates, then refresh this page."}
+                ? "Billing periods will appear after migration 021 is applied and the program has start/end dates."
+                : "No billing periods yet. Set program start and end dates, then refresh this page."}
             </p>
           ) : (
             <Table>
@@ -258,7 +258,7 @@ export function ProgramBillingScheduleView({
         <CardContent className="overflow-x-auto">
           {bundle.participants.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No active enrollments with charges for this offering.
+              No active enrollments with charges for this program.
             </p>
           ) : (
             <Table>
@@ -421,7 +421,7 @@ export function ProgramBillingScheduleView({
             <CardTitle>Billing Override</CardTitle>
             <CardDescription>
               Waive, adjust, skip, or add fees for one participant or all
-              participants in this offering.
+              participants in this program.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -464,7 +464,7 @@ export function ProgramBillingScheduleView({
               </div>
 
               <div className="space-y-2">
-                <Label>Participant (leave blank for offering-wide)</Label>
+                <Label>Participant (leave blank for program-wide)</Label>
                 <Select
                   value={overrideEnrollmentId}
                   onValueChange={setOverrideEnrollmentId}
@@ -523,7 +523,7 @@ export function ProgramBillingScheduleView({
                   checked={applyToAll}
                   onChange={(event) => setApplyToAll(event.target.checked)}
                 />
-                Apply to all participants in this offering
+                Apply to all participants in this program
               </label>
 
               <Button type="submit" disabled={pending}>
@@ -646,7 +646,7 @@ export function ProgramBillingScheduleView({
                         ? "All participants"
                         : override.enrollment_id
                           ? "One participant"
-                          : "Offering"}
+                          : "Program"}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {override.reason || "—"}

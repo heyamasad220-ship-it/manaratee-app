@@ -26,6 +26,7 @@ import {
   ClipboardList,
   Baby,
   UserCheck,
+  BarChart3,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -48,6 +49,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 import { WORKFORCE_MODULE_LABEL } from "@/lib/hr/hr-module-label"
+import { FUND_DEVELOPMENT_MODULE_LABEL } from "@/lib/donations/fund-development-module-label"
 import { isFacilitiesOnlyAccess } from "@/lib/permissions/facilities-access"
 import {
   STAFF_BREADCRUMB_ROW_HEIGHT_CLASS,
@@ -233,6 +235,7 @@ const subItemPermissionFallbacks: Record<string, string[]> = {
 const moduleDisplayNameMap: Record<string, string> = {
   workforce: WORKFORCE_MODULE_LABEL,
   hr: WORKFORCE_MODULE_LABEL,
+  donations: FUND_DEVELOPMENT_MODULE_LABEL,
   bookings: "Venue Rentals",
   spaces: "Facility Manager",
 }
@@ -249,9 +252,16 @@ const moduleGroupOverride: Record<string, string> = {
 const moduleDefaultRouteOverride: Record<string, string> = {
   contacts: "/contacts/people",
   spaces: "/facilities/reservation-center",
-  programs: "/workforce/departments",
+  programs: "/programs/catalog",
   workforce: "/workforce",
   hr: "/workforce",
+}
+
+const departmentsNavItem: SubItem = {
+  label: "Departments",
+  href: "/workforce/departments",
+  matchPrefix: "/workforce/departments",
+  permissionKey: "staff.view",
 }
 
 const moduleChildren: Record<string, SubItem[]> = {
@@ -296,12 +306,6 @@ const moduleChildren: Record<string, SubItem[]> = {
     { label: "Schedule", href: "/facilities/calendar", matchPrefix: "/facilities/calendar", permissionKey: "spaces.view" },
   ],
   programs: [
-    {
-      label: "Departments",
-      href: "/workforce/departments",
-      matchPrefix: "/workforce/departments",
-      permissionKey: "staff.view",
-    },
     {
       label: "Catalog",
       href: "/programs/catalog",
@@ -360,6 +364,7 @@ const moduleChildren: Record<string, SubItem[]> = {
       exact: true,
       permissionKey: "staff.view",
     },
+    departmentsNavItem,
     {
       label: "Employees",
       href: "/workforce/employees",
@@ -414,6 +419,7 @@ const moduleChildren: Record<string, SubItem[]> = {
       exact: true,
       permissionKey: "staff.view",
     },
+    departmentsNavItem,
     {
       label: "Employees",
       href: "/workforce/employees",
@@ -582,6 +588,14 @@ function buildNavItems(rows: SidebarModuleRow[], permissionContext: UserPermissi
       icon: CreditCard,
       matchPrefix: "/billing",
       requiresSuperAdmin: true,
+      pinToBottom: true,
+    },
+    {
+      label: "Reports",
+      href: "/reports",
+      icon: BarChart3,
+      matchPrefix: "/reports",
+      permissionKey: "reports.view",
       pinToBottom: true,
     },
     {

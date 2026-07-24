@@ -69,7 +69,7 @@ export function CarTagsWorkspace({
           className="mb-3 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="h-4 w-4" />
-          Back to Program
+          Back to Year/Season
         </Link>
 
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -83,7 +83,7 @@ export function CarTagsWorkspace({
           </div>
 
           <Button variant="outline" size="sm" asChild>
-            <Link href={`/programs/${programId}`}>View Program</Link>
+            <Link href={`/programs/${programId}`}>View Year/Season</Link>
           </Button>
         </div>
       </div>

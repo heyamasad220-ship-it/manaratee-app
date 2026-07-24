@@ -4,9 +4,11 @@ import { workforceDepartmentDetailPath } from "@/lib/departments/department-path
 import {
   roundMoney,
 } from "@/lib/departments/department-period-helpers"
+import {
+  canManageDepartment,
+  canViewDepartment,
+} from "@/lib/departments/department-access"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
-import { PERMISSIONS } from "@/lib/permissions/permission-keys"
-import { hasPermission } from "@/lib/permissions/permissions"
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 
@@ -326,7 +328,7 @@ export async function resolveCurrentOrgStaffAction() {
 }
 
 export async function listPayrollHourLogOptionsAction(departmentId: string) {
-  const canView = await hasPermission(PERMISSIONS.STAFF_VIEW)
+  const canView = await canViewDepartment(departmentId)
   if (!canView) {
     return { success: false as const, error: "You do not have permission to log hours." }
   }
@@ -334,7 +336,7 @@ export async function listPayrollHourLogOptionsAction(departmentId: string) {
   const access = await requireOrg()
   if (!access.ok) return { success: false as const, error: access.error }
 
-  const canManage = await hasPermission(PERMISSIONS.STAFF_MANAGE)
+  const canManage = await canManageDepartment(departmentId)
   const eligible = await loadPayrollEligibleStaff(
     access.supabase,
     access.organizationId,
@@ -493,8 +495,8 @@ export async function logDepartmentStaffHoursAction(input: {
   hours: number
   notes?: string | null
 }) {
-  const canManage = await hasPermission(PERMISSIONS.STAFF_MANAGE)
-  const canView = await hasPermission(PERMISSIONS.STAFF_VIEW)
+  const canManage = await canManageDepartment(input.departmentId)
+  const canView = await canViewDepartment(input.departmentId)
   if (!canView) {
     return { success: false as const, error: "You do not have permission to log hours." }
   }
@@ -599,7 +601,7 @@ export async function createPayPeriodForAllEmployeesAction(input: {
   periodStart: string
   periodEnd: string
 }) {
-  const allowed = await hasPermission(PERMISSIONS.STAFF_MANAGE)
+  const allowed = await canManageDepartment(input.departmentId)
   if (!allowed) {
     return {
       success: false as const,
@@ -733,7 +735,7 @@ export async function submitPayPeriodAction(input: {
   const access = await requireOrg()
   if (!access.ok) return { success: false as const, error: access.error }
 
-  const canManage = await hasPermission(PERMISSIONS.STAFF_MANAGE)
+  const canManage = await canManageDepartment(input.departmentId)
   const { data: entry, error } = await access.supabase
     .from("department_staff_pay_entries")
     .select("id, staff_id, status, department_id")
@@ -781,7 +783,7 @@ export async function approvePayPeriodAction(input: {
   payEntryId: string
   approve: boolean
 }) {
-  const allowed = await hasPermission(PERMISSIONS.STAFF_MANAGE)
+  const allowed = await canManageDepartment(input.departmentId)
   if (!allowed) {
     return {
       success: false as const,
@@ -820,6 +822,152 @@ export async function approvePayPeriodAction(input: {
   return { success: true as const }
 }
 
+export async function updatePayPeriodEntryAction(input: {
+  departmentId: string
+  payEntryId: string
+  hoursWorked?: number | null
+  amount?: number | null
+  notes?: string | null
+}) {
+  const allowed = await canManageDepartment(input.departmentId)
+  if (!allowed) {
+    return {
+      success: false as const,
+      error: "Only a department head / manager can edit payroll entries.",
+    }
+  }
+
+  const access = await requireOrg()
+  if (!access.ok) return { success: false as const, error: access.error }
+
+  const { data: entry, error } = await access.supabase
+    .from("department_staff_pay_entries")
+    .select(
+      "id, department_id, pay_basis, hourly_rate, monthly_salary, hours_worked, amount, status"
+    )
+    .eq("organization_id", access.organizationId)
+    .eq("id", input.payEntryId)
+    .maybeSingle()
+
+  if (error || !entry || entry.department_id !== input.departmentId) {
+    return { success: false as const, error: "Pay period not found." }
+  }
+
+  const payBasis =
+    (entry.pay_basis as string) === "monthly" ? "monthly" : "hourly"
+  const hourlyRate =
+    entry.hourly_rate == null ? null : Number(entry.hourly_rate)
+
+  let hoursWorked =
+    input.hoursWorked !== undefined
+      ? input.hoursWorked
+      : entry.hours_worked == null
+        ? null
+        : Number(entry.hours_worked)
+
+  let amount =
+    input.amount !== undefined
+      ? input.amount
+      : Number(entry.amount || 0)
+
+  if (payBasis === "hourly") {
+    if (hoursWorked != null && hoursWorked < 0) {
+      return { success: false as const, error: "Hours cannot be negative." }
+    }
+    // If hours changed and amount not explicitly set, recalculate from rate.
+    if (
+      input.hoursWorked !== undefined &&
+      input.amount === undefined &&
+      hoursWorked != null &&
+      hourlyRate != null
+    ) {
+      amount = roundMoney(hoursWorked * hourlyRate)
+    }
+  } else {
+    hoursWorked = null
+  }
+
+  if (amount == null || !Number.isFinite(amount) || amount < 0) {
+    return { success: false as const, error: "Enter a valid payment amount." }
+  }
+
+  const patch: Record<string, unknown> = {
+    hours_worked: hoursWorked,
+    amount: roundMoney(amount),
+    updated_at: new Date().toISOString(),
+  }
+  if (input.notes !== undefined) {
+    patch.notes = input.notes?.trim() || null
+  }
+
+  const { error: updateError } = await access.supabase
+    .from("department_staff_pay_entries")
+    .update(patch)
+    .eq("id", input.payEntryId)
+    .eq("organization_id", access.organizationId)
+
+  if (updateError) return { success: false as const, error: updateError.message }
+
+  revalidatePath(workforceDepartmentDetailPath(input.departmentId))
+  return { success: true as const }
+}
+
+export async function deletePayPeriodEntryAction(input: {
+  departmentId: string
+  payEntryId: string
+}) {
+  const allowed = await canManageDepartment(input.departmentId)
+  if (!allowed) {
+    return {
+      success: false as const,
+      error: "Only a department head / manager can delete payroll entries.",
+    }
+  }
+
+  const access = await requireOrg()
+  if (!access.ok) return { success: false as const, error: access.error }
+
+  const { data: entry, error } = await access.supabase
+    .from("department_staff_pay_entries")
+    .select("id, department_id, staff_id, period_key, period_start, period_end")
+    .eq("organization_id", access.organizationId)
+    .eq("id", input.payEntryId)
+    .maybeSingle()
+
+  if (error || !entry || entry.department_id !== input.departmentId) {
+    return { success: false as const, error: "Pay period not found." }
+  }
+
+  const bounds =
+    entry.period_start && entry.period_end
+      ? {
+          periodStart: entry.period_start as string,
+          periodEnd: entry.period_end as string,
+        }
+      : periodBounds(entry.period_key as string)
+
+  // Remove hour logs in this period so the line does not reappear from sync.
+  await access.supabase
+    .from("department_staff_hour_logs")
+    .delete()
+    .eq("organization_id", access.organizationId)
+    .eq("department_id", input.departmentId)
+    .eq("staff_id", entry.staff_id)
+    .gte("work_date", bounds.periodStart)
+    .lte("work_date", bounds.periodEnd)
+
+  const { error: deleteError } = await access.supabase
+    .from("department_staff_pay_entries")
+    .delete()
+    .eq("id", input.payEntryId)
+    .eq("organization_id", access.organizationId)
+
+  if (deleteError) return { success: false as const, error: deleteError.message }
+
+  revalidatePath(workforceDepartmentDetailPath(input.departmentId))
+  return { success: true as const }
+}
+
 export async function fetchDepartmentPayrollList(
   departmentId: string,
   options?: { scope?: "visible" | "all-approved-for-budget" }
@@ -829,10 +977,10 @@ export async function fetchDepartmentPayrollList(
   canApprove: boolean
   selfStaffId: string | null
 }> {
-  const canView = await hasPermission(PERMISSIONS.STAFF_VIEW)
+  const canView = await canViewDepartment(departmentId)
   if (!canView) throw new Error("You do not have permission to view payroll.")
 
-  const canApprove = await hasPermission(PERMISSIONS.STAFF_MANAGE)
+  const canApprove = await canManageDepartment(departmentId)
   const access = await requireOrg()
   if (!access.ok) {
     return { rows: [], migrationRequired: false, canApprove: false, selfStaffId: null }
@@ -972,7 +1120,7 @@ export async function fetchStaffHourLogsAction(input: {
   const access = await requireOrg()
   if (!access.ok) return { success: false as const, error: access.error }
 
-  const canManage = await hasPermission(PERMISSIONS.STAFF_MANAGE)
+  const canManage = await canManageDepartment(input.departmentId)
   if (!canManage) {
     const self = await findStaffForAuthUser(
       access.supabase,

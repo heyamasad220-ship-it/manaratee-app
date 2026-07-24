@@ -54,7 +54,7 @@ export function ProgramApplyForm({
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
     if (!offeringId) {
-      setError("Select an offering.")
+      setError("Select a program.")
       return
     }
     if (!participantName.trim()) {
@@ -85,22 +85,16 @@ export function ProgramApplyForm({
       return
     }
 
-    if (result.application.status === "approved") {
-      setSuccessMessage(
-        "Application approved. You can register when a seat is available."
-      )
-    } else {
-      setSuccessMessage(
-        "Application submitted. A department reviewer will evaluate new students."
-      )
-    }
+    setSuccessMessage(
+      "Application submitted. The department will review it, then you can register."
+    )
     router.refresh()
   }
 
   if (offerings.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
-        No offerings are available to apply for yet.
+        No programs are available to apply for yet.
       </p>
     )
   }
@@ -108,7 +102,7 @@ export function ProgramApplyForm({
   return (
     <form onSubmit={(event) => void handleSubmit(event)} className="space-y-4">
       <div className="space-y-1.5">
-        <Label htmlFor="apply-offering">Offering</Label>
+        <Label htmlFor="apply-offering">Program</Label>
         <select
           id="apply-offering"
           value={offeringId}
@@ -139,7 +133,7 @@ export function ProgramApplyForm({
             <span>
               <span className="font-medium">Returning student</span>
               <span className="block text-xs text-muted-foreground">
-                Auto-approved for this offering.
+                Reviewed by the department before registration.
               </span>
             </span>
           </label>
@@ -155,7 +149,7 @@ export function ProgramApplyForm({
             <span>
               <span className="font-medium">New student</span>
               <span className="block text-xs text-muted-foreground">
-                Needs department evaluation before you can register.
+                Reviewed by the department before registration.
               </span>
             </span>
           </label>

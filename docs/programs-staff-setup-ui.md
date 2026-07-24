@@ -84,7 +84,7 @@ On success → `/programs/[id]` (program detail).
 
 **Client:** `components/programs/offering-manage-client.tsx`
 
-Tabs: Overview (includes Instructors & Staff), Enrollment. Shows the offering opened from program detail (switch offerings from the program offerings list). Attendance and Waitlist viewing live under Programs → Reports.
+Tabs: Overview (includes Instructors & Staff + Schedule), Enrollment. Shows the offering opened from program detail (switch offerings from the program offerings list). Attendance and Waitlist viewing live under Programs → Reports.
 
 Pricing source of truth: **offering fee plans** → quote RPC → charge ledger (Phase 2B).
 

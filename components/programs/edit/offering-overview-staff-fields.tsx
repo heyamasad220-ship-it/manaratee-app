@@ -350,7 +350,7 @@ export function OfferingOverviewStaffFields({
                   onChange={(event) => setSessionId(event.target.value)}
                   className="h-9 w-full rounded-md border bg-background px-3 text-sm"
                 >
-                  <option value="">Entire offering</option>
+                  <option value="">Entire program</option>
                   {sessions.map((session) => (
                     <option key={session.id} value={session.id}>
                       {session.name}

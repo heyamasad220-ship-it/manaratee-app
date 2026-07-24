@@ -76,7 +76,7 @@ export async function getStaffAssignmentsForOffering(
 
   if (error) {
     console.error("getStaffAssignmentsForOffering:", error.message)
-    throw new Error("Failed to load staff assignments")
+    return []
   }
 
   return (data || []).map((row) =>
@@ -281,8 +281,11 @@ export async function getOfferingRosterEnrollments(
     .order("child_name", { ascending: true })
 
   if (error) {
+    // Personal-portal teachers are often not organization_members; without
+    // SQL 183 they cannot read other families' enrollments. Prefer empty
+    // roster over crashing /my-classes/[offeringId].
     console.error("getOfferingRosterEnrollments:", error.message)
-    throw new Error("Failed to load roster")
+    return []
   }
 
   return (data || []) as OfferingRosterEnrollment[]

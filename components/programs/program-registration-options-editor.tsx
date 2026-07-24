@@ -16,7 +16,7 @@ import {
 
 const OPTION_DESCRIPTIONS: Record<string, string> = {
   full_program:
-    "Register for the complete program. Access is granted to all sessions in this offering.",
+    "Register for the complete program. Access is granted to all sessions in this program.",
   selected_sessions: "Choose one or more sessions or weeks.",
   single_session: "Register for a single session only.",
   drop_in: "Drop in for an individual session without a full commitment.",

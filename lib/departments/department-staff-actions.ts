@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 
 import { createEmployeeFromContact } from "@/lib/contacts/contact-actions"
+import { canManageDepartment } from "@/lib/departments/department-access"
 import { workforceDepartmentDetailPath } from "@/lib/departments/department-paths"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { hasPermission } from "@/lib/permissions/permissions"
@@ -20,8 +21,10 @@ function normalizeHourlyRate(value: number | string | null | undefined) {
   return Math.max(0, parsed)
 }
 
-async function requireStaffManage() {
-  const allowed = await hasPermission(PERMISSIONS.STAFF_MANAGE)
+async function requireStaffManage(departmentId?: string) {
+  const allowed = departmentId
+    ? await canManageDepartment(departmentId)
+    : await hasPermission(PERMISSIONS.STAFF_MANAGE)
   if (!allowed) {
     return { ok: false as const, error: "You do not have permission to manage employees." }
   }
@@ -70,7 +73,7 @@ export async function searchStaffForDepartmentAssignAction(
   search: string,
   limit = 30
 ) {
-  const access = await requireStaffManage()
+  const access = await requireStaffManage(departmentId)
   if (!access.ok) return { success: false as const, error: access.error }
 
   let query = access.supabase
@@ -112,7 +115,7 @@ export async function assignStaffToDepartmentAction(input: {
   position_name?: string | null
   hourly_rate?: number | null
 }) {
-  const access = await requireStaffManage()
+  const access = await requireStaffManage(input.departmentId)
   if (!access.ok) return { success: false as const, error: access.error }
 
   const { data: department, error: departmentError } = await access.supabase
@@ -182,7 +185,7 @@ export async function removeStaffFromDepartmentAction(input: {
   departmentId: string
   staffId: string
 }) {
-  const access = await requireStaffManage()
+  const access = await requireStaffManage(input.departmentId)
   if (!access.ok) return { success: false as const, error: access.error }
 
   const { error } = await access.supabase
@@ -211,7 +214,7 @@ export async function updateDepartmentEmployeeAction(input: {
   pay_basis?: "hourly" | "monthly"
   monthly_salary?: number | null
 }) {
-  const access = await requireStaffManage()
+  const access = await requireStaffManage(input.departmentId)
   if (!access.ok) return { success: false as const, error: access.error }
 
   const { data: staff, error: staffError } = await access.supabase
@@ -294,7 +297,7 @@ export async function addEmployeeToDepartmentAction(input: {
   pay_basis?: "hourly" | "monthly"
   monthly_salary?: number | null
 }) {
-  const access = await requireStaffManage()
+  const access = await requireStaffManage(input.departmentId)
   if (!access.ok) return { success: false as const, error: access.error }
 
   const { data: department, error: departmentError } = await access.supabase

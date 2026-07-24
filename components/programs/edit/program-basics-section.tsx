@@ -117,7 +117,7 @@ export function ProgramBasicsSection({
     <div className="grid w-full max-w-5xl grid-cols-1 gap-6 md:grid-cols-2 md:items-start">
       <div className="min-w-0 space-y-3">
         <div className="space-y-1.5">
-          <Label htmlFor="name">Program Name *</Label>
+          <Label htmlFor="name">Year/Season Name *</Label>
           <Input
             id="name"
             name="name"
@@ -134,11 +134,11 @@ export function ProgramBasicsSection({
                 id="subtitle"
                 name="subtitle"
                 defaultValue={program?.subtitle || ""}
-                placeholder="Short tagline shown under the program name"
+                placeholder="Short tagline shown under the year/season name"
                 className="bg-background"
               />
               <p className="text-xs text-muted-foreground">
-                A brief line customers see below the program title.
+                A brief line customers see below the year/season title.
               </p>
             </div>
 
@@ -164,7 +164,7 @@ export function ProgramBasicsSection({
 
         <BasicsSubsection
           title="Schedule"
-          description="Program dates apply to all offerings unless an offering sets its own dates."
+          description="Year/Season dates apply to all programs unless a program sets its own dates."
         >
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
@@ -212,7 +212,7 @@ export function ProgramBasicsSection({
 
         <BasicsSubsection
           title="Eligibility"
-          description="Gender and age apply to the whole program. Offerings inherit these for years like QIL; summer camps can still use capacity groups per offering when needed."
+          description="Gender and age apply to the whole year/season. Programs inherit these for years like QIL; summer camps can still use capacity groups per program when needed."
         >
           <input type="hidden" name="min_age" value={ageSelectValue(minAge)} />
           <input type="hidden" name="max_age" value={ageSelectValue(maxAge)} />

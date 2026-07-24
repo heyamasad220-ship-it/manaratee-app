@@ -186,7 +186,7 @@ function RegistrationOptionFeePlanSelect({
       </SelectTrigger>
       <SelectContent>
         <SelectItem value={DEFAULT_FEE_PLAN_VALUE}>
-          Use offering default
+          Use program default
           {defaultPlanLabel ? ` (${defaultPlanLabel})` : ""}
         </SelectItem>
         {persistedPlans.map((plan) => (
@@ -372,7 +372,7 @@ export function ProgramFeePlanEditor({
               <p className="text-sm font-medium">Registration pricing</p>
               <p className="text-xs text-muted-foreground">
                 Each registration type on the Registration tab can use the
-                offering&apos;s default fee plan or a specific plan below. Pick a
+                program&apos;s default fee plan or a specific plan below. Pick a
                 plan for each enabled type, then click Save pricing.
               </p>
             </div>

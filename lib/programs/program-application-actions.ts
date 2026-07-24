@@ -50,8 +50,8 @@ export type SubmitProgramApplicationInput = {
 }
 
 /**
- * Create an application. Returning students are auto-approved.
- * New students stay `submitted` until department evaluation.
+ * Create an application. All applicants (new and returning) stay `submitted`
+ * until a department director evaluates them.
  */
 export async function submitProgramApplication(
   input: SubmitProgramApplicationInput
@@ -81,7 +81,6 @@ export async function submitProgramApplication(
     return { success: false, error: "Offering does not belong to this program." }
   }
 
-  const autoApprove = input.applicantType === "returning"
   const now = new Date().toISOString()
 
   const { data, error } = await supabase
@@ -90,20 +89,16 @@ export async function submitProgramApplication(
       organization_id: input.organizationId,
       program_id: input.programId,
       offering_id: input.offeringId,
-      approved_offering_id: autoApprove ? input.offeringId : null,
+      approved_offering_id: null,
       registrant_contact_id: input.registrantContactId,
       participant_contact_id: input.participantContactId || null,
       participant_name: name,
       applicant_type: input.applicantType,
-      status: autoApprove ? "approved" : "submitted",
+      status: "submitted",
       source: input.source ?? "customer",
-      evaluated_at: autoApprove ? now : null,
-      evaluated_by_user_id: autoApprove
-        ? input.createdByUserId || null
-        : null,
-      evaluation_notes: autoApprove
-        ? "Auto-approved returning student."
-        : null,
+      evaluated_at: null,
+      evaluated_by_user_id: null,
+      evaluation_notes: null,
       created_by_user_id: input.createdByUserId || null,
       updated_at: now,
     })
@@ -118,6 +113,17 @@ export async function submitProgramApplication(
     }
   }
 
+  const { data: program } = await supabase
+    .from("programs")
+    .select("department_id")
+    .eq("id", input.programId)
+    .maybeSingle()
+
+  if (program?.department_id) {
+    revalidatePath(
+      workforceDepartmentDetailPath(program.department_id as string)
+    )
+  }
   revalidatePath(`/customer/programs/${input.programId}`)
   revalidatePath(`/customer/programs/${input.programId}/apply`)
   revalidatePath(`/programs/${input.programId}`)
@@ -323,6 +329,53 @@ export async function evaluateProgramApplication(
   revalidatePath(`/customer/programs/${existing.program_id as string}/apply`)
 
   return { success: true, application: mapApplication(data) }
+}
+
+export type EvaluateProgramApplicationsBatchInput = {
+  applicationIds: string[]
+  decision: "approved" | "not_approved"
+  notes?: string | null
+  evaluatedByUserId: string
+}
+
+export async function evaluateProgramApplicationsBatch(
+  input: EvaluateProgramApplicationsBatchInput
+): Promise<
+  | { success: true; approved: number; failed: number; errors: string[] }
+  | { success: false; error: string }
+> {
+  const ids = [
+    ...new Set(
+      (input.applicationIds || []).map((id) => String(id || "").trim()).filter(Boolean)
+    ),
+  ]
+  if (ids.length === 0) {
+    return { success: false, error: "Select at least one application." }
+  }
+  if (!input.evaluatedByUserId) {
+    return { success: false, error: "You must be signed in to evaluate applications." }
+  }
+
+  let approved = 0
+  let failed = 0
+  const errors: string[] = []
+
+  for (const applicationId of ids) {
+    const result = await evaluateProgramApplication({
+      applicationId,
+      decision: input.decision,
+      notes: input.notes,
+      evaluatedByUserId: input.evaluatedByUserId,
+    })
+    if (result.success) {
+      approved += 1
+    } else {
+      failed += 1
+      errors.push(result.error)
+    }
+  }
+
+  return { success: true, approved, failed, errors }
 }
 
 export async function fetchDepartmentApplicationsAction(departmentId: string) {

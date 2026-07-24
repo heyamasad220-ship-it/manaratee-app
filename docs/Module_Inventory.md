@@ -124,20 +124,20 @@ Features:
 
 ## Financial Assistance
 
-Status: In Development
+Status: Working (staff awards + applications)
 
 Completed:
 
-* Database design
-* Program settings
-* Status history
-* Document storage
+* Database design (applications + **staff awards** `program_enrollment_fa_awards` — run **185**)
+* Program settings / Overview
+* Status history + document storage (applications)
+* Staff **Mark financial assistance** writes awards; **Reports** tab lists who / program / offering / original vs assisted fee / plan; **Remove** restores original fee and supersedes the award
+* Contact profile Program enrollments + Financial timeline show FA
 
 Pending:
 
-* Customer application flow
-* Admin review dashboard
-* Approval workflow
+* Richer admin review for customer applications
+* Approval workflow polish
 
 ---
 
@@ -172,6 +172,27 @@ Features:
 * Permission filtering
 * Dynamic visibility
 * Module order: Dashboard → Contacts → HR → Membership → Donations → …
+* Pinned footer: Billing (super admin) → **Reports** (`/reports`, `reports.view`) → Settings
+
+---
+
+## Organization Reports
+
+Status: Working (expandable)
+
+Route: `/reports`
+
+Permission: `reports.view`
+
+Tabs:
+
+* Payment transactions — cross-module list (Donations payments + Programs charge payments)
+* Failed transactions — failed/declined/voided/needs-review payment activity
+* More reports — placeholder for future org-wide reports
+
+Key files: `components/reports/org-reports-client.tsx`, `lib/reports/org-payment-transactions.ts`
+
+Note: Module-specific reports remain under each module (e.g. `/programs/reports`, `/donations/reports/*`).
 
 ---
 
@@ -278,15 +299,15 @@ Status: Working (simplified)
 
 Route: `/workforce/employees`
 
-HR module sidebar includes **Overview** (`/workforce`), then Employees, Volunteers, Childcare Providers, Reports, Settings. **Departments** is under **Programs** (first item), not HR.
+HR module sidebar includes **Overview** (`/workforce`), **Departments**, Employees, Volunteers, Childcare Providers, Reports, Settings.
 
-Roster-only employee list using the shared HR directory shell (Export, Add Employee, Employees | Applications | Archived tabs, KPI cards, filters, pagination). **Departments** is under Programs → Departments; Positions remain under **HR → Settings**.
+Roster-only employee list using the shared HR directory shell (Export, Add Employee, Employees | Applications | Archived tabs, KPI cards, filters, pagination). **Departments** is under **HR → Departments**; Positions remain under **HR → Settings**.
 
 **Contact-first:** Add Employee requires selecting an existing contact (`HrContactPicker` → `createEmployeeFromContact`). Create the person in Contacts first if they are not found.
 
 Removed tabs (redirect to Employees or Settings):
 
-* Departments → `/workforce/departments` (sidebar: **Programs → Departments**; opens shared workspace `/workforce/departments/[id]`: **Overview** (year programs + flyer; Super Admin archive), Employees, Rosters, **Offerings** (same Programs Catalog UI for that department), Schedule, Payroll, Financial Summary; optional Group giving; Activity; **Reports** (archived years); apply SQL `169`/`170`/`171`/`172`/`173`/`174`; legacy settings path redirects to list). Historical QIL load: `scripts/import-qil-year.mjs`; consolidate course-as-programs → offerings: `scripts/migrate-qil-courses-to-offerings.mjs` (after `174`).
+* Departments → `/workforce/departments` (sidebar: **HR → Departments**; opens shared workspace `/workforce/departments/[id]`: **Overview** (years/seasons + flyer; Super Admin archive), Employees, Rosters, Applications, Schedule, **Financial** (Payroll / Expenses / Financial Summary), optional Group giving, Activity, **Reports** (archived years); apply SQL `169`/`170`/`171`/`172`/`173`/`174`/`186`; scoped access via `lib/departments/department-access.ts` for department heads; legacy settings path redirects to list). Historical QIL load: `scripts/import-qil-year.mjs`; consolidate course-as-programs → offerings: `scripts/migrate-qil-courses-to-offerings.mjs` (after `174`).
 * Positions → `/workforce/settings/positions`
 * Time Off, Work Schedule, Notifications, Teams, Applications
 
@@ -298,7 +319,7 @@ Shared shell: `components/workforce/hr-directory-shell.tsx` (also used by Volunt
 
 Route: `/workforce/settings`
 
-Tabs/pages: Positions, Application Templates (`/workforce/settings` redirects to Positions). **Departments** lives under Programs (`/workforce/departments`); legacy `/workforce/settings/departments` redirects there.
+Tabs/pages: Positions, Application Templates (`/workforce/settings` redirects to Positions). **Departments** lives under HR (`/workforce/departments`); legacy `/workforce/settings/departments` redirects there.
 
 Key files:
 

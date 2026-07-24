@@ -113,6 +113,8 @@ Sidebar visibility uses two filters:
 
 Both conditions must pass before showing a module.
 
+Pinned footer items (below module list): Billing (super admin) → organization **Reports** (`/reports`) → Settings.
+
 ---
 
 ## Customer Portal
@@ -150,6 +152,8 @@ All customer pages must respect the active organization.
 People Management module
 Unified Applications engine
 Programs Module
+Staff UI labels: Year/Season (`programs`) → Program (`program_offerings`); see `lib/programs/program-display-labels.ts`.
+**Deferred naming (parked — high blast radius):** (1) DB rename `programs`→`seasons`, `program_offerings`→`programs` (fits years, seasons, camps); (2) align HR sidebar vs `/workforce/*` routes/folders; (3) Donations module → Fund Development in DB/routes (UI label already Fund Development). Do not start without a dedicated migration plan. Details in `docs/Features.md`.
 Registrations
 Financial Assistance
 **Programs flexibility contract** — **F1–F7** (`180`–`181`). See [`docs/programs-flexibility-contract.md`](./programs-flexibility-contract.md).
@@ -185,7 +189,7 @@ Sidebar (People Management / HR):
 * Volunteers
 * Child Care
 * Reports
-* Settings → `/hr/settings` (Discount Policies only); HR org settings at `/workforce/settings` (Positions, Application Templates). **Departments** lives under **Programs** in the sidebar (`/workforce/departments`: Overview, Employees, Rosters, Offerings, Schedule, Payroll, Financial Summary, Reports for archived years; Group giving when a donations group is linked; Activity = department events not individual gifts).
+* Settings → `/hr/settings` (Discount Policies only); HR org settings at `/workforce/settings` (Positions, Application Templates). **Departments** lives under **HR** in the sidebar (`/workforce/departments`: Overview, Employees, Rosters, Applications, Schedule, Financial [Payroll / Expenses / Financial Summary], Reports for archived years; Group giving when a donations group is linked; Activity = department events not individual gifts).
 
 Membership sidebar includes **Groups** (`/membership/groups` — member groups / former HR Teams). Giving collectives are under Donations (`/donations/groups/[id]`, Group Giving report) — badge can link a collective to a Membership Group or Department, otherwise **Group Donation**.
 

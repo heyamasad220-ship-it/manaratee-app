@@ -4,7 +4,7 @@ import { MyClassDetailClient } from "@/components/programs/my-class-detail-clien
 import { userCanAccessOfferingRoster } from "@/lib/auth/portal-capabilities"
 import { requireCustomerPortalPageContext } from "@/lib/auth/require-customer-portal-page"
 import { getCustomerPortalSupabase } from "@/lib/auth/customer-portal-session"
-import { getOfferingAttendanceForDate } from "@/lib/programs/program-attendance-actions"
+import { getOfferingAttendanceForDate } from "@/lib/programs/program-attendance-queries"
 import {
   getOfferingRosterEnrollments,
   getStaffAssignmentsForOffering,
@@ -16,6 +16,18 @@ function todayDateString() {
   const m = String(now.getMonth() + 1).padStart(2, "0")
   const d = String(now.getDate()).padStart(2, "0")
   return `${y}-${m}-${d}`
+}
+
+function asProgramName(value: unknown): string {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const name = (value as { name?: unknown }).name
+    if (typeof name === "string" && name.trim()) return name
+  }
+  if (Array.isArray(value) && value[0] && typeof value[0] === "object") {
+    const name = (value[0] as { name?: unknown }).name
+    if (typeof name === "string" && name.trim()) return name
+  }
+  return "Program"
 }
 
 export default async function MyClassRosterPage({
@@ -45,37 +57,65 @@ export default async function MyClassRosterPage({
     notFound()
   }
 
-  const { data: offering, error: offeringError } = await supabase
-    .from("program_offerings")
-    .select(
-      "id, name, program_id, attendance_tracked, program:program_id ( name )"
-    )
-    .eq("organization_id", organizationId)
-    .eq("id", offeringId)
-    .maybeSingle()
+  let offering: {
+    id: string
+    name: string
+    program_id: string
+    attendance_tracked?: boolean | null
+    program?: unknown
+  } | null = null
 
-  if (offeringError || !offering) {
+  {
+    const withAttendance = await supabase
+      .from("program_offerings")
+      .select(
+        "id, name, program_id, attendance_tracked, program:program_id ( name )"
+      )
+      .eq("organization_id", organizationId)
+      .eq("id", offeringId)
+      .maybeSingle()
+
+    if (!withAttendance.error && withAttendance.data) {
+      offering = withAttendance.data as typeof offering
+    } else {
+      // Column may be missing if migration 176/181 is not applied yet.
+      const fallback = await supabase
+        .from("program_offerings")
+        .select("id, name, program_id, program:program_id ( name )")
+        .eq("organization_id", organizationId)
+        .eq("id", offeringId)
+        .maybeSingle()
+
+      if (fallback.error || !fallback.data) {
+        notFound()
+      }
+      offering = fallback.data as typeof offering
+    }
+  }
+
+  if (!offering) {
     notFound()
   }
 
-  const [roster, staffAssignments, contactRow, attendance] = await Promise.all([
-    getOfferingRosterEnrollments(offeringId, organizationId),
-    getStaffAssignmentsForOffering(offeringId, organizationId),
-    supabase
-      .from("contacts")
-      .select("id")
-      .eq("organization_id", organizationId)
-      .eq("auth_user_id", userId)
-      .maybeSingle(),
-    getOfferingAttendanceForDate({
-      offeringId,
-      organizationId,
-      attendanceDate,
-    }).catch(() => []),
-  ])
+  const [roster, staffAssignments, contactResult, attendance] =
+    await Promise.all([
+      getOfferingRosterEnrollments(offeringId, organizationId),
+      getStaffAssignmentsForOffering(offeringId, organizationId),
+      supabase
+        .from("contacts")
+        .select("id")
+        .eq("organization_id", organizationId)
+        .eq("auth_user_id", userId)
+        .limit(1)
+        .maybeSingle(),
+      getOfferingAttendanceForDate({
+        offeringId,
+        organizationId,
+        attendanceDate,
+      }),
+    ])
 
-  const program = offering.program as { name?: string } | null
-  const myContactId = contactRow.data?.id as string | undefined
+  const myContactId = (contactResult.data?.id as string | undefined) ?? undefined
   const myAssignments = staffAssignments.filter(
     (assignment) => assignment.contact_id === myContactId
   )
@@ -85,8 +125,8 @@ export default async function MyClassRosterPage({
       userId={userId}
       organizationId={organizationId}
       offeringId={offeringId}
-      programName={program?.name || "Program"}
-      offeringName={offering.name as string}
+      programName={asProgramName(offering.program)}
+      offeringName={offering.name}
       attendanceTracked={Boolean(offering.attendance_tracked)}
       roster={roster}
       staffAssignments={staffAssignments}

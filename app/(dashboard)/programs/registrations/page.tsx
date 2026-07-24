@@ -11,24 +11,19 @@ import {
 } from "lucide-react"
 
 import { Header } from "@/components/layout/header"
-import { RegistrationRowActions } from "@/components/programs/registration-row-actions"
-import { Badge } from "@/components/ui/badge"
+import { ProgramsRegistrationsTable } from "@/components/programs/programs-registrations-table"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
 
 import { getDepartments } from "@/lib/departments/department-queries"
-import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
 import { createClient } from "@/lib/supabase/server"
 import { getPrograms } from "@/lib/programs/program-queries"
+import {
+  PROGRAM_LABEL,
+  PROGRAM_LABEL_PLURAL,
+  YEAR_SEASON_LABEL,
+} from "@/lib/programs/program-display-labels"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import {
   contactLabel,
@@ -41,7 +36,6 @@ type PageSearchParams = {
   q?: string
   department?: string
   offering?: string
-  payment?: string
   status?: string
   type?: string
 }
@@ -67,6 +61,7 @@ type EnrollmentRow = {
   payment_status: string | null
   amount_paid: number | null
   total_amount: number | null
+  notes: string | null
   created_at: string | null
 }
 
@@ -107,6 +102,7 @@ type RegistrationRow = {
   amount_paid: number | null
   total_amount: number | null
   waitlist_position: number | null
+  notes: string | null
 }
 
 function getValue(value: string | string[] | undefined) {
@@ -122,7 +118,7 @@ function formatDate(value: string | null) {
 
   if (Number.isNaN(date.getTime())) return "TBD"
 
-  return date.toLocaleDateString(undefined, {
+  return date.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -148,77 +144,32 @@ function outstandingBalance(
   return Math.max(0, total - paid)
 }
 
-function normalizeStatus(value: string | null) {
-  if (!value) return "Unknown"
-
-  return value
-    .split("_")
-    .join(" ")
-    .replace(/\b\w/g, (letter) => letter.toUpperCase())
-}
-
-/** Normalize DB / display payment labels into filter buckets. */
-function resolvePaymentBucket(
+/** Balance status for registration fees: Paid / Open / Refunded. */
+function resolveBalanceStatus(
   paymentStatus: string | null | undefined,
   amountPaid: number | null | undefined,
   totalAmount: number | null | undefined
-) {
-  const raw = (paymentStatus || "").toLowerCase().trim()
-  if (raw === "partially_paid") return "partial"
-  if (raw === "pending_payment" || raw === "unpaid") return "pending"
-  if (raw === "paid" || raw === "partial" || raw === "pending" || raw === "none") {
-    return raw
-  }
-
-  const paid = Number(amountPaid || 0)
-  const total = Number(totalAmount || 0)
-  if (total <= 0 && paid <= 0) return raw || "none"
-  if (paid <= 0.009) return "pending"
-  if (paid + 0.009 >= total) return "paid"
-  return "partial"
-}
-
-/** Transaction outcome for the Payments list Status column. */
-function resolveTransactionStatus(
-  paymentStatus: string | null | undefined,
-  amountPaid: number | null | undefined
-): "succeeded" | "refunded" | "failed" {
+): "paid" | "open" | "refunded" {
   const raw = (paymentStatus || "").toLowerCase().trim()
   if (raw === "refunded") return "refunded"
-  if (raw === "failed") return "failed"
-  if (
-    raw === "paid" ||
-    raw === "partial" ||
-    raw === "partially_paid" ||
-    raw === "waived"
-  ) {
-    return "succeeded"
-  }
-  if (Number(amountPaid || 0) > 0.009) return "succeeded"
-  return "failed"
+
+  // Prefer actual fee vs received — stale payment_status (e.g. still "paid" after a void)
+  // must not hide open balances from the Status filter.
+  const balance = outstandingBalance(totalAmount, amountPaid)
+  if (balance <= 0.009) return "paid"
+  if (raw === "waived") return "paid"
+  return "open"
 }
 
-function formatTransactionStatus(status: "succeeded" | "refunded" | "failed") {
-  if (status === "succeeded") return "Succeeded"
-  if (status === "refunded") return "Refunded"
-  return "Failed"
+function formatBalanceStatus(status: "paid" | "open" | "refunded") {
+  if (status === "paid") return "Paid"
+  if (status === "open") return "Open"
+  return "Refunded"
 }
 
-function getPaymentBadgeVariant(paymentStatus: string | null) {
-  const status = (paymentStatus || "").toLowerCase()
-
+function getBalanceStatusBadgeVariant(status: "paid" | "open" | "refunded") {
   if (status === "paid") return "default"
-  if (status === "pending") return "destructive"
-  if (status === "partial") return "outline"
-
-  return "secondary"
-}
-
-function getTransactionStatusBadgeVariant(
-  status: "succeeded" | "refunded" | "failed"
-) {
-  if (status === "succeeded") return "default"
-  if (status === "failed") return "destructive"
+  if (status === "open") return "outline"
   return "secondary"
 }
 
@@ -246,11 +197,20 @@ function isAdultEnrollment(row: EnrollmentRow) {
   )
 }
 
+function hasActiveFilters(filters: PageSearchParams) {
+  return Boolean(
+    (filters.q || "").trim() ||
+      (filters.department && filters.department !== "all") ||
+      (filters.offering && filters.offering !== "all") ||
+      (filters.status && filters.status !== "all") ||
+      (filters.type && filters.type !== "all")
+  )
+}
+
 function matchesFilters(row: RegistrationRow, filters: PageSearchParams) {
   const query = (filters.q || "").trim().toLowerCase()
   const departmentFilter = (filters.department || "all").toLowerCase()
   const offeringFilter = filters.offering || "all"
-  const paymentFilter = (filters.payment || "all").toLowerCase()
   const statusFilter = (filters.status || "all").toLowerCase()
   const typeFilter = filters.type || "all"
 
@@ -270,23 +230,18 @@ function matchesFilters(row: RegistrationRow, filters: PageSearchParams) {
   const matchesOffering =
     offeringFilter === "all" || row.offering_id === offeringFilter
 
-  const paymentBucket = resolvePaymentBucket(
+  const balanceStatus = resolveBalanceStatus(
     row.payment_status,
     row.amount_paid,
     row.total_amount
   )
 
-  const matchesPayment =
-    paymentFilter === "all" ||
-    paymentBucket === paymentFilter ||
-    (paymentFilter === "none" &&
-      (paymentBucket === "none" || !row.payment_status))
-
+  // Open matches the Open Balances KPI: active enrollments still owing.
   const matchesStatus =
     statusFilter === "all" ||
     (row.type === "enrollment" &&
-      resolveTransactionStatus(row.payment_status, row.amount_paid) ===
-        statusFilter)
+      balanceStatus === statusFilter &&
+      (statusFilter !== "open" || !isTerminalEnrollmentStatus(row.status)))
 
   const matchesType = typeFilter === "all" || row.type === typeFilter
 
@@ -294,7 +249,6 @@ function matchesFilters(row: RegistrationRow, filters: PageSearchParams) {
     matchesSearch &&
     matchesDepartment &&
     matchesOffering &&
-    matchesPayment &&
     matchesStatus &&
     matchesType
   )
@@ -311,7 +265,6 @@ export default async function ProgramsRegistrationsPage({
     q: getValue(resolvedSearchParams?.q),
     department: getValue(resolvedSearchParams?.department) || "all",
     offering: getValue(resolvedSearchParams?.offering) || "all",
-    payment: getValue(resolvedSearchParams?.payment) || "all",
     status: getValue(resolvedSearchParams?.status) || "all",
     type: getValue(resolvedSearchParams?.type) || "all",
   }
@@ -373,6 +326,7 @@ export default async function ProgramsRegistrationsPage({
           payment_status,
           amount_paid,
           total_amount,
+          notes,
           created_at
         `
           )
@@ -425,7 +379,7 @@ export default async function ProgramsRegistrationsPage({
     for (const offering of offeringsResult.data || []) {
       const id = offering.id as string
       const programId = offering.program_id as string
-      const name = (offering.name as string) || "Offering"
+      const name = (offering.name as string) || PROGRAM_LABEL
       offeringNameById.set(id, name)
       offeringMeta.push({
         id,
@@ -486,15 +440,9 @@ export default async function ProgramsRegistrationsPage({
         null
 
       const offeringName = row.offering_id
-        ? offeringNameById.get(row.offering_id) || "Offering"
+        ? offeringNameById.get(row.offering_id) || PROGRAM_LABEL
         : (row.program_id ? programNameById.get(row.program_id) : null) ||
           "Unknown offering"
-
-      const paymentBucket = resolvePaymentBucket(
-        row.payment_status,
-        row.amount_paid,
-        row.total_amount
-      )
 
       return {
         id: row.id,
@@ -504,7 +452,7 @@ export default async function ProgramsRegistrationsPage({
         department_id: departmentId,
         program_name:
           (row.program_id ? programNameById.get(row.program_id) : null) ||
-          "Unknown Program",
+          `Unknown ${YEAR_SEASON_LABEL}`,
         offering_name: offeringName,
         participant_name: participantName,
         participant_contact_id: row.participant_contact_id,
@@ -517,10 +465,11 @@ export default async function ProgramsRegistrationsPage({
         child_age: row.child_age,
         registered_date: row.enrollment_date || row.created_at,
         status: row.status,
-        payment_status: paymentBucket,
+        payment_status: row.payment_status,
         amount_paid: row.amount_paid,
         total_amount: row.total_amount,
         waitlist_position: null,
+        notes: row.notes,
       }
     }),
     ...waitlist.map((row) => ({
@@ -533,10 +482,10 @@ export default async function ProgramsRegistrationsPage({
         : null,
       program_name:
         (row.program_id ? programNameById.get(row.program_id) : null) ||
-        "Unknown Program",
+        `Unknown ${YEAR_SEASON_LABEL}`,
       offering_name:
         (row.program_id ? programNameById.get(row.program_id) : null) ||
-        "Unknown offering",
+        `Unknown ${PROGRAM_LABEL.toLowerCase()}`,
       participant_name: row.child_name,
       participant_contact_id: null,
       contact_name: row.parent_name || "Contact not set",
@@ -550,6 +499,7 @@ export default async function ProgramsRegistrationsPage({
       amount_paid: null,
       total_amount: null,
       waitlist_position: row.position,
+      notes: null,
     })),
   ].sort((a, b) => {
     const aDate = a.registered_date ? new Date(a.registered_date).getTime() : 0
@@ -569,10 +519,11 @@ export default async function ProgramsRegistrationsPage({
     isThisMonth(row.registered_date)
   ).length
 
-  const pendingPaymentCount = enrollments.filter(
+  const openBalanceCount = enrollments.filter(
     (row) =>
-      resolvePaymentBucket(row.payment_status, row.amount_paid, row.total_amount) ===
-      "pending"
+      !isTerminalEnrollmentStatus(row.status) &&
+      resolveBalanceStatus(row.payment_status, row.amount_paid, row.total_amount) ===
+        "open"
   ).length
 
   const revenue = enrollments.reduce(
@@ -580,22 +531,7 @@ export default async function ProgramsRegistrationsPage({
     0
   )
 
-  const paymentStatuses = Array.from(
-    new Set(
-      registrationRows
-        .filter((row) => row.type === "enrollment")
-        .map((row) =>
-          resolvePaymentBucket(
-            row.payment_status,
-            row.amount_paid,
-            row.total_amount
-          )
-        )
-        .filter((status) => status && status !== "none")
-    )
-  ).sort()
-
-  const statuses = ["succeeded", "refunded", "failed"] as const
+  const statuses = ["open", "paid", "refunded"] as const
 
   const departmentFilter = filters.department || "all"
   const offeringsForSelect =
@@ -614,32 +550,40 @@ export default async function ProgramsRegistrationsPage({
       value: String(activeEnrollmentCount),
       icon: Users,
       color: "text-blue-600",
+      href: null as string | null,
     },
     {
       label: "Waitlist",
       value: String(totalWaitlist),
       icon: UserPlus,
       color: "text-orange-600",
+      href: "/programs/registrations?type=waitlist",
     },
     {
       label: "This Month",
       value: String(thisMonthRegistrations),
       icon: CheckCircle,
       color: "text-green-600",
+      href: null as string | null,
     },
     {
-      label: "Pending Payment",
-      value: String(pendingPaymentCount),
+      label: "Open Balances",
+      value: String(openBalanceCount),
       icon: Clock,
       color: "text-amber-600",
+      // Clear search/other filters so the table matches this KPI.
+      href: "/programs/registrations?status=open",
     },
     {
       label: "Revenue Collected",
       value: formatCurrency(revenue),
       icon: DollarSign,
       color: "text-purple-600",
+      href: null as string | null,
     },
   ]
+
+  const filtersActive = hasActiveFilters(filters)
 
   return (
     <>
@@ -678,8 +622,8 @@ export default async function ProgramsRegistrationsPage({
         </div>
 
         <div className="mb-6 flex flex-wrap gap-4 [&>*]:w-fit">
-          {stats.map((stat) => (
-            <Card key={stat.label}>
+          {stats.map((stat) => {
+            const content = (
               <CardContent className="flex items-center gap-4 p-4">
                 <div className={`rounded-full bg-muted p-3 ${stat.color}`}>
                   <stat.icon className="h-5 w-5" />
@@ -691,13 +635,28 @@ export default async function ProgramsRegistrationsPage({
                   </p>
                 </div>
               </CardContent>
-            </Card>
-          ))}
+            )
+            return (
+              <Card key={stat.label}>
+                {stat.href ? (
+                  <Link
+                    href={stat.href}
+                    className="block rounded-lg transition-colors hover:bg-muted/40"
+                    title={`Show ${stat.label.toLowerCase()}`}
+                  >
+                    {content}
+                  </Link>
+                ) : (
+                  content
+                )}
+              </Card>
+            )
+          })}
         </div>
 
         <Card className="mb-6">
           <CardContent className="p-4">
-            <form method="get" className="grid gap-4 lg:grid-cols-7">
+            <form method="get" className="grid gap-4 lg:grid-cols-6">
               <div className="relative lg:col-span-2">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -726,7 +685,7 @@ export default async function ProgramsRegistrationsPage({
                 defaultValue={filters.offering}
                 className="h-10 rounded-md border bg-background px-3 text-sm"
               >
-                <option value="all">All Offerings</option>
+                <option value="all">All {PROGRAM_LABEL_PLURAL}</option>
                 {offeringsForSelect.map((offering) => (
                   <option key={offering.id} value={offering.id}>
                     {offering.name}
@@ -747,20 +706,6 @@ export default async function ProgramsRegistrationsPage({
                 <option value="waitlist">Waitlist</option>
               </select>
 
-              <select
-                name="payment"
-                defaultValue={(filters.payment || "all").toLowerCase()}
-                className="h-10 rounded-md border bg-background px-3 text-sm"
-              >
-                <option value="all">All Payments</option>
-                {paymentStatuses.map((status) => (
-                  <option key={status} value={status}>
-                    {normalizeStatus(status)}
-                  </option>
-                ))}
-                <option value="none">No Payment</option>
-              </select>
-
               <div className="flex gap-4">
                 <select
                   name="status"
@@ -770,13 +715,28 @@ export default async function ProgramsRegistrationsPage({
                   <option value="all">All Statuses</option>
                   {statuses.map((status) => (
                     <option key={status} value={status}>
-                      {formatTransactionStatus(status)}
+                      {formatBalanceStatus(status)}
                     </option>
                   ))}
                 </select>
                 <Button type="submit">Apply</Button>
               </div>
             </form>
+            {filtersActive ? (
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
+                <p>
+                  Showing {filteredRows.length}{" "}
+                  {filteredRows.length === 1 ? "result" : "results"}
+                  {(filters.status || "").toLowerCase() === "open" &&
+                  openBalanceCount > filteredRows.length
+                    ? ` (${openBalanceCount} open balances total)`
+                    : null}
+                </p>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href="/programs/registrations">Clear filters</Link>
+                </Button>
+              </div>
+            ) : null}
           </CardContent>
         </Card>
 
@@ -803,154 +763,60 @@ export default async function ProgramsRegistrationsPage({
         ) : (
           <Card>
             <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Participant</TableHead>
-                    <TableHead>Contact</TableHead>
-                    <TableHead>Offering</TableHead>
-                    <TableHead>Registered</TableHead>
-                    <TableHead>Fee</TableHead>
-                    <TableHead>Received</TableHead>
-                    <TableHead>Balance</TableHead>
-                    <TableHead>Payment</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="w-[90px]">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
+              <ProgramsRegistrationsTable
+                rows={filteredRows.map((row) => {
+                  const balance =
+                    row.type === "waitlist"
+                      ? null
+                      : outstandingBalance(row.total_amount, row.amount_paid)
+                  const balanceStatus =
+                    row.type === "waitlist" ||
+                    !shouldShowEnrollmentPaymentStatus(row.status)
+                      ? null
+                      : resolveBalanceStatus(
+                          row.payment_status,
+                          row.amount_paid,
+                          row.total_amount
+                        )
 
-                <TableBody>
-                  {filteredRows.map((row) => {
-                    const balance =
+                  return {
+                    id: row.id,
+                    type: row.type,
+                    participantName: row.participant_name,
+                    participantContactId: row.participant_contact_id,
+                    contactName: row.contact_name,
+                    contactProfileId: row.contact_profile_id,
+                    contactEmail: row.contact_email,
+                    contactPhone: row.contact_phone,
+                    childAge: row.child_age,
+                    waitlistPosition: row.waitlist_position,
+                    offeringName: row.offering_name,
+                    registeredDateLabel: formatDate(row.registered_date),
+                    feeLabel:
                       row.type === "waitlist"
-                        ? null
-                        : outstandingBalance(row.total_amount, row.amount_paid)
-                    const txStatus =
+                        ? "N/A"
+                        : formatCurrency(row.total_amount),
+                    receivedLabel:
                       row.type === "waitlist"
-                        ? null
-                        : resolveTransactionStatus(
-                            row.payment_status,
-                            row.amount_paid
-                          )
-
-                    return (
-                    <TableRow key={`${row.type}-${row.id}`}>
-                      <TableCell>
-                        <div>
-                          {row.participant_contact_id ? (
-                            <Link
-                              href={contactProfileHref(row.participant_contact_id)}
-                              className="font-medium text-primary hover:underline"
-                            >
-                              {row.participant_name}
-                            </Link>
-                          ) : (
-                            <p className="font-medium text-foreground">
-                              {row.participant_name}
-                            </p>
-                          )}
-                          <p className="text-xs text-muted-foreground">
-                            {row.child_age !== null && row.child_age !== undefined
-                              ? `Age ${row.child_age}`
-                              : "Age not set"}
-                          </p>
-                          {row.waitlist_position ? (
-                            <p className="text-xs text-muted-foreground">
-                              Waitlist position #{row.waitlist_position}
-                            </p>
-                          ) : null}
-                        </div>
-                      </TableCell>
-
-                      <TableCell>
-                        <div>
-                          {row.contact_profile_id ? (
-                            <Link
-                              href={contactProfileHref(row.contact_profile_id)}
-                              className="text-sm text-primary hover:underline"
-                            >
-                              {row.contact_name}
-                            </Link>
-                          ) : (
-                            <p className="text-sm text-foreground">{row.contact_name}</p>
-                          )}
-                          <p className="text-xs text-muted-foreground">
-                            {row.contact_email || "No email"}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {row.contact_phone || "No phone"}
-                          </p>
-                        </div>
-                      </TableCell>
-
-                      <TableCell>
-                        <div>
-                          <p className="text-sm text-foreground">{row.offering_name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {row.program_name}
-                          </p>
-                        </div>
-                      </TableCell>
-
-                      <TableCell className="text-muted-foreground">
-                        {formatDate(row.registered_date)}
-                      </TableCell>
-
-                      <TableCell className="font-medium">
-                        {row.type === "waitlist"
-                          ? "N/A"
-                          : formatCurrency(row.total_amount)}
-                      </TableCell>
-
-                      <TableCell className="font-medium">
-                        {row.type === "waitlist"
-                          ? "N/A"
-                          : formatCurrency(row.amount_paid)}
-                      </TableCell>
-
-                      <TableCell className="font-medium">
-                        {row.type === "waitlist"
-                          ? "N/A"
-                          : formatCurrency(balance)}
-                      </TableCell>
-
-                      <TableCell>
-                        {row.type === "waitlist" ||
-                        !shouldShowEnrollmentPaymentStatus(row.status) ? (
-                          <Badge variant="secondary">N/A</Badge>
-                        ) : (
-                          <Badge
-                            variant={getPaymentBadgeVariant(row.payment_status)}
-                          >
-                            {normalizeStatus(row.payment_status)}
-                          </Badge>
-                        )}
-                      </TableCell>
-
-                      <TableCell>
-                        {txStatus == null ? (
-                          <Badge variant="secondary">N/A</Badge>
-                        ) : (
-                          <Badge
-                            variant={getTransactionStatusBadgeVariant(txStatus)}
-                          >
-                            {formatTransactionStatus(txStatus)}
-                          </Badge>
-                        )}
-                      </TableCell>
-
-                      <TableCell>
-                        <RegistrationRowActions
-                          registrationId={row.id}
-                          recordType={row.type}
-                          programId={row.program_id}
-                        />
-                      </TableCell>
-                    </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
+                        ? "N/A"
+                        : formatCurrency(row.amount_paid),
+                    balanceLabel:
+                      row.type === "waitlist"
+                        ? "N/A"
+                        : formatCurrency(balance),
+                    statusLabel: balanceStatus
+                      ? formatBalanceStatus(balanceStatus)
+                      : null,
+                    statusVariant: balanceStatus
+                      ? getBalanceStatusBadgeVariant(balanceStatus)
+                      : "secondary",
+                    enrollmentStatus: row.status,
+                    totalAmount: row.total_amount ?? 0,
+                    amountPaid: row.amount_paid ?? 0,
+                    notes: row.notes,
+                  }
+                })}
+              />
             </CardContent>
           </Card>
         )}

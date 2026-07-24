@@ -23,6 +23,7 @@ import {
   markRentalPaymentPaid,
   markVenueRentalCompletedAndAwaitingRefund,
 } from "@/lib/bookings/venue-rental-actions"
+import type { VenueRentalEmployeePricingSuggestion } from "@/lib/bookings/venue-rental-employee-pricing"
 import { formatVenueRentalTimeRange } from "@/lib/bookings/venue-rental-format"
 import {
   canStaffCancelVenueRental,
@@ -65,6 +66,7 @@ type VenueRentalDetailClientProps = {
   payments: RentalPaymentRecord[]
   canManage: boolean
   canViewFinance: boolean
+  employeePricing?: VenueRentalEmployeePricingSuggestion | null
 }
 
 function isAwaitingPaymentStatus(status: VenueRentalStatus): boolean {
@@ -75,18 +77,38 @@ function isAwaitingPaymentStatus(status: VenueRentalStatus): boolean {
   )
 }
 
+function formatMoney(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(Number(value) || 0)
+}
+
 export function VenueRentalDetailClient({
   rental,
   payments,
   canManage,
   canViewFinance,
+  employeePricing = null,
 }: VenueRentalDetailClientProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
-  const [depositAmount, setDepositAmount] = useState("500")
-  const [securityDepositAmount, setSecurityDepositAmount] = useState("250")
-  const [remainingBalanceAmount, setRemainingBalanceAmount] = useState("0")
+  const [depositAmount, setDepositAmount] = useState(
+    employeePricing?.eligible
+      ? String(employeePricing.suggestedDeposit)
+      : "500"
+  )
+  const [securityDepositAmount, setSecurityDepositAmount] = useState(
+    employeePricing?.eligible
+      ? String(employeePricing.suggestedSecurityDeposit)
+      : "250"
+  )
+  const [remainingBalanceAmount, setRemainingBalanceAmount] = useState(
+    employeePricing?.eligible
+      ? String(employeePricing.suggestedRemainingBalance)
+      : "0"
+  )
   const [declineReason, setDeclineReason] = useState("")
   const [extendReason, setExtendReason] = useState("")
   const [refundAmount, setRefundAmount] = useState("")
@@ -292,6 +314,23 @@ export function VenueRentalDetailClient({
             <CardTitle className="text-base">Supervisor approval</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-3">
+            {employeePricing?.eligible ? (
+              <div className="md:col-span-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+                <p className="font-medium">
+                  {employeePricing.label || "Full-time employee benefit"}
+                </p>
+                <p className="mt-1 text-emerald-800">
+                  Space fee {formatMoney(employeePricing.baseSpaceFee)} →{" "}
+                  {formatMoney(employeePricing.discountedSpaceFee)} (
+                  {employeePricing.percentOff}% off
+                  {employeePricing.hours > 0
+                    ? ` · ${employeePricing.hours} hr`
+                    : ""}
+                  ). Security deposit is not discounted. Amounts below are
+                  prefilled — adjust if needed.
+                </p>
+              </div>
+            ) : null}
             <div className="grid gap-2">
               <Label>Deposit (non-refundable)</Label>
               <Input value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} />

@@ -35,6 +35,7 @@ import { loadMemberContactsByIds } from "@/lib/contacts/group-membership-data"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { PERMISSIONS } from "@/lib/permissions/permission-keys"
 import { hasPermission } from "@/lib/permissions/permissions"
+import { getActiveFaAwardsByEnrollmentIds } from "@/lib/programs/fa-awards"
 import { createClient } from "@/lib/supabase/server"
 
 const PAID_RENTAL_STATUSES = new Set<string>([
@@ -500,6 +501,12 @@ export async function loadContactFinancialSummaryAction(
         })
         .filter((id): id is string => Boolean(id))
 
+      const enrollmentIds = (enrollments || []).map((row) => row.id as string)
+      const faByEnrollment = await getActiveFaAwardsByEnrollmentIds(
+        organizationId,
+        enrollmentIds
+      )
+
       const schedulesByChargeId = new Map<
         string,
         Array<{
@@ -564,12 +571,33 @@ export async function loadContactFinancialSummaryAction(
         const paid = charge ? Number(charge.amount_paid || 0) : 0
         // Remaining balance from fee − paid (due_today on charges is often the original due, not remaining).
         const due = Math.max(total - paid, 0)
+        const faAward = faByEnrollment.get(enrollment.id as string) || null
 
         const schedules = charge?.id ? schedulesByChargeId.get(charge.id) || [] : []
         const paidSchedules = schedules.filter(
           (row) =>
             (row.status || "").toLowerCase() === "paid" && Number(row.amount || 0) > 0
         )
+        const voidedSchedules = schedules.filter(
+          (row) =>
+            (row.status || "").toLowerCase() === "void" && Number(row.amount || 0) > 0
+        )
+
+        if (faAward) {
+          activityDates.push(faAward.appliedAt || enrollmentDate)
+          timeline.push({
+            id: `program-fa-${enrollment.id}`,
+            date: faAward.appliedAt || enrollmentDate,
+            eventType: activityTypeLabel("programs"),
+            description: `${programName} — Financial assistance (${faAward.planLabel})`,
+            amount: -faAward.discountAmount,
+            method: null,
+            status: "Succeeded",
+            sourceModule: "programs",
+            filterCategory: "programs",
+            href: `/programs/registrations/${enrollment.id}`,
+          })
+        }
 
         if (paidSchedules.length > 0) {
           for (const schedule of paidSchedules) {
@@ -612,13 +640,35 @@ export async function loadContactFinancialSummaryAction(
           activityDates.push(enrollmentDate)
         }
 
+        for (const schedule of voidedSchedules) {
+          const paymentAmount = Number(schedule.amount || 0)
+          const paymentDate =
+            schedule.paid_at || schedule.due_date || enrollmentDate
+          activityDates.push(paymentDate)
+          timeline.push({
+            id: `program-void-${schedule.id}`,
+            date: paymentDate,
+            eventType: activityTypeLabel("programs"),
+            description: `${programName} — Voided ${schedule.label || "payment"}`,
+            amount: paymentAmount,
+            method: null,
+            status: "Voided",
+            sourceModule: "programs",
+            filterCategory: "programs",
+            href: `/programs/registrations/${enrollment.id}`,
+          })
+        }
+
         if (due > 0) {
           outstandingBalance += due
+          const faDescription = faAward
+            ? `${programName} · FA ${faAward.planLabel} (was $${faAward.originalAmount.toFixed(2)})`
+            : programName
           openBalances.push({
             id: charge?.id || (enrollment.id as string),
-            type: "Program fee",
-            description: programName,
-            originalAmount: total || null,
+            type: faAward ? "Program fee (FA)" : "Program fee",
+            description: faDescription,
+            originalAmount: faAward?.originalAmount ?? (total || null),
             paidAmount: paid || null,
             balanceRemaining: due,
             status: enrollment.status,

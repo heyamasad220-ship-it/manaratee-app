@@ -93,7 +93,7 @@ export const OfferingRegistrationCapacitySection = React.forwardRef<
             ) : (
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label htmlFor="program-capacity">Offering capacity</Label>
+                  <Label htmlFor="program-capacity">Program capacity</Label>
                   <Input
                     id="program-capacity"
                     type="number"

@@ -162,7 +162,7 @@ export function DepartmentsManager() {
                   <TableHead className="w-[60px]">Color</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Description</TableHead>
-                  <TableHead>Programs</TableHead>
+                  <TableHead>Years/Seasons</TableHead>
                   <TableHead className="w-[110px]" />
                 </TableRow>
               </TableHeader>

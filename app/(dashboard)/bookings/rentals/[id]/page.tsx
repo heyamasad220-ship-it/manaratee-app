@@ -6,6 +6,7 @@ import {
   getRentalPaymentsForRental,
   getVenueRentalDetailRow,
 } from "@/lib/bookings/venue-rental-queries"
+import { getVenueRentalEmployeePricingSuggestion } from "@/lib/bookings/venue-rental-employee-pricing"
 import {
   hasAnyPermission,
   PERMISSIONS,
@@ -40,7 +41,13 @@ export default async function VenueRentalDetailPage({ params }: PageProps) {
     notFound()
   }
 
-  const payments = canViewFinance ? await getRentalPaymentsForRental(id) : []
+  const [payments, employeePricing] = await Promise.all([
+    canViewFinance ? getRentalPaymentsForRental(id) : Promise.resolve([]),
+    canManage &&
+    rental.status === "awaiting_supervisor_approval"
+      ? getVenueRentalEmployeePricingSuggestion(id)
+      : Promise.resolve(null),
+  ])
 
   return (
     <>
@@ -50,6 +57,7 @@ export default async function VenueRentalDetailPage({ params }: PageProps) {
         payments={payments}
         canManage={canManage}
         canViewFinance={canViewFinance}
+        employeePricing={employeePricing}
       />
     </>
   )

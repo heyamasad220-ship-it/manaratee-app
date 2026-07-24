@@ -14,6 +14,7 @@ import {
 } from "@/lib/contacts/contact-timeline-rules"
 import { getVenueRentalStatusLabel } from "@/lib/bookings/venue-rental-status"
 import type { VenueRentalStatus } from "@/lib/bookings/venue-rental-types"
+import { getActiveFaAwardsByEnrollmentIds } from "@/lib/programs/fa-awards"
 
 export type ContactRelationshipSummary = {
   affiliationsCount: number
@@ -80,6 +81,12 @@ export type ContactEnrollmentRecord = {
   offeringName: string | null
   status: string | null
   enrollmentDate: string | null
+  totalAmount: number | null
+  amountPaid: number | null
+  faOriginalAmount: number | null
+  faAssistedAmount: number | null
+  faPlanLabel: string | null
+  faNote: string | null
 }
 
 export type ContactProfileData = {
@@ -355,6 +362,8 @@ export async function fetchContactProfileData(
       status: string | null
       payment_status: string | null
       created_at: string | null
+      total_amount?: number | null
+      amount_paid?: number | null
       programs?: { name?: string } | null
       offerings?: { name?: string } | null
       offering?: { name?: string } | null
@@ -370,6 +379,16 @@ export async function fetchContactProfileData(
         offeringName,
         status: enrollment.status || enrollment.payment_status,
         enrollmentDate: enrollment.enrollment_date || enrollment.created_at,
+        totalAmount:
+          enrollment.total_amount == null
+            ? null
+            : Number(enrollment.total_amount),
+        amountPaid:
+          enrollment.amount_paid == null ? null : Number(enrollment.amount_paid),
+        faOriginalAmount: null,
+        faAssistedAmount: null,
+        faPlanLabel: null,
+        faNote: null,
       })
       activity.programs.push({
         id: enrollment.id,
@@ -397,6 +416,8 @@ export async function fetchContactProfileData(
     status,
     payment_status,
     created_at,
+    total_amount,
+    amount_paid,
     programs:program_id (name),
     offering:offering_id (name)
   `
@@ -422,6 +443,21 @@ export async function fetchContactProfileData(
       .limit(50)
 
     await appendEnrollmentActivity((enrollmentsByPerson || []) as any[])
+  }
+
+  if (enrollmentRecords.length > 0) {
+    const faByEnrollment = await getActiveFaAwardsByEnrollmentIds(
+      orgId,
+      enrollmentRecords.map((row) => row.id)
+    )
+    for (const record of enrollmentRecords) {
+      const award = faByEnrollment.get(record.id)
+      if (!award) continue
+      record.faOriginalAmount = award.originalAmount
+      record.faAssistedAmount = award.assistedAmount
+      record.faPlanLabel = award.planLabel
+      record.faNote = award.note
+    }
   }
 
   if (email) {

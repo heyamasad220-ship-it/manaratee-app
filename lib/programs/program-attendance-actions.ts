@@ -4,41 +4,9 @@ import { revalidatePath } from "next/cache"
 
 import { userCanAccessOfferingRoster } from "@/lib/auth/portal-capabilities"
 import { createClient } from "@/lib/supabase/server"
-import type {
-  ProgramAttendanceRecord,
-  ProgramAttendanceStatus,
-} from "@/lib/programs/program-attendance-types"
+import type { ProgramAttendanceStatus } from "@/lib/programs/program-attendance-types"
 
-function todayDateString() {
-  const now = new Date()
-  const y = now.getFullYear()
-  const m = String(now.getMonth() + 1).padStart(2, "0")
-  const d = String(now.getDate()).padStart(2, "0")
-  return `${y}-${m}-${d}`
-}
-
-export async function getOfferingAttendanceForDate(input: {
-  offeringId: string
-  organizationId: string
-  attendanceDate?: string
-}): Promise<ProgramAttendanceRecord[]> {
-  const supabase = await createClient()
-  const attendanceDate = input.attendanceDate || todayDateString()
-
-  const { data, error } = await supabase
-    .from("program_attendance")
-    .select("*")
-    .eq("organization_id", input.organizationId)
-    .eq("offering_id", input.offeringId)
-    .eq("attendance_date", attendanceDate)
-
-  if (error) {
-    console.error("getOfferingAttendanceForDate:", error.message)
-    throw new Error("Failed to load attendance")
-  }
-
-  return (data || []) as ProgramAttendanceRecord[]
-}
+export { getOfferingAttendanceForDate } from "@/lib/programs/program-attendance-queries"
 
 export async function upsertOfferingAttendanceMarks(input: {
   userId: string

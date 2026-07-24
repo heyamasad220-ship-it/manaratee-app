@@ -31,6 +31,8 @@ import {
 } from "@/components/ui/select"
 import { EmployeeStaffAssignmentsPanel } from "@/components/hr/employee-staff-assignments-panel"
 import { EmployeeStaffDocumentsPanel } from "@/components/hr/employee-staff-documents-panel"
+import { ContactDepartmentWorkspacePanel } from "@/components/contacts/contact-department-workspace-panel"
+import { Checkbox } from "@/components/ui/checkbox"
 
 type StaffStatus = "active" | "inactive" | "on_leave" | "pending"
 
@@ -48,6 +50,7 @@ type EmployeeRecord = {
   position_name: string | null
   department_id: string | null
   department_name: string | null
+  is_department_head: boolean
   hr_job_role_id: string | null
   hr_job_role_name: string | null
 }
@@ -99,6 +102,7 @@ export function ContactEmployeePanel({
   const [programRole, setProgramRole] = useState<ProgramRole | "none">("none")
   const [status, setStatus] = useState<StaffStatus>("active")
   const [departmentId, setDepartmentId] = useState<string | null>(null)
+  const [isDepartmentHead, setIsDepartmentHead] = useState(false)
   const [positionId, setPositionId] = useState<string | null>(null)
   const [hireDate, setHireDate] = useState("")
 
@@ -118,6 +122,7 @@ export function ContactEmployeePanel({
       )
       setStatus(record.status)
       setDepartmentId(record.department_id)
+      setIsDepartmentHead(record.is_department_head)
       setPositionId(record.position_id)
       setHireDate(record.hire_date?.slice(0, 10) || "")
       setError(null)
@@ -150,6 +155,7 @@ export function ContactEmployeePanel({
               position,
               position_id,
               department_id,
+              is_department_head,
               hr_job_role_id,
               hr_positions:position_id (name),
               hr_job_roles:hr_job_role_id (name),
@@ -177,7 +183,42 @@ export function ContactEmployeePanel({
             .order("name"),
         ])
 
-      if (staffResult.error) throw staffResult.error
+      let staffData = staffResult.data
+      let staffError = staffResult.error
+
+      // Column added in scripts/186 — fall back if not migrated yet.
+      if (
+        staffError &&
+        (staffError.message.includes("is_department_head") ||
+          staffError.message.toLowerCase().includes("does not exist"))
+      ) {
+        const retry = await supabase
+          .from("staff")
+          .select(`
+              id,
+              first_name,
+              last_name,
+              email,
+              phone,
+              staff_type,
+              status,
+              hire_date,
+              position,
+              position_id,
+              department_id,
+              hr_job_role_id,
+              hr_positions:position_id (name),
+              hr_job_roles:hr_job_role_id (name),
+              departments:department_id (name)
+            `)
+          .eq("id", staffId)
+          .eq("organization_id", organizationId)
+          .maybeSingle()
+        staffData = retry.data
+        staffError = retry.error
+      }
+
+      if (staffError) throw staffError
       if (departmentsResult.error) throw departmentsResult.error
       if (positionsResult.error && positionsResult.error.code !== "42P01") {
         throw positionsResult.error
@@ -190,7 +231,7 @@ export function ContactEmployeePanel({
       setHrPositions((positionsResult.data || []) as HrPositionOption[])
       setHrJobRoles((jobRolesResult.data || []) as HrJobRoleOption[])
 
-      const data = staffResult.data
+      const data = staffData
       if (!data) {
         setEmployee(null)
         return
@@ -210,6 +251,9 @@ export function ContactEmployeePanel({
         position_name: (data as any).hr_positions?.name || data.position || null,
         department_id: data.department_id || null,
         department_name: (data as any).departments?.name || null,
+        is_department_head: Boolean(
+          (data as { is_department_head?: boolean }).is_department_head
+        ),
         hr_job_role_id: data.hr_job_role_id || null,
         hr_job_role_name: (data as any).hr_job_roles?.name || null,
       }
@@ -295,6 +339,7 @@ export function ContactEmployeePanel({
             hr_job_role_id: matchedJobRoleId,
             hire_date: hireDate || null,
             department_id: departmentId,
+            is_department_head: Boolean(departmentId) && isDepartmentHead,
           })
           .eq("id", employee.id)
           .eq("organization_id", organizationId)
@@ -340,6 +385,15 @@ export function ContactEmployeePanel({
 
   return (
     <div className="space-y-6">
+      {employee.is_department_head &&
+      employee.department_id &&
+      employee.department_name ? (
+        <ContactDepartmentWorkspacePanel
+          departmentId={employee.department_id}
+          departmentName={employee.department_name}
+        />
+      ) : null}
+
       <Card>
         <CardHeader className="flex flex-row items-start justify-between space-y-0">
           <div>
@@ -452,9 +506,11 @@ export function ContactEmployeePanel({
                   <Label>Department</Label>
                   <Select
                     value={departmentId || "none"}
-                    onValueChange={(value) =>
-                      setDepartmentId(value === "none" ? null : value)
-                    }
+                    onValueChange={(value) => {
+                      const next = value === "none" ? null : value
+                      setDepartmentId(next)
+                      if (!next) setIsDepartmentHead(false)
+                    }}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select department" />
@@ -468,6 +524,23 @@ export function ContactEmployeePanel({
                       ))}
                     </SelectContent>
                   </Select>
+                  <label className="flex items-start gap-2 pt-1 text-sm">
+                    <Checkbox
+                      checked={isDepartmentHead}
+                      disabled={!departmentId}
+                      onCheckedChange={(checked) =>
+                        setIsDepartmentHead(checked === true)
+                      }
+                      className="mt-0.5"
+                    />
+                    <span>
+                      <span className="font-medium">Department Head (Director)</span>
+                      <span className="block text-xs text-muted-foreground">
+                        Can open this department&apos;s workspace from their profile
+                        (all tabs).
+                      </span>
+                    </span>
+                  </label>
                 </div>
                 <div className="space-y-2">
                   <Label>Position</Label>
@@ -557,6 +630,9 @@ export function ContactEmployeePanel({
                 ) : null}
                 {resolvedProgramRoleLabel ? (
                   <Badge variant="secondary">{resolvedProgramRoleLabel}</Badge>
+                ) : null}
+                {employee.is_department_head ? (
+                  <Badge variant="secondary">Department Head</Badge>
                 ) : null}
               </div>
               <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

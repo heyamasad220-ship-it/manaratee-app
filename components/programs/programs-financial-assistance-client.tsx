@@ -1,6 +1,8 @@
 "use client"
 
-import { CreditCard, HeartHandshake } from "lucide-react"
+import * as React from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { CreditCard, FileBarChart } from "lucide-react"
 import { ModuleApplicationsClient } from "@/components/applications/module-applications-client"
 import { FinancialAssistanceOverviewPanel } from "@/components/programs/financial-assistance-overview-panel"
 import {
@@ -17,6 +19,17 @@ export function ProgramsFinancialAssistanceClient({
   initialPrograms: ProgramFinancialAssistanceSettings[]
   canManage: boolean
 }) {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
+  React.useEffect(() => {
+    if (searchParams.get("tab") === "financial-assistance") {
+      const next = new URLSearchParams(searchParams.toString())
+      next.set("tab", "reports")
+      router.replace(`${PROGRAMS_FINANCIAL_ASSISTANCE_PATH}?${next.toString()}`)
+    }
+  }, [router, searchParams])
+
   return (
     <ModuleApplicationsClient
       moduleOwner="programs"
@@ -32,9 +45,9 @@ export function ProgramsFinancialAssistanceClient({
       }
       extraTabs={[
         {
-          value: "financial-assistance",
-          label: "Financial Assistance",
-          icon: HeartHandshake,
+          value: "reports",
+          label: "Reports",
+          icon: FileBarChart,
           content: <FinancialAssistanceReportPanel />,
         },
         {

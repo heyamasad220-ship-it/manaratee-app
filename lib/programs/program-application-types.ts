@@ -25,8 +25,8 @@ export const PROGRAM_APPLICANT_TYPE_LABELS: Record<
   ProgramApplicantType,
   string
 > = {
-  returning: "Returning student",
-  new: "New student",
+  returning: "Returning",
+  new: "New",
 }
 
 export type ProgramApplication = {

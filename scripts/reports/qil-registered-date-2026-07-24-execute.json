@@ -1,0 +1,73 @@
+{
+  "mode": "execute",
+  "generatedAt": "2026-07-24T00:56:09.777Z",
+  "program": {
+    "id": "88a39883-baa8-424b-91c0-93a309978c3b",
+    "name": "Quran Institute for Ladies 2025-2026"
+  },
+  "targetDate": "2025-09-01",
+  "total": 118,
+  "needingUpdate": 118,
+  "sample": [
+    {
+      "id": "7db0f0fd-226e-4eb4-b6ce-00d296f8b687",
+      "name": "Birlanti Alsawfta",
+      "enrollment_date": "2025-08-31",
+      "created_at": "2026-07-20T21:48:56.705947+00:00"
+    },
+    {
+      "id": "a01da459-5696-4a03-83b1-79a594fa16ff",
+      "name": "Suzan Qawouq",
+      "enrollment_date": "2025-08-31",
+      "created_at": "2026-07-20T21:49:02.124904+00:00"
+    },
+    {
+      "id": "85ea33df-6fe2-4f08-bd2e-d4f4eadd0049",
+      "name": "Sara Kenana",
+      "enrollment_date": "2025-08-31",
+      "created_at": "2026-07-20T21:49:00.404928+00:00"
+    },
+    {
+      "id": "be187b3b-dead-4612-9b04-119db624c8de",
+      "name": "Sumaiyah Patel",
+      "enrollment_date": "2025-08-31",
+      "created_at": "2026-07-20T21:49:11.427265+00:00"
+    },
+    {
+      "id": "1761fa2c-5be0-4477-b716-f0820e668f5e",
+      "name": "Noha Abdellatif",
+      "enrollment_date": "2025-08-31",
+      "created_at": "2026-07-20T21:48:59.265863+00:00"
+    },
+    {
+      "id": "9592827d-aceb-40ff-af44-72b374a667f4",
+      "name": "Fathieh Duqqa",
+      "enrollment_date": "2025-08-31",
+      "created_at": "2026-07-20T21:50:24.401792+00:00"
+    },
+    {
+      "id": "9ebc4163-0e97-41dd-bcab-4d8b722d4a7c",
+      "name": "Esraa Althamary",
+      "enrollment_date": "2025-08-31",
+      "created_at": "2026-07-20T21:49:08.336515+00:00"
+    },
+    {
+      "id": "90fee7d5-f6e8-431c-ac19-439c0727bb0c",
+      "name": "Ayat Althamary",
+      "enrollment_date": "2025-08-31",
+      "created_at": "2026-07-20T21:49:07.589189+00:00"
+    },
+    {
+      "id": "90bcca4e-7148-4384-bd8c-b2d4b7124f63",
+      "name": "Aisha Diallo",
+      "enrollment_date": "2025-08-31",
+      "created_at": "2026-07-20T21:49:06.822339+00:00"
+    },
+    {
+      "id": "7d3d02a5-154a-4180-a588-4689be053844",
+      "name": "Selwaan Mahmoud",
+      "enrollment_date": "2025-08-31",
+      "created_at": "2026-07-20T21:49:10.62787+00:00"
+    }
+  ]
+}

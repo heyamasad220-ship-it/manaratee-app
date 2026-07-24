@@ -23,6 +23,11 @@ import {
 } from "@/lib/programs/program-enrollment-report"
 import { programOfferingManageHref } from "@/lib/programs/program-offering-paths"
 import type { ProgramOffering } from "@/lib/programs/program-offering-types"
+import {
+  PROGRAM_LABEL,
+  PROGRAM_LABEL_PLURAL,
+  YEAR_SEASON_LABEL,
+} from "@/lib/programs/program-display-labels"
 
 function formatDate(value: string | null) {
   if (!value) return "—"
@@ -126,7 +131,7 @@ export function ProgramEnrollmentsReportPanel({
       [
         [
           "Student",
-          "Offering",
+          PROGRAM_LABEL,
           "Teacher",
           "Status",
           "Parent",
@@ -154,7 +159,8 @@ export function ProgramEnrollmentsReportPanel({
         <div>
           <h2 className="text-lg font-semibold tracking-tight">Enrollments</h2>
           <p className="text-sm text-muted-foreground">
-            Students registered across offerings for this program.
+            Students registered across {PROGRAM_LABEL_PLURAL.toLowerCase()} for
+            this {YEAR_SEASON_LABEL.toLowerCase()}.
           </p>
         </div>
         <Button
@@ -171,14 +177,14 @@ export function ProgramEnrollmentsReportPanel({
 
       <div className="flex flex-wrap items-end gap-4 rounded-lg border bg-card p-3">
         <div className="space-y-1.5">
-          <Label htmlFor="report-offering">Offering</Label>
+          <Label htmlFor="report-offering">{PROGRAM_LABEL}</Label>
           <select
             id="report-offering"
             value={offeringFilter}
             onChange={(event) => setOfferingFilter(event.target.value)}
             className="h-9 min-w-[12rem] rounded-md border bg-background px-3 text-sm"
           >
-            <option value="all">All offerings</option>
+            <option value="all">All {PROGRAM_LABEL_PLURAL.toLowerCase()}</option>
             {activeOfferings.map((offering) => (
               <option key={offering.id} value={offering.id}>
                 {offering.name}
@@ -217,7 +223,7 @@ export function ProgramEnrollmentsReportPanel({
           layout="header"
           fill
           tone="violet"
-          label="Offerings"
+          label={PROGRAM_LABEL_PLURAL}
           value={byOffering}
         />
         <StatCard
@@ -255,7 +261,7 @@ export function ProgramEnrollmentsReportPanel({
             <TableHeader>
               <TableRow>
                 <TableHead>Student</TableHead>
-                <TableHead>Offering</TableHead>
+                <TableHead>{PROGRAM_LABEL}</TableHead>
                 <TableHead>Teacher</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Parent / Guardian</TableHead>

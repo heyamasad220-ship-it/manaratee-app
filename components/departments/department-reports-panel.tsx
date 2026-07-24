@@ -234,7 +234,7 @@ export function DepartmentReportsPanel({
           label="Courses"
           value={archived.reduce((sum, program) => sum + program.offeringCount, 0)}
           icon={FileBarChart}
-          hint="Offerings in archives"
+          hint="Programs in archives"
         />
       </StatCardsRow>
 

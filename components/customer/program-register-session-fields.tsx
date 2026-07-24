@@ -83,7 +83,7 @@ export function ProgramRegisterSessionFields({
 
       {sessions.length === 0 ? (
         <div className="rounded-lg border border-dashed p-5 text-sm text-muted-foreground">
-          No sessions are available for this offering yet.
+          No sessions are available for this program yet.
         </div>
       ) : (
         <div className="space-y-2">

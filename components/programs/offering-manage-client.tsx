@@ -34,6 +34,10 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { OfferingWorkspaceData } from "@/lib/programs/offering-workspace-types"
 import {
+  PROGRAM_LABEL,
+  YEAR_SEASON_LABEL,
+} from "@/lib/programs/program-display-labels"
+import {
   buildProgramCustomerUrl,
   buildProgramRegistrationUrl,
 } from "@/lib/programs/program-customer-url"
@@ -83,23 +87,6 @@ function offeringToDraft(offering: ProgramOffering): ProgramOfferingInput {
       care_enabled: offering.care_enabled ?? false,
     },
   }
-}
-
-function academicYearLabel(start: string | null, end: string | null) {
-  if (!start || !end) return "—"
-  const startYear = new Date(`${start}T00:00:00`).getFullYear()
-  const endYear = new Date(`${end}T00:00:00`).getFullYear()
-  if (!Number.isFinite(startYear) || !Number.isFinite(endYear)) return "—"
-  return `${startYear}-${endYear}`
-}
-
-function formatDate(value: string | null | undefined) {
-  if (!value) return "—"
-  return new Date(`${value}T00:00:00`).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  })
 }
 
 export function OfferingManageClient({
@@ -185,7 +172,9 @@ export function OfferingManageClient({
       return true
     } catch (saveError) {
       setError(
-        saveError instanceof Error ? saveError.message : "Failed to save offering."
+        saveError instanceof Error
+          ? saveError.message
+          : `Failed to save ${PROGRAM_LABEL.toLowerCase()}.`
       )
       return false
     } finally {
@@ -195,7 +184,9 @@ export function OfferingManageClient({
 
   async function handleCopyRegistrationLink() {
     if (selected.status !== "active" || program.status !== "active") {
-      showMessage("Set program and offering to Active before sharing.")
+      showMessage(
+        `Set ${YEAR_SEASON_LABEL.toLowerCase()} and ${PROGRAM_LABEL.toLowerCase()} to Active before sharing.`
+      )
       return
     }
     try {
@@ -243,7 +234,8 @@ export function OfferingManageClient({
             </Badge>
           </div>
           <p className="text-muted-foreground">
-            Manage this offering&apos;s details, registration, fees, schedule, and staff.
+            Manage this {PROGRAM_LABEL.toLowerCase()}&apos;s details,
+            registration, fees, schedule, and staff.
           </p>
           <p className="text-sm text-muted-foreground">
             <Link href={`/programs/${program.id}`} className="hover:underline">
@@ -255,7 +247,7 @@ export function OfferingManageClient({
         <div className="relative flex flex-wrap items-center gap-2">
           <Button type="button" variant="outline" size="sm" onClick={handlePreviewOffering}>
             <Eye className="mr-2 h-4 w-4" />
-            Preview Offering Page
+            Preview {PROGRAM_LABEL} Page
           </Button>
           <Button
             type="button"
@@ -274,7 +266,9 @@ export function OfferingManageClient({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem asChild>
-                <Link href={`/programs/${program.id}`}>Back to program</Link>
+                <Link href={`/programs/${program.id}`}>
+                  Back to {YEAR_SEASON_LABEL.toLowerCase()}
+                </Link>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -346,7 +340,7 @@ export function OfferingManageClient({
                 <div>
                   <CardTitle className="text-base">Overview</CardTitle>
                   <p className="text-sm text-muted-foreground">
-                    Basic information about this offering
+                    Basic information about this {PROGRAM_LABEL.toLowerCase()}
                   </p>
                 </div>
                 {!editingOverview ? (
@@ -421,7 +415,7 @@ export function OfferingManageClient({
                   </>
                 ) : (
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <DetailItem label="Offering name" value={selected.name} />
+                    <DetailItem label={`${PROGRAM_LABEL} name`} value={selected.name} />
                     <DetailItem
                       label="Status"
                       value={PROGRAM_OFFERING_STATUS_LABELS[selected.status]}
@@ -442,20 +436,8 @@ export function OfferingManageClient({
                       }
                     />
                     <DetailItem
-                      label="Start date"
-                      value={formatDate(selected.start_date)}
-                    />
-                    <DetailItem
                       label="Department"
                       value={departmentName || "No department"}
-                    />
-                    <DetailItem
-                      label="End date"
-                      value={formatDate(selected.end_date)}
-                    />
-                    <DetailItem
-                      label="Academic year"
-                      value={academicYearLabel(selected.start_date, selected.end_date)}
                     />
                     <DetailItem
                       label="Capacity"
@@ -487,6 +469,12 @@ export function OfferingManageClient({
                 )}
               </CardContent>
             </Card>
+
+            <OfferingSchedulePanel
+              programId={program.id}
+              offering={selected}
+              workspaceData={workspaceData}
+            />
           </TabsContent>
 
           <TabsContent value="enrollment" className="mt-0 space-y-6">
@@ -550,24 +538,17 @@ export function OfferingManageClient({
                 }}
               />
               <p className="text-xs text-muted-foreground">
-                Financial assistance is configured on the program, not on this
-                offering.
+                Financial assistance is configured on the year/season, not on
+                this program.
               </p>
             </section>
 
-            <section className="space-y-4">
-              <OfferingSchedulePanel
-                programId={program.id}
-                offering={selected}
-                workspaceData={workspaceData}
-              />
-              <OfferingSessionsPanel
-                programId={program.id}
-                offering={selected}
-                workspaceData={workspaceData}
-                sessionRegistrationEnabled={sessionRegistrationEnabled}
-              />
-            </section>
+            <OfferingSessionsPanel
+              programId={program.id}
+              offering={selected}
+              workspaceData={workspaceData}
+              sessionRegistrationEnabled={sessionRegistrationEnabled}
+            />
           </TabsContent>
         </div>
       </Tabs>
