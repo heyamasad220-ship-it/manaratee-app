@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { ArrowLeft, Briefcase, Loader2, Mail, Phone, User } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
@@ -12,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { EmployeeStaffAssignmentsPanel } from "@/components/hr/employee-staff-assignments-panel"
 import { EmployeeStaffDocumentsPanel } from "@/components/hr/employee-staff-documents-panel"
 import { ContactProgramAssignmentsPanel } from "@/components/contacts/contact-program-assignments-panel"
+import { PageBreadcrumbs } from "@/components/navigation/page-breadcrumbs"
 import { loadContactProgramAssignments } from "@/lib/programs/program-staff-assignment-actions"
 import type { ProgramStaffAssignmentWithDetails } from "@/lib/programs/program-staff-assignment-types"
 
@@ -176,15 +176,12 @@ export function EmployeeProfileClient({
         </div>
       ) : null}
 
-      <div className="flex items-center gap-4">
-        <Link
-          href="/workforce/employees"
-          className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="mr-1.5 size-4" />
-          Back to Employees
-        </Link>
-      </div>
+      <PageBreadcrumbs
+        items={[
+          { label: "Employees", href: "/workforce/employees" },
+          { label: fullName },
+        ]}
+      />
 
       <div className="flex items-start gap-4">
         <Avatar className="size-16">

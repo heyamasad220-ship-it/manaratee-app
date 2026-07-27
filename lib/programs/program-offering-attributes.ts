@@ -28,6 +28,11 @@ export type ProgramOfferingAttributes = {
   waitlist_capacity: number | null
   waitlist_offer_deadline_days: number | null
   registration_mode: OfferingRegistrationMode
+  /**
+   * When true (default), customers Apply and await approval before Register.
+   * When false, they Register & pay immediately (no approval queue).
+   */
+  application_required: boolean
   attendance_tracked: boolean
   /** F4: show childcare admin tools for this offering. */
   care_enabled: boolean
@@ -71,6 +76,7 @@ export const OFFERING_ATTRIBUTE_COLUMNS = [
   "waitlist_capacity",
   "waitlist_offer_deadline_days",
   "registration_mode",
+  "application_required",
   "attendance_tracked",
   "care_enabled",
   "delivery_format",
@@ -132,6 +138,7 @@ export function attributesFromProgramRow(
       fullProgramEnabled: program.full_program_registration_enabled,
       sessionRegistrationEnabled: program.session_registration_enabled,
     }),
+    application_required: true,
     attendance_tracked: false,
     care_enabled: false,
     delivery_format: "in_person",
@@ -175,6 +182,7 @@ export function attributesFromOfferingRow(
     registration_mode:
       (row.registration_mode as OfferingRegistrationMode | undefined) ??
       "required",
+    application_required: row.application_required !== false,
     attendance_tracked: Boolean(row.attendance_tracked),
     care_enabled: Boolean(row.care_enabled),
     delivery_format:

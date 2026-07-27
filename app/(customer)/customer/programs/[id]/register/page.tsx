@@ -28,6 +28,7 @@ import {
 } from "@/lib/programs/program-registration-option-queries"
 import {
   formatProgramAgeRangeShort,
+  formatProgramGenderLabel,
   formatProgramGradeRangeShort,
 } from "@/lib/programs/program-eligibility-display"
 import { enrollmentStatusBlocksDuplicate } from "@/lib/programs/enrollment-status-helpers"
@@ -255,9 +256,30 @@ async function getFamilyMembers(
 
       if (!person) return null
 
+      const age = (() => {
+        if (!person.date_of_birth) return null
+        const today = new Date()
+        const birth = new Date(`${person.date_of_birth}T00:00:00`)
+        let years = today.getFullYear() - birth.getFullYear()
+        const monthDiff = today.getMonth() - birth.getMonth()
+        if (
+          monthDiff < 0 ||
+          (monthDiff === 0 && today.getDate() < birth.getDate())
+        ) {
+          years--
+        }
+        return years
+      })()
+
+      // Minors never expose a contact id for registration — Contact + Participant.
+      const contactId =
+        age !== null && age < 18
+          ? null
+          : (contactByPersonId.get(person.id as string) ?? null)
+
       return {
         personId: person.id as string,
-        contactId: contactByPersonId.get(person.id as string) ?? null,
+        contactId,
         first_name: person.first_name || "",
         last_name: person.last_name || "",
         date_of_birth: person.date_of_birth,
@@ -268,14 +290,14 @@ async function getFamilyMembers(
     .filter(Boolean) as FamilyMember[]
 }
 
-async function getActiveEnrollmentByContactId(
+async function getActiveEnrollmentByPersonId(
   organizationId: string,
   programId: string,
-  participantContactIds: string[]
+  participantPersonIds: string[]
 ) {
-  const uniqueContactIds = [...new Set(participantContactIds.filter(Boolean))]
+  const uniquePersonIds = [...new Set(participantPersonIds.filter(Boolean))]
 
-  if (uniqueContactIds.length === 0) {
+  if (uniquePersonIds.length === 0) {
     return new Map<string, string>()
   }
 
@@ -283,28 +305,28 @@ async function getActiveEnrollmentByContactId(
 
   const { data, error } = await supabase
     .from("program_enrollments")
-    .select("participant_contact_id, status")
+    .select("child_person_id, status")
     .eq("organization_id", organizationId)
     .eq("program_id", programId)
-    .in("participant_contact_id", uniqueContactIds)
+    .in("child_person_id", uniquePersonIds)
 
   if (error) {
     console.error("Enrollment lookup for registration:", error.message)
     return new Map<string, string>()
   }
 
-  const activeByContactId = new Map<string, string>()
+  const activeByPersonId = new Map<string, string>()
 
   for (const row of data || []) {
-    const contactId = row.participant_contact_id as string | null
+    const personId = row.child_person_id as string | null
     const status = row.status as string | null
 
-    if (contactId && enrollmentStatusBlocksDuplicate(status)) {
-      activeByContactId.set(contactId, status || "active")
+    if (personId && enrollmentStatusBlocksDuplicate(status)) {
+      activeByPersonId.set(personId, status || "active")
     }
   }
 
-  return activeByContactId
+  return activeByPersonId
 }
 
 type RegisterSearchParams = {
@@ -416,10 +438,10 @@ export default async function CustomerProgramRegisterPage({
       ? await getFamilyMembers(customerContact.person_id, organizationId)
       : []
 
-  const activeEnrollmentByContactId = await getActiveEnrollmentByContactId(
+  const activeEnrollmentByPersonId = await getActiveEnrollmentByPersonId(
     organizationId,
     program.id,
-    familyMembers.map((member) => member.contactId || "")
+    familyMembers.map((member) => member.personId)
   )
 
   const sessionQuery = supabase
@@ -619,8 +641,8 @@ export default async function CustomerProgramRegisterPage({
                         familyMembers={familyMembers}
                         lunchOptions={lunchOptions}
                         showAddons={mode !== "waitlist"}
-                        activeEnrollmentByContactId={Object.fromEntries(
-                          activeEnrollmentByContactId
+                        activeEnrollmentByPersonId={Object.fromEntries(
+                          activeEnrollmentByPersonId
                         )}
                       />
                     )}
@@ -783,7 +805,7 @@ export default async function CustomerProgramRegisterPage({
                   <UserCircle2 className="mt-0.5 h-4 w-4" />
                   <div>
                     <p className="font-medium text-foreground">Gender</p>
-                    <p>{program.gender || "All"}</p>
+                    <p>{formatProgramGenderLabel(program.gender)}</p>
                   </div>
                 </div>
               </CardContent>

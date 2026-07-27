@@ -11,6 +11,7 @@ export type DepartmentProgramsYear = {
   id: string
   name: string
   status: string
+  program_kind: "academic" | "seasonal"
   start_date: string | null
   end_date: string | null
   enrollment_open_date: string | null
@@ -40,7 +41,7 @@ async function loadOpenYearsWithEnrollmentDates(
   const { data, error } = await supabase
     .from("programs")
     .select(
-      "id, name, status, start_date, end_date, enrollment_open_date, enrollment_close_date"
+      "id, name, status, program_kind, start_date, end_date, enrollment_open_date, enrollment_close_date"
     )
     .eq("organization_id", organizationId)
     .in(
@@ -59,6 +60,8 @@ async function loadOpenYearsWithEnrollmentDates(
         id: row.id as string,
         name: (row.name as string) || "Year",
         status: (row.status as string) || "active",
+        program_kind:
+          (row.program_kind as string) === "seasonal" ? "seasonal" : "academic",
         start_date: (row.start_date as string | null) ?? null,
         end_date: (row.end_date as string | null) ?? null,
         enrollment_open_date:

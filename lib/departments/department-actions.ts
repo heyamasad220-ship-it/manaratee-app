@@ -13,6 +13,7 @@ type CreateDepartmentInput = {
   name: string
   description?: string
   color?: string
+  flyerUrl?: string | null
 }
 
 type UpdateDepartmentInput = {
@@ -20,6 +21,7 @@ type UpdateDepartmentInput = {
   name: string
   description?: string
   color?: string
+  flyerUrl?: string | null
 }
 
 export type DepartmentWithProgramCount = {
@@ -27,6 +29,7 @@ export type DepartmentWithProgramCount = {
   name: string
   description: string | null
   color: string
+  flyer_url: string | null
   programs_count: number
 }
 
@@ -114,19 +117,25 @@ export async function createDepartment(input: CreateDepartmentInput) {
 
   const { organizationId, supabase } = await requireDepartmentWriteAccess()
 
-  const { error } = await supabase.from("departments").insert({
-    organization_id: organizationId,
-    name,
-    description: input.description?.trim() || null,
-    color: normalizeDepartmentColor(input.color),
-  })
+  const { data, error } = await supabase
+    .from("departments")
+    .insert({
+      organization_id: organizationId,
+      name,
+      description: input.description?.trim() || null,
+      color: normalizeDepartmentColor(input.color),
+      flyer_url: input.flyerUrl?.trim() || null,
+    })
+    .select("id")
+    .single()
 
   if (error) {
     console.error("createDepartment error:", error)
     throw new Error(formatDepartmentError(error, "create"))
   }
 
-  revalidateDepartmentPaths()
+  revalidateDepartmentPaths(data?.id)
+  return { id: data.id as string }
 }
 
 export async function updateDepartment(input: UpdateDepartmentInput) {
@@ -143,6 +152,7 @@ export async function updateDepartment(input: UpdateDepartmentInput) {
       name,
       description: input.description?.trim() || null,
       color: normalizeDepartmentColor(input.color),
+      flyer_url: input.flyerUrl?.trim() || null,
     })
     .eq("id", input.id)
     .eq("organization_id", organizationId)
@@ -150,6 +160,28 @@ export async function updateDepartment(input: UpdateDepartmentInput) {
   if (error) {
     console.error("updateDepartment error:", error)
     throw new Error(formatDepartmentError(error, "update"))
+  }
+
+  revalidateDepartmentPaths(input.id)
+}
+
+export async function updateDepartmentFlyer(input: {
+  id: string
+  flyerUrl: string | null
+}) {
+  const { organizationId, supabase } = await requireDepartmentWriteAccess()
+
+  const { error } = await supabase
+    .from("departments")
+    .update({
+      flyer_url: input.flyerUrl?.trim() || null,
+    })
+    .eq("id", input.id)
+    .eq("organization_id", organizationId)
+
+  if (error) {
+    console.error("updateDepartmentFlyer error:", error)
+    throw new Error(formatDepartmentError(error, "update flyer for"))
   }
 
   revalidateDepartmentPaths(input.id)
@@ -212,6 +244,7 @@ export async function fetchDepartmentsWithProgramCounts(): Promise<
     name: department.name,
     description: department.description,
     color: department.color,
+    flyer_url: department.flyer_url ?? null,
     programs_count: programCounts.get(department.id) || 0,
   }))
 }

@@ -4,15 +4,12 @@ import { useState, useTransition } from "react"
 import { Loader2, Pencil, Plus, Trash2 } from "lucide-react"
 
 import { Header } from "@/components/layout/header"
-import { EventManagementSettingsNav } from "@/components/events/event-management-settings-nav"
+import { FacilitiesSettingsNav } from "@/components/bookings/bookings-settings-nav"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card"
 import {
   Dialog,
@@ -125,25 +122,20 @@ export function SetupStylesClient({
 
   return (
     <>
-      <Header title="Event Management" />
+      <Header title="Bookings" />
 
-      <div className="flex flex-col gap-6 p-6">
+      <div className="flex flex-col gap-6 p-4 sm:p-6">
         <div>
           <h2 className="text-xl font-semibold">Settings</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Configure internal event options for your organization.
+            Configure spaces and facility options for your organization.
           </p>
         </div>
 
-        <EventManagementSettingsNav />
+        <FacilitiesSettingsNav />
 
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Setup Styles</h1>
-            <p className="text-muted-foreground">
-              Room layouts available when requesting or planning events.
-            </p>
-          </div>
+          <h1 className="text-2xl font-semibold tracking-tight">Setup Styles</h1>
 
           <Button onClick={openCreate} disabled={!tablesAvailable}>
             <Plus className="mr-2 h-4 w-4" />
@@ -160,13 +152,6 @@ export function SetupStylesClient({
           </Card>
         ) : (
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Organization setup styles</CardTitle>
-              <CardDescription>
-                Default styles were seeded for your organization. Add or edit styles
-                used on event request forms.
-              </CardDescription>
-            </CardHeader>
             <CardContent className="p-0">
               <Table>
                 <TableHeader>

@@ -67,10 +67,12 @@ Features:
 * Organization filtering
 * Program details
 * Eligibility rules (ages, grades, gender, capacity groups)
-* Registration model, eligibility, capacity, and fee plans (offering manage → Enrollment)
+* Registration model, eligibility, capacity, and fee plans (offering manage **Settings**; unified fees + discounts save with page Save; run `scripts/200_program_pricing_billing_scope.sql`)
 * Program detail **Reports** — enrollments across offerings (filter + CSV)
 * Offering-scoped pricing (Phase 2A/2B)
 * **Department Settings** (`?tab=settings` on department workspace): General / Registration / Notifications stubs (`department_program_settings`); department-wide promo codes (`discount_codes.department_id`); Service Needs for that department’s years. Legacy `/programs/settings*` → `/workforce?tab=departments`. Run **`scripts/190_department_settings_promo_codes.sql`**.
+* **Summer Camps 2026 Phase 1 import** (payments CSV → Recreational Camps / year + offerings / weeks / enrollments / FA / childcare addons): `scripts/import-summer-camps-2026.mjs`. **Merged** Camp One + Two → one **Summer Camp** (8 weeks, week-count tuition tiers + sibling 5%): `scripts/merge-summer-camps-2026.mjs` + SQL **`190`**. Master roster + staff payroll phases pending.
+* **QLH (Education) registrations import** (Excel roster → Education years `QLH 2024-2025` / `QLH 2025-2026` + default `QLH Registration` offering each): `scripts/import-qlh-registrations.mjs`.
 
 Pending:
 
@@ -87,6 +89,7 @@ Features:
 
 * Program sessions table
 * Session capacity fields
+* Add/edit sessions from offering manage Registration → Sessions (always available; tip if Selected Sessions / Day Pass off)
 
 Pending:
 
@@ -172,47 +175,38 @@ Features:
 * Subscription filtering
 * Permission filtering
 * Dynamic visibility
-* Module order: Dashboard → Contacts → HR → Membership → Fund Development → …
+* Module order: Dashboard → Contacts → HR → Membership → Fund Development → Finance → Programs → …
 
-* Pinned footer: Billing (super admin SaaS subscription) → **Reports** (`/reports`, `reports.view`) → Settings
-
----
-
-## Finance / Payroll
-
-Status: Working (under HR)
-
-Org payroll queue lives on **HR → Payroll** (`/workforce?tab=payroll`) — not a main sidebar module.
-
-* Ready to pay / Paid queue for department-approved pay entries (teachers + childcare)
-* Mark paid (`finance.manage`) after `scripts/187_finance_module_and_payroll_paid.sql`
-* Permissions: `finance.view` / `finance.manage` (panel); page requires `staff.view`
-* Legacy `/finance` and `/finance/payroll` redirect to the HR Payroll tab
-* SaaS **Billing** remains in the sidebar footer
-
-Key files: `components/finance/finance-payroll-queue-panel.tsx`, `lib/finance/org-payroll-queue.ts`, `lib/hr/hr-overview-path.ts` (`hrPayrollHref`)
-
-Future: broader org finance (AP/GL) could restore a Finance module; not planned soon.
+* Pinned footer: Billing (super admin SaaS subscription) → Settings
 
 ---
 
-## Organization Reports
+## Finance
 
-Status: Working (expandable)
+Status: Working
 
-Route: `/reports`
+Routes:
 
-Permission: `reports.view`
+* `/finance` → `/finance/transactions`
+* `/finance/transactions` — org payment transactions (Donations + Programs) + failed tab
+* `/finance/payroll` — org payroll queue (Mark paid)
+* `/finance/financial-assistance` — FA hub (Overview / Submissions / Templates / Reports / Payment Plans)
 
-Tabs:
+Sidebar children: Transactions, Payroll, Financial Assistance.
 
-* Payment transactions — cross-module list (Donations payments + Programs charge payments)
-* Failed transactions — failed/declined/voided/needs-review payment activity
-* More reports — placeholder for future org-wide reports
+Permissions: `finance.view` (module; fallbacks include donations/staff/reports/applications view); child pages also accept `reports.view` / `staff.view` / `applications.view` as appropriate. Mark paid requires `finance.manage`.
 
-Key files: `components/reports/org-reports-client.tsx`, `lib/reports/org-payment-transactions.ts`
+Legacy redirects:
 
-Note: Module-specific reports remain under each module (e.g. `/programs/reports`, `/donations/reports/*`).
+* `/reports` → `/finance/transactions`
+* `/programs/financial-assistance` → `/finance/financial-assistance`
+* `/workforce?tab=payroll` → `/finance/payroll`
+
+Enable module + home route: `scripts/192_finance_module_sidebar_restore.sql` (depends on `187`).
+
+Key files: `lib/finance/finance-paths.ts`, `app/(dashboard)/finance/*`, `components/reports/org-reports-client.tsx`, `components/finance/finance-payroll-queue-panel.tsx`, `lib/finance/org-payroll-queue.ts`
+
+Note: Department payroll approval stays on department workspace Financial → Payroll. Module-specific reports remain under each module (e.g. `/programs/reports`, `/donations/reports/*`).
 
 ---
 
@@ -273,13 +267,13 @@ North star: **One Contact · Many Roles · Many Activities · No Duplicate Ident
 | Ticketing / Venue | ticket order / rental billing contact | → **Customer** only (events + bookings; `175`) |
 | Volunteers | `volunteers.contact_id` | `createVolunteer`, `ensureVolunteerForContact` (S-11) |
 
-Routes: `/contacts/people` (default; `/contacts` redirects here), `/contacts/[id]`, `/contacts/families`, `/contacts/families/[id]`, `/contacts/organizations`, `/contacts/reports`, `/contacts/reports/directory`, `/contacts/settings`
+Routes: `/contacts/people` (default; `/contacts` redirects here), `/contacts/[id]`, `/contacts/families` (redirects to Reports → Families), `/contacts/families/[id]` (redirects to primary contact), `/contacts/organizations`, `/contacts/reports`, `/contacts/reports/directory`, `/contacts/settings`
 
 **Contact profile Overview:** Module-gated right rail with Quick Actions, Financial Summary, and Activity (`components/contacts/contact-profile-overview-rail.tsx`).
 
 **Groups** list is not under Contacts. Giving collectives use `/donations/groups/[id]` and roll up on **Donations → Reports → Donors → Group Giving**; `/contacts/groups` and group `/contacts/[id]` redirect into Donations. Member groups live under **Membership → Groups**.
 
-**Reports (Phase 1):** Contact Directory report with filters + CSV export (`lib/contacts/contact-report-actions.ts`, `components/contacts/contacts-directory-report-panel.tsx`). Donor giving reports stay under Donations.
+**Reports (Phase 1):** Contact Directory report with Individuals / Organizations / Families tabs, Roles filter + CSV export (`lib/contacts/contact-report-actions.ts`, `components/contacts/contacts-directory-report-panel.tsx`). Families removed from Contacts sidebar (July 2026). Donor giving reports stay under Donations.
 
 **Contact record types:** `individual`, `organization`, `group` (migration `132`). Groups = internal collectives (halaqas, committees); Organizations = external entities.
 
@@ -319,7 +313,7 @@ Status: Working (simplified)
 
 Route: `/workforce` (Employees tab: `?tab=employees`)
 
-HR module sidebar is a **direct link to Overview** (`/workforce` with tabs: Overview, Departments, Employees, Volunteers, Childcare Providers, **Payroll**). No flyout. Reports and Settings hubs removed — metrics live on the Overview tab; Positions under Employees → Positions; org payroll queue under Payroll.
+HR module sidebar opens a **second drawer** like other modules: Overview, Departments, Employees, Volunteers, Childcare Providers (paths under `/workforce` / `/workforce/departments` / `/workforce/employees` / `/workforce/volunteers` / `/workforce/childcare`). Org payroll queue under **Finance → Payroll**. In-page tabs remain for switching within the HR shell.
 
 Roster-only employee list using the shared HR directory shell (Export, Add Employee, Employees | Applications | Positions tabs, KPI cards, Active/Inactive status filter defaulting to Active, pagination), embedded under **HR → Overview → Employees**.
 
@@ -327,7 +321,7 @@ Roster-only employee list using the shared HR directory shell (Export, Add Emplo
 
 Removed tabs (redirect to Overview):
 
-* Departments → `/workforce?tab=departments` (department workspace still at `/workforce/departments/[id]`: **Overview** (years/seasons + flyer; Super Admin archive), **Programs** (`?tab=programs` — offerings for open years; year filter + Add Program; year/season `?tab=offerings` redirects here), **Enrollments** (UI label; URL `?tab=rosters` or `?tab=enrollments`; year/program filters, parent/guardian, Export CSV; year/season `?tab=reports` redirects here), Applications, Schedule, **Financial** (Payroll / Expenses / Financial Summary — employees managed under Payroll, merged columns, no email/phone; legacy `?tab=employees` → Payroll), optional Group giving, Activity, **Settings** (`?tab=settings` — General / Registration / Notifications stubs; department-wide Promo Codes; Service Needs; `&section=…`), **Archive** (archived closeout: students, teachers, financial totals, CSV); apply SQL `169`/`170`/`171`/`172`/`173`/`174`/`186`/`190`; scoped access via `lib/departments/department-access.ts` for department heads; legacy settings path redirects to Overview Departments tab). Historical QIL load: `scripts/import-qil-year.mjs`; consolidate course-as-programs → offerings: `scripts/migrate-qil-courses-to-offerings.mjs` (after `174`).
+* Departments → `/workforce?tab=departments` (department workspace still at `/workforce/departments/[id]`: **Overview** (years/seasons + flyer; Super Admin **Close year**), **Programs** (`?tab=programs` — offerings for workspace years incl. closed; year filter + Add Program; manage opens `/workforce/departments/[id]/programs/[programId]/offerings/[offeringId]` so sidebar stays on Departments; year/season `?tab=offerings` redirects here), **Participants** (UI label; URL `?tab=students`; stages Needs review / Approved — not registered / Roster; program filter on roster, no year filter; legacy `?tab=rosters|enrollments|applications`; year/season `?tab=reports` → Participants roster), Schedule, **Financial** (Payroll / Expenses / Financial Summary — employees managed under Payroll, merged columns, no email/phone; legacy `?tab=employees` → Payroll), optional Group giving, **Events** (UI label; URL `?tab=activity`), **Settings** (`?tab=settings` — General / Registration / Notifications stubs; department-wide Promo Codes; Service Needs; `&section=…`), **Archive** (archived closeout: students, teachers, financial totals, CSV); Department Heads: Staff Tools **My department** + sidebar **My department** when lacking `staff.view`; apply SQL `169`/`170`/`171`/`172`/`173`/`174`/`186`/`190`; scoped access via `lib/departments/department-access.ts` for department heads; legacy settings path redirects to Overview Departments tab). Historical QIL load: `scripts/import-qil-year.mjs`; consolidate course-as-programs → offerings: `scripts/migrate-qil-courses-to-offerings.mjs` (after `174`).
 * Positions → `/workforce?tab=employees&view=positions`
 * Time Off, Work Schedule, Notifications, Teams, Applications
 

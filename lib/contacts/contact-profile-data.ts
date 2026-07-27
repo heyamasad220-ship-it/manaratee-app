@@ -79,6 +79,9 @@ export type ContactEnrollmentRecord = {
   id: string
   programName: string
   offeringName: string | null
+  childName: string | null
+  /** How this contact relates to the enrollment. */
+  relation: "participant" | "registrant" | "payer" | "child"
   status: string | null
   enrollmentDate: string | null
   totalAmount: number | null
@@ -362,21 +365,39 @@ export async function fetchContactProfileData(
       status: string | null
       payment_status: string | null
       created_at: string | null
+      child_name?: string | null
+      participant_contact_id?: string | null
+      registrant_contact_id?: string | null
+      payer_contact_id?: string | null
       total_amount?: number | null
       amount_paid?: number | null
       programs?: { name?: string } | null
       offerings?: { name?: string } | null
       offering?: { name?: string } | null
-    }>
+    }>,
+    relationFallback: ContactEnrollmentRecord["relation"] = "participant"
   ) {
     for (const enrollment of enrollments) {
       const programName = enrollment.programs?.name || "Program"
       const offeringName =
         enrollment.offering?.name || enrollment.offerings?.name || null
+      const childName = (enrollment.child_name || "").trim() || null
+
+      let relation: ContactEnrollmentRecord["relation"] = relationFallback
+      if (enrollment.participant_contact_id === contactId) {
+        relation = "participant"
+      } else if (enrollment.registrant_contact_id === contactId) {
+        relation = "registrant"
+      } else if (enrollment.payer_contact_id === contactId) {
+        relation = "payer"
+      }
+
       enrollmentRecords.push({
         id: enrollment.id,
         programName,
         offeringName,
+        childName,
+        relation,
         status: enrollment.status || enrollment.payment_status,
         enrollmentDate: enrollment.enrollment_date || enrollment.created_at,
         totalAmount:
@@ -390,20 +411,31 @@ export async function fetchContactProfileData(
         faPlanLabel: null,
         faNote: null,
       })
+
+      const activityTitle = offeringName
+        ? `${programName} — ${offeringName}`
+        : programName
+      const timelineTitle =
+        relation === "registrant" || relation === "payer"
+          ? childName
+            ? `Registered ${childName} for ${offeringName || programName}`
+            : `Registered a participant for ${offeringName || programName}`
+          : offeringName
+            ? `Registered for ${offeringName}`
+            : `Registered for ${programName}`
+
       activity.programs.push({
         id: enrollment.id,
         module: "programs",
         activityType: "registered_program",
-        title: offeringName ? `${programName} — ${offeringName}` : programName,
+        title: activityTitle,
         date: enrollment.enrollment_date || enrollment.created_at,
         status: enrollment.status || enrollment.payment_status,
       })
       pushTimeline({
         id: `enrollment-${enrollment.id}`,
         date: enrollment.enrollment_date || enrollment.created_at || new Date().toISOString(),
-        title: offeringName
-          ? `Registered for ${offeringName}`
-          : `Registered for ${programName}`,
+        title: timelineTitle,
         module: "Programs",
         status: enrollment.status || enrollment.payment_status,
       })
@@ -416,21 +448,31 @@ export async function fetchContactProfileData(
     status,
     payment_status,
     created_at,
+    child_name,
+    participant_contact_id,
+    registrant_contact_id,
+    payer_contact_id,
     total_amount,
     amount_paid,
     programs:program_id (name),
     offering:offering_id (name)
   `
 
-  const { data: enrollmentsByContact } = await supabase
+  const { data: enrollmentsForContact } = await supabase
     .from("program_enrollments")
     .select(enrollmentSelect)
     .eq("organization_id", orgId)
-    .eq("participant_contact_id", contactId)
+    .or(
+      [
+        `participant_contact_id.eq.${contactId}`,
+        `registrant_contact_id.eq.${contactId}`,
+        `payer_contact_id.eq.${contactId}`,
+      ].join(",")
+    )
     .order("enrollment_date", { ascending: false })
     .limit(50)
 
-  await appendEnrollmentActivity((enrollmentsByContact || []) as any[])
+  await appendEnrollmentActivity((enrollmentsForContact || []) as any[])
 
   if (personId) {
     const { data: enrollmentsByPerson } = await supabase
@@ -442,7 +484,7 @@ export async function fetchContactProfileData(
       .order("enrollment_date", { ascending: false })
       .limit(50)
 
-    await appendEnrollmentActivity((enrollmentsByPerson || []) as any[])
+    await appendEnrollmentActivity((enrollmentsByPerson || []) as any[], "child")
   }
 
   if (enrollmentRecords.length > 0) {

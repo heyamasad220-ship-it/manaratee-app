@@ -1,11 +1,29 @@
 import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 
-/** Programs still open for the department workspace (not year-closed). */
-export const DEPARTMENT_OPEN_PROGRAM_STATUSES = ["draft", "active", "paused"] as const
+/** Years visible in the department workspace (includes finished/closed years). */
+export const DEPARTMENT_WORKSPACE_PROGRAM_STATUSES = [
+  "draft",
+  "active",
+  "paused",
+  "closed",
+] as const
+
+/**
+ * Years still operating for catalog / new-enrollment surfaces.
+ * Closed years stay in the department workspace but are not sold as open.
+ */
+export const DEPARTMENT_OPEN_PROGRAM_STATUSES = [
+  "draft",
+  "active",
+  "paused",
+] as const
 
 export type DepartmentOpenProgramStatus =
   (typeof DEPARTMENT_OPEN_PROGRAM_STATUSES)[number]
+
+export type DepartmentWorkspaceProgramStatus =
+  (typeof DEPARTMENT_WORKSPACE_PROGRAM_STATUSES)[number]
 
 export type DepartmentOpenProgram = {
   id: string
@@ -76,7 +94,8 @@ export function dateWithinOpenPrograms(
 }
 
 /**
- * Load department programs that are not archived (open academic years).
+ * Load department year/season programs for the workspace (not archived).
+ * Includes closed years so staff can report and compare across years.
  */
 export async function loadDepartmentOpenPrograms(
   organizationId: string,
@@ -88,7 +107,7 @@ export async function loadDepartmentOpenPrograms(
     .select("id, name, status, start_date, end_date")
     .eq("organization_id", organizationId)
     .eq("department_id", departmentId)
-    .in("status", [...DEPARTMENT_OPEN_PROGRAM_STATUSES])
+    .in("status", [...DEPARTMENT_WORKSPACE_PROGRAM_STATUSES])
     .order("start_date", { ascending: false, nullsFirst: false })
     .order("name", { ascending: true })
 

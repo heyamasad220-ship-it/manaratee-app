@@ -54,8 +54,13 @@ import {
 const CALENDAR_PATHS = [
   "/facilities/availability",
   "/facilities/calendar",
+  "/facilities/overview",
+  "/facilities/reservation-center",
   "/bookings/calendar",
   "/bookings/overview",
+  "/bookings/requests",
+  "/bookings/payments",
+  "/bookings/rentals",
   "/customer/rentals",
   "/customer/rentals/new",
 ]
@@ -811,6 +816,142 @@ export async function markRentalPaymentPaid(input: {
         venueRentalId: payment.venue_rental_id,
         paymentId: input.paymentId,
         paymentType: payment.payment_type,
+      },
+    },
+  ])
+
+  revalidateVenueRentalPaths()
+}
+
+/** Record a payment received (create ledger row if needed, then mark paid). */
+export async function recordVenueRentalPaymentReceived(input: {
+  venueRentalId: string
+  paymentType:
+    | "deposit"
+    | "security_deposit"
+    | "remaining_balance"
+  amount: number
+  notes?: string
+}) {
+  await assertCanManageVenueRentals()
+
+  const amount = Number(input.amount)
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new Error("Enter a payment amount greater than zero.")
+  }
+
+  const paymentType =
+    input.paymentType === "deposit"
+      ? RENTAL_PAYMENT_TYPES.deposit
+      : input.paymentType === "security_deposit"
+        ? RENTAL_PAYMENT_TYPES.securityDeposit
+        : RENTAL_PAYMENT_TYPES.remainingBalance
+
+  const supabase = await createClient()
+  const organizationId = await resolveOrganizationId()
+
+  if (!organizationId) {
+    throw new Error("No organization selected")
+  }
+
+  const { data: rental } = await supabase
+    .from("venue_rentals")
+    .select("id")
+    .eq("id", input.venueRentalId)
+    .eq("organization_id", organizationId)
+    .maybeSingle()
+
+  if (!rental) {
+    throw new Error("Venue rental not found.")
+  }
+
+  const { data: existingPayments, error: listError } = await supabase
+    .from("rental_payments")
+    .select("id, status, amount")
+    .eq("organization_id", organizationId)
+    .eq("venue_rental_id", input.venueRentalId)
+    .eq("payment_type", paymentType)
+    .order("created_at", { ascending: true })
+
+  if (listError) {
+    throw new Error(listError.message || "Failed to load payment records.")
+  }
+
+  const unpaid = (existingPayments || []).find(
+    (payment) =>
+      payment.status !== RENTAL_PAYMENT_STATUSES.paidManually &&
+      payment.status !== RENTAL_PAYMENT_STATUSES.paidStripeLater &&
+      payment.status !== RENTAL_PAYMENT_STATUSES.refunded
+  )
+
+  let paymentId = unpaid?.id as string | undefined
+  const noteText = input.notes?.trim() || null
+
+  if (paymentId) {
+    const { error } = await supabase
+      .from("rental_payments")
+      .update({
+        amount,
+        status: RENTAL_PAYMENT_STATUSES.paidManually,
+        paid_at: new Date().toISOString(),
+        notes: noteText,
+      })
+      .eq("id", paymentId)
+      .eq("organization_id", organizationId)
+
+    if (error) {
+      throw new Error(error.message || "Failed to update payment.")
+    }
+  } else {
+    const { data: created, error } = await supabase
+      .from("rental_payments")
+      .insert({
+        organization_id: organizationId,
+        venue_rental_id: input.venueRentalId,
+        payment_type: paymentType,
+        status: RENTAL_PAYMENT_STATUSES.paidManually,
+        amount,
+        paid_at: new Date().toISOString(),
+        notes: noteText,
+      })
+      .select("id")
+      .single()
+
+    if (error || !created) {
+      throw new Error(error?.message || "Failed to create payment.")
+    }
+    paymentId = created.id
+  }
+
+  await syncVenueRentalStatusAfterPayment(input.venueRentalId, organizationId)
+
+  fireModuleNotifications([
+    {
+      organizationId,
+      moduleKey: "venue_rentals",
+      audience: "staff",
+      eventKey: "payment_received",
+      subject: "Venue rental payment received",
+      summary: "A venue rental payment was recorded.",
+      metadata: {
+        venueRentalId: input.venueRentalId,
+        paymentId,
+        paymentType,
+        amount,
+      },
+    },
+    {
+      organizationId,
+      moduleKey: "venue_rentals",
+      audience: "customer",
+      eventKey: "payment_received",
+      subject: "Venue rental payment received",
+      summary: "Your venue rental payment was received.",
+      metadata: {
+        venueRentalId: input.venueRentalId,
+        paymentId,
+        paymentType,
+        amount,
       },
     },
   ])

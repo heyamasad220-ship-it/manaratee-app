@@ -376,6 +376,7 @@ export async function removeEnrollmentFaAwardAction(input: {
 
     revalidatePath("/programs/registrations")
     revalidatePath(`/programs/registrations/${enrollmentId}`)
+    revalidatePath("/finance/financial-assistance")
     revalidatePath("/programs/financial-assistance")
     revalidatePath("/programs/reports")
     const programId =

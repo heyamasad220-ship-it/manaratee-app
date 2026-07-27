@@ -1,5 +1,6 @@
 "use server"
 
+import { DEPARTMENT_WORKSPACE_PROGRAM_STATUSES } from "@/lib/departments/department-active-programs"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { createClient } from "@/lib/supabase/server"
 
@@ -61,7 +62,7 @@ export async function fetchDepartmentSchedule(
     .select("id, name")
     .eq("organization_id", organizationId)
     .eq("department_id", departmentId)
-    .in("status", ["draft", "active", "paused"])
+    .in("status", [...DEPARTMENT_WORKSPACE_PROGRAM_STATUSES])
     .order("name", { ascending: true })
 
   if (programsError) {

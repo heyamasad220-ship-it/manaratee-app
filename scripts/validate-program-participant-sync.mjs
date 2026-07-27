@@ -93,10 +93,11 @@ const registrationSource = readFileSync(
   "utf8"
 )
 record(
-  "registration-actions-resolve-participant-contact",
-  registrationSource.includes("resolveParticipantContactIdForRegistration") &&
-    registrationSource.includes("syncAffiliationAfterEnrollmentCreation"),
-  "S-09 resolve + S-10 sync wired in registerSingleParticipant"
+  "registration-actions-person-based-youth",
+  registrationSource.includes("p_participant_person_id") &&
+    registrationSource.includes("syncAffiliationAfterEnrollmentCreation") &&
+    registrationSource.includes("verifyParticipantPersonInRegistrantFamily"),
+  "Youth registers by person_id; affiliation sync after enroll"
 )
 
 const enrollmentSource = readFileSync(
@@ -116,10 +117,10 @@ const personSource = readFileSync(
   "utf8"
 )
 record(
-  "person-actions-wrap-ensure-contact-for-person",
-  personSource.includes("ensureContactForPerson") &&
-    personSource.includes("ensureParticipantContactForPerson"),
-  "participant contact uses approved identity helper"
+  "person-actions-no-auto-create-contacts",
+  personSource.includes("resolveExistingParticipantContactId") &&
+    !personSource.includes("ensureContactForPerson"),
+  "participant helpers must not create CRM contacts for minors"
 )
 
 const lifecycleSource = readFileSync(

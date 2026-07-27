@@ -258,6 +258,7 @@ export async function updateOperationalBriefSetupAction(input: {
   revalidatePath("/facilities/calendar")
   revalidatePath("/facilities/availability")
   revalidatePath("/facilities/reservation-center")
+  revalidatePath("/facilities/overview")
 }
 
 export async function getOperationalBriefViewByIdAction(

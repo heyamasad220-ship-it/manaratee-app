@@ -2,9 +2,10 @@
 
 import { useEffect, useState, useTransition } from "react"
 import Link from "next/link"
-import { ExternalLink, Loader2, Pencil, Trash2, UserPlus, Users } from "lucide-react"
+import { Loader2, Pencil, Trash2, UserPlus, Users } from "lucide-react"
 
 import { FamilyContactPicker } from "@/components/contacts/family-contact-picker"
+import { FamilySettingsPanel } from "@/components/contacts/family-settings-panel"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { BirthDateInput } from "@/components/ui/birth-date-input"
@@ -99,6 +100,8 @@ export function ContactFamilyPanel({
   const [household, setHousehold] = useState<{
     id: string
     name: string
+    primaryContactId: string | null
+    primaryName: string | null
     isPrimary: boolean
   } | null>(null)
   const [newMember, setNewMember] = useState({
@@ -308,7 +311,8 @@ export function ContactFamilyPanel({
                 Family members
               </CardTitle>
               <CardDescription>
-                Link spouses and dependents for registrations, enrollments, and household giving.
+                Household extension of this contact. Link a spouse or dependents here — they share
+                one household. Donations and other activity stay on each adult contact.
               </CardDescription>
             </div>
           ) : null}
@@ -326,20 +330,45 @@ export function ContactFamilyPanel({
         </CardHeader>
         <CardContent className={embedded ? "pt-0" : undefined}>
           {household ? (
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-muted/20 px-3 py-2 text-sm">
-              <div>
-                <span className="text-muted-foreground">Household: </span>
-                <span className="font-medium">{household.name}</span>
-                {!household.isPrimary ? (
-                  <span className="ml-2 text-xs text-muted-foreground">(member)</span>
+            <div className="mb-4 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-muted/20 px-3 py-2 text-sm">
+                <div>
+                  <span className="text-muted-foreground">Household: </span>
+                  <span className="font-medium">{household.name}</span>
+                  {!household.isPrimary ? (
+                    <span className="ml-2 text-xs text-muted-foreground">(member)</span>
+                  ) : (
+                    <span className="ml-2 text-xs text-muted-foreground">(primary)</span>
+                  )}
+                </div>
+                {!household.isPrimary && household.primaryContactId ? (
+                  <Button variant="ghost" size="sm" asChild className="h-8 px-2">
+                    <Link
+                      href={contactProfileHref(household.primaryContactId, {
+                        returnTo: currentReturnTo,
+                        list: "families",
+                      })}
+                    >
+                      Open primary
+                      {household.primaryName ? `: ${household.primaryName}` : " contact"}
+                    </Link>
+                  </Button>
                 ) : null}
               </div>
-              <Button variant="ghost" size="sm" asChild className="h-8 px-2">
-                <Link href={`/contacts/families/${household.id}`}>
-                  View household giving
-                  <ExternalLink className="ml-2 h-3.5 w-3.5" />
-                </Link>
-              </Button>
+              {household.isPrimary ? (
+                <FamilySettingsPanel
+                  familyId={household.id}
+                  canManage
+                  embedded
+                  onSaved={async () => {
+                    const familyResult = await getFamilyForContactAction(contactId)
+                    if (familyResult.success) {
+                      setHousehold(familyResult.family)
+                    }
+                    await onChanged()
+                  }}
+                />
+              ) : null}
             </div>
           ) : null}
 
@@ -390,7 +419,7 @@ export function ContactFamilyPanel({
                       </Avatar>
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-2">
-                          {member.contactId ? (
+                          {member.contactId && !isMinor ? (
                             <Link
                               href={contactProfileHref(member.contactId, {
                                 returnTo: currentReturnTo,
@@ -526,8 +555,8 @@ export function ContactFamilyPanel({
                 </Select>
               </div>
               <p className="text-xs text-muted-foreground">
-                Use this to join spouses who were imported as separate donors into one household.
-                Their donations stay on each contact; household giving rolls up both.
+                Use this to join spouses who were imported as separate contacts into one household.
+                Donations and other activity stay on each contact.
               </p>
             </TabsContent>
 

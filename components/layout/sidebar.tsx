@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, createContext, useContext, Suspense } from "react"
+import { useState, useEffect, useCallback, Suspense } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { usePathname, useSearchParams } from "next/navigation"
@@ -26,7 +26,6 @@ import {
   ClipboardList,
   Baby,
   UserCheck,
-  BarChart3,
   Wallet,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
@@ -59,8 +58,11 @@ import {
   STAFF_SIDEBAR_NAV_TOP_CLASS,
 } from "@/lib/layout/staff-dashboard-chrome"
 import {
-  programsFinancialAssistanceNavItem,
-} from "@/lib/applications/application-nav"
+  StaffSidebarContext,
+  useSidebarContext,
+} from "@/components/layout/staff-sidebar-context"
+
+export { useSidebarContext }
 
 interface SidebarModuleRow {
   name: string
@@ -80,8 +82,6 @@ const HIDDEN_SIDEBAR_MODULE_SLUGS = new Set([
   "hr",
   "reports",
   "applications",
-  // Payroll queue lives under HR → Payroll (`/workforce?tab=payroll`).
-  "finance",
 ])
 
 /** Ensures Event Management appears before SQL migration 038 is applied. */
@@ -109,6 +109,14 @@ const STATIC_SIDEBAR_MODULES: SidebarModuleRow[] = [
     icon_name: "Users",
     group_name: "People",
     sort_order: 20,
+  },
+  {
+    name: "Finance",
+    slug: "finance",
+    route: "/finance/transactions",
+    icon_name: "Wallet",
+    group_name: "Financial",
+    sort_order: 35,
   },
 ]
 
@@ -226,7 +234,7 @@ const modulePermissionMap: Record<string, string> = {
 const modulePermissionFallbacks: Record<string, string[]> = {
   "event-management": ["programs.view", "ticketing.view", "ticketing.manage"],
   membership: ["contacts.view"],
-  finance: ["donations.view", "staff.view"],
+  finance: ["donations.view", "staff.view", "reports.view", "applications.view"],
 }
 
 const subItemPermissionFallbacks: Record<string, string[]> = {
@@ -237,7 +245,12 @@ const subItemPermissionFallbacks: Record<string, string[]> = {
   "ticketing.manage": ["events.manage", "programs.manage"],
   "membership.view": ["contacts.view"],
   "membership.manage": ["contacts.manage"],
-  "finance.view": ["donations.view", "staff.view"],
+  "finance.view": [
+    "donations.view",
+    "staff.view",
+    "reports.view",
+    "applications.view",
+  ],
   "finance.manage": ["donations.manage", "staff.manage"],
 }
 
@@ -246,7 +259,7 @@ const moduleDisplayNameMap: Record<string, string> = {
   hr: WORKFORCE_MODULE_LABEL,
   donations: FUND_DEVELOPMENT_MODULE_LABEL,
   bookings: "Venue Rentals",
-  spaces: "Facility Manager",
+  spaces: "Bookings",
 }
 
 function resolveModuleNavSlug(slug: string) {
@@ -260,21 +273,38 @@ const moduleGroupOverride: Record<string, string> = {
 
 const moduleDefaultRouteOverride: Record<string, string> = {
   contacts: "/contacts/people",
-  spaces: "/facilities/reservation-center",
+  spaces: "/facilities/overview",
   programs: "/programs/catalog",
   workforce: "/workforce",
   hr: "/workforce",
+  finance: "/finance/transactions",
+}
+
+/** Broader than default href so all module routes stay under the parent (breadcrumb + active). */
+const moduleMatchPrefixOverride: Record<string, string> = {
+  programs: "/programs",
+  finance: "/finance",
+  contacts: "/contacts",
+  donations: "/donations",
+  workforce: "/workforce",
+  hr: "/workforce",
+  membership: "/membership",
+  "event-management": "/event-management",
+  bookings: "/bookings",
+  "vendor-hub": "/vendor-hub",
+  spaces: "/facilities",
 }
 
 const moduleChildren: Record<string, SubItem[]> = {
   bookings: [
     { label: "Dashboard", href: "/bookings/overview", matchPrefix: "/bookings/overview", permissionKey: "bookings.view" },
-    { label: "Requests", href: "/bookings/requests", matchPrefix: "/bookings/requests", permissionKey: "bookings.manage" },
-    { label: "Settings", href: "/bookings/settings", matchPrefix: "/bookings/settings", permissionKey: "bookings.manage" },
+    { label: "Requests", href: "/bookings/requests", matchPrefix: "/bookings/requests", permissionKey: "bookings.view" },
+    { label: "Payments", href: "/bookings/payments", matchPrefix: "/bookings/payments", permissionKey: "bookings.view" },
+    { label: "Settings", href: "/bookings/settings/notifications", matchPrefix: "/bookings/settings", permissionKey: "bookings.manage" },
   ],
   "event-management": [
     { label: "Dashboard", href: "/event-management/overview", matchPrefix: "/event-management/overview", permissionKey: "events.view" },
-    { label: "Space Availability", href: "/facilities/availability", matchPrefix: "/facilities/availability", permissionKey: "events.view" },
+    { label: "Calendar", href: "/facilities/calendar", matchPrefix: "/facilities/calendar", permissionKey: "events.view" },
     { label: "Events", href: "/event-management", matchPrefix: "/event-management", exact: true, permissionKey: "events.view" },
     { label: "Ticketing", href: "/event-management/ticketing", matchPrefix: "/event-management/ticketing", permissionKey: "ticketing.view" },
     {
@@ -298,14 +328,19 @@ const moduleChildren: Record<string, SubItem[]> = {
         },
       ],
     },
-    { label: "Settings", href: "/event-management/settings/event-types", matchPrefix: "/event-management/settings", permissionKey: "events.manage" },
+    { label: "Settings", href: "/event-management/settings/notifications", matchPrefix: "/event-management/settings", permissionKey: "events.manage" },
   ],
   spaces: [
-    { label: "Spaces", href: "/facilities/settings/spaces", matchPrefix: "/facilities/settings/spaces", permissionKey: "spaces.view" },
-    { label: "Resources", href: "/facilities/resources", matchPrefix: "/facilities/resources", permissionKey: "spaces.view" },
+    { label: "Overview", href: "/facilities/overview", matchPrefix: "/facilities/overview", permissionKey: "spaces.view" },
     { label: "Reservation Center", href: "/facilities/reservation-center", matchPrefix: "/facilities/reservation-center", permissionKey: "spaces.view" },
-    { label: "Space Availability", href: "/facilities/availability", matchPrefix: "/facilities/availability", permissionKey: "spaces.view" },
-    { label: "Schedule", href: "/facilities/calendar", matchPrefix: "/facilities/calendar", permissionKey: "spaces.view" },
+    { label: "Calendar", href: "/facilities/calendar", matchPrefix: "/facilities/calendar", alsoMatchPrefixes: ["/facilities/availability"], permissionKey: "spaces.view" },
+    {
+      label: "Settings",
+      href: "/facilities/settings/spaces",
+      matchPrefix: "/facilities/settings",
+      alsoMatchPrefixes: ["/facilities/resources"],
+      permissionKey: "spaces.view",
+    },
   ],
   programs: [
     {
@@ -320,7 +355,6 @@ const moduleChildren: Record<string, SubItem[]> = {
       matchPrefix: "/programs/schedule",
       permissionKey: "programs.view",
     },
-    programsFinancialAssistanceNavItem(),
     {
       label: "Reports",
       href: "/programs/reports",
@@ -328,11 +362,30 @@ const moduleChildren: Record<string, SubItem[]> = {
       alsoMatchPrefixes: ["/programs/registrations"],
       permissionKey: "reports.view",
     },
+  ],
+  finance: [
     {
-      label: "Settings",
-      href: "/workforce?tab=departments",
-      matchPrefix: "/workforce/departments",
-      permissionKey: "programs.manage",
+      label: "Transactions",
+      href: "/finance/transactions",
+      matchPrefix: "/finance/transactions",
+      alsoMatchPrefixes: ["/reports"],
+      permissionKey: "reports.view",
+      permissionKeys: ["finance.view", "reports.view"],
+    },
+    {
+      label: "Payroll",
+      href: "/finance/payroll",
+      matchPrefix: "/finance/payroll",
+      permissionKey: "staff.view",
+      permissionKeys: ["finance.view", "staff.view"],
+    },
+    {
+      label: "Financial Assistance",
+      href: "/finance/financial-assistance",
+      matchPrefix: "/finance/financial-assistance",
+      alsoMatchPrefixes: ["/programs/financial-assistance"],
+      permissionKey: "applications.view",
+      permissionKeys: ["finance.view", "applications.view"],
     },
   ],
   "vendor-hub": [
@@ -345,7 +398,6 @@ const moduleChildren: Record<string, SubItem[]> = {
   ],
   contacts: [
     { label: "People", href: "/contacts/people", matchPrefix: "/contacts/people", contactListSegment: "people", permissionKey: "contacts.view" },
-    { label: "Families", href: "/contacts/families", matchPrefix: "/contacts/families", contactListSegment: "families", permissionKey: "contacts.view" },
     { label: "Organizations", href: "/contacts/organizations", matchPrefix: "/contacts/organizations", contactListSegment: "organizations", permissionKey: "contacts.view" },
     { label: "Reports", href: "/contacts/reports/directory", matchPrefix: "/contacts/reports", permissionKey: "contacts.view" },
     { label: "Settings", href: "/contacts/settings", matchPrefix: "/contacts/settings", permissionKey: "contacts.view" },
@@ -358,9 +410,72 @@ const moduleChildren: Record<string, SubItem[]> = {
     { label: "Settings", href: "/membership/settings", matchPrefix: "/membership/settings", permissionKey: "membership.manage" },
   ],
   donations: DONATIONS_SIDEBAR_CHILDREN,
-  // No flyout — HR goes straight to Overview (`/workforce`).
-  workforce: [],
-  hr: [],
+  workforce: [
+    {
+      label: "Overview",
+      href: "/workforce",
+      matchPrefix: "/workforce",
+      exact: true,
+      permissionKey: "staff.view",
+    },
+    {
+      label: "Departments",
+      href: "/workforce/departments",
+      matchPrefix: "/workforce/departments",
+      permissionKey: "staff.view",
+    },
+    {
+      label: "Employees",
+      href: "/workforce/employees",
+      matchPrefix: "/workforce/employees",
+      permissionKey: "staff.view",
+    },
+    {
+      label: "Volunteers",
+      href: "/workforce/volunteers",
+      matchPrefix: "/workforce/volunteers",
+      permissionKey: "staff.view",
+    },
+    {
+      label: "Childcare Providers",
+      href: "/workforce/childcare",
+      matchPrefix: "/workforce/childcare",
+      permissionKey: "staff.view",
+    },
+  ],
+  hr: [
+    {
+      label: "Overview",
+      href: "/workforce",
+      matchPrefix: "/workforce",
+      exact: true,
+      permissionKey: "staff.view",
+    },
+    {
+      label: "Departments",
+      href: "/workforce/departments",
+      matchPrefix: "/workforce/departments",
+      permissionKey: "staff.view",
+    },
+    {
+      label: "Employees",
+      href: "/workforce/employees",
+      matchPrefix: "/workforce/employees",
+      permissionKey: "staff.view",
+    },
+    {
+      label: "Volunteers",
+      href: "/workforce/volunteers",
+      matchPrefix: "/workforce/volunteers",
+      permissionKey: "staff.view",
+    },
+    {
+      label: "Childcare Providers",
+      href: "/workforce/childcare",
+      matchPrefix: "/workforce/childcare",
+      permissionKey: "staff.view",
+    },
+  ],
 }
 
 function userCanAccess(permissionContext: UserPermissionContext, permissionKey?: string) {
@@ -434,37 +549,38 @@ function filterNavItemsByPermissions(items: NavItem[], permissionContext: UserPe
       enabledPermissions: permissionContext.enabledPermissions,
     })
   ) {
-    return filtered
-      .filter(
-        (item) =>
-          item.moduleSlug === "spaces" ||
-          item.matchPrefix.startsWith("/facilities")
-      )
-      .map((item) => ({
-        ...item,
-        children: item.children?.filter(
-          (child) => child.href !== "/facilities/availability"
-        ),
-      }))
+    return filtered.filter(
+      (item) =>
+        item.moduleSlug === "spaces" ||
+        item.matchPrefix.startsWith("/facilities")
+    )
   }
 
   return filtered
 }
 
-function buildNavItems(rows: SidebarModuleRow[], permissionContext: UserPermissionContext): NavItem[] {
+function buildNavItems(
+  rows: SidebarModuleRow[],
+  permissionContext: UserPermissionContext,
+  myDepartment?: { id: string; name: string } | null
+): NavItem[] {
   const dynamicItems: NavItem[] = rows
     .filter((row) => row.route && row.slug !== "applications")
     .map((row) => {
       const slug = normalizeModuleSlug(row.slug)
       const navSlug = resolveModuleNavSlug(slug)
       const href = (moduleDefaultRouteOverride[navSlug] ?? row.route) || "/dashboard"
+      const matchPrefix =
+        moduleMatchPrefixOverride[navSlug] ??
+        moduleMatchPrefixOverride[slug] ??
+        href
       const iconName = row.icon_name || "Boxes"
       const Icon = iconMap[iconName] || Boxes
       return {
         label: moduleDisplayNameMap[navSlug] ?? moduleDisplayNameMap[slug] ?? row.name,
         href,
         icon: Icon,
-        matchPrefix: href,
+        matchPrefix,
         group: moduleGroupOverride[navSlug] ?? row.group_name,
         permissionKey: modulePermissionMap[navSlug] ?? modulePermissionMap[slug],
         moduleSlug: slug,
@@ -474,8 +590,23 @@ function buildNavItems(rows: SidebarModuleRow[], permissionContext: UserPermissi
       }
     })
 
+  const hasStaffView =
+    permissionContext.isOwner ||
+    permissionContext.enabledPermissions.has("staff.view")
+
+  const myDepartmentItem: NavItem | null =
+    myDepartment && !hasStaffView
+      ? {
+          label: "My department",
+          href: `/workforce/departments/${myDepartment.id}`,
+          icon: Building2,
+          matchPrefix: `/workforce/departments/${myDepartment.id}`,
+        }
+      : null
+
   const allItems: NavItem[] = [
     { label: "Dashboard", href: "/dashboard", icon: Home, matchPrefix: "/dashboard" },
+    ...(myDepartmentItem ? [myDepartmentItem] : []),
     ...dynamicItems,
     {
       label: "Billing",
@@ -483,14 +614,6 @@ function buildNavItems(rows: SidebarModuleRow[], permissionContext: UserPermissi
       icon: CreditCard,
       matchPrefix: "/billing",
       requiresSuperAdmin: true,
-      pinToBottom: true,
-    },
-    {
-      label: "Reports",
-      href: "/reports",
-      icon: BarChart3,
-      matchPrefix: "/reports",
-      permissionKey: "reports.view",
       pinToBottom: true,
     },
     {
@@ -524,35 +647,6 @@ function buildNavItems(rows: SidebarModuleRow[], permissionContext: UserPermissi
   ]
 
   return filterNavItemsByPermissions(allItems, permissionContext)
-}
-
-interface SidebarContextType {
-  mobileOpen: boolean
-  setMobileOpen: (open: boolean) => void
-  navItems: NavItem[]
-  loading: boolean
-  /** Module whose navigation drawer is open (desktop). */
-  moduleDrawerModule: NavItem | null
-  openModuleDrawer: (module: NavItem | null) => void
-  closeModuleDrawer: () => void
-  toggleModuleDrawer: (module: NavItem) => void
-  /** @deprecated Use moduleDrawerModule — kept for breadcrumb handlers. */
-  selectedModule: NavItem | null
-  /** @deprecated Use openModuleDrawer — kept for breadcrumb handlers. */
-  setSelectedModule: (module: NavItem | null) => void
-  expandedSubKeys: Set<string>
-  ensureSubExpanded: (keys: string[]) => void
-  toggleSubExpanded: (key: string) => void
-}
-
-const SidebarContext = createContext<SidebarContextType | null>(null)
-
-export function useSidebarContext() {
-  const context = useContext(SidebarContext)
-  if (!context) {
-    throw new Error("useSidebarContext must be used within SidebarProvider")
-  }
-  return context
 }
 
 export function SidebarProvider({ children }: { children: React.ReactNode }) {
@@ -634,8 +728,22 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
         const permissionContext = parseSidebarPermissionContext(
           modulesPayload.permissionContext || {}
         )
+        const myDepartment =
+          modulesPayload.myDepartment &&
+          typeof modulesPayload.myDepartment.id === "string"
+            ? {
+                id: modulesPayload.myDepartment.id as string,
+                name: String(modulesPayload.myDepartment.name || "Department"),
+              }
+            : null
 
-        setNavItems(buildNavItems(mergeSidebarModules(moduleRows), permissionContext))
+        setNavItems(
+          buildNavItems(
+            mergeSidebarModules(moduleRows),
+            permissionContext,
+            myDepartment
+          )
+        )
       } catch (error) {
         if (!cancelled) {
           console.error("Error loading sidebar modules:", error)
@@ -656,7 +764,7 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   return (
-    <SidebarContext.Provider
+    <StaffSidebarContext.Provider
       value={{
         mobileOpen,
         setMobileOpen,
@@ -674,7 +782,7 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
       }}
     >
       {children}
-    </SidebarContext.Provider>
+    </StaffSidebarContext.Provider>
   )
 }
 

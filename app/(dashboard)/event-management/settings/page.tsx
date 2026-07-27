@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation"
 
 export default function EventManagementSettingsPage() {
-  redirect("/event-management/settings/event-types")
+  redirect("/event-management/settings/notifications")
 }

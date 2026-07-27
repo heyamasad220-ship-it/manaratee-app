@@ -86,8 +86,8 @@ function ParticipantFeeColumn({
 }) {
   const fullName = getFullName(member)
   const age = calculateAge(member.date_of_birth)
-  const contactId = member.contactId
-  const disabled = !contactId || Boolean(activeEnrollmentStatus)
+  const personId = member.personId
+  const disabled = Boolean(activeEnrollmentStatus)
   const feesDisabled = disabled || !selected
 
   return (
@@ -107,16 +107,20 @@ function ParticipantFeeColumn({
       >
         <input
           type="checkbox"
-          name="participant_contact_ids"
-          value={contactId || ""}
+          name="participant_person_ids"
+          value={personId}
           disabled={disabled}
           checked={selected}
-          onChange={(event) => {
-            if (!contactId) return
-            onToggle(event.target.checked)
-          }}
+          onChange={(event) => onToggle(event.target.checked)}
           className="mt-1"
         />
+        {member.contactId ? (
+          <input
+            type="hidden"
+            name={`participant_${personId}_contact_id`}
+            value={member.contactId}
+          />
+        ) : null}
         <div className="min-w-0 flex-1">
           <p className="font-medium">{fullName}</p>
           <p className="text-xs text-muted-foreground">
@@ -130,12 +134,6 @@ function ParticipantFeeColumn({
               Contact the organization if this should be cancelled.
             </p>
           ) : null}
-          {disabled && !activeEnrollmentStatus ? (
-            <p className="mt-1 text-xs text-amber-700">
-              Contact record missing — add this family member again from your
-              profile or contact the organization.
-            </p>
-          ) : null}
         </div>
       </label>
 
@@ -146,7 +144,7 @@ function ParticipantFeeColumn({
               Lunch
             </p>
             <select
-              name={`participant_${contactId}_lunch_option_id`}
+              name={`participant_${personId}_lunch_option_id`}
               className="h-10 w-full rounded-md border bg-background px-3 text-sm disabled:cursor-not-allowed disabled:opacity-50"
               defaultValue=""
               disabled={feesDisabled}
@@ -167,7 +165,7 @@ function ParticipantFeeColumn({
           >
             <input
               type="checkbox"
-              name={`participant_${contactId}_before_care`}
+              name={`participant_${personId}_before_care`}
               disabled={feesDisabled}
               className="h-4 w-4"
             />
@@ -181,7 +179,7 @@ function ParticipantFeeColumn({
           >
             <input
               type="checkbox"
-              name={`participant_${contactId}_after_care`}
+              name={`participant_${personId}_after_care`}
               disabled={feesDisabled}
               className="h-4 w-4"
             />
@@ -197,24 +195,22 @@ export function ProgramRegisterParticipantsFields({
   familyMembers,
   lunchOptions,
   showAddons,
-  activeEnrollmentByContactId = {},
+  activeEnrollmentByPersonId = {},
 }: {
   familyMembers: FamilyMember[]
   lunchOptions: LunchOption[]
   showAddons: boolean
-  activeEnrollmentByContactId?: Record<string, string>
+  activeEnrollmentByPersonId?: Record<string, string>
 }) {
-  const [selectedContactIds, setSelectedContactIds] = React.useState<string[]>([])
+  const [selectedPersonIds, setSelectedPersonIds] = React.useState<string[]>([])
 
-  const eligibleMembers = familyMembers.filter((member) => member.contactId)
-
-  function toggleParticipant(contactId: string, checked: boolean) {
-    setSelectedContactIds((current) => {
+  function toggleParticipant(personId: string, checked: boolean) {
+    setSelectedPersonIds((current) => {
       if (checked) {
-        return current.includes(contactId) ? current : [...current, contactId]
+        return current.includes(personId) ? current : [...current, personId]
       }
 
-      return current.filter((id) => id !== contactId)
+      return current.filter((id) => id !== personId)
     })
   }
 
@@ -232,10 +228,7 @@ export function ProgramRegisterParticipantsFields({
 
       <div className="grid gap-4 sm:grid-cols-2">
         {familyMembers.map((member) => {
-          const contactId = member.contactId
-          const selected = contactId
-            ? selectedContactIds.includes(contactId)
-            : false
+          const selected = selectedPersonIds.includes(member.personId)
 
           return (
             <ParticipantFeeColumn
@@ -245,18 +238,17 @@ export function ProgramRegisterParticipantsFields({
               showAddons={showAddons}
               selected={selected}
               activeEnrollmentStatus={
-                contactId ? activeEnrollmentByContactId[contactId] ?? null : null
+                activeEnrollmentByPersonId[member.personId] ?? null
               }
-              onToggle={(checked) => {
-                if (!contactId) return
-                toggleParticipant(contactId, checked)
-              }}
+              onToggle={(checked) =>
+                toggleParticipant(member.personId, checked)
+              }
             />
           )
         })}
       </div>
 
-      {eligibleMembers.length > 0 && selectedContactIds.length === 0 ? (
+      {familyMembers.length > 0 && selectedPersonIds.length === 0 ? (
         <p className="text-xs text-muted-foreground">
           Select at least one participant to continue.
         </p>

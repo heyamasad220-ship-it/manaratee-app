@@ -17,9 +17,17 @@ import { AGE_OPTIONS, ageSelectValue } from "./utils"
 const STATUS_OPTIONS = [
   { value: "draft", label: "Draft" },
   { value: "active", label: "Active" },
+  { value: "closed", label: "Closed" },
+] as const
+
+const LEGACY_STATUS_OPTIONS = [
   { value: "paused", label: "Paused" },
   { value: "archived", label: "Archived" },
 ] as const
+
+type StatusOptionValue =
+  | (typeof STATUS_OPTIONS)[number]["value"]
+  | (typeof LEGACY_STATUS_OPTIONS)[number]["value"]
 
 type ProgramBasicsDefaults = {
   name?: string
@@ -70,6 +78,7 @@ export function ProgramBasicsSection({
   initialVisibility = "public",
   programStatusFallback = "draft",
   allowedStatuses,
+  layout = "columns",
 }: {
   program?: ProgramBasicsDefaults | null
   programId?: string
@@ -78,11 +87,24 @@ export function ProgramBasicsSection({
   onStatusChange?: (status: string) => void
   initialVisibility?: VisibilityType
   programStatusFallback?: string
-  allowedStatuses?: Array<(typeof STATUS_OPTIONS)[number]["value"]>
+  allowedStatuses?: StatusOptionValue[]
+  /** `stack` = single full-width column (dialogs). `columns` = two-column edit page. */
+  layout?: "columns" | "stack"
 }) {
-  const statusOptions = allowedStatuses
-    ? STATUS_OPTIONS.filter((option) => allowedStatuses.includes(option.value))
-    : STATUS_OPTIONS
+  const currentStatus = status ?? programStatusFallback
+  const statusOptions = (() => {
+    const base = allowedStatuses
+      ? STATUS_OPTIONS.filter((option) => allowedStatuses.includes(option.value))
+      : [...STATUS_OPTIONS]
+    const legacy = LEGACY_STATUS_OPTIONS.find(
+      (option) => option.value === currentStatus
+    )
+    if (legacy && !base.some((option) => option.value === legacy.value)) {
+      return [...base, legacy]
+    }
+    return base
+  })()
+  const stacked = layout === "stack"
 
   const [flyerUrl, setFlyerUrl] = React.useState(program?.flyer_url ?? "")
   const ageBounds = React.useMemo(
@@ -113,8 +135,59 @@ export function ProgramBasicsSection({
     setGender((program?.gender as ProgramGender) || "All")
   }, [program?.min_age, program?.max_age, program?.gender])
 
+  const publishingFields = (
+    <BasicsSubsection title="Publishing">
+      <input type="hidden" name="visibility" value={initialVisibility} />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="min-w-0 space-y-1.5">
+          <Label htmlFor="department_id">Department</Label>
+          <select
+            id="department_id"
+            name="department_id"
+            defaultValue={program?.department_id || ""}
+            className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+          >
+            <option value="">No department</option>
+            {departments.map((department) => (
+              <option key={department.id} value={department.id}>
+                {department.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="min-w-0 space-y-1.5">
+          <Label htmlFor="status">Status</Label>
+          <select
+            id="status"
+            name="status"
+            value={status ?? programStatusFallback}
+            onChange={(event) => onStatusChange?.(event.target.value)}
+            className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+          >
+            {statusOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-muted-foreground">
+            Years stay in Draft until you set status to Active.
+          </p>
+        </div>
+      </div>
+    </BasicsSubsection>
+  )
+
   return (
-    <div className="grid w-full max-w-5xl grid-cols-1 gap-6 md:grid-cols-2 md:items-start">
+    <div
+      className={cn(
+        "w-full gap-6",
+        stacked
+          ? "flex flex-col"
+          : "grid max-w-5xl grid-cols-1 md:grid-cols-2 md:items-start"
+      )}
+    >
       <div className="min-w-0 space-y-3">
         <div className="space-y-1.5">
           <Label htmlFor="name">Year/Season Name *</Label>
@@ -156,7 +229,7 @@ export function ProgramBasicsSection({
           <Textarea
             id="description"
             name="description"
-            rows={5}
+            rows={stacked ? 3 : 5}
             defaultValue={program?.description || ""}
             placeholder="Describe what participants will experience..."
           />
@@ -166,8 +239,8 @@ export function ProgramBasicsSection({
           title="Schedule"
           description="Year/Season dates apply to all programs unless a program sets its own dates."
         >
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="min-w-0 space-y-1.5">
               <Label htmlFor="start_date">Start date</Label>
               <Input
                 id="start_date"
@@ -177,7 +250,7 @@ export function ProgramBasicsSection({
                 className="bg-background"
               />
             </div>
-            <div className="space-y-1.5">
+            <div className="min-w-0 space-y-1.5">
               <Label htmlFor="end_date">End date</Label>
               <Input
                 id="end_date"
@@ -187,7 +260,7 @@ export function ProgramBasicsSection({
                 className="bg-background"
               />
             </div>
-            <div className="space-y-1.5">
+            <div className="min-w-0 space-y-1.5">
               <Label htmlFor="enrollment_open_date">Enrollment opens</Label>
               <Input
                 id="enrollment_open_date"
@@ -197,7 +270,7 @@ export function ProgramBasicsSection({
                 className="bg-background"
               />
             </div>
-            <div className="space-y-1.5">
+            <div className="min-w-0 space-y-1.5">
               <Label htmlFor="enrollment_close_date">Enrollment closes</Label>
               <Input
                 id="enrollment_close_date"
@@ -216,8 +289,13 @@ export function ProgramBasicsSection({
         >
           <input type="hidden" name="min_age" value={ageSelectValue(minAge)} />
           <input type="hidden" name="max_age" value={ageSelectValue(maxAge)} />
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
+          <div
+            className={cn(
+              "grid gap-3",
+              stacked ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-1 sm:grid-cols-2"
+            )}
+          >
+            <div className="min-w-0 space-y-1.5">
               <Label htmlFor="gender">Gender</Label>
               <select
                 id="gender"
@@ -228,12 +306,12 @@ export function ProgramBasicsSection({
                 }
                 className="h-9 w-full rounded-md border bg-background px-3 text-sm"
               >
-                <option value="All">All genders</option>
-                <option value="Male">Male only</option>
-                <option value="Female">Female only</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="All">Both</option>
               </select>
             </div>
-            <div className="space-y-1.5">
+            <div className="min-w-0 space-y-1.5">
               <Label htmlFor="min_age_select">Minimum age</Label>
               <select
                 id="min_age_select"
@@ -251,7 +329,12 @@ export function ProgramBasicsSection({
                 ))}
               </select>
             </div>
-            <div className="space-y-1.5 sm:col-span-2">
+            <div
+              className={cn(
+                "min-w-0 space-y-1.5",
+                !stacked && "sm:col-span-2"
+              )}
+            >
               <Label htmlFor="max_age_select">Maximum age</Label>
               <select
                 id="max_age_select"
@@ -271,62 +354,11 @@ export function ProgramBasicsSection({
             </div>
           </div>
         </BasicsSubsection>
+
+        {stacked ? publishingFields : null}
       </div>
 
-      <div className="min-w-0">
-        <BasicsSubsection title="Publishing">
-          <div className="space-y-1.5">
-            <Label htmlFor="department_id">Department</Label>
-            <select
-              id="department_id"
-              name="department_id"
-              defaultValue={program?.department_id || ""}
-              className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-            >
-              <option value="">No department</option>
-              {departments.map((department) => (
-                <option key={department.id} value={department.id}>
-                  {department.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="visibility">Visibility</Label>
-            <select
-              id="visibility"
-              name="visibility"
-              defaultValue={initialVisibility}
-              className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-            >
-              <option value="public">Public</option>
-              <option value="members_only">Members Only</option>
-              <option value="private">Private</option>
-            </select>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="status">Status</Label>
-            <select
-              id="status"
-              name="status"
-              value={status ?? programStatusFallback}
-              onChange={(event) => onStatusChange?.(event.target.value)}
-              className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-            >
-              {statusOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-            <p className="text-xs text-muted-foreground">
-              Programs stay in Draft until you change status to Active.
-            </p>
-          </div>
-        </BasicsSubsection>
-      </div>
+      {!stacked ? <div className="min-w-0">{publishingFields}</div> : null}
     </div>
   )
 }

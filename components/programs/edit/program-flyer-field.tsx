@@ -168,9 +168,6 @@ export function ProgramFlyerField({
         </Button>
       ) : null}
 
-      <p className="text-xs text-muted-foreground">
-        Upload a promotional flyer image for this program.
-      </p>
       {error ? <p className="text-xs text-red-600">{error}</p> : null}
     </div>
   )

@@ -390,7 +390,7 @@ export function ContactBasicsPanel({
                   </>
                 )}
               </div>
-              {!isEntity ? (
+              {contactType === "individual" || contactType === "organization" ? (
                 <ContactDiscountTagsField contactId={contact.id} editing={isEditing} />
               ) : null}
             </div>

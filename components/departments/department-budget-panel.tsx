@@ -93,7 +93,7 @@ export function DepartmentBudgetPanel({
             label="Tuition"
             value={formatCurrency(summary.totals.studentTuition)}
             icon={DollarSign}
-            hint="Student payments"
+            hint="Participant payments"
           />
           <StatCard
             layout="header"
@@ -133,7 +133,7 @@ export function DepartmentBudgetPanel({
               Financial Summary
             </CardTitle>
             <CardDescription>
-              Student payments (from Programs billing) minus approved payroll for {departmentName}.
+              Participant payments (from Programs billing) minus approved payroll for {departmentName}.
               Add periods with start and end dates for this year. Directors see revenue totals here
               without student-level payment details. Separate from Group giving donations.
             </CardDescription>
@@ -179,7 +179,7 @@ export function DepartmentBudgetPanel({
                   <TableHeader>
                     <TableRow>
                       <TableHead>Period</TableHead>
-                      <TableHead className="text-right">Student payments</TableHead>
+                      <TableHead className="text-right">Participant payments</TableHead>
                       <TableHead className="text-right">Payroll</TableHead>
                       <TableHead className="text-right">Profit</TableHead>
                       {summary.canManage ? <TableHead className="w-[72px]" /> : null}
@@ -273,7 +273,7 @@ export function DepartmentBudgetPanel({
                 <TableHeader>
                   <TableRow>
                     <TableHead>Month</TableHead>
-                    <TableHead className="text-right">Student payments</TableHead>
+                    <TableHead className="text-right">Participant payments</TableHead>
                     <TableHead className="text-right">Payroll</TableHead>
                     <TableHead className="text-right">Profit</TableHead>
                   </TableRow>

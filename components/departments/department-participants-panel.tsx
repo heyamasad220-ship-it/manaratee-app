@@ -32,6 +32,7 @@ import {
   YEAR_SEASON_LABEL,
   YEAR_SEASON_LABEL_PLURAL,
 } from "@/lib/programs/program-display-labels"
+import { programOfferingManageHref } from "@/lib/programs/program-offering-paths"
 
 function formatDate(value: string | null) {
   if (!value) return "—"
@@ -86,19 +87,19 @@ function downloadCsv(filename: string, rows: string[][]) {
 export function DepartmentParticipantsPanel({
   departmentId,
   departmentName,
-  initialYearProgramId = null,
+  embedded = false,
 }: {
   departmentId: string
   departmentName: string
-  /** Prefill year/season filter (e.g. redirect from program Reports). */
-  initialYearProgramId?: string | null
+  /** Hide outer card title chrome when embedded in Participants tab. */
+  embedded?: boolean
 }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [participants, setParticipants] = useState<DepartmentParticipantRow[]>([])
   const [years, setYears] = useState<DepartmentParticipantYearOption[]>([])
   const [courses, setCourses] = useState<DepartmentParticipantCourseOption[]>([])
-  const [yearFilter, setYearFilter] = useState<string>(initialYearProgramId || "all")
+  const [yearFilterSelect, setYearFilterSelect] = useState<string>("all")
   const [courseFilterSelect, setCourseFilterSelect] = useState<string>("all")
   const [includeInactive, setIncludeInactive] = useState(false)
   const [studentFilter, setStudentFilter] = useState("")
@@ -108,17 +109,11 @@ export function DepartmentParticipantsPanel({
   const [teacherFilter, setTeacherFilter] = useState("")
   const [teacherFilterInput, setTeacherFilterInput] = useState("")
 
-  useEffect(() => {
-    if (initialYearProgramId) {
-      setYearFilter(initialYearProgramId)
-    }
-  }, [initialYearProgramId])
-
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     const result = await fetchDepartmentParticipantsAction(departmentId, {
-      programId: yearFilter === "all" ? null : yearFilter,
+      programId: yearFilterSelect === "all" ? null : yearFilterSelect,
       offeringId: courseFilterSelect === "all" ? null : courseFilterSelect,
       includeInactive,
     })
@@ -134,11 +129,18 @@ export function DepartmentParticipantsPanel({
     setYears(result.years)
     setCourses(result.courses)
     setLoading(false)
-  }, [departmentId, yearFilter, courseFilterSelect, includeInactive])
+  }, [departmentId, yearFilterSelect, courseFilterSelect, includeInactive])
 
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    if (yearFilterSelect === "all") return
+    if (!years.some((year) => year.id === yearFilterSelect)) {
+      setYearFilterSelect("all")
+    }
+  }, [years, yearFilterSelect])
 
   useEffect(() => {
     if (courseFilterSelect === "all") return
@@ -146,6 +148,11 @@ export function DepartmentParticipantsPanel({
       setCourseFilterSelect("all")
     }
   }, [courses, courseFilterSelect])
+
+  const programOptions = useMemo(() => {
+    if (yearFilterSelect === "all") return courses
+    return courses.filter((course) => course.programId === yearFilterSelect)
+  }, [courses, yearFilterSelect])
 
   const filteredParticipants = useMemo(
     () =>
@@ -180,7 +187,7 @@ export function DepartmentParticipantsPanel({
     Boolean(studentFilter.trim()) ||
     Boolean(courseFilter.trim()) ||
     Boolean(teacherFilter.trim()) ||
-    yearFilter !== "all" ||
+    yearFilterSelect !== "all" ||
     courseFilterSelect !== "all" ||
     includeInactive
 
@@ -189,8 +196,7 @@ export function DepartmentParticipantsPanel({
       `${departmentName.replace(/[^\w-]+/g, "-").toLowerCase()}-enrollments.csv`,
       [
         [
-          "Student",
-          YEAR_SEASON_LABEL,
+          "Participant",
           PROGRAM_LABEL,
           "Teacher",
           "Status",
@@ -201,7 +207,6 @@ export function DepartmentParticipantsPanel({
         ],
         ...filteredParticipants.map((row) => [
           row.studentName,
-          row.yearSeasonName,
           row.courseName,
           row.teacherName || "",
           row.status || "",
@@ -213,6 +218,245 @@ export function DepartmentParticipantsPanel({
       ]
     )
   }
+
+  const rosterBody = (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-end gap-4 rounded-lg border bg-muted/20 p-3">
+        <div className="space-y-1.5">
+          <Label htmlFor="roster-year">{YEAR_SEASON_LABEL}</Label>
+          <select
+            id="roster-year"
+            value={yearFilterSelect}
+            onChange={(event) => {
+              setYearFilterSelect(event.target.value)
+              setCourseFilterSelect("all")
+            }}
+            className="h-9 min-w-[12rem] rounded-md border bg-background px-3 text-sm"
+          >
+            <option value="all">
+              All {YEAR_SEASON_LABEL_PLURAL.toLowerCase()}
+            </option>
+            {years.map((year) => (
+              <option key={year.id} value={year.id}>
+                {year.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="roster-course">{PROGRAM_LABEL}</Label>
+          <select
+            id="roster-course"
+            value={courseFilterSelect}
+            onChange={(event) => setCourseFilterSelect(event.target.value)}
+            className="h-9 min-w-[12rem] rounded-md border bg-background px-3 text-sm"
+          >
+            <option value="all">All {PROGRAM_LABEL_PLURAL.toLowerCase()}</option>
+            {programOptions.map((course) => (
+              <option key={course.id} value={course.id}>
+                {course.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <label className="flex items-center gap-2 pb-2 text-sm">
+          <input
+            type="checkbox"
+            className="size-3.5"
+            checked={includeInactive}
+            onChange={(event) => setIncludeInactive(event.target.checked)}
+          />
+          Include cancelled / withdrawn
+        </label>
+        <div className="ml-auto pb-0.5">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleExport}
+            disabled={loading || filteredParticipants.length === 0}
+          >
+            <Download className="mr-1.5 h-4 w-4" />
+            Export CSV
+          </Button>
+        </div>
+      </div>
+
+      {loading ? (
+        <p className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
+          <Loader2 className="size-4 animate-spin" />
+          Loading roster...
+        </p>
+      ) : error ? (
+        <p className="py-6 text-sm text-destructive">{error}</p>
+      ) : participants.length === 0 && !filtersActive ? (
+        <p className="py-6 text-center text-sm text-muted-foreground">
+          No students registered in this department&apos;s open{" "}
+          {YEAR_SEASON_LABEL_PLURAL.toLowerCase()} yet.
+        </p>
+      ) : (
+        <div className="overflow-x-auto rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>
+                  <TableColumnHeaderFilter
+                    label="Participant"
+                    active={Boolean(studentFilter.trim())}
+                  >
+                    {({ close }) => (
+                      <Input
+                        placeholder="Search by name"
+                        value={studentFilterInput}
+                        onChange={(event) => {
+                          setStudentFilterInput(event.target.value)
+                          setStudentFilter(event.target.value)
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            setStudentFilter(studentFilterInput)
+                            close()
+                          }
+                        }}
+                      />
+                    )}
+                  </TableColumnHeaderFilter>
+                </TableHead>
+                <TableHead>
+                  <TableColumnHeaderFilter
+                    label={PROGRAM_LABEL}
+                    active={Boolean(courseFilter.trim())}
+                  >
+                    {({ close }) => (
+                      <Input
+                        placeholder={`Search by ${PROGRAM_LABEL.toLowerCase()}`}
+                        value={courseFilterInput}
+                        onChange={(event) => {
+                          setCourseFilterInput(event.target.value)
+                          setCourseFilter(event.target.value)
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            setCourseFilter(courseFilterInput)
+                            close()
+                          }
+                        }}
+                      />
+                    )}
+                  </TableColumnHeaderFilter>
+                </TableHead>
+                <TableHead>
+                  <TableColumnHeaderFilter
+                    label="Teacher"
+                    active={Boolean(teacherFilter.trim())}
+                  >
+                    {({ close }) => (
+                      <Input
+                        placeholder="Search by teacher"
+                        value={teacherFilterInput}
+                        onChange={(event) => {
+                          setTeacherFilterInput(event.target.value)
+                          setTeacherFilter(event.target.value)
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            setTeacherFilter(teacherFilterInput)
+                            close()
+                          }
+                        }}
+                      />
+                    )}
+                  </TableColumnHeaderFilter>
+                </TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Parent / Guardian</TableHead>
+                <TableHead>Registered</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredParticipants.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={6}
+                    className="py-8 text-center text-sm text-muted-foreground"
+                  >
+                    No enrollments match these filters.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredParticipants.map((row) => (
+                  <TableRow key={row.enrollmentId}>
+                    <TableCell className="font-medium">
+                      <div>{row.studentName}</div>
+                      <Link
+                        href={`/programs/registrations/${row.enrollmentId}`}
+                        className="text-xs text-muted-foreground hover:underline"
+                      >
+                        View registration
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      {row.offeringId ? (
+                        <Link
+                          href={programOfferingManageHref(
+                            row.programId,
+                            row.offeringId,
+                            { departmentId }
+                          )}
+                          className="text-primary hover:underline"
+                        >
+                          {row.courseName}
+                        </Link>
+                      ) : (
+                        row.courseName
+                      )}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {row.teacherName || "—"}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" className="capitalize font-normal">
+                        {formatStatus(row.status)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {row.parentName || row.parentContactId ? (
+                        <div>
+                          {row.parentContactId ? (
+                            <Link
+                              href={contactProfileHref(row.parentContactId)}
+                              className="font-medium text-primary hover:underline"
+                            >
+                              {row.parentName || "View contact"}
+                            </Link>
+                          ) : (
+                            <div className="font-medium text-foreground">
+                              {row.parentName}
+                            </div>
+                          )}
+                          {row.parentEmail ? (
+                            <div className="text-xs">{row.parentEmail}</div>
+                          ) : null}
+                          {row.parentPhone ? (
+                            <div className="text-xs">{row.parentPhone}</div>
+                          ) : null}
+                        </div>
+                      ) : (
+                        "—"
+                      )}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {formatDate(row.registeredAt)}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+    </div>
+  )
 
   return (
     <div className="space-y-6">
@@ -231,10 +475,10 @@ export function DepartmentParticipantsPanel({
             layout="header"
             fill
             tone="sky"
-            label="Students"
+            label="Participants"
             value={uniqueStudents}
             icon={UserRound}
-            hint="Unique students"
+            hint="Unique participants"
           />
           <StatCard
             layout="header"
@@ -275,260 +519,41 @@ export function DepartmentParticipantsPanel({
         </StatCardsRow>
       ) : null}
 
-      <Card>
-        <CardHeader className="flex flex-col gap-3 space-y-0 pb-2 sm:flex-row sm:items-start sm:justify-between">
+      {embedded ? (
+        <div className="space-y-3">
           <div>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Users className="size-4" />
-              Enrollments
-            </CardTitle>
-            <CardDescription>
-              Students enrolled in {YEAR_SEASON_LABEL_PLURAL.toLowerCase()} for {departmentName}.
-              Payment details stay in Programs billing.
+            <h2 className="text-base font-semibold tracking-tight">Roster</h2>
+            <p className="text-sm text-muted-foreground">
+              Registered participants for {departmentName}. Payment details stay in
+              Programs billing.
               {filtersActive
                 ? ` Showing ${filteredParticipants.length} of ${participants.length}.`
                 : null}
-            </CardDescription>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleExport}
-            disabled={loading || filteredParticipants.length === 0}
-          >
-            <Download className="mr-1.5 h-4 w-4" />
-            Export CSV
-          </Button>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-wrap items-end gap-4 rounded-lg border bg-muted/20 p-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="roster-year">{YEAR_SEASON_LABEL}</Label>
-              <select
-                id="roster-year"
-                value={yearFilter}
-                onChange={(event) => {
-                  setYearFilter(event.target.value)
-                  setCourseFilterSelect("all")
-                }}
-                className="h-9 min-w-[14rem] rounded-md border bg-background px-3 text-sm"
-              >
-                <option value="all">All {YEAR_SEASON_LABEL_PLURAL.toLowerCase()}</option>
-                {years.map((year) => (
-                  <option key={year.id} value={year.id}>
-                    {year.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="roster-course">{PROGRAM_LABEL}</Label>
-              <select
-                id="roster-course"
-                value={courseFilterSelect}
-                onChange={(event) => setCourseFilterSelect(event.target.value)}
-                className="h-9 min-w-[12rem] rounded-md border bg-background px-3 text-sm"
-              >
-                <option value="all">All {PROGRAM_LABEL_PLURAL.toLowerCase()}</option>
-                {courses.map((course) => (
-                  <option key={course.id} value={course.id}>
-                    {course.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <label className="flex items-center gap-2 pb-2 text-sm">
-              <input
-                type="checkbox"
-                className="size-3.5"
-                checked={includeInactive}
-                onChange={(event) => setIncludeInactive(event.target.checked)}
-              />
-              Include cancelled / withdrawn
-            </label>
-          </div>
-
-          {loading ? (
-            <p className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" />
-              Loading enrollments...
             </p>
-          ) : error ? (
-            <p className="py-6 text-sm text-destructive">{error}</p>
-          ) : participants.length === 0 && !filtersActive ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">
-              No students registered in this department&apos;s open{" "}
-              {YEAR_SEASON_LABEL_PLURAL.toLowerCase()} yet.
-            </p>
-          ) : (
-            <div className="overflow-x-auto rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>
-                      <TableColumnHeaderFilter
-                        label="Student"
-                        active={Boolean(studentFilter.trim())}
-                      >
-                        {({ close }) => (
-                          <Input
-                            placeholder="Search by name"
-                            value={studentFilterInput}
-                            onChange={(event) => {
-                              setStudentFilterInput(event.target.value)
-                              setStudentFilter(event.target.value)
-                            }}
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter") {
-                                setStudentFilter(studentFilterInput)
-                                close()
-                              }
-                            }}
-                          />
-                        )}
-                      </TableColumnHeaderFilter>
-                    </TableHead>
-                    <TableHead>{YEAR_SEASON_LABEL}</TableHead>
-                    <TableHead>
-                      <TableColumnHeaderFilter
-                        label={PROGRAM_LABEL}
-                        active={Boolean(courseFilter.trim())}
-                      >
-                        {({ close }) => (
-                          <Input
-                            placeholder={`Search by ${PROGRAM_LABEL.toLowerCase()}`}
-                            value={courseFilterInput}
-                            onChange={(event) => {
-                              setCourseFilterInput(event.target.value)
-                              setCourseFilter(event.target.value)
-                            }}
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter") {
-                                setCourseFilter(courseFilterInput)
-                                close()
-                              }
-                            }}
-                          />
-                        )}
-                      </TableColumnHeaderFilter>
-                    </TableHead>
-                    <TableHead>
-                      <TableColumnHeaderFilter
-                        label="Teacher"
-                        active={Boolean(teacherFilter.trim())}
-                      >
-                        {({ close }) => (
-                          <Input
-                            placeholder="Search by teacher"
-                            value={teacherFilterInput}
-                            onChange={(event) => {
-                              setTeacherFilterInput(event.target.value)
-                              setTeacherFilter(event.target.value)
-                            }}
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter") {
-                                setTeacherFilter(teacherFilterInput)
-                                close()
-                              }
-                            }}
-                          />
-                        )}
-                      </TableColumnHeaderFilter>
-                    </TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Parent / Guardian</TableHead>
-                    <TableHead>Registered</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredParticipants.length === 0 ? (
-                    <TableRow>
-                      <TableCell
-                        colSpan={7}
-                        className="py-8 text-center text-sm text-muted-foreground"
-                      >
-                        No enrollments match these filters.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredParticipants.map((row) => (
-                      <TableRow key={row.enrollmentId}>
-                        <TableCell className="font-medium">
-                          <div>
-                            {row.studentContactId ? (
-                              <Link
-                                href={contactProfileHref(row.studentContactId)}
-                                className="text-primary hover:underline"
-                              >
-                                {row.studentName}
-                              </Link>
-                            ) : (
-                              row.studentName
-                            )}
-                          </div>
-                          <Link
-                            href={`/programs/registrations/${row.enrollmentId}`}
-                            className="text-xs text-muted-foreground hover:underline"
-                          >
-                            View registration
-                          </Link>
-                        </TableCell>
-                        <TableCell>
-                          <Link
-                            href={`/programs/${row.programId}`}
-                            className="text-primary hover:underline"
-                          >
-                            {row.yearSeasonName}
-                          </Link>
-                        </TableCell>
-                        <TableCell>
-                          {row.offeringId ? (
-                            <Link
-                              href={`/programs/${row.programId}/offerings/${row.offeringId}`}
-                              className="text-primary hover:underline"
-                            >
-                              {row.courseName}
-                            </Link>
-                          ) : (
-                            row.courseName
-                          )}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {row.teacherName || "—"}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary" className="capitalize font-normal">
-                            {formatStatus(row.status)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {row.parentName ? (
-                            <div>
-                              <div>{row.parentName}</div>
-                              {row.parentEmail ? (
-                                <div className="text-xs">{row.parentEmail}</div>
-                              ) : null}
-                              {row.parentPhone ? (
-                                <div className="text-xs">{row.parentPhone}</div>
-                              ) : null}
-                            </div>
-                          ) : (
-                            "—"
-                          )}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {formatDate(row.registeredAt)}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
+          </div>
+          {rosterBody}
+        </div>
+      ) : (
+        <Card>
+          <CardHeader className="flex flex-col gap-3 space-y-0 pb-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Users className="size-4" />
+                Roster
+              </CardTitle>
+              <CardDescription>
+                Participants enrolled in {YEAR_SEASON_LABEL_PLURAL.toLowerCase()} for{" "}
+                {departmentName}. Payment details stay in Programs billing.
+                {filtersActive
+                  ? ` Showing ${filteredParticipants.length} of ${participants.length}.`
+                  : null}
+              </CardDescription>
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </CardHeader>
+          <CardContent>{rosterBody}</CardContent>
+        </Card>
+      )}
     </div>
   )
 }
+

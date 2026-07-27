@@ -294,27 +294,36 @@ export async function updateProgramOffering(
     throw new Error("Offering name is required")
   }
 
+  const updatePayload: Record<string, unknown> = {
+    name,
+    offering_type: input.offering_type ?? "standard",
+    start_date: input.start_date ?? null,
+    end_date: input.end_date ?? null,
+    enrollment_open_date: input.enrollment_open_date ?? null,
+    enrollment_close_date: input.enrollment_close_date ?? null,
+    status: input.status ?? "draft",
+    updated_at: new Date().toISOString(),
+  }
+
+  if (input.flyer_url !== undefined) {
+    updatePayload.flyer_url = input.flyer_url?.trim() || null
+  }
+  if (input.background_color !== undefined) {
+    updatePayload.background_color = input.background_color?.trim() || null
+  }
+  if (input.attributes?.delivery_format) {
+    updatePayload.delivery_format = input.attributes.delivery_format
+  }
+  if (input.attributes?.attendance_tracked !== undefined) {
+    updatePayload.attendance_tracked = input.attributes.attendance_tracked
+  }
+  if (input.attributes?.care_enabled !== undefined) {
+    updatePayload.care_enabled = input.attributes.care_enabled
+  }
+
   const { data, error } = await supabase
     .from("program_offerings")
-    .update({
-      name,
-      offering_type: input.offering_type ?? "standard",
-      start_date: input.start_date ?? null,
-      end_date: input.end_date ?? null,
-      enrollment_open_date: input.enrollment_open_date ?? null,
-      enrollment_close_date: input.enrollment_close_date ?? null,
-      status: input.status ?? "draft",
-      ...(input.attributes?.delivery_format
-        ? { delivery_format: input.attributes.delivery_format }
-        : {}),
-      ...(input.attributes?.attendance_tracked !== undefined
-        ? { attendance_tracked: input.attributes.attendance_tracked }
-        : {}),
-      ...(input.attributes?.care_enabled !== undefined
-        ? { care_enabled: input.attributes.care_enabled }
-        : {}),
-      updated_at: new Date().toISOString(),
-    })
+    .update(updatePayload)
     .eq("id", offeringId)
     .eq("organization_id", organizationId)
     .select("*")
@@ -349,7 +358,18 @@ export async function archiveProgramOffering(offeringId: string) {
   }
 
   if (offering.is_default) {
-    throw new Error("The default offering cannot be archived. Rename it instead.")
+    const { error: clearDefaultError } = await supabase
+      .from("program_offerings")
+      .update({
+        is_default: false,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", offeringId)
+      .eq("organization_id", organizationId)
+
+    if (clearDefaultError) {
+      throw new Error(clearDefaultError.message)
+    }
   }
 
   const { error } = await supabase
@@ -387,12 +407,6 @@ export async function deleteProgramOffering(offeringId: string) {
     throw new Error("Offering not found")
   }
 
-  if (offering.is_default) {
-    throw new Error(
-      "The default offering cannot be deleted. Rename it or archive it instead."
-    )
-  }
-
   const { count, error: enrollmentError } = await supabase
     .from("program_enrollments")
     .select("id", { count: "exact", head: true })
@@ -406,8 +420,26 @@ export async function deleteProgramOffering(offeringId: string) {
 
   if ((count ?? 0) > 0) {
     throw new Error(
-      "This offering has registrations and cannot be deleted. Set status to Archived instead."
+      "This program has registrations and cannot be deleted. Archive it instead."
     )
+  }
+
+  // Empty default shells (e.g. auto-created year defaults) can be removed after
+  // clearing is_default so the unique default constraint is satisfied.
+  if (offering.is_default) {
+    const { error: clearDefaultError } = await supabase
+      .from("program_offerings")
+      .update({
+        is_default: false,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", offeringId)
+      .eq("organization_id", organizationId)
+
+    if (clearDefaultError) {
+      console.error("deleteProgramOffering clear default:", clearDefaultError)
+      throw new Error(clearDefaultError.message)
+    }
   }
 
   const { error: deleteError } = await supabase

@@ -1,42 +1,28 @@
-import { Suspense } from "react"
-import { Header } from "@/components/layout/header"
-import { HrOverviewClient } from "@/components/hr/hr-overview-client"
-import { fetchChildcareProvidersData } from "@/lib/hr/childcare-provider-actions"
-import { fetchPeopleManagementOverview } from "@/lib/hr/hr-overview-actions"
-import { WORKFORCE_MODULE_LABEL } from "@/lib/hr/hr-module-label"
-import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
-import { PERMISSIONS, requirePermission } from "@/lib/permissions/permissions"
+import { redirect } from "next/navigation"
+
+import { HrOverviewRoutePage } from "@/components/hr/hr-overview-route-page"
+import { FINANCE_PAYROLL_PATH } from "@/lib/finance/finance-paths"
+import {
+  hrOverviewHref,
+  parseHrOverviewTab,
+} from "@/lib/hr/hr-overview-path"
 
 export default async function WorkforceOverviewPage({
   searchParams,
 }: {
   searchParams: Promise<{ tab?: string }>
 }) {
-  await requirePermission(PERMISSIONS.STAFF_VIEW)
-
   const { tab } = await searchParams
-  const [overview, organizationId, childcare] = await Promise.all([
-    fetchPeopleManagementOverview(),
-    getSelectedOrganizationId(),
-    fetchChildcareProvidersData(),
-  ])
+  if (tab === "payroll") {
+    redirect(FINANCE_PAYROLL_PATH)
+  }
+  // Legacy `?tab=` deep links → path-based HR sections.
+  if (tab && tab !== "overview") {
+    const next = parseHrOverviewTab(tab)
+    if (next !== "overview") {
+      redirect(hrOverviewHref({ tab: next }))
+    }
+  }
 
-  return (
-    <>
-      <Header title={WORKFORCE_MODULE_LABEL} />
-      <Suspense fallback={<div className="h-64 animate-pulse rounded-lg bg-muted m-6" />}>
-        <HrOverviewClient
-          organizationId={organizationId}
-          overviewStats={{
-            employees: overview.employees.totalEmployees,
-            volunteers: overview.volunteerContacts,
-            childcareProviders: overview.childcareProviders,
-          }}
-          childcareProviders={childcare.providers}
-          childcareStats={childcare.stats}
-          initialTab={tab}
-        />
-      </Suspense>
-    </>
-  )
+  return <HrOverviewRoutePage initialTab="overview" />
 }

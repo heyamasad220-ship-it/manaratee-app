@@ -69,7 +69,9 @@ async function AudienceCalendarPageContent({
       initialDate={dateParam || toDateParam(anchorDate)}
       initialView={view}
       canManageBlocks={canManageBlocks && audience === "ops"}
-      canPlanEvents={canPlanEvents && audience === "staff"}
+      canPlanEvents={
+        canPlanEvents && (audience === "staff" || audience === "ops")
+      }
       headerTitle={headerTitle || CALENDAR_AUDIENCE_LABELS[audience]}
       description={CALENDAR_AUDIENCE_DESCRIPTIONS[audience]}
     />

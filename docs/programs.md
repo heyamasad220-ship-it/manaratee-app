@@ -84,7 +84,7 @@ The Programs module lets organizations create and manage programs (camps, classe
 
 **Important design decisions:**
 
-- Customers register via **contacts** (`registrant_contact_id`, `participant_contact_id`), not legacy `people`/`child_person_id` alone.
+- Customers register via **Contact + Participant**: adult/self uses contacts; youth minors use `child_person_id` (people under the parent Contact) with `participant_contact_id` null.
 - Customers do **not** write enrollments directly; they call `register_for_program` RPC (017+).
 - Pricing is computed server-side via `quote_program_registration`; internal `compute_program_registration_quote` is locked down (019A/019B).
 - Sessions for registration are resolved by `resolve_registration_session_ids` (full program vs selected sessions vs drop-in).
@@ -381,9 +381,9 @@ Programs module (Catalog first). **Departments** is under **HR** (`/workforce/de
 |----------|-------|------------|
 | Catalog | `/programs/catalog` | `programs.view` |
 | Schedule | `/programs/schedule` | `programs.view` |
-| Financial Assistance | `/programs/financial-assistance` | `applications.view` — Overview / Submissions / Templates + FA report + Payment Plans tabs |
-| Reports | `/programs/reports` | `reports.view` — Overview / Registrations / Payment transactions / Attendance / Waitlist (department + active offering filters). Expenses → department workspace; enable waitlist/attendance on offering |
-| Settings | Departments list → department **Settings** (`/workforce?tab=departments`, then `?tab=settings`) | `programs.manage` |
+| Financial Assistance | `/finance/financial-assistance` (legacy `/programs/financial-assistance` redirects) | `applications.view` / `finance.view` — Overview / Submissions / Templates + FA report + Payment Plans tabs |
+| Reports | `/programs/reports` | `reports.view` — Overview / Registrations / Attendance / Waitlist. Payment transactions → **Finance → Transactions**; expenses → department workspace |
+| Settings | Per-department **Settings** on the department workspace (`/workforce/departments/[id]?tab=settings`) — not in the Programs sidebar | `staff.view` / department head |
 
 ### Program management routes
 
@@ -394,7 +394,7 @@ Programs module (Catalog first). **Departments** is under **HR** (`/workforce/de
 | `/programs/create` | **Quick Create** — basics + eligibility; redirects to `/programs/[id]` after save |
 | `/programs/[id]` | Program detail home (Overview inline edit + Offerings; Catalog → Edit) |
 | `/programs/[id]/offerings` | Redirects to first non-archived offering manage page (or program detail if none) |
-| `/programs/[id]/offerings/[offeringId]` | **Offering manage** — Overview (staff + schedule) / Enrollment (registration + fees; waitlist toggle). Attendance & Waitlist views → Reports |
+| `/programs/[id]/offerings/[offeringId]` | **Offering manage** (orphan years). Department-linked years use `/workforce/departments/[id]/programs/[programId]/offerings/[offeringId]` instead. |
 | `/programs/[id]/edit` | **Retired** — redirects to detail or offering manage (legacy deep links) |
 | `/programs/[id]/billing` | Redirects to offering Enrollment tab (fees) |
 | `/programs/[id]/car-tags` | Printable car dismissal name tags (staff operations) |

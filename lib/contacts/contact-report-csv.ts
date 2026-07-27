@@ -1,5 +1,4 @@
 import type { ContactDirectoryExportRow } from "@/lib/contacts/contact-report-types"
-import { getContactRecordTypeLabel } from "@/lib/contacts/contact-constants"
 
 function escapeCsvValue(value: unknown) {
   return `"${String(value ?? "").replaceAll('"', '""')}"`
@@ -21,11 +20,8 @@ export function buildContactDirectoryCsvRows(contacts: ContactDirectoryExportRow
     Name: contact.name,
     Email: contact.email,
     Phone: contact.phone,
-    "Record Type": getContactRecordTypeLabel(contact.recordType),
     Roles: contact.roles.join(", "),
-    Status: contact.status,
     "Primary Contact": contact.primaryContactName,
-    Teams: contact.teams.map((team) => team.name).join(", "),
     Address: contact.address,
     City: contact.city,
     State: contact.state,

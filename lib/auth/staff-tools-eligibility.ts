@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 
+import { resolveDepartmentHeadship } from "@/lib/departments/department-headship"
 import { resolvePortalPermissions } from "@/lib/auth/resolve-portal-permissions"
 
 /** Contact roles that can use Staff Tools in the member portal. */
@@ -42,6 +43,16 @@ export async function resolveStaffToolsPortalAccess(
   )
 
   if (portalPermissions.hasStaffToolsPortal) {
+    return true
+  }
+
+  // Department Heads get Staff Tools so they can open My department.
+  const headship = await resolveDepartmentHeadship(
+    supabase,
+    organizationId,
+    userId
+  )
+  if (headship) {
     return true
   }
 

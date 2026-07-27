@@ -249,6 +249,7 @@ function revalidateInternalEventPaths(eventId?: string) {
   revalidatePath("/event-management/overview")
   revalidatePath("/facilities/calendar")
   revalidatePath("/facilities/reservation-center")
+  revalidatePath("/facilities/overview")
   revalidateTicketingPaths()
   if (eventId) {
     revalidatePath(`/event-management/${eventId}`)

@@ -37,6 +37,7 @@ import {
   PledgeSummaryMetricCards,
   type PledgeSummaryMetrics,
 } from "@/components/donations/pledge-summary-metric-cards"
+import { ensureCampaignDonationFundAction } from "@/lib/donations/ensure-campaign-donation-fund-actions"
 import {
   formatDonationCurrency,
 } from "@/lib/donations/campaign-analytics"
@@ -310,6 +311,14 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
         console.error("Error saving campaign:", error)
         alert(error.message)
         return
+      }
+
+      const fundResult = await ensureCampaignDonationFundAction(campaignForm.name.trim())
+      if (!fundResult.success) {
+        console.error("Error creating campaign fund:", fundResult.error)
+        alert(
+          `Campaign created, but the fund under General Donation could not be created: ${fundResult.error}`
+        )
       }
     }
 

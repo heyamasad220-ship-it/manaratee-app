@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { AffiliationRulesPanel } from "@/components/contacts/affiliation-rules-panel"
 import { DiscountPoliciesPanel } from "@/components/hr/discount-policies-panel"
 import type { OrganizationAffiliationSettingRow } from "@/lib/contacts/contact-affiliation-settings"
+import type { DiscountTag } from "@/lib/discount-tags/discount-tag-types"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Tags, Users } from "lucide-react"
 
@@ -19,13 +20,6 @@ function normalizeTab(tab?: string | null): ContactsSettingsTab {
     return tab as ContactsSettingsTab
   }
   return "affiliations"
-}
-
-type DiscountTag = {
-  id: string
-  name: string
-  description: string | null
-  active: boolean
 }
 
 export function ContactsSettingsClient({

@@ -1,6 +1,5 @@
-import { redirect } from "next/navigation"
-import { hrOverviewHref } from "@/lib/hr/hr-overview-path"
+import { HrOverviewRoutePage } from "@/components/hr/hr-overview-route-page"
 
 export default async function WorkforceDepartmentsPage() {
-  redirect(hrOverviewHref({ tab: "departments" }))
+  return <HrOverviewRoutePage initialTab="departments" />
 }

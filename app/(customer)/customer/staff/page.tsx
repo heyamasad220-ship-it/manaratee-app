@@ -3,15 +3,19 @@ import { redirect } from "next/navigation"
 import {
   ArrowRight,
   Briefcase,
+  Building2,
   CalendarPlus,
   ClipboardList,
   LayoutDashboard,
 } from "lucide-react"
 
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { requireCustomerPortalPageContext } from "@/lib/auth/require-customer-portal-page"
 import { getUserPortalCapabilities, requireStaffToolsPortal } from "@/lib/auth/portal-capabilities"
+import { getDepartmentHeadshipForCurrentUser } from "@/lib/departments/department-access"
+import { workforceDepartmentDetailPath } from "@/lib/departments/department-paths"
 import { getMyInternalEventRequests } from "@/lib/events/customer-staff-event-queries"
 import {
   getInternalEventStatusLabel,
@@ -27,8 +31,11 @@ export default async function CustomerStaffToolsPage() {
     redirect("/customer/dashboard")
   }
 
-  const portalCapabilities = await getUserPortalCapabilities(userId, organizationId)
-  const myRequests = await getMyInternalEventRequests(userId, organizationId)
+  const [portalCapabilities, myRequests, headship] = await Promise.all([
+    getUserPortalCapabilities(userId, organizationId),
+    getMyInternalEventRequests(userId, organizationId),
+    getDepartmentHeadshipForCurrentUser(),
+  ])
   const pendingCount = myRequests.filter((event) =>
     isInternalEventPendingApproval(event.status)
   ).length
@@ -40,22 +47,59 @@ export default async function CustomerStaffToolsPage() {
           <Briefcase className="h-4 w-4" />
           Staff Tools
         </div>
-        <h1 className="text-2xl font-bold tracking-tight">Department events</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Staff Tools</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Submit internal event requests for supervisor approval. This is separate
-          from personal venue rentals in My Account.
+          Department workspace access and internal event requests. Personal
+          venue rentals stay under My Account.
+        </p>
+      </div>
+
+      {headship ? (
+        <Card className="border-primary/20 bg-primary/5">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Building2 className="h-4 w-4" />
+              My department
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-medium">{headship.departmentName}</p>
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                <Badge variant="secondary">Department Head</Badge>
+                <span className="text-sm text-muted-foreground">
+                  Overview, programs, students, schedule, and financial tools
+                </span>
+              </div>
+            </div>
+            <Button asChild>
+              <Link href={workforceDepartmentDetailPath(headship.departmentId)}>
+                Open workspace
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      <div>
+        <h2 className="mb-3 text-lg font-semibold tracking-tight">
+          Department events
+        </h2>
+        <p className="mb-4 text-sm text-muted-foreground">
+          Submit internal event requests for supervisor approval. Approved events
+          appear on the organization calendar.
         </p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <Card className="sm:col-span-2 border-primary/20 bg-primary/5">
+        <Card className={headship ? undefined : "sm:col-span-2 border-primary/20 bg-primary/5"}>
           <CardHeader>
             <CardTitle className="text-base">Request a department event</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
               Choose a space and time, add setup details, and submit for approval.
-              Approved events appear on the organization calendar.
             </p>
             <Button asChild>
               <Link href="/customer/staff/events/request">

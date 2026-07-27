@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation"
-import { hrPayrollHref } from "@/lib/hr/hr-overview-path"
 
-/** Finance module sidebar removed — payroll lives under HR → Payroll. */
+import { FINANCE_TRANSACTIONS_PATH } from "@/lib/finance/finance-paths"
+
+/** Finance module home → Transactions. */
 export default function FinanceIndexPage() {
-  redirect(hrPayrollHref())
+  redirect(FINANCE_TRANSACTIONS_PATH)
 }

@@ -350,7 +350,7 @@ export function EventManagementOverviewClient({
                   Today&apos;s Schedule
                 </CardTitle>
                 <Button variant="ghost" size="sm" asChild>
-                  <Link href="/facilities/availability" className="text-xs">
+                  <Link href="/facilities/calendar" className="text-xs">
                     View Calendar
                     <ChevronRight className="ml-1 h-3 w-3" />
                   </Link>

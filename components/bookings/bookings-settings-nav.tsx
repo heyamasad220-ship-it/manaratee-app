@@ -7,15 +7,25 @@ import { cn } from "@/lib/utils"
 
 const settingsTabs = [
   {
-    label: "Overview",
-    href: "/facilities/settings",
-    matchPrefix: "/facilities/settings",
-    exact: true,
-  },
-  {
     label: "Spaces",
     href: "/facilities/settings/spaces",
     matchPrefix: "/facilities/settings/spaces",
+  },
+  {
+    label: "Resources",
+    href: "/facilities/settings/resources",
+    matchPrefix: "/facilities/settings/resources",
+    alsoMatchPrefixes: ["/facilities/resources"],
+  },
+  {
+    label: "Setup Styles",
+    href: "/facilities/settings/setup-styles",
+    matchPrefix: "/facilities/settings/setup-styles",
+  },
+  {
+    label: "Event Types",
+    href: "/facilities/settings/event-types",
+    matchPrefix: "/facilities/settings/event-types",
   },
 ] as const
 
@@ -25,9 +35,12 @@ export function FacilitiesSettingsNav() {
   return (
     <nav className="flex gap-1 border-b border-border">
       {settingsTabs.map((tab) => {
-        const isActive = tab.exact
-          ? pathname === tab.href
-          : pathname.startsWith(tab.matchPrefix)
+        const isActive =
+          pathname.startsWith(tab.matchPrefix) ||
+          ("alsoMatchPrefixes" in tab &&
+            (tab.alsoMatchPrefixes ?? []).some(
+              (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+            ))
 
         return (
           <Link

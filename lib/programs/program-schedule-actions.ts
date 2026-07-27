@@ -26,15 +26,22 @@ type CreateRecurringScheduleInput = Omit<ScheduleItemInput, "day_of_week"> & {
   days_of_week: string[]
 }
 
-function revalidateSchedulePaths(programId: string, offeringId: string) {
+function revalidateSchedulePaths(
+  programId: string,
+  offeringId: string,
+  departmentId?: string | null
+) {
   revalidatePath(`/programs/${programId}`)
   revalidatePath(`/programs/${programId}/offerings`)
-  revalidatePath(programOfferingManageHref(programId, offeringId, "enrollment"))
+  revalidatePath(
+    programOfferingManageHref(programId, offeringId, { departmentId })
+  )
   revalidatePath(`/customer/programs/${programId}`)
   revalidatePath("/programs/schedule")
   revalidatePath("/facilities/calendar")
   revalidatePath("/facilities/availability")
   revalidatePath("/facilities/reservation-center")
+  revalidatePath("/facilities/overview")
 }
 
 async function assertOfferingBelongsToProgram(
@@ -367,7 +374,7 @@ export async function copyOfferingScheduleItems(input: {
   revalidateSchedulePaths(input.programId, input.targetOfferingId)
 }
 
-/** Resolve offering Schedule tab for /programs/schedule?program= redirects. */
+/** Resolve offering manage URL for /programs/schedule?program= redirects. */
 export async function resolveProgramScheduleRedirect(
   programId: string
 ): Promise<string | null> {
@@ -376,19 +383,29 @@ export async function resolveProgramScheduleRedirect(
 
   const supabase = await createClient()
 
-  const { data: offerings } = await supabase
-    .from("program_offerings")
-    .select("id, is_default, status")
-    .eq("organization_id", organizationId)
-    .eq("program_id", programId)
-    .neq("status", "archived")
-    .order("is_default", { ascending: false })
-    .order("name", { ascending: true })
+  const [{ data: program }, { data: offerings }] = await Promise.all([
+    supabase
+      .from("programs")
+      .select("department_id")
+      .eq("id", programId)
+      .eq("organization_id", organizationId)
+      .maybeSingle(),
+    supabase
+      .from("program_offerings")
+      .select("id, is_default, status")
+      .eq("organization_id", organizationId)
+      .eq("program_id", programId)
+      .neq("status", "archived")
+      .order("is_default", { ascending: false })
+      .order("name", { ascending: true }),
+  ])
 
   const offering = (offerings || [])[0]
   if (!offering?.id) {
     return `/programs/${programId}`
   }
 
-  return programOfferingManageHref(programId, offering.id as string, "enrollment")
+  return programOfferingManageHref(programId, offering.id as string, {
+    departmentId: (program?.department_id as string | null) ?? null,
+  })
 }

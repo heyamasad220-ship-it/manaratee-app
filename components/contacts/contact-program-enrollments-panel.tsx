@@ -44,8 +44,8 @@ export function ContactProgramEnrollmentsPanel({
         </div>
 
         <p className="mb-4 text-sm text-muted-foreground">
-          Programs this person is enrolled in as a participant. This is separate from MAS
-          membership — enrolling in a class does not automatically make someone a member.
+          Programs linked to this contact as participant, registrant (parent/guardian), or payer.
+          Enrolling in a class does not automatically create MAS membership.
         </p>
 
         {loading ? (
@@ -58,6 +58,14 @@ export function ContactProgramEnrollmentsPanel({
               const hasFa =
                 enrollment.faOriginalAmount != null &&
                 enrollment.faAssistedAmount != null
+              const relationLabel =
+                enrollment.relation === "registrant"
+                  ? "Registrant"
+                  : enrollment.relation === "payer"
+                    ? "Payer"
+                    : enrollment.relation === "child"
+                      ? "Participant"
+                      : "Participant"
               return (
                 <li
                   key={enrollment.id}
@@ -72,8 +80,14 @@ export function ContactProgramEnrollmentsPanel({
                         {enrollment.programName}
                       </p>
                     ) : null}
+                    {enrollment.childName ? (
+                      <p className="text-sm text-muted-foreground">
+                        Participant: {enrollment.childName}
+                      </p>
+                    ) : null}
                     <p className="text-sm text-muted-foreground">
-                      Enrolled {formatContactDate(enrollment.enrollmentDate)}
+                      {relationLabel} · Enrolled{" "}
+                      {formatContactDate(enrollment.enrollmentDate)}
                     </p>
                     {hasFa ? (
                       <div className="mt-2 rounded-md bg-muted/50 px-2.5 py-2 text-sm">

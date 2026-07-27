@@ -202,6 +202,7 @@ export function DepartmentProgramsPanel({
       {selectedYear ? (
         <ProgramOfferingsListPanel
           program={selectedYear}
+          departmentId={departmentId}
           rows={activeRows}
           archivedCount={archivedRows.length}
           showArchived={archivedRows}
@@ -268,7 +269,8 @@ function AllYearsOfferingsTable({
                         <Link
                           href={programOfferingManageHref(
                             yearProgramId,
-                            offering.id
+                            offering.id,
+                            { departmentId }
                           )}
                           className="text-sky-600 hover:text-sky-700 hover:underline"
                         >

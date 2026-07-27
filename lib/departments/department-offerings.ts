@@ -126,9 +126,10 @@ export async function createDepartmentProgramAction(input: {
   }
 
   try {
-    const programId = await createProgram({
+    const { programId } = await createProgram({
       name,
       department_id: input.departmentId,
+      program_kind: "academic",
       status: "active",
       program_type: "adult",
     })

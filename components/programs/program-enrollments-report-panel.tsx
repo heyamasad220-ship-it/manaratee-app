@@ -130,7 +130,7 @@ export function ProgramEnrollmentsReportPanel({
       `${programName.replace(/[^\w-]+/g, "-").toLowerCase()}-enrollments.csv`,
       [
         [
-          "Student",
+          "Participant",
           PROGRAM_LABEL,
           "Teacher",
           "Status",
@@ -159,7 +159,7 @@ export function ProgramEnrollmentsReportPanel({
         <div>
           <h2 className="text-lg font-semibold tracking-tight">Enrollments</h2>
           <p className="text-sm text-muted-foreground">
-            Students registered across {PROGRAM_LABEL_PLURAL.toLowerCase()} for
+            Participants registered across {PROGRAM_LABEL_PLURAL.toLowerCase()} for
             this {YEAR_SEASON_LABEL.toLowerCase()}.
           </p>
         </div>
@@ -216,7 +216,7 @@ export function ProgramEnrollmentsReportPanel({
           layout="header"
           fill
           tone="sky"
-          label="Unique students"
+          label="Unique participants"
           value={uniqueStudents}
         />
         <StatCard
@@ -260,7 +260,7 @@ export function ProgramEnrollmentsReportPanel({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Student</TableHead>
+                <TableHead>Participant</TableHead>
                 <TableHead>{PROGRAM_LABEL}</TableHead>
                 <TableHead>Teacher</TableHead>
                 <TableHead>Status</TableHead>
@@ -271,18 +271,9 @@ export function ProgramEnrollmentsReportPanel({
             <TableBody>
               {rows.map((row) => (
                 <TableRow key={row.enrollmentId}>
-                  <TableCell className="font-medium">
-                    <div>
-                      {row.studentContactId ? (
-                        <Link
-                          href={contactProfileHref(row.studentContactId)}
-                          className="text-sky-600 hover:underline"
-                        >
-                          {row.studentName}
-                        </Link>
-                      ) : (
-                        row.studentName
-                      )}
+                    <TableCell>
+                    <div className="text-sm font-medium">
+                      {row.studentName}
                     </div>
                     <Link
                       href={`/programs/registrations/${row.enrollmentId}`}

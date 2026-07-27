@@ -14,10 +14,9 @@ import {
 import type { ProgramRegistrationOptionType } from "@/lib/programs/program-registration-option-types"
 import { getActiveSessionIdsForOffering } from "@/lib/programs/program-registration-session-access"
 import { syncAffiliationAfterEnrollmentCreation } from "@/lib/programs/program-enrollment-actions"
-import { resolveParticipantContactIdForRegistration } from "@/lib/programs/person-actions"
 import {
   getCustomerContactForUser,
-  verifyParticipantInRegistrantFamily,
+  verifyParticipantPersonInRegistrantFamily,
 } from "@/lib/programs/registration-contact-resolver"
 import { userHasActiveMembership } from "@/lib/memberships/membership-queries"
 import { isProgramPublishedForRegistration } from "@/lib/programs/program-enrollment-availability"
@@ -233,21 +232,18 @@ async function registerSingleParticipant(input: {
     input.redirectBase
   )
 
-  const participantContactIdForRpc = input.isAdultProgram
-    ? null
-    : await resolveParticipantContactIdForRegistration({
-        organizationId: input.organizationId,
-        participantContactId: input.participant.participantContactId,
-        redirectBase: input.redirectBase,
-      })
-
   const { data: rpcData, error: rpcError } = await input.supabase.rpc(
     "register_for_program",
     {
       p_organization_id: input.organizationId,
       p_program_id: input.programId,
       p_registration_option_id: input.registrationOptionId,
-      p_participant_contact_id: participantContactIdForRpc,
+      p_participant_contact_id: input.isAdultProgram
+        ? null
+        : input.participant.participantContactId,
+      p_participant_person_id: input.isAdultProgram
+        ? null
+        : input.participant.participantPersonId,
       p_session_ids: input.sessionIdsForAccess,
       p_mode: input.rpcMode,
       p_parent_name: input.customerContact.full_name,
@@ -272,7 +268,7 @@ async function registerSingleParticipant(input: {
       console.warn("[program-fee-plans] Registration blocked by invalid fee_plan_id", {
         programId: input.programId,
         registrationOptionId: input.registrationOptionId,
-        participantContactId: input.participant.participantContactId,
+        participantPersonId: input.participant.participantPersonId,
       })
     }
     mapRegisterForProgramError(
@@ -386,11 +382,13 @@ export async function registerForProgram(formData: FormData) {
 
   if (!isAdultProgram && customerContact.person_id) {
     for (const participant of participants) {
-      const isFamilyParticipant = await verifyParticipantInRegistrantFamily({
-        organizationId,
-        registrantPersonId: customerContact.person_id,
-        participantContactId: participant.participantContactId,
-      })
+      const isFamilyParticipant = await verifyParticipantPersonInRegistrantFamily(
+        {
+          organizationId,
+          registrantPersonId: customerContact.person_id,
+          participantPersonId: participant.participantPersonId,
+        }
+      )
 
       if (!isFamilyParticipant) {
         redirect(`${redirectBase}?error=invalid-participant`)
@@ -465,6 +463,7 @@ export async function registerForProgram(formData: FormData) {
       ? participants
       : [
           {
+            participantPersonId: customerContact.person_id,
             participantContactId: customerContact.id,
             lunchOptionId: null,
             beforeCare: false,

@@ -3,7 +3,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 
 import { syncContactAffiliations } from "@/lib/contacts/contact-affiliation-sync"
-import { ensureParticipantContactForPerson } from "@/lib/programs/person-actions"
 
 export async function maybeSyncProgramParticipantAffiliation(
   supabase: SupabaseClient,
@@ -26,8 +25,9 @@ export async function maybeSyncProgramParticipantAffiliation(
 }
 
 /**
- * After enrollment creation, backfill participant_contact_id when missing and sync affiliations.
- * Sync failures are logged and never fail the enrollment write.
+ * After enrollment creation, sync Programs affiliation on contacts that already
+ * exist. Do **not** create CRM contacts for child/person-only participants —
+ * minors stay as people under the parent Contact (registrant).
  */
 export async function syncAffiliationAfterEnrollmentCreation(input: {
   supabase: SupabaseClient
@@ -51,42 +51,21 @@ export async function syncAffiliationAfterEnrollmentCreation(input: {
     return
   }
 
-  let participantContactId = enrollment.participant_contact_id as string | null
+  const contactIds = [
+    enrollment.registrant_contact_id as string | null,
+    enrollment.payer_contact_id as string | null,
+    // Only sync an existing participant contact — never create one for a child person.
+    enrollment.participant_contact_id as string | null,
+  ].filter((id): id is string => Boolean(id))
 
-  if (!participantContactId && enrollment.child_person_id) {
-    try {
-      const { contactId } = await ensureParticipantContactForPerson({
-        organizationId: input.organizationId,
-        personId: enrollment.child_person_id as string,
-      })
-      participantContactId = contactId
+  const uniqueIds = [...new Set(contactIds)]
 
-      const { error: updateError } = await input.supabase
-        .from("program_enrollments")
-        .update({ participant_contact_id: contactId })
-        .eq("organization_id", input.organizationId)
-        .eq("id", input.enrollmentId)
-        .is("participant_contact_id", null)
-
-      if (updateError) {
-        console.error(
-          `[program-enrollment] participant_contact_id backfill failed (${input.context}, enrollment ${input.enrollmentId}): ${updateError.message}`
-        )
-      }
-    } catch (backfillError) {
-      const message =
-        backfillError instanceof Error ? backfillError.message : String(backfillError)
-      console.error(
-        `[program-enrollment] ensure contact for enrollment failed (${input.context}, enrollment ${input.enrollmentId}): ${message}`
-      )
-      return
-    }
+  for (const contactId of uniqueIds) {
+    await maybeSyncProgramParticipantAffiliation(
+      input.supabase,
+      input.organizationId,
+      contactId,
+      input.context
+    )
   }
-
-  await maybeSyncProgramParticipantAffiliation(
-    input.supabase,
-    input.organizationId,
-    participantContactId,
-    input.context
-  )
 }

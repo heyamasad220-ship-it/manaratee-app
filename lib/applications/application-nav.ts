@@ -1,10 +1,10 @@
 import type { ModuleOwner } from "@/lib/applications/application-types"
 import {
   HR_EMPLOYEE_APPLICATIONS_PATH,
-  PROGRAMS_FINANCIAL_ASSISTANCE_PATH,
   VENDOR_HUB_APPLICATIONS_PATH,
   hrCategoryApplicationsUrl,
 } from "@/lib/applications/application-routes"
+import { FINANCE_FINANCIAL_ASSISTANCE_PATH } from "@/lib/finance/finance-paths"
 
 export type ApplicationNavItem = {
   label: string
@@ -37,8 +37,8 @@ export function vendorApplicationNavItem(): ApplicationNavItem {
 export function programsFinancialAssistanceNavItem(): ApplicationNavItem {
   return {
     label: "Financial Assistance",
-    href: PROGRAMS_FINANCIAL_ASSISTANCE_PATH,
-    matchPrefix: PROGRAMS_FINANCIAL_ASSISTANCE_PATH,
+    href: FINANCE_FINANCIAL_ASSISTANCE_PATH,
+    matchPrefix: FINANCE_FINANCIAL_ASSISTANCE_PATH,
     permissionKey: "applications.view",
   }
 }

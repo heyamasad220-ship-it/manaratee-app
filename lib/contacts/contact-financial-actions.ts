@@ -464,7 +464,7 @@ export async function loadContactFinancialSummaryAction(
   }
 
   if (modules.programs) {
-    let enrollmentQuery = supabase
+    const enrollmentQuery = supabase
       .from("program_enrollments")
       .select(
         `
@@ -478,7 +478,13 @@ export async function loadContactFinancialSummaryAction(
       `
       )
       .eq("organization_id", organizationId)
-      .eq("participant_contact_id", contactId)
+      .or(
+        [
+          `participant_contact_id.eq.${contactId}`,
+          `registrant_contact_id.eq.${contactId}`,
+          `payer_contact_id.eq.${contactId}`,
+        ].join(",")
+      )
       .order("created_at", { ascending: false })
       .limit(50)
 

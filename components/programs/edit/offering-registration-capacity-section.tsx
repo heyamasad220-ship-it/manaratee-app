@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { Plus } from "lucide-react"
 
 import { EditSectionCard } from "@/components/programs/edit/edit-section-card"
 import { gradesApplyForMinAge } from "@/components/programs/edit/utils"
@@ -9,10 +10,15 @@ import {
   ProgramCapacityGroupEditor,
   type ProgramCapacityGroupEditorHandle,
 } from "@/components/programs/program-capacity-group-editor"
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import type { ProgramCapacityGroupInput } from "@/lib/programs/program-capacity-group-types"
+import {
+  getTotalCapacityFromGroups,
+  type ProgramCapacityGroupInput,
+} from "@/lib/programs/program-capacity-group-types"
 import type { Program } from "@/lib/programs/program-types"
+import { cn } from "@/lib/utils"
 
 export type OfferingRegistrationCapacitySectionHandle = {
   flushCapacityGroups: () => ProgramCapacityGroupInput[]
@@ -35,6 +41,8 @@ export const OfferingRegistrationCapacitySection = React.forwardRef<
     waitlistCapacity: string
     onWaitlistCapacityChange: (value: string) => void
     enrolled?: number
+    disabled?: boolean
+    plain?: boolean
   }
 >(function OfferingRegistrationCapacitySection(
   {
@@ -52,11 +60,22 @@ export const OfferingRegistrationCapacitySection = React.forwardRef<
     waitlistCapacity,
     onWaitlistCapacityChange,
     enrolled,
+    disabled = false,
+    plain = false,
   },
   ref
 ) {
   const capacityGroupRef = React.useRef<ProgramCapacityGroupEditorHandle>(null)
   const useGroupCapacity = gradesApplyForMinAge(minAge)
+  const [showCapacityGroups, setShowCapacityGroups] = React.useState(
+    () => capacityGroups.length > 0
+  )
+
+  React.useEffect(() => {
+    if (capacityGroups.length > 0) {
+      setShowCapacityGroups(true)
+    }
+  }, [capacityGroups.length])
 
   React.useImperativeHandle(ref, () => ({
     flushCapacityGroups() {
@@ -68,51 +87,50 @@ export const OfferingRegistrationCapacitySection = React.forwardRef<
     return null
   }
 
+  const groupsEditorOpen = useGroupCapacity && showCapacityGroups
+  const hasCapacityGroups = useGroupCapacity && capacityGroups.length > 0
+  const groupsTotal = hasCapacityGroups
+    ? getTotalCapacityFromGroups(capacityGroups)
+    : capacity
+  const programCapacityValue = hasCapacityGroups ? groupsTotal : capacity
+  const programCapacityReadOnly = hasCapacityGroups
+
   return (
     <div className="space-y-4">
       {fullProgramEnabled ? (
-        <EditSectionCard
-          title="Capacity"
-          description={
-            useGroupCapacity
-              ? "Set capacity by grade and gender group for camp-style programs."
-              : "Maximum number of participants for full program registration."
-          }
-        >
-          <div className="space-y-4">
-            {useGroupCapacity ? (
-              <ProgramCapacityGroupEditor
-                ref={capacityGroupRef}
-                selectedGrades={gradeLevels}
-                programGender={programGender}
-                groups={capacityGroups}
-                onChange={onCapacityGroupsChange}
-                totalCapacity={capacity}
-                onTotalCapacityChange={onCapacityChange}
-              />
-            ) : (
-              <div className="grid gap-3 md:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label htmlFor="program-capacity">Program capacity</Label>
-                  <Input
-                    id="program-capacity"
-                    type="number"
-                    min="0"
-                    value={capacity}
-                    onChange={(event) =>
-                      onCapacityChange(Number(event.target.value || 0))
-                    }
-                    placeholder="e.g. 20"
-                    className="h-9"
-                  />
-                </div>
+        <EditSectionCard title={plain ? undefined : "Capacity"} plain={plain}>
+          <div
+            className={cn("space-y-4", disabled && "pointer-events-none opacity-60")}
+          >
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="program-capacity">Program Capacity</Label>
+                <Input
+                  id="program-capacity"
+                  type="number"
+                  min="0"
+                  value={programCapacityValue}
+                  readOnly={programCapacityReadOnly}
+                  disabled={disabled}
+                  onChange={(event) =>
+                    onCapacityChange(Number(event.target.value || 0))
+                  }
+                  placeholder="e.g. 20"
+                  className={cn(
+                    "h-9 w-[140px]",
+                    programCapacityReadOnly && "bg-muted"
+                  )}
+                />
+              </div>
+
+              {!plain ? (
                 <div className="space-y-1.5">
                   <Label>Currently enrolled</Label>
                   <div className="flex h-9 items-center rounded-md border bg-muted/40 px-3 text-sm">
                     {enrolled ?? program.enrolled ?? 0}
-                    {capacity > 0 ? (
+                    {programCapacityValue > 0 ? (
                       <span className="ml-1 text-muted-foreground">
-                        / {capacity}
+                        / {programCapacityValue}
                       </span>
                     ) : (
                       <span className="ml-1 text-muted-foreground">
@@ -121,8 +139,53 @@ export const OfferingRegistrationCapacitySection = React.forwardRef<
                     )}
                   </div>
                 </div>
-              </div>
-            )}
+              ) : null}
+
+              {useGroupCapacity ? (
+                showCapacityGroups ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-9"
+                    disabled={disabled}
+                    onClick={() => setShowCapacityGroups(false)}
+                  >
+                    Hide capacity groups
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-9 bg-blue-600 hover:bg-blue-700"
+                    disabled={disabled}
+                    onClick={() => setShowCapacityGroups(true)}
+                  >
+                    <Plus className="mr-1.5 h-4 w-4" />
+                    Add capacity groups
+                  </Button>
+                )
+              ) : null}
+            </div>
+
+            {programCapacityReadOnly ? (
+              <p className="text-xs text-muted-foreground">
+                Total is calculated from capacity groups.
+              </p>
+            ) : null}
+
+            {groupsEditorOpen ? (
+              <ProgramCapacityGroupEditor
+                ref={capacityGroupRef}
+                selectedGrades={gradeLevels}
+                programGender={programGender}
+                groups={capacityGroups}
+                onChange={onCapacityGroupsChange}
+                totalCapacity={capacity}
+                onTotalCapacityChange={onCapacityChange}
+                hideTotalField
+              />
+            ) : null}
 
             {enableWaitlist ? (
               <div className="space-y-1.5 border-t pt-4">
@@ -132,6 +195,7 @@ export const OfferingRegistrationCapacitySection = React.forwardRef<
                   type="number"
                   min="0"
                   value={waitlistCapacity}
+                  disabled={disabled}
                   onChange={(event) =>
                     onWaitlistCapacityChange(event.target.value)
                   }

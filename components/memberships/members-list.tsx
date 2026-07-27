@@ -53,7 +53,9 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
+import { ListPagination } from "@/components/ui/list-pagination"
 import { formatContactDate } from "@/lib/contacts/contact-profile-data"
+import { DEFAULT_LIST_PAGE_SIZE } from "@/lib/ui/list-pagination"
 
 function getInitials(name: string) {
   return (name?.trim() || "?")
@@ -73,6 +75,9 @@ function formatTeams(teams: MembershipListRow["teams"]) {
 export function MembersList() {
   const router = useRouter()
   const [rows, setRows] = useState<MembershipListRow[]>([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(DEFAULT_LIST_PAGE_SIZE)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [search, setSearch] = useState("")
@@ -99,19 +104,27 @@ export function MembersList() {
         status: statusFilter,
         membershipTypeId: typeFilter,
         teamId: teamFilter,
+        page,
+        pageSize,
       })
       setRows(result.rows)
+      setTotal(result.total)
     } catch (error) {
       console.error("Error loading members:", error)
       setRows([])
+      setTotal(0)
     } finally {
       setLoading(false)
     }
-  }, [search, statusFilter, typeFilter, teamFilter])
+  }, [search, statusFilter, typeFilter, teamFilter, page, pageSize])
 
   useEffect(() => {
     void loadRows()
   }, [loadRows])
+
+  useEffect(() => {
+    setPage(1)
+  }, [search, statusFilter, typeFilter, teamFilter])
 
   useEffect(() => {
     void (async () => {
@@ -325,6 +338,19 @@ export function MembersList() {
           )}
         </CardContent>
       </Card>
+
+      <ListPagination
+        page={page}
+        pageSize={pageSize}
+        total={total}
+        disabled={loading}
+        entryLabel="members"
+        onPageChange={setPage}
+        onPageSizeChange={(next) => {
+          setPageSize(next)
+          setPage(1)
+        }}
+      />
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="max-w-lg">

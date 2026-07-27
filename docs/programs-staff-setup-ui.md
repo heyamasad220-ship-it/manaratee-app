@@ -13,8 +13,10 @@ Staff setup is split across three surfaces:
 | Step | Route | Purpose |
 |------|-------|---------|
 | **Quick Create** | `/programs/create` | Create a program shell with basics + eligibility |
-| **Program detail** | `/programs/[id]` | View/edit program publishing basics; list offerings |
-| **Offering manage** | `/programs/[id]/offerings/[offeringId]` | Registration, fees, schedule, staff per offering |
+| **Program detail** | `/programs/[id]` (orphan years only) | View/edit program publishing basics; list offerings |
+| **Offering manage** | Department-linked: `/workforce/departments/[id]/programs/[programId]/offerings/[offeringId]`; orphan: `/programs/[id]/offerings/[offeringId]` | Registration, fees, schedule, staff per offering |
+
+**Department home:** Years/seasons with a `department_id` are managed from **HR → Departments** so the sidebar does not bounce to Programs. Legacy `/programs/[id]/offerings/[offeringId]` redirects when the year is department-linked.
 
 **Retired:** `/programs/[id]/edit` (General + Offerings tabs). That URL redirects to program detail or offering manage so bookmarks keep working.
 
@@ -80,11 +82,16 @@ On success → `/programs/[id]` (program detail).
 
 ---
 
-## Offering manage (`/programs/[id]/offerings/[offeringId]`)
+## Offering manage
 
-**Client:** `components/programs/offering-manage-client.tsx`
+**Routes:**
+- Department-linked: `/workforce/departments/[id]/programs/[programId]/offerings/[offeringId]`
+- Orphan / Programs module: `/programs/[id]/offerings/[offeringId]` (redirects to department route when `department_id` is set)
 
-Tabs: Overview (includes Instructors & Staff + Schedule), Enrollment. Shows the offering opened from program detail (switch offerings from the program offerings list). Attendance and Waitlist viewing live under Programs → Reports.
+**Client:** `components/programs/offering-manage-client.tsx`  
+**Href helper:** `programOfferingManageHref(programId, offeringId, { departmentId })`
+
+Single **Settings** page aligned to the program settings mockup: tinted summary cards, numbered collapsible sections (General → Registration → Participants → Pricing / Staff / Optional Features → Schedule → Sessions), flat section forms, sticky Save Changes. Department mode breadcrumbs: Department → Programs tab → offering. Attendance and Waitlist viewing live under Programs → Reports.
 
 Pricing source of truth: **offering fee plans** → quote RPC → charge ledger (Phase 2B).
 
@@ -95,8 +102,9 @@ Pricing source of truth: **offering fee plans** → quote RPC → charge ledger 
 | Old URL | New destination |
 |---------|-----------------|
 | `/programs/[id]/edit` | `/programs/[id]` |
-| `/programs/[id]/edit?tab=offerings&offering=…` | `/programs/[id]/offerings/[offeringId]` (+ mapped `?tab=`) |
-| `/programs/[id]/billing` | Offering Fees tab |
+| `/programs/[id]/edit?tab=offerings&offering=…` | Department-scoped or `/programs/[id]/offerings/[offeringId]` |
+| `/programs/[id]/offerings/[offeringId]` (with `department_id`) | `/workforce/departments/[deptId]/programs/[id]/offerings/[offeringId]` |
+| `/programs/[id]/billing` | Offering manage |
 
 ---
 
@@ -127,6 +135,7 @@ app/(dashboard)/programs/create/
 app/(dashboard)/programs/[id]/page.tsx
 app/(dashboard)/programs/[id]/edit/page.tsx          # redirect only
 app/(dashboard)/programs/[id]/offerings/[offeringId]/page.tsx
+app/(dashboard)/workforce/departments/[id]/programs/[programId]/offerings/[offeringId]/page.tsx
 components/programs/program-form.tsx                 # create mode
 components/programs/program-detail-client.tsx
 components/programs/offering-manage-client.tsx

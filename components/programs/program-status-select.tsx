@@ -11,12 +11,8 @@ import {
   type ProgramStatus,
 } from "@/lib/programs/program-status"
 
-const STATUS_OPTIONS: ProgramStatus[] = [
-  "draft",
-  "active",
-  "paused",
-  "archived",
-]
+const STATUS_OPTIONS: ProgramStatus[] = ["draft", "active", "closed"]
+const LEGACY_STATUS_OPTIONS: ProgramStatus[] = ["paused", "archived"]
 
 export function ProgramStatusSelect({
   programId,
@@ -35,6 +31,13 @@ export function ProgramStatusSelect({
   React.useEffect(() => {
     setValue(status)
   }, [status])
+
+  const options = React.useMemo(() => {
+    if (LEGACY_STATUS_OPTIONS.includes(value)) {
+      return [...STATUS_OPTIONS, value]
+    }
+    return STATUS_OPTIONS
+  }, [value])
 
   async function handleChange(event: React.ChangeEvent<HTMLSelectElement>) {
     const nextStatus = event.target.value as ProgramStatus
@@ -75,7 +78,7 @@ export function ProgramStatusSelect({
           isUpdating && "opacity-70"
         )}
       >
-        {STATUS_OPTIONS.map((option) => (
+        {options.map((option) => (
           <option key={option} value={option}>
             {getProgramStatusLabel(option)}
           </option>

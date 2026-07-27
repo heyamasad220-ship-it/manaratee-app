@@ -2,13 +2,18 @@
 
 import * as React from "react"
 import Link from "next/link"
+import { ImageIcon, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react"
+
 import {
   createDepartment,
   deleteDepartment,
   fetchDepartmentsWithProgramCounts,
   updateDepartment,
+  updateDepartmentFlyer,
 } from "@/lib/departments/department-actions"
 import { workforceDepartmentDetailPath } from "@/lib/departments/department-paths"
+import { YEAR_SEASON_LABEL_PLURAL } from "@/lib/programs/program-display-labels"
+import { ProgramFlyerField } from "@/components/programs/edit/program-flyer-field"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import {
@@ -19,24 +24,23 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
-import { Pencil, Plus, Trash2 } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 type Department = {
   id: string
   name: string
   description: string | null
   color: string | null
+  flyer_url: string | null
   programs_count?: number
 }
 
@@ -45,6 +49,7 @@ const emptyDepartment = {
   name: "",
   description: "",
   color: "#3b82f6",
+  flyerUrl: "",
 }
 
 export function DepartmentsManager() {
@@ -52,6 +57,10 @@ export function DepartmentsManager() {
   const [saving, setSaving] = React.useState(false)
   const [departments, setDepartments] = React.useState<Department[]>([])
   const [departmentDialogOpen, setDepartmentDialogOpen] = React.useState(false)
+  const [flyerDialogOpen, setFlyerDialogOpen] = React.useState(false)
+  const [flyerDepartment, setFlyerDepartment] = React.useState<Department | null>(null)
+  const [flyerUrlDraft, setFlyerUrlDraft] = React.useState("")
+  const [savingFlyer, setSavingFlyer] = React.useState(false)
   const [editingDepartment, setEditingDepartment] = React.useState(emptyDepartment)
 
   React.useEffect(() => {
@@ -83,8 +92,15 @@ export function DepartmentsManager() {
       name: department.name,
       description: department.description || "",
       color: department.color || "#3b82f6",
+      flyerUrl: department.flyer_url || "",
     })
     setDepartmentDialogOpen(true)
+  }
+
+  function openFlyerDialog(department: Department) {
+    setFlyerDepartment(department)
+    setFlyerUrlDraft(department.flyer_url || "")
+    setFlyerDialogOpen(true)
   }
 
   async function handleSaveDepartment() {
@@ -93,35 +109,59 @@ export function DepartmentsManager() {
     setSaving(true)
 
     try {
+      const payload = {
+        name: editingDepartment.name.trim(),
+        description: editingDepartment.description.trim() || undefined,
+        color: editingDepartment.color || "#3b82f6",
+        flyerUrl: editingDepartment.flyerUrl.trim() || null,
+      }
+
       if (editingDepartment.id) {
         await updateDepartment({
           id: editingDepartment.id,
-          name: editingDepartment.name.trim(),
-          description: editingDepartment.description.trim() || undefined,
-          color: editingDepartment.color || "#3b82f6",
+          ...payload,
         })
       } else {
-        await createDepartment({
-          name: editingDepartment.name.trim(),
-          description: editingDepartment.description.trim() || undefined,
-          color: editingDepartment.color || "#3b82f6",
-        })
+        await createDepartment(payload)
       }
 
       setDepartmentDialogOpen(false)
       setEditingDepartment(emptyDepartment)
       await loadDepartments()
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Save department error:", error)
-      alert(error?.message || "Could not save department.")
+      alert(error instanceof Error ? error.message : "Could not save department.")
     } finally {
       setSaving(false)
     }
   }
 
+  async function handleSaveFlyer() {
+    if (!flyerDepartment) return
+
+    setSavingFlyer(true)
+    try {
+      await updateDepartmentFlyer({
+        id: flyerDepartment.id,
+        flyerUrl: flyerUrlDraft.trim() || null,
+      })
+      setFlyerDialogOpen(false)
+      setFlyerDepartment(null)
+      setFlyerUrlDraft("")
+      await loadDepartments()
+    } catch (error: unknown) {
+      console.error("Save department flyer error:", error)
+      alert(error instanceof Error ? error.message : "Could not save flyer.")
+    } finally {
+      setSavingFlyer(false)
+    }
+  }
+
   async function handleDeleteDepartment(department: Department) {
     if ((department.programs_count || 0) > 0) {
-      alert("This department is used by programs. Move those programs first, then delete the department.")
+      alert(
+        "This department is used by programs. Move those programs first, then delete the department."
+      )
       return
     }
 
@@ -131,9 +171,9 @@ export function DepartmentsManager() {
     try {
       await deleteDepartment(department.id)
       await loadDepartments()
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Delete department error:", error)
-      alert(error?.message || "Could not delete department.")
+      alert(error instanceof Error ? error.message : "Could not delete department.")
     }
   }
 
@@ -154,86 +194,122 @@ export function DepartmentsManager() {
           </Button>
         </div>
 
-        <Card>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[60px]">Color</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Years/Seasons</TableHead>
-                  <TableHead className="w-[110px]" />
-                </TableRow>
-              </TableHeader>
+        {loading ? (
+          <p className="py-8 text-center text-sm text-muted-foreground">Loading departments...</p>
+        ) : departments.length === 0 ? (
+          <Card>
+            <CardContent className="py-10 text-center text-sm text-muted-foreground">
+              No departments yet.
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {departments.map((department) => {
+              const color = department.color || "#3b82f6"
+              const years = department.programs_count || 0
+              return (
+                <Card key={department.id} className="overflow-hidden border-border/80 shadow-sm">
+                  <CardContent className="flex h-full flex-col gap-3 p-4">
+                    <div className="flex gap-3">
+                      <div
+                        className={cn(
+                          "relative aspect-square w-16 shrink-0 overflow-hidden rounded-lg sm:w-20"
+                        )}
+                        style={
+                          department.flyer_url
+                            ? undefined
+                            : { backgroundColor: color }
+                        }
+                      >
+                        {department.flyer_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={department.flyer_url}
+                            alt={`${department.name} flyer`}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-full items-center justify-center">
+                            <span className="text-xl font-semibold text-white/90">
+                              {department.name.trim().charAt(0).toUpperCase() || "D"}
+                            </span>
+                          </div>
+                        )}
+                      </div>
 
-              <TableBody>
-                {loading ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
-                      Loading departments...
-                    </TableCell>
-                  </TableRow>
-                ) : departments.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
-                      No departments yet.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  departments.map((department) => (
-                    <TableRow key={department.id}>
-                      <TableCell>
-                        <div
-                          className="size-6 rounded-full border"
-                          style={{ backgroundColor: department.color || "#3b82f6" }}
-                        />
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        <Link
-                          href={workforceDepartmentDetailPath(department.id)}
-                          className="text-primary hover:underline"
-                        >
-                          {department.name}
-                        </Link>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {department.description || "-"}
-                      </TableCell>
-                      <TableCell>{department.programs_count || 0}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-8"
-                            onClick={() => openEditDepartmentDialog(department)}
-                          >
-                            <Pencil className="size-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-8 text-muted-foreground hover:text-red-600"
-                            onClick={() => handleDeleteDepartment(department)}
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
+                      <div className="min-w-0 flex-1 space-y-1.5">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className="inline-block size-2.5 shrink-0 rounded-full border"
+                                style={{ backgroundColor: color }}
+                                title="Department color"
+                              />
+                              <Link
+                                href={workforceDepartmentDetailPath(department.id)}
+                                className="truncate text-base font-semibold leading-snug tracking-tight text-primary hover:underline"
+                              >
+                                {department.name}
+                              </Link>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {years} {YEAR_SEASON_LABEL_PLURAL.toLowerCase()}
+                            </p>
+                          </div>
+
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 shrink-0"
+                                aria-label={`${department.name} actions`}
+                              >
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                              <DropdownMenuItem
+                                onClick={() => openEditDepartmentDialog(department)}
+                              >
+                                <Pencil className="mr-2 h-4 w-4" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => openFlyerDialog(department)}>
+                                <ImageIcon className="mr-2 h-4 w-4" />
+                                {department.flyer_url ? "Edit flyer" : "Upload flyer"}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onClick={() => void handleDeleteDepartment(department)}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+
+                        <p className="line-clamp-2 text-sm text-muted-foreground">
+                          {department.description || "No description"}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       <Dialog open={departmentDialogOpen} onOpenChange={setDepartmentDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingDepartment.id ? "Edit Department" : "Add Department"}</DialogTitle>
+            <DialogTitle>
+              {editingDepartment.id ? "Edit Department" : "Add Department"}
+            </DialogTitle>
             <DialogDescription>
               {editingDepartment.id ? "Update this department." : "Create a new department."}
             </DialogDescription>
@@ -264,7 +340,9 @@ export function DepartmentsManager() {
                     setEditingDepartment({ ...editingDepartment, color: event.target.value })
                   }
                 />
-                <span className="text-sm text-muted-foreground">Choose a color for the department</span>
+                <span className="text-sm text-muted-foreground">
+                  Choose a color for the department
+                </span>
               </div>
             </div>
 
@@ -274,20 +352,76 @@ export function DepartmentsManager() {
                 id="department-description"
                 value={editingDepartment.description}
                 onChange={(event) =>
-                  setEditingDepartment({ ...editingDepartment, description: event.target.value })
+                  setEditingDepartment({
+                    ...editingDepartment,
+                    description: event.target.value,
+                  })
                 }
                 placeholder="Brief description of this department"
                 rows={2}
               />
             </div>
+
+            <ProgramFlyerField
+              programId={editingDepartment.id || "department-draft"}
+              value={editingDepartment.flyerUrl}
+              onValueChange={(url) =>
+                setEditingDepartment({ ...editingDepartment, flyerUrl: url })
+              }
+              hideHiddenInput
+            />
           </div>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setDepartmentDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSaveDepartment} disabled={saving}>
+            <Button onClick={() => void handleSaveDepartment()} disabled={saving}>
               {saving ? "Saving..." : editingDepartment.id ? "Save Changes" : "Add Department"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={flyerDialogOpen}
+        onOpenChange={(open) => {
+          setFlyerDialogOpen(open)
+          if (!open) {
+            setFlyerDepartment(null)
+            setFlyerUrlDraft("")
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {flyerDepartment?.flyer_url ? "Edit flyer" : "Upload flyer"}
+            </DialogTitle>
+            <DialogDescription>
+              {flyerDepartment
+                ? `Flyer for ${flyerDepartment.name}. Shown on the department card.`
+                : "Upload a department flyer."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-2">
+            {flyerDepartment ? (
+              <ProgramFlyerField
+                programId={flyerDepartment.id}
+                value={flyerUrlDraft}
+                onValueChange={setFlyerUrlDraft}
+                hideHiddenInput
+              />
+            ) : null}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setFlyerDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => void handleSaveFlyer()} disabled={savingFlyer}>
+              {savingFlyer ? "Saving..." : "Save flyer"}
             </Button>
           </DialogFooter>
         </DialogContent>

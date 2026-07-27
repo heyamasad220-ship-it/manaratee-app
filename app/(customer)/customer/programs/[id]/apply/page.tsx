@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { cookies } from "next/headers"
-import { notFound } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
 import { ArrowLeft } from "lucide-react"
 
 import { ProgramApplyForm } from "@/components/customer/program-apply-form"
@@ -20,6 +20,7 @@ import {
   PROGRAM_APPLICANT_TYPE_LABELS,
   PROGRAM_APPLICATION_STATUS_LABELS,
 } from "@/lib/programs/program-application-types"
+import { isOfferingOpenEnrollment } from "@/lib/programs/offering-enrollment-path"
 import { getCustomerOfferingsForProgram } from "@/lib/programs/program-offering-queries"
 import {
   getCustomerContactForUser,
@@ -174,6 +175,18 @@ export default async function ProgramApplyPage({
   const openOfferings = offerings.filter(
     (offering) => offering.status === "active" || offering.status === "closed"
   )
+
+  const preferredOffering =
+    (offeringParam
+      ? openOfferings.find((offering) => offering.id === offeringParam)
+      : null) ??
+    (openOfferings.length === 1 ? openOfferings[0] : null)
+
+  if (preferredOffering && isOfferingOpenEnrollment(preferredOffering)) {
+    redirect(
+      `/customer/programs/${programId}/register?offering=${preferredOffering.id}`
+    )
+  }
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-6">

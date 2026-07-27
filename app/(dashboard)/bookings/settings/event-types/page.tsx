@@ -1,17 +1,6 @@
-import { VenueRentalEventTypesClient } from "@/components/bookings/venue-rental-event-types-client"
-import { getVenueRentalEventTypes } from "@/lib/bookings/venue-rental-event-type-queries"
-import {
-  PERMISSIONS,
-  requireAnyPermission,
-} from "@/lib/permissions/permissions"
+import { redirect } from "next/navigation"
 
-export default async function VenueRentalEventTypesSettingsPage() {
-  await requireAnyPermission(
-    PERMISSIONS.BOOKINGS_MANAGE,
-    PERMISSIONS.PROGRAMS_MANAGE
-  )
-
-  const eventTypes = await getVenueRentalEventTypes()
-
-  return <VenueRentalEventTypesClient eventTypes={eventTypes} />
+/** Event types moved to Bookings → Settings → Event Types. */
+export default function BookingsEventTypesSettingsRedirectPage() {
+  redirect("/facilities/settings/event-types")
 }

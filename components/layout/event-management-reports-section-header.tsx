@@ -1,7 +1,8 @@
 "use client"
 
-import Link from "next/link"
 import { usePathname } from "next/navigation"
+
+import { PageBreadcrumbs } from "@/components/navigation/page-breadcrumbs"
 
 export function EventManagementReportsSectionHeader() {
   const pathname = usePathname()
@@ -9,23 +10,27 @@ export function EventManagementReportsSectionHeader() {
 
   return (
     <div className="border-b border-border bg-card px-6 pt-6 pb-4">
-      <nav className="mb-2 text-sm text-muted-foreground">
-        <Link href="/event-management/overview" className="hover:text-foreground">
-          Event Management
-        </Link>
-        <span className="mx-2">/</span>
-        {isChildcare ? (
-          <>
-            <Link href="/event-management/reports" className="hover:text-foreground">
-              Reports
-            </Link>
-            <span className="mx-2">/</span>
-            <span className="text-foreground">Childcare Registrations</span>
-          </>
-        ) : (
-          <span className="text-foreground">Reports</span>
-        )}
-      </nav>
+      <PageBreadcrumbs
+        className="mb-2"
+        items={
+          isChildcare
+            ? [
+                {
+                  label: "Event Management",
+                  href: "/event-management/overview",
+                },
+                { label: "Reports", href: "/event-management/reports" },
+                { label: "Childcare Registrations" },
+              ]
+            : [
+                {
+                  label: "Event Management",
+                  href: "/event-management/overview",
+                },
+                { label: "Reports" },
+              ]
+        }
+      />
       <h1 className="text-2xl font-semibold tracking-tight">
         {isChildcare ? "Childcare Registrations" : "Reports"}
       </h1>

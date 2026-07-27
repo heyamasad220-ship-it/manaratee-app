@@ -2,28 +2,25 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { Building2, Download, Users, UsersRound } from "lucide-react"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import { Building2, Download, Home, Users } from "lucide-react"
 
+import { ContactsFamiliesDirectoryPanel } from "@/components/contacts/contacts-families-directory-panel"
 import {
   fetchContactDirectoryExportAction,
   fetchContactDirectoryPageAction,
   fetchContactDirectorySummaryAction,
-  fetchContactReportTeamOptionsAction,
 } from "@/lib/contacts/contact-report-actions"
 import type { ContactDirectoryReportFilters } from "@/lib/contacts/contact-report-types"
 import { downloadContactDirectoryCsv } from "@/lib/contacts/contact-report-csv"
 import {
-  getContactRecordTypeLabel,
   getRoleFilterOptionsForRecordType,
-  STATUS_COLORS,
-  STATUS_OPTIONS,
   type ContactRecordType,
   type ContactRoleValue,
-  type ContactStatus,
 } from "@/lib/contacts/contact-constants"
 import type { ContactListRow } from "@/lib/contacts/contact-list-actions"
 import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
+import { fetchFamilyListSummariesAction } from "@/lib/contacts/family-actions"
 import { clearSelectedOrganizationIdCache } from "@/lib/current-organization"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -49,23 +46,16 @@ import {
   DonationMetricCard,
   DonationMetricCardGrid,
 } from "@/components/donations/donation-metric-card"
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination"
+import { ListPagination } from "@/components/ui/list-pagination"
+import { DEFAULT_LIST_PAGE_SIZE } from "@/lib/ui/list-pagination"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
-const PREVIEW_PAGE_SIZE = 50
+type DirectoryTab = "individuals" | "organizations" | "families"
 
-const RECORD_TYPE_OPTIONS: { label: string; value: ContactRecordType | "all" }[] = [
-  { label: "All types", value: "all" },
-  { label: "People", value: "individual" },
-  { label: "Organizations", value: "organization" },
-  { label: "Groups", value: "group" },
-]
+function parseDirectoryTab(value: string | null): DirectoryTab {
+  if (value === "organizations" || value === "families") return value
+  return "individuals"
+}
 
 function formatDate(value: string | null) {
   if (!value) return "—"
@@ -78,10 +68,8 @@ function formatDate(value: string | null) {
 
 function buildFilterSummary(input: {
   search: string
-  recordType: ContactRecordType | "all"
+  recordType: ContactRecordType
   role: ContactRoleValue | "all"
-  status: ContactStatus | "all"
-  teamName?: string
 }) {
   const parts: string[] = []
 
@@ -89,41 +77,41 @@ function buildFilterSummary(input: {
     parts.push(`Search: "${input.search.trim()}"`)
   }
 
-  if (input.recordType !== "all") {
-    parts.push(`Record type: ${getContactRecordTypeLabel(input.recordType)}`)
-  }
+  parts.push(
+    `Record type: ${input.recordType === "individual" ? "Individuals" : "Organizations"}`
+  )
 
   if (input.role !== "all") {
     parts.push(`Role: ${input.role}`)
   }
 
-  if (input.status !== "all") {
-    parts.push(`Status: ${input.status}`)
-  }
+  return parts.join("; ")
+}
 
-  if (input.teamName) {
-    parts.push(`Team: ${input.teamName}`)
-  }
-
-  return parts.length > 0 ? parts.join("; ") : "None"
+function recordTypeForTab(tab: DirectoryTab): ContactRecordType | null {
+  if (tab === "individuals") return "individual"
+  if (tab === "organizations") return "organization"
+  return null
 }
 
 export function ContactsDirectoryReportPanel() {
   const pathname = usePathname()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const activeTab = parseDirectoryTab(searchParams.get("tab"))
+
   const [contacts, setContacts] = useState<ContactListRow[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(DEFAULT_LIST_PAGE_SIZE)
   const [search, setSearch] = useState("")
   const [debouncedSearch, setDebouncedSearch] = useState("")
-  const [recordType, setRecordType] = useState<ContactRecordType | "all">("all")
   const [role, setRole] = useState<ContactRoleValue | "all">("all")
-  const [status, setStatus] = useState<ContactStatus | "all">("all")
-  const [teamId, setTeamId] = useState<string>("all")
-  const [teams, setTeams] = useState<{ id: string; name: string }[]>([])
   const [loading, setLoading] = useState(true)
   const [summaryLoading, setSummaryLoading] = useState(true)
   const [exportingCsv, setExportingCsv] = useState(false)
   const [error, setError] = useState("")
+  const [familyCount, setFamilyCount] = useState(0)
   const [summary, setSummary] = useState({
     total: 0,
     people: 0,
@@ -131,38 +119,47 @@ export function ContactsDirectoryReportPanel() {
     groups: 0,
   })
 
+  const lockedRecordType = recordTypeForTab(activeTab)
+
   const roleOptions = useMemo(
-    () => getRoleFilterOptionsForRecordType(recordType),
-    [recordType]
+    () =>
+      getRoleFilterOptionsForRecordType(lockedRecordType ?? "all"),
+    [lockedRecordType]
   )
 
   const filters = useMemo<ContactDirectoryReportFilters>(
     () => ({
       search: debouncedSearch || undefined,
-      recordType,
+      recordType: lockedRecordType ?? "all",
       role,
-      status,
-      teamId,
+      status: "all",
+      teamId: "all",
     }),
-    [debouncedSearch, recordType, role, status, teamId]
+    [debouncedSearch, lockedRecordType, role]
   )
-
-  const selectedTeamName = useMemo(() => {
-    if (teamId === "all") return undefined
-    return teams.find((team) => team.id === teamId)?.name
-  }, [teamId, teams])
 
   const filterSummary = useMemo(
     () =>
-      buildFilterSummary({
-        search: debouncedSearch,
-        recordType,
-        role,
-        status,
-        teamName: selectedTeamName,
-      }),
-    [debouncedSearch, recordType, role, status, selectedTeamName]
+      lockedRecordType
+        ? buildFilterSummary({
+            search: debouncedSearch,
+            recordType: lockedRecordType,
+            role,
+          })
+        : "Families directory",
+    [debouncedSearch, lockedRecordType, role]
   )
+
+  function setActiveTab(tab: DirectoryTab) {
+    const params = new URLSearchParams(searchParams.toString())
+    if (tab === "individuals") {
+      params.delete("tab")
+    } else {
+      params.set("tab", tab)
+    }
+    const query = params.toString()
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false })
+  }
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 300)
@@ -171,7 +168,10 @@ export function ContactsDirectoryReportPanel() {
 
   useEffect(() => {
     setPage(1)
-  }, [debouncedSearch, recordType, role, status, teamId])
+    setSearch("")
+    setDebouncedSearch("")
+    setRole("all")
+  }, [activeTab])
 
   useEffect(() => {
     if (role === "all") return
@@ -180,20 +180,23 @@ export function ContactsDirectoryReportPanel() {
     }
   }, [role, roleOptions])
 
-  useEffect(() => {
-    void fetchContactReportTeamOptionsAction().then((result) => {
-      if (result.success) {
-        setTeams(result.teams)
-      }
-    })
-  }, [pathname])
-
   const loadContacts = useCallback(async () => {
+    if (!lockedRecordType) {
+      setContacts([])
+      setTotal(0)
+      setLoading(false)
+      return
+    }
+
     clearSelectedOrganizationIdCache()
     setLoading(true)
     setError("")
 
-    const result = await fetchContactDirectoryPageAction({ filters, page })
+    const result = await fetchContactDirectoryPageAction({
+      filters,
+      page,
+      pageSize,
+    })
 
     if (!result.success) {
       setError(result.error)
@@ -205,23 +208,32 @@ export function ContactsDirectoryReportPanel() {
     }
 
     setLoading(false)
-  }, [filters, page])
+  }, [filters, page, pageSize, lockedRecordType])
 
   const loadSummary = useCallback(async () => {
     clearSelectedOrganizationIdCache()
     setSummaryLoading(true)
 
-    const result = await fetchContactDirectorySummaryAction(filters)
+    const [summaryResult, familiesResult] = await Promise.all([
+      fetchContactDirectorySummaryAction({}),
+      fetchFamilyListSummariesAction(),
+    ])
 
-    if (!result.success) {
-      setError((current) => current || result.error)
+    if (!summaryResult.success) {
+      setError((current) => current || summaryResult.error)
       setSummary({ total: 0, people: 0, organizations: 0, groups: 0 })
     } else {
-      setSummary(result.summary)
+      setSummary(summaryResult.summary)
+    }
+
+    if (familiesResult.success) {
+      setFamilyCount(familiesResult.families.length)
+    } else {
+      setFamilyCount(0)
     }
 
     setSummaryLoading(false)
-  }, [filters])
+  }, [])
 
   useEffect(() => {
     void loadContacts()
@@ -232,6 +244,8 @@ export function ContactsDirectoryReportPanel() {
   }, [loadSummary, pathname])
 
   async function handleExportCsv() {
+    if (!lockedRecordType) return
+
     setExportingCsv(true)
 
     const result = await fetchContactDirectoryExportAction(filters)
@@ -251,24 +265,13 @@ export function ContactsDirectoryReportPanel() {
     downloadContactDirectoryCsv(result.contacts, result.generatedAt, filterSummary)
   }
 
-  const totalPages = Math.max(1, Math.ceil(total / PREVIEW_PAGE_SIZE))
-  const rangeStart = total === 0 ? 0 : (page - 1) * PREVIEW_PAGE_SIZE + 1
-  const rangeEnd = Math.min(page * PREVIEW_PAGE_SIZE, total)
-
   const hasActiveFilters =
-    Boolean(debouncedSearch.trim()) ||
-    recordType !== "all" ||
-    role !== "all" ||
-    status !== "all" ||
-    teamId !== "all"
+    Boolean(debouncedSearch.trim()) || role !== "all"
 
   function clearFilters() {
     setSearch("")
     setDebouncedSearch("")
-    setRecordType("all")
     setRole("all")
-    setStatus("all")
-    setTeamId("all")
     setPage(1)
   }
 
@@ -277,20 +280,22 @@ export function ContactsDirectoryReportPanel() {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-sm text-muted-foreground">
-            Filter your contact directory and export the full result set as CSV. Preview shows up to{" "}
-            {PREVIEW_PAGE_SIZE} rows per page.
+            Browse individuals, organizations, and families. Export filtered contact
+            rows as CSV.
           </p>
         </div>
-        <Button variant="outline" disabled={exportingCsv || loading} onClick={handleExportCsv}>
-          <Download className="mr-2 h-4 w-4" />
-          {exportingCsv ? "Exporting..." : "Export CSV"}
-        </Button>
+        {activeTab !== "families" ? (
+          <Button variant="outline" disabled={exportingCsv || loading} onClick={handleExportCsv}>
+            <Download className="mr-2 h-4 w-4" />
+            {exportingCsv ? "Exporting..." : "Export CSV"}
+          </Button>
+        ) : null}
       </div>
 
       {summaryLoading ? (
         <p className="text-sm text-muted-foreground">Loading summary...</p>
       ) : (
-        <DonationMetricCardGrid columns={4}>
+        <DonationMetricCardGrid columns={4} colorful className="w-full">
           <DonationMetricCard
             title="Total contacts"
             value={summary.total.toLocaleString()}
@@ -298,7 +303,7 @@ export function ContactsDirectoryReportPanel() {
             accent="blue"
           />
           <DonationMetricCard
-            title="People"
+            title="Individuals"
             value={summary.people.toLocaleString()}
             icon={Users}
             accent="emerald"
@@ -310,9 +315,9 @@ export function ContactsDirectoryReportPanel() {
             accent="purple"
           />
           <DonationMetricCard
-            title="Groups"
-            value={summary.groups.toLocaleString()}
-            icon={UsersRound}
+            title="Families"
+            value={familyCount.toLocaleString()}
+            icon={Home}
             accent="amber"
           />
         </DonationMetricCardGrid>
@@ -320,248 +325,249 @@ export function ContactsDirectoryReportPanel() {
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
-      <Card>
-        <CardHeader className="pb-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <CardTitle className="text-base">Preview</CardTitle>
-            <div className="flex flex-wrap items-center gap-2">
-              {hasActiveFilters ? (
-                <Button type="button" variant="ghost" size="sm" onClick={clearFilters}>
-                  Clear filters
-                </Button>
-              ) : null}
-              <p className="text-sm text-muted-foreground">
-                {loading
-                  ? "Loading..."
-                  : total === 0
-                    ? "No contacts match"
-                    : `Showing ${rangeStart}–${rangeEnd} of ${total.toLocaleString()}`}
-              </p>
-            </div>
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => setActiveTab(parseDirectoryTab(value))}
+        className="gap-4"
+      >
+        <TabsList>
+          <TabsTrigger value="individuals">Individuals</TabsTrigger>
+          <TabsTrigger value="organizations">Organizations</TabsTrigger>
+          <TabsTrigger value="families">Families</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="individuals" className="mt-0 space-y-4">
+          <ContactDirectoryTable
+            contacts={contacts}
+            loading={loading}
+            total={total}
+            search={search}
+            debouncedSearch={debouncedSearch}
+            role={role}
+            roleOptions={roleOptions}
+            hasActiveFilters={hasActiveFilters}
+            pathname={pathname}
+            onSearchChange={setSearch}
+            onSearchCommit={() => setDebouncedSearch(search.trim())}
+            onRoleChange={setRole}
+            onClearFilters={clearFilters}
+          />
+          <ListPagination
+            page={page}
+            pageSize={pageSize}
+            total={total}
+            disabled={loading}
+            entryLabel="contacts"
+            onPageChange={setPage}
+            onPageSizeChange={(next) => {
+              setPageSize(next)
+              setPage(1)
+            }}
+          />
+        </TabsContent>
+
+        <TabsContent value="organizations" className="mt-0 space-y-4">
+          <ContactDirectoryTable
+            contacts={contacts}
+            loading={loading}
+            total={total}
+            search={search}
+            debouncedSearch={debouncedSearch}
+            role={role}
+            roleOptions={roleOptions}
+            hasActiveFilters={hasActiveFilters}
+            pathname={pathname}
+            onSearchChange={setSearch}
+            onSearchCommit={() => setDebouncedSearch(search.trim())}
+            onRoleChange={setRole}
+            onClearFilters={clearFilters}
+          />
+          <ListPagination
+            page={page}
+            pageSize={pageSize}
+            total={total}
+            disabled={loading}
+            entryLabel="contacts"
+            onPageChange={setPage}
+            onPageSizeChange={(next) => {
+              setPageSize(next)
+              setPage(1)
+            }}
+          />
+        </TabsContent>
+
+        <TabsContent value="families" className="mt-0">
+          <ContactsFamiliesDirectoryPanel />
+        </TabsContent>
+      </Tabs>
+    </div>
+  )
+}
+
+function ContactDirectoryTable({
+  contacts,
+  loading,
+  total,
+  search,
+  debouncedSearch,
+  role,
+  roleOptions,
+  hasActiveFilters,
+  pathname,
+  onSearchChange,
+  onSearchCommit,
+  onRoleChange,
+  onClearFilters,
+}: {
+  contacts: ContactListRow[]
+  loading: boolean
+  total: number
+  search: string
+  debouncedSearch: string
+  role: ContactRoleValue | "all"
+  roleOptions: { label: string; value: ContactRoleValue }[]
+  hasActiveFilters: boolean
+  pathname: string
+  onSearchChange: (value: string) => void
+  onSearchCommit: () => void
+  onRoleChange: (value: ContactRoleValue | "all") => void
+  onClearFilters: () => void
+}) {
+  return (
+    <Card>
+      <CardHeader className="pb-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <CardTitle className="text-base">Preview</CardTitle>
+          <div className="flex flex-wrap items-center gap-2">
+            {hasActiveFilters ? (
+              <Button type="button" variant="ghost" size="sm" onClick={onClearFilters}>
+                Clear filters
+              </Button>
+            ) : null}
+            <p className="text-sm text-muted-foreground">
+              {loading
+                ? "Loading..."
+                : total === 0
+                  ? "No contacts match"
+                  : `${total.toLocaleString()} matching`}
+            </p>
           </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
+        </div>
+      </CardHeader>
+      <CardContent className="p-0">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>
+                <TableColumnHeaderFilter
+                  label="Contact"
+                  active={Boolean(debouncedSearch.trim())}
+                >
+                  {({ close }) => (
+                    <Input
+                      placeholder="Name, email, or phone"
+                      value={search}
+                      onChange={(event) => onSearchChange(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          onSearchCommit()
+                          close()
+                        }
+                      }}
+                    />
+                  )}
+                </TableColumnHeaderFilter>
+              </TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>Phone</TableHead>
+              <TableHead>
+                <TableColumnHeaderFilter label="Roles" active={role !== "all"}>
+                  {({ close }) => (
+                    <Select
+                      value={role}
+                      onValueChange={(value) => {
+                        onRoleChange(value as ContactRoleValue | "all")
+                        close()
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="All roles" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All roles</SelectItem>
+                        {roleOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </TableColumnHeaderFilter>
+              </TableHead>
+              <TableHead>Last activity</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
               <TableRow>
-                <TableHead>
-                  <TableColumnHeaderFilter
-                    label="Contact"
-                    active={Boolean(debouncedSearch.trim())}
-                  >
-                    {({ close }) => (
-                      <Input
-                        placeholder="Name, email, or phone"
-                        value={search}
-                        onChange={(event) => setSearch(event.target.value)}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter") {
-                            setDebouncedSearch(search.trim())
-                            close()
-                          }
-                        }}
-                      />
-                    )}
-                  </TableColumnHeaderFilter>
-                </TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead>
-                  <TableColumnHeaderFilter label="Type" active={recordType !== "all"}>
-                    {({ close }) => (
-                      <Select
-                        value={recordType}
-                        onValueChange={(value) => {
-                          setRecordType(value as ContactRecordType | "all")
-                          close()
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {RECORD_TYPE_OPTIONS.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  </TableColumnHeaderFilter>
-                </TableHead>
-                <TableHead>
-                  <TableColumnHeaderFilter label="Roles" active={role !== "all"}>
-                    {({ close }) => (
-                      <Select
-                        value={role}
-                        onValueChange={(value) => {
-                          setRole(value as ContactRoleValue | "all")
-                          close()
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="All roles" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All roles</SelectItem>
-                          {roleOptions.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  </TableColumnHeaderFilter>
-                </TableHead>
-                <TableHead>
-                  <TableColumnHeaderFilter label="Status" active={status !== "all"}>
-                    {({ close }) => (
-                      <Select
-                        value={status}
-                        onValueChange={(value) => {
-                          setStatus(value as ContactStatus | "all")
-                          close()
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All statuses</SelectItem>
-                          {STATUS_OPTIONS.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  </TableColumnHeaderFilter>
-                </TableHead>
-                <TableHead>
-                  <TableColumnHeaderFilter label="Teams" active={teamId !== "all"}>
-                    {({ close }) => (
-                      <Select
-                        value={teamId}
-                        onValueChange={(value) => {
-                          setTeamId(value)
-                          close()
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="All teams" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All teams</SelectItem>
-                          {teams.map((team) => (
-                            <SelectItem key={team.id} value={team.id}>
-                              {team.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  </TableColumnHeaderFilter>
-                </TableHead>
-                <TableHead>Last activity</TableHead>
+                <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
+                  Loading contacts...
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
-                    Loading contacts...
+            ) : contacts.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
+                  {hasActiveFilters ? (
+                    <div className="flex flex-col items-center gap-2">
+                      <span>No contacts match the current filters.</span>
+                      <Button type="button" variant="outline" size="sm" onClick={onClearFilters}>
+                        Clear filters
+                      </Button>
+                    </div>
+                  ) : (
+                    "No contacts yet."
+                  )}
+                </TableCell>
+              </TableRow>
+            ) : (
+              contacts.map((contact) => (
+                <TableRow key={contact.id}>
+                  <TableCell>
+                    <Link
+                      href={contactProfileHref(contact.id, { returnTo: pathname })}
+                      className="font-medium text-primary hover:underline"
+                    >
+                      {contact.name}
+                    </Link>
+                    {contact.primaryContactName ? (
+                      <p className="text-xs text-muted-foreground">
+                        {contact.primaryContactName}
+                      </p>
+                    ) : null}
                   </TableCell>
-                </TableRow>
-              ) : contacts.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
-                    {hasActiveFilters ? (
-                      <div className="flex flex-col items-center gap-2">
-                        <span>No contacts match the current filters.</span>
-                        <Button type="button" variant="outline" size="sm" onClick={clearFilters}>
-                          Clear filters
-                        </Button>
+                  <TableCell>{contact.email || "—"}</TableCell>
+                  <TableCell>{contact.phone || "—"}</TableCell>
+                  <TableCell>
+                    {contact.roles.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {contact.roles.map((roleLabel) => (
+                          <Badge key={roleLabel} variant="secondary" className="font-normal">
+                            {roleLabel}
+                          </Badge>
+                        ))}
                       </div>
                     ) : (
-                      "No contacts yet."
+                      "—"
                     )}
                   </TableCell>
+                  <TableCell>{formatDate(contact.lastActivity)}</TableCell>
                 </TableRow>
-              ) : (
-                contacts.map((contact) => (
-                  <TableRow key={contact.id}>
-                    <TableCell>
-                      <Link
-                        href={contactProfileHref(contact.id, { returnTo: pathname })}
-                        className="font-medium text-primary hover:underline"
-                      >
-                        {contact.name}
-                      </Link>
-                      {contact.primaryContactName ? (
-                        <p className="text-xs text-muted-foreground">
-                          {contact.primaryContactName}
-                        </p>
-                      ) : null}
-                    </TableCell>
-                    <TableCell>{contact.email || "—"}</TableCell>
-                    <TableCell>{contact.phone || "—"}</TableCell>
-                    <TableCell>{getContactRecordTypeLabel(contact.recordType)}</TableCell>
-                    <TableCell>
-                      {contact.roles.length > 0 ? contact.roles.join(", ") : "—"}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className={STATUS_COLORS[contact.status]}>
-                        {contact.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {contact.teams.length > 0
-                        ? contact.teams.map((team) => team.name).join(", ")
-                        : "—"}
-                    </TableCell>
-                    <TableCell>{formatDate(contact.lastActivity)}</TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      {totalPages > 1 ? (
-        <Pagination>
-          <PaginationContent>
-            <PaginationItem>
-              <PaginationPrevious
-                href="#"
-                onClick={(event) => {
-                  event.preventDefault()
-                  setPage((current) => Math.max(1, current - 1))
-                }}
-                className={page <= 1 ? "pointer-events-none opacity-50" : undefined}
-              />
-            </PaginationItem>
-            <PaginationItem>
-              <PaginationLink href="#" isActive>
-                Page {page} of {totalPages}
-              </PaginationLink>
-            </PaginationItem>
-            <PaginationItem>
-              <PaginationNext
-                href="#"
-                onClick={(event) => {
-                  event.preventDefault()
-                  setPage((current) => Math.min(totalPages, current + 1))
-                }}
-                className={page >= totalPages ? "pointer-events-none opacity-50" : undefined}
-              />
-            </PaginationItem>
-          </PaginationContent>
-        </Pagination>
-      ) : null}
-    </div>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
   )
 }

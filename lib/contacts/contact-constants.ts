@@ -46,7 +46,7 @@ export const CONTACT_WORKFORCE_ROLES = ["employee", "volunteer"] as const
 /** Activity-derived customer role (events/ticketing + venue rentals). */
 export const CONTACT_CUSTOMER_ROLE = "customer" as const
 
-/** Activity-derived Programs affiliation (enrollments: participant or parent registrant). */
+/** Activity-derived Programs affiliation (enrollments: participant, registrant, or payer). */
 export const CONTACT_PROGRAM_PARTICIPANT_ROLE = "program_participant" as const
 
 /** Participation roles derived from enrollments, ticketing, rentals (not manual CRM picks). */

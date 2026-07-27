@@ -9,6 +9,7 @@ export async function quoteProgramRegistration(input: {
   offeringId: string
   registrationOptionId: string
   participantContactId?: string | null
+  participantPersonId?: string | null
   sessionIds: string[]
   addons?: QuoteAddons
 }) {
@@ -25,6 +26,7 @@ export async function quoteProgramRegistration(input: {
       before_care: input.addons?.before_care ?? false,
       after_care: input.addons?.after_care ?? false,
       lunch_option_id: input.addons?.lunch_option_id ?? null,
+      participant_person_id: input.participantPersonId ?? null,
     },
   })
 

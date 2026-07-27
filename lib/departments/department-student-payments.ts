@@ -1,5 +1,9 @@
 "use server"
 
+import {
+  DEPARTMENT_OPEN_PROGRAM_STATUSES,
+  DEPARTMENT_WORKSPACE_PROGRAM_STATUSES,
+} from "@/lib/departments/department-active-programs"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { isBillingSchemaMissingError } from "@/lib/programs/program-billing-schema"
 import type { ChargeScheduleStatus } from "@/lib/programs/program-billing-types"
@@ -105,7 +109,8 @@ function roundMoney(value: number) {
  * dynamic month columns from billing periods / charge schedules.
  */
 export async function fetchDepartmentStudentPaymentsMatrix(
-  departmentId: string
+  departmentId: string,
+  options: { openYearsOnly?: boolean } = {}
 ): Promise<DepartmentStudentPaymentsMatrix> {
   const organizationId = await getSelectedOrganizationId()
   if (!organizationId) {
@@ -113,13 +118,16 @@ export async function fetchDepartmentStudentPaymentsMatrix(
   }
 
   const supabase = await createClient()
+  const statuses = options.openYearsOnly
+    ? DEPARTMENT_OPEN_PROGRAM_STATUSES
+    : DEPARTMENT_WORKSPACE_PROGRAM_STATUSES
 
   const { data: programs, error: programsError } = await supabase
     .from("programs")
     .select("id, name, department_id, start_date, end_date")
     .eq("organization_id", organizationId)
     .eq("department_id", departmentId)
-    .in("status", ["draft", "active", "paused"])
+    .in("status", [...statuses])
 
   if (programsError) {
     throw new Error(programsError.message || "Could not load department programs.")
@@ -139,7 +147,7 @@ export async function fetchDepartmentStudentPaymentsMatrix(
     ])
   )
 
-  // Open years only — do not include archived-year enrollments via department_id.
+  // Workspace years (incl. closed) — archived years stay out of operating tabs.
   if (programIds.length === 0) {
     return { months: [], rows: [], migrationRequired: false }
   }

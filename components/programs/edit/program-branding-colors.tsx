@@ -25,11 +25,13 @@ export function ProgramBrandingColors({
   onFlyerUrlChange,
   programId,
   initialBackgroundColor,
+  onBackgroundColorChange,
 }: {
   flyerUrl?: string
   onFlyerUrlChange?: (url: string) => void
   programId?: string
   initialBackgroundColor?: string | null
+  onBackgroundColorChange?: (color: string) => void
 }) {
   const [committedFlyerUrl, setCommittedFlyerUrl] = React.useState(flyerUrl || "")
   const [committedBackgroundColor, setCommittedBackgroundColor] = React.useState(
@@ -48,8 +50,13 @@ export function ProgramBrandingColors({
     onFlyerUrlChange?.(url)
   }
 
+  function handleBackgroundChange(color: string) {
+    setCommittedBackgroundColor(color)
+    onBackgroundColorChange?.(color)
+  }
+
   return (
-    <div className="space-y-3 border-t pt-3">
+    <div className="space-y-3">
       <input type="hidden" name="flyer_url" value={committedFlyerUrl} />
       <input type="hidden" name="background_color" value={committedBackgroundColor} />
 
@@ -65,7 +72,7 @@ export function ProgramBrandingColors({
           <Label className="shrink-0">Background Color</Label>
           <BackgroundColorPicker
             value={committedBackgroundColor}
-            onChange={setCommittedBackgroundColor}
+            onChange={handleBackgroundChange}
           />
         </div>
       </div>

@@ -13,6 +13,14 @@ export function getAgeGroupLabelsFromMinMax(
   return []
 }
 
+/** Display label for stored gender (`All` → Both). */
+export function formatProgramGenderLabel(
+  gender: string | null | undefined
+): string {
+  if (!gender || gender === "All") return "Both"
+  return gender
+}
+
 /** Read min/max age from columns or legacy age_groups labels for edit forms. */
 export function parseProgramAgeBounds(input: {
   age_groups?: string[] | null

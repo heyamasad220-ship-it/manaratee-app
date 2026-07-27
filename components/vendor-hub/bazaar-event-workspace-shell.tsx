@@ -1,6 +1,5 @@
-import Link from "next/link"
-
 import { ModuleTabNav } from "@/components/layout/module-tab-nav"
+import { PageBreadcrumbs } from "@/components/navigation/page-breadcrumbs"
 import { Badge } from "@/components/ui/badge"
 import { bazaarEventTabs } from "@/lib/vendor-hub/vendor-hub-nav"
 import { VENDOR_HUB_ROUTES } from "@/lib/vendor-hub/vendor-hub-routes"
@@ -21,17 +20,14 @@ export function BazaarEventWorkspaceShell({
   return (
     <>
       <div className="border-b border-border bg-card px-6 pt-6">
-        <nav className="mb-2 text-sm text-muted-foreground">
-          <Link href="/vendor-hub" className="hover:text-foreground">
-            Vendor Hub
-          </Link>
-          <span className="mx-2">/</span>
-          <Link href={VENDOR_HUB_ROUTES.events.list} className="hover:text-foreground">
-            Bazaar Events
-          </Link>
-          <span className="mx-2">/</span>
-          <span className="text-foreground">{event.name}</span>
-        </nav>
+        <PageBreadcrumbs
+          className="mb-2"
+          items={[
+            { label: "Vendor Hub", href: "/vendor-hub" },
+            { label: "Bazaar Events", href: VENDOR_HUB_ROUTES.events.list },
+            { label: event.name },
+          ]}
+        />
 
         <div className="flex flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2">

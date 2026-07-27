@@ -65,6 +65,7 @@ export function ProgramRegisterQuotePreview({
             offeringId,
             registrationOptionId,
             participantContactId: participant.participantContactId,
+            participantPersonId: participant.participantPersonId,
             sessionIds,
             addons: {
               before_care: participant.beforeCare,

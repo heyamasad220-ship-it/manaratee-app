@@ -1,30 +1,24 @@
-import { Suspense } from "react"
-import { Header } from "@/components/layout/header"
-import { ProgramsFinancialAssistanceClient } from "@/components/programs/programs-financial-assistance-client"
-import {
-  hasPermission,
-  PERMISSIONS,
-  requirePermission,
-} from "@/lib/permissions/permissions"
-import { getProgramsFinancialAssistanceSettings } from "@/lib/programs/program-financial-assistance-actions"
+import { redirect } from "next/navigation"
 
-export default async function ProgramsFinancialAssistancePage() {
-  await requirePermission(PERMISSIONS.APPLICATIONS_VIEW)
+import { FINANCE_FINANCIAL_ASSISTANCE_PATH } from "@/lib/finance/finance-paths"
 
-  const [programs, canManage] = await Promise.all([
-    getProgramsFinancialAssistanceSettings(),
-    hasPermission(PERMISSIONS.PROGRAMS_MANAGE),
-  ])
-
-  return (
-    <>
-      <Header title="Financial Assistance" />
-      <Suspense>
-        <ProgramsFinancialAssistanceClient
-          initialPrograms={programs}
-          canManage={canManage}
-        />
-      </Suspense>
-    </>
+/** Legacy Programs → Financial Assistance → Finance. */
+export default async function ProgramsFinancialAssistanceRedirectPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}) {
+  const resolved = await searchParams
+  const params = new URLSearchParams()
+  for (const [key, value] of Object.entries(resolved)) {
+    if (value == null) continue
+    const text = Array.isArray(value) ? value[0] : value
+    if (text) params.set(key, text)
+  }
+  const query = params.toString()
+  redirect(
+    query
+      ? `${FINANCE_FINANCIAL_ASSISTANCE_PATH}?${query}`
+      : FINANCE_FINANCIAL_ASSISTANCE_PATH
   )
 }

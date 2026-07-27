@@ -9,6 +9,7 @@ import {
   DonationMetricCard,
   DonationMetricCardGrid,
 } from "@/components/donations/donation-metric-card"
+import { DonationReportsTabs } from "@/components/donations/donation-reports-chrome"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -81,7 +82,7 @@ import { receivePaymentActionLabel } from "@/lib/donations/payment-admin-copy"
 import { getDonorProfilePath } from "@/lib/donations/donor-profile-path"
 import { TableColumnHeaderFilter, TableColumnHeaderSort } from "@/components/ui/table-column-header-filter"
 
-const REPORT_TABLE_COLSPAN = 11
+const REPORT_TABLE_COLSPAN = 10
 const CONTACT_TABLE_COLSPAN = 9
 
 const AMOUNT_SORT_OPTIONS = [
@@ -232,11 +233,14 @@ function parseOptionalCountInput(value: string) {
 
 export function DonationRecurringPanel({
   embedded = false,
+  showReportsTabs = false,
   donorId: scopedDonorId = null,
   onPlansCountChange,
   onUpdated,
 }: {
   embedded?: boolean
+  /** Show Fund Development report tabs below KPI cards (Reports → Recurring). */
+  showReportsTabs?: boolean
   /** When set, show only this donor’s plans (contact profile Payment Plans). */
   donorId?: string | null
   onPlansCountChange?: (count: number) => void
@@ -701,6 +705,8 @@ export function DonationRecurringPanel({
           </DonationMetricCardGrid>
         ) : null}
 
+        {showReportsTabs && !isDonorScoped ? <DonationReportsTabs /> : null}
+
         {loadError ? (
           <p className="text-sm text-destructive">{loadError}</p>
         ) : null}
@@ -822,21 +828,18 @@ export function DonationRecurringPanel({
                     </div>
                   </TableHead>
                   {!contactScopedColumns ? (
-                    <>
-                      <TableHead>
-                        <div className="flex items-center gap-1">
-                          <span className="font-medium">Plan End</span>
-                          <TableColumnHeaderSort
-                            label="Plan End"
-                            value={sortValueForColumn(sortKey, "end_", "end_desc")}
-                            active={sortKey.startsWith("end_")}
-                            options={[...PLAN_END_SORT_OPTIONS]}
-                            onChange={(value) => setSortKey(value as RecurringSortKey)}
-                          />
-                        </div>
-                      </TableHead>
-                      <TableHead>Next Payment</TableHead>
-                    </>
+                    <TableHead>
+                      <div className="flex items-center gap-1">
+                        <span className="font-medium">Plan End</span>
+                        <TableColumnHeaderSort
+                          label="Plan End"
+                          value={sortValueForColumn(sortKey, "end_", "end_desc")}
+                          active={sortKey.startsWith("end_")}
+                          options={[...PLAN_END_SORT_OPTIONS]}
+                          onChange={(value) => setSortKey(value as RecurringSortKey)}
+                        />
+                      </div>
+                    </TableHead>
                   ) : null}
                   <TableHead
                     className={contactScopedColumns ? "w-[110px] text-right" : "text-right"}
@@ -931,10 +934,7 @@ export function DonationRecurringPanel({
                       <TableCell>{formatRecurringFrequencyLabel(plan.frequency)}</TableCell>
                       <TableCell>{formatDate(plan.start_date)}</TableCell>
                       {!contactScopedColumns ? (
-                        <>
-                          <TableCell>{formatDate(plan.end_date)}</TableCell>
-                          <TableCell>{formatNextPaymentDate(plan)}</TableCell>
-                        </>
+                        <TableCell>{formatDate(plan.end_date)}</TableCell>
                       ) : null}
                       <TableCell className="text-right">
                         {formatCount(plan.total_payments)}

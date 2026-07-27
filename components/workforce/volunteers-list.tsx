@@ -27,6 +27,11 @@ import {
 } from "@/lib/hr/hr-overview-path"
 import { HrCategoryApplicationsPanel } from "@/components/applications/hr-category-applications-panel"
 import { HrContactPicker } from "@/components/hr/hr-contact-picker"
+import { ListPagination } from "@/components/ui/list-pagination"
+import {
+  DEFAULT_LIST_PAGE_SIZE,
+  slicePageItems,
+} from "@/lib/ui/list-pagination"
 import {
   HrDirectoryShell,
   formatEmploymentTenure,
@@ -61,8 +66,6 @@ import {
 } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
-
-const PAGE_SIZE = 10
 
 const STATUS_OPTIONS: { value: VolunteerStatus; label: string }[] = [
   { value: "active", label: "Active" },
@@ -142,6 +145,7 @@ export function VolunteersList() {
   )
   const [applicationsCount, setApplicationsCount] = useState(0)
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(DEFAULT_LIST_PAGE_SIZE)
   const [addOpen, setAddOpen] = useState(false)
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null)
   const [selectedContactLabel, setSelectedContactLabel] = useState("")
@@ -223,14 +227,11 @@ export function VolunteersList() {
     return rows.filter((row) => row.status !== "inactive")
   }, [rows, statusFilter])
 
-  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE))
-  const currentPage = Math.min(page, totalPages)
-  const pageStart = filteredRows.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1
-  const pageEnd = Math.min(currentPage * PAGE_SIZE, filteredRows.length)
-  const pagedRows = filteredRows.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE
+  const currentPage = Math.min(
+    page,
+    Math.max(1, Math.ceil(filteredRows.length / pageSize) || 1)
   )
+  const pagedRows = slicePageItems(filteredRows, currentPage, pageSize)
 
   async function handleAddVolunteer() {
     if (!selectedContactId) {
@@ -397,34 +398,17 @@ export function VolunteersList() {
         }
         footer={
           directoryTab === "applications" || filteredRows.length === 0 ? undefined : (
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm text-muted-foreground">
-                Showing {pageStart} to {pageEnd} of {filteredRows.length} volunteers
-              </p>
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={currentPage <= 1}
-                  onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-                >
-                  Previous
-                </Button>
-                <span className="text-sm text-muted-foreground">
-                  Page {currentPage} of {totalPages}
-                </span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={currentPage >= totalPages}
-                  onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
+            <ListPagination
+              page={currentPage}
+              pageSize={pageSize}
+              total={filteredRows.length}
+              entryLabel="volunteers"
+              onPageChange={setPage}
+              onPageSizeChange={(next) => {
+                setPageSize(next)
+                setPage(1)
+              }}
+            />
           )
         }
       >

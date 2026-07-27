@@ -23,6 +23,7 @@ import {
   filterContactRoles,
   type ContactRoleValue,
 } from "@/lib/contacts/contact-constants"
+import { PageBreadcrumbs } from "@/components/navigation/page-breadcrumbs"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -241,10 +242,13 @@ export function HrTeamDetailClient({ teamId }: { teamId: string }) {
     <div className="flex flex-col gap-6 p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <Button variant="ghost" size="sm" className="mb-2 -ml-2" onClick={() => router.push(MEMBERSHIP_TEAMS_PATH)}>
-            <ArrowLeft className="mr-2 size-4" />
-            Back to Groups
-          </Button>
+          <PageBreadcrumbs
+            className="mb-2"
+            items={[
+              { label: "Groups", href: MEMBERSHIP_TEAMS_PATH },
+              { label: team.name },
+            ]}
+          />
           <div className="flex items-center gap-3">
             <span
               className="inline-block size-4 rounded-full"

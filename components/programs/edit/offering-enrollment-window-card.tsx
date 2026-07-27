@@ -29,7 +29,7 @@ const ENROLLMENT_TYPE_OPTIONS: Array<{
   },
   {
     value: "single_session",
-    label: "Single Session",
+    label: "Day Pass",
   },
 ]
 
@@ -47,10 +47,12 @@ export function OfferingEnrollmentWindowCard({
   registrationOpen,
   enableWaitlist,
   onEnableWaitlistChange,
-  inheritDates,
-  inheritEnrollment,
-  onInheritDatesChange,
-  onInheritEnrollmentChange,
+  openEnrollment = false,
+  onOpenEnrollmentChange,
+  attendanceTracked = false,
+  onAttendanceTrackedChange,
+  disabled = false,
+  plain = false,
 }: {
   fullProgramEnabled: boolean
   sessionRegistrationEnabled: boolean
@@ -65,10 +67,13 @@ export function OfferingEnrollmentWindowCard({
   registrationOpen: boolean
   enableWaitlist: boolean
   onEnableWaitlistChange: (enabled: boolean) => void
-  inheritDates?: boolean
-  inheritEnrollment?: boolean
-  onInheritDatesChange?: (inherit: boolean) => void
-  onInheritEnrollmentChange?: (inherit: boolean) => void
+  /** When true, customers Register & pay with no Apply/Approve step. */
+  openEnrollment?: boolean
+  onOpenEnrollmentChange?: (enabled: boolean) => void
+  attendanceTracked?: boolean
+  onAttendanceTrackedChange?: (enabled: boolean) => void
+  disabled?: boolean
+  plain?: boolean
 }) {
   const typeChecked: Record<EnrollmentTypeId, boolean> = {
     full_program: fullProgramEnabled,
@@ -82,71 +87,143 @@ export function OfferingEnrollmentWindowCard({
     single_session: onSingleSessionChange,
   }
 
-  const datesLocked = Boolean(inheritDates)
-  const enrollmentLocked = Boolean(inheritEnrollment)
+  const enrollmentModel = (
+    <div className="space-y-1.5">
+      <Label>Enrollment Model</Label>
+      <div
+        className={cn(
+          plain
+            ? "space-y-2"
+            : "space-y-2 rounded-md border bg-background px-3 py-2",
+          disabled && "opacity-60"
+        )}
+      >
+        {ENROLLMENT_TYPE_OPTIONS.map((option) => (
+          <label
+            key={option.value}
+            className="flex cursor-pointer items-center gap-2 text-sm"
+          >
+            <input
+              type="checkbox"
+              checked={typeChecked[option.value]}
+              disabled={disabled}
+              onChange={(event) =>
+                typeHandlers[option.value](event.target.checked)
+              }
+              className="size-3.5 rounded border"
+            />
+            <span>{option.label}</span>
+          </label>
+        ))}
+      </div>
+      {!plain ? (
+        <p className="text-xs text-muted-foreground">
+          Choose one or more ways customers can register.
+        </p>
+      ) : null}
+    </div>
+  )
+
+  if (plain) {
+    return (
+      <EditSectionCard plain>
+        <div className={cn("space-y-3", disabled && "opacity-60")}>
+          <div className="space-y-1.5">
+            <Label htmlFor="enrollment_open_date">Enrollment Opens</Label>
+            <div className="relative">
+              <CalendarIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                id="enrollment_open_date"
+                type="date"
+                className="h-9 bg-background pl-9"
+                value={enrollmentOpenDate}
+                disabled={disabled}
+                onChange={(event) =>
+                  onEnrollmentOpenDateChange(event.target.value)
+                }
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="enrollment_close_date">Enrollment Closes</Label>
+            <div className="relative">
+              <CalendarIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                id="enrollment_close_date"
+                type="date"
+                className="h-9 bg-background pl-9"
+                value={enrollmentCloseDate}
+                disabled={disabled}
+                onChange={(event) =>
+                  onEnrollmentCloseDateChange(event.target.value)
+                }
+              />
+            </div>
+          </div>
+
+          {enrollmentModel}
+
+          <div className="space-y-1.5">
+            <Label htmlFor="enrollment-open-path">
+              Automatically register and pay
+            </Label>
+            <div className="flex h-9 items-center gap-3">
+              <Switch
+                id="enrollment-open-path"
+                checked={openEnrollment}
+                disabled={disabled}
+                onCheckedChange={(checked) => {
+                  onOpenEnrollmentChange?.(checked)
+                }}
+              />
+              <span className="text-sm text-muted-foreground">
+                {openEnrollment
+                  ? "No approval — customers register and pay"
+                  : "Require Apply / Approve first"}
+              </span>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="enrollment-waitlist">Enable waitlist</Label>
+            <div className="flex h-9 items-center gap-3">
+              <Switch
+                id="enrollment-waitlist"
+                checked={enableWaitlist}
+                disabled={disabled}
+                onCheckedChange={onEnableWaitlistChange}
+              />
+              <span className="text-sm text-muted-foreground">
+                {enableWaitlist ? "On" : "Off"}
+              </span>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="enrollment-attendance">Attendance</Label>
+            <div className="flex h-9 items-center gap-3">
+              <Switch
+                id="enrollment-attendance"
+                checked={attendanceTracked}
+                disabled={disabled}
+                onCheckedChange={(checked) => {
+                  onAttendanceTrackedChange?.(checked)
+                }}
+              />
+              <span className="text-sm text-muted-foreground">
+                {attendanceTracked ? "Track attendance" : "Off"}
+              </span>
+            </div>
+          </div>
+        </div>
+      </EditSectionCard>
+    )
+  }
 
   return (
     <EditSectionCard title="Enrollment Window & Type">
-      <div className="mb-4 flex flex-wrap gap-4 text-sm">
-        {onInheritDatesChange ? (
-          <label className="flex items-center gap-2">
-            <Switch
-              checked={datesLocked}
-              onCheckedChange={onInheritDatesChange}
-            />
-            <span className="text-muted-foreground">
-              Use program dates
-            </span>
-          </label>
-        ) : null}
-        {onInheritEnrollmentChange ? (
-          <label className="flex items-center gap-2">
-            <Switch
-              checked={enrollmentLocked}
-              onCheckedChange={onInheritEnrollmentChange}
-            />
-            <span className="text-muted-foreground">
-              Use program enrollment types &amp; waitlist
-            </span>
-          </label>
-        ) : null}
-      </div>
-
       <div className="grid gap-4 lg:grid-cols-5">
-        <div className="space-y-1.5">
-          <Label>Enrollment Type</Label>
-          <div
-            className={cn(
-              "space-y-2 rounded-md border bg-background px-3 py-2",
-              enrollmentLocked && "opacity-60"
-            )}
-          >
-            {ENROLLMENT_TYPE_OPTIONS.map((option) => (
-              <label
-                key={option.value}
-                className="flex cursor-pointer items-center gap-2 text-sm"
-              >
-                <input
-                  type="checkbox"
-                  checked={typeChecked[option.value]}
-                  disabled={enrollmentLocked}
-                  onChange={(event) => {
-                    onInheritEnrollmentChange?.(false)
-                    typeHandlers[option.value](event.target.checked)
-                  }}
-                  className="size-3.5 rounded border"
-                />
-                <span>{option.label}</span>
-              </label>
-            ))}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            {enrollmentLocked
-              ? "Inherited from program settings."
-              : "Choose one or more ways customers can register."}
-          </p>
-        </div>
-
         <div className="space-y-1.5">
           <Label htmlFor="enrollment_open_date">Enrollment Opens</Label>
           <div className="relative">
@@ -156,11 +233,8 @@ export function OfferingEnrollmentWindowCard({
               type="date"
               className="h-9 bg-background pl-9"
               value={enrollmentOpenDate}
-              disabled={datesLocked}
-              onChange={(event) => {
-                onInheritDatesChange?.(false)
-                onEnrollmentOpenDateChange(event.target.value)
-              }}
+              disabled={disabled}
+              onChange={(event) => onEnrollmentOpenDateChange(event.target.value)}
             />
           </div>
         </div>
@@ -174,11 +248,10 @@ export function OfferingEnrollmentWindowCard({
               type="date"
               className="h-9 bg-background pl-9"
               value={enrollmentCloseDate}
-              disabled={datesLocked}
-              onChange={(event) => {
-                onInheritDatesChange?.(false)
+              disabled={disabled}
+              onChange={(event) =>
                 onEnrollmentCloseDateChange(event.target.value)
-              }}
+              }
             />
           </div>
         </div>
@@ -200,25 +273,59 @@ export function OfferingEnrollmentWindowCard({
           </div>
         </div>
 
+        {enrollmentModel}
+
         <div className="space-y-1.5">
-          <Label htmlFor="enrollment-waitlist">Waitlist</Label>
+          <Label htmlFor="enrollment-open-path">
+            Automatically register and pay
+          </Label>
+          <div className="flex h-9 items-center gap-3">
+            <Switch
+              id="enrollment-open-path"
+              checked={openEnrollment}
+              disabled={disabled}
+              onCheckedChange={(checked) => {
+                onOpenEnrollmentChange?.(checked)
+              }}
+            />
+            <span className="text-sm text-muted-foreground">
+              {openEnrollment
+                ? "No approval — customers register and pay"
+                : "Require Apply / Approve first"}
+            </span>
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="enrollment-waitlist">Enable waitlist</Label>
           <div className="flex h-9 items-center gap-3">
             <Switch
               id="enrollment-waitlist"
               checked={enableWaitlist}
-              disabled={enrollmentLocked}
-              onCheckedChange={(checked) => {
-                onInheritEnrollmentChange?.(false)
-                onEnableWaitlistChange(checked)
-              }}
+              disabled={disabled}
+              onCheckedChange={onEnableWaitlistChange}
             />
             <span className="text-sm text-muted-foreground">
               {enableWaitlist ? "On" : "Off"}
             </span>
           </div>
-          <p className="text-xs text-muted-foreground">
-            Enable to allow waitlisted registrations.
-          </p>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="enrollment-attendance">Attendance</Label>
+          <div className="flex h-9 items-center gap-3">
+            <Switch
+              id="enrollment-attendance"
+              checked={attendanceTracked}
+              disabled={disabled}
+              onCheckedChange={(checked) => {
+                onAttendanceTrackedChange?.(checked)
+              }}
+            />
+            <span className="text-sm text-muted-foreground">
+              {attendanceTracked ? "Track attendance" : "Off"}
+            </span>
+          </div>
         </div>
       </div>
     </EditSectionCard>

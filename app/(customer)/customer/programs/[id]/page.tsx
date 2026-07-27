@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/card"
 import {
   formatProgramAgeRangeShort,
+  formatProgramGenderLabel,
   formatProgramGradeRangeShort,
 } from "@/lib/programs/program-eligibility-display"
 import { getCustomerOfferingsForProgram } from "@/lib/programs/program-offering-queries"
@@ -33,6 +34,7 @@ import {
   formatOfferingDateRange,
   isOfferingEnrollmentOpen,
 } from "@/lib/programs/program-offering-display"
+import { isOfferingOpenEnrollment } from "@/lib/programs/offering-enrollment-path"
 import type { ProgramOffering } from "@/lib/programs/program-offering-types"
 
 type CustomerOrganization = {
@@ -291,7 +293,7 @@ export default async function CustomerProgramDetailsPage({
   const singleOffering =
     offerings.length === 1 ? offerings[0] : null
 
-  function getOfferingApplyLabel(offering: ProgramOffering) {
+  function getOfferingCtaLabel(offering: ProgramOffering) {
     if (offering.status === "closed") {
       return "Registration closed"
     }
@@ -300,7 +302,7 @@ export default async function CustomerProgramDetailsPage({
       return "Not open yet"
     }
 
-    return "Apply"
+    return isOfferingOpenEnrollment(offering) ? "Register" : "Apply"
   }
 
   function isOfferingApplyDisabled(offering: ProgramOffering) {
@@ -308,6 +310,13 @@ export default async function CustomerProgramDetailsPage({
       offering.status === "closed" ||
       !isOfferingEnrollmentOpen(offering, program)
     )
+  }
+
+  function offeringCtaHref(offering: ProgramOffering) {
+    const base = isOfferingOpenEnrollment(offering)
+      ? `/customer/programs/${program.id}/register`
+      : `/customer/programs/${program.id}/apply`
+    return `${base}?offering=${offering.id}`
   }
 
   return (
@@ -381,12 +390,10 @@ export default async function CustomerProgramDetailsPage({
                 )
               ) : singleOffering ? (
                 isOfferingApplyDisabled(singleOffering) ? (
-                  <span>{getOfferingApplyLabel(singleOffering)}</span>
+                  <span>{getOfferingCtaLabel(singleOffering)}</span>
                 ) : (
-                  <Link
-                    href={`/customer/programs/${program.id}/apply?offering=${singleOffering.id}`}
-                  >
-                    Apply
+                  <Link href={offeringCtaHref(singleOffering)}>
+                    {getOfferingCtaLabel(singleOffering)}
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
                 )
@@ -403,8 +410,10 @@ export default async function CustomerProgramDetailsPage({
               </CardTitle>
               <CardDescription>
                 {offerings.length === 1
-                  ? "Apply for the available program under this year/season."
-                  : "Select the level, camp, or track you want to apply for."}
+                  ? isOfferingOpenEnrollment(offerings[0])
+                    ? "Register and pay for this program."
+                    : "Apply for the available program under this year/season."
+                  : "Select the level, camp, or track you want."}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -419,7 +428,7 @@ export default async function CustomerProgramDetailsPage({
                           <CardTitle className="text-lg">{offering.name}</CardTitle>
                           <Badge variant={disabled ? "secondary" : "default"}>
                             {disabled
-                              ? getOfferingApplyLabel(offering)
+                              ? getOfferingCtaLabel(offering)
                               : "Open"}
                           </Badge>
                         </div>
@@ -437,12 +446,10 @@ export default async function CustomerProgramDetailsPage({
                           asChild={!disabled}
                         >
                           {disabled ? (
-                            <span>{getOfferingApplyLabel(offering)}</span>
+                            <span>{getOfferingCtaLabel(offering)}</span>
                           ) : (
-                            <Link
-                              href={`/customer/programs/${program.id}/apply?offering=${offering.id}`}
-                            >
-                              Apply
+                            <Link href={offeringCtaHref(offering)}>
+                              {getOfferingCtaLabel(offering)}
                               <ArrowRight className="ml-2 h-4 w-4" />
                             </Link>
                           )}
@@ -510,7 +517,9 @@ export default async function CustomerProgramDetailsPage({
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Gender</p>
-                <p className="font-semibold">{program.gender || "All"}</p>
+                <p className="font-semibold">
+                  {formatProgramGenderLabel(program.gender)}
+                </p>
               </div>
             </CardContent>
           </Card>

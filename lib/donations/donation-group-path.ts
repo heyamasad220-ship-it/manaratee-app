@@ -7,8 +7,7 @@ export const DONATIONS_GROUPS_BASE_PATH = "/donations/groups"
 export type GroupWorkspaceTab =
   | "overview"
   | "programs"
-  | "rosters"
-  | "applications"
+  | "students"
   | "schedule"
   | "financial"
   | "group-giving"
@@ -19,6 +18,9 @@ export type GroupWorkspaceTab =
 /** Sub-tabs under Department → Financial. */
 export type DepartmentFinanceSection = "payroll" | "expenses" | "budget"
 
+/** Stage filters under Department → Students. */
+export type DepartmentStudentsSection = "review" | "approved" | "roster"
+
 /** Sub-tabs under Department → Settings. */
 export type DepartmentSettingsSection =
   | "general"
@@ -26,6 +28,7 @@ export type DepartmentSettingsSection =
   | "notifications"
   | "promo-codes"
   | "service-needs"
+  | "year-defaults"
 
 export function donationGroupHref(
   groupContactId: string,
@@ -54,8 +57,9 @@ export function departmentGroupWorkspaceHref(
   options?: {
     tab?: GroupWorkspaceTab
     finance?: DepartmentFinanceSection
+    studentsSection?: DepartmentStudentsSection
     settingsSection?: DepartmentSettingsSection
-    /** Prefill Programs / Enrollments year/season filter (open program id). */
+    /** Prefill Programs year/season filter (open program id). */
     yearProgramId?: string
     returnTo?: string
   }
@@ -70,6 +74,13 @@ export function departmentGroupWorkspaceHref(
     options.finance !== "payroll"
   ) {
     params.set("section", options.finance)
+  }
+  if (
+    options?.tab === "students" &&
+    options.studentsSection &&
+    options.studentsSection !== "roster"
+  ) {
+    params.set("section", options.studentsSection)
   }
   if (
     options?.tab === "settings" &&
@@ -95,8 +106,7 @@ export function mapDonationTabToWorkspaceTab(
   if (
     tab === "overview" ||
     tab === "programs" ||
-    tab === "rosters" ||
-    tab === "applications" ||
+    tab === "students" ||
     tab === "schedule" ||
     tab === "activity" ||
     tab === "reports" ||
@@ -121,9 +131,15 @@ export function mapDonationTabToWorkspaceTab(
   ) {
     return "financial"
   }
-  // Enrollments UI label; URL stays ?tab=rosters (and enrollments alias).
-  if (tab === "enrollments" || tab === "payments" || tab === "participants") {
-    return "rosters"
+  // Students hub (merged Enrollments + Applications).
+  if (
+    tab === "rosters" ||
+    tab === "enrollments" ||
+    tab === "payments" ||
+    tab === "participants" ||
+    tab === "applications"
+  ) {
+    return "students"
   }
   // Donation Members / Financial map to department Group giving.
   if (tab === "members" || tab === "financial" || tab === "group-giving") {
@@ -138,8 +154,7 @@ export function parseDepartmentWorkspaceTab(
   if (
     tab === "overview" ||
     tab === "programs" ||
-    tab === "rosters" ||
-    tab === "applications" ||
+    tab === "students" ||
     tab === "schedule" ||
     tab === "financial" ||
     tab === "group-giving" ||
@@ -166,15 +181,49 @@ export function parseDepartmentWorkspaceTab(
   ) {
     return "financial"
   }
-  // Enrollments UI label; URL stays ?tab=rosters (and enrollments alias).
-  if (tab === "enrollments" || tab === "payments" || tab === "participants") {
-    return "rosters"
+  // Students hub (merged Enrollments + Applications).
+  if (
+    tab === "rosters" ||
+    tab === "enrollments" ||
+    tab === "payments" ||
+    tab === "participants" ||
+    tab === "applications"
+  ) {
+    return "students"
   }
   // Legacy Members → Group giving (donation “financial” stays group-giving via mapDonation).
   if (tab === "members") {
     return "group-giving"
   }
   return "overview"
+}
+
+/**
+ * Students stage from URL. Returns null when the caller should auto-pick
+ * (needs review if any pending, otherwise roster).
+ */
+export function parseDepartmentStudentsSection(
+  tab: string | null | undefined,
+  section: string | null | undefined
+): DepartmentStudentsSection | null {
+  if (tab === "applications") return "review"
+  if (
+    tab === "rosters" ||
+    tab === "enrollments" ||
+    tab === "payments" ||
+    tab === "participants"
+  ) {
+    return "roster"
+  }
+  if (tab !== "students") return null
+  if (
+    section === "review" ||
+    section === "approved" ||
+    section === "roster"
+  ) {
+    return section
+  }
+  return null
 }
 
 export function parseDepartmentFinanceSection(
@@ -196,7 +245,8 @@ export function parseDepartmentSettingsSection(
     section === "registration" ||
     section === "notifications" ||
     section === "promo-codes" ||
-    section === "service-needs"
+    section === "service-needs" ||
+    section === "year-defaults"
   ) {
     return section
   }

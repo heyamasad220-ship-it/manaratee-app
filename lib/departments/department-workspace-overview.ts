@@ -2,6 +2,10 @@
 
 import { fetchDepartmentDetail } from "@/lib/departments/department-actions"
 import { canViewDepartment } from "@/lib/departments/department-access"
+import {
+  DEPARTMENT_OPEN_PROGRAM_STATUSES,
+  loadDepartmentOpenPrograms,
+} from "@/lib/departments/department-active-programs"
 import { roundMoney } from "@/lib/departments/department-period-helpers"
 import { fetchDepartmentPayrollList } from "@/lib/departments/department-payroll"
 import { fetchDepartmentStudentPaymentsMatrix } from "@/lib/departments/department-student-payments"
@@ -15,15 +19,27 @@ export type DepartmentWorkspaceOverview = {
   expenses: number
   net: number
   upcomingEventsCount: number
+  /** True when at least one draft/active/paused year exists. */
+  hasOpenYears: boolean
 }
 
 function todayIsoDate() {
   return new Date().toISOString().slice(0, 10)
 }
 
+const ACTIVE_ENROLLMENT_STATUSES = [
+  "pending_payment",
+  "pending",
+  "enrolled",
+  "active",
+  "completed",
+] as const
+
 /**
- * KPI strip for the department Overview tab:
- * students, staff, revenue, expenses, net, and related program counts.
+ * KPI strip for the department Overview tab.
+ * Participants / revenue use **open** years only (draft / active / paused).
+ * Closed years stay on cards and operating tabs for reports, but do not inflate
+ * the live Overview KPIs.
  */
 export async function fetchDepartmentWorkspaceOverview(
   departmentId: string
@@ -41,18 +57,54 @@ export async function fetchDepartmentWorkspaceOverview(
     expenses: 0,
     net: 0,
     upcomingEventsCount: 0,
+    hasOpenYears: false,
   }
   if (!organizationId) return empty
 
-  const [detail, tuition, payroll] = await Promise.all([
+  const supabase = await createClient()
+
+  const [detail, openPrograms, tuition, payroll] = await Promise.all([
     fetchDepartmentDetail(departmentId),
-    fetchDepartmentStudentPaymentsMatrix(departmentId),
+    loadDepartmentOpenPrograms(organizationId, departmentId).then((rows) =>
+      rows.filter((row) =>
+        (DEPARTMENT_OPEN_PROGRAM_STATUSES as readonly string[]).includes(row.status)
+      )
+    ),
+    fetchDepartmentStudentPaymentsMatrix(departmentId, { openYearsOnly: true }),
     fetchDepartmentPayrollList(departmentId, { scope: "all-approved-for-budget" }),
   ])
 
-  const studentsCount = new Set(
-    tuition.rows.map((row) => row.studentName.trim().toLowerCase()).filter(Boolean)
-  ).size
+  // Prefer counting enrollments on open years only (not closed).
+  const openProgramIds = openPrograms.map((p) => p.id)
+  let studentsCount = 0
+  if (openProgramIds.length > 0) {
+    const { data: enrollments } = await supabase
+      .from("program_enrollments")
+      .select("id, child_name, participant_contact_id, child_person_id")
+      .eq("organization_id", organizationId)
+      .in("program_id", openProgramIds)
+      .in("status", [...ACTIVE_ENROLLMENT_STATUSES])
+
+    const keys = new Set<string>()
+    for (const row of enrollments || []) {
+      const personId = row.child_person_id as string | null
+      const contactId = row.participant_contact_id as string | null
+      const name = String(row.child_name || "")
+        .trim()
+        .toLowerCase()
+      const key = personId
+        ? `person:${personId}`
+        : contactId
+          ? `contact:${contactId}`
+          : name
+            ? `name:${name}`
+            : `enrollment:${row.id}`
+      keys.add(key)
+    }
+    studentsCount = keys.size
+  }
+
+  // Fallback if payments matrix is needed for revenue only
   const staffCount = detail?.staff.length ?? 0
   const revenue = roundMoney(
     tuition.rows.reduce((sum, row) => sum + Number(row.received || 0), 0)
@@ -65,7 +117,6 @@ export async function fetchDepartmentWorkspaceOverview(
   const net = roundMoney(revenue - expenses)
 
   let upcomingEventsCount = 0
-  const supabase = await createClient()
   const { data: events, error } = await supabase
     .from("internal_events")
     .select("id")
@@ -84,6 +135,7 @@ export async function fetchDepartmentWorkspaceOverview(
     expenses,
     net,
     upcomingEventsCount,
+    hasOpenYears: openProgramIds.length > 0,
   }
 }
 
@@ -93,7 +145,7 @@ export async function fetchDepartmentWorkspaceOverviewAction(departmentId: strin
     return { success: true as const, overview }
   } catch (error) {
     return {
-      success: false as const,
+      success: false,
       error:
         error instanceof Error ? error.message : "Could not load department overview.",
     }

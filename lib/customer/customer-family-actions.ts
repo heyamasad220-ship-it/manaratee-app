@@ -216,13 +216,55 @@ export async function addCustomerFamilyMember(input: AddCustomerFamilyMemberInpu
     throw new Error(relationshipError.message || "Could not save family relationship.")
   }
 
-  const { contactId } = await ensureContactForPerson({
-    organizationId,
-    personId: createdPerson.id as string,
-  })
+  const ageYears = (() => {
+    if (!dateOfBirth) return null
+    const today = new Date()
+    const birth = new Date(`${dateOfBirth}T00:00:00`)
+    let age = today.getFullYear() - birth.getFullYear()
+    const monthDiff = today.getMonth() - birth.getMonth()
+    if (
+      monthDiff < 0 ||
+      (monthDiff === 0 && today.getDate() < birth.getDate())
+    ) {
+      age--
+    }
+    return age
+  })()
+
+  const isMinor =
+    relationship === "child" || (ageYears !== null && ageYears < 18)
+
+  // Minors stay as people under the parent Contact — no CRM contact profile.
+  let contactId: string | null = null
+  if (!isMinor) {
+    const ensured = await ensureContactForPerson({
+      organizationId,
+      personId: createdPerson.id as string,
+    })
+    contactId = ensured.contactId
+  }
 
   revalidatePath("/customer/profile")
   revalidatePath("/customer/programs")
+  revalidatePath("/contacts/families")
+
+  // Keep Contacts → Families household in sync (minors as person-only members).
+  if (contact.id) {
+    try {
+      const { syncHouseholdFromParentContact } = await import("@/lib/contacts/family-sync")
+      await syncHouseholdFromParentContact({
+        supabase,
+        organizationId,
+        primaryContactId: contact.id as string,
+        primaryName: (contact.full_name as string | null) ?? null,
+      })
+    } catch (error) {
+      console.warn(
+        "syncHouseholdFromParentContact after addCustomerFamilyMember:",
+        error instanceof Error ? error.message : error
+      )
+    }
+  }
 
   return {
     personId: createdPerson.id as string,

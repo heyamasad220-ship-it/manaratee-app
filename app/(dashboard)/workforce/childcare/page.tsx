@@ -1,27 +1,5 @@
-import { redirect } from "next/navigation"
-import { hrOverviewHref } from "@/lib/hr/hr-overview-path"
+import { HrOverviewRoutePage } from "@/components/hr/hr-overview-route-page"
 
-function directoryApplicationsView(params: {
-  tab?: string
-  view?: string
-}): "applications" | null {
-  if (params.view === "applications" || params.tab === "applications") {
-    return "applications"
-  }
-  return null
-}
-
-export default async function HrChildcarePage({
-  searchParams,
-}: {
-  searchParams: Promise<{ tab?: string; view?: string }>
-}) {
-  const params = await searchParams
-
-  redirect(
-    hrOverviewHref({
-      tab: "childcare",
-      view: directoryApplicationsView(params),
-    })
-  )
+export default async function HrChildcarePage() {
+  return <HrOverviewRoutePage initialTab="childcare" />
 }

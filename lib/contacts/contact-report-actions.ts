@@ -193,6 +193,7 @@ export async function fetchContactDirectorySummaryAction(
 export async function fetchContactDirectoryPageAction(input: {
   filters: ContactDirectoryReportFilters
   page?: number
+  pageSize?: number
 }): Promise<
   | {
       success: true
@@ -208,8 +209,9 @@ export async function fetchContactDirectoryPageAction(input: {
 
   try {
     const page = Math.max(1, input.page ?? 1)
+    const pageSize = Math.max(1, input.pageSize ?? PREVIEW_PAGE_SIZE)
     const result = await fetchContactsList(
-      toListInput(input.filters, page, PREVIEW_PAGE_SIZE)
+      toListInput(input.filters, page, pageSize)
     )
 
     return {

@@ -44,7 +44,7 @@ function downloadYearReportCsv(report: DepartmentYearReport) {
   lines.push(`Summary,Status,${csvEscape(report.status)}`)
   lines.push(`Summary,Start,${csvEscape(report.startDate)}`)
   lines.push(`Summary,End,${csvEscape(report.endDate)}`)
-  lines.push(`Summary,Students,${report.studentsCount}`)
+  lines.push(`Summary,Participants,${report.studentsCount}`)
   lines.push(`Summary,Courses,${report.offeringsCount}`)
   lines.push(`Summary,Teachers,${report.teachersCount}`)
   lines.push(`Summary,Course fees (total),${report.totalCourseFees}`)
@@ -54,10 +54,10 @@ function downloadYearReportCsv(report: DepartmentYearReport) {
   lines.push(`Summary,Expenses,${report.totalExpenses}`)
   lines.push(`Summary,Net (collected - payroll - expenses),${report.net}`)
   lines.push("")
-  lines.push("Students,Student,Course")
+  lines.push("Participants,Participant,Course")
   for (const row of report.students) {
     lines.push(
-      ["Students", csvEscape(row.studentName), csvEscape(row.courseName)].join(",")
+      ["Participants", csvEscape(row.studentName), csvEscape(row.courseName)].join(",")
     )
   }
   lines.push("")
@@ -181,7 +181,7 @@ export function DepartmentReportsPanel({
                 layout="header"
                 fill
                 tone="blue"
-                label="Students"
+                label="Participants"
                 value={report.studentsCount}
               />
               <StatCard
@@ -212,7 +212,7 @@ export function DepartmentReportsPanel({
               <CardHeader>
                 <CardTitle className="text-base">Financial summary</CardTitle>
                 <CardDescription>
-                  Totals only. Student payment detail is omitted for confidentiality.
+                  Totals only. Participant payment detail is omitted for confidentiality.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -259,16 +259,16 @@ export function DepartmentReportsPanel({
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Students</CardTitle>
+                <CardTitle className="text-base">Participants</CardTitle>
                 <CardDescription>
-                  Roster-style enrollments (student × course). No payment columns.
+                  Roster-style enrollments (participant × course). No payment columns.
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Student</TableHead>
+                      <TableHead>Participant</TableHead>
                       <TableHead>Course</TableHead>
                     </TableRow>
                   </TableHeader>

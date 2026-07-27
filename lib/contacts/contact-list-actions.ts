@@ -292,7 +292,7 @@ async function runDonorGivingContactsQuery(
         includeTeams: options.includeTeams,
         includeActivityColumns: options.includeActivityColumns,
         includePrimaryContactName: options.includePrimaryContactName,
-        includeRoles: Boolean(input.role && input.role !== "all"),
+        includeRoles: true,
       })
     )
     .eq("organization_id", organizationId)
@@ -404,7 +404,7 @@ async function runContactsQuery(
         includeTeams: options.includeTeams,
         includeActivityColumns: options.includeActivityColumns,
         includePrimaryContactName: options.includePrimaryContactName,
-        includeRoles: Boolean(roleFilter),
+        includeRoles: true,
       }),
       { count: "exact" }
     )

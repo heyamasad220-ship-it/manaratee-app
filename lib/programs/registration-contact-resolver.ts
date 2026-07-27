@@ -104,6 +104,28 @@ export async function getCustomerContactForUser(
   return data as CustomerContact
 }
 
+export async function verifyParticipantPersonInRegistrantFamily(input: {
+  organizationId: string
+  registrantPersonId: string
+  participantPersonId: string
+}) {
+  const supabase = await createClient()
+
+  const { data: relationship, error: relationshipError } = await supabase
+    .from("person_relationships")
+    .select("id")
+    .eq("organization_id", input.organizationId)
+    .eq("person_id", input.registrantPersonId)
+    .eq("related_person_id", input.participantPersonId)
+    .maybeSingle()
+
+  if (relationshipError) {
+    return false
+  }
+
+  return Boolean(relationship)
+}
+
 export async function verifyParticipantInRegistrantFamily(input: {
   organizationId: string
   registrantPersonId: string
@@ -122,19 +144,11 @@ export async function verifyParticipantInRegistrantFamily(input: {
     return false
   }
 
-  const { data: relationship, error: relationshipError } = await supabase
-    .from("person_relationships")
-    .select("id")
-    .eq("organization_id", input.organizationId)
-    .eq("person_id", input.registrantPersonId)
-    .eq("related_person_id", participantContact.person_id)
-    .maybeSingle()
-
-  if (relationshipError) {
-    return false
-  }
-
-  return Boolean(relationship)
+  return verifyParticipantPersonInRegistrantFamily({
+    organizationId: input.organizationId,
+    registrantPersonId: input.registrantPersonId,
+    participantPersonId: participantContact.person_id as string,
+  })
 }
 
 export async function verifyContactInOrganization(

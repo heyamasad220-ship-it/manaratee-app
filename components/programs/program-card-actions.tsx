@@ -63,7 +63,9 @@ export function ProgramCardActions({
   programName,
   programStatus,
   editLabel = "View Details",
+  detailsHref,
   onEditFlyer,
+  onConfigure,
   onArchiveYear,
   hideDelete = false,
 }: {
@@ -72,7 +74,11 @@ export function ProgramCardActions({
   programStatus: string
   /** Primary open label (department Overview uses "View / Edit"). */
   editLabel?: string
+  /** Override primary link (e.g. department workspace Overview). */
+  detailsHref?: string
   onEditFlyer?: () => void
+  /** When set, primary action calls this instead of navigating. */
+  onConfigure?: () => void
   onArchiveYear?: () => void
   /** Department year cards: use Archive instead of permanent Delete. */
   hideDelete?: boolean
@@ -198,12 +204,19 @@ export function ProgramCardActions({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-52">
-          <DropdownMenuItem asChild>
-            <Link href={`/programs/${programId}`}>
+          {onConfigure ? (
+            <DropdownMenuItem onClick={onConfigure}>
               <Pencil className="h-4 w-4" />
               {editLabel}
-            </Link>
-          </DropdownMenuItem>
+            </DropdownMenuItem>
+          ) : (
+            <DropdownMenuItem asChild>
+              <Link href={detailsHref || `/programs/${programId}`}>
+                <Pencil className="h-4 w-4" />
+                {editLabel}
+              </Link>
+            </DropdownMenuItem>
+          )}
           {onEditFlyer ? (
             <DropdownMenuItem onClick={onEditFlyer}>
               <ImageIcon className="h-4 w-4" />
@@ -249,7 +262,7 @@ export function ProgramCardActions({
                 onClick={onArchiveYear}
               >
                 <Archive className="h-4 w-4" />
-                Archive
+                Close year
               </DropdownMenuItem>
             </>
           ) : null}

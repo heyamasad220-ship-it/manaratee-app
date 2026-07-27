@@ -25,6 +25,7 @@ export type FeePlanComponentInput = {
   applies_to_option_types?: string[] | null
   sort_order: number
   is_active: boolean
+  billing_scope?: "individual" | "family"
 }
 
 export type DiscountRuleInput = {
@@ -37,6 +38,7 @@ export type DiscountRuleInput = {
   is_active: boolean
   priority_rank: number
   exclude_component_types?: string[]
+  conditions?: Record<string, unknown>
 }
 
 export type FeePlanInput = {
@@ -297,6 +299,7 @@ export async function saveOfferingFeePlans(input: {
         applies_to_option_types: component.applies_to_option_types ?? null,
         sort_order: component.sort_order ?? index * 10,
         is_active: component.is_active,
+        billing_scope: component.billing_scope ?? "individual",
       }))
 
     if (componentRows.length > 0) {
@@ -343,7 +346,12 @@ export async function saveOfferingFeePlans(input: {
         discount_type: rule.discount_type,
         amount: rule.amount,
         conditions: {
-          exclude_component_types: rule.exclude_component_types ?? ["registration_fee"],
+          ...(rule.conditions ?? {}),
+          exclude_component_types:
+            rule.exclude_component_types ??
+            (Array.isArray(rule.conditions?.exclude_component_types)
+              ? (rule.conditions!.exclude_component_types as string[])
+              : ["registration_fee"]),
         },
         is_active: rule.is_active,
         priority_rank: rule.priority_rank,

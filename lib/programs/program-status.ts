@@ -2,6 +2,7 @@ export const PROGRAM_STATUSES = {
   draft: "draft",
   active: "active",
   paused: "paused",
+  closed: "closed",
   archived: "archived",
 } as const
 
@@ -16,6 +17,8 @@ export function getProgramStatusLabel(status: ProgramStatus): string {
       return "Active"
     case "paused":
       return "Paused"
+    case "closed":
+      return "Closed"
     case "archived":
       return "Archived"
     default:

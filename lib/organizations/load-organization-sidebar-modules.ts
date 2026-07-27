@@ -50,7 +50,7 @@ const SIDEBAR_MODULE_DEFAULTS: Record<
   },
   finance: {
     name: "Finance",
-    route: "/finance/payroll",
+    route: "/finance/transactions",
     icon_name: "Wallet",
     group_name: "Financial",
     sort_order: 35,
@@ -84,8 +84,8 @@ const SIDEBAR_MODULE_DEFAULTS: Record<
     sort_order: 70,
   },
   spaces: {
-    name: "Facility Manager",
-    route: "/facilities/reservation-center",
+    name: "Bookings",
+    route: "/facilities/overview",
     icon_name: "Building2",
     group_name: "Facilities",
     sort_order: 80,

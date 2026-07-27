@@ -172,11 +172,14 @@ function ReportFilters({
           id="report-offering-filter"
           value={offeringId}
           onChange={(event) => onOfferingChange(event.target.value)}
-          disabled={loading || offerings.length === 0}
+          disabled={loading}
           className="h-10 w-full rounded-md border bg-background px-3 text-sm"
         >
+          <option value="">All {PROGRAM_LABEL_PLURAL.toLowerCase()}</option>
           {offerings.length === 0 ? (
-            <option value="">No active {PROGRAM_LABEL_PLURAL.toLowerCase()}</option>
+            <option value="__none" disabled>
+              No active {PROGRAM_LABEL_PLURAL.toLowerCase()}
+            </option>
           ) : (
             offerings.map((offering) => (
               <option key={offering.id} value={offering.id}>
@@ -204,8 +207,9 @@ function useReportOfferings() {
       if (cancelled) return
       setOfferings(rows)
       setSelectedId((current) => {
-        if (current && rows.some((row) => row.id === current)) return current
-        return rows[0]?.id || ""
+        if (!current) return ""
+        if (rows.some((row) => row.id === current)) return current
+        return ""
       })
       setLoading(false)
     }
@@ -228,15 +232,10 @@ function useReportOfferings() {
   }, [offerings, departmentId])
 
   React.useEffect(() => {
-    if (filteredOfferings.length === 0) {
-      setSelectedId("")
-      return
-    }
     setSelectedId((current) => {
-      if (current && filteredOfferings.some((row) => row.id === current)) {
-        return current
-      }
-      return filteredOfferings[0]?.id || ""
+      if (!current) return ""
+      if (filteredOfferings.some((row) => row.id === current)) return current
+      return ""
     })
   }, [filteredOfferings])
 
@@ -319,7 +318,9 @@ export function ProgramsAttendanceReportPanel() {
       {!selected ? (
         <Card>
           <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            No active programs in this department.
+            {offerings.length === 0
+              ? "No active programs in this department."
+              : `Select a ${PROGRAM_LABEL.toLowerCase()} to review attendance.`}
           </CardContent>
         </Card>
       ) : (
@@ -410,13 +411,13 @@ export function ProgramsWaitlistReportPanel() {
         />
       </div>
 
-      {!selected ? (
+      {offerings.length === 0 ? (
         <Card>
           <CardContent className="py-10 text-center text-sm text-muted-foreground">
             No active programs in this department.
           </CardContent>
         </Card>
-      ) : (
+      ) : selected ? (
         <>
           {!selected.waitlistEnabled ? (
             <div className="rounded-lg border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
@@ -435,6 +436,14 @@ export function ProgramsWaitlistReportPanel() {
             offeringName={selected.name}
           />
         </>
+      ) : (
+        <OfferingWaitlistPanel
+          programIds={Array.from(
+            new Set(offerings.map((offering) => offering.programId))
+          )}
+          offeringIds={offerings.map((offering) => offering.id)}
+          offeringName={`all ${PROGRAM_LABEL_PLURAL.toLowerCase()}`}
+        />
       )}
     </div>
   )

@@ -218,18 +218,22 @@ export function buildSubExpandKey(moduleLabel: string, ancestors: string[], labe
 export function buildNavigationTrail(
   pathname: string,
   navItems: NavItem[],
-  profileListSegment: ContactsListSegment | null
+  profileListSegment: ContactsListSegment | null,
+  trailingSegments: NavigationTrailSegment[] = []
 ): NavigationTrailSegment[] {
   const trail: NavigationTrailSegment[] = [{ label: "Dashboard", href: "/dashboard" }]
 
   if (pathname === "/dashboard") {
-    return trail
+    return trailingSegments.length > 0 ? [...trail, ...trailingSegments] : trail
   }
 
   const activeModule = findActiveModuleWithChildren(navItems, pathname, profileListSegment)
 
   if (!activeModule?.children?.length) {
     trail.push({ label: getReturnToLabel(pathname), href: pathname })
+    if (trailingSegments.length > 0) {
+      trail.push(...trailingSegments)
+    }
     return trail
   }
 
@@ -244,6 +248,9 @@ export function buildNavigationTrail(
     const pageLabel = getReturnToLabel(pathname)
     if (pageLabel !== activeModule.label) {
       trail.push({ label: pageLabel })
+    }
+    if (trailingSegments.length > 0) {
+      trail.push(...trailingSegments)
     }
     return trail
   }
@@ -269,20 +276,35 @@ export function buildNavigationTrail(
   if (match.leaf) {
     const leafAncestors = [...ancestorLabels, match.leaf.label]
     const leafIsCurrentPage = subItemMatchesPath(match.leaf, pathname, profileListSegment)
+    const leafExpandKeys = leafAncestors.map((label, index) =>
+      buildSubExpandKey(activeModule.label, leafAncestors.slice(0, index), label)
+    )
 
     if (leafIsCurrentPage) {
-      trail.push({ label: match.leaf.label })
+      // Keep parent navigable when a page appends a deeper trail segment (e.g. department name).
+      trail.push(
+        trailingSegments.length > 0
+          ? {
+              label: match.leaf.label,
+              href: match.leaf.href,
+              module: activeModule,
+              expandKeys: leafExpandKeys,
+            }
+          : { label: match.leaf.label }
+      )
     } else {
       trail.push({
         label: match.leaf.label,
         href: match.leaf.href,
         module: activeModule,
-        expandKeys: leafAncestors.map((label, index) =>
-          buildSubExpandKey(activeModule.label, leafAncestors.slice(0, index), label)
-        ),
+        expandKeys: leafExpandKeys,
       })
       trail.push({ label: getReturnToLabel(pathname) })
     }
+  }
+
+  if (trailingSegments.length > 0) {
+    trail.push(...trailingSegments)
   }
 
   return trail

@@ -1,4 +1,10 @@
+import { FINANCE_PAYROLL_PATH } from "@/lib/finance/finance-paths"
+
 export const HR_OVERVIEW_PATH = "/workforce"
+export const HR_DEPARTMENTS_PATH = "/workforce/departments"
+export const HR_EMPLOYEES_PATH = "/workforce/employees"
+export const HR_VOLUNTEERS_PATH = "/workforce/volunteers"
+export const HR_CHILDCARE_PATH = "/workforce/childcare"
 
 export type HrOverviewTab =
   | "overview"
@@ -6,7 +12,6 @@ export type HrOverviewTab =
   | "employees"
   | "volunteers"
   | "childcare"
-  | "payroll"
 
 export type HrDirectoryView = "roster" | "applications" | "positions"
 
@@ -19,17 +24,63 @@ export const HR_OVERVIEW_TABS: ReadonlyArray<{
   { id: "employees", label: "Employees" },
   { id: "volunteers", label: "Volunteers" },
   { id: "childcare", label: "Childcare Providers" },
-  { id: "payroll", label: "Payroll" },
 ]
+
+export function hrOverviewTabPath(tab: HrOverviewTab = "overview"): string {
+  switch (tab) {
+    case "departments":
+      return HR_DEPARTMENTS_PATH
+    case "employees":
+      return HR_EMPLOYEES_PATH
+    case "volunteers":
+      return HR_VOLUNTEERS_PATH
+    case "childcare":
+      return HR_CHILDCARE_PATH
+    default:
+      return HR_OVERVIEW_PATH
+  }
+}
+
+/** Resolve HR section from a pathname (path-based routes). */
+export function hrOverviewTabFromPathname(
+  pathname: string | null | undefined
+): HrOverviewTab {
+  if (!pathname) return "overview"
+  if (
+    pathname === HR_DEPARTMENTS_PATH ||
+    pathname.startsWith(`${HR_DEPARTMENTS_PATH}/`)
+  ) {
+    return "departments"
+  }
+  if (
+    pathname === HR_EMPLOYEES_PATH ||
+    pathname.startsWith(`${HR_EMPLOYEES_PATH}/`)
+  ) {
+    return "employees"
+  }
+  if (
+    pathname === HR_VOLUNTEERS_PATH ||
+    pathname.startsWith(`${HR_VOLUNTEERS_PATH}/`)
+  ) {
+    return "volunteers"
+  }
+  if (
+    pathname === HR_CHILDCARE_PATH ||
+    pathname.startsWith(`${HR_CHILDCARE_PATH}/`)
+  ) {
+    return "childcare"
+  }
+  return "overview"
+}
 
 /** Canonical URL for employee job-title management. */
 export function hrEmployeePositionsHref() {
   return hrOverviewHref({ tab: "employees", view: "positions" })
 }
 
-/** Canonical URL for org payroll queue (formerly /finance/payroll). */
+/** Canonical URL for org payroll queue (Finance → Payroll). */
 export function hrPayrollHref() {
-  return hrOverviewHref({ tab: "payroll" })
+  return FINANCE_PAYROLL_PATH
 }
 
 export function parseHrOverviewTab(tab: string | null | undefined): HrOverviewTab {
@@ -37,8 +88,7 @@ export function parseHrOverviewTab(tab: string | null | undefined): HrOverviewTa
     tab === "departments" ||
     tab === "employees" ||
     tab === "volunteers" ||
-    tab === "childcare" ||
-    tab === "payroll"
+    tab === "childcare"
   ) {
     return tab
   }
@@ -76,9 +126,7 @@ export function hrOverviewHref(options?: {
 }): string {
   const params = new URLSearchParams()
   const tab = options?.tab ?? "overview"
-  if (tab !== "overview") {
-    params.set("tab", tab)
-  }
+  const path = hrOverviewTabPath(tab)
   if (options?.view === "applications" || options?.view === "positions") {
     params.set("view", options.view)
   }
@@ -86,7 +134,7 @@ export function hrOverviewHref(options?: {
     params.set("status", options.status)
   }
   const query = params.toString()
-  return query ? `${HR_OVERVIEW_PATH}?${query}` : HR_OVERVIEW_PATH
+  return query ? `${path}?${query}` : path
 }
 
 export function hrOverviewTabFromApplicationType(

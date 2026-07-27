@@ -2,6 +2,11 @@ import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 
 import {
+  dayScheduleFromPricingRows,
+  type VenueDayScheduleFormRow,
+} from "@/lib/bookings/venue-day-pricing"
+import {
+  normalizeVenueColor,
   normalizeVenueStatus,
   parseAmenities,
   type VenueRecord,
@@ -27,6 +32,8 @@ type VenueRow = {
   availability_end?: string | null
   amenities: string[] | null
   status: string | null
+  color?: string | null
+  flyer_url?: string | null
   created_at: string
   updated_at: string
 }
@@ -67,6 +74,8 @@ function mapVenueRow(row: VenueRow): VenueRecord {
     availability_end: row.availability_end ?? null,
     amenities: parseAmenities(row.amenities),
     status: normalizeVenueStatus(row.status),
+    color: normalizeVenueColor(row.color),
+    flyer_url: row.flyer_url?.trim() || null,
     created_at: row.created_at,
     updated_at: row.updated_at,
   }
@@ -90,6 +99,8 @@ const venueSelectColumns = `
   availability_end,
   amenities,
   status,
+  color,
+  flyer_url,
   created_at,
   updated_at
 `
@@ -119,6 +130,9 @@ function isMissingVenueColumnError(error: { message?: string } | null) {
     message.includes("peak_hourly_rate") ||
     message.includes("availability_start") ||
     message.includes("availability_end") ||
+    message.includes("flyer_url") ||
+    message.includes("venues.color") ||
+    message.includes("column \"color\"") ||
     message.includes("does not exist")
   )
 }
@@ -216,9 +230,49 @@ async function getVenueBookingStats(organizationId: string) {
   return stats
 }
 
+async function getVenueDaySchedulesByVenueId(
+  organizationId: string,
+  venueIds: string[]
+): Promise<Map<string, VenueDayScheduleFormRow[]>> {
+  const result = new Map<string, VenueDayScheduleFormRow[]>()
+  if (venueIds.length === 0) return result
+
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from("rental_space_pricing")
+    .select("venue_id, day_of_week, start_time, end_time, flat_price, hourly_price, is_active")
+    .eq("organization_id", organizationId)
+    .in("venue_id", venueIds)
+
+  if (error) {
+    // Table may not exist yet on older orgs — fall back to empty (UI uses venue legacy fields).
+    if (error.code !== "42P01") {
+      console.error("Failed to load venue day pricing:", error)
+    }
+    return result
+  }
+
+  const grouped = new Map<string, NonNullable<typeof data>>()
+  for (const row of data || []) {
+    const venueId = row.venue_id as string
+    const list = grouped.get(venueId) || []
+    list.push(row)
+    grouped.set(venueId, list)
+  }
+
+  for (const [venueId, rows] of grouped) {
+    result.set(venueId, dayScheduleFromPricingRows(rows))
+  }
+
+  return result
+}
+
 export async function getVenues(): Promise<VenueRecord[]> {
   const venues = await getVenuesWithStats()
-  return venues.map(({ totalBookings: _totalBookings, revenue: _revenue, ...venue }) => venue)
+  return venues.map(
+    ({ totalBookings: _totalBookings, revenue: _revenue, daySchedule: _daySchedule, ...venue }) =>
+      venue
+  )
 }
 
 export async function getVenuesWithStats(): Promise<VenueWithStats[]> {
@@ -237,15 +291,28 @@ export async function getVenuesWithStats(): Promise<VenueWithStats[]> {
 
   const rows = (Array.isArray(data) ? data : data ? [data] : []) as VenueRow[]
   const bookingStats = await getVenueBookingStats(organizationId)
+  const venueIds = rows.map((row) => row.id)
+  const daySchedules = await getVenueDaySchedulesByVenueId(organizationId, venueIds)
 
   return rows.map((row) => {
     const venue = mapVenueRow(row)
     const stats = bookingStats.get(venue.id) || { totalBookings: 0, revenue: 0 }
+    const daySchedule =
+      daySchedules.get(venue.id) ||
+      dayScheduleFromPricingRows([], {
+        startTime: venue.availability_start,
+        endTime: venue.availability_end,
+        baseFlat: venue.base_price,
+        baseHourly: venue.hourly_rate,
+        peakFlat: venue.peak_flat_price,
+        peakHourly: venue.peak_hourly_rate,
+      })
 
     return {
       ...venue,
       totalBookings: stats.totalBookings,
       revenue: stats.revenue,
+      daySchedule,
     }
   })
 }
@@ -277,5 +344,12 @@ export async function getBookableVenues(): Promise<VenueRecord[]> {
   const venues = await getVenuesWithStats()
   return venues
     .filter((venue) => venue.available_for_bookings && venue.status === "active")
-    .map(({ totalBookings: _totalBookings, revenue: _revenue, ...venue }) => venue)
+    .map(
+      ({
+        totalBookings: _totalBookings,
+        revenue: _revenue,
+        daySchedule: _daySchedule,
+        ...venue
+      }) => venue
+    )
 }

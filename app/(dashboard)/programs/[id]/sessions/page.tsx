@@ -128,7 +128,7 @@ export default async function ProgramSessionsPage({
   }
 
   const editProgramHref = selectedOffering
-    ? `/programs/${program.id}/offerings/${selectedOffering.id}?tab=enrollment`
+    ? `/programs/${program.id}/offerings/${selectedOffering.id}`
     : `/programs/${program.id}`
 
   return (

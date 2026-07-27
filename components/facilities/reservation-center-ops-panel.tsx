@@ -109,7 +109,7 @@ export function ReservationCenterOpsPanel({
             </p>
           )}
           <Button variant="link" className="mt-3 h-auto p-0" asChild>
-            <Link href="/facilities/calendar">Open facilities schedule</Link>
+            <Link href="/facilities/calendar">Open calendar</Link>
           </Button>
         </CardContent>
       </Card>
@@ -178,7 +178,7 @@ export function ReservationCenterOpsPanel({
               </p>
             )}
             <Button variant="link" className="h-auto p-0" asChild>
-              <Link href="/facilities/calendar">Review on facilities schedule</Link>
+              <Link href="/facilities/calendar">Review on calendar</Link>
             </Button>
           </CardContent>
         </Card>

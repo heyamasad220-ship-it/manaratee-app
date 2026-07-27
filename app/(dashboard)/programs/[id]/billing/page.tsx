@@ -32,7 +32,11 @@ export default async function ProgramBillingPage({
     null
 
   if (selected) {
-    redirect(programOfferingManageHref(id, selected.id, "enrollment"))
+    redirect(
+      programOfferingManageHref(id, selected.id, {
+        departmentId: program.department_id,
+      })
+    )
   }
 
   redirect(programOfferingsIndexHref(id))

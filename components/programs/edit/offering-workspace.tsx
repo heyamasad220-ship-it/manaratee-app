@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { ProgramBrandingColors } from "@/components/programs/edit/program-branding-colors"
 import { OfferingPricingPanel } from "@/components/programs/edit/offering-pricing-panel"
 import { OfferingRegistrationPanel } from "@/components/programs/edit/offering-registration-panel"
 import { OfferingOverviewStaffFields } from "@/components/programs/edit/offering-overview-staff-fields"
@@ -27,6 +28,7 @@ import {
 } from "@/components/programs/edit/offering-workspace-panels"
 import type { OfferingWorkspaceDataMap } from "@/lib/programs/offering-workspace-types"
 import type { ProgramCapacityGroupInput } from "@/lib/programs/program-capacity-group-types"
+import { cn } from "@/lib/utils"
 import {
   isSessionManagementEnabled,
   type ProgramRegistrationOption,
@@ -134,7 +136,9 @@ export function OfferingWorkspace({
     draft.offering_type !== savedDraft.offering_type ||
     draft.status !== savedDraft.status ||
     (draft.start_date ?? "") !== (savedDraft.start_date ?? "") ||
-    (draft.end_date ?? "") !== (savedDraft.end_date ?? "")
+    (draft.end_date ?? "") !== (savedDraft.end_date ?? "") ||
+    (draft.flyer_url ?? "") !== (savedDraft.flyer_url ?? "") ||
+    (draft.background_color ?? "") !== (savedDraft.background_color ?? "")
 
   const workspaceData = offering ? workspaceDataMap[offering.id] : null
 
@@ -211,7 +215,11 @@ export function OfferingWorkspace({
 
         <TabsContent value="overview" className="mt-0 space-y-4">
           <div onKeyDown={preventFormSubmitOnEnter} className="space-y-4">
-            <OfferingOverviewFields draft={draft} onDraftChange={onDraftChange} />
+            <OfferingOverviewFields
+              draft={draft}
+              onDraftChange={onDraftChange}
+              offeringId={offering.id}
+            />
             <div className="grid gap-4 lg:grid-cols-2">
               <OfferingFeaturePacksFields
                 draft={draft}
@@ -284,13 +292,173 @@ export function OfferingWorkspace({
   )
 }
 
-export function OfferingOverviewFields({
+export function OfferingSettingsBrandingRow({
   draft,
   onDraftChange,
+  offeringId,
+  description,
+  disabled = false,
 }: {
   draft: ProgramOfferingInput
   onDraftChange: (draft: ProgramOfferingInput) => void
+  offeringId?: string
+  description?: string | null
+  disabled?: boolean
 }) {
+  return (
+    <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,260px)_minmax(0,1fr)]">
+      <fieldset disabled={disabled} className="min-w-0 disabled:opacity-60">
+        <ProgramBrandingColors
+          programId={offeringId}
+          flyerUrl={draft.flyer_url || ""}
+          onFlyerUrlChange={(url) =>
+            onDraftChange({ ...draft, flyer_url: url || null })
+          }
+          initialBackgroundColor={draft.background_color}
+          onBackgroundColorChange={(color) =>
+            onDraftChange({ ...draft, background_color: color })
+          }
+        />
+      </fieldset>
+      <div className="space-y-1.5">
+        <Label>Description</Label>
+        <div className="min-h-[180px] rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground whitespace-pre-wrap">
+          {description?.trim() || "No description on the year/season."}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export function OfferingOverviewFields({
+  draft,
+  onDraftChange,
+  offeringId,
+  disabled = false,
+  layout = "default",
+  departmentName,
+  seasonLabel,
+  description,
+}: {
+  draft: ProgramOfferingInput
+  onDraftChange: (draft: ProgramOfferingInput) => void
+  offeringId?: string
+  disabled?: boolean
+  /** Settings page: stacked name/dates/format/status (flyer + description render above). */
+  layout?: "default" | "settings"
+  departmentName?: string | null
+  seasonLabel?: string | null
+  description?: string | null
+}) {
+  if (layout === "settings") {
+    return (
+      <div className="space-y-3">
+        <div className="space-y-1.5">
+          <Label htmlFor="offering-name">Program Name</Label>
+          <Input
+            id="offering-name"
+            value={draft.name}
+            disabled={disabled}
+            onChange={(event) =>
+              onDraftChange({ ...draft, name: event.target.value })
+            }
+            placeholder="Beginner ESL, June Camp, Piano Level 1"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label>Department</Label>
+          <div className="flex min-h-9 items-center rounded-md border bg-muted/40 px-3 text-sm text-muted-foreground">
+            {departmentName || "No department"}
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="offering-start">Start Date</Label>
+            <Input
+              id="offering-start"
+              type="date"
+              value={draft.start_date ?? ""}
+              disabled={disabled}
+              onChange={(event) =>
+                onDraftChange({
+                  ...draft,
+                  start_date: event.target.value || null,
+                })
+              }
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="offering-end">End Date</Label>
+            <Input
+              id="offering-end"
+              type="date"
+              value={draft.end_date ?? ""}
+              disabled={disabled}
+              onChange={(event) =>
+                onDraftChange({
+                  ...draft,
+                  end_date: event.target.value || null,
+                })
+              }
+            />
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="offering-delivery">Format</Label>
+            <select
+              id="offering-delivery"
+              value={draft.attributes?.delivery_format ?? "in_person"}
+              disabled={disabled}
+              onChange={(event) =>
+                onDraftChange({
+                  ...draft,
+                  attributes: {
+                    ...draft.attributes,
+                    delivery_format: event.target.value as OfferingDeliveryFormat,
+                  },
+                })
+              }
+              className="h-9 w-full rounded-md border bg-background px-3 text-sm disabled:opacity-60"
+            >
+              {OFFERING_DELIVERY_FORMAT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="offering-status">Status</Label>
+            <select
+              id="offering-status"
+              value={draft.status ?? "draft"}
+              disabled={disabled}
+              onChange={(event) =>
+                onDraftChange({
+                  ...draft,
+                  status: event.target.value as ProgramOfferingStatus,
+                })
+              }
+              className="h-9 w-full rounded-md border bg-background px-3 text-sm disabled:opacity-60"
+            >
+              {STATUS_OPTIONS.map((status) => (
+                <option key={status} value={status}>
+                  {PROGRAM_OFFERING_STATUS_LABELS[status]}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -299,6 +467,7 @@ export function OfferingOverviewFields({
           <Input
             id="offering-name"
             value={draft.name}
+            disabled={disabled}
             onChange={(event) =>
               onDraftChange({ ...draft, name: event.target.value })
             }
@@ -311,6 +480,7 @@ export function OfferingOverviewFields({
           <select
             id="offering-type"
             value={draft.offering_type ?? "standard"}
+            disabled={disabled}
             onChange={(event) =>
               onDraftChange({
                 ...draft,
@@ -318,7 +488,7 @@ export function OfferingOverviewFields({
                   .value as ProgramOfferingInput["offering_type"],
               })
             }
-            className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+            className="h-9 w-full rounded-md border bg-background px-3 text-sm disabled:opacity-60"
           >
             {OFFERING_TYPE_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
@@ -329,10 +499,11 @@ export function OfferingOverviewFields({
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="offering-delivery">Delivery</Label>
+          <Label htmlFor="offering-delivery">Format</Label>
           <select
             id="offering-delivery"
             value={draft.attributes?.delivery_format ?? "in_person"}
+            disabled={disabled}
             onChange={(event) =>
               onDraftChange({
                 ...draft,
@@ -342,7 +513,7 @@ export function OfferingOverviewFields({
                 },
               })
             }
-            className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+            className="h-9 w-full rounded-md border bg-background px-3 text-sm disabled:opacity-60"
             title="Use separate programs for on-site vs online when instructors or capacity differ."
           >
             {OFFERING_DELIVERY_FORMAT_OPTIONS.map((option) => (
@@ -358,13 +529,14 @@ export function OfferingOverviewFields({
           <select
             id="offering-status"
             value={draft.status ?? "draft"}
+            disabled={disabled}
             onChange={(event) =>
               onDraftChange({
                 ...draft,
                 status: event.target.value as ProgramOfferingStatus,
               })
             }
-            className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+            className="h-9 w-full rounded-md border bg-background px-3 text-sm disabled:opacity-60"
             title="Use Archived to hide from customers without deleting."
           >
             {STATUS_OPTIONS.map((status) => (
@@ -383,6 +555,7 @@ export function OfferingOverviewFields({
             id="offering-start"
             type="date"
             value={draft.start_date ?? ""}
+            disabled={disabled}
             onChange={(event) =>
               onDraftChange({
                 ...draft,
@@ -398,6 +571,7 @@ export function OfferingOverviewFields({
             id="offering-end"
             type="date"
             value={draft.end_date ?? ""}
+            disabled={disabled}
             onChange={(event) =>
               onDraftChange({
                 ...draft,
@@ -407,6 +581,20 @@ export function OfferingOverviewFields({
           />
         </div>
       </div>
+
+      <fieldset disabled={disabled} className="min-w-0 disabled:opacity-60">
+        <ProgramBrandingColors
+          programId={offeringId}
+          flyerUrl={draft.flyer_url || ""}
+          onFlyerUrlChange={(url) =>
+            onDraftChange({ ...draft, flyer_url: url || null })
+          }
+          initialBackgroundColor={draft.background_color}
+          onBackgroundColorChange={(color) =>
+            onDraftChange({ ...draft, background_color: color })
+          }
+        />
+      </fieldset>
     </div>
   )
 }
@@ -414,18 +602,22 @@ export function OfferingOverviewFields({
 export function OfferingFeaturePacksFields({
   draft,
   onDraftChange,
+  disabled = false,
+  plain = false,
 }: {
   draft: ProgramOfferingInput
   onDraftChange: (draft: ProgramOfferingInput) => void
+  disabled?: boolean
+  plain?: boolean
 }) {
   return (
-    <div className="space-y-3 rounded-md border p-3 h-full">
-      <p className="text-sm font-medium">Feature packs</p>
-      <label className="flex items-center justify-between gap-3 text-sm">
-        <span>Track attendance</span>
+    <div className={cn("space-y-3", !plain && "rounded-md border p-3 h-full")}>
+      {!plain ? <p className="text-sm font-medium">Feature packs</p> : null}
+      <label className="flex items-center gap-3 text-sm">
         <input
           type="checkbox"
           className="size-4"
+          disabled={disabled}
           checked={Boolean(draft.attributes?.attendance_tracked)}
           onChange={(event) =>
             onDraftChange({
@@ -437,12 +629,13 @@ export function OfferingFeaturePacksFields({
             })
           }
         />
+        <span>Attendance</span>
       </label>
-      <label className="flex items-center justify-between gap-3 text-sm">
-        <span>Childcare</span>
+      <label className="flex items-center gap-3 text-sm">
         <input
           type="checkbox"
           className="size-4"
+          disabled={disabled}
           checked={Boolean(draft.attributes?.care_enabled)}
           onChange={(event) =>
             onDraftChange({
@@ -454,6 +647,7 @@ export function OfferingFeaturePacksFields({
             })
           }
         />
+        <span>Before &amp; After Care</span>
       </label>
     </div>
   )

@@ -32,12 +32,12 @@ export async function fetchFamilyHouseholdSummaries(): Promise<FamilyHouseholdSu
       id: family.id,
       primaryPersonId: null,
       primaryContactId: family.primaryContactId,
-      primaryName: family.primaryName || family.name.replace(/ Family$/, ""),
+      primaryName: family.primaryName || family.name.replace(/\s+Family$/i, ""),
       primaryEmail: family.primaryEmail,
       memberCount: family.memberCount,
-      lifetimeTotal: family.lifetimeTotal,
-      giftCount: family.giftCount,
-      lastGiftDate: family.lastGiftDate,
+      lifetimeTotal: 0,
+      giftCount: 0,
+      lastGiftDate: null,
       relationshipTypes: [],
     }))
   }

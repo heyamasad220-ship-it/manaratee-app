@@ -137,7 +137,7 @@ export function DonationGroupActivityPanel({
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Activity</CardTitle>
+          <CardTitle className="text-base">Events</CardTitle>
           <CardDescription>
             Department events and other non-gift activity. Individual donations are listed under
             Group giving by campaign.

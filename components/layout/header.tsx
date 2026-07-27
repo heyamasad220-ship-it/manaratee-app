@@ -21,9 +21,11 @@ interface HeaderProps {
   title?: string
   showSearch?: boolean
   actions?: ReactNode
+  /** Appended after the nav trail (e.g. department name on HR → Departments). */
+  breadcrumbExtras?: Array<{ label: string; href?: string }>
 }
 
-export function Header({ showSearch = false, actions }: HeaderProps) {
+export function Header({ showSearch = false, actions, breadcrumbExtras }: HeaderProps) {
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
 
   useEffect(() => {
@@ -93,7 +95,7 @@ export function Header({ showSearch = false, actions }: HeaderProps) {
         </div>
       </header>
       <Suspense fallback={null}>
-        <NavigationBreadcrumbs />
+        <NavigationBreadcrumbs extras={breadcrumbExtras} />
       </Suspense>
     </div>
   )

@@ -111,18 +111,6 @@ export async function computeDerivedAffiliations(
     derived.add("vendor")
   }
 
-  const { data: vendorRow } = await supabase
-    .from("vendors")
-    .select("id")
-    .eq("organization_id", organizationId)
-    .eq("contact_id", contactId)
-    .limit(1)
-    .maybeSingle()
-
-  if (vendorRow) {
-    derived.add("vendor")
-  }
-
   const { data: approvedChildcareApplication } = await supabase
     .from("applications")
     .select("id")
@@ -152,9 +140,25 @@ export async function computeDerivedAffiliations(
     .eq("registrant_contact_id", contactId)
     .not("status", "in", `(${terminalStatuses})`)
 
+  const { count: programAsPayerCount } = await supabase
+    .from("program_enrollments")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", organizationId)
+    .eq("payer_contact_id", contactId)
+    .not("status", "in", `(${terminalStatuses})`)
+
+  const { count: paidProgramChargesCount } = await supabase
+    .from("program_charges")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", organizationId)
+    .eq("payer_contact_id", contactId)
+    .gt("amount_paid", 0)
+
   if (
     (programAsParticipantCount ?? 0) > 0 ||
-    (programAsRegistrantCount ?? 0) > 0
+    (programAsRegistrantCount ?? 0) > 0 ||
+    (programAsPayerCount ?? 0) > 0 ||
+    (paidProgramChargesCount ?? 0) > 0
   ) {
     derived.add("program_participant")
   }

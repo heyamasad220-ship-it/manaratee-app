@@ -47,6 +47,7 @@ import {
   VENDOR_HUB_APPLICATIONS_PATH,
   type PeopleManagementApplicationsPageTab,
 } from "@/lib/applications/application-routes"
+import { FINANCE_FINANCIAL_ASSISTANCE_PATH } from "@/lib/finance/finance-paths"
 import {
   APPLICATION_LIST_STATUS_TABS,
   dashboardCardToTabId,
@@ -139,7 +140,8 @@ function buildPageUrl(
 
   if (
     basePath === VENDOR_HUB_APPLICATIONS_PATH ||
-    basePath === PROGRAMS_FINANCIAL_ASSISTANCE_PATH
+    basePath === PROGRAMS_FINANCIAL_ASSISTANCE_PATH ||
+    basePath === FINANCE_FINANCIAL_ASSISTANCE_PATH
   ) {
     return applicationsPageUrl(basePath, {
       pageTab: options.pageTab ?? "submissions",

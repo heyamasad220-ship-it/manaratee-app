@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation"
 
-export default function BookingsTransitionReportRedirect() {
-  redirect("/facilities/reservation-center")
+export default function VenueRentalTransitionSettingsRedirectPage() {
+  redirect("/facilities/overview")
 }

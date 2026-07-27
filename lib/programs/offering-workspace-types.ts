@@ -5,6 +5,7 @@ import type {
   ProgramOfferingFeePlanComponent,
 } from "@/lib/programs/program-fee-plan-types"
 import type { InvalidFeePlanLink } from "@/lib/programs/program-fee-plan-queries"
+import type { ProgramOfferingRegistrationQuestion } from "@/lib/programs/program-registration-question-types"
 import type { ProgramRegistrationOption } from "@/lib/programs/program-registration-option-types"
 import type { ProgramSession } from "@/lib/programs/program-session-types"
 import type { ProgramScheduleItem } from "@/lib/programs/program-schedule-types"
@@ -20,6 +21,9 @@ export type OfferingWorkspaceData = {
   scheduleItems: ProgramScheduleItem[]
   staffAssignments: ProgramStaffAssignmentWithDetails[]
   billingSchedule: OfferingBillingScheduleResult
+  /** Active org discount tags for member/staff pricing rules. */
+  discountTags: Array<{ id: string; name: string }>
+  registrationQuestions: ProgramOfferingRegistrationQuestion[]
 }
 
 export type OfferingWorkspaceDataMap = Record<string, OfferingWorkspaceData>

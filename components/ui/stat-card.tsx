@@ -10,7 +10,7 @@ export const statCardWidthClassName = "w-52 shrink-0"
 export const statCardsRowClassName = "flex flex-wrap gap-4"
 
 /** Full-width equal columns for HR directory KPI rows. */
-export const statCardsEqualRowClassName = "grid w-full gap-4"
+export const statCardsEqualRowClassName = "grid w-full items-stretch gap-4"
 
 export const STAT_CARD_TONES = {
   blue: {
@@ -140,11 +140,18 @@ export function StatCard({
 
   if (layout === "header") {
     return (
-      <Card className={cn(widthClass, colors?.card, className)}>
+      <Card
+        className={cn(
+          widthClass,
+          fill && "flex h-full flex-col",
+          colors?.card,
+          className
+        )}
+      >
         <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0 pb-2">
           <CardTitle
             className={cn(
-              "whitespace-nowrap text-sm font-medium",
+              "text-sm font-medium",
               colors?.label ?? "text-muted-foreground"
             )}
           >
@@ -160,7 +167,7 @@ export function StatCard({
             />
           ) : null}
         </CardHeader>
-        <CardContent>
+        <CardContent className={cn(fill && "flex flex-1 flex-col")}>
           <div className={cn("text-2xl font-bold tabular-nums", colors?.value)}>{value}</div>
           {hint ? (
             <p className={cn("mt-1 text-xs", colors?.hint ?? "text-muted-foreground")}>{hint}</p>

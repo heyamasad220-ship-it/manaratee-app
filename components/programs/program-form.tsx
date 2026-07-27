@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { ArrowLeft } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
+import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { EligibilitySection } from "@/components/programs/edit/eligibility-section"
 import { EditProgramStickyFooter } from "@/components/programs/edit/edit-program-sticky-footer"
@@ -27,6 +28,7 @@ import {
 import type { FeePlanEditorState } from "@/components/programs/program-fee-plan-editor"
 import type { Department } from "@/lib/departments/department-types"
 import { createProgram } from "@/lib/programs/program-actions"
+import { programOfferingManageHref } from "@/lib/programs/program-offering-paths"
 import type { ProgramCapacityGroupInput } from "@/lib/programs/program-capacity-group-types"
 import {
   getPersistableCapacityGroups,
@@ -44,6 +46,11 @@ import type { OfferingWorkspaceDataMap } from "@/lib/programs/offering-workspace
 import type { InvalidFeePlanLink } from "@/lib/programs/program-fee-plan-queries"
 import type { ProgramRegistrationOption } from "@/lib/programs/program-registration-option-types"
 import type { Program } from "@/lib/programs/program-types"
+import {
+  PROGRAM_KIND_DESCRIPTIONS,
+  PROGRAM_KIND_LABELS,
+  type ProgramKind,
+} from "@/lib/programs/program-kind"
 import {
   PROGRAM_LABEL_PLURAL,
   YEAR_SEASON_LABEL,
@@ -294,6 +301,8 @@ export function ProgramForm(props: ProgramFormProps) {
     }
     return tab
   })
+  const [programKind, setProgramKind] = React.useState<ProgramKind>("academic")
+  const [openEnrollment, setOpenEnrollment] = React.useState(false)
   const [maxUnlockedTabIndex, setMaxUnlockedTabIndex] = React.useState(() => {
     if (isCreate) {
       return 0
@@ -502,13 +511,16 @@ export function ProgramForm(props: ProgramFormProps) {
       isCreate
     )
 
-    const programId = await createProgram({
+    const created = await createProgram({
       name: payload.name.trim(),
       subtitle: payload.subtitle,
       description: payload.description,
       department_id: payload.department_id,
       flyer_url: payload.flyer_url,
       background_color: payload.background_color,
+      program_kind: programKind,
+      delivery_format: undefined,
+      application_required: !openEnrollment,
       program_type: payload.selectedProgramType,
       start_date: payload.start_date,
       end_date: payload.end_date,
@@ -529,9 +541,19 @@ export function ProgramForm(props: ProgramFormProps) {
         registrationFlags.session_registration_enabled,
     })
 
-    // S4: no default offering — capacity groups and fee plans are configured per offering.
     continueAfterSaveRef.current = false
-    router.replace(`/programs/${programId}?created=1`)
+    if (
+      created.programKind === "seasonal" &&
+      created.offeringId
+    ) {
+      router.replace(
+        programOfferingManageHref(created.programId, created.offeringId, {
+          departmentId: payload.department_id,
+        })
+      )
+      return
+    }
+    router.replace(`/programs/${created.programId}?created=1`)
     return
   }
 
@@ -750,6 +772,64 @@ export function ProgramForm(props: ProgramFormProps) {
           </TabsList>
 
           <TabsContent forceMount value="basics" className="mt-0 space-y-4">
+            {isCreate ? (
+              <div className="space-y-3 rounded-lg border p-4">
+                <div>
+                  <p className="text-sm font-semibold">What are you creating?</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Choose once — this controls whether you get offerings (classes)
+                    or a single seasonal camp page.
+                  </p>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {(Object.keys(PROGRAM_KIND_LABELS) as ProgramKind[]).map(
+                    (kind) => (
+                      <label
+                        key={kind}
+                        className={
+                          programKind === kind
+                            ? "flex cursor-pointer flex-col gap-1 rounded-lg border-2 border-blue-600 bg-blue-50/50 p-3"
+                            : "flex cursor-pointer flex-col gap-1 rounded-lg border p-3 hover:bg-muted/40"
+                        }
+                      >
+                        <span className="flex items-center gap-2 text-sm font-medium">
+                          <input
+                            type="radio"
+                            name="program_kind"
+                            value={kind}
+                            checked={programKind === kind}
+                            onChange={() => {
+                              setProgramKind(kind)
+                              setOpenEnrollment(kind === "seasonal")
+                            }}
+                            className="size-3.5"
+                          />
+                          {PROGRAM_KIND_LABELS[kind]}
+                        </span>
+                        <span className="pl-5 text-xs text-muted-foreground">
+                          {PROGRAM_KIND_DESCRIPTIONS[kind]}
+                        </span>
+                      </label>
+                    )
+                  )}
+                </div>
+                <label className="flex items-start justify-between gap-3 rounded-md border bg-muted/20 p-3 text-sm">
+                  <span className="space-y-0.5">
+                    <span className="block font-medium">
+                      Automatically register and pay
+                    </span>
+                    <span className="block text-xs text-muted-foreground">
+                      No Apply / Approve step — customers register and pay
+                      immediately.
+                    </span>
+                  </span>
+                  <Switch
+                    checked={openEnrollment}
+                    onCheckedChange={setOpenEnrollment}
+                  />
+                </label>
+              </div>
+            ) : null}
             <ProgramBasicsSection
               program={basicsProgramDefaults}
               programId={program?.id}

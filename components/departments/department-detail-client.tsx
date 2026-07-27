@@ -10,6 +10,7 @@ import {
 } from "@/lib/departments/department-actions"
 import { WORKFORCE_DEPARTMENTS_PATH } from "@/lib/departments/department-paths"
 import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
+import { PageBreadcrumbs } from "@/components/navigation/page-breadcrumbs"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -84,12 +85,12 @@ export function DepartmentDetailClient({
     <div className="flex flex-col gap-6 p-6">
       <div className="flex flex-col gap-4 border-b border-border pb-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 space-y-2">
-          <Button variant="ghost" size="sm" className="-ml-2 h-8 px-2" asChild>
-            <Link href={WORKFORCE_DEPARTMENTS_PATH}>
-              <ArrowLeft className="mr-1.5 h-4 w-4" />
-              Departments
-            </Link>
-          </Button>
+          <PageBreadcrumbs
+            items={[
+              { label: "Departments", href: WORKFORCE_DEPARTMENTS_PATH },
+              { label: department.name },
+            ]}
+          />
           <div className="flex flex-wrap items-center gap-2">
             <span
               className="inline-block size-3 rounded-full border"

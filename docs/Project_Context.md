@@ -113,7 +113,7 @@ Sidebar visibility uses two filters:
 
 Both conditions must pass before showing a module.
 
-Pinned footer items (below module list): Billing (super admin) → organization **Reports** (`/reports`) → Settings.
+Pinned footer items (below module list): Billing (super admin) → Settings.
 
 ---
 
@@ -184,8 +184,10 @@ Routes remain under `/hr/*` / `/workforce/*` for now. Application submissions li
 
 Sidebar (HR):
 
-* Overview → `/workforce` (tabs: Overview, Departments, Employees, Volunteers, Childcare Providers, Payroll). Overview tab shows headcount metrics and employees by department. Employees includes Positions (`?view=positions`). **Payroll** (`?tab=payroll`) is the org queue to Mark paid (formerly Finance sidebar). Sidebar: HR is a direct link to Overview (no flyout). Legacy `/finance` / `/finance/payroll` and `/workforce/reports` redirect into HR.
-* Discount Policies → `/hr/settings` (Membership Benefits redirect path may apply). Department **list** is Overview → Departments (`/workforce?tab=departments`); department **workspace** remains `/workforce/departments/[id]` (Overview, Rosters, Applications, Schedule, Financial [Payroll / Expenses / Financial Summary — employees under Payroll], Reports for archived years; Group giving when a donations group is linked; Activity = department events not individual gifts). SaaS **Billing** stays in the footer.
+* Overview → `/workforce` (drawer + in-page tabs: Overview, Departments, Employees, Volunteers, Childcare Providers). Path sections: `/workforce/departments`, `/workforce/employees`, `/workforce/volunteers`, `/workforce/childcare`. Overview tab shows headcount metrics and employees by department. Employees includes Positions (`?view=positions`). Org payroll queue is **Finance → Payroll** (`/finance/payroll`); legacy `/workforce?tab=payroll` redirects there. Sidebar: HR opens a child drawer (same pattern as Programs/Finance). Legacy `/workforce?tab=…` redirects to the matching path. Legacy `/reports` redirects to **Finance → Transactions**.
+* Discount Policies → `/hr/settings` (Membership Benefits redirect path may apply). Department **list** is Overview → Departments (`/workforce?tab=departments`); department **workspace** remains `/workforce/departments/[id]` (Overview, Programs, **Participants** [Needs review / Approved — not registered / Roster], Schedule, Financial [Payroll / Expenses / Financial Summary — employees under Payroll], Reports for archived years; Group giving when a donations group is linked; **Events** = department events not individual gifts, URL `?tab=activity`). **Department Heads** open the workspace from Staff Tools (**My department**) or a sidebar **My department** link when they lack org-wide HR (`staff.view`). SaaS **Billing** stays in the footer.
+
+**Finance** sidebar module (`finance`): Transactions (`/finance/transactions`), Payroll (`/finance/payroll`), Financial Assistance (`/finance/financial-assistance`). Enable with `scripts/192_finance_module_sidebar_restore.sql`.
 
 Membership sidebar includes **Groups** (`/membership/groups` — member groups / former HR Teams). Giving collectives are under Donations (`/donations/groups/[id]`, Group Giving report) — badge can link a collective to a Membership Group or Department, otherwise **Group Donation**.
 
@@ -194,6 +196,6 @@ Employees, Volunteers, and Childcare Providers use a shared directory UI (`HrDir
 Other modules link to Applications with filters:
 
 * Vendor Hub → `/applications/all?application_type=vendor`
-* Programs → Financial Assistance filter
+* Finance → Financial Assistance
 * Employment applications → `/workforce?tab=employees&view=applications`
 * Committee applications → `/membership/applications`

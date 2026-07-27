@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
-import { formatProgramAgeEligibility } from "@/lib/programs/program-eligibility-display"
+import { formatProgramAgeEligibility, formatProgramGenderLabel } from "@/lib/programs/program-eligibility-display"
 
 type CustomerOrganization = {
   organization_id: string
@@ -515,7 +515,7 @@ export default async function CustomerProgramsPage({
 
                       <div className="flex items-center gap-2 text-muted-foreground">
                         <Users className="h-4 w-4" />
-                        <span>{program.gender || "All genders"}</span>
+                        <span>{formatProgramGenderLabel(program.gender)}</span>
                       </div>
                     </div>
 

@@ -199,7 +199,6 @@ export function HrOverviewDashboard({
           tone="blue"
           label="Active Employees"
           value={overviewStats.totalEmployees}
-          hint={`${overviewStats.newHires} new hire${overviewStats.newHires === 1 ? "" : "s"} this period`}
           icon={Users}
         />
         <StatCard
@@ -208,7 +207,6 @@ export function HrOverviewDashboard({
           tone="emerald"
           label="Departments"
           value={overviewStats.departments}
-          hint={`${overviewStats.avgPerDepartment} avg employees/dept`}
           icon={Building2}
         />
         <StatCard
@@ -217,7 +215,6 @@ export function HrOverviewDashboard({
           tone="violet"
           label="Volunteers"
           value={volunteerCount}
-          hint="Contact affiliations"
           icon={HeartHandshake}
         />
         <StatCard
@@ -226,7 +223,6 @@ export function HrOverviewDashboard({
           tone="amber"
           label="Childcare Providers"
           value={childcareProviderCount}
-          hint="Active providers"
           icon={Baby}
         />
       </StatCardsRow>

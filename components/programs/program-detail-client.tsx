@@ -27,7 +27,7 @@ import {
   getProgramRegistrationAvailabilityLabel,
   isProgramAcceptingRegistration,
 } from "@/lib/programs/program-enrollment-availability"
-import { formatProgramAgeEligibility } from "@/lib/programs/program-eligibility-display"
+import { formatProgramAgeEligibility, formatProgramGenderLabel } from "@/lib/programs/program-eligibility-display"
 import { updateProgramBasics } from "@/lib/programs/program-detail-actions"
 import {
   YEAR_SEASON_LABEL,
@@ -77,17 +77,6 @@ function formatDate(value: string | null | undefined) {
     day: "numeric",
     year: "numeric",
   })
-}
-
-function formatVisibility(value: string | null | undefined) {
-  switch (value) {
-    case "members_only":
-      return "Members only"
-    case "private":
-      return "Private"
-    default:
-      return "Public"
-  }
 }
 
 function getFlyerPlaceholderColor(programId: string) {
@@ -158,7 +147,7 @@ export function ProgramDetailClient({
     setProgramStatus(program.status)
   }, [program.status])
 
-  const audienceLabel = `${program.gender || "All"} • ${formatProgramAgeEligibility(program)}`
+  const audienceLabel = `${formatProgramGenderLabel(program.gender)} • ${formatProgramAgeEligibility(program)}`
   const availabilityLabel = getProgramRegistrationAvailabilityLabel(program)
   const acceptingRegistration = isProgramAcceptingRegistration(program)
   const activeOfferings = offerings.filter(
@@ -507,12 +496,6 @@ function OverviewCard({
               Department
             </p>
             <p className="mt-1 font-medium">{departmentName || "No department"}</p>
-          </div>
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Visibility
-            </p>
-            <p className="mt-1 font-medium">{formatVisibility(visibility)}</p>
           </div>
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">

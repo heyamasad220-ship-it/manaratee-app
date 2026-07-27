@@ -4,17 +4,20 @@ import type { ApplicationStatusTabId } from "@/lib/applications/application-stat
 import {
   hrOverviewHref,
   hrOverviewTabFromApplicationType,
+  HR_CHILDCARE_PATH,
+  HR_EMPLOYEES_PATH,
   HR_OVERVIEW_PATH,
+  HR_VOLUNTEERS_PATH,
 } from "@/lib/hr/hr-overview-path"
 
 /** @deprecated Hub removed — redirects to HR category Applications tabs. */
 export const PEOPLE_MANAGEMENT_APPLICATIONS_PATH = "/settings/applications"
 /** @deprecated Templates hub removed — redirects resolve to HR Overview. */
 export const HR_APPLICATION_TEMPLATES_PATH = "/workforce"
-/** Base overview path; use hrCategoryApplicationsUrl for Applications deep links. */
-export const HR_EMPLOYEE_APPLICATIONS_PATH = HR_OVERVIEW_PATH
-export const HR_VOLUNTEER_APPLICATIONS_PATH = HR_OVERVIEW_PATH
-export const HR_CHILDCARE_APPLICATIONS_PATH = HR_OVERVIEW_PATH
+/** Base section paths; use hrCategoryApplicationsUrl for Applications deep links. */
+export const HR_EMPLOYEE_APPLICATIONS_PATH = HR_EMPLOYEES_PATH
+export const HR_VOLUNTEER_APPLICATIONS_PATH = HR_VOLUNTEERS_PATH
+export const HR_CHILDCARE_APPLICATIONS_PATH = HR_CHILDCARE_PATH
 /** @deprecated Use MEMBERSHIP_APPLICATIONS_PATH — committee apps live under Membership. */
 export const HR_COMMITTEE_APPLICATIONS_PATH = "/workforce/settings/committee-applications"
 export const MEMBERSHIP_APPLICATIONS_PATH = "/membership/applications"
@@ -45,19 +48,24 @@ export function hrCategoryApplicationsPath(
 ): string {
   switch (applicationType) {
     case "employment":
+      return HR_EMPLOYEES_PATH
     case "volunteer":
+      return HR_VOLUNTEERS_PATH
     case "childcare_provider":
-      return HR_OVERVIEW_PATH
+      return HR_CHILDCARE_PATH
     case "committee_member":
       return MEMBERSHIP_APPLICATIONS_PATH
     default:
-      return HR_OVERVIEW_PATH
+      return HR_EMPLOYEES_PATH
   }
 }
 
 export function isHrCategoryApplicationsPath(path: string) {
   return (
     path === HR_OVERVIEW_PATH ||
+    path === HR_EMPLOYEES_PATH ||
+    path === HR_VOLUNTEERS_PATH ||
+    path === HR_CHILDCARE_PATH ||
     path === "/workforce/employees" ||
     path === "/workforce/volunteers" ||
     path === "/workforce/childcare" ||
@@ -66,7 +74,7 @@ export function isHrCategoryApplicationsPath(path: string) {
   )
 }
 
-/** HR category Applications tab URL, e.g. /workforce?tab=employees&view=applications */
+/** HR category Applications tab URL, e.g. /workforce/employees?view=applications */
 export function hrCategoryApplicationsUrl(options?: {
   applicationType?: string | null
   status?: ApplicationStatusTabId | ApplicationStatus | ApplicationStatus[]

@@ -101,9 +101,9 @@ export function EligibilitySection({
             }
             className="h-9 w-full rounded-md border bg-background px-3 text-sm"
           >
-            <option value="All">All genders</option>
-            <option value="Male">Male only</option>
-            <option value="Female">Female only</option>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+            <option value="All">Both</option>
           </select>
         </div>
       </div>

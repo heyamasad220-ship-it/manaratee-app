@@ -1,13 +1,6 @@
-import { createAudienceCalendarPage } from "@/lib/reservations/calendar-page"
-import { PERMISSIONS } from "@/lib/permissions/permissions"
+import { redirect } from "next/navigation"
 
-export default createAudienceCalendarPage(
-  "staff",
-  [
-    PERMISSIONS.EVENTS_VIEW,
-    PERMISSIONS.PROGRAMS_VIEW,
-    PERMISSIONS.BOOKINGS_VIEW,
-    PERMISSIONS.SPACES_VIEW,
-  ],
-  "Space Availability"
-)
+/** Legacy Space Availability route — merged into Bookings → Calendar. */
+export default function FacilitiesAvailabilityRedirectPage() {
+  redirect("/facilities/calendar")
+}

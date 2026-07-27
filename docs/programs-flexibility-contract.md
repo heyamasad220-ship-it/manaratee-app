@@ -16,9 +16,11 @@
 | 3 | Program defaults edited on **Program detail → Settings** (Enrollment defaults) |
 | 4 | **Existing offerings = overridden** (`inherit_* = false`) so current values stay; no surprise re-inheritance |
 | 11 | After F1 helpers: build **program defaults + slim offering create** (F2/F3) before teacher page / reports |
+| 12 | **Program kinds:** `academic` (year + offerings) vs `seasonal` (camp/season as one product). Same Programs menu; different create + settings chrome. SQL **`193`**. |
+| 13 | **Department is home** for dept-linked years/seasons: manage at `/workforce/departments/[id]/programs/[programId]/offerings/[offeringId]` so HR → Departments stays selected; legacy Programs-module URLs redirect. |
 
 Inherit columns (F1): `inherit_dates`, `inherit_eligibility`, `inherit_enrollment` on `program_offerings`.  
-New offerings default `true`; migration backfills existing rows to `false`.
+New offerings default `true`; migration backfills existing rows to `false`. Seasonal programs hide inherit toggles (leaf is the top-level product UI).
 
 **Resolution:** `effective = offering.inherit_X ? program.default : offering.value`
 

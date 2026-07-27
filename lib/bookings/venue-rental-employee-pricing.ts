@@ -5,6 +5,7 @@ import {
   contactIsActiveFullTimeEmployee,
   getOrganizationEmployeeBenefitPolicy,
 } from "@/lib/benefits/employee-benefit"
+import { getContactBestAutoApplyTagDiscount } from "@/lib/discount-tags/discount-tag-benefits"
 import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 
@@ -29,8 +30,8 @@ function hoursBetween(startAt: string, endAt: string) {
 }
 
 /**
- * Suggest venue rental payment amounts with FTE employee benefit applied
- * to space fees (not security deposit).
+ * Suggest venue rental payment amounts with the best applicable discount
+ * (FTE employee benefit or auto-apply discount tag) on space fees.
  */
 export async function getVenueRentalEmployeePricingSuggestion(
   venueRentalId: string
@@ -52,14 +53,6 @@ export async function getVenueRentalEmployeePricingSuggestion(
   if (!organizationId || !venueRentalId) return empty
 
   const supabase = await createClient()
-  const policy = await getOrganizationEmployeeBenefitPolicy(
-    organizationId,
-    supabase
-  )
-
-  if (!policy?.enabled || !policy.appliesToVenueRentals) {
-    return empty
-  }
 
   const { data: rental } = await supabase
     .from("venue_rentals")
@@ -81,13 +74,40 @@ export async function getVenueRentalEmployeePricingSuggestion(
     contactId = (contact?.id as string | undefined) || null
   }
 
-  const eligible = await contactIsActiveFullTimeEmployee(
-    contactId,
+  const policy = await getOrganizationEmployeeBenefitPolicy(
     organizationId,
     supabase
   )
-  if (!eligible) {
-    return { ...empty, percentOff: policy.percentOff }
+
+  let bestPercent = 0
+  let bestLabel: string | null = null
+
+  const fteEligible =
+    Boolean(policy?.enabled && policy.appliesToVenueRentals) &&
+    (await contactIsActiveFullTimeEmployee(contactId, organizationId, supabase))
+
+  if (fteEligible && policy) {
+    bestPercent = policy.percentOff
+    bestLabel = `Full-time employee benefit (${policy.percentOff}% off space fees)`
+  }
+
+  const tagDiscount = await getContactBestAutoApplyTagDiscount(
+    contactId,
+    "venue_rentals",
+    organizationId,
+    supabase
+  )
+
+  if (tagDiscount && tagDiscount.percentOff > bestPercent) {
+    bestPercent = tagDiscount.percentOff
+    bestLabel = `${tagDiscount.tagName} (${tagDiscount.percentOff}% off space fees)`
+  }
+
+  if (!(bestPercent > 0) || !bestLabel) {
+    return {
+      ...empty,
+      percentOff: policy?.percentOff ?? empty.percentOff,
+    }
   }
 
   const { data: reservations } = await supabase
@@ -99,6 +119,7 @@ export async function getVenueRentalEmployeePricingSuggestion(
   const venueIds = [
     ...new Set((reservations || []).map((row) => row.venue_id as string)),
   ]
+
   const { data: venues } = venueIds.length
     ? await supabase
         .from("venues")
@@ -107,12 +128,29 @@ export async function getVenueRentalEmployeePricingSuggestion(
         .in("id", venueIds)
     : { data: [] as { id: string; hourly_rate: number; peak_hourly_rate: number }[] }
 
-  const rateByVenue = new Map(
+  const { data: dayPricing } = venueIds.length
+    ? await supabase
+        .from("rental_space_pricing")
+        .select("venue_id, day_of_week, hourly_price, is_active")
+        .eq("organization_id", organizationId)
+        .in("venue_id", venueIds)
+        .eq("is_active", true)
+    : { data: [] as Array<{ venue_id: string; day_of_week: number; hourly_price: number }> }
+
+  const legacyRateByVenue = new Map(
     (venues || []).map((venue) => [
       venue.id as string,
       Number(venue.hourly_rate || venue.peak_hourly_rate || 0),
     ])
   )
+
+  const dayRateByVenue = new Map<string, Map<number, number>>()
+  for (const row of dayPricing || []) {
+    const venueId = row.venue_id as string
+    const byDay = dayRateByVenue.get(venueId) || new Map<number, number>()
+    byDay.set(Number(row.day_of_week), Number(row.hourly_price || 0))
+    dayRateByVenue.set(venueId, byDay)
+  }
 
   let hours = 0
   let baseSpaceFee = 0
@@ -122,14 +160,21 @@ export async function getVenueRentalEmployeePricingSuggestion(
       reservation.end_at as string
     )
     hours += slotHours
-    const rate = rateByVenue.get(reservation.venue_id as string) || 0
+    const dayOfWeek = new Date(reservation.start_at as string).getDay()
+    const dayRate = dayRateByVenue
+      .get(reservation.venue_id as string)
+      ?.get(dayOfWeek)
+    const rate =
+      dayRate != null && dayRate > 0
+        ? dayRate
+        : legacyRateByVenue.get(reservation.venue_id as string) || 0
     baseSpaceFee += slotHours * rate
   }
 
   baseSpaceFee = Math.round(baseSpaceFee * 100) / 100
   hours = Math.round(hours * 100) / 100
 
-  const priced = applyPercentOff(baseSpaceFee, policy.percentOff)
+  const priced = applyPercentOff(baseSpaceFee, bestPercent)
   const suggestedDeposit =
     Math.round(Math.min(priced.total, Math.max(priced.total * 0.25, 0)) * 100) /
     100
@@ -138,7 +183,7 @@ export async function getVenueRentalEmployeePricingSuggestion(
 
   return {
     eligible: true,
-    percentOff: policy.percentOff,
+    percentOff: bestPercent,
     baseSpaceFee: priced.base,
     discountedSpaceFee: priced.total,
     discountAmount: priced.discount,
@@ -146,6 +191,6 @@ export async function getVenueRentalEmployeePricingSuggestion(
     suggestedRemainingBalance,
     suggestedSecurityDeposit: 250,
     hours,
-    label: `Full-time employee benefit (${policy.percentOff}% off space fees)`,
+    label: bestLabel,
   }
 }

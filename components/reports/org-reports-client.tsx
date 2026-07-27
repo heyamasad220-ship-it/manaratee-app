@@ -216,8 +216,11 @@ function PaymentsTab({ failedOnly }: { failedOnly: boolean }) {
 
 export function OrgReportsClient({
   initialTab = "payments",
+  basePath = "/finance/transactions",
 }: {
   initialTab?: string
+  /** Path used for tab URL sync (Finance Transactions or legacy /reports). */
+  basePath?: string
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -237,7 +240,7 @@ export function OrgReportsClient({
       params.set("tab", next)
     }
     const query = params.toString()
-    router.replace(query ? `/reports?${query}` : "/reports")
+    router.replace(query ? `${basePath}?${query}` : basePath)
   }
 
   return (

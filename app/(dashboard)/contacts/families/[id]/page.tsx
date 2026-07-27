@@ -1,15 +1,13 @@
-import Link from "next/link"
-import { notFound } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
 
-import { Header } from "@/components/layout/header"
-import { FamilyGivingDetail } from "@/components/contacts/family-giving-detail"
-import { Button } from "@/components/ui/button"
-import { fetchFamilyGivingRollup } from "@/lib/contacts/family-giving-data"
-import { hasPermission } from "@/lib/permissions/permissions"
-import { PERMISSIONS } from "@/lib/permissions/permission-keys"
+import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
 import { createClient } from "@/lib/supabase/server"
 import { resolveOrganizationId } from "@/lib/organizations/resolve-organization-id"
 
+/**
+ * Legacy family “profile” URL — contact is the canonical record.
+ * Redirects to the household’s primary contact.
+ */
 export default async function ContactFamilyDetailPage({
   params,
 }: {
@@ -23,25 +21,26 @@ export default async function ContactFamilyDetailPage({
     notFound()
   }
 
-  const result = await fetchFamilyGivingRollup(supabase, organizationId, id)
+  const { data: family, error } = await supabase
+    .from("families")
+    .select("id, primary_contact_id")
+    .eq("organization_id", organizationId)
+    .eq("id", id)
+    .maybeSingle()
 
-  if (!result.ok) {
+  if (error || !family) {
     notFound()
   }
 
-  const canManage = await hasPermission(PERMISSIONS.CONTACTS_MANAGE)
+  const primaryContactId = family.primary_contact_id as string | null
+  if (!primaryContactId) {
+    redirect("/contacts/reports/directory?tab=families")
+  }
 
-  return (
-    <>
-      <Header title="Family" />
-      <div className="flex flex-col gap-6 p-6">
-        <div>
-          <Button variant="ghost" size="sm" asChild className="-ml-2 mb-2">
-            <Link href="/contacts/families">← Back to Families</Link>
-          </Button>
-        </div>
-        <FamilyGivingDetail rollup={result.rollup} canManage={canManage} />
-      </div>
-    </>
+  redirect(
+    contactProfileHref(primaryContactId, {
+      list: "families",
+      returnTo: "/contacts/reports/directory?tab=families",
+    })
   )
 }

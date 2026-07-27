@@ -1,7 +1,6 @@
 "use client"
 
 import { useTransition } from "react"
-import { Info } from "lucide-react"
 import type { OrganizationAffiliationSettingRow } from "@/lib/contacts/contact-affiliation-settings"
 import { setOrganizationAffiliationAutoSync } from "@/lib/contacts/contact-affiliation-settings"
 import { Badge } from "@/components/ui/badge"
@@ -44,29 +43,6 @@ export function AffiliationRulesPanel({
 
   return (
     <div className="flex flex-col gap-6">
-      <Card className="border-blue-200 bg-blue-50/50">
-        <CardContent className="flex items-start gap-3 p-4">
-          <Info className="mt-0.5 h-5 w-5 shrink-0 text-blue-600" />
-          <div className="space-y-2 text-sm text-blue-700">
-            <p className="font-medium text-blue-800">How role settings work</p>
-            <ul className="list-disc space-y-1 pl-5">
-              <li>
-                <strong>This page</strong> turns automatic role tagging on or off per role type.
-                There is no add/edit for custom types — these rules are built into Manaratee.
-              </li>
-              <li>
-                <strong>Contact profiles</strong> do not allow manual role edits — roles are
-                assigned automatically from module activity using these rules.
-              </li>
-              <li>
-                <strong>Stop future auto-tagging:</strong> turn <strong>Auto-sync</strong> off here
-                (for example, turn Donor off if you only use venue rentals).
-              </li>
-            </ul>
-          </div>
-        </CardContent>
-      </Card>
-
       <Card>
         <CardHeader>
           <CardTitle>Automatic roles</CardTitle>

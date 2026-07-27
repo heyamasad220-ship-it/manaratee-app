@@ -25,6 +25,7 @@ import { getAllRegistrationOptionsForOffering } from "@/lib/programs/program-reg
 import { getProgramById } from "@/lib/programs/program-queries"
 import { getAgeGroupLabelsFromMinMax } from "@/lib/programs/program-eligibility-display"
 import { normalizeProgramAudienceType } from "@/lib/programs/program-offering-attributes"
+import { normalizeProgramKind } from "@/lib/programs/program-kind"
 import type { ProgramStatus } from "@/lib/programs/program-status"
 
 type ProgramRow = Record<string, unknown> & {
@@ -160,10 +161,13 @@ export async function duplicateProgram(
   const duplicateName = buildCopyName(sourceProgram.name)
 
   try {
-    const newProgramId = await createProgram({
+    const { programId: newProgramId } = await createProgram({
       name: duplicateName,
       description: sourceProgram.description ?? "",
       department_id: sourceProgram.department_id,
+      program_kind: normalizeProgramKind(
+        (sourceProgram as { program_kind?: string }).program_kind
+      ),
       program_type: normalizeProgramAudienceType(sourceProgram.program_type),
       start_date: null,
       end_date: null,
@@ -378,6 +382,7 @@ const PROGRAM_STATUS_VALUES: ProgramStatus[] = [
   "draft",
   "active",
   "paused",
+  "closed",
   "archived",
 ]
 

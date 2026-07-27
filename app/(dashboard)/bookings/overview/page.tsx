@@ -1,10 +1,6 @@
 import { Header } from "@/components/layout/header"
-import { VenueRentalRequestsQueue } from "@/components/bookings/venue-rental-requests-queue"
-import { VenueRentalTransitionReportPanel } from "@/components/bookings/venue-rental-transition-report-panel"
-import {
-  getVenueRentalDashboardStats,
-  getVenueRentalQueueRows,
-} from "@/lib/bookings/venue-rental-queries"
+import { VenueRentalUpcomingDashboard } from "@/components/bookings/venue-rental-upcoming-dashboard"
+import { getVenueRentalQueueRows } from "@/lib/bookings/venue-rental-queries"
 import {
   hasAnyPermission,
   PERMISSIONS,
@@ -24,25 +20,10 @@ export default async function BookingsDashboardPage() {
     hasAnyPermission(PERMISSIONS.BOOKINGS_MANAGE, PERMISSIONS.PROGRAMS_MANAGE),
   ])
 
-  const stats = getVenueRentalDashboardStats(rows)
-
   return (
     <>
       <Header title="Venue Rentals" />
-      <div className="space-y-6">
-        {canManage ? (
-          <div className="px-4 sm:px-6 pt-4 sm:pt-6">
-            <VenueRentalTransitionReportPanel />
-          </div>
-        ) : null}
-        <VenueRentalRequestsQueue
-          rows={rows}
-          stats={stats}
-          canManage={canManage}
-          title="Dashboard"
-          description="Monitor venue rental requests, payments, and conflicts."
-        />
-      </div>
+      <VenueRentalUpcomingDashboard rows={rows} canManage={canManage} />
     </>
   )
 }

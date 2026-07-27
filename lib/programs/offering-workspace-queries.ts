@@ -1,9 +1,11 @@
 import { getOfferingBillingScheduleBundle } from "@/lib/programs/program-billing-queries"
+import { getActiveDiscountTags } from "@/lib/programs/program-discount-queries"
 import {
   getFeePlanBundleForOffering,
   getInvalidFeePlanLinksForOffering,
 } from "@/lib/programs/program-fee-plan-queries"
 import type { ProgramOffering } from "@/lib/programs/program-offering-types"
+import { getRegistrationQuestionsForOffering } from "@/lib/programs/program-registration-question-actions"
 import { getAllRegistrationOptionsForOffering } from "@/lib/programs/program-registration-option-queries"
 import { getProgramSessionsForOffering } from "@/lib/programs/program-session-queries"
 import { getOfferingScheduleItems } from "@/lib/programs/program-schedule-queries"
@@ -26,6 +28,8 @@ export async function getOfferingWorkspaceData(
     scheduleItems,
     staffAssignments,
     billingSchedule,
+    discountTags,
+    registrationQuestions,
   ] = await Promise.all([
     getAllRegistrationOptionsForOffering(offering.id),
     getFeePlanBundleForOffering(offering.id, organizationId),
@@ -40,6 +44,8 @@ export async function getOfferingWorkspaceData(
     getOfferingBillingScheduleBundle(programId, organizationId, offering.id, {
       includeParticipants: false,
     }),
+    getActiveDiscountTags().catch(() => []),
+    getRegistrationQuestionsForOffering(offering.id, organizationId),
   ])
 
   return {
@@ -52,6 +58,11 @@ export async function getOfferingWorkspaceData(
     scheduleItems,
     staffAssignments,
     billingSchedule,
+    discountTags: (discountTags || []).map((tag) => ({
+      id: tag.id as string,
+      name: tag.name as string,
+    })),
+    registrationQuestions,
   }
 }
 

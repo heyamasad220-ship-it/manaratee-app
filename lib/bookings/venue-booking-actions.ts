@@ -51,4 +51,5 @@ export async function updateVenueBookingStatus(
   revalidatePath("/bookings/calendar")
   revalidatePath("/facilities/availability")
   revalidatePath("/facilities/calendar")
+  revalidatePath("/facilities/overview")
 }

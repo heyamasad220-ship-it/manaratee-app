@@ -1,6 +1,5 @@
-import Link from "next/link"
-
 import { ModuleTabNav, type ModuleTabNavItem } from "@/components/layout/module-tab-nav"
+import { PageBreadcrumbs } from "@/components/navigation/page-breadcrumbs"
 import { VendorHubEventSelector } from "@/components/vendor-hub/vendor-hub-event-selector"
 
 export function VendorHubSectionShell({
@@ -19,13 +18,13 @@ export function VendorHubSectionShell({
   return (
     <>
       <div className="border-b border-border bg-card px-6 pt-6">
-        <nav className="mb-2 text-sm text-muted-foreground">
-          <Link href="/vendor-hub" className="hover:text-foreground">
-            Vendor Hub
-          </Link>
-          <span className="mx-2">/</span>
-          <span className="text-foreground">{title}</span>
-        </nav>
+        <PageBreadcrumbs
+          className="mb-2"
+          items={[
+            { label: "Vendor Hub", href: "/vendor-hub" },
+            { label: title },
+          ]}
+        />
 
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>

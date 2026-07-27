@@ -2,9 +2,10 @@
 
 import * as React from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Bell, HeartHandshake, Loader2, Settings, ShieldCheck, Ticket } from "lucide-react"
+import { Bell, CalendarRange, HeartHandshake, Loader2, Settings, ShieldCheck, Ticket } from "lucide-react"
 
 import { DepartmentPromoCodesSettingsPanel } from "@/components/departments/department-promo-codes-settings-panel"
+import { DepartmentYearDefaultsSettingsPanel } from "@/components/departments/department-year-defaults-settings-panel"
 import { ProgramServiceNeedsSettingsClient } from "@/components/programs/program-service-needs-settings-client"
 import { Button } from "@/components/ui/button"
 import {
@@ -291,6 +292,7 @@ export function DepartmentSettingsPanel({
       departmentGroupWorkspaceHref(departmentId, {
         tab: "settings",
         settingsSection: parsed,
+        yearProgramId: searchParams.get("year") || undefined,
       }),
       { scroll: false }
     )
@@ -371,6 +373,10 @@ export function DepartmentSettingsPanel({
           <TabsTrigger value="general" className="gap-2">
             <Settings className="size-4" />
             General
+          </TabsTrigger>
+          <TabsTrigger value="year-defaults" className="gap-2">
+            <CalendarRange className="size-4" />
+            Year defaults
           </TabsTrigger>
           <TabsTrigger value="registration" className="gap-2">
             <ShieldCheck className="size-4" />
@@ -497,6 +503,10 @@ export function DepartmentSettingsPanel({
               </Button>
             </div>
           </div>
+        </TabsContent>
+
+        <TabsContent value="year-defaults">
+          <DepartmentYearDefaultsSettingsPanel departmentId={departmentId} />
         </TabsContent>
 
         <TabsContent value="registration">

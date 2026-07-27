@@ -1,9 +1,8 @@
 "use client"
 
 import * as React from "react"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Loader2 } from "lucide-react"
+import { Loader2 } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -16,6 +15,7 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { PageBreadcrumbs } from "@/components/navigation/page-breadcrumbs"
 import {
   Table,
   TableBody,
@@ -159,14 +159,12 @@ export function MyClassDetailClient({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-3">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href="/my-classes">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to My Classes
-          </Link>
-        </Button>
-      </div>
+      <PageBreadcrumbs
+        items={[
+          { label: "My Classes", href: "/my-classes" },
+          { label: `${programName} · ${offeringName}` },
+        ]}
+      />
 
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">

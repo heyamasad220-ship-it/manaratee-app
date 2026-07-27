@@ -10,9 +10,15 @@ export type FamilyMemberRole =
 
 export type FamilyMemberGivingRow = {
   id: string
-  contactId: string
+  /** Adult CRM contact — null for person-only minors. */
+  contactId: string | null
+  /** Canonical person identity (preferred). */
+  personId: string | null
   memberName: string | null
+  email: string | null
+  phone: string | null
   role: string
+  isMinor: boolean
   totalDonations: number
   donationCount: number
   lastDonationDate: string | null
@@ -48,10 +54,9 @@ export type FamilyListSummary = {
   primaryContactId: string | null
   primaryName: string | null
   primaryEmail: string | null
+  primaryPhone: string | null
+  primaryAddress: string | null
   memberCount: number
-  lifetimeTotal: number
-  giftCount: number
-  lastGiftDate: string | null
 }
 
 export type HouseholdGivingReportRow = {

@@ -1030,6 +1030,7 @@ export async function applyEnrollmentFinancialAssistanceAction(input: {
       enrollmentId,
       enrollment.program_id as string | null
     )
+    revalidatePath("/finance/financial-assistance")
     revalidatePath("/programs/financial-assistance")
     if (enrollment.participant_contact_id) {
       revalidatePath(`/contacts/${enrollment.participant_contact_id}`)

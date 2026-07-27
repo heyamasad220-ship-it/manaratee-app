@@ -1,4 +1,7 @@
 import type { ProgramStatus } from "./program-status"
+import type { ProgramKind } from "./program-kind"
+
+export type { ProgramKind }
 
 export interface Program {
   id: string
@@ -8,6 +11,9 @@ export interface Program {
   name: string
   subtitle: string | null
   description: string | null
+
+  /** academic = year + offerings; seasonal = single camp/season product. */
+  program_kind: ProgramKind
 
   department_id: string | null
   flyer_url: string | null

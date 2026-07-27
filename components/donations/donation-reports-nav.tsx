@@ -80,12 +80,18 @@ function isTabActive(tab: DonationReportsTab, pathname: string, tabs: DonationRe
   return !overridden
 }
 
-export function DonationReportsNav({ canManage }: { canManage: boolean }) {
+export function DonationReportsNav({
+  canManage,
+  className,
+}: {
+  canManage: boolean
+  className?: string
+}) {
   const pathname = usePathname()
   const visibleTabs = DONATION_REPORTS_TABS.filter((tab) => !tab.requiresManage || canManage)
 
   return (
-    <div className="border-b border-border bg-background px-6">
+    <div className={cn("border-b border-border", className)}>
       <nav className="-mb-px flex gap-0 overflow-x-auto">
         {visibleTabs.map((tab) => {
           const active = isTabActive(tab, pathname, visibleTabs)

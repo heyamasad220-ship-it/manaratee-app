@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 
 import { loadOrganizationSidebarModules } from "@/lib/organizations/load-organization-sidebar-modules"
 import { buildSidebarPermissionContext } from "@/lib/organizations/sidebar-nav-context"
+import { resolveDepartmentHeadship } from "@/lib/departments/department-headship"
 import { isCurrentUserPlatformAdmin } from "@/lib/platform/is-platform-admin-user"
 import { getPlatformAdminOrgAccessOrganizationId } from "@/lib/platform/platform-org-access"
 import { getServiceRoleClient } from "@/lib/platform/require-platform-admin"
@@ -42,6 +43,7 @@ export async function GET() {
     return NextResponse.json({
       modules: [],
       platformSupportMode: false,
+      myDepartment: null,
       permissionContext: {
         isOwner: false,
         isSuperAdmin: false,
@@ -72,7 +74,7 @@ export async function GET() {
 
   try {
     const admin = getServiceRoleClient()
-    const [modules, permissionContext] = await Promise.all([
+    const [modules, permissionContext, headship] = await Promise.all([
       loadOrganizationSidebarModules(admin, organizationId),
       buildSidebarPermissionContext({
         supabase,
@@ -82,9 +84,22 @@ export async function GET() {
         membershipRoleId,
         platformSupportMode,
       }),
+      resolveDepartmentHeadship(supabase, organizationId, user.id),
     ])
 
-    return NextResponse.json({ modules, platformSupportMode, permissionContext })
+    const myDepartment = headship
+      ? {
+          id: headship.departmentId,
+          name: headship.departmentName,
+        }
+      : null
+
+    return NextResponse.json({
+      modules,
+      platformSupportMode,
+      myDepartment,
+      permissionContext,
+    })
   } catch (error) {
     console.error("sidebar-modules GET failed:", error)
     return NextResponse.json(

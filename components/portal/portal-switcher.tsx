@@ -40,7 +40,7 @@ function buildPortalOptions(
     options.push({
       id: "staff",
       label: "Staff Tools",
-      description: "Department event requests",
+      description: "My department & event requests",
       href: "/customer/staff",
     })
   }
@@ -81,8 +81,13 @@ export function getActivePortalId(pathname: string): PortalId {
     pathname.startsWith("/facilities") ||
     pathname.startsWith("/bookings") ||
     pathname.startsWith("/programs") ||
+    pathname.startsWith("/finance") ||
     pathname.startsWith("/workforce") ||
-    pathname.startsWith("/settings")
+    pathname.startsWith("/donations") ||
+    pathname.startsWith("/contacts") ||
+    pathname.startsWith("/membership") ||
+    pathname.startsWith("/settings") ||
+    pathname.startsWith("/reports")
   ) {
     return "admin"
   }

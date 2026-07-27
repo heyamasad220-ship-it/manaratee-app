@@ -22,7 +22,7 @@ export function isMissingFamiliesTable(error: { code?: string; message?: string 
 }
 
 export function familiesMigrationMessage() {
-  return "Family households are not available yet. Run migration scripts/148_families_and_family_members.sql."
+  return "Family households are not available yet. Run migration scripts/148_families_and_family_members.sql (and 196_family_members_person.sql for minors)."
 }
 
 function paymentNetAmount(amount: unknown, refundedAmount: unknown) {
@@ -84,9 +84,13 @@ export async function loadContactGivingStatsMap(
 function rollupMemberStats(
   members: Array<{
     id: string
-    contactId: string
+    contactId: string | null
+    personId: string | null
     memberName: string | null
+    email: string | null
+    phone: string | null
     role: string
+    isMinor: boolean
   }>,
   statsByContactId: Map<string, ContactGivingStat>
 ): {
@@ -100,11 +104,12 @@ function rollupMemberStats(
   let lastGiftDate: string | null = null
 
   const memberRows = members.map((member) => {
-    const stats = statsByContactId.get(member.contactId) || {
-      totalDonations: 0,
-      donationCount: 0,
-      lastDonationDate: null,
-    }
+    const stats =
+      (member.contactId && statsByContactId.get(member.contactId)) || {
+        totalDonations: 0,
+        donationCount: 0,
+        lastDonationDate: null,
+      }
 
     lifetimeTotal += stats.totalDonations
     giftCount += stats.donationCount
@@ -119,19 +124,39 @@ function rollupMemberStats(
     return {
       id: member.id,
       contactId: member.contactId,
+      personId: member.personId,
       memberName: member.memberName,
+      email: member.email,
+      phone: member.phone,
       role: member.role,
+      isMinor: member.isMinor,
       totalDonations: stats.totalDonations,
       donationCount: stats.donationCount,
       lastDonationDate: stats.lastDonationDate,
     }
   })
 
-  memberRows.sort((left, right) =>
-    (left.memberName || "").localeCompare(right.memberName || "")
-  )
+  memberRows.sort((left, right) => {
+    const roleRank = (role: string) =>
+      role === "head" ? 0 : role === "spouse" ? 1 : role === "child" ? 2 : 3
+    const rankDiff = roleRank(left.role) - roleRank(right.role)
+    if (rankDiff !== 0) return rankDiff
+    return (left.memberName || "").localeCompare(right.memberName || "")
+  })
 
   return { members: memberRows, lifetimeTotal, giftCount, lastGiftDate }
+}
+
+function calculateAgeYears(dateOfBirth: string | null | undefined): number | null {
+  if (!dateOfBirth) return null
+  const today = new Date()
+  const birth = new Date(`${dateOfBirth}T00:00:00`)
+  let age = today.getFullYear() - birth.getFullYear()
+  const monthDiff = today.getMonth() - birth.getMonth()
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+    age--
+  }
+  return age
 }
 
 export async function fetchFamilyGivingRollup(
@@ -171,8 +196,10 @@ export async function fetchFamilyGivingRollup(
       `
       id,
       contact_id,
+      person_id,
       role,
-      contact:contact_id ( full_name )
+      contact:contact_id ( full_name, email, phone ),
+      person:person_id ( first_name, last_name, email, phone, date_of_birth )
     `
     )
     .eq("organization_id", organizationId)
@@ -186,15 +213,41 @@ export async function fetchFamilyGivingRollup(
 
   const members = (memberRows || []).map((row) => {
     const contact = Array.isArray(row.contact) ? row.contact[0] : row.contact
+    const person = Array.isArray(row.person) ? row.person[0] : row.person
+    const personName = person
+      ? `${person.first_name || ""} ${person.last_name || ""}`.trim()
+      : ""
+    const age = calculateAgeYears(person?.date_of_birth as string | null)
+    const role = (row.role as string) || "member"
+    const isMinor =
+      !row.contact_id ||
+      role === "child" ||
+      (age !== null && age < 18)
+
     return {
       id: row.id as string,
-      contactId: row.contact_id as string,
-      memberName: (contact?.full_name as string | null) ?? null,
-      role: (row.role as string) || "member",
+      contactId: (row.contact_id as string | null) ?? null,
+      personId: (row.person_id as string | null) ?? null,
+      memberName:
+        (contact?.full_name as string | null) ||
+        personName ||
+        null,
+      email:
+        (contact?.email as string | null) ||
+        (person?.email as string | null) ||
+        null,
+      phone:
+        (contact?.phone as string | null) ||
+        (person?.phone as string | null) ||
+        null,
+      role,
+      isMinor,
     }
   })
 
-  const contactIds = members.map((member) => member.contactId)
+  const contactIds = members
+    .map((member) => member.contactId)
+    .filter((id): id is string => Boolean(id))
   const statsByContactId = await loadContactGivingStatsMap(
     supabase,
     organizationId,
@@ -270,6 +323,22 @@ export async function fetchFamilyGivingRollup(
   }
 }
 
+function formatPrimaryAddress(primary: {
+  address?: string | null
+  city?: string | null
+  state?: string | null
+  zip?: string | null
+} | null): string | null {
+  if (!primary) return null
+  const line1 = (primary.address || "").trim()
+  const city = (primary.city || "").trim()
+  const state = (primary.state || "").trim()
+  const zip = (primary.zip || "").trim()
+  const cityStateZip = [city, [state, zip].filter(Boolean).join(" ")].filter(Boolean).join(", ")
+  const parts = [line1, cityStateZip].filter(Boolean)
+  return parts.length > 0 ? parts.join(", ") : null
+}
+
 export async function fetchFamilyListSummaries(
   supabase: SupabaseClient,
   organizationId: string
@@ -282,8 +351,8 @@ export async function fetchFamilyListSummaries(
       name,
       status,
       primary_contact_id,
-      primary:primary_contact_id ( full_name, email ),
-      family_members ( contact_id, end_date )
+      primary:primary_contact_id ( full_name, email, phone, address, city, state, zip ),
+      family_members ( contact_id, person_id, end_date )
     `
     )
     .eq("organization_id", organizationId)
@@ -297,59 +366,31 @@ export async function fetchFamilyListSummaries(
     return { ok: false, error: error.message }
   }
 
-  const familyRecords = (families || []).map((family) => {
-    const primary = Array.isArray(family.primary) ? family.primary[0] : family.primary
-    const memberRows = (family.family_members as Array<{ contact_id: string; end_date: string | null }> | null) || []
-    const activeContactIds = memberRows
-      .filter((row) => !row.end_date)
-      .map((row) => row.contact_id)
+  const summaries: FamilyListSummary[] = (families || [])
+    .map((family) => {
+      const primary = Array.isArray(family.primary) ? family.primary[0] : family.primary
+      const memberRows =
+        (family.family_members as Array<{
+          contact_id: string | null
+          person_id: string | null
+          end_date: string | null
+        }> | null) || []
+      const activeMembers = memberRows.filter((row) => !row.end_date)
 
-    return {
-      id: family.id as string,
-      name: family.name as string,
-      status: family.status as string,
-      primaryContactId: (family.primary_contact_id as string | null) ?? null,
-      primaryName: (primary?.full_name as string | null) ?? null,
-      primaryEmail: (primary?.email as string | null) ?? null,
-      activeContactIds,
-    }
-  })
-
-  const allContactIds = [...new Set(familyRecords.flatMap((family) => family.activeContactIds))]
-  const statsByContactId = await loadContactGivingStatsMap(
-    supabase,
-    organizationId,
-    allContactIds
-  )
-
-  const summaries: FamilyListSummary[] = familyRecords.map((family) => {
-    let lifetimeTotal = 0
-    let giftCount = 0
-    let lastGiftDate: string | null = null
-
-    for (const contactId of family.activeContactIds) {
-      const stats = statsByContactId.get(contactId)
-      if (!stats) continue
-      lifetimeTotal += stats.totalDonations
-      giftCount += stats.donationCount
-      if (stats.lastDonationDate && (!lastGiftDate || stats.lastDonationDate > lastGiftDate)) {
-        lastGiftDate = stats.lastDonationDate
+      return {
+        id: family.id as string,
+        name: family.name as string,
+        status: family.status as string,
+        primaryContactId: (family.primary_contact_id as string | null) ?? null,
+        primaryName: (primary?.full_name as string | null) ?? null,
+        primaryEmail: (primary?.email as string | null) ?? null,
+        primaryPhone: (primary?.phone as string | null) ?? null,
+        primaryAddress: formatPrimaryAddress(primary),
+        memberCount: activeMembers.length,
       }
-    }
-
-    return {
-      id: family.id,
-      name: family.name,
-      status: family.status,
-      primaryContactId: family.primaryContactId,
-      primaryName: family.primaryName,
-      primaryEmail: family.primaryEmail,
-      memberCount: family.activeContactIds.length,
-      lifetimeTotal,
-      giftCount,
-      lastGiftDate,
-    }
-  })
+    })
+    // Hide emptied households left active by older move logic.
+    .filter((family) => family.memberCount > 0)
 
   return { ok: true, families: summaries }
 }

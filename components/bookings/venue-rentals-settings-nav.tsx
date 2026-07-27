@@ -7,17 +7,6 @@ import { cn } from "@/lib/utils"
 
 const settingsTabs = [
   {
-    label: "Overview",
-    href: "/bookings/settings",
-    matchPrefix: "/bookings/settings",
-    exact: true,
-  },
-  {
-    label: "Event Types",
-    href: "/bookings/settings/event-types",
-    matchPrefix: "/bookings/settings/event-types",
-  },
-  {
     label: "Notifications",
     href: "/bookings/settings/notifications",
     matchPrefix: "/bookings/settings/notifications",
@@ -30,10 +19,7 @@ export function VenueRentalsSettingsNav() {
   return (
     <nav className="flex gap-1 border-b border-border">
       {settingsTabs.map((tab) => {
-        const isActive =
-          "exact" in tab && tab.exact
-            ? pathname === tab.href
-            : pathname.startsWith(tab.matchPrefix)
+        const isActive = pathname.startsWith(tab.matchPrefix)
 
         return (
           <Link

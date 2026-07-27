@@ -3,8 +3,18 @@
 import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Plus } from "lucide-react"
+import { Archive, Loader2, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react"
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -16,6 +26,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
@@ -39,7 +56,6 @@ import {
   isOfferingEnrollmentOpen,
 } from "@/lib/programs/program-offering-display"
 import {
-  DEFAULT_NEW_OFFERING_INHERIT_FLAGS,
   resolveEffectiveOfferingDates,
   type ProgramDefaultsSource,
 } from "@/lib/programs/program-offering-inherit"
@@ -50,6 +66,11 @@ import {
   PROGRAM_OFFERING_STATUS_LABELS,
   type ProgramOffering,
 } from "@/lib/programs/program-offering-types"
+import {
+  isSeasonalProgramKind,
+  PROGRAM_KIND_LABELS,
+  type ProgramKind,
+} from "@/lib/programs/program-kind"
 import type { Program } from "@/lib/programs/program-types"
 import { cn } from "@/lib/utils"
 
@@ -70,7 +91,9 @@ export type ProgramOfferingsListProgram = Pick<
   | "end_date"
   | "enrollment_open_date"
   | "enrollment_close_date"
->
+> & {
+  program_kind?: ProgramKind | string | null
+}
 
 export type ProgramDetailOfferingRow = {
   offering: ProgramOffering
@@ -79,12 +102,15 @@ export type ProgramDetailOfferingRow = {
 
 export function ProgramOfferingsListPanel({
   program,
+  departmentId = null,
   rows,
   archivedCount,
   showArchived,
   addDisabled = false,
 }: {
   program: ProgramOfferingsListProgram
+  /** When set, manage links stay under the department workspace. */
+  departmentId?: string | null
   rows: ProgramDetailOfferingRow[]
   archivedCount: number
   showArchived?: ProgramDetailOfferingRow[]
@@ -92,35 +118,51 @@ export function ProgramOfferingsListPanel({
   addDisabled?: boolean
 }) {
   const router = useRouter()
+  const parentIsSeasonal = isSeasonalProgramKind(program.program_kind)
   const [addOpen, setAddOpen] = React.useState(false)
+  const [createKind, setCreateKind] = React.useState<ProgramKind>(
+    parentIsSeasonal ? "seasonal" : "academic"
+  )
   const [offeringName, setOfferingName] = React.useState("")
   const [deliveryFormat, setDeliveryFormat] =
     React.useState<OfferingDeliveryFormat>("in_person")
-  const [inheritDates, setInheritDates] = React.useState(
-    DEFAULT_NEW_OFFERING_INHERIT_FLAGS.inherit_dates
-  )
-  const [inheritEligibility, setInheritEligibility] = React.useState(
-    DEFAULT_NEW_OFFERING_INHERIT_FLAGS.inherit_eligibility
-  )
-  const [inheritEnrollment, setInheritEnrollment] = React.useState(
-    DEFAULT_NEW_OFFERING_INHERIT_FLAGS.inherit_enrollment
-  )
+  const [openEnrollment, setOpenEnrollment] = React.useState(parentIsSeasonal)
   const [creating, setCreating] = React.useState(false)
   const [createError, setCreateError] = React.useState<string | null>(null)
+
+  const [rowAction, setRowAction] = React.useState<{
+    type: "delete" | "archive"
+    offering: ProgramOffering
+    enrolled: number
+  } | null>(null)
+  const [rowBusy, setRowBusy] = React.useState(false)
+  const [rowError, setRowError] = React.useState<string | null>(null)
+
+  React.useEffect(() => {
+    if (!addOpen) return
+    const nextKind = parentIsSeasonal ? "seasonal" : "academic"
+    setCreateKind(nextKind)
+    setOpenEnrollment(nextKind === "seasonal")
+  }, [addOpen, parentIsSeasonal])
 
   function resetCreateForm() {
     setOfferingName("")
     setDeliveryFormat("in_person")
-    setInheritDates(DEFAULT_NEW_OFFERING_INHERIT_FLAGS.inherit_dates)
-    setInheritEligibility(DEFAULT_NEW_OFFERING_INHERIT_FLAGS.inherit_eligibility)
-    setInheritEnrollment(DEFAULT_NEW_OFFERING_INHERIT_FLAGS.inherit_enrollment)
+    const nextKind = parentIsSeasonal ? "seasonal" : "academic"
+    setCreateKind(nextKind)
+    setOpenEnrollment(nextKind === "seasonal")
     setCreateError(null)
   }
 
-  async function handleCreateOffering() {
+  async function handleCreate() {
     const name = offeringName.trim()
     if (!name) {
-      setCreateError(`${PROGRAM_LABEL} name is required.`)
+      setCreateError("Name is required.")
+      return
+    }
+
+    if (createKind === "seasonal" && !departmentId) {
+      setCreateError("Seasonal camps must be created from a department.")
       return
     }
 
@@ -128,6 +170,63 @@ export function ProgramOfferingsListPanel({
     setCreateError(null)
 
     try {
+      if (createKind === "seasonal") {
+        const { createProgram } = await import("@/lib/programs/program-actions")
+        const created = await createProgram({
+          name,
+          department_id: departmentId,
+          program_kind: "seasonal",
+          delivery_format: deliveryFormat,
+          application_required: !openEnrollment,
+          status: "draft",
+          visibility: "public",
+        })
+        setAddOpen(false)
+        resetCreateForm()
+        if (created.offeringId) {
+          router.push(
+            programOfferingManageHref(created.programId, created.offeringId, {
+              departmentId,
+            })
+          )
+        } else {
+          router.push(
+            departmentId
+              ? `/workforce/departments/${departmentId}?tab=programs&year=${created.programId}`
+              : `/programs/${created.programId}`
+          )
+        }
+        router.refresh()
+        return
+      }
+
+      // Academic: add a class under this year when the year is academic.
+      // If the selected year is seasonal, start a new academic year instead.
+      if (parentIsSeasonal) {
+        if (!departmentId) {
+          setCreateError(
+            "Create an academic year from Overview, then add classes there."
+          )
+          setCreating(false)
+          return
+        }
+        const { createProgram } = await import("@/lib/programs/program-actions")
+        const created = await createProgram({
+          name,
+          department_id: departmentId,
+          program_kind: "academic",
+          status: "draft",
+          visibility: "public",
+        })
+        setAddOpen(false)
+        resetCreateForm()
+        router.push(
+          `/workforce/departments/${departmentId}?tab=programs&year=${created.programId}`
+        )
+        router.refresh()
+        return
+      }
+
       const { createProgramOffering } = await import(
         "@/lib/programs/program-offering-actions"
       )
@@ -139,16 +238,21 @@ export function ProgramOfferingsListPanel({
         enrollment_open_date: program.enrollment_open_date,
         enrollment_close_date: program.enrollment_close_date,
         status: program.status === "draft" ? "draft" : "active",
-        inherit_dates: inheritDates,
-        inherit_eligibility: inheritEligibility,
-        inherit_enrollment: inheritEnrollment,
+        inherit_dates: false,
+        inherit_eligibility: false,
+        inherit_enrollment: false,
         attributes: {
           delivery_format: deliveryFormat,
+          application_required: !openEnrollment,
         },
       })
       setAddOpen(false)
       resetCreateForm()
-      router.push(programOfferingManageHref(program.id, created.id as string))
+      router.push(
+        programOfferingManageHref(program.id, created.id as string, {
+          departmentId,
+        })
+      )
       router.refresh()
     } catch (error) {
       setCreateError(
@@ -158,6 +262,30 @@ export function ProgramOfferingsListPanel({
       )
     } finally {
       setCreating(false)
+    }
+  }
+
+  async function confirmRowAction() {
+    if (!rowAction) return
+    setRowBusy(true)
+    setRowError(null)
+    try {
+      const actions = await import("@/lib/programs/program-offering-actions")
+      if (rowAction.type === "delete") {
+        await actions.deleteProgramOffering(rowAction.offering.id)
+      } else {
+        await actions.archiveProgramOffering(rowAction.offering.id)
+      }
+      setRowAction(null)
+      router.refresh()
+    } catch (error) {
+      setRowError(
+        error instanceof Error
+          ? error.message
+          : `Could not ${rowAction.type} this ${PROGRAM_LABEL.toLowerCase()}.`
+      )
+    } finally {
+      setRowBusy(false)
     }
   }
 
@@ -220,6 +348,9 @@ export function ProgramOfferingsListPanel({
                   <TableHead>Dates</TableHead>
                   <TableHead>Enrollment</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead className="w-[1%] text-right">
+                    <span className="sr-only">Actions</span>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -236,11 +367,17 @@ export function ProgramOfferingsListPanel({
                     effectiveDates.start_date,
                     effectiveDates.end_date
                   )
+                  const manageHref = programOfferingManageHref(
+                    program.id,
+                    offering.id,
+                    { departmentId }
+                  )
+                  const canDelete = enrolled === 0
                   return (
                     <TableRow key={offering.id}>
                       <TableCell className="font-medium">
                         <Link
-                          href={programOfferingManageHref(program.id, offering.id)}
+                          href={manageHref}
                           className="text-sky-600 hover:text-sky-700 hover:underline"
                         >
                           {offering.name}
@@ -258,14 +395,7 @@ export function ProgramOfferingsListPanel({
                           offering.offering_type}
                       </TableCell>
                       <TableCell>
-                        <div className="space-y-0.5">
-                          <p>{dateRange}</p>
-                          {offering.inherit_dates === true ? (
-                            <p className="text-xs text-muted-foreground">
-                              From {YEAR_SEASON_LABEL.toLowerCase()}
-                            </p>
-                          ) : null}
-                        </div>
+                        <p>{dateRange}</p>
                       </TableCell>
                       <TableCell>
                         <div className="space-y-1">
@@ -291,6 +421,75 @@ export function ProgramOfferingsListPanel({
                           {PROGRAM_OFFERING_STATUS_LABELS[offering.status]}
                         </Badge>
                       </TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              aria-label={`Actions for ${offering.name}`}
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem asChild>
+                              <Link href={manageHref}>
+                                <Pencil className="mr-2 h-4 w-4" />
+                                Edit
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            {canDelete ? (
+                              <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onSelect={() => {
+                                  setRowError(null)
+                                  setRowAction({
+                                    type: "delete",
+                                    offering,
+                                    enrolled,
+                                  })
+                                }}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete
+                              </DropdownMenuItem>
+                            ) : (
+                              <DropdownMenuItem
+                                onSelect={() => {
+                                  setRowError(null)
+                                  setRowAction({
+                                    type: "archive",
+                                    offering,
+                                    enrolled,
+                                  })
+                                }}
+                              >
+                                <Archive className="mr-2 h-4 w-4" />
+                                Archive
+                              </DropdownMenuItem>
+                            )}
+                            {canDelete && offering.status !== "archived" ? (
+                              <DropdownMenuItem
+                                onSelect={() => {
+                                  setRowError(null)
+                                  setRowAction({
+                                    type: "archive",
+                                    offering,
+                                    enrolled,
+                                  })
+                                }}
+                              >
+                                <Archive className="mr-2 h-4 w-4" />
+                                Archive
+                              </DropdownMenuItem>
+                            ) : null}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
                     </TableRow>
                   )
                 })}
@@ -308,7 +507,9 @@ export function ProgramOfferingsListPanel({
               {showArchived.map(({ offering }) => (
                 <li key={offering.id}>
                   <Link
-                    href={programOfferingManageHref(program.id, offering.id)}
+                    href={programOfferingManageHref(program.id, offering.id, {
+                      departmentId,
+                    })}
                     className="text-sky-600 hover:text-sky-700 hover:underline"
                   >
                     {offering.name}
@@ -330,19 +531,57 @@ export function ProgramOfferingsListPanel({
             <DialogHeader>
               <DialogTitle>Add {PROGRAM_LABEL.toLowerCase()}</DialogTitle>
               <DialogDescription>
-                Create a class or track. {YEAR_SEASON_LABEL} defaults are used
-                unless you turn off inherit below. Fees and schedule are set after
-                create.
+                {createKind === "seasonal"
+                  ? "Create a camp or season product. Dates, eligibility, fees, and sessions are set on the next page — no year defaults to inherit."
+                  : parentIsSeasonal
+                    ? "Starts a new academic year for this department. Add classes under it afterward."
+                    : `Create a class or track under this ${YEAR_SEASON_LABEL.toLowerCase()}. Fees and schedule are set after create.`}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-2">
+              <div className="space-y-2">
+                <Label>Type</Label>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {(Object.keys(PROGRAM_KIND_LABELS) as ProgramKind[]).map(
+                    (kind) => (
+                      <label
+                        key={kind}
+                        className={cn(
+                          "flex cursor-pointer items-center gap-2 rounded-md border p-3 text-sm font-medium transition-colors",
+                          createKind === kind
+                            ? "border-sky-500 bg-sky-50/80"
+                            : "hover:bg-muted/40"
+                        )}
+                      >
+                        <input
+                          type="radio"
+                          name="dept-add-program-kind"
+                          className="accent-sky-600"
+                          checked={createKind === kind}
+                          onChange={() => {
+                            setCreateKind(kind)
+                            setOpenEnrollment(kind === "seasonal")
+                          }}
+                          disabled={creating}
+                        />
+                        {PROGRAM_KIND_LABELS[kind]}
+                      </label>
+                    )
+                  )}
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="detail-offering-name">Name</Label>
                 <Input
                   id="detail-offering-name"
                   value={offeringName}
                   onChange={(event) => setOfferingName(event.target.value)}
-                  placeholder="e.g. Tajweed Beginner — Centre"
+                  placeholder={
+                    createKind === "seasonal"
+                      ? "Camp or season name"
+                      : "Class or track name"
+                  }
                   disabled={creating}
                 />
               </div>
@@ -365,48 +604,32 @@ export function ProgramOfferingsListPanel({
                     </option>
                   ))}
                 </select>
-                <p className="text-xs text-muted-foreground">
-                  Create separate {PROGRAM_LABEL_PLURAL.toLowerCase()} for on-site
-                  and online when instructors or capacity differ.
-                </p>
+                {createKind === "academic" ? (
+                  <p className="text-xs text-muted-foreground">
+                    Create separate {PROGRAM_LABEL_PLURAL.toLowerCase()} for
+                    on-site and online when instructors or capacity differ.
+                  </p>
+                ) : null}
               </div>
 
-              <div className="space-y-3 rounded-md border p-3">
-                <div>
-                  <p className="text-sm font-medium">
-                    Use {YEAR_SEASON_LABEL.toLowerCase()} defaults
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Turn off a group only when this{" "}
-                    {PROGRAM_LABEL.toLowerCase()} needs different dates,
-                    eligibility, or enrollment settings.
-                  </p>
-                </div>
-                <label className="flex items-center justify-between gap-3 text-sm">
-                  <span>Dates &amp; enrollment window</span>
+              {!(createKind === "academic" && parentIsSeasonal) ? (
+                <label className="flex items-start justify-between gap-3 rounded-md border p-3 text-sm">
+                  <span className="space-y-0.5">
+                    <span className="block font-medium">
+                      Automatically register and pay
+                    </span>
+                    <span className="block text-xs text-muted-foreground">
+                      No Apply / Approve step — customers register and pay
+                      immediately.
+                    </span>
+                  </span>
                   <Switch
-                    checked={inheritDates}
-                    onCheckedChange={setInheritDates}
+                    checked={openEnrollment}
+                    onCheckedChange={setOpenEnrollment}
                     disabled={creating}
                   />
                 </label>
-                <label className="flex items-center justify-between gap-3 text-sm">
-                  <span>Eligibility (age / gender)</span>
-                  <Switch
-                    checked={inheritEligibility}
-                    onCheckedChange={setInheritEligibility}
-                    disabled={creating}
-                  />
-                </label>
-                <label className="flex items-center justify-between gap-3 text-sm">
-                  <span>Enrollment types &amp; waitlist</span>
-                  <Switch
-                    checked={inheritEnrollment}
-                    onCheckedChange={setInheritEnrollment}
-                    disabled={creating}
-                  />
-                </label>
-              </div>
+              ) : null}
 
               {createError ? (
                 <p className="text-sm text-destructive">{createError}</p>
@@ -423,7 +646,7 @@ export function ProgramOfferingsListPanel({
               </Button>
               <Button
                 type="button"
-                onClick={() => void handleCreateOffering()}
+                onClick={() => void handleCreate()}
                 disabled={creating}
               >
                 {creating ? "Creating…" : `Create ${PROGRAM_LABEL.toLowerCase()}`}
@@ -431,6 +654,80 @@ export function ProgramOfferingsListPanel({
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <AlertDialog
+          open={rowAction != null}
+          onOpenChange={(open) => {
+            if (!open && !rowBusy) {
+              setRowAction(null)
+              setRowError(null)
+            }
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {rowAction?.type === "delete"
+                  ? `Delete ${PROGRAM_LABEL.toLowerCase()}?`
+                  : `Archive ${PROGRAM_LABEL.toLowerCase()}?`}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {rowAction?.type === "delete" ? (
+                  <>
+                    Permanently delete{" "}
+                    <span className="font-medium text-foreground">
+                      {rowAction.offering.name}
+                    </span>
+                    . This only works when there are no registrations.
+                  </>
+                ) : (
+                  <>
+                    Archive{" "}
+                    <span className="font-medium text-foreground">
+                      {rowAction?.offering.name}
+                    </span>
+                    {rowAction && rowAction.enrolled > 0
+                      ? ` (${rowAction.enrolled} registration${
+                          rowAction.enrolled === 1 ? "" : "s"
+                        }). `
+                      : ". "}
+                    It will move to the archived list and stay available for
+                    history.
+                  </>
+                )}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            {rowError ? (
+              <p className="text-sm text-destructive">{rowError}</p>
+            ) : null}
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={rowBusy}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                disabled={rowBusy}
+                className={
+                  rowAction?.type === "delete"
+                    ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    : undefined
+                }
+                onClick={(event) => {
+                  event.preventDefault()
+                  void confirmRowAction()
+                }}
+              >
+                {rowBusy ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Working…
+                  </>
+                ) : rowAction?.type === "delete" ? (
+                  "Delete"
+                ) : (
+                  "Archive"
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </CardContent>
     </Card>
   )

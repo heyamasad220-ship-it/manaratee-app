@@ -189,15 +189,20 @@ function SimpleTable({
   )
 }
 
-/** Waitlist view — filter by offering when `offering_id` is set (Reports). */
+/** Waitlist view — filter by offering when `offeringId` is set; omit for all offerings in scope. */
 export function OfferingWaitlistPanel({
   programId,
   offeringId,
   offeringName,
+  offeringIds,
+  programIds,
 }: {
-  programId: string
-  offeringId: string
+  programId?: string
+  offeringId?: string
   offeringName: string
+  /** Reports → All programs: waitlist rows for these offerings (and program-level null offering_id). */
+  offeringIds?: string[]
+  programIds?: string[]
 }) {
   const supabase = createClient()
   const [loading, setLoading] = React.useState(true)
@@ -208,18 +213,30 @@ export function OfferingWaitlistPanel({
   } | null>(null)
 
   const reportsHref = "/programs/reports?tab=waitlist"
+  const scopeProgramIds = React.useMemo(() => {
+    if (programIds && programIds.length > 0) return programIds
+    if (programId) return [programId]
+    return []
+  }, [programId, programIds])
 
   React.useEffect(() => {
     let cancelled = false
     async function load() {
       setLoading(true)
 
+      if (scopeProgramIds.length === 0) {
+        setItems([])
+        setProgramMeta(null)
+        setLoading(false)
+        return
+      }
+
       let waitlistQuery = supabase
         .from("program_waitlist")
         .select(
           "id, child_name, child_age, parent_name, parent_email, parent_phone, status, position, added_date, offer_expiry, offering_id"
         )
-        .eq("program_id", programId)
+        .in("program_id", scopeProgramIds)
         .order("position", { ascending: true, nullsFirst: false })
 
       if (offeringId) {
@@ -230,11 +247,13 @@ export function OfferingWaitlistPanel({
 
       const [waitlistResult, programResult] = await Promise.all([
         waitlistQuery,
-        supabase
-          .from("programs")
-          .select("capacity, enrolled")
-          .eq("id", programId)
-          .maybeSingle(),
+        programId
+          ? supabase
+              .from("programs")
+              .select("capacity, enrolled")
+              .eq("id", programId)
+              .maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
       ])
 
       if (cancelled) return
@@ -247,13 +266,25 @@ export function OfferingWaitlistPanel({
         setItems([])
       } else {
         const rows = (waitlistResult.data || []) as WaitlistRow[]
+        const offeringIdSet =
+          !offeringId && offeringIds && offeringIds.length > 0
+            ? new Set(offeringIds)
+            : null
         setItems(
-          rows.filter(
-            (row) =>
-              !offeringId ||
-              row.offering_id === offeringId ||
-              row.offering_id == null
-          )
+          rows.filter((row) => {
+            if (offeringId) {
+              return (
+                row.offering_id === offeringId || row.offering_id == null
+              )
+            }
+            if (offeringIdSet) {
+              return (
+                row.offering_id == null ||
+                offeringIdSet.has(row.offering_id)
+              )
+            }
+            return true
+          })
         )
       }
 
@@ -272,7 +303,7 @@ export function OfferingWaitlistPanel({
     return () => {
       cancelled = true
     }
-  }, [programId, offeringId, supabase])
+  }, [programId, offeringId, offeringIds, scopeProgramIds, supabase])
 
   return (
     <div className="rounded-lg border">

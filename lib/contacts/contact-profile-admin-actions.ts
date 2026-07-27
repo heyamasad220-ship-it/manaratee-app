@@ -221,12 +221,30 @@ async function attachFamilyMemberContactIds(
   }
 
   return members.map((member) => {
+    const age = calculateAgeFromDob(member.dateOfBirth)
+    // Minors never get a CRM contact profile — they belong under the parent Contact.
+    if (age !== null && age < 18) {
+      return { ...member, contactId: null }
+    }
     const contact = contactByPersonId.get(member.id)
     if (!contact || !profileWorthyContactIds.has(contact.id)) {
       return { ...member, contactId: null }
     }
     return { ...member, contactId: contact.id }
   })
+}
+
+function calculateAgeFromDob(dateOfBirth: string | null | undefined): number | null {
+  if (!dateOfBirth) return null
+  const today = new Date()
+  const birthDate = new Date(`${dateOfBirth}T00:00:00`)
+  if (Number.isNaN(birthDate.getTime())) return null
+  let age = today.getFullYear() - birthDate.getFullYear()
+  const monthDiff = today.getMonth() - birthDate.getMonth()
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+    age -= 1
+  }
+  return age
 }
 
 export async function loadContactProfileExtendedData(
@@ -404,6 +422,21 @@ export async function addContactFamilyMember(input: {
 
   if (relationshipError || !createdRelationship) {
     throw new Error(relationshipError?.message || "Could not save family relationship.")
+  }
+
+  try {
+    const { syncHouseholdFromParentContact } = await import("@/lib/contacts/family-sync")
+    await syncHouseholdFromParentContact({
+      supabase,
+      organizationId,
+      primaryContactId: input.contactId,
+      primaryName: (contact.full_name as string | null) ?? null,
+    })
+  } catch (error) {
+    console.warn(
+      "syncHouseholdFromParentContact after addContactFamilyMember:",
+      error instanceof Error ? error.message : error
+    )
   }
 
   // Person-only household members do not get a contact profile. Profile links appear only when

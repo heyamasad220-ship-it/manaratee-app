@@ -1,18 +1,17 @@
 "use client"
 
 import Link from "next/link"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
   AlertTriangle,
   Calendar,
   CheckCircle2,
   Clock,
-  Search,
-  Users,
+  MoreHorizontal,
 } from "lucide-react"
 
 import { formatVenueRentalTimeRange } from "@/lib/bookings/venue-rental-format"
-import { getVenueRentalCalendarColorClasses } from "@/lib/bookings/venue-rental-status"
+import { getVenueRentalStatusBadgeClasses } from "@/lib/bookings/venue-rental-status"
 import type {
   VenueRentalDashboardStats,
   VenueRentalQueueRow,
@@ -22,8 +21,14 @@ import { VENUE_RENTAL_STATUSES } from "@/lib/bookings/venue-rental-types"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { ListPagination } from "@/components/ui/list-pagination"
 import {
   Select,
   SelectContent,
@@ -39,14 +44,27 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { TableColumnHeaderFilter } from "@/components/ui/table-column-header-filter"
+import {
+  DEFAULT_LIST_PAGE_SIZE,
+  slicePageItems,
+} from "@/lib/ui/list-pagination"
+import { STAFF_MAIN_CONTENT_STICKY_TOP_CLASS } from "@/lib/layout/staff-dashboard-chrome"
+import { cn } from "@/lib/utils"
+
+type StatusFilter =
+  | "all"
+  | "awaiting_approval"
+  | "awaiting_payment"
+  | "confirmed"
+  | "completed"
 
 type VenueRentalRequestsQueueProps = {
   rows: VenueRentalQueueRow[]
   stats: VenueRentalDashboardStats
   canManage: boolean
   title?: string
-  description?: string
-  defaultStatusFilter?: "all" | "awaiting_approval" | "awaiting_payment"
+  defaultStatusFilter?: StatusFilter
 }
 
 function isAwaitingPaymentStatus(status: VenueRentalStatus): boolean {
@@ -62,108 +80,151 @@ export function VenueRentalRequestsQueue({
   stats,
   canManage,
   title = "Requests",
-  description = "Review venue rental requests from customers.",
   defaultStatusFilter = "all",
 }: VenueRentalRequestsQueueProps) {
-  const [search, setSearch] = useState("")
-  const [statusFilter, setStatusFilter] = useState(defaultStatusFilter)
+  const [customerFilterInput, setCustomerFilterInput] = useState("")
+  const [customerFilter, setCustomerFilter] = useState("")
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(defaultStatusFilter)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(DEFAULT_LIST_PAGE_SIZE)
 
   const filteredRows = useMemo(() => {
     return rows.filter((row) => {
-      const query = search.toLowerCase()
-      const matchesSearch =
+      const query = customerFilter.toLowerCase()
+      const matchesCustomer =
+        !query ||
         row.customerName.toLowerCase().includes(query) ||
         (row.customerEmail || "").toLowerCase().includes(query) ||
-        (row.customerPhone || "").toLowerCase().includes(query) ||
-        row.shortId.toLowerCase().includes(query) ||
-        row.spaces.some((space) => space.venueName.toLowerCase().includes(query))
+        (row.customerPhone || "").toLowerCase().includes(query)
 
       const matchesStatus =
         statusFilter === "all" ||
         (statusFilter === "awaiting_approval" &&
-          row.status === VENUE_RENTAL_STATUSES.awaitingSupervisorApproval) ||
-        (statusFilter === "awaiting_payment" && isAwaitingPaymentStatus(row.status))
+          (row.status === VENUE_RENTAL_STATUSES.awaitingSupervisorApproval ||
+            row.status === VENUE_RENTAL_STATUSES.submitted)) ||
+        (statusFilter === "awaiting_payment" && isAwaitingPaymentStatus(row.status)) ||
+        (statusFilter === "confirmed" &&
+          row.status === VENUE_RENTAL_STATUSES.confirmed) ||
+        (statusFilter === "completed" &&
+          row.status === VENUE_RENTAL_STATUSES.completed)
 
-      return matchesSearch && matchesStatus
+      return matchesCustomer && matchesStatus
     })
-  }, [rows, search, statusFilter])
+  }, [rows, customerFilter, statusFilter])
+
+  useEffect(() => {
+    setPage(1)
+  }, [customerFilter, statusFilter])
+
+  const currentPage = Math.min(
+    page,
+    Math.max(1, Math.ceil(filteredRows.length / pageSize) || 1)
+  )
+  const pagedRows = useMemo(
+    () => slicePageItems(filteredRows, currentPage, pageSize),
+    [filteredRows, currentPage, pageSize]
+  )
 
   return (
     <div className="flex flex-col gap-4 sm:gap-6 p-4 sm:p-6">
-      <div>
-        <h2 className="text-xl font-semibold text-foreground">{title}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-      </div>
+      <div
+        className={cn(
+          "sticky z-30 -mx-4 space-y-4 border-b border-border bg-background px-4 pb-4 sm:-mx-6 sm:space-y-6 sm:px-6",
+          STAFF_MAIN_CONTENT_STICKY_TOP_CLASS
+        )}
+      >
+        <div>
+          <h2 className="text-xl font-semibold text-foreground">{title}</h2>
+        </div>
 
-      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Awaiting approval" value={stats.awaitingApprovalCount} icon={Clock} />
-        <StatCard label="Awaiting payment" value={stats.awaitingPaymentCount} icon={CheckCircle2} />
-        <StatCard label="Confirmed" value={stats.confirmedCount} icon={CheckCircle2} />
-        <StatCard label="Conflicts" value={stats.conflictCount} icon={AlertTriangle} />
+        <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
+          <StatCard label="Awaiting approval" value={stats.awaitingApprovalCount} icon={Clock} />
+          <StatCard label="Awaiting payment" value={stats.awaitingPaymentCount} icon={CheckCircle2} />
+          <StatCard label="Confirmed" value={stats.confirmedCount} icon={CheckCircle2} />
+          <StatCard label="Conflicts" value={stats.conflictCount} icon={AlertTriangle} />
+        </div>
       </div>
-
-      <Card>
-        <CardContent className="p-3 sm:p-4">
-          <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
-            <div className="flex-1">
-              <Label className="text-xs text-muted-foreground mb-1.5 block">Search</Label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Search customer, venue, or request ID..."
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  className="pl-9 h-10"
-                />
-              </div>
-            </div>
-            <div className="w-full sm:w-[180px]">
-              <Label className="text-xs text-muted-foreground mb-1.5 block">Status</Label>
-              <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as typeof statusFilter)}>
-                <SelectTrigger className="h-10">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="awaiting_approval">Awaiting approval</SelectItem>
-                  <SelectItem value="awaiting_payment">Awaiting payment</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
       <Card className="overflow-hidden">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <Table className="min-w-[900px]">
+            <Table className="min-w-[700px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>Request</TableHead>
-                  <TableHead>Customer</TableHead>
+                  <TableHead>
+                    <TableColumnHeaderFilter
+                      label="Customer"
+                      active={Boolean(customerFilter.trim())}
+                    >
+                      {({ close }) => (
+                        <Input
+                          placeholder="Search by name, email, or phone"
+                          value={customerFilterInput}
+                          onChange={(event) => {
+                            setCustomerFilterInput(event.target.value)
+                            setCustomerFilter(event.target.value)
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                              setCustomerFilter(customerFilterInput)
+                              close()
+                            }
+                          }}
+                        />
+                      )}
+                    </TableColumnHeaderFilter>
+                  </TableHead>
                   <TableHead>Spaces</TableHead>
-                  <TableHead>Add-ons</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Conflict</TableHead>
-                  <TableHead />
+                  <TableHead>Event type</TableHead>
+                  <TableHead>
+                    <TableColumnHeaderFilter
+                      label="Status"
+                      active={statusFilter !== "all"}
+                    >
+                      {({ close }) => (
+                        <Select
+                          value={statusFilter}
+                          onValueChange={(value) => {
+                            setStatusFilter(value as StatusFilter)
+                            close()
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All</SelectItem>
+                            <SelectItem value="awaiting_approval">
+                              Awaiting approval
+                            </SelectItem>
+                            <SelectItem value="awaiting_payment">
+                              Awaiting payment
+                            </SelectItem>
+                            <SelectItem value="confirmed">Confirmed</SelectItem>
+                            <SelectItem value="completed">Completed</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </TableColumnHeaderFilter>
+                  </TableHead>
+                  <TableHead className="w-12" />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredRows.length === 0 ? (
+                {pagedRows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
+                    <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
                       No venue rental requests found.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredRows.map((row) => {
-                    const colors = getVenueRentalCalendarColorClasses(row.calendarColor)
+                  pagedRows.map((row) => {
+                    const colors = getVenueRentalStatusBadgeClasses(row.status)
                     return (
                       <TableRow key={row.id}>
                         <TableCell>
-                          <div className="font-medium">{row.shortId}</div>
-                          <div className="text-xs text-muted-foreground">{row.submittedAtLabel}</div>
+                          <div className="text-sm font-medium">{row.submittedAtLabel}</div>
                         </TableCell>
                         <TableCell>
                           <div className="font-medium">{row.customerName}</div>
@@ -188,15 +249,8 @@ export function VenueRentalRequestsQueue({
                             </div>
                           ))}
                         </TableCell>
-                        <TableCell>
-                          {row.addons.length ? (
-                            <div className="flex items-center gap-1 text-sm">
-                              <Users className="h-3.5 w-3.5" />
-                              {row.addons.map((addon) => addon.name).join(", ")}
-                            </div>
-                          ) : (
-                            "—"
-                          )}
+                        <TableCell className="max-w-[200px] text-sm">
+                          {row.eventTypeName || "—"}
                         </TableCell>
                         <TableCell>
                           <Badge variant="secondary" className={`${colors.bg} ${colors.text}`}>
@@ -204,20 +258,27 @@ export function VenueRentalRequestsQueue({
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          {row.hasConflict ? (
-                            <Badge variant="secondary" className="bg-red-100 text-red-700">
-                              Conflict
-                            </Badge>
-                          ) : (
-                            "Clear"
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Button variant="outline" size="sm" asChild>
-                            <Link href={`/bookings/rentals/${row.id}`}>
-                              {canManage ? "Review" : "View"}
-                            </Link>
-                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                              >
+                                <MoreHorizontal className="h-4 w-4" />
+                                <span className="sr-only">
+                                  {canManage ? "Request actions" : "View request"}
+                                </span>
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem asChild>
+                                <Link href={`/bookings/rentals/${row.id}`}>
+                                  {canManage ? "Review" : "View"}
+                                </Link>
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                       </TableRow>
                     )
@@ -226,6 +287,21 @@ export function VenueRentalRequestsQueue({
               </TableBody>
             </Table>
           </div>
+          {filteredRows.length > 0 ? (
+            <div className="border-t border-border px-3 py-3 sm:px-4">
+              <ListPagination
+                page={currentPage}
+                pageSize={pageSize}
+                total={filteredRows.length}
+                entryLabel="requests"
+                onPageChange={setPage}
+                onPageSizeChange={(next) => {
+                  setPageSize(next)
+                  setPage(1)
+                }}
+              />
+            </div>
+          ) : null}
         </CardContent>
       </Card>
     </div>

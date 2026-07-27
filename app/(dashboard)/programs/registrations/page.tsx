@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { Suspense } from "react"
 import {
   CheckCircle,
   Clock,
@@ -12,13 +13,14 @@ import {
 
 import { Header } from "@/components/layout/header"
 import { ProgramsRegistrationsTable } from "@/components/programs/programs-registrations-table"
+import { ProgramsReportsNav } from "@/components/programs/programs-reports-nav"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 
 import { getDepartments } from "@/lib/departments/department-queries"
 import { createClient } from "@/lib/supabase/server"
-import { getPrograms } from "@/lib/programs/program-queries"
+import { getOpenPrograms } from "@/lib/programs/program-queries"
 import {
   PROGRAM_LABEL,
   PROGRAM_LABEL_PLURAL,
@@ -272,7 +274,7 @@ export default async function ProgramsRegistrationsPage({
   const supabase = await createClient()
   const organizationId = await getSelectedOrganizationId()
   const [programs, departments] = await Promise.all([
-    getPrograms(),
+    getOpenPrograms(),
     getDepartments(),
   ])
   const programIds = programs.map((program) => program.id)
@@ -589,11 +591,15 @@ export default async function ProgramsRegistrationsPage({
     <>
       <Header title="Programs" />
 
+      <Suspense fallback={null}>
+        <ProgramsReportsNav />
+      </Suspense>
+
       <div className="p-6">
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-xl font-semibold text-foreground">
-              Payments
+              Registrations
             </h2>
             <p className="text-sm text-muted-foreground">
               View program enrollment fees, payments received, and balances.
@@ -621,14 +627,14 @@ export default async function ProgramsRegistrationsPage({
           </div>
         </div>
 
-        <div className="mb-6 flex flex-wrap gap-4 [&>*]:w-fit">
+        <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
           {stats.map((stat) => {
             const content = (
-              <CardContent className="flex items-center gap-4 p-4">
+              <CardContent className="flex h-full items-center gap-4 p-4">
                 <div className={`rounded-full bg-muted p-3 ${stat.color}`}>
                   <stat.icon className="h-5 w-5" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <p className="text-sm text-muted-foreground">{stat.label}</p>
                   <p className="text-2xl font-bold text-foreground">
                     {stat.value}
@@ -637,11 +643,11 @@ export default async function ProgramsRegistrationsPage({
               </CardContent>
             )
             return (
-              <Card key={stat.label}>
+              <Card key={stat.label} className="h-full">
                 {stat.href ? (
                   <Link
                     href={stat.href}
-                    className="block rounded-lg transition-colors hover:bg-muted/40"
+                    className="block h-full rounded-lg transition-colors hover:bg-muted/40"
                     title={`Show ${stat.label.toLowerCase()}`}
                   >
                     {content}
@@ -750,20 +756,16 @@ export default async function ProgramsRegistrationsPage({
               </p>
             </CardContent>
           </Card>
-        ) : filteredRows.length === 0 ? (
-          <Card>
-            <CardContent className="flex min-h-[220px] flex-col items-center justify-center p-8 text-center">
-              <Users className="mb-4 h-10 w-10 text-muted-foreground" />
-              <h3 className="font-semibold">No payments found</h3>
-              <p className="mt-2 max-w-md text-sm text-muted-foreground">
-                Try clearing filters, or payments will appear here after registration.
-              </p>
-            </CardContent>
-          </Card>
         ) : (
           <Card>
             <CardContent className="p-0">
               <ProgramsRegistrationsTable
+                emptyMessage="No registrations found"
+                emptyDescription={
+                  filtersActive
+                    ? "Try clearing filters, or registrations will appear here after enrollment."
+                    : "Registrations for open years will appear here after enrollment."
+                }
                 rows={filteredRows.map((row) => {
                   const balance =
                     row.type === "waitlist"

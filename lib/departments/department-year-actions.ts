@@ -12,6 +12,8 @@ import {
 } from "@/lib/departments/department-access"
 import { workforceDepartmentDetailPath } from "@/lib/departments/department-paths"
 import { roundMoney } from "@/lib/departments/department-period-helpers"
+import { getDepartments } from "@/lib/departments/department-queries"
+import type { Department } from "@/lib/departments/department-types"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import {
   canViewOrganizationBilling,
@@ -26,6 +28,8 @@ import { createProgram } from "@/lib/programs/program-actions"
 import { copyOfferingCapacityGroups } from "@/lib/programs/program-capacity-group-actions"
 import { createProgramOffering } from "@/lib/programs/program-offering-actions"
 import { normalizeProgramAudienceType } from "@/lib/programs/program-offering-attributes"
+import { getProgramById } from "@/lib/programs/program-queries"
+import type { Program } from "@/lib/programs/program-types"
 import { copyOfferingScheduleItems } from "@/lib/programs/program-schedule-actions"
 import { createClient } from "@/lib/supabase/server"
 
@@ -71,6 +75,8 @@ function revalidateDepartmentYearPaths(departmentId: string, programId?: string)
   revalidatePath("/workforce/departments")
   revalidatePath("/programs/catalog")
   revalidatePath("/programs")
+  revalidatePath("/programs/registrations")
+  revalidatePath("/programs/reports")
   if (programId) {
     revalidatePath(`/programs/${programId}`)
   }
@@ -100,31 +106,68 @@ async function mapProgramsWithOfferingCounts(
   if (programs.length === 0) return []
   const supabase = await createClient()
   const ids = programs.map((p) => p.id)
-  const { data: offerings } = await supabase
-    .from("program_offerings")
-    .select("program_id")
-    .eq("organization_id", organizationId)
-    .in("program_id", ids)
-    .neq("status", "archived")
 
-  const counts = new Map<string, number>()
+  const [{ data: offerings }, { data: enrollments }] = await Promise.all([
+    supabase
+      .from("program_offerings")
+      .select("program_id, capacity, capacity_mode")
+      .eq("organization_id", organizationId)
+      .in("program_id", ids)
+      .neq("status", "archived"),
+    supabase
+      .from("program_enrollments")
+      .select("program_id")
+      .eq("organization_id", organizationId)
+      .in("program_id", ids)
+      .in("status", [
+        "pending_payment",
+        "pending",
+        "enrolled",
+        "active",
+        "completed",
+      ]),
+  ])
+
+  const offeringCounts = new Map<string, number>()
+  const capacityByProgram = new Map<string, number>()
+  const unlimitedPrograms = new Set<string>()
   for (const row of offerings || []) {
     const pid = row.program_id as string
-    counts.set(pid, (counts.get(pid) || 0) + 1)
+    offeringCounts.set(pid, (offeringCounts.get(pid) || 0) + 1)
+    const mode = String(row.capacity_mode || "unlimited")
+    if (mode === "limited") {
+      capacityByProgram.set(
+        pid,
+        (capacityByProgram.get(pid) || 0) + Math.max(0, Number(row.capacity || 0))
+      )
+    } else {
+      unlimitedPrograms.add(pid)
+    }
   }
 
-  return programs.map((p) => ({
-    id: p.id,
-    name: p.name || "Program",
-    status: p.status || "active",
-    startDate: p.start_date,
-    endDate: p.end_date,
-    flyerUrl: p.flyer_url,
-    offeringCount: counts.get(p.id) || 0,
-    enrolled: Number(p.enrolled || 0),
-    capacity: Number(p.capacity || 0),
-    gender: p.gender,
-  }))
+  const enrolledByProgram = new Map<string, number>()
+  for (const row of enrollments || []) {
+    const pid = row.program_id as string
+    enrolledByProgram.set(pid, (enrolledByProgram.get(pid) || 0) + 1)
+  }
+
+  return programs.map((p) => {
+    const hasLimited = capacityByProgram.has(p.id)
+    const unlimited = unlimitedPrograms.has(p.id) && !hasLimited
+    return {
+      id: p.id,
+      name: p.name || "Program",
+      status: p.status || "active",
+      startDate: p.start_date,
+      endDate: p.end_date,
+      flyerUrl: p.flyer_url,
+      offeringCount: offeringCounts.get(p.id) || 0,
+      enrolled: enrolledByProgram.get(p.id) || 0,
+      // 0 capacity = unlimited in the Overview card UI
+      capacity: unlimited ? 0 : capacityByProgram.get(p.id) || 0,
+      gender: p.gender,
+    }
+  })
 }
 
 export async function fetchDepartmentYearProgramsAction(
@@ -200,6 +243,61 @@ export async function fetchDepartmentYearProgramsAction(
   }
 }
 
+export type DepartmentYearBasicsPayload = {
+  program: Program
+  visibility: string | null
+  departments: Department[]
+}
+
+export async function fetchDepartmentYearBasicsAction(
+  departmentId: string,
+  programId: string
+): Promise<
+  | { success: true; data: DepartmentYearBasicsPayload }
+  | { success: false; error: string }
+> {
+  try {
+    const canView = await canViewDepartment(departmentId)
+    if (!canView) {
+      return { success: false, error: "You do not have permission to view this department." }
+    }
+
+    const organizationId = await getSelectedOrganizationId()
+    if (!organizationId) {
+      return { success: false, error: "No organization selected." }
+    }
+
+    const [program, departments] = await Promise.all([
+      getProgramById(programId),
+      getDepartments(),
+    ])
+
+    if (!program || program.department_id !== departmentId) {
+      return { success: false, error: "Year/season not found for this department." }
+    }
+
+    const visibility =
+      ((program as Program & { visibility?: string | null }).visibility ?? null)
+
+    return {
+      success: true,
+      data: {
+        program: program as Program,
+        visibility,
+        departments,
+      },
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Could not load year/season details.",
+    }
+  }
+}
+
 export type CreateDepartmentYearInput = {
   departmentId: string
   name: string
@@ -262,13 +360,14 @@ export async function createDepartmentYearProgramAction(
 
     const flyerUrl = input.flyerUrl?.trim() || source?.flyer_url || null
 
-    const programId = await createProgram({
+    const { programId } = await createProgram({
       name,
       description:
         input.description?.trim() ||
         source?.description ||
         "Department academic year program",
       department_id: input.departmentId,
+      program_kind: "academic",
       program_type: normalizeProgramAudienceType(source?.program_type) || "adult",
       start_date: input.startDate || null,
       end_date: input.endDate || null,
@@ -289,7 +388,7 @@ export async function createDepartmentYearProgramAction(
       const { data: sourceOfferings } = await supabase
         .from("program_offerings")
         .select(
-          "id, name, offering_type, start_date, end_date, enrollment_open_date, enrollment_close_date, status, is_default, audience_type, min_age, max_age, min_grade, max_grade, grade_levels, gender, require_guardian, require_grade, require_emergency_contact, capacity_mode, capacity, enable_waitlist, waitlist_capacity, waitlist_offer_deadline_days, registration_mode, attendance_tracked, delivery_format"
+          "id, name, offering_type, start_date, end_date, enrollment_open_date, enrollment_close_date, status, is_default, audience_type, min_age, max_age, min_grade, max_grade, grade_levels, gender, require_guardian, require_grade, require_emergency_contact, capacity_mode, capacity, enable_waitlist, waitlist_capacity, waitlist_offer_deadline_days, registration_mode, application_required, attendance_tracked, delivery_format"
         )
         .eq("organization_id", organizationId)
         .eq("program_id", source.id)
@@ -348,6 +447,7 @@ export async function createDepartmentYearProgramAction(
                 offering.registration_mode === "none"
                   ? offering.registration_mode
                   : "required",
+              application_required: offering.application_required !== false,
               attendance_tracked: Boolean(offering.attendance_tracked),
               delivery_format:
                 offering.delivery_format === "online" ||
@@ -453,7 +553,7 @@ export async function updateDepartmentYearFlyerAction(input: {
   }
 }
 
-export async function archiveDepartmentYearProgramAction(input: {
+export async function closeDepartmentYearProgramAction(input: {
   departmentId: string
   programId: string
   confirmName: string
@@ -462,7 +562,7 @@ export async function archiveDepartmentYearProgramAction(input: {
     if (!(await canArchiveDepartmentYears())) {
       return {
         success: false,
-        error: "Only a Super Admin can archive (close) a department year.",
+        error: "Only a Super Admin can close a department year.",
       }
     }
 
@@ -481,21 +581,21 @@ export async function archiveDepartmentYearProgramAction(input: {
       return { success: false, error: "Program not found in this department." }
     }
 
-    if (program.status === "archived") {
-      return { success: false, error: "This year is already archived." }
+    if (program.status === "closed" || program.status === "archived") {
+      return { success: false, error: "This year is already closed." }
     }
 
     if (input.confirmName.trim() !== String(program.name).trim()) {
       return {
         success: false,
-        error: "Type the exact program name to confirm archiving.",
+        error: "Type the exact program name to confirm closing.",
       }
     }
 
     const { error: programError } = await supabase
       .from("programs")
       .update({
-        status: "archived",
+        status: "closed",
         updated_at: new Date().toISOString(),
       })
       .eq("id", input.programId)
@@ -518,7 +618,69 @@ export async function archiveDepartmentYearProgramAction(input: {
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Could not archive year program.",
+      error: error instanceof Error ? error.message : "Could not close year program.",
+    }
+  }
+}
+
+/** @deprecated Use closeDepartmentYearProgramAction — years are closed, not archived. */
+export async function archiveDepartmentYearProgramAction(input: {
+  departmentId: string
+  programId: string
+  confirmName: string
+}): Promise<{ success: true } | { success: false; error: string }> {
+  return closeDepartmentYearProgramAction(input)
+}
+
+export async function restoreClosedDepartmentYearProgramAction(input: {
+  departmentId: string
+  programId: string
+}): Promise<{ success: true } | { success: false; error: string }> {
+  try {
+    if (!(await canArchiveDepartmentYears())) {
+      return {
+        success: false,
+        error: "Only a Super Admin can restore a closed or archived year.",
+      }
+    }
+
+    const organizationId = await getSelectedOrganizationId()
+    if (!organizationId) return { success: false, error: "No organization selected." }
+
+    const supabase = await createClient()
+    const { data: program, error: findError } = await supabase
+      .from("programs")
+      .select("id, name, status, department_id")
+      .eq("organization_id", organizationId)
+      .eq("id", input.programId)
+      .maybeSingle()
+
+    if (findError || !program || program.department_id !== input.departmentId) {
+      return { success: false, error: "Program not found in this department." }
+    }
+
+    if (program.status !== "archived" && program.status !== "closed") {
+      return { success: false, error: "Only closed or archived years can be restored this way." }
+    }
+
+    const { error: programError } = await supabase
+      .from("programs")
+      .update({
+        status: "closed",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", input.programId)
+      .eq("organization_id", organizationId)
+
+    if (programError) return { success: false, error: programError.message }
+
+    revalidateDepartmentYearPaths(input.departmentId, input.programId)
+    return { success: true }
+  } catch (error) {
+    return {
+      success: false,
+      error:
+        error instanceof Error ? error.message : "Could not restore year program.",
     }
   }
 }

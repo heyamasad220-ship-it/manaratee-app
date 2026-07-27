@@ -22,13 +22,18 @@ export interface VenueRecord {
   availability_end: string | null
   amenities: string[]
   status: VenueStatus
+  color: string
+  flyer_url: string | null
   created_at: string
   updated_at: string
 }
 
+import type { VenueDayScheduleFormRow } from "@/lib/bookings/venue-day-pricing"
+
 export interface VenueWithStats extends VenueRecord {
   totalBookings: number
   revenue: number
+  daySchedule: VenueDayScheduleFormRow[]
 }
 
 export function getVenueStatusLabel(status: VenueStatus): string {
@@ -71,6 +76,15 @@ export function parseAmenities(value: string[] | string | null | undefined): str
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean)
+}
+
+export function normalizeVenueColor(color?: string | null) {
+  const value = color?.trim()
+  if (!value) return "#3b82f6"
+  if (value.startsWith("#") && (value.length === 4 || value.length === 7)) {
+    return value
+  }
+  return "#3b82f6"
 }
 
 export function getVenueSummaryStats(venues: VenueWithStats[]) {

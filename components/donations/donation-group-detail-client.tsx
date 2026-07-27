@@ -17,6 +17,7 @@ import { DonationGroupActivityPanel } from "@/components/donations/donation-grou
 import { DonationGroupEditForm } from "@/components/donations/donation-group-edit-form"
 import { DonationGroupFinancialPanel } from "@/components/donations/donation-group-financial-panel"
 import { Header } from "@/components/layout/header"
+import { PageBreadcrumbs } from "@/components/navigation/page-breadcrumbs"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -263,12 +264,12 @@ export function DonationGroupDetailClient({ groupId }: DonationGroupDetailClient
       <div className="flex flex-col gap-6 p-6">
         <div className="flex flex-col gap-4 border-b border-border pb-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 space-y-2">
-            <Button variant="ghost" size="sm" className="-ml-2 h-8 px-2" asChild>
-              <Link href={backHref}>
-                <ArrowLeft className="mr-1.5 h-4 w-4" />
-                Group Giving
-              </Link>
-            </Button>
+            <PageBreadcrumbs
+              items={[
+                { label: "Group Giving", href: backHref },
+                { label: displayName },
+              ]}
+            />
             <div className="flex flex-wrap items-center gap-2">
               <Users className="h-5 w-5 text-muted-foreground" />
               <h1 className="text-xl font-semibold tracking-tight">{displayName}</h1>

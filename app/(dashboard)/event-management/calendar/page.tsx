@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation"
 
 export default function EventManagementCalendarRedirectPage() {
-  redirect("/facilities/availability")
+  redirect("/facilities/calendar")
 }

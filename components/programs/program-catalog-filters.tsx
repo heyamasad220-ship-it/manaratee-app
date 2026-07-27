@@ -22,6 +22,8 @@ export function ProgramCatalogFilters({
   initialFilters,
   basePath = "/programs/catalog",
   hideDepartmentFilter = false,
+  hideStatusFilter = false,
+  hideViewToggle = false,
   /** Controlled mode: call instead of pushing catalog URL (department embed). */
   onFiltersChange,
 }: {
@@ -29,6 +31,10 @@ export function ProgramCatalogFilters({
   initialFilters: CatalogFilters
   basePath?: string
   hideDepartmentFilter?: boolean
+  /** Org catalog shows active years only — no status dropdown. */
+  hideStatusFilter?: boolean
+  /** Cards-only catalog — hide grid/list switcher. */
+  hideViewToggle?: boolean
   onFiltersChange?: (next: CatalogFilters) => void
 }) {
   const router = useRouter()
@@ -62,7 +68,11 @@ export function ProgramCatalogFilters({
         params.delete("q")
       }
 
-      if (merged.status && merged.status !== "all") {
+      if (
+        !hideStatusFilter &&
+        merged.status &&
+        merged.status !== "all"
+      ) {
         params.set("status", merged.status)
       } else {
         params.delete("status")
@@ -95,6 +105,7 @@ export function ProgramCatalogFilters({
     },
     [
       basePath,
+      hideStatusFilter,
       initialFilters.department,
       initialFilters.status,
       initialFilters.view,
@@ -162,19 +173,21 @@ export function ProgramCatalogFilters({
           />
         </div>
 
-        <select
-          value={initialFilters.status || "all"}
-          onChange={(event) =>
-            pushFilters({ status: event.target.value, q: query })
-          }
-          className="h-10 rounded-md border bg-background px-3 text-sm"
-        >
-          <option value="all">All Statuses</option>
-          <option value="draft">Draft</option>
-          <option value="active">Active</option>
-          <option value="paused">Paused</option>
-          <option value="archived">Archived</option>
-        </select>
+        {!hideStatusFilter ? (
+          <select
+            value={initialFilters.status || "all"}
+            onChange={(event) =>
+              pushFilters({ status: event.target.value, q: query })
+            }
+            className="h-10 rounded-md border bg-background px-3 text-sm"
+          >
+            <option value="all">All Statuses</option>
+            <option value="draft">Draft</option>
+            <option value="active">Active</option>
+            <option value="paused">Paused</option>
+            <option value="archived">Archived</option>
+          </select>
+        ) : null}
 
         {!hideDepartmentFilter ? (
           <select
@@ -194,59 +207,61 @@ export function ProgramCatalogFilters({
         ) : null}
       </div>
 
-      <div className="inline-flex h-10 shrink-0 items-center rounded-md border bg-muted/40 p-0.5">
-        {onFiltersChange ? (
-          <>
-            <Button
-              variant={viewMode === "cards" ? "default" : "ghost"}
-              size="icon"
-              className="h-9 w-9 rounded-[6px]"
-              type="button"
-              aria-label="Cards view"
-              onClick={() =>
-                pushFilters({ view: "cards", q: query })
-              }
-            >
-              <LayoutGrid className="h-4 w-4" />
-            </Button>
-            <Button
-              variant={viewMode === "table" ? "default" : "ghost"}
-              size="icon"
-              className="h-9 w-9 rounded-[6px]"
-              type="button"
-              aria-label="Table view"
-              onClick={() =>
-                pushFilters({ view: "table", q: query })
-              }
-            >
-              <List className="h-4 w-4" />
-            </Button>
-          </>
-        ) : (
-          <>
-            <Button
-              variant={viewMode === "cards" ? "default" : "ghost"}
-              size="icon"
-              className="h-9 w-9 rounded-[6px]"
-              asChild
-            >
-              <Link href={buildViewHref("cards")} aria-label="Cards view">
+      {!hideViewToggle ? (
+        <div className="inline-flex h-10 shrink-0 items-center rounded-md border bg-muted/40 p-0.5">
+          {onFiltersChange ? (
+            <>
+              <Button
+                variant={viewMode === "cards" ? "default" : "ghost"}
+                size="icon"
+                className="h-9 w-9 rounded-[6px]"
+                type="button"
+                aria-label="Cards view"
+                onClick={() =>
+                  pushFilters({ view: "cards", q: query })
+                }
+              >
                 <LayoutGrid className="h-4 w-4" />
-              </Link>
-            </Button>
-            <Button
-              variant={viewMode === "table" ? "default" : "ghost"}
-              size="icon"
-              className="h-9 w-9 rounded-[6px]"
-              asChild
-            >
-              <Link href={buildViewHref("table")} aria-label="Table view">
+              </Button>
+              <Button
+                variant={viewMode === "table" ? "default" : "ghost"}
+                size="icon"
+                className="h-9 w-9 rounded-[6px]"
+                type="button"
+                aria-label="Table view"
+                onClick={() =>
+                  pushFilters({ view: "table", q: query })
+                }
+              >
                 <List className="h-4 w-4" />
-              </Link>
-            </Button>
-          </>
-        )}
-      </div>
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                variant={viewMode === "cards" ? "default" : "ghost"}
+                size="icon"
+                className="h-9 w-9 rounded-[6px]"
+                asChild
+              >
+                <Link href={buildViewHref("cards")} aria-label="Cards view">
+                  <LayoutGrid className="h-4 w-4" />
+                </Link>
+              </Button>
+              <Button
+                variant={viewMode === "table" ? "default" : "ghost"}
+                size="icon"
+                className="h-9 w-9 rounded-[6px]"
+                asChild
+              >
+                <Link href={buildViewHref("table")} aria-label="Table view">
+                  <List className="h-4 w-4" />
+                </Link>
+              </Button>
+            </>
+          )}
+        </div>
+      ) : null}
     </div>
   )
 }

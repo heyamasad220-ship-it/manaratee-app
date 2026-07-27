@@ -30,6 +30,10 @@ export interface ProgramOffering extends ProgramOfferingAttributes {
   /** F1: when true, waitlist (+ enrollment-type defaults) resolve from the program. */
   inherit_enrollment?: boolean
   status: ProgramOfferingStatus
+  /** Catalog flyer (optional). */
+  flyer_url?: string | null
+  /** Catalog placeholder color when no flyer (hex, e.g. #2563eb). */
+  background_color?: string | null
   created_at: string
   updated_at: string
 }
@@ -42,6 +46,8 @@ export type ProgramOfferingInput = {
   enrollment_open_date?: string | null
   enrollment_close_date?: string | null
   status?: ProgramOfferingStatus
+  flyer_url?: string | null
+  background_color?: string | null
   /** F1: defaults true for new offerings when omitted. */
   inherit_dates?: boolean
   inherit_eligibility?: boolean

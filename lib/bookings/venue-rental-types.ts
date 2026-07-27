@@ -217,6 +217,42 @@ export interface VenueRentalQueueRow {
   hasConflict: boolean
 }
 
+export type VenueRentalPaymentBalanceFilter =
+  | "all"
+  | "unpaid"
+  | "partial"
+  | "paid"
+  | "no_payments"
+
+export interface VenueRentalPaymentReportRow {
+  id: string
+  shortId: string
+  status: VenueRentalStatus
+  statusLabel: string
+  customerName: string
+  customerEmail: string | null
+  customerPhone: string | null
+  eventTypeName: string | null
+  spaceLabel: string
+  eventStartAt: string | null
+  totalFee: number
+  depositAmount: number
+  depositReceived: number
+  securityAmount: number
+  securityReceived: number
+  remainingAmount: number
+  remainingReceived: number
+  remainingDue: number
+  amountReceived: number
+  balanceDue: number
+  paymentBalance: VenueRentalPaymentBalanceFilter
+  unpaidPaymentIds: {
+    depositId: string | null
+    securityId: string | null
+    remainingId: string | null
+  }
+}
+
 export interface VenueRentalDashboardStats {
   awaitingApprovalCount: number
   awaitingPaymentCount: number

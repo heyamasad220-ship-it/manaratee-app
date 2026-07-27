@@ -11,7 +11,7 @@ const STATUS_LABELS: Record<VenueRentalStatus, string> = {
   deposit_paid: "Deposit Paid",
   security_deposit_paid: "Security Deposit Paid",
   confirmed: "Confirmed",
-  cancelled_before_payment: "Cancelled (Before Payment)",
+  cancelled_before_payment: "Cancelled",
   cancelled_after_payment: "Cancelled (After Payment)",
   completed: "Completed",
   awaiting_security_deposit_refund_approval: "Awaiting Refund Approval",
@@ -184,6 +184,46 @@ export function getVenueRentalCalendarColorClasses(color: VenueRentalCalendarCol
         text: "text-amber-800",
         border: "border-amber-200",
       }
+  }
+}
+
+/** Distinct badge colors for queue / list status chips (not calendar). */
+export function getVenueRentalStatusBadgeClasses(status: VenueRentalStatus): {
+  bg: string
+  text: string
+} {
+  switch (status) {
+    case VENUE_RENTAL_STATUSES.draft:
+      return { bg: "bg-slate-100", text: "text-slate-700" }
+    case VENUE_RENTAL_STATUSES.submitted:
+      return { bg: "bg-sky-100", text: "text-sky-800" }
+    case VENUE_RENTAL_STATUSES.awaitingSupervisorApproval:
+      return { bg: "bg-indigo-100", text: "text-indigo-800" }
+    case VENUE_RENTAL_STATUSES.approvedPendingPayment:
+      return { bg: "bg-amber-100", text: "text-amber-900" }
+    case VENUE_RENTAL_STATUSES.depositPaid:
+      return { bg: "bg-orange-100", text: "text-orange-900" }
+    case VENUE_RENTAL_STATUSES.securityDepositPaid:
+      return { bg: "bg-yellow-100", text: "text-yellow-900" }
+    case VENUE_RENTAL_STATUSES.confirmed:
+      return { bg: "bg-emerald-100", text: "text-emerald-800" }
+    case VENUE_RENTAL_STATUSES.completed:
+      return { bg: "bg-green-100", text: "text-green-800" }
+    case VENUE_RENTAL_STATUSES.closed:
+      return { bg: "bg-teal-100", text: "text-teal-800" }
+    case VENUE_RENTAL_STATUSES.declined:
+      return { bg: "bg-red-100", text: "text-red-800" }
+    case VENUE_RENTAL_STATUSES.holdExpired:
+      return { bg: "bg-stone-200", text: "text-stone-800" }
+    case VENUE_RENTAL_STATUSES.cancelledBeforePayment:
+    case VENUE_RENTAL_STATUSES.cancelledAfterPayment:
+      return { bg: "bg-rose-100", text: "text-rose-800" }
+    case VENUE_RENTAL_STATUSES.awaitingSecurityDepositRefundApproval:
+      return { bg: "bg-violet-100", text: "text-violet-800" }
+    case VENUE_RENTAL_STATUSES.securityDepositRefunded:
+      return { bg: "bg-cyan-100", text: "text-cyan-800" }
+    default:
+      return { bg: "bg-muted", text: "text-muted-foreground" }
   }
 }
 

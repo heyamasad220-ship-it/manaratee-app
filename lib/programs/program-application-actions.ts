@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
+import { hasPermission, PERMISSIONS } from "@/lib/permissions/permissions"
 import { createClient } from "@/lib/supabase/server"
 import type {
   ProgramApplicantType,
@@ -10,8 +11,10 @@ import type {
   ProgramApplicationSource,
   ProgramApplicationStatus,
   ProgramApplicationWithDetails,
+  DepartmentApplicationListFilter,
 } from "@/lib/programs/program-application-types"
-import { DEPARTMENT_OPEN_PROGRAM_STATUSES } from "@/lib/departments/department-active-programs"
+import { DEPARTMENT_WORKSPACE_PROGRAM_STATUSES } from "@/lib/departments/department-active-programs"
+import { canManageDepartment } from "@/lib/departments/department-access"
 import { workforceDepartmentDetailPath } from "@/lib/departments/department-paths"
 
 function mapApplication(row: Record<string, unknown>): ProgramApplication {
@@ -177,8 +180,14 @@ export async function getApplicationsForRegistrantContact(
   })
 }
 
-export async function getSubmittedApplicationsForDepartment(
-  departmentId: string
+/**
+ * Department Students stages:
+ * - submitted → needs review
+ * - approved_pending_registration → approved, no enrollment yet
+ */
+export async function getDepartmentApplications(
+  departmentId: string,
+  filter: DepartmentApplicationListFilter = "submitted"
 ): Promise<ProgramApplicationWithDetails[]> {
   const organizationId = await getSelectedOrganizationId()
   if (!organizationId) return []
@@ -191,7 +200,7 @@ export async function getSubmittedApplicationsForDepartment(
     .select("id, name")
     .eq("organization_id", organizationId)
     .eq("department_id", departmentId)
-    .in("status", [...DEPARTMENT_OPEN_PROGRAM_STATUSES])
+    .in("status", [...DEPARTMENT_WORKSPACE_PROGRAM_STATUSES])
 
   if (programsError || !programs?.length) {
     return []
@@ -202,33 +211,54 @@ export async function getSubmittedApplicationsForDepartment(
     programs.map((row) => [row.id as string, (row.name as string) || "Program"])
   )
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("program_applications")
     .select(
       `
       *,
-      offering:offering_id ( name )
+      offering:offering_id ( name ),
+      approved_offering:approved_offering_id ( name )
     `
     )
     .eq("organization_id", organizationId)
     .in("program_id", programIds)
-    .eq("status", "submitted")
-    .order("created_at", { ascending: true })
+
+  if (filter === "submitted") {
+    query = query.eq("status", "submitted").order("created_at", {
+      ascending: true,
+    })
+  } else {
+    query = query
+      .eq("status", "approved")
+      .is("enrollment_id", null)
+      .order("evaluated_at", { ascending: false })
+  }
+
+  const { data, error } = await query
 
   if (error) {
-    console.error("getSubmittedApplicationsForDepartment:", error.message)
+    console.error("getDepartmentApplications:", error.message)
     return []
   }
 
   return (data || []).map((row) => {
     const base = mapApplication(row as Record<string, unknown>)
     const offering = row.offering as { name?: string } | null
+    const approved = row.approved_offering as { name?: string } | null
     return {
       ...base,
       program_name: programNameById.get(base.program_id),
       offering_name: offering?.name,
+      approved_offering_name: approved?.name ?? null,
     }
   })
+}
+
+/** @deprecated Prefer getDepartmentApplications(..., "submitted") */
+export async function getSubmittedApplicationsForDepartment(
+  departmentId: string
+): Promise<ProgramApplicationWithDetails[]> {
+  return getDepartmentApplications(departmentId, "submitted")
 }
 
 export type EvaluateProgramApplicationInput = {
@@ -266,6 +296,28 @@ export async function evaluateProgramApplication(
 
   if ((existing.status as string) !== "submitted") {
     return { success: false, error: "Only pending applications can be evaluated." }
+  }
+
+  const { data: programForAccess } = await supabase
+    .from("programs")
+    .select("department_id")
+    .eq("id", existing.program_id as string)
+    .eq("organization_id", organizationId)
+    .maybeSingle()
+
+  const departmentId = (programForAccess?.department_id as string | null) || null
+  if (departmentId) {
+    if (!(await canManageDepartment(departmentId))) {
+      return {
+        success: false,
+        error: "You do not have permission to evaluate applications for this department.",
+      }
+    }
+  } else if (!(await hasPermission(PERMISSIONS.PROGRAMS_MANAGE))) {
+    return {
+      success: false,
+      error: "You do not have permission to evaluate applications.",
+    }
   }
 
   let approvedOfferingId: string | null = null
@@ -381,9 +433,12 @@ export async function evaluateProgramApplicationsBatch(
   return { success: true, approved, failed, errors }
 }
 
-export async function fetchDepartmentApplicationsAction(departmentId: string) {
+export async function fetchDepartmentApplicationsAction(
+  departmentId: string,
+  filter: DepartmentApplicationListFilter = "submitted"
+) {
   try {
-    const rows = await getSubmittedApplicationsForDepartment(departmentId)
+    const rows = await getDepartmentApplications(departmentId, filter)
     return { success: true as const, applications: rows }
   } catch (error) {
     return {
@@ -392,6 +447,32 @@ export async function fetchDepartmentApplicationsAction(departmentId: string) {
         error instanceof Error
           ? error.message
           : "Failed to load applications.",
+    }
+  }
+}
+
+export async function fetchDepartmentApplicationStageCountsAction(
+  departmentId: string
+) {
+  try {
+    const [submitted, approvedPending] = await Promise.all([
+      getDepartmentApplications(departmentId, "submitted"),
+      getDepartmentApplications(departmentId, "approved_pending_registration"),
+    ])
+    return {
+      success: true as const,
+      needsReview: submitted.length,
+      approvedPending: approvedPending.length,
+    }
+  } catch (error) {
+    return {
+      success: false as const,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to load application counts.",
+      needsReview: 0,
+      approvedPending: 0,
     }
   }
 }

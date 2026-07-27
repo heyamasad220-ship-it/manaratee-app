@@ -28,7 +28,6 @@ export default async function EditProgramPage({
 
   const tab = resolvedSearch?.tab
   const offeringParam = resolvedSearch?.offering
-  const workspaceTab = resolvedSearch?.workspaceTab
 
   const offeringsTabs = new Set([
     "offerings",
@@ -48,19 +47,11 @@ export default async function EditProgramPage({
       null
 
     if (selected) {
-      const manageTab =
-        workspaceTab === "staff"
-          ? "staff"
-          : workspaceTab === "pricing" ||
-              tab === "pricing" ||
-              workspaceTab === "registration" ||
-              tab === "registration" ||
-              workspaceTab === "sessions" ||
-              tab === "sessions" ||
-              workspaceTab === "schedule"
-            ? "enrollment"
-            : undefined
-      redirect(programOfferingManageHref(id, selected.id, manageTab))
+      redirect(
+        programOfferingManageHref(id, selected.id, {
+          departmentId: program.department_id,
+        })
+      )
     }
 
     redirect(programOfferingsIndexHref(id))

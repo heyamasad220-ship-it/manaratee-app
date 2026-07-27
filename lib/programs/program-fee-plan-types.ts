@@ -22,7 +22,14 @@ export type FeeQuantityMode =
   | "month_count"
   | "addon_selected"
 
-export type DiscountRuleType = "sibling" | "multi_session" | "early_bird" | "custom"
+export type FeeBillingScope = "individual" | "family"
+
+export type DiscountRuleType =
+  | "sibling"
+  | "multi_session"
+  | "early_bird"
+  | "full_payment"
+  | "custom"
 
 export type DiscountType = "percent" | "fixed_amount"
 
@@ -62,6 +69,8 @@ export interface ProgramOfferingFeePlanComponent {
   applies_to_option_types: string[] | null
   sort_order: number
   is_active: boolean
+  /** individual = per registrant; family = flat once per household. */
+  billing_scope?: FeeBillingScope
 }
 
 export interface ProgramOfferingDiscountRule {

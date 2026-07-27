@@ -1,52 +1,81 @@
 /**
- * Offering manage page tabs and legacy query aliases.
- * Overview includes staff assignment. Enrollment holds registration, fees,
- * schedule, and waitlist enable/disable. Attendance / waitlist *views* live
- * under Programs → Reports.
+ * Offering manage page — single Settings surface (no Overview / Enrollment tabs).
+ * Legacy `?tab=` values still resolve to this page for bookmarks.
+ *
+ * Department-linked years/seasons open under
+ * `/workforce/departments/{deptId}/programs/{programId}/offerings/{offeringId}`
+ * so the Departments sidebar stays selected.
  */
 
+export type OfferingManageTab = "settings"
+
+/** @deprecated Tabs removed; kept for legacy `?tab=` deep links. */
 export const OFFERING_MANAGE_TABS = [
-  { value: "overview", label: "Overview" },
-  { value: "enrollment", label: "Enrollment" },
+  { value: "settings", label: "Settings" },
 ] as const
 
-export type OfferingManageTab = (typeof OFFERING_MANAGE_TABS)[number]["value"]
-
-const LEGACY_OFFERING_TAB_MAP: Record<string, OfferingManageTab> = {
-  registration: "enrollment",
-  fees: "enrollment",
-  schedule: "enrollment",
-  waitlist: "enrollment",
-  pricing: "enrollment",
-  /** Staff assignment moved onto Overview. */
-  staff: "overview",
-  /** Viewing moved to Reports; feature toggles remain on Overview. */
-  attendance: "overview",
-  care: "overview",
-}
+const LEGACY_OFFERING_TAB_ALIASES = new Set([
+  "overview",
+  "enrollment",
+  "registration",
+  "fees",
+  "schedule",
+  "waitlist",
+  "pricing",
+  "staff",
+  "attendance",
+  "care",
+  "settings",
+])
 
 export function normalizeOfferingManageTab(
   tab?: string | null
 ): OfferingManageTab {
-  if (!tab || tab === "overview") return "overview"
-  const mapped = LEGACY_OFFERING_TAB_MAP[tab] ?? tab
-  if (mapped === "overview" || mapped === "enrollment") {
-    return mapped
-  }
-  return "overview"
+  void tab
+  return "settings"
 }
 
+export function isLegacyOfferingManageTab(tab?: string | null): boolean {
+  if (!tab) return false
+  return LEGACY_OFFERING_TAB_ALIASES.has(tab)
+}
+
+export type OfferingManageHrefOptions = {
+  departmentId?: string | null
+  /** @deprecated Ignored — manage is a single settings page. */
+  tab?: string
+}
+
+/**
+ * Prefer department-scoped URL when `departmentId` is set so staff stay in
+ * HR → Departments instead of bouncing to the Programs sidebar.
+ */
 export function programOfferingManageHref(
   programId: string,
   offeringId: string,
-  tab?: string
+  tabOrOptions?: string | OfferingManageHrefOptions
 ) {
-  const base = `/programs/${programId}/offerings/${offeringId}`
-  const normalized = normalizeOfferingManageTab(tab)
-  if (normalized === "overview") return base
-  return `${base}?tab=${encodeURIComponent(normalized)}`
+  const options: OfferingManageHrefOptions =
+    typeof tabOrOptions === "string"
+      ? { tab: tabOrOptions }
+      : tabOrOptions || {}
+
+  const departmentId = options.departmentId?.trim() || null
+  if (departmentId) {
+    return `/workforce/departments/${departmentId}/programs/${programId}/offerings/${offeringId}`
+  }
+
+  return `/programs/${programId}/offerings/${offeringId}`
 }
 
 export function programOfferingsIndexHref(programId: string) {
   return `/programs/${programId}/offerings`
+}
+
+/** Standalone Programs-module URL (ignores department). */
+export function standaloneProgramOfferingManageHref(
+  programId: string,
+  offeringId: string
+) {
+  return `/programs/${programId}/offerings/${offeringId}`
 }

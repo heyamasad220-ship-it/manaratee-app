@@ -8,7 +8,6 @@ import {
   BookOpen,
   CalendarClock,
   CalendarDays,
-  ClipboardCheck,
   DollarSign,
   FileBarChart,
   Heart,
@@ -21,17 +20,16 @@ import {
   Wallet,
 } from "lucide-react"
 
-import { DepartmentApplicationsPanel } from "@/components/departments/department-applications-panel"
 import { DepartmentBudgetPanel } from "@/components/departments/department-budget-panel"
 import { DepartmentExpensesPanel } from "@/components/departments/department-expenses-panel"
 import { DepartmentGroupGivingPanel } from "@/components/departments/department-group-giving-panel"
 import { DepartmentOverviewPanel } from "@/components/departments/department-overview-panel"
-import { DepartmentParticipantsPanel } from "@/components/departments/department-participants-panel"
 import { DepartmentPayrollPanel } from "@/components/departments/department-payroll-panel"
 import { DepartmentProgramsPanel } from "@/components/departments/department-programs-panel"
 import { DepartmentReportsPanel } from "@/components/departments/department-reports-panel"
 import { DepartmentSchedulePanel } from "@/components/departments/department-schedule-panel"
 import { DepartmentSettingsPanel } from "@/components/departments/department-settings-panel"
+import { DepartmentStudentsPanel } from "@/components/departments/department-students-panel"
 import { DonationGroupActivityPanel } from "@/components/donations/donation-group-activity-panel"
 import { DonationGroupEditForm } from "@/components/donations/donation-group-edit-form"
 import { Header } from "@/components/layout/header"
@@ -59,6 +57,7 @@ import {
   departmentGroupWorkspaceHref,
   donationGroupGivingListHref,
   parseDepartmentFinanceSection,
+  parseDepartmentStudentsSection,
   parseDepartmentWorkspaceTab,
   type GroupWorkspaceTab,
 } from "@/lib/donations/donation-group-path"
@@ -109,6 +108,10 @@ export function DepartmentGroupWorkspaceClient({
   const activeTab = parseDepartmentWorkspaceTab(rawTab)
   const yearProgramId = searchParams.get("year")
   const financeSection = parseDepartmentFinanceSection(
+    rawTab,
+    searchParams.get("section")
+  )
+  const studentsSection = parseDepartmentStudentsSection(
     rawTab,
     searchParams.get("section")
   )
@@ -223,6 +226,19 @@ export function DepartmentGroupWorkspaceClient({
     )
   }
 
+  function handleStudentsSectionChange(section: string) {
+    const next =
+      parseDepartmentStudentsSection("students", section) ?? "roster"
+    router.replace(
+      departmentGroupWorkspaceHref(departmentId, {
+        tab: "students",
+        studentsSection: next,
+        returnTo: returnTo && isSafeReturnToPath(returnTo) ? returnTo : undefined,
+      }),
+      { scroll: false }
+    )
+  }
+
   if (loading) {
     return (
       <>
@@ -262,16 +278,10 @@ export function DepartmentGroupWorkspaceClient({
 
   return (
     <>
-      <Header title={displayName} />
+      <Header title={displayName} breadcrumbExtras={[{ label: displayName }]} />
       <div className="flex flex-col gap-6 p-6">
         <div className="flex flex-col gap-4 border-b border-border pb-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 space-y-2">
-            <Button variant="ghost" size="sm" className="-ml-2 h-8 px-2" asChild>
-              <Link href={backHref}>
-                <ArrowLeft className="mr-1.5 h-4 w-4" />
-                {backLabel}
-              </Link>
-            </Button>
             <div className="flex flex-wrap items-center gap-2">
               <span
                 className="inline-block size-3 rounded-full border"
@@ -309,13 +319,9 @@ export function DepartmentGroupWorkspaceClient({
               <BookOpen className="size-4" />
               {PROGRAM_LABEL_PLURAL}
             </TabsTrigger>
-            <TabsTrigger value="rosters" className="gap-2">
+            <TabsTrigger value="students" className="gap-2">
               <Users className="size-4" />
-              Enrollments
-            </TabsTrigger>
-            <TabsTrigger value="applications" className="gap-2">
-              <ClipboardCheck className="size-4" />
-              Applications
+              Participants
             </TabsTrigger>
             <TabsTrigger value="schedule" className="gap-2">
               <CalendarClock className="size-4" />
@@ -333,7 +339,7 @@ export function DepartmentGroupWorkspaceClient({
             ) : null}
             <TabsTrigger value="activity" className="gap-2">
               <CalendarDays className="size-4" />
-              Activity
+              Events
             </TabsTrigger>
             <TabsTrigger value="settings" className="gap-2">
               <Settings className="size-4" />
@@ -350,6 +356,7 @@ export function DepartmentGroupWorkspaceClient({
           <DepartmentOverviewPanel
             departmentId={department.id}
             departmentName={displayName}
+            highlightYearProgramId={yearProgramId}
           />
         ) : null}
 
@@ -361,18 +368,12 @@ export function DepartmentGroupWorkspaceClient({
           />
         ) : null}
 
-        {resolvedTab === "rosters" ? (
-          <DepartmentParticipantsPanel
+        {resolvedTab === "students" ? (
+          <DepartmentStudentsPanel
             departmentId={department.id}
             departmentName={displayName}
-            initialYearProgramId={yearProgramId}
-          />
-        ) : null}
-
-        {resolvedTab === "applications" ? (
-          <DepartmentApplicationsPanel
-            departmentId={department.id}
-            departmentName={displayName}
+            initialSection={studentsSection}
+            onSectionChange={handleStudentsSectionChange}
           />
         ) : null}
 

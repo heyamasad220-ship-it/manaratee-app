@@ -26,7 +26,8 @@ type UpsertEventTypeInput = {
 export async function upsertEventType(input: UpsertEventTypeInput) {
   const canManage = await hasAnyPermission(
     PERMISSIONS.EVENTS_MANAGE,
-    PERMISSIONS.PROGRAMS_MANAGE
+    PERMISSIONS.PROGRAMS_MANAGE,
+    PERMISSIONS.BOOKINGS_MANAGE
   )
   if (!canManage) {
     throw new Error("You do not have permission to manage event types.")
@@ -87,13 +88,16 @@ export async function upsertEventType(input: UpsertEventTypeInput) {
   }
 
   revalidatePath("/event-management/settings/event-types")
+  revalidatePath("/facilities/settings/event-types")
+  revalidatePath("/bookings/settings/event-types")
   revalidatePath("/event-management/overview")
 }
 
 export async function deleteEventType(id: string) {
   const canManage = await hasAnyPermission(
     PERMISSIONS.EVENTS_MANAGE,
-    PERMISSIONS.PROGRAMS_MANAGE
+    PERMISSIONS.PROGRAMS_MANAGE,
+    PERMISSIONS.BOOKINGS_MANAGE
   )
   if (!canManage) {
     throw new Error("You do not have permission to manage event types.")
@@ -121,5 +125,7 @@ export async function deleteEventType(id: string) {
   }
 
   revalidatePath("/event-management/settings/event-types")
+  revalidatePath("/facilities/settings/event-types")
+  revalidatePath("/bookings/settings/event-types")
   revalidatePath("/event-management/overview")
 }

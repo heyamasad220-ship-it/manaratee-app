@@ -22,6 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { departmentGroupWorkspaceHref } from "@/lib/donations/donation-group-path"
 import {
   formatEnrollmentCapacityLabel,
   type ProgramCatalogCapacity,
@@ -42,7 +43,7 @@ import {
   getProgramCatalogStatusDotClass,
   resolveProgramCatalogCapacity,
 } from "@/lib/programs/program-catalog-helpers"
-import { formatProgramAgeEligibility } from "@/lib/programs/program-eligibility-display"
+import { formatProgramAgeEligibility, formatProgramGenderLabel } from "@/lib/programs/program-eligibility-display"
 import {
   getProgramRegistrationAvailabilityLabel,
   isProgramAcceptingRegistration,
@@ -50,6 +51,16 @@ import {
 import { getProgramStatusLabel, type ProgramStatus } from "@/lib/programs/program-status"
 import type { Program } from "@/lib/programs/program-types"
 import { cn } from "@/lib/utils"
+
+function programDetailsHref(program: Program) {
+  if (program.department_id) {
+    return departmentGroupWorkspaceHref(program.department_id, {
+      tab: "overview",
+      yearProgramId: program.id,
+    })
+  }
+  return `/programs/${program.id}`
+}
 
 function ProgramStatusBadge({ status }: { status: ProgramStatus }) {
   return (
@@ -84,7 +95,7 @@ function ProgramCard({
   const acceptingRegistration = isProgramAcceptingRegistration(program)
   const availabilityLabel = getProgramRegistrationAvailabilityLabel(program)
   const ageLabel = formatProgramAgeEligibility(program)
-  const audienceLabel = `${program.gender || "All"} • ${ageLabel}`
+  const audienceLabel = `${formatProgramGenderLabel(program.gender)} • ${ageLabel}`
   const enrollmentLabel = formatEnrollmentCapacityLabel(
     program.enrolled,
     catalogCapacity
@@ -128,6 +139,7 @@ function ProgramCard({
                 programId={program.id}
                 programName={program.name}
                 programStatus={program.status}
+                detailsHref={programDetailsHref(program)}
               />
             </div>
           </div>
@@ -253,6 +265,7 @@ function ProgramsTable({
                       programId={program.id}
                       programName={program.name}
                       programStatus={program.status}
+                      detailsHref={programDetailsHref(program)}
                     />
                   </TableCell>
                 </TableRow>
@@ -390,6 +403,8 @@ export type ProgramCatalogViewProps = {
   onPageChange?: (page: number) => void
   createHref?: string
   createLabel?: string
+  /** When true, omit create buttons (org catalog is browse-only). */
+  hideCreate?: boolean
   emptyTitle?: string
   emptyDescription?: string
   filters?: ReactNode
@@ -413,30 +428,37 @@ export function ProgramCatalogView({
   onPageChange,
   createHref = "/programs/create",
   createLabel = `Create ${YEAR_SEASON_LABEL}`,
+  hideCreate = false,
   emptyTitle = `No ${YEAR_SEASON_LABEL_PLURAL.toLowerCase()} found`,
   emptyDescription = `Create a ${YEAR_SEASON_LABEL.toLowerCase()} or adjust your filters.`,
   filters,
   showTitle = true,
   title = YEAR_SEASON_LABEL_PLURAL,
-  description = `Manage ${YEAR_SEASON_LABEL_PLURAL.toLowerCase()}, classes, camps, and activities.`,
+  description,
 }: ProgramCatalogViewProps) {
+  const showCreateButton = !hideCreate && Boolean(createHref)
+
   return (
     <div className="flex flex-col gap-6">
       {showTitle ? (
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-            <p className="text-muted-foreground">{description}</p>
+            {description ? (
+              <p className="text-muted-foreground">{description}</p>
+            ) : null}
           </div>
 
-          <Button asChild>
-            <Link href={createHref}>
-              <Plus className="mr-2 h-4 w-4" />
-              {createLabel}
-            </Link>
-          </Button>
+          {showCreateButton ? (
+            <Button asChild>
+              <Link href={createHref}>
+                <Plus className="mr-2 h-4 w-4" />
+                {createLabel}
+              </Link>
+            </Button>
+          ) : null}
         </div>
-      ) : (
+      ) : showCreateButton ? (
         <div className="flex justify-end">
           <Button asChild>
             <Link href={createHref}>
@@ -445,7 +467,7 @@ export function ProgramCatalogView({
             </Link>
           </Button>
         </div>
-      )}
+      ) : null}
 
       {filters}
 
@@ -455,12 +477,14 @@ export function ProgramCatalogView({
           <h3 className="text-lg font-medium">{emptyTitle}</h3>
           <p className="mt-1 text-sm text-muted-foreground">{emptyDescription}</p>
 
-          <Button className="mt-4" asChild>
-            <Link href={createHref}>
-              <Plus className="mr-2 h-4 w-4" />
-              {createLabel}
-            </Link>
-          </Button>
+          {showCreateButton ? (
+            <Button className="mt-4" asChild>
+              <Link href={createHref}>
+                <Plus className="mr-2 h-4 w-4" />
+                {createLabel}
+              </Link>
+            </Button>
+          ) : null}
         </Card>
       ) : viewMode === "table" ? (
         <>
@@ -479,7 +503,7 @@ export function ProgramCatalogView({
         </>
       ) : (
         <>
-          <div className="grid gap-5 md:grid-cols-2">
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {programs.map((program) => (
               <ProgramCard
                 key={program.id}

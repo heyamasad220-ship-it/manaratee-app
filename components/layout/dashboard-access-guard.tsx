@@ -80,7 +80,7 @@ export function DashboardAccessGuard() {
         !isFacilitiesRoute(pathname) &&
         !ALLOWED_NON_FACILITIES_PATHS.some((path) => pathname.startsWith(path))
       ) {
-        router.replace("/facilities/reservation-center")
+        router.replace("/facilities/overview")
         return
       }
 

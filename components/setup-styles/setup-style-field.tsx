@@ -43,7 +43,7 @@ export function SetupStyleField({
         </Label>
         {canManage ? (
           <Link
-            href="/event-management/settings/setup-styles"
+            href="/facilities/settings/setup-styles"
             className="text-xs font-medium text-primary hover:underline"
           >
             Manage

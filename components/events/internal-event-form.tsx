@@ -325,7 +325,7 @@ export function InternalEventForm(props: InternalEventFormProps) {
       : props.mode === "request"
         ? isMemberStaffRequest
           ? "/customer/staff"
-          : "/facilities/availability"
+          : "/facilities/calendar"
         : "/event-management"
 
   const isRequestMode = props.mode === "request"

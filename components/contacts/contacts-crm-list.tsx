@@ -61,17 +61,15 @@ import {
   TableColumnHeaderSort,
 } from "@/components/ui/table-column-header-filter"
 import { Textarea } from "@/components/ui/textarea"
+import { ListPagination } from "@/components/ui/list-pagination"
+import { DEFAULT_LIST_PAGE_SIZE } from "@/lib/ui/list-pagination"
 import {
   Building2,
-  ChevronLeft,
-  ChevronRight,
   Loader2,
   Plus,
   Search,
   User,
 } from "lucide-react"
-
-const PAGE_SIZE = 50
 
 const ENTITY_SORT_OPTIONS = (entityLabel: string) =>
   [
@@ -183,6 +181,7 @@ export function ContactsCrmList({
   const [contacts, setContacts] = useState<ContactListRow[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(DEFAULT_LIST_PAGE_SIZE)
   const [isRecentView, setIsRecentView] = useState(true)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -248,7 +247,7 @@ export function ContactsCrmList({
         sortBy: usesEntityColumnControls ? sort.sortBy : undefined,
         sortAsc: usesEntityColumnControls ? sort.sortAsc : undefined,
         page,
-        pageSize: PAGE_SIZE,
+        pageSize,
       })
       setContacts(result.contacts)
       setTotal(result.total)
@@ -267,6 +266,7 @@ export function ContactsCrmList({
     entityNameFilter,
     entitySortKey,
     page,
+    pageSize,
     recordTypeFilter,
     usesEntityColumnControls,
   ])
@@ -301,9 +301,8 @@ export function ContactsCrmList({
   ])
 
   const listTitle = entityLabel
-  const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
-  const rangeEnd = Math.min(page * PAGE_SIZE, total)
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const rangeStart = total === 0 ? 0 : (page - 1) * pageSize + 1
+  const rangeEnd = Math.min(page * pageSize, total)
 
   function clearFilters() {
     setSearchQuery("")
@@ -633,38 +632,18 @@ export function ContactsCrmList({
         </CardContent>
       </Card>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-muted-foreground">
-          {total === 0
-            ? "Page 1 of 1"
-            : `Showing ${rangeStart.toLocaleString()}–${rangeEnd.toLocaleString()} of ${total.toLocaleString()}`}
-        </p>
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={loading || page <= 1}
-            onClick={() => setPage((current) => Math.max(1, current - 1))}
-          >
-            <ChevronLeft className="mr-1 h-4 w-4" />
-            Previous
-          </Button>
-          <span className="text-sm text-muted-foreground">
-            Page {page} of {totalPages}
-          </span>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={loading || page >= totalPages}
-            onClick={() => setPage((current) => current + 1)}
-          >
-            Next
-            <ChevronRight className="ml-1 h-4 w-4" />
-          </Button>
-        </div>
-      </div>
+      <ListPagination
+        page={page}
+        pageSize={pageSize}
+        total={total}
+        disabled={loading}
+        entryLabel={entityLabel.toLowerCase()}
+        onPageChange={setPage}
+        onPageSizeChange={(next) => {
+          setPageSize(next)
+          setPage(1)
+        }}
+      />
 
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
         <DialogContent className="max-w-lg">

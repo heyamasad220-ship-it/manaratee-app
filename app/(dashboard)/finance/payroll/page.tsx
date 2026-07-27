@@ -1,7 +1,29 @@
+import { Header } from "@/components/layout/header"
+import { FinancePayrollQueuePanel } from "@/components/finance/finance-payroll-queue-panel"
+import { hasPermission, PERMISSIONS } from "@/lib/permissions/permissions"
 import { redirect } from "next/navigation"
-import { hrPayrollHref } from "@/lib/hr/hr-overview-path"
 
-/** Legacy Finance → Payroll redirects to HR Overview → Payroll. */
-export default function FinancePayrollRedirectPage() {
-  redirect(hrPayrollHref())
+export default async function FinancePayrollPage() {
+  const canView =
+    (await hasPermission(PERMISSIONS.FINANCE_VIEW)) ||
+    (await hasPermission(PERMISSIONS.STAFF_VIEW))
+  if (!canView) {
+    redirect("/unauthorized")
+  }
+
+  return (
+    <>
+      <Header title="Payroll" />
+      <div className="flex flex-col gap-6 p-6">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Payroll</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Organization payout queue. Department heads approve hours in their
+            department workspace; finance marks paid here.
+          </p>
+        </div>
+        <FinancePayrollQueuePanel />
+      </div>
+    </>
+  )
 }

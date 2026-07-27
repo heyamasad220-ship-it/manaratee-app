@@ -13,6 +13,8 @@ import {
   XCircle,
 } from "lucide-react"
 
+// Single customer summary card — billing organization panel removed.
+
 import {
   approveVenueRentalRequest,
   approveSecurityDepositRefund,
@@ -24,7 +26,10 @@ import {
   markVenueRentalCompletedAndAwaitingRefund,
 } from "@/lib/bookings/venue-rental-actions"
 import type { VenueRentalEmployeePricingSuggestion } from "@/lib/bookings/venue-rental-employee-pricing"
-import { formatVenueRentalTimeRange } from "@/lib/bookings/venue-rental-format"
+import {
+  formatVenueRentalSpaceLine,
+  getVenueRentalDisplayNotes,
+} from "@/lib/bookings/venue-rental-format"
 import {
   canStaffCancelVenueRental,
   canStaffForceBookVenueRental,
@@ -59,7 +64,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { VenueRentalBillingContactCard } from "@/components/bookings/venue-rental-billing-contact-card"
 
 type VenueRentalDetailClientProps = {
   rental: VenueRentalQueueRow
@@ -173,6 +177,8 @@ export function VenueRentalDetailClient({
     })
   }, [paymentSummary.depositPaid, paymentSummary.securityPaid, payments])
 
+  const displayNotes = getVenueRentalDisplayNotes(rental.notes)
+
   async function submitCancellation() {
     await cancelVenueRental({
       venueRentalId: rental.id,
@@ -249,64 +255,47 @@ export function VenueRentalDetailClient({
         ) : null}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Customer</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            <p className="font-medium">{rental.customerName}</p>
-            <p className="text-muted-foreground">
-              {rental.customerEmail || "No email on file"}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Customer</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          <p className="font-medium">{rental.customerName}</p>
+          <p className="text-muted-foreground">
+            {rental.customerEmail || "No email on file"}
+          </p>
+          <p className="text-muted-foreground">
+            {rental.customerPhone || "No phone on file"}
+          </p>
+          {rental.eventTypeName ? (
+            <p>Event type: {rental.eventTypeName}</p>
+          ) : null}
+          {rental.spaces.map((space) => (
+            <p key={`${space.venueId}-${space.startAt}`}>
+              {formatVenueRentalSpaceLine(
+                space.venueName,
+                space.startAt,
+                space.endAt
+              )}
             </p>
-            <p className="text-muted-foreground">
-              {rental.customerPhone || "No phone on file"}
-            </p>
-            {rental.eventTypeName ? (
-              <p>Event type: {rental.eventTypeName}</p>
-            ) : null}
-            {rental.notes ? <p className="whitespace-pre-wrap">{rental.notes}</p> : null}
-          </CardContent>
-        </Card>
-
-        {canManage ? (
-          <VenueRentalBillingContactCard
-            rentalId={rental.id}
-            billingContactId={rental.billingContactId}
-            billingContactName={rental.billingContactName}
-            billingContactType={rental.billingContactType}
-            canManage={canManage}
-          />
-        ) : null}
-
-        <Card className={canManage ? "lg:col-span-2" : undefined}>
-          <CardHeader>
-            <CardTitle className="text-base">Spaces</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm">
-            {rental.spaces.map((space) => (
-              <div key={`${space.venueId}-${space.startAt}`} className="rounded border p-3">
-                <p className="font-medium">{space.venueName}</p>
-                <p className="text-muted-foreground">
-                  {formatVenueRentalTimeRange(space.startAt, space.endAt)}
-                </p>
-              </div>
-            ))}
-            {rental.addons.length ? (
-              <div>
-                <p className="mb-2 font-medium">Add-ons</p>
-                <ul className="space-y-1 text-muted-foreground">
-                  {rental.addons.map((addon) => (
-                    <li key={addon.id}>
-                      {addon.name} × {addon.quantity}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-          </CardContent>
-        </Card>
-      </div>
+          ))}
+          {displayNotes ? (
+            <p className="whitespace-pre-wrap text-muted-foreground">{displayNotes}</p>
+          ) : null}
+          {rental.addons.length ? (
+            <div className="pt-1">
+              <p className="mb-1 font-medium">Add-ons</p>
+              <ul className="space-y-1 text-muted-foreground">
+                {rental.addons.map((addon) => (
+                  <li key={addon.id}>
+                    {addon.name} × {addon.quantity}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
 
       {canManage && canViewFinance && rental.status === VENUE_RENTAL_STATUSES.awaitingSupervisorApproval ? (
         <Card>

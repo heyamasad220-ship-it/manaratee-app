@@ -20,9 +20,9 @@ export type OfferingInheritFlags = {
 }
 
 export const DEFAULT_NEW_OFFERING_INHERIT_FLAGS: OfferingInheritFlags = {
-  inherit_dates: true,
-  inherit_eligibility: true,
-  inherit_enrollment: true,
+  inherit_dates: false,
+  inherit_eligibility: false,
+  inherit_enrollment: false,
 }
 
 /** Existing rows before F1 / unknown: treat as overridden. */

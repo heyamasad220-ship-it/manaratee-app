@@ -1,6 +1,6 @@
 "use server"
 
-import { DEPARTMENT_OPEN_PROGRAM_STATUSES } from "@/lib/departments/department-active-programs"
+import { DEPARTMENT_WORKSPACE_PROGRAM_STATUSES } from "@/lib/departments/department-active-programs"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { contactLabel, loadContactsByIds } from "@/lib/programs/registration-display-helpers"
 import { createClient } from "@/lib/supabase/server"
@@ -17,10 +17,13 @@ const DEFAULT_ENROLLMENT_STATUSES = [
 export type DepartmentParticipantRow = {
   enrollmentId: string
   studentName: string
+  /** Participant contact when present; minors typically have none / no profile page. */
   studentContactId: string | null
   parentName: string | null
   parentEmail: string | null
   parentPhone: string | null
+  /** Registrant / guardian contact — profile link for youth enrollments. */
+  parentContactId: string | null
   teacherName: string | null
   courseName: string
   yearSeasonName: string
@@ -69,7 +72,7 @@ export async function fetchDepartmentParticipants(
     .select("id, name")
     .eq("organization_id", organizationId)
     .eq("department_id", departmentId)
-    .in("status", [...DEPARTMENT_OPEN_PROGRAM_STATUSES])
+    .in("status", [...DEPARTMENT_WORKSPACE_PROGRAM_STATUSES])
     .order("start_date", { ascending: false, nullsFirst: false })
     .order("name", { ascending: true })
 
@@ -117,6 +120,7 @@ export async function fetchDepartmentParticipants(
       offering_id,
       child_name,
       participant_contact_id,
+      registrant_contact_id,
       parent_name,
       parent_email,
       parent_phone,
@@ -199,15 +203,23 @@ export async function fetchDepartmentParticipants(
 
   const contactsById = await loadContactsByIds(
     organizationId,
-    enrollments
-      .map((row) => row.participant_contact_id as string | null)
-      .filter((id): id is string => Boolean(id))
+    enrollments.flatMap((row) =>
+      [
+        row.participant_contact_id as string | null,
+        row.registrant_contact_id as string | null,
+      ].filter((id): id is string => Boolean(id))
+    )
   )
 
   const participants: DepartmentParticipantRow[] = enrollments.map((row) => {
     const offering = row.offering as { id: string; name: string | null } | null
     const programId = row.program_id as string
     const offeringId = (row.offering_id as string | null) ?? null
+    const parentContactId =
+      (row.registrant_contact_id as string | null) ?? null
+    const parentContact = parentContactId
+      ? contactsById.get(parentContactId)
+      : undefined
 
     return {
       enrollmentId: row.id as string,
@@ -218,9 +230,19 @@ export async function fetchDepartmentParticipants(
         row.child_name as string
       ),
       studentContactId: (row.participant_contact_id as string | null) ?? null,
-      parentName: (row.parent_name as string | null) ?? null,
-      parentEmail: (row.parent_email as string | null) ?? null,
-      parentPhone: (row.parent_phone as string | null) ?? null,
+      parentName:
+        parentContact?.full_name?.trim() ||
+        (row.parent_name as string | null) ||
+        null,
+      parentEmail:
+        parentContact?.email?.trim() ||
+        (row.parent_email as string | null) ||
+        null,
+      parentPhone:
+        parentContact?.phone?.trim() ||
+        (row.parent_phone as string | null) ||
+        null,
+      parentContactId,
       teacherName: offeringId ? teacherByOfferingId.get(offeringId) || null : null,
       courseName: offering?.name?.trim() || programNameById.get(programId) || "Course",
       yearSeasonName: programNameById.get(programId) || "Year/Season",

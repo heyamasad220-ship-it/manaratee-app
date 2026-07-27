@@ -15,7 +15,7 @@ import {
 import { isContactsListSegment } from "@/lib/contacts/contact-module-label"
 import { buildNavigationTrail } from "@/lib/navigation/sidebar-nav"
 import { STAFF_BREADCRUMB_ROW_HEIGHT_CLASS } from "@/lib/layout/staff-dashboard-chrome"
-import { useSidebarContext } from "@/components/layout/sidebar"
+import { useSidebarContext } from "@/components/layout/staff-sidebar-context"
 import { cn } from "@/lib/utils"
 
 function resolveContactProfileListSegment(
@@ -28,18 +28,22 @@ function resolveContactProfileListSegment(
   return isContactsListSegment(list) ? list : null
 }
 
-export function NavigationBreadcrumbs() {
+export function NavigationBreadcrumbs({
+  extras = [],
+}: {
+  extras?: Array<{ label: string; href?: string }>
+}) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const router = useRouter()
   const { navItems, loading, ensureSubExpanded } = useSidebarContext()
 
-  if (loading || pathname === "/dashboard") {
+  if (loading || (pathname === "/dashboard" && extras.length === 0)) {
     return null
   }
 
   const profileListSegment = resolveContactProfileListSegment(pathname, searchParams)
-  const trail = buildNavigationTrail(pathname, navItems, profileListSegment)
+  const trail = buildNavigationTrail(pathname, navItems, profileListSegment, extras)
 
   if (trail.length <= 1) {
     return null

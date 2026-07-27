@@ -160,8 +160,8 @@ export const AFFILIATION_RULE_DEFINITIONS: AffiliationRuleDefinition[] = [
     role: "program_participant",
     label: "Programs",
     trigger:
-      "Program enrollment as the participant, or as the registrant (parent/guardian of a minor)",
-    autoAdd: "Yes — on enrollment",
+      "Program enrollment as participant, registrant (parent/guardian), or payer — or a paid program charge",
+    autoAdd: "Yes — on enrollment or program payment",
     autoRemove: "Never — program history retained",
     moduleList: "Programs → Registrations",
     moduleSlugs: AFFILIATION_ROLE_MODULE_SLUGS.program_participant,

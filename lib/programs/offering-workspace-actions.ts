@@ -205,6 +205,8 @@ export async function saveOfferingRegistrationPanel(input: {
   capacityGroups: ProgramCapacityGroupInput[]
   enable_waitlist: boolean
   waitlist_capacity: number | null
+  /** false = Register & pay immediately (no Apply/Approve). */
+  application_required?: boolean
   inherit_dates?: boolean
   inherit_eligibility?: boolean
   inherit_enrollment?: boolean
@@ -281,6 +283,7 @@ export async function saveOfferingRegistrationPanel(input: {
       enable_waitlist: input.enable_waitlist,
       waitlist_capacity: input.waitlist_capacity,
       registration_mode: registrationMode,
+      application_required: input.application_required !== false,
       enrollment_open_date: input.enrollment_open_date || null,
       enrollment_close_date: input.enrollment_close_date || null,
       inherit_dates: input.inherit_dates ?? false,

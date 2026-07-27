@@ -182,7 +182,7 @@ export function DepartmentSchedulePanel({
                         ? programOfferingManageHref(
                             program.id,
                             program.defaultOfferingId,
-                            "schedule"
+                            { departmentId }
                           )
                         : `/programs/${program.id}`
                     }
@@ -302,7 +302,7 @@ export function DepartmentSchedulePanel({
                                   href={programOfferingManageHref(
                                     row.programId,
                                     row.offeringId,
-                                    "schedule"
+                                    { departmentId }
                                   )}
                                 >
                                   Edit

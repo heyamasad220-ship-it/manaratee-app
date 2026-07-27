@@ -53,8 +53,9 @@ export function FamilyGivingDetail({ rollup, canManage = false }: FamilyGivingDe
             <Badge variant="outline">{rollup.status === "active" ? "Active" : "Inactive"}</Badge>
           </div>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-            Household giving summary. Donations remain on individual contacts; this page aggregates
-            active member gifts only. Tax receipts stay with each donor contact.
+            Household view of adults (with phone/email) and minors (no separate contact profile).
+            Donations stay on adult contacts; this page rolls up those gifts. Tax receipts stay with
+            each donor contact.
           </p>
           {rollup.primaryContactId ? (
             <p className="mt-2 text-sm text-muted-foreground">

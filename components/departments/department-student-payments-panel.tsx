@@ -14,11 +14,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
 import {
   fetchDepartmentStudentPaymentsAction,
   type DepartmentStudentPaymentsMatrix,
 } from "@/lib/departments/department-student-payments"
+import { programOfferingManageHref } from "@/lib/programs/program-offering-paths"
 import { cn } from "@/lib/utils"
 
 function formatCurrency(value: number) {
@@ -97,7 +97,7 @@ export function DepartmentStudentPaymentsPanel({
           <p className="py-6 text-sm text-destructive">{error}</p>
         ) : !matrix || matrix.rows.length === 0 ? (
           <p className="py-6 text-center text-sm text-muted-foreground">
-            No program enrollments for this department yet. Register students under Programs linked
+            No program enrollments for this department yet. Register participants under Programs linked
             to this department to see them here.
           </p>
         ) : (
@@ -113,7 +113,7 @@ export function DepartmentStudentPaymentsPanel({
                 <TableHeader>
                   <TableRow>
                     <TableHead className="min-w-[140px] sticky left-0 z-10 bg-background">
-                      Student
+                      Participant
                     </TableHead>
                     <TableHead className="min-w-[120px]">Teacher</TableHead>
                     <TableHead className="min-w-[140px]">Course</TableHead>
@@ -134,16 +134,7 @@ export function DepartmentStudentPaymentsPanel({
                   {matrix.rows.map((row) => (
                     <TableRow key={row.enrollmentId}>
                       <TableCell className="sticky left-0 z-10 bg-background font-medium">
-                        {row.studentContactId ? (
-                          <Link
-                            href={contactProfileHref(row.studentContactId)}
-                            className="text-primary hover:underline"
-                          >
-                            {row.studentName}
-                          </Link>
-                        ) : (
-                          row.studentName
-                        )}
+                        {row.studentName}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {row.teacherName || "—"}
@@ -151,7 +142,11 @@ export function DepartmentStudentPaymentsPanel({
                       <TableCell>
                         {row.offeringId ? (
                           <Link
-                            href={`/programs/${row.programId}/offerings/${row.offeringId}`}
+                            href={programOfferingManageHref(
+                              row.programId,
+                              row.offeringId,
+                              { departmentId }
+                            )}
                             className="text-primary hover:underline"
                           >
                             {row.courseName}

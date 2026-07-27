@@ -11,6 +11,10 @@ export type ProgramApplicationStatus =
   | "withdrawn"
 export type ProgramApplicationSource = "customer" | "staff"
 
+export type DepartmentApplicationListFilter =
+  | "submitted"
+  | "approved_pending_registration"
+
 export const PROGRAM_APPLICATION_STATUS_LABELS: Record<
   ProgramApplicationStatus,
   string

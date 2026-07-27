@@ -239,22 +239,18 @@ export function DonationMetricCardGrid({
           ? "sm:grid-cols-2 lg:grid-cols-5"
           : "sm:grid-cols-2 lg:grid-cols-4"
 
-  if (colorful) {
-    return (
-      <div
-        className={cn(
-          "grid grid-cols-1",
-          compact ? "gap-2" : "gap-4",
-          columnClass,
-          className
-        )}
-      >
-        {children}
-      </div>
-    )
-  }
-
   return (
-    <div className={cn("flex flex-wrap gap-4 [&>*]:w-fit", className)}>{children}</div>
+    <div
+      className={cn(
+        "grid w-full grid-cols-1 items-stretch",
+        compact ? "gap-2" : "gap-4",
+        columnClass,
+        // Keep colorful as a no-op flag for call-site compatibility.
+        colorful && "donation-metric-card-grid--colorful",
+        className
+      )}
+    >
+      {children}
+    </div>
   )
 }

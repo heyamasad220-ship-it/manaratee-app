@@ -6,8 +6,8 @@ import type {
 import { SOURCE_TYPE_LABELS } from "@/lib/reservations/reservation-types"
 
 export const CALENDAR_AUDIENCE_LABELS: Record<CalendarAudience, string> = {
-  staff: "Space Availability",
-  ops: "Facilities Schedule",
+  staff: "Calendar",
+  ops: "Calendar",
   customer: "Book a Space",
 }
 
@@ -21,7 +21,7 @@ export const CALENDAR_AUDIENCE_DESCRIPTIONS: Record<CalendarAudience, string> = 
 }
 
 export const CALENDAR_AUDIENCE_PATHS: Record<CalendarAudience, string> = {
-  staff: "/facilities/availability",
+  staff: "/facilities/calendar",
   ops: "/facilities/calendar",
   customer: "/customer/rentals/new",
 }

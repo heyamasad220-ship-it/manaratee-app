@@ -11,7 +11,8 @@
 |--------|--------|
 | Reports: **Registrations** rename + **Payment transactions** tab | Done |
 | `program_applications` table + waitlist offering/offer columns | Done (SQL `182`) |
-| Customer apply (`/customer/programs/[id]/apply`) + New/Returning type | Done (all applications await evaluation) |
+| Customer apply (`/customer/programs/[id]/apply`) + New/Returning type | Done (await evaluation when `application_required`) |
+| Open enrollment (`application_required = false`) — Register & pay, no approve | Done (SQL **`194`**; Add program + Registration settings) |
 | Department workspace **Applications** tab (approve / not approve + batch) | Done (approve other offering next) |
 | Waitlist on full + offer deadline | Not yet |
 | Gate Register on approved + seat/offer; fee on register | Not yet |

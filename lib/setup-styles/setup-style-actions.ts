@@ -25,6 +25,8 @@ type UpsertRoomSetupStyleInput = {
 
 export async function upsertRoomSetupStyle(input: UpsertRoomSetupStyleInput) {
   const canManage = await hasAnyPermission(
+    PERMISSIONS.SPACES_MANAGE,
+    PERMISSIONS.BOOKINGS_MANAGE,
     PERMISSIONS.EVENTS_MANAGE,
     PERMISSIONS.PROGRAMS_MANAGE
   )
@@ -86,6 +88,7 @@ export async function upsertRoomSetupStyle(input: UpsertRoomSetupStyleInput) {
     }
   }
 
+  revalidatePath("/facilities/settings/setup-styles")
   revalidatePath("/event-management/settings/setup-styles")
   revalidatePath("/event-management/request")
   revalidatePath("/event-management/create")
@@ -93,6 +96,8 @@ export async function upsertRoomSetupStyle(input: UpsertRoomSetupStyleInput) {
 
 export async function deleteRoomSetupStyle(id: string) {
   const canManage = await hasAnyPermission(
+    PERMISSIONS.SPACES_MANAGE,
+    PERMISSIONS.BOOKINGS_MANAGE,
     PERMISSIONS.EVENTS_MANAGE,
     PERMISSIONS.PROGRAMS_MANAGE
   )
@@ -118,6 +123,7 @@ export async function deleteRoomSetupStyle(id: string) {
     throw new Error("Failed to delete setup style")
   }
 
+  revalidatePath("/facilities/settings/setup-styles")
   revalidatePath("/event-management/settings/setup-styles")
   revalidatePath("/event-management/request")
   revalidatePath("/event-management/create")

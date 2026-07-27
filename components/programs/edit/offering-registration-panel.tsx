@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { createPortal } from "react-dom"
 import { useRouter } from "next/navigation"
 import { Loader2 } from "lucide-react"
 
@@ -14,6 +15,8 @@ import {
   OfferingRegistrationCapacitySection,
   type OfferingRegistrationCapacitySectionHandle,
 } from "@/components/programs/edit/offering-registration-capacity-section"
+import { OfferingRegistrationQuestionsEditor } from "@/components/programs/edit/offering-registration-questions-editor"
+import { OfferingSettingsAccordionItem } from "@/components/programs/edit/offering-settings-section"
 import {
   getInitialGradeLevels,
   gradesApplyForMinAge,
@@ -27,11 +30,15 @@ import { normalizeCapacityGroups } from "@/lib/programs/program-capacity-group-u
 import type { OfferingWorkspaceData } from "@/lib/programs/offering-workspace-types"
 import type { OfferingAudienceType } from "@/lib/programs/program-offering-attributes"
 import {
-  readOfferingInheritFlags,
   resolveEffectiveOfferingRegistrationSource,
 } from "@/lib/programs/program-offering-inherit"
 import { isOfferingEnrollmentOpen } from "@/lib/programs/program-offering-display"
 import type { ProgramOffering } from "@/lib/programs/program-offering-types"
+import { saveRegistrationQuestionsForOffering } from "@/lib/programs/program-registration-question-actions"
+import {
+  parseRegistrationQuestions,
+  type RegistrationQuestionInput,
+} from "@/lib/programs/program-registration-question-types"
 import {
   getRegistrationOptionsSignature,
   isRegistrationOptionActive,
@@ -62,6 +69,7 @@ function getOfferingRegistrationSource(
         : 0,
     enable_waitlist: effective.enable_waitlist,
     waitlist_capacity: effective.waitlist_capacity,
+    application_required: offering.application_required !== false,
     inherit_dates: effective.inherit_dates,
     inherit_eligibility: effective.inherit_eligibility,
     inherit_enrollment: effective.inherit_enrollment,
@@ -97,6 +105,20 @@ export function OfferingRegistrationPanel({
   enrolled,
   showSaveButton = true,
   saveHandlerRef,
+  disabled = false,
+  sections,
+  plain = false,
+  /** Render Registration + Participants as numbered accordion items (shared state). */
+  settingsSplit = false,
+  /** When settingsSplit, portal the Capacity accordion into this DOM node (above Sessions). */
+  capacityAccordionPortalTarget = null,
+  /** Paired left of Registration in the settings two-column row. */
+  generalSection = null,
+  /** Paired right of Participants (e.g. Pricing) in the settings two-column row. */
+  participantsCompanion = null,
+  attendanceTracked,
+  onAttendanceTrackedChange,
+  onDirty,
 }: {
   program: Program
   offering: ProgramOffering
@@ -108,13 +130,32 @@ export function OfferingRegistrationPanel({
     registrationOptions: ProgramRegistrationOption[]
   ) => void
   enrolled?: number
-  /** When false, parent provides a shared Save (e.g. offering manage Enrollment). */
+  /** When false, parent provides a shared Save (e.g. offering manage Settings). */
   showSaveButton?: boolean
   saveHandlerRef?: React.MutableRefObject<(() => Promise<boolean>) | null>
+  /** When true, all settings fields are locked (read-only settings view). */
+  disabled?: boolean
+  /** Which registration blocks to render (default: all). */
+  sections?: Array<"window" | "eligibility" | "capacity">
+  plain?: boolean
+  settingsSplit?: boolean
+  capacityAccordionPortalTarget?: HTMLElement | null
+  generalSection?: React.ReactNode
+  participantsCompanion?: React.ReactNode
+  /** Controlled attendance flag (offering attribute); falls back to offering. */
+  attendanceTracked?: boolean
+  onAttendanceTrackedChange?: (enabled: boolean) => void
+  onDirty?: () => void
 }) {
   const router = useRouter()
   const capacitySectionRef =
     React.useRef<OfferingRegistrationCapacitySectionHandle>(null)
+  const showWindow =
+    settingsSplit || !sections || sections.includes("window")
+  const showEligibility =
+    settingsSplit || !sections || sections.includes("eligibility")
+  const showCapacity =
+    settingsSplit || !sections || sections.includes("capacity")
   const source = React.useMemo(
     () => getOfferingRegistrationSource(offering, program),
     [offering, program]
@@ -161,19 +202,15 @@ export function OfferingRegistrationPanel({
   const [enableWaitlist, setEnableWaitlist] = React.useState(
     source.enable_waitlist
   )
+  const [openEnrollment, setOpenEnrollment] = React.useState(
+    !source.application_required
+  )
   const [waitlistCapacity, setWaitlistCapacity] = React.useState(
     source.waitlist_capacity?.toString() ?? ""
   )
-  const initialInherit = readOfferingInheritFlags(offering)
-  const [inheritDates, setInheritDates] = React.useState(
-    initialInherit.inherit_dates
-  )
-  const [inheritEligibility, setInheritEligibility] = React.useState(
-    initialInherit.inherit_eligibility
-  )
-  const [inheritEnrollment, setInheritEnrollment] = React.useState(
-    initialInherit.inherit_enrollment
-  )
+  const [registrationQuestions, setRegistrationQuestions] = React.useState<
+    RegistrationQuestionInput[]
+  >(() => parseRegistrationQuestions(workspaceData.registrationQuestions ?? []))
   const [isSaving, setIsSaving] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [success, setSuccess] = React.useState(false)
@@ -194,57 +231,29 @@ export function OfferingRegistrationPanel({
     setEnrollmentCloseDate(source.enrollment_close_date ?? "")
     setCapacity(source.capacity)
     setEnableWaitlist(source.enable_waitlist)
+    setOpenEnrollment(!source.application_required)
     setWaitlistCapacity(source.waitlist_capacity?.toString() ?? "")
-    const flags = readOfferingInheritFlags(offering)
-    setInheritDates(flags.inherit_dates)
-    setInheritEligibility(flags.inherit_eligibility)
-    setInheritEnrollment(flags.inherit_enrollment)
   }, [source, offering])
 
-  function applyProgramDates() {
-    setEnrollmentOpenDate(program.enrollment_open_date ?? "")
-    setEnrollmentCloseDate(program.enrollment_close_date ?? "")
-  }
+  const registrationQuestionsSignature = React.useMemo(
+    () =>
+      JSON.stringify(
+        (workspaceData.registrationQuestions ?? []).map((row) => [
+          row.id,
+          row.prompt,
+          row.question_type,
+          row.is_required,
+          row.sort_order,
+        ])
+      ),
+    [workspaceData.registrationQuestions]
+  )
 
-  function applyProgramEligibility() {
-    const effective = resolveEffectiveOfferingRegistrationSource(
-      { ...offering, inherit_eligibility: true },
-      program
+  React.useEffect(() => {
+    setRegistrationQuestions(
+      parseRegistrationQuestions(workspaceData.registrationQuestions ?? [])
     )
-    setAudienceType(effective.audience_type)
-    setMinAge(effective.min_age)
-    setMaxAge(effective.max_age)
-    setGradeLevels(effective.grade_levels)
-    setProgramGender((effective.gender as ProgramGender) || "All")
-  }
-
-  function applyProgramEnrollment() {
-    const prog = program as Program & {
-      full_program_registration_enabled?: boolean
-      session_registration_enabled?: boolean
-      single_session_registration_enabled?: boolean
-    }
-    setFullProgramEnabled(prog.full_program_registration_enabled ?? true)
-    setSessionRegistrationEnabled(prog.session_registration_enabled ?? false)
-    setSingleSessionEnabled(prog.single_session_registration_enabled ?? false)
-    setEnableWaitlist(prog.enable_waitlist ?? false)
-    setWaitlistCapacity(prog.waitlist_capacity?.toString() ?? "")
-  }
-
-  function handleInheritDatesChange(inherit: boolean) {
-    setInheritDates(inherit)
-    if (inherit) applyProgramDates()
-  }
-
-  function handleInheritEligibilityChange(inherit: boolean) {
-    setInheritEligibility(inherit)
-    if (inherit) applyProgramEligibility()
-  }
-
-  function handleInheritEnrollmentChange(inherit: boolean) {
-    setInheritEnrollment(inherit)
-    if (inherit) applyProgramEnrollment()
-  }
+  }, [offering.id, registrationQuestionsSignature])
 
   const registrationOptionsSignature = React.useMemo(
     () => getRegistrationOptionsSignature(workspaceData.registrationOptions),
@@ -299,9 +308,15 @@ export function OfferingRegistrationPanel({
         enable_waitlist: enableWaitlist,
         waitlist_capacity:
           waitlistCapacity.trim() === "" ? null : Number(waitlistCapacity),
-        inherit_dates: inheritDates,
-        inherit_eligibility: inheritEligibility,
-        inherit_enrollment: inheritEnrollment,
+        application_required: !openEnrollment,
+        inherit_dates: false,
+        inherit_eligibility: false,
+        inherit_enrollment: false,
+      })
+      await saveRegistrationQuestionsForOffering({
+        programId: program.id,
+        offeringId: offering.id,
+        questions: registrationQuestions,
       })
       onRegistrationOptionsSaved?.(offering.id, registrationOptions)
       onCapacityGroupsChange(flushedCapacityGroups)
@@ -328,63 +343,128 @@ export function OfferingRegistrationPanel({
     }
   })
 
-  return (
-    <div className="space-y-4">
-      <OfferingEnrollmentWindowCard
-        fullProgramEnabled={fullProgramEnabled}
-        sessionRegistrationEnabled={sessionRegistrationEnabled}
-        singleSessionEnabled={singleSessionEnabled}
-        onFullProgramChange={setFullProgramEnabled}
-        onSessionRegistrationChange={setSessionRegistrationEnabled}
-        onSingleSessionChange={setSingleSessionEnabled}
-        enrollmentOpenDate={enrollmentOpenDate}
-        enrollmentCloseDate={enrollmentCloseDate}
-        onEnrollmentOpenDateChange={setEnrollmentOpenDate}
-        onEnrollmentCloseDateChange={setEnrollmentCloseDate}
-        registrationOpen={registrationOpen}
-        enableWaitlist={enableWaitlist}
-        onEnableWaitlistChange={setEnableWaitlist}
-        inheritDates={inheritDates}
-        inheritEnrollment={inheritEnrollment}
-        onInheritDatesChange={handleInheritDatesChange}
-        onInheritEnrollmentChange={handleInheritEnrollmentChange}
-      />
+  function touch() {
+    onDirty?.()
+  }
 
-      <OfferingEligibilityCard
-        audienceType={audienceType}
-        onAudienceTypeChange={setAudienceType}
-        minAge={minAge}
-        maxAge={maxAge}
-        onMinAgeChange={setMinAge}
-        onMaxAgeChange={setMaxAge}
-        gradeLevels={gradeLevels}
-        onGradeLevelsChange={setGradeLevels}
-        programGender={programGender}
-        onProgramGenderChange={setProgramGender}
-        inheritEligibility={inheritEligibility}
-        onInheritEligibilityChange={handleInheritEligibilityChange}
-      />
+  const windowCard = showWindow ? (
+    <OfferingEnrollmentWindowCard
+      fullProgramEnabled={fullProgramEnabled}
+      sessionRegistrationEnabled={sessionRegistrationEnabled}
+      singleSessionEnabled={singleSessionEnabled}
+      onFullProgramChange={(value) => {
+        setFullProgramEnabled(value)
+        touch()
+      }}
+      onSessionRegistrationChange={(value) => {
+        setSessionRegistrationEnabled(value)
+        touch()
+      }}
+      onSingleSessionChange={(value) => {
+        setSingleSessionEnabled(value)
+        touch()
+      }}
+      enrollmentOpenDate={enrollmentOpenDate}
+      enrollmentCloseDate={enrollmentCloseDate}
+      onEnrollmentOpenDateChange={(value) => {
+        setEnrollmentOpenDate(value)
+        touch()
+      }}
+      onEnrollmentCloseDateChange={(value) => {
+        setEnrollmentCloseDate(value)
+        touch()
+      }}
+      registrationOpen={registrationOpen}
+      enableWaitlist={enableWaitlist}
+      onEnableWaitlistChange={(value) => {
+        setEnableWaitlist(value)
+        touch()
+      }}
+      openEnrollment={openEnrollment}
+      onOpenEnrollmentChange={(value) => {
+        setOpenEnrollment(value)
+        touch()
+      }}
+      attendanceTracked={
+        attendanceTracked ?? Boolean(offering.attendance_tracked)
+      }
+      onAttendanceTrackedChange={(value) => {
+        onAttendanceTrackedChange?.(value)
+        touch()
+      }}
+      disabled={disabled}
+      plain={plain || settingsSplit}
+    />
+  ) : null
 
-      <OfferingRegistrationCapacitySection
-        ref={capacitySectionRef}
-        program={program}
-        fullProgramEnabled={fullProgramEnabled}
-        sessionRegistrationEnabled={
-          sessionRegistrationEnabled || singleSessionEnabled
-        }
-        minAge={minAge}
-        gradeLevels={gradeLevels}
-        programGender={programGender}
-        capacity={capacity}
-        onCapacityChange={setCapacity}
-        capacityGroups={normalizedCapacityGroups}
-        onCapacityGroupsChange={onCapacityGroupsChange}
-        enableWaitlist={enableWaitlist}
-        waitlistCapacity={waitlistCapacity}
-        onWaitlistCapacityChange={setWaitlistCapacity}
-        enrolled={enrolled}
-      />
+  const eligibilityCard = showEligibility ? (
+    <OfferingEligibilityCard
+      audienceType={audienceType}
+      onAudienceTypeChange={(value) => {
+        setAudienceType(value)
+        touch()
+      }}
+      minAge={minAge}
+      maxAge={maxAge}
+      onMinAgeChange={(value) => {
+        setMinAge(value)
+        touch()
+      }}
+      onMaxAgeChange={(value) => {
+        setMaxAge(value)
+        touch()
+      }}
+      gradeLevels={gradeLevels}
+      onGradeLevelsChange={(value) => {
+        setGradeLevels(value)
+        touch()
+      }}
+      programGender={programGender}
+      onProgramGenderChange={(value) => {
+        setProgramGender(value)
+        touch()
+      }}
+      disabled={disabled}
+      plain={plain || settingsSplit}
+      hideAudience={settingsSplit}
+    />
+  ) : null
 
+  const capacityCard = showCapacity ? (
+    <OfferingRegistrationCapacitySection
+      ref={capacitySectionRef}
+      program={program}
+      fullProgramEnabled={fullProgramEnabled}
+      sessionRegistrationEnabled={
+        sessionRegistrationEnabled || singleSessionEnabled
+      }
+      minAge={minAge}
+      gradeLevels={gradeLevels}
+      programGender={programGender}
+      capacity={capacity}
+      onCapacityChange={(value) => {
+        setCapacity(value)
+        touch()
+      }}
+      capacityGroups={normalizedCapacityGroups}
+      onCapacityGroupsChange={(groups) => {
+        onCapacityGroupsChange(groups)
+        touch()
+      }}
+      enableWaitlist={enableWaitlist}
+      waitlistCapacity={waitlistCapacity}
+      onWaitlistCapacityChange={(value) => {
+        setWaitlistCapacity(value)
+        touch()
+      }}
+      enrolled={enrolled}
+      disabled={disabled}
+      plain={plain || settingsSplit}
+    />
+  ) : null
+
+  const statusMessages = (
+    <>
       {error ? (
         <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
           {error}
@@ -395,6 +475,67 @@ export function OfferingRegistrationPanel({
           Registration settings saved for {offering.name}.
         </p>
       ) : null}
+    </>
+  )
+
+  if (settingsSplit) {
+    const capacityAccordion =
+      showCapacity && capacityCard ? (
+        <OfferingSettingsAccordionItem
+          value="capacity"
+          step={4}
+          title="Capacity"
+        >
+          {capacityCard}
+        </OfferingSettingsAccordionItem>
+      ) : null
+
+    return (
+      <>
+        <OfferingSettingsAccordionItem
+          value="registration"
+          step={1}
+          title="Enrollment"
+        >
+          <div className="space-y-3">
+            {windowCard}
+            {statusMessages}
+          </div>
+        </OfferingSettingsAccordionItem>
+        <OfferingSettingsAccordionItem
+          value="participants"
+          step={2}
+          title="Participants"
+        >
+          {eligibilityCard}
+        </OfferingSettingsAccordionItem>
+        <OfferingSettingsAccordionItem
+          value="questions"
+          step={3}
+          title="Questions"
+        >
+          <OfferingRegistrationQuestionsEditor
+            questions={registrationQuestions}
+            disabled={disabled}
+            onChange={(next) => {
+              setRegistrationQuestions(next)
+              touch()
+            }}
+          />
+        </OfferingSettingsAccordionItem>
+        {capacityAccordion && capacityAccordionPortalTarget
+          ? createPortal(capacityAccordion, capacityAccordionPortalTarget)
+          : capacityAccordion}
+      </>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      {windowCard}
+      {eligibilityCard}
+      {capacityCard}
+      {statusMessages}
 
       {showSaveButton ? (
         <div className="flex justify-end border-t pt-4">

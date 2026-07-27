@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Loader2, Trash2 } from "lucide-react"
 
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -27,22 +28,21 @@ function formatCurrency(value: number) {
   }).format(value)
 }
 
-function formatDate(value: string | null) {
-  if (!value) return "—"
-  return new Date(value).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  })
-}
-
 function formatRole(role: string) {
   return role.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase())
 }
 
-function buildRemoveConfirmMessage(memberName: string) {
+function buildRemoveConfirmMessage(member: FamilyMemberGivingRow) {
+  if (member.isMinor || !member.contactId) {
+    return [
+      `Remove ${member.memberName || "this member"} from this household?`,
+      "",
+      "They will no longer appear on this household page. Their person record stays under the parent Contact family panel unless you remove it there too.",
+    ].join("\n")
+  }
+
   return [
-    `Remove ${memberName} from this household?`,
+    `Remove ${member.memberName || "this member"} from this household?`,
     "",
     "Their individual contact profile and all donations will stay on their record.",
     "They will no longer appear in this household's giving totals.",
@@ -65,11 +65,10 @@ export function FamilyMembersPanel({
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
-  const [removingContactId, setRemovingContactId] = useState<string | null>(null)
+  const [removingMemberId, setRemovingMemberId] = useState<string | null>(null)
 
   function handleRemove(member: FamilyMemberGivingRow) {
-    const memberName = member.memberName || "this member"
-    const isPrimary = primaryContactId === member.contactId
+    const isPrimary = Boolean(member.contactId) && primaryContactId === member.contactId
     const hasOtherMembers = members.length > 1
 
     if (isPrimary && hasOtherMembers) {
@@ -77,19 +76,21 @@ export function FamilyMembersPanel({
       return
     }
 
-    if (!window.confirm(buildRemoveConfirmMessage(memberName))) {
+    if (!window.confirm(buildRemoveConfirmMessage(member))) {
       return
     }
 
     setError(null)
-    setRemovingContactId(member.contactId)
+    setRemovingMemberId(member.id)
     startTransition(async () => {
       const result = await removeHouseholdMemberAction({
         familyId,
+        memberId: member.id,
         memberContactId: member.contactId,
+        memberPersonId: member.personId,
       })
 
-      setRemovingContactId(null)
+      setRemovingMemberId(null)
 
       if (!result.success) {
         setError(result.error)
@@ -105,8 +106,8 @@ export function FamilyMembersPanel({
       <CardHeader>
         <CardTitle>Members</CardTitle>
         <CardDescription>
-          Lifetime giving per active household member. Removing a member (for example after a
-          divorce) ends their household membership only — their contact and donations are kept.
+          Adults show phone and email from their contact. Minors have no separate contact profile.
+          Giving totals use adult contacts only.
         </CardDescription>
       </CardHeader>
       <CardContent className="p-0">
@@ -122,40 +123,59 @@ export function FamilyMembersPanel({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Member</TableHead>
+                <TableHead>Name</TableHead>
                 <TableHead>Role</TableHead>
+                <TableHead>Phone</TableHead>
+                <TableHead>Email</TableHead>
                 <TableHead>Lifetime Giving</TableHead>
                 <TableHead>Gifts</TableHead>
-                <TableHead>Last Gift</TableHead>
                 {canManage ? <TableHead className="w-[72px]" /> : null}
               </TableRow>
             </TableHeader>
             <TableBody>
               {members.map((member) => {
-                const isPrimary = primaryContactId === member.contactId
+                const isPrimary =
+                  Boolean(member.contactId) && primaryContactId === member.contactId
                 const cannotRemove = isPrimary && members.length > 1
 
                 return (
                   <TableRow key={member.id}>
                     <TableCell className="font-medium">
-                      {member.contactId ? (
-                        <Link
-                          href={contactProfileHref(member.contactId, { list: "families" })}
-                          className="text-primary hover:underline"
-                        >
-                          {member.memberName || "Unnamed"}
-                        </Link>
-                      ) : (
-                        member.memberName || "Unnamed"
-                      )}
+                      <span className="inline-flex flex-wrap items-center gap-2">
+                        {member.contactId ? (
+                          <Link
+                            href={contactProfileHref(member.contactId, {
+                              list: "families",
+                            })}
+                            className="text-primary hover:underline"
+                          >
+                            {member.memberName || "Unnamed"}
+                          </Link>
+                        ) : (
+                          <span>{member.memberName || "Unnamed"}</span>
+                        )}
+                        {member.isMinor ? (
+                          <Badge variant="secondary" className="text-xs">
+                            Minor
+                          </Badge>
+                        ) : null}
+                      </span>
                     </TableCell>
                     <TableCell>{formatRole(member.role)}</TableCell>
-                    <TableCell>{formatCurrency(member.totalDonations)}</TableCell>
-                    <TableCell>{member.donationCount}</TableCell>
-                    <TableCell>{formatDate(member.lastDonationDate)}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {member.isMinor ? "—" : member.phone || "—"}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {member.isMinor ? "—" : member.email || "—"}
+                    </TableCell>
+                    <TableCell>
+                      {member.isMinor ? "—" : formatCurrency(member.totalDonations)}
+                    </TableCell>
+                    <TableCell>{member.isMinor ? "—" : member.donationCount}</TableCell>
                     {canManage ? (
                       <TableCell>
                         <Button
+                          type="button"
                           variant="ghost"
                           size="icon"
                           className="text-muted-foreground hover:text-destructive"
@@ -167,7 +187,7 @@ export function FamilyMembersPanel({
                           }
                           onClick={() => handleRemove(member)}
                         >
-                          {isPending && removingContactId === member.contactId ? (
+                          {isPending && removingMemberId === member.id ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
                           ) : (
                             <Trash2 className="h-4 w-4" />

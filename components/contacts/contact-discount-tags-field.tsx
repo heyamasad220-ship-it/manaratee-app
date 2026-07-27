@@ -170,8 +170,9 @@ export function ContactDiscountTagsField({
           </SelectContent>
         </Select>
         <p className="text-xs text-muted-foreground">
-          Donor and custom tags can be set here. Employee, Member, and Full-Time
-          Employee tags are applied automatically from Workforce or Membership.
+          Assign custom tags such as Top Donor here. Employee, Member, Staff, and
+          Full-Time Employee tags are applied automatically from Workforce or
+          Membership.
         </p>
       </div>
 

@@ -2,10 +2,9 @@
 
 import * as React from "react"
 import { Suspense } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 
 import { DepartmentsManager } from "@/components/departments/departments-manager"
-import { FinancePayrollQueuePanel } from "@/components/finance/finance-payroll-queue-panel"
 import { HrChildcarePanel } from "@/components/hr/hr-childcare-panel"
 import { HrOverviewDashboard } from "@/components/hr/hr-reports-client"
 import { StaffRecordsClient } from "@/components/hr/staff-records-client"
@@ -14,10 +13,14 @@ import { VolunteersList } from "@/components/workforce/volunteers-list"
 import {
   HR_OVERVIEW_TABS,
   hrOverviewHref,
+  hrOverviewTabFromPathname,
   parseHrOverviewTab,
   type HrOverviewTab,
 } from "@/lib/hr/hr-overview-path"
-import type { ChildcareProviderRecord, ChildcareProviderStats } from "@/lib/hr/childcare-provider-actions"
+import type {
+  ChildcareProviderRecord,
+  ChildcareProviderStats,
+} from "@/lib/hr/childcare-provider-actions"
 
 export function HrOverviewClient({
   organizationId,
@@ -37,14 +40,17 @@ export function HrOverviewClient({
   initialTab?: string | null
 }) {
   const router = useRouter()
+  const pathname = usePathname()
   const searchParams = useSearchParams()
   const [activeTab, setActiveTab] = React.useState<HrOverviewTab>(() =>
-    parseHrOverviewTab(initialTab ?? searchParams.get("tab"))
+    parseHrOverviewTab(
+      initialTab ?? hrOverviewTabFromPathname(pathname) ?? searchParams.get("tab")
+    )
   )
 
   React.useEffect(() => {
-    setActiveTab(parseHrOverviewTab(searchParams.get("tab")))
-  }, [searchParams])
+    setActiveTab(hrOverviewTabFromPathname(pathname))
+  }, [pathname])
 
   function onTabChange(value: string) {
     const next = parseHrOverviewTab(value)
@@ -84,19 +90,22 @@ export function HrOverviewClient({
         </TabsContent>
 
         <TabsContent value="volunteers" className="mt-0">
-          <Suspense fallback={<div className="h-64 animate-pulse rounded-lg bg-muted" />}>
+          <Suspense
+            fallback={<div className="h-64 animate-pulse rounded-lg bg-muted" />}
+          >
             <VolunteersList />
           </Suspense>
         </TabsContent>
 
         <TabsContent value="childcare" className="mt-0">
-          <Suspense fallback={<div className="h-64 animate-pulse rounded-lg bg-muted" />}>
-            <HrChildcarePanel providers={childcareProviders} stats={childcareStats} />
+          <Suspense
+            fallback={<div className="h-64 animate-pulse rounded-lg bg-muted" />}
+          >
+            <HrChildcarePanel
+              providers={childcareProviders}
+              stats={childcareStats}
+            />
           </Suspense>
-        </TabsContent>
-
-        <TabsContent value="payroll" className="mt-0">
-          <FinancePayrollQueuePanel />
         </TabsContent>
       </Tabs>
     </div>

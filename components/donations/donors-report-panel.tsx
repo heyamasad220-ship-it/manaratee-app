@@ -29,6 +29,7 @@ import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
 import { donationGroupHref } from "@/lib/donations/donation-group-path"
 import { formatDonationCurrency } from "@/lib/donations/campaign-analytics"
 import { DONATIONS_PAGE_SIZE } from "@/lib/donations/donation-pagination"
+import { ListPagination } from "@/components/ui/list-pagination"
 import { clearSelectedOrganizationIdCache } from "@/lib/current-organization"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -53,14 +54,7 @@ import {
   DonationMetricCard,
   DonationMetricCardGrid,
 } from "@/components/donations/donation-metric-card"
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination"
+import { DonationReportsTabs } from "@/components/donations/donation-reports-chrome"
 import { TableColumnHeaderFilter } from "@/components/ui/table-column-header-filter"
 import { Download, DollarSign, FileText, Gift, Home, Users, UsersRound } from "lucide-react"
 
@@ -195,6 +189,7 @@ export function DonorsReportPanel() {
   const [groups, setGroups] = useState<GroupGivingReportRow[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(DONATIONS_PAGE_SIZE)
   const [rollupSearch, setRollupSearch] = useState("")
   const [debouncedRollupSearch, setDebouncedRollupSearch] = useState("")
   const [donorNameFilter, setDonorNameFilter] = useState("")
@@ -359,7 +354,7 @@ export function DonorsReportPanel() {
     if (reportView === "household") {
       const result = await fetchHouseholdGivingReportPageAction({
         page,
-        pageSize: DONATIONS_PAGE_SIZE,
+        pageSize,
         search: filterInput.search,
         dateFrom: filterInput.dateFrom,
         dateTo: filterInput.dateTo,
@@ -399,7 +394,7 @@ export function DonorsReportPanel() {
     if (reportView === "group") {
       const result = await fetchGroupGivingReportPageAction({
         page,
-        pageSize: DONATIONS_PAGE_SIZE,
+        pageSize,
         search: filterInput.search,
         dateFrom: filterInput.dateFrom,
         dateTo: filterInput.dateTo,
@@ -438,7 +433,7 @@ export function DonorsReportPanel() {
 
     const result = await fetchDonorSummaryPageAction({
       page,
-      pageSize: DONATIONS_PAGE_SIZE,
+      pageSize,
       ...filterInput,
       sortBy,
       sortAsc,
@@ -458,7 +453,7 @@ export function DonorsReportPanel() {
     }
 
     setLoading(false)
-  }, [page, filterInput, sortBy, sortAsc, reportView])
+  }, [page, pageSize, filterInput, sortBy, sortAsc, reportView])
 
   const loadSummary = useCallback(async () => {
     if (reportView === "household" || reportView === "group") {
@@ -579,9 +574,8 @@ export function DonorsReportPanel() {
     })
   }
 
-  const totalPages = Math.max(1, Math.ceil(total / DONATIONS_PAGE_SIZE))
-  const rangeStart = total === 0 ? 0 : (page - 1) * DONATIONS_PAGE_SIZE + 1
-  const rangeEnd = Math.min(page * DONATIONS_PAGE_SIZE, total)
+  const rangeStart = total === 0 ? 0 : (page - 1) * pageSize + 1
+  const rangeEnd = Math.min(page * pageSize, total)
   const lastGiftHeader =
     dateRangeMode === "lifetime" ? "Last Gift" : "Last Gift (in period)"
   const exporting = exportingCsv || exportingPdf
@@ -673,6 +667,8 @@ export function DonorsReportPanel() {
           />
         </DonationMetricCardGrid>
       )}
+
+      <DonationReportsTabs />
 
       <Card>
         <CardHeader>
@@ -1052,12 +1048,19 @@ export function DonorsReportPanel() {
                 households.map((household) => (
                   <TableRow key={household.family_id}>
                     <TableCell className="font-medium">
-                      <Link
-                        href={`/contacts/families/${household.family_id}`}
-                        className="text-primary hover:underline"
-                      >
-                        {household.family_name}
-                      </Link>
+                      {household.primary_contact_id ? (
+                        <Link
+                          href={contactProfileHref(household.primary_contact_id, {
+                            tab: "financial",
+                            list: "families",
+                          })}
+                          className="text-primary hover:underline"
+                        >
+                          {household.family_name}
+                        </Link>
+                      ) : (
+                        household.family_name
+                      )}
                     </TableCell>
                     <TableCell>
                       {household.primary_contact_id ? (
@@ -1131,37 +1134,24 @@ export function DonorsReportPanel() {
         </CardContent>
       </Card>
 
-      {totalPages > 1 ? (
-        <Pagination>
-          <PaginationContent>
-            <PaginationItem>
-              <PaginationPrevious
-                href="#"
-                onClick={(event) => {
-                  event.preventDefault()
-                  setPage((current) => Math.max(1, current - 1))
-                }}
-                className={page <= 1 ? "pointer-events-none opacity-50" : ""}
-              />
-            </PaginationItem>
-            <PaginationItem>
-              <PaginationLink href="#" isActive>
-                {page} / {totalPages}
-              </PaginationLink>
-            </PaginationItem>
-            <PaginationItem>
-              <PaginationNext
-                href="#"
-                onClick={(event) => {
-                  event.preventDefault()
-                  setPage((current) => Math.min(totalPages, current + 1))
-                }}
-                className={page >= totalPages ? "pointer-events-none opacity-50" : ""}
-              />
-            </PaginationItem>
-          </PaginationContent>
-        </Pagination>
-      ) : null}
+      <ListPagination
+        page={page}
+        pageSize={pageSize}
+        total={total}
+        disabled={loading}
+        entryLabel={
+          reportView === "household"
+            ? "households"
+            : reportView === "group"
+              ? "groups"
+              : "donors"
+        }
+        onPageChange={setPage}
+        onPageSizeChange={(next) => {
+          setPageSize(next)
+          setPage(1)
+        }}
+      />
     </div>
   )
 }

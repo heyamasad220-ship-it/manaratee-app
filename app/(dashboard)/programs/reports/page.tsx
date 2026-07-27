@@ -9,17 +9,13 @@ import { cn } from "@/lib/utils"
 import {
   AlertCircle,
   ArrowUpDown,
-  BarChart3,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
-  ClipboardCheck,
-  CreditCard,
   DollarSign,
   Download,
   FileText,
   FolderOpen,
-  ListOrdered,
   Mail,
   MoreHorizontal,
   Phone,
@@ -37,16 +33,17 @@ import {
   ProgramsAttendanceReportPanel,
   ProgramsWaitlistReportPanel,
 } from "@/components/programs/programs-attendance-waitlist-report-panels"
-import { ProgramPaymentTransactionsPanel } from "@/components/programs/program-payment-transactions-panel"
+import {
+  ProgramsReportsNav,
+  resolveProgramsReportsTab,
+  type ProgramsReportsTabId,
+} from "@/components/programs/programs-reports-nav"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card"
 import {
   Dialog,
@@ -80,10 +77,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
-
-type ReportTab = "overview" | "enrollment" | "transactions" | "attendance" | "waitlist"
 
 type Program = {
   id: string
@@ -262,25 +256,29 @@ export default function ProgramsReportsPage() {
   const searchParams = useSearchParams()
   const supabase = createClient()
 
-  const initialTab = React.useMemo((): ReportTab => {
-    const tab = searchParams.get("tab")
-    if (
-      tab === "transactions" ||
-      tab === "attendance" ||
-      tab === "waitlist"
-    ) {
-      return tab
-    }
-    return "overview"
-  }, [searchParams])
+  const activeTab: ProgramsReportsTabId = resolveProgramsReportsTab(
+    "/programs/reports",
+    searchParams
+  )
 
-  const [activeTab, setActiveTab] = React.useState<ReportTab>(initialTab)
+  React.useEffect(() => {
+    const tab = searchParams.get("tab")
+    if (tab === "enrollment") {
+      router.replace("/programs/registrations")
+      return
+    }
+    if (tab === "transactions") {
+      router.replace("/finance/transactions")
+    }
+  }, [router, searchParams])
+
   const [loading, setLoading] = React.useState(true)
   const [tablesAvailable, setTablesAvailable] = React.useState(true)
 
   const [programs, setPrograms] = React.useState<Program[]>([])
   const [departments, setDepartments] = React.useState<Department[]>([])
   const [enrollments, setEnrollments] = React.useState<Enrollment[]>([])
+  const [activeOfferingCount, setActiveOfferingCount] = React.useState(0)
 
   const [searchQuery, setSearchQuery] = React.useState("")
   const [departmentFilter, setDepartmentFilter] = React.useState("all")
@@ -295,24 +293,6 @@ export default function ProgramsReportsPage() {
     entry: Enrollment
   } | null>(null)
   const [message, setMessage] = React.useState("")
-
-  React.useEffect(() => {
-    setActiveTab(initialTab)
-  }, [initialTab])
-
-  function selectReportTab(value: string) {
-    if (value === "enrollment") {
-      router.push("/programs/registrations")
-      return
-    }
-    const next = value as ReportTab
-    setActiveTab(next)
-    if (next === "overview") {
-      router.replace("/programs/reports", { scroll: false })
-    } else {
-      router.replace(`/programs/reports?tab=${next}`, { scroll: false })
-    }
-  }
 
   React.useEffect(() => {
     void fetchReportsData()
@@ -331,6 +311,7 @@ export default function ProgramsReportsPage() {
         supabase
           .from("programs")
           .select("id, name, description, department_id, capacity, enrolled, waitlist, status, start_date, end_date")
+          .in("status", ["draft", "active", "paused", "closed"])
           .order("name"),
         supabase.from("departments").select("id, name, color").order("name"),
         supabase
@@ -361,14 +342,59 @@ export default function ProgramsReportsPage() {
 
       setTablesAvailable(missingTableErrors.length === 0)
 
-      if (!programsResult.error) setPrograms((programsResult.data || []) as Program[])
-      else console.warn("programs could not be loaded:", programsResult.error.message)
+      if (!programsResult.error) {
+        setPrograms((programsResult.data || []) as Program[])
+      } else {
+        console.warn("programs could not be loaded:", programsResult.error.message)
+      }
+
+      const openProgramIds = ((programsResult.data || []) as Program[]).map(
+        (program) => program.id
+      )
+
+      if (openProgramIds.length > 0) {
+        const offeringsResult = await supabase
+          .from("program_offerings")
+          .select("id", { count: "exact", head: true })
+          .in("program_id", openProgramIds)
+          .eq("status", "active")
+
+        if (offeringsResult.error) {
+          console.warn(
+            "program_offerings count could not be loaded:",
+            offeringsResult.error.message
+          )
+          setActiveOfferingCount(0)
+        } else {
+          setActiveOfferingCount(offeringsResult.count || 0)
+        }
+      } else {
+        setActiveOfferingCount(0)
+      }
 
       if (!departmentsResult.error) setDepartments((departmentsResult.data || []) as Department[])
       else console.warn("departments could not be loaded:", departmentsResult.error.message)
 
-      if (!enrollmentsResult.error) setEnrollments((enrollmentsResult.data || []) as Enrollment[])
-      else console.warn("program_enrollments could not be loaded:", enrollmentsResult.error.message)
+      if (!enrollmentsResult.error) {
+        const openProgramIdSet = new Set(openProgramIds)
+        const openEnrollments = ((enrollmentsResult.data || []) as Enrollment[]).filter(
+          (enrollment) => {
+            if (enrollment.program_id && openProgramIdSet.has(enrollment.program_id)) {
+              return true
+            }
+            const status = enrollment.program?.status
+            return (
+              status === "draft" ||
+              status === "active" ||
+              status === "paused" ||
+              status === "closed"
+            )
+          }
+        )
+        setEnrollments(openEnrollments)
+      } else {
+        console.warn("program_enrollments could not be loaded:", enrollmentsResult.error.message)
+      }
     } catch (error) {
       console.error("Reports page error:", error)
       setTablesAvailable(false)
@@ -432,7 +458,6 @@ export default function ProgramsReportsPage() {
   ])
 
   const overviewStats = React.useMemo(() => {
-    const activePrograms = programs.filter((program) => program.status === "active").length
     const totalCapacity = programs.reduce((sum, program) => sum + Number(program.capacity || 0), 0)
     const totalEnrolled = programs.reduce((sum, program) => sum + Number(program.enrolled || 0), 0)
     const revenue = enrollments
@@ -447,57 +472,14 @@ export default function ProgramsReportsPage() {
       )
 
     return {
-      activePrograms,
+      activePrograms: activeOfferingCount,
       totalCapacity,
       totalEnrolled,
       availableCapacity: Math.max(totalCapacity - totalEnrolled, 0),
       revenue,
       outstanding,
     }
-  }, [programs, enrollments])
-
-  const enrollmentStats = React.useMemo(() => {
-    return {
-      total: filteredEnrollments.length,
-      confirmed: filteredEnrollments.filter((enrollment) => enrollment.status === "confirmed").length,
-      pending: filteredEnrollments.filter((enrollment) => enrollment.status === "pending").length,
-      cancelled: filteredEnrollments.filter((enrollment) => enrollment.status === "cancelled").length,
-      revenue: filteredEnrollments
-        .filter((enrollment) => enrollment.status !== "cancelled")
-        .reduce((sum, enrollment) => sum + Number(enrollment.amount_paid || 0), 0),
-      totalCapacity: overviewStats.totalCapacity,
-      totalEnrolled: overviewStats.totalEnrolled,
-      availableCapacity: overviewStats.availableCapacity,
-    }
-  }, [filteredEnrollments, overviewStats])
-
-  const revenueByDepartment = React.useMemo(() => {
-    const departmentRevenue = new Map<string, number>()
-
-    enrollments
-      .filter((enrollment) => enrollment.status !== "cancelled")
-      .forEach((enrollment) => {
-        const program = enrollment.program || programs.find((item) => item.id === enrollment.program_id)
-        const departmentId = enrollment.department_id || program?.department_id || "unassigned"
-        departmentRevenue.set(
-          departmentId,
-          (departmentRevenue.get(departmentId) || 0) + Number(enrollment.amount_paid || 0)
-        )
-      })
-
-    const total = Array.from(departmentRevenue.values()).reduce((sum, value) => sum + value, 0)
-
-    return Array.from(departmentRevenue.entries()).map(([departmentId, amount]) => {
-      const department = departments.find((item) => item.id === departmentId)
-
-      return {
-        id: departmentId,
-        name: department?.name || "Unassigned",
-        amount,
-        percentage: total ? Math.round((amount / total) * 100) : 0,
-      }
-    })
-  }, [enrollments, programs, departments])
+  }, [programs, enrollments, activeOfferingCount])
 
   function handleSort(field: string) {
     if (sortField === field) {
@@ -538,34 +520,38 @@ export default function ProgramsReportsPage() {
     <>
       <Header title="Programs" />
 
+      <ProgramsReportsNav />
+
       <div className="flex flex-col gap-6 p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Reports</h1>
             <p className="text-muted-foreground">
-              Program analytics, enrollment reporting, and financial tracking.
+              Program enrollment, attendance, and waitlist reporting.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <Select value={dateRange} onValueChange={setDateRange}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="this-week">This Week</SelectItem>
-                <SelectItem value="this-month">This Month</SelectItem>
-                <SelectItem value="this-quarter">This Quarter</SelectItem>
-                <SelectItem value="this-year">This Year</SelectItem>
-                <SelectItem value="custom">Custom Range</SelectItem>
-              </SelectContent>
-            </Select>
+          {activeTab === "overview" ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <Select value={dateRange} onValueChange={setDateRange}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="this-week">This Week</SelectItem>
+                  <SelectItem value="this-month">This Month</SelectItem>
+                  <SelectItem value="this-quarter">This Quarter</SelectItem>
+                  <SelectItem value="this-year">This Year</SelectItem>
+                  <SelectItem value="custom">Custom Range</SelectItem>
+                </SelectContent>
+              </Select>
 
-            <Button variant="outline" onClick={handleExport}>
-              <Download className="mr-2 size-4" />
-              Export CSV
-            </Button>
-          </div>
+              <Button variant="outline" onClick={handleExport}>
+                <Download className="mr-2 size-4" />
+                Export CSV
+              </Button>
+            </div>
+          ) : null}
         </div>
 
         {!tablesAvailable && (
@@ -580,39 +566,11 @@ export default function ProgramsReportsPage() {
           </Card>
         )}
 
-        <Tabs
-          value={activeTab}
-          onValueChange={selectReportTab}
-          className="space-y-6"
-        >
-          <TabsList className="flex h-auto flex-wrap">
-            <TabsTrigger value="overview" className="gap-2">
-              <BarChart3 className="size-4" />
-              Overview
-            </TabsTrigger>
-            <TabsTrigger value="enrollment" className="gap-2">
-              <FileText className="size-4" />
-              Registrations
-              <Badge variant="secondary" className="ml-1">{enrollmentStats.total}</Badge>
-            </TabsTrigger>
-            <TabsTrigger value="transactions" className="gap-2">
-              <CreditCard className="size-4" />
-              Payment transactions
-            </TabsTrigger>
-            <TabsTrigger value="attendance" className="gap-2">
-              <ClipboardCheck className="size-4" />
-              Attendance
-            </TabsTrigger>
-            <TabsTrigger value="waitlist" className="gap-2">
-              <ListOrdered className="size-4" />
-              Waitlist
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="overview" className="space-y-6">
-            <div className="flex flex-wrap gap-4 [&>*]:w-fit">
+        {activeTab === "overview" ? (
+          <div className="space-y-6">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <SummaryCard
-                title="Active Years/Seasons"
+                title="Active Programs"
                 value={overviewStats.activePrograms}
                 icon={<FileText className="size-5" />}
                 className="bg-blue-100 text-blue-600"
@@ -636,90 +594,20 @@ export default function ProgramsReportsPage() {
                 className="bg-amber-100 text-amber-600"
               />
             </div>
+          </div>
+        ) : null}
 
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <QuickReport
-                title="Registrations"
-                description="Year/Season enrollments and balances"
-                icon={<FileText className="size-5" />}
-                onClick={() => router.push("/programs/registrations")}
-              />
-              <QuickReport
-                title="Payment transactions"
-                description="Paid and refunded program payments"
-                icon={<CreditCard className="size-5" />}
-                onClick={() => selectReportTab("transactions")}
-              />
-              <QuickReport
-                title="Attendance"
-                description="Class attendance by offering"
-                icon={<ClipboardCheck className="size-5" />}
-                onClick={() => selectReportTab("attendance")}
-              />
-              <QuickReport
-                title="Waitlist"
-                description="Waitlist entries by offering"
-                icon={<ListOrdered className="size-5" />}
-                onClick={() => selectReportTab("waitlist")}
-              />
-              <QuickReport
-                title="Department Expenses"
-                description="Expenses by department workspace"
-                icon={<DollarSign className="size-5" />}
-                onClick={() => router.push("/workforce/departments")}
-              />
-              <QuickReport
-                title="Financial Assistance"
-                description="Applications and payment plans"
-                icon={<FileText className="size-5" />}
-                onClick={() => router.push("/programs/financial-assistance?tab=reports")}
-              />
-              <QuickReport
-                title="Payment Plans"
-                description="Installments and balances"
-                icon={<CreditCard className="size-5" />}
-                onClick={() => router.push("/programs/financial-assistance?tab=payment-plans")}
-              />
-            </div>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Revenue by Department</CardTitle>
-                <CardDescription>Breakdown by program department.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {revenueByDepartment.length === 0 ? (
-                  <EmptyText>No revenue data yet.</EmptyText>
-                ) : (
-                  revenueByDepartment.map((item) => (
-                    <div key={item.id} className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="size-3 rounded-full bg-primary" />
-                        <span className="text-sm font-medium">{item.name}</span>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <span className="text-sm text-muted-foreground">{item.percentage}%</span>
-                        <span className="w-24 text-right font-medium">{formatCurrency(item.amount)}</span>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="transactions" className="space-y-6">
-            <ProgramPaymentTransactionsPanel />
-          </TabsContent>
-
-          <TabsContent value="attendance" className="space-y-6">
+        {activeTab === "attendance" ? (
+          <div className="space-y-6">
             <ProgramsAttendanceReportPanel />
-          </TabsContent>
+          </div>
+        ) : null}
 
-          <TabsContent value="waitlist" className="space-y-6">
+        {activeTab === "waitlist" ? (
+          <div className="space-y-6">
             <ProgramsWaitlistReportPanel />
-          </TabsContent>
-        </Tabs>
+          </div>
+        ) : null}
 
         <Dialog
           open={!!messageDialog}
@@ -795,36 +683,12 @@ function SummaryCard({
   className: string
 }) {
   return (
-    <Card>
-      <CardContent className="flex items-center gap-4 p-4">
-        <div className={cn("rounded-full p-3", className)}>{icon}</div>
-        <div>
+    <Card className="h-full">
+      <CardContent className="flex h-full items-center gap-4 p-4">
+        <div className={cn("shrink-0 rounded-full p-3", className)}>{icon}</div>
+        <div className="min-w-0">
           <p className="text-sm text-muted-foreground">{title}</p>
           <p className="text-2xl font-bold">{value}</p>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-function QuickReport({
-  title,
-  description,
-  icon,
-  onClick,
-}: {
-  title: string
-  description: string
-  icon: React.ReactNode
-  onClick: () => void
-}) {
-  return (
-    <Card className="cursor-pointer transition-colors hover:bg-muted/50" onClick={onClick}>
-      <CardContent className="flex items-center gap-4 p-4">
-        <div className="rounded-full bg-muted p-3 text-muted-foreground">{icon}</div>
-        <div>
-          <p className="font-medium">{title}</p>
-          <p className="text-sm text-muted-foreground">{description}</p>
         </div>
       </CardContent>
     </Card>

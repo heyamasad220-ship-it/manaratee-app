@@ -92,12 +92,24 @@ export async function getFamilyForContactAction(contactId: string) {
       return { success: true as const, family: null }
     }
 
+    let primaryName: string | null = null
+    if (family.primaryContactId) {
+      const { data: primaryContact } = await access.supabase
+        .from("contacts")
+        .select("full_name")
+        .eq("organization_id", access.organizationId)
+        .eq("id", family.primaryContactId)
+        .maybeSingle()
+      primaryName = (primaryContact?.full_name as string | null) ?? null
+    }
+
     return {
       success: true as const,
       family: {
         id: family.id,
         name: family.name,
         primaryContactId: family.primaryContactId,
+        primaryName,
         isPrimary: family.isPrimary,
         memberRole: family.memberRole ?? null,
       },
@@ -148,15 +160,20 @@ export async function getFamilySettingsAction(familyId: string) {
       name: family.name as string,
       status: family.status as string,
       primaryContactId: (family.primary_contact_id as string | null) ?? null,
-      members: (members || []).map((row) => {
-        const contact = Array.isArray(row.contact) ? row.contact[0] : row.contact
-        return {
-          id: row.id as string,
-          contactId: row.contact_id as string,
-          role: row.role as string,
-          fullName: (contact?.full_name as string | null) ?? "Unnamed",
-        }
-      }),
+      members: (members || [])
+        .map((row) => {
+          const contact = Array.isArray(row.contact) ? row.contact[0] : row.contact
+          return {
+            id: row.id as string,
+            contactId: (row.contact_id as string | null) ?? null,
+            role: row.role as string,
+            fullName: (contact?.full_name as string | null) ?? "Unnamed",
+          }
+        })
+        .filter(
+          (member): member is { id: string; contactId: string; role: string; fullName: string } =>
+            Boolean(member.contactId)
+        ),
     },
   }
 }
@@ -267,7 +284,9 @@ export async function updateFamilySettingsAction(input: {
       .is("end_date", null)
 
     for (const row of memberRows || []) {
-      revalidatePath(`/contacts/${row.contact_id as string}`)
+      if (row.contact_id) {
+        revalidatePath(`/contacts/${row.contact_id as string}`)
+      }
     }
 
     revalidatePath(`/contacts/families/${familyId}`)
@@ -361,9 +380,83 @@ export async function linkExistingContactToFamilyAction(input: {
       organizationId: access.organizationId,
       familyId,
       contactId: member.id as string,
+      personId: (member.person_id as string | null) ?? null,
       role: mapRelationshipToFamilyRole(relationship),
       personRelationshipId,
     })
+
+    try {
+      const {
+        syncHouseholdFromParentContact,
+        importContactDependentsIntoHousehold,
+      } = await import("@/lib/contacts/family-sync")
+
+      // Pull the linked contact's kids into this household and mirror them onto the anchor.
+      const isPartnerLink =
+        relationship.toLowerCase() === "spouse" ||
+        relationship.toLowerCase() === "partner" ||
+        relationship.toLowerCase() === "parent" ||
+        relationship.toLowerCase() === "guardian"
+
+      if (isPartnerLink) {
+        await importContactDependentsIntoHousehold({
+          supabase: access.supabase,
+          organizationId: access.organizationId,
+          familyId,
+          sourceContactId: member.id as string,
+          mirrorToContactId: anchor.id as string,
+        })
+        // Also import kids the anchor already has onto the linked spouse's panel.
+        await importContactDependentsIntoHousehold({
+          supabase: access.supabase,
+          organizationId: access.organizationId,
+          familyId,
+          sourceContactId: anchor.id as string,
+          mirrorToContactId: member.id as string,
+        })
+      }
+
+      await syncHouseholdFromParentContact({
+        supabase: access.supabase,
+        organizationId: access.organizationId,
+        primaryContactId: anchor.id as string,
+        primaryName: (anchor.full_name as string | null) ?? null,
+      })
+      await syncHouseholdFromParentContact({
+        supabase: access.supabase,
+        organizationId: access.organizationId,
+        primaryContactId: member.id as string,
+        primaryName: (member.full_name as string | null) ?? null,
+      })
+    } catch (error) {
+      console.warn(
+        "household dependent sync after linkExistingContact:",
+        error instanceof Error ? error.message : error
+      )
+    }
+
+    try {
+      const { syncContactAffiliations } = await import(
+        "@/lib/contacts/contact-affiliation-sync"
+      )
+      await syncContactAffiliations(
+        anchor.id as string,
+        access.organizationId,
+        access.supabase,
+        false
+      )
+      await syncContactAffiliations(
+        member.id as string,
+        access.organizationId,
+        access.supabase,
+        false
+      )
+    } catch (error) {
+      console.warn(
+        "affiliation sync after linkExistingContact:",
+        error instanceof Error ? error.message : error
+      )
+    }
 
     revalidatePath(`/contacts/${anchor.id}`)
     revalidatePath(`/contacts/${member.id}`)
@@ -412,15 +505,19 @@ export async function searchContactsForFamilyLinkAction(search: string, limit = 
 
 export async function removeHouseholdMemberAction(input: {
   familyId: string
-  memberContactId: string
+  memberId?: string | null
+  memberContactId?: string | null
+  memberPersonId?: string | null
 }) {
   const access = await requireContactsManageAccess()
   if (!access.ok) return { success: false as const, error: access.error }
 
   const familyId = input.familyId.trim()
-  const memberContactId = input.memberContactId.trim()
+  const memberId = input.memberId?.trim() || null
+  const memberContactId = input.memberContactId?.trim() || null
+  const memberPersonId = input.memberPersonId?.trim() || null
 
-  if (!familyId || !memberContactId) {
+  if (!familyId || (!memberId && !memberContactId && !memberPersonId)) {
     return { success: false as const, error: "Household and member are required." }
   }
 
@@ -429,10 +526,14 @@ export async function removeHouseholdMemberAction(input: {
       supabase: access.supabase,
       organizationId: access.organizationId,
       familyId,
+      memberId,
       memberContactId,
+      memberPersonId,
     })
 
-    revalidatePath(`/contacts/${memberContactId}`)
+    if (memberContactId) {
+      revalidatePath(`/contacts/${memberContactId}`)
+    }
     for (const contactId of result.remainingContactIds) {
       revalidatePath(`/contacts/${contactId}`)
     }

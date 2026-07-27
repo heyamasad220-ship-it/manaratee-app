@@ -34,6 +34,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
+import { ListPagination } from "@/components/ui/list-pagination"
+import {
+  DEFAULT_LIST_PAGE_SIZE,
+  slicePageItems,
+} from "@/lib/ui/list-pagination"
 import {
   Search,
   UserPlus,
@@ -43,8 +48,6 @@ import {
   Trash2,
   Clock,
   Calendar,
-  ChevronLeft,
-  ChevronRight,
   User,
 } from "lucide-react"
 import {
@@ -63,8 +66,6 @@ import { HrPositionsManager } from "@/components/hr/hr-positions-manager"
 
 type StaffType = "full_time" | "part_time" | "temporary" | "contract" | "seasonal"
 type StaffStatus = "active" | "inactive" | "on_leave" | "pending"
-
-const PAGE_SIZE = 10
 
 const STAFF_TYPE_OPTIONS: { value: StaffType; label: string }[] = [
   { value: "full_time", label: "Full-Time" },
@@ -159,6 +160,7 @@ export function StaffRecordsClient({
   const [departmentFilter, setDepartmentFilter] = useState("all")
   const [positionFilter, setPositionFilter] = useState("all")
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(DEFAULT_LIST_PAGE_SIZE)
   const [applicationsCount, setApplicationsCount] = useState(0)
   const [isAddStaffOpen, setIsAddStaffOpen] = useState(false)
   const [savingStaff, setSavingStaff] = useState(false)
@@ -460,11 +462,8 @@ export function StaffRecordsClient({
     positionFilter,
   ])
 
-  const pageCount = Math.max(1, Math.ceil(filteredStaff.length / PAGE_SIZE))
-  const currentPage = Math.min(page, pageCount)
-  const pageStart = filteredStaff.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1
-  const pageEnd = Math.min(currentPage * PAGE_SIZE, filteredStaff.length)
-  const pagedStaff = filteredStaff.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  const currentPage = Math.min(page, Math.max(1, Math.ceil(filteredStaff.length / pageSize) || 1))
+  const pagedStaff = slicePageItems(filteredStaff, currentPage, pageSize)
 
   function getInitials(person: StaffMember) {
     return `${person.first_name?.[0] || ""}${person.last_name?.[0] || ""}`.toUpperCase()
@@ -688,55 +687,17 @@ export function StaffRecordsClient({
         }
         footer={
           isRosterView ? (
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-muted-foreground">
-              Showing {pageStart} to {pageEnd} of {filteredStaff.length} employees.
-            </p>
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                disabled={currentPage <= 1}
-                onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-              >
-                <ChevronLeft className="size-4" />
-              </Button>
-              {Array.from({ length: pageCount }, (_, index) => index + 1)
-                .filter((pageNumber) => {
-                  if (pageCount <= 5) return true
-                  return Math.abs(pageNumber - currentPage) <= 1 || pageNumber === 1 || pageNumber === pageCount
-                })
-                .map((pageNumber, index, list) => {
-                  const prev = list[index - 1]
-                  const showEllipsis = prev != null && pageNumber - prev > 1
-                  return (
-                    <span key={pageNumber} className="flex items-center gap-2">
-                      {showEllipsis ? <span className="text-muted-foreground">…</span> : null}
-                      <Button
-                        type="button"
-                        variant={pageNumber === currentPage ? "default" : "outline"}
-                        size="sm"
-                        className="min-w-8"
-                        onClick={() => setPage(pageNumber)}
-                      >
-                        {pageNumber}
-                      </Button>
-                    </span>
-                  )
-                })}
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                disabled={currentPage >= pageCount}
-                onClick={() => setPage((prev) => Math.min(pageCount, prev + 1))}
-              >
-                <ChevronRight className="size-4" />
-              </Button>
-              <span className="ml-2 text-sm text-muted-foreground">{PAGE_SIZE} / page</span>
-            </div>
-          </div>
+            <ListPagination
+              page={currentPage}
+              pageSize={pageSize}
+              total={filteredStaff.length}
+              entryLabel="employees"
+              onPageChange={setPage}
+              onPageSizeChange={(next) => {
+                setPageSize(next)
+                setPage(1)
+              }}
+            />
           ) : undefined
         }
       >

@@ -33,11 +33,20 @@ export function getTotalCapacityFromGroups(
 
 export function getGroupGenderLabel(genders: string[]) {
   if (genders.length === 0) {
-    return "Any gender"
+    return "Both"
   }
 
   if (genders.length === 1) {
-    return genders[0]
+    return genders[0] === "All" ? "Both" : genders[0]
+  }
+
+  const normalized = new Set(genders.map((gender) => gender.trim()).filter(Boolean))
+  if (
+    normalized.size === 2 &&
+    normalized.has("Male") &&
+    normalized.has("Female")
+  ) {
+    return "Both"
   }
 
   return genders.join(", ")

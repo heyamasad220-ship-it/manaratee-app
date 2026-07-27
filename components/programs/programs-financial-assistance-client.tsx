@@ -10,30 +10,38 @@ import {
   PaymentPlansReportPanel,
 } from "@/components/programs/programs-fa-report-panels"
 import { PROGRAMS_FINANCIAL_ASSISTANCE_PATH } from "@/lib/applications/application-routes"
+import { FINANCE_FINANCIAL_ASSISTANCE_PATH } from "@/lib/finance/finance-paths"
 import type { ProgramFinancialAssistanceSettings } from "@/lib/programs/program-financial-assistance-actions"
 
 export function ProgramsFinancialAssistanceClient({
   initialPrograms,
   canManage,
+  basePath = FINANCE_FINANCIAL_ASSISTANCE_PATH,
 }: {
   initialPrograms: ProgramFinancialAssistanceSettings[]
   canManage: boolean
+  /** Canonical FA hub path (Finance). Legacy Programs path still accepted. */
+  basePath?: string
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const resolvedBasePath =
+    basePath ||
+    FINANCE_FINANCIAL_ASSISTANCE_PATH ||
+    PROGRAMS_FINANCIAL_ASSISTANCE_PATH
 
   React.useEffect(() => {
     if (searchParams.get("tab") === "financial-assistance") {
       const next = new URLSearchParams(searchParams.toString())
       next.set("tab", "reports")
-      router.replace(`${PROGRAMS_FINANCIAL_ASSISTANCE_PATH}?${next.toString()}`)
+      router.replace(`${resolvedBasePath}?${next.toString()}`)
     }
-  }, [router, searchParams])
+  }, [router, searchParams, resolvedBasePath])
 
   return (
     <ModuleApplicationsClient
       moduleOwner="programs"
-      basePath={PROGRAMS_FINANCIAL_ASSISTANCE_PATH}
+      basePath={resolvedBasePath}
       title="Financial Assistance"
       lockedApplicationType="financial_aid"
       hubApplicationTypes={["financial_aid"]}

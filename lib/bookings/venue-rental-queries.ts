@@ -7,6 +7,9 @@ import {
 
 import {
   formatVenueRentalDateTime,
+  formatVenueRentalSpaceLine,
+  resolveVenueRentalEventTypeName,
+  resolveVenueRentalSubmittedAt,
   shortVenueRentalId,
 } from "./venue-rental-format"
 import {
@@ -19,11 +22,16 @@ import type {
   RentalReservationRecord,
   PublicAvailabilityBlock,
   VenueRentalDashboardStats,
+  VenueRentalPaymentReportRow,
   VenueRentalQueueRow,
   VenueRentalRecord,
   VenueRentalStatus,
 } from "./venue-rental-types"
-import { VENUE_RENTAL_STATUSES } from "./venue-rental-types"
+import {
+  RENTAL_PAYMENT_STATUSES,
+  RENTAL_PAYMENT_TYPES,
+  VENUE_RENTAL_STATUSES,
+} from "./venue-rental-types"
 
 type CustomerContactSummary = {
   name: string
@@ -526,6 +534,8 @@ export async function getVenueRentalQueueRows(options?: {
   statuses?: VenueRentalStatus[]
   customerUserId?: string
   organizationId?: string
+  /** Skip per-row conflict checks (use for payment reports / bulk lists). */
+  skipConflictCheck?: boolean
 }): Promise<VenueRentalQueueRow[]> {
   const supabase = await createClient()
   const organizationId = options?.organizationId ?? (await resolveOrganizationId())
@@ -667,6 +677,11 @@ export async function getVenueRentalQueueRows(options?: {
       profile: customer,
     })
 
+    const submittedAt = resolveVenueRentalSubmittedAt(
+      rental.notes,
+      rental.created_at
+    )
+
     rows.push({
       id: rental.id,
       shortId: shortVenueRentalId(rental.id),
@@ -679,9 +694,12 @@ export async function getVenueRentalQueueRows(options?: {
       billingContactId: rental.billing_contact_id,
       billingContactName: billingContact?.name ?? null,
       billingContactType: billingContact?.contactType ?? null,
-      eventTypeName: rental.venue_rental_event_type_id
-        ? eventTypeMap.get(rental.venue_rental_event_type_id) || null
-        : null,
+      eventTypeName: resolveVenueRentalEventTypeName(
+        rental.notes,
+        rental.venue_rental_event_type_id
+          ? eventTypeMap.get(rental.venue_rental_event_type_id) || null
+          : null
+      ),
       spaces: reservations.map((reservation) => ({
         venueId: reservation.venue_id,
         venueName: venueMap.get(reservation.venue_id) || "Space",
@@ -691,12 +709,18 @@ export async function getVenueRentalQueueRows(options?: {
       addons: addonsByRental.get(rental.id) || [],
       notes: rental.notes,
       guestCount: rental.expected_attendance,
-      submittedAt: rental.created_at,
-      submittedAtLabel: formatVenueRentalDateTime(rental.created_at),
+      submittedAt,
+      submittedAtLabel: formatVenueRentalDateTime(submittedAt),
       holdExpiresAt: rental.hold_expires_at,
-      hasConflict: await rentalHasConflicts(organizationId, reservations),
+      hasConflict: options?.skipConflictCheck
+        ? false
+        : await rentalHasConflicts(organizationId, reservations),
     })
   }
+
+  rows.sort(
+    (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
+  )
 
   return rows
 }
@@ -713,7 +737,9 @@ export function getVenueRentalDashboardStats(
 ): VenueRentalDashboardStats {
   return {
     awaitingApprovalCount: rows.filter(
-      (row) => row.status === VENUE_RENTAL_STATUSES.awaitingSupervisorApproval
+      (row) =>
+        row.status === VENUE_RENTAL_STATUSES.awaitingSupervisorApproval ||
+        row.status === VENUE_RENTAL_STATUSES.submitted
     ).length,
     awaitingPaymentCount: rows.filter(
       (row) =>
@@ -724,6 +750,143 @@ export function getVenueRentalDashboardStats(
     confirmedCount: rows.filter((row) => row.status === VENUE_RENTAL_STATUSES.confirmed).length,
     conflictCount: rows.filter((row) => row.hasConflict).length,
   }
+}
+
+function isPaidPaymentStatus(status: string) {
+  return (
+    status === RENTAL_PAYMENT_STATUSES.paidManually ||
+    status === RENTAL_PAYMENT_STATUSES.paidStripeLater
+  )
+}
+
+function summarizePaymentsForRental(payments: RentalPaymentRecord[]) {
+  let depositAmount = 0
+  let depositReceived = 0
+  let securityAmount = 0
+  let securityReceived = 0
+  let remainingAmount = 0
+  let remainingReceived = 0
+  let unpaidDepositId: string | null = null
+  let unpaidSecurityId: string | null = null
+  let unpaidRemainingId: string | null = null
+
+  for (const payment of payments) {
+    if (payment.payment_type === RENTAL_PAYMENT_TYPES.refund) continue
+    const amount = Number(payment.amount) || 0
+    const paid = isPaidPaymentStatus(payment.status)
+
+    if (payment.payment_type === RENTAL_PAYMENT_TYPES.deposit) {
+      depositAmount += amount
+      if (paid) depositReceived += amount
+      else if (!unpaidDepositId) unpaidDepositId = payment.id
+    } else if (payment.payment_type === RENTAL_PAYMENT_TYPES.securityDeposit) {
+      securityAmount += amount
+      if (paid) securityReceived += amount
+      else if (!unpaidSecurityId) unpaidSecurityId = payment.id
+    } else if (
+      payment.payment_type === RENTAL_PAYMENT_TYPES.remainingBalance ||
+      payment.payment_type === RENTAL_PAYMENT_TYPES.addonFee
+    ) {
+      remainingAmount += amount
+      if (paid) remainingReceived += amount
+      else if (
+        payment.payment_type === RENTAL_PAYMENT_TYPES.remainingBalance &&
+        !unpaidRemainingId
+      ) {
+        unpaidRemainingId = payment.id
+      }
+    }
+  }
+
+  const totalFee = depositAmount + securityAmount + remainingAmount
+  const amountReceived = depositReceived + securityReceived + remainingReceived
+  const remainingDue = Math.max(0, remainingAmount - remainingReceived)
+  const balanceDue = Math.max(0, totalFee - amountReceived)
+
+  let paymentBalance: VenueRentalPaymentReportRow["paymentBalance"] = "no_payments"
+  if (payments.some((p) => p.payment_type !== RENTAL_PAYMENT_TYPES.refund)) {
+    if (balanceDue <= 0 && amountReceived > 0) paymentBalance = "paid"
+    else if (amountReceived > 0 && balanceDue > 0) paymentBalance = "partial"
+    else paymentBalance = "unpaid"
+  }
+
+  return {
+    totalFee,
+    depositAmount,
+    depositReceived,
+    securityAmount,
+    securityReceived,
+    remainingAmount,
+    remainingReceived,
+    remainingDue,
+    amountReceived,
+    balanceDue,
+    paymentBalance,
+    unpaidPaymentIds: {
+      depositId: unpaidDepositId,
+      securityId: unpaidSecurityId,
+      remainingId: unpaidRemainingId,
+    },
+  }
+}
+
+/** Staff payment report rows for Venue Rentals → Payments. */
+export async function getVenueRentalPaymentReportRows(): Promise<
+  VenueRentalPaymentReportRow[]
+> {
+  const supabase = await createClient()
+  const organizationId = await resolveOrganizationId()
+
+  if (!organizationId) {
+    return []
+  }
+
+  const queueRows = await getVenueRentalQueueRows({ skipConflictCheck: true })
+  if (!queueRows.length) {
+    return []
+  }
+
+  const rentalIds = queueRows.map((row) => row.id)
+  const { data: paymentRows, error } = await supabase
+    .from("rental_payments")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .in("venue_rental_id", rentalIds)
+
+  if (error && error.code !== "42P01") {
+    console.error(error)
+    throw new Error("Failed to load rental payments")
+  }
+
+  const paymentsByRental = new Map<string, RentalPaymentRecord[]>()
+  for (const payment of (paymentRows || []) as RentalPaymentRecord[]) {
+    const list = paymentsByRental.get(payment.venue_rental_id) || []
+    list.push(payment)
+    paymentsByRental.set(payment.venue_rental_id, list)
+  }
+
+  return queueRows.map((row) => {
+    const payments = paymentsByRental.get(row.id) || []
+    const summary = summarizePaymentsForRental(payments)
+    const primary = row.spaces[0]
+    const spaceLabel = primary
+      ? formatVenueRentalSpaceLine(primary.venueName, primary.startAt, primary.endAt)
+      : "—"
+
+    return {
+      id: row.id,
+      shortId: row.shortId,
+      status: row.status,
+      statusLabel: row.statusLabel,
+      customerName: row.customerName,
+      customerEmail: row.customerEmail,
+      customerPhone: row.customerPhone,
+      eventTypeName: row.eventTypeName,
+      spaceLabel,
+      eventStartAt: primary?.startAt ?? null,
+      ...summary,
+    }
+  })
 }
 
 export async function getCustomerVenueRentals(

@@ -272,6 +272,8 @@ export const ProgramCapacityGroupEditor = React.forwardRef<
     onChange: (groups: ProgramCapacityGroupInput[]) => void
     totalCapacity: number
     onTotalCapacityChange: (capacity: number) => void
+    /** When true, parent owns the Program Capacity field. */
+    hideTotalField?: boolean
   }
 >(function ProgramCapacityGroupEditor(
   {
@@ -281,6 +283,7 @@ export const ProgramCapacityGroupEditor = React.forwardRef<
     onChange,
     totalCapacity,
     onTotalCapacityChange,
+    hideTotalField = false,
   },
   ref
 ) {
@@ -504,7 +507,7 @@ export const ProgramCapacityGroupEditor = React.forwardRef<
 
     if (draft.grade_levels.length > 0) {
       return [
-        { value: "", label: "Any gender" },
+        { value: "", label: "Both" },
         { value: "Male", label: "Male" },
         { value: "Female", label: "Female" },
       ]
@@ -519,7 +522,7 @@ export const ProgramCapacityGroupEditor = React.forwardRef<
     }))
 
     if (draft.genders.length === 0) {
-      return [{ value: "", label: "Any gender" }, ...genderOptions]
+      return [{ value: "", label: "Both" }, ...genderOptions]
     }
 
     return genderOptions
@@ -808,33 +811,35 @@ export const ProgramCapacityGroupEditor = React.forwardRef<
           </div>
         </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <div className="space-y-2">
-          <Label htmlFor="total-capacity">
-            {usingGroupCapacity ? "Total Capacity" : "Program Capacity"}
-          </Label>
-          <Input
-            id="total-capacity"
-            type="number"
-            min="0"
-            value={totalCapacity}
-            readOnly={usingGroupCapacity}
-            onChange={(event) => {
-              if (!usingGroupCapacity) {
-                onTotalCapacityChange(Number(event.target.value || 0))
-              }
-            }}
-            onKeyDown={preventFormSubmitOnEnter}
-            placeholder="50"
-            className={usingGroupCapacity ? "bg-muted" : undefined}
-          />
-          {usingGroupCapacity ? (
-            <p className="text-xs text-muted-foreground">
-              Total is calculated automatically from capacity groups.
-            </p>
-          ) : null}
+      {!hideTotalField ? (
+        <div className="grid gap-4 md:grid-cols-3">
+          <div className="space-y-2">
+            <Label htmlFor="total-capacity">
+              {usingGroupCapacity ? "Total Capacity" : "Program Capacity"}
+            </Label>
+            <Input
+              id="total-capacity"
+              type="number"
+              min="0"
+              value={totalCapacity}
+              readOnly={usingGroupCapacity}
+              onChange={(event) => {
+                if (!usingGroupCapacity) {
+                  onTotalCapacityChange(Number(event.target.value || 0))
+                }
+              }}
+              onKeyDown={preventFormSubmitOnEnter}
+              placeholder="50"
+              className={usingGroupCapacity ? "bg-muted" : undefined}
+            />
+            {usingGroupCapacity ? (
+              <p className="text-xs text-muted-foreground">
+                Total is calculated automatically from capacity groups.
+              </p>
+            ) : null}
+          </div>
         </div>
-      </div>
+      ) : null}
     </div>
   )
 })

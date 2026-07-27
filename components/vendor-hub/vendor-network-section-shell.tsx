@@ -1,6 +1,6 @@
-import Link from "next/link"
-
 import { ModuleTabNav, type ModuleTabNavItem } from "@/components/layout/module-tab-nav"
+import { PageBreadcrumbs } from "@/components/navigation/page-breadcrumbs"
+import { VENDOR_HUB_ROUTES } from "@/lib/vendor-hub/vendor-hub-routes"
 
 export function VendorNetworkSectionShell({
   title,
@@ -13,22 +13,25 @@ export function VendorNetworkSectionShell({
   tabs?: ModuleTabNavItem[]
   children: React.ReactNode
 }) {
+  const items =
+    title === "Vendor Network"
+      ? [
+          { label: "Vendor Hub", href: "/vendor-hub" },
+          { label: "Vendor Network" },
+        ]
+      : [
+          { label: "Vendor Hub", href: "/vendor-hub" },
+          {
+            label: "Vendor Network",
+            href: VENDOR_HUB_ROUTES.network.root,
+          },
+          { label: title },
+        ]
+
   return (
     <>
       <div className="border-b border-border bg-card px-6 pt-6">
-        <nav className="mb-2 text-sm text-muted-foreground">
-          <Link href="/vendor-hub" className="hover:text-foreground">
-            Vendor Hub
-          </Link>
-          <span className="mx-2">/</span>
-          <span className="text-foreground">Vendor Network</span>
-          {title !== "Vendor Network" ? (
-            <>
-              <span className="mx-2">/</span>
-              <span className="text-foreground">{title}</span>
-            </>
-          ) : null}
-        </nav>
+        <PageBreadcrumbs className="mb-2" items={items} />
 
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>

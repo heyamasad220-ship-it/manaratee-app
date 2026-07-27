@@ -30,8 +30,8 @@ export function ContactDepartmentWorkspacePanel({
           Department workspace
         </CardTitle>
         <CardDescription>
-          Open the department workspace (overview, rosters, years/seasons, payroll,
-          and more) as Department Head.
+          Open the department workspace (overview, programs, students, schedule,
+          payroll, and more) as Department Head.
         </CardDescription>
       </CardHeader>
       <CardContent>

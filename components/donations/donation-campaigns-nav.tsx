@@ -5,6 +5,11 @@ import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { isDonationCampaignsOverviewPath } from "@/lib/donations/donation-campaign-paths"
 
+/**
+ * @deprecated Campaigns no longer uses an Overview/Pledges tab bar —
+ * Pledges is a top-level Fund Development sidebar item.
+ * Kept for any residual imports.
+ */
 export type DonationCampaignsTab = {
   label: string
   href: string
@@ -20,12 +25,6 @@ export const DONATION_CAMPAIGNS_TABS: DonationCampaignsTab[] = [
     href: "/donations/campaigns",
     matchPrefix: "/donations/campaigns",
     overviewOnly: true,
-  },
-  {
-    label: "Pledges",
-    href: "/donations/campaigns/pledges",
-    matchPrefix: "/donations/campaigns/pledges",
-    extraMatchPrefixes: ["/donations/reports/pledges", "/donations/pledges"],
   },
 ]
 
@@ -59,6 +58,10 @@ function isTabActive(tab: DonationCampaignsTab, pathname: string, tabs: Donation
 export function DonationCampaignsNav({ canManage }: { canManage: boolean }) {
   const pathname = usePathname()
   const visibleTabs = DONATION_CAMPAIGNS_TABS.filter((tab) => !tab.requiresManage || canManage)
+
+  if (visibleTabs.length <= 1) {
+    return null
+  }
 
   return (
     <div className="border-b border-border bg-background px-6">

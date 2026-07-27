@@ -13,6 +13,10 @@ import {
   getTodayDateString,
   shouldCloseEnrollmentForStatus,
 } from "@/lib/programs/program-enrollment-availability"
+import {
+  normalizeProgramKind,
+  type ProgramKind,
+} from "@/lib/programs/program-kind"
 
 function isMissingProgramColumnError(error: { message?: string; code?: string }) {
   const message = (error.message || "").toLowerCase()
@@ -52,6 +56,15 @@ type CreateProgramInput = {
   department_id?: string | null
   flyer_url?: string | null
   background_color?: string | null
+  /** academic (QIL-style) or seasonal (camp). Default academic. */
+  program_kind?: ProgramKind
+  /** Delivery for seasonal leaf offering (default in_person). */
+  delivery_format?: "in_person" | "online" | "hybrid"
+  /**
+   * When false, customers Register & pay with no Apply/Approve step.
+   * Seasonal defaults to open enrollment; academic defaults to application required.
+   */
+  application_required?: boolean
   program_type?: "adult" | "youth"
   start_date?: string | null
   end_date?: string | null
@@ -74,8 +87,10 @@ type CreateProgramInput = {
 }
 
 /**
- * Create program identity + optional defaults only.
- * Does not create a default offering (S4 — programs may have 0 offerings).
+ * Create program identity + optional defaults.
+ * Academic: no offering (add offerings later).
+ * Seasonal: creates the single leaf offering (same name) so fees/sessions work;
+ * staff manage it as the season — no offerings chrome.
  */
 export async function createProgram(input: CreateProgramInput) {
   const supabase = await createClient()
@@ -99,10 +114,9 @@ export async function createProgram(input: CreateProgramInput) {
     : input.enrollment_close_date || null
 
   const programType = normalizeProgramAudienceType(input.program_type)
+  const programKind = normalizeProgramKind(input.program_kind)
 
-  const { data, error } = await supabase
-    .from("programs")
-    .insert({
+  const insertPayload: Record<string, unknown> = {
       organization_id: organizationId,
       name: input.name,
       subtitle: input.subtitle || null,
@@ -110,6 +124,7 @@ export async function createProgram(input: CreateProgramInput) {
       department_id: input.department_id || null,
       flyer_url: input.flyer_url || null,
       background_color: input.background_color || null,
+      program_kind: programKind,
       start_date: input.start_date || null,
       end_date: input.end_date || null,
       enrollment_open_date: input.enrollment_open_date || null,
@@ -140,9 +155,23 @@ export async function createProgram(input: CreateProgramInput) {
       waitlist: 0,
       status,
       visibility: input.visibility || "public",
-    })
+  }
+
+  let { data, error } = await supabase
+    .from("programs")
+    .insert(insertPayload)
     .select("id")
     .single()
+
+  if (error && isMissingProgramColumnError(error)) {
+    const retryPayload = omitUnavailableProgramColumns(insertPayload, error)
+    delete retryPayload.program_kind
+    ;({ data, error } = await supabase
+      .from("programs")
+      .insert(retryPayload)
+      .select("id")
+      .single())
+  }
 
   if (error) {
     console.error(error)
@@ -151,13 +180,40 @@ export async function createProgram(input: CreateProgramInput) {
 
   const programId = data.id as string
 
+  let offeringId: string | null = null
+  if (programKind === "seasonal") {
+    const { createProgramOffering } = await import(
+      "@/lib/programs/program-offering-actions"
+    )
+    const offering = await createProgramOffering(programId, {
+      name: input.name.trim(),
+      offering_type: "summer",
+      start_date: input.start_date || null,
+      end_date: input.end_date || null,
+      enrollment_open_date: input.enrollment_open_date || null,
+      enrollment_close_date: enrollmentCloseDate,
+      status: status === "draft" ? "draft" : "active",
+      // Seasonal leaf is the operational SSOT — no inherit toggles in UI.
+      inherit_dates: false,
+      inherit_eligibility: false,
+      inherit_enrollment: false,
+      attributes: {
+        delivery_format: input.delivery_format || "in_person",
+        audience_type: programType,
+        application_required:
+          input.application_required ?? programKind !== "seasonal",
+      },
+    })
+    offeringId = offering.id
+  }
+
   revalidatePath("/programs")
   revalidatePath("/programs/catalog")
   if (input.department_id) {
     revalidatePath(workforceDepartmentDetailPath(input.department_id))
   }
 
-  return programId
+  return { programId, offeringId, programKind }
 }
 
 type UpdateProgramInput = {

@@ -87,6 +87,8 @@ function offeringToDraft(offering: ProgramOffering): ProgramOfferingInput {
     enrollment_open_date: offering.enrollment_open_date,
     enrollment_close_date: offering.enrollment_close_date,
     status: offering.status,
+    flyer_url: offering.flyer_url ?? null,
+    background_color: offering.background_color ?? null,
     attributes: {
       delivery_format: offering.delivery_format ?? "in_person",
     },

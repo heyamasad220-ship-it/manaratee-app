@@ -48,8 +48,8 @@ export function NeedSpaceIntakeCard({
         </CardTitle>
         <CardDescription>
           {facilitiesOnly
-            ? "Review reservations and setup details on the facilities schedule."
-            : "Departments request space in their module. Facilities operates the building from the facilities schedule and reservation center."}
+            ? "Review reservations and setup details on the calendar."
+            : "Departments request space in their module. Facilities operates the building from Overview, Reservation Center, and Calendar."}
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-3 md:grid-cols-2">

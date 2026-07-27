@@ -10,6 +10,7 @@ import {
 } from "@/lib/permissions/permissions"
 import type { ProgramStatus } from "@/lib/programs/program-status"
 import { PROGRAMS_FINANCIAL_ASSISTANCE_PATH } from "@/lib/applications/application-routes"
+import { FINANCE_FINANCIAL_ASSISTANCE_PATH } from "@/lib/finance/finance-paths"
 
 export type ProgramFinancialAssistanceSettings = {
   id: string
@@ -34,6 +35,7 @@ async function requireProgramsManagePermission() {
 }
 
 function revalidateFinancialAssistancePaths(programId: string) {
+  revalidatePath(FINANCE_FINANCIAL_ASSISTANCE_PATH)
   revalidatePath(PROGRAMS_FINANCIAL_ASSISTANCE_PATH)
   revalidatePath(`/programs/${programId}`)
   revalidatePath(`/customer/programs/${programId}/financial-assistance`)

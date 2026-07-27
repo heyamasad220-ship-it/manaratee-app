@@ -2,17 +2,11 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
-import { CalendarDays, Pencil, Plus, Users } from "lucide-react"
+import { CalendarDays, Pencil, Plus } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -64,10 +58,8 @@ type SessionDraft = {
   end_date: string
   registration_open_date: string
   registration_close_date: string
-  capacity: string
   price: string
   enable_waitlist: boolean
-  waitlist_capacity: string
   status: ProgramSessionStatus
 }
 
@@ -78,10 +70,8 @@ const emptyDraft: SessionDraft = {
   end_date: "",
   registration_open_date: "",
   registration_close_date: "",
-  capacity: "0",
   price: "0",
   enable_waitlist: true,
-  waitlist_capacity: "",
   status: "active",
 }
 
@@ -99,11 +89,8 @@ function sessionToDraft(session: ProgramSession): SessionDraft {
     end_date: session.end_date ?? "",
     registration_open_date: session.registration_open_date ?? "",
     registration_close_date: session.registration_close_date ?? "",
-    capacity: String(session.capacity),
     price: String(session.price),
     enable_waitlist: session.enable_waitlist,
-    waitlist_capacity:
-      session.waitlist_capacity == null ? "" : String(session.waitlist_capacity),
     status: session.status,
   }
 }
@@ -116,13 +103,11 @@ function draftToPayload(draft: SessionDraft) {
     end_date: draft.end_date || null,
     registration_open_date: draft.registration_open_date || null,
     registration_close_date: draft.registration_close_date || null,
-    capacity: Number(draft.capacity || 0),
+    // Capacity is managed on the program/offering, not per session.
+    capacity: 0,
     price: Number(draft.price || 0),
     enable_waitlist: draft.enable_waitlist,
-    waitlist_capacity:
-      draft.waitlist_capacity === ""
-        ? null
-        : Number(draft.waitlist_capacity || 0),
+    waitlist_capacity: null as number | null,
     status: draft.status,
   }
 }
@@ -206,17 +191,6 @@ function SessionFormFields({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor={`${idPrefix}-capacity`}>Capacity</Label>
-        <Input
-          id={`${idPrefix}-capacity`}
-          type="number"
-          min="0"
-          value={draft.capacity}
-          onChange={(event) => onChange("capacity", event.target.value)}
-        />
-      </div>
-
-      <div className="space-y-2">
         <Label htmlFor={`${idPrefix}-price`}>Price</Label>
         <Input
           id={`${idPrefix}-price`}
@@ -225,20 +199,6 @@ function SessionFormFields({
           step="0.01"
           value={draft.price}
           onChange={(event) => onChange("price", event.target.value)}
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor={`${idPrefix}-waitlist-capacity`}>Waitlist Capacity</Label>
-        <Input
-          id={`${idPrefix}-waitlist-capacity`}
-          type="number"
-          min="0"
-          value={draft.waitlist_capacity}
-          onChange={(event) =>
-            onChange("waitlist_capacity", event.target.value)
-          }
-          placeholder="Optional"
         />
       </div>
 
@@ -270,7 +230,7 @@ function SessionFormFields({
         <div>
           <p className="text-sm font-medium">Enable waitlist</p>
           <p className="text-xs text-muted-foreground">
-            Allow customers to join a waitlist when this session is full.
+            Allow customers to join a waitlist when the program is full.
           </p>
         </div>
       </label>
@@ -282,10 +242,16 @@ export function ProgramSessionsEditor({
   programId,
   offeringId,
   sessions: initialSessions,
+  sessionRegistrationEnabled = true,
+  plain = false,
 }: {
   programId: string
   offeringId: string
   sessions: ProgramSession[]
+  /** When false, still allow staff to add sessions; show a tip for enrollment model. */
+  sessionRegistrationEnabled?: boolean
+  /** Hide nested card chrome when inside offering manage accordion. */
+  plain?: boolean
 }) {
   const router = useRouter()
   const [sessions, setSessions] = React.useState(() =>
@@ -373,153 +339,174 @@ export function ProgramSessionsEditor({
 
   const isFormOpen = panelMode !== "closed"
 
-  return (
-    <Card className="border-0 shadow-none">
-      <CardHeader className="px-0 pt-0">
-        <CardTitle className="text-base">Sessions</CardTitle>
-        <CardDescription>
-          Add weeks, months, or class sections for this offering.
-        </CardDescription>
-      </CardHeader>
+  const addSessionButton = !isFormOpen ? (
+    <Button type="button" onClick={openAddForm} disabled={isSaving}>
+      <Plus className="mr-2 h-4 w-4" />
+      Add Session
+    </Button>
+  ) : null
 
-      <CardContent className="space-y-6 px-0 pb-0">
-        {sessions.length === 0 ? (
-          <div className="rounded-lg border border-dashed bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground">
-            No sessions yet. Click Add Session to create your first one.
-          </div>
-        ) : (
-          <div className="rounded-lg border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Session</TableHead>
-                  <TableHead>Dates</TableHead>
-                  <TableHead className="text-right">Capacity</TableHead>
-                  <TableHead className="text-right">Price</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="w-[80px] text-right">Actions</TableHead>
+  const body = (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 space-y-1">
+          {!plain ? (
+            <>
+              <p className="text-base font-semibold leading-none">Sessions</p>
+              <p className="text-sm text-muted-foreground">
+                Add weeks, months, or class sections for this offering.
+              </p>
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Add weeks, months, or class sections for this offering. Sessions
+              save immediately.
+            </p>
+          )}
+          {!sessionRegistrationEnabled ? (
+            <p className="text-sm text-muted-foreground">
+              Tip: enable Selected Sessions or Day Pass under Enrollment so
+              customers can register for these sessions.
+            </p>
+          ) : null}
+        </div>
+        {addSessionButton}
+      </div>
+
+      {sessions.length === 0 && !isFormOpen ? (
+        <div className="rounded-lg border border-dashed bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground">
+          No sessions yet. Click Add Session to create your first one.
+        </div>
+      ) : null}
+
+      {sessions.length > 0 ? (
+        <div className="rounded-lg border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Session</TableHead>
+                <TableHead>Dates</TableHead>
+                <TableHead className="text-right">Price</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="w-[80px] text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sessions.map((session) => (
+                <TableRow
+                  key={session.id}
+                  className={
+                    editingSessionId === session.id ? "bg-muted/30" : undefined
+                  }
+                >
+                  <TableCell className="whitespace-normal font-medium">
+                    {session.name}
+                  </TableCell>
+                  <TableCell className="whitespace-normal text-sm text-muted-foreground">
+                    {formatDate(session.start_date)} –{" "}
+                    {formatDate(session.end_date)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {formatCurrency(session.price)}
+                  </TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={
+                        session.status === "active" ? "default" : "secondary"
+                      }
+                    >
+                      {session.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => openEditForm(session)}
+                      disabled={isSaving}
+                    >
+                      <Pencil className="mr-1 h-3.5 w-3.5" />
+                      Edit
+                    </Button>
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sessions.map((session) => (
-                  <TableRow
-                    key={session.id}
-                    className={
-                      editingSessionId === session.id ? "bg-muted/30" : undefined
-                    }
-                  >
-                    <TableCell className="whitespace-normal font-medium">
-                      {session.name}
-                    </TableCell>
-                    <TableCell className="whitespace-normal text-sm text-muted-foreground">
-                      {formatDate(session.start_date)} –{" "}
-                      {formatDate(session.end_date)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {session.enrolled}/{session.capacity}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {formatCurrency(session.price)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          session.status === "active" ? "default" : "secondary"
-                        }
-                      >
-                        {session.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => openEditForm(session)}
-                        disabled={isSaving}
-                      >
-                        <Pencil className="mr-1 h-3.5 w-3.5" />
-                        Edit
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      ) : null}
 
-        <div className="space-y-3">
-          <p className="text-xs text-muted-foreground">
-            Sessions save immediately. You do not need to click Save on the
-            program form.
+      {isFormOpen ? (
+        <div
+          className="space-y-4 rounded-lg border bg-muted/20 p-4"
+          onKeyDown={preventFormSubmitOnEnter}
+        >
+          <p className="text-sm font-medium">
+            {panelMode === "edit" ? "Edit session" : "Add session"}
           </p>
 
-          {isFormOpen ? (
-            <div
-              className="space-y-4 rounded-lg border bg-muted/20 p-4"
-              onKeyDown={preventFormSubmitOnEnter}
+          <SessionFormFields
+            draft={draft}
+            idPrefix={panelMode === "edit" ? "edit-session" : "add-session"}
+            onChange={updateDraft}
+          />
+
+          {error ? (
+            <p className="text-sm text-destructive">{error}</p>
+          ) : null}
+
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              type="button"
+              onClick={() => void handleSaveSession()}
+              disabled={isSaving}
             >
-              <p className="text-sm font-medium">
-                {panelMode === "edit" ? "Edit session" : "Add session"}
-              </p>
-
-              <SessionFormFields
-                draft={draft}
-                idPrefix={panelMode === "edit" ? "edit-session" : "add-session"}
-                onChange={updateDraft}
-              />
-
-              {error ? (
-                <p className="text-sm text-destructive">{error}</p>
-              ) : null}
-
-              <div className="flex flex-wrap items-center gap-3">
-                <Button
-                  type="button"
-                  onClick={() => void handleSaveSession()}
-                  disabled={isSaving}
-                >
-                  {isSaving
-                    ? panelMode === "edit"
-                      ? "Saving..."
-                      : "Adding..."
-                    : panelMode === "edit"
-                      ? "Save changes"
-                      : "Add Session"}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={closeForm}
-                  disabled={isSaving}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <Button type="button" onClick={openAddForm}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Session
+              {isSaving
+                ? panelMode === "edit"
+                  ? "Saving..."
+                  : "Adding..."
+                : panelMode === "edit"
+                  ? "Save changes"
+                  : "Add Session"}
             </Button>
-          )}
-        </div>
-
-        {sessions.length > 0 ? (
-          <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-            <div className="flex items-center gap-2">
-              <CalendarDays className="h-4 w-4" />
-              {sessions.length} session{sessions.length === 1 ? "" : "s"}
-            </div>
-            <div className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              {sessions.reduce((sum, session) => sum + session.enrolled, 0)}{" "}
-              total enrolled
-            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={closeForm}
+              disabled={isSaving}
+            >
+              Cancel
+            </Button>
           </div>
-        ) : null}
-      </CardContent>
+        </div>
+      ) : null}
+
+      {sessions.length > 0 && !plain ? (
+        <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <CalendarDays className="h-4 w-4" />
+            {sessions.length} session{sessions.length === 1 ? "" : "s"}
+          </div>
+        </div>
+      ) : null}
+
+      {!plain ? (
+        <p className="text-xs text-muted-foreground">
+          Sessions save immediately. You do not need to click Save on the
+          program form.
+        </p>
+      ) : null}
+    </div>
+  )
+
+  if (plain) {
+    return body
+  }
+
+  return (
+    <Card className="border-0 shadow-none">
+      <CardContent className="px-0 pb-0 pt-0">{body}</CardContent>
     </Card>
   )
 }

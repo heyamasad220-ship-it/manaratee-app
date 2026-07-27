@@ -16,6 +16,7 @@ import {
 } from "lucide-react"
 
 import { ProgramFlyerField } from "@/components/programs/edit/program-flyer-field"
+import { DepartmentYearConfigureDialog } from "@/components/departments/department-year-configure-dialog"
 import { ProgramCardActions } from "@/components/programs/program-card-actions"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -40,10 +41,9 @@ import {
 import { StatCard, StatCardsRow } from "@/components/ui/stat-card"
 import type { DepartmentYearProgramRow } from "@/lib/departments/department-active-programs"
 import {
-  archiveDepartmentYearProgramAction,
+  closeDepartmentYearProgramAction,
   createDepartmentYearProgramAction,
   fetchDepartmentYearProgramsAction,
-  updateDepartmentYearFlyerAction,
   type DepartmentYearProgramsBundle,
 } from "@/lib/departments/department-year-actions"
 import {
@@ -57,6 +57,7 @@ import {
   programCountPhrase,
 } from "@/lib/programs/program-display-labels"
 import { getProgramStatusLabel, type ProgramStatus } from "@/lib/programs/program-status"
+import { formatProgramGenderLabel } from "@/lib/programs/program-eligibility-display"
 import { cn } from "@/lib/utils"
 
 function formatMoney(value: number) {
@@ -109,6 +110,7 @@ function statusBadgeClass(status: string) {
   if (status === "active") return "bg-emerald-50 text-emerald-800"
   if (status === "draft") return "bg-slate-100 text-slate-700"
   if (status === "paused") return "bg-amber-50 text-amber-800"
+  if (status === "closed") return "bg-slate-200 text-slate-700"
   return "bg-muted text-muted-foreground"
 }
 
@@ -116,23 +118,28 @@ function statusDotClass(status: string) {
   if (status === "active") return "bg-emerald-500"
   if (status === "draft") return "bg-slate-400"
   if (status === "paused") return "bg-amber-500"
+  if (status === "closed") return "bg-slate-500"
   return "bg-muted-foreground"
 }
 
 export function DepartmentOverviewPanel({
   departmentId,
   departmentName,
+  highlightYearProgramId = null,
 }: {
   departmentId: string
   departmentName: string
+  /** From `?year=` — scroll/highlight that year card. */
+  highlightYearProgramId?: string | null
 }) {
   const [bundle, setBundle] = useState<DepartmentYearProgramsBundle | null>(null)
   const [overview, setOverview] = useState<DepartmentWorkspaceOverview | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
-  const [archiveTarget, setArchiveTarget] = useState<DepartmentYearProgramRow | null>(null)
-  const [flyerTarget, setFlyerTarget] = useState<DepartmentYearProgramRow | null>(null)
+  const [closeTarget, setCloseTarget] = useState<DepartmentYearProgramRow | null>(null)
+  const [configureTarget, setConfigureTarget] =
+    useState<DepartmentYearProgramRow | null>(null)
   const [isPending, startTransition] = useTransition()
 
   const [newName, setNewName] = useState("")
@@ -164,6 +171,12 @@ export function DepartmentOverviewPanel({
     void load()
   }, [load])
 
+  useEffect(() => {
+    if (!highlightYearProgramId || loading) return
+    const el = document.getElementById(`year-card-${highlightYearProgramId}`)
+    el?.scrollIntoView({ behavior: "smooth", block: "center" })
+  }, [highlightYearProgramId, loading, bundle])
+
   function openCreate() {
     setFormError(null)
     setNewName(`${departmentName} `)
@@ -194,39 +207,21 @@ export function DepartmentOverviewPanel({
     })
   }
 
-  function handleArchive() {
-    if (!archiveTarget) return
+  function handleCloseYear() {
+    if (!closeTarget) return
     setFormError(null)
     startTransition(async () => {
-      const result = await archiveDepartmentYearProgramAction({
+      const result = await closeDepartmentYearProgramAction({
         departmentId,
-        programId: archiveTarget.id,
+        programId: closeTarget.id,
         confirmName,
       })
       if (!result.success) {
         setFormError(result.error)
         return
       }
-      setArchiveTarget(null)
+      setCloseTarget(null)
       setConfirmName("")
-      await load()
-    })
-  }
-
-  function handleFlyerSave() {
-    if (!flyerTarget) return
-    setFormError(null)
-    startTransition(async () => {
-      const result = await updateDepartmentYearFlyerAction({
-        departmentId,
-        programId: flyerTarget.id,
-        flyerUrl: flyerUrl || null,
-      })
-      if (!result.success) {
-        setFormError(result.error)
-        return
-      }
-      setFlyerTarget(null)
       await load()
     })
   }
@@ -267,10 +262,12 @@ export function DepartmentOverviewPanel({
             layout="header"
             fill
             tone="blue"
-            label="Students"
+            label="Participants"
             value={overview.studentsCount}
             icon={GraduationCap}
-            hint="Open years only"
+            hint={
+              overview.hasOpenYears ? "Open years only" : "No open years"
+            }
           />
           <StatCard
             layout="header"
@@ -288,7 +285,11 @@ export function DepartmentOverviewPanel({
             label="Revenue"
             value={formatMoney(overview.revenue)}
             icon={DollarSign}
-            hint="Open years · Programs billing"
+            hint={
+              overview.hasOpenYears
+                ? "Open years · Programs billing"
+                : "No open years"
+            }
           />
           <StatCard
             layout="header"
@@ -332,7 +333,7 @@ export function DepartmentOverviewPanel({
           </CardHeader>
         </Card>
       ) : (
-        <div className="grid gap-4">
+        <div className="grid gap-4 sm:grid-cols-2">
           {bundle.openPrograms.map((program) => {
             const capacity = program.capacity || 0
             const percent =
@@ -342,115 +343,133 @@ export function DepartmentOverviewPanel({
             return (
               <Card
                 key={program.id}
-                className="overflow-hidden border-border/80 shadow-sm"
+                id={`year-card-${program.id}`}
+                className={cn(
+                  "overflow-hidden border-border/80 shadow-sm scroll-mt-24",
+                  highlightYearProgramId === program.id &&
+                    "ring-2 ring-primary/40"
+                )}
               >
-                <div className="flex gap-4 p-4">
-                  <div
-                    className={cn(
-                      "relative aspect-square w-24 shrink-0 overflow-hidden rounded-lg sm:w-28",
-                      !program.flyerUrl && getFlyerPlaceholderColor(program.id)
-                    )}
-                  >
-                    {program.flyerUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={program.flyerUrl}
-                        alt={`${program.name} flyer`}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-full items-center justify-center">
-                        <span className="text-2xl font-semibold text-white/90">
-                          {program.name.trim().charAt(0).toUpperCase() || "P"}
-                        </span>
+                <div className="flex h-full flex-col gap-3 p-4">
+                  <div className="flex gap-3">
+                    <div
+                      className={cn(
+                        "relative aspect-square w-16 shrink-0 overflow-hidden rounded-lg sm:w-20",
+                        !program.flyerUrl && getFlyerPlaceholderColor(program.id)
+                      )}
+                    >
+                      {program.flyerUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={program.flyerUrl}
+                          alt={`${program.name} flyer`}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full items-center justify-center">
+                          <span className="text-xl font-semibold text-white/90">
+                            {program.name.trim().charAt(0).toUpperCase() || "P"}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 space-y-1.5">
+                          <p className="text-base font-semibold leading-snug tracking-tight">
+                            {program.name}
+                          </p>
+                          <Badge
+                            variant="secondary"
+                            className={cn(
+                              "gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium capitalize",
+                              statusBadgeClass(program.status)
+                            )}
+                          >
+                            <span
+                              className={cn(
+                                "h-1.5 w-1.5 rounded-full",
+                                statusDotClass(program.status)
+                              )}
+                            />
+                            {getProgramStatusLabel(
+                              (program.status as ProgramStatus) || "active"
+                            )}
+                          </Badge>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1">
+                          <ProgramCardActions
+                            programId={program.id}
+                            programName={program.name}
+                            programStatus={program.status}
+                            editLabel={bundle.canManageYears ? "Edit" : "View"}
+                            hideDelete
+                            onConfigure={
+                              bundle.canManageYears
+                                ? () => setConfigureTarget(program)
+                                : undefined
+                            }
+                            detailsHref={departmentGroupWorkspaceHref(departmentId, {
+                              tab: "overview",
+                              yearProgramId: program.id,
+                            })}
+                            onArchiveYear={
+                              bundle.canArchiveYears &&
+                              program.status !== "closed" &&
+                              program.status !== "archived"
+                                ? () => {
+                                    setCloseTarget(program)
+                                    setConfirmName("")
+                                    setFormError(null)
+                                  }
+                                : undefined
+                            }
+                          />
+                        </div>
                       </div>
-                    )}
+
+                      <div className="space-y-1 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4 shrink-0" />
+                          <span className="truncate">
+                            {formatDate(program.startDate)} -{" "}
+                            {formatDate(program.endDate)}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                          <div className="flex items-center gap-2">
+                            <Users className="h-4 w-4 shrink-0" />
+                            <span className="truncate">
+                              {formatProgramGenderLabel(program.gender)}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Tag className="h-4 w-4 shrink-0" />
+                            <span>{programCountPhrase(program.offeringCount)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="min-w-0 flex-1 space-y-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0 space-y-1.5">
-                        <p className="text-base font-semibold leading-snug tracking-tight">
-                          {program.name}
-                        </p>
-                        <Badge
-                          variant="secondary"
-                          className={cn(
-                            "gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium capitalize",
-                            statusBadgeClass(program.status)
-                          )}
-                        >
-                          <span
-                            className={cn(
-                              "h-1.5 w-1.5 rounded-full",
-                              statusDotClass(program.status)
-                            )}
-                          />
-                          {getProgramStatusLabel(
-                            (program.status as ProgramStatus) || "active"
-                          )}
-                        </Badge>
-                      </div>
-                      <ProgramCardActions
-                        programId={program.id}
-                        programName={program.name}
-                        programStatus={program.status}
-                        editLabel="View / Edit"
-                        hideDelete
-                        onEditFlyer={
-                          bundle.canManageYears
-                            ? () => {
-                                setFlyerTarget(program)
-                                setFlyerUrl(program.flyerUrl || "")
-                                setFormError(null)
-                              }
-                            : undefined
-                        }
-                        onArchiveYear={
-                          bundle.canArchiveYears
-                            ? () => {
-                                setArchiveTarget(program)
-                                setConfirmName("")
-                                setFormError(null)
-                              }
-                            : undefined
-                        }
-                      />
+                  <div className="mt-auto">
+                    <div className="mb-1 flex justify-between text-sm">
+                      <span className="text-muted-foreground">Enrollment</span>
+                      <span className="font-medium tabular-nums">
+                        {capacity > 0
+                          ? `${program.enrolled} / ${capacity}`
+                          : `${program.enrolled} enrolled`}
+                      </span>
                     </div>
-
-                    <div className="space-y-1.5 text-sm text-muted-foreground">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4 shrink-0" />
-                        <span>
-                          {formatDate(program.startDate)} - {formatDate(program.endDate)}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Users className="h-4 w-4 shrink-0" />
-                        <span className="truncate">{program.gender || "All"}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Tag className="h-4 w-4 shrink-0" />
-                        <span>
-                          {programCountPhrase(program.offeringCount)}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="mb-1 flex justify-between text-sm">
-                        <span className="text-muted-foreground">Enrollment</span>
-                        <span className="font-medium tabular-nums">
-                          {program.enrolled} / {capacity}
-                        </span>
-                      </div>
+                    {capacity > 0 ? (
                       <div className="h-2 overflow-hidden rounded-full bg-muted">
                         <div
                           className="h-full rounded-full bg-emerald-500 transition-all"
                           style={{ width: `${percent}%` }}
                         />
                       </div>
-                    </div>
+                    ) : null}
                   </div>
                 </div>
               </Card>
@@ -561,61 +580,28 @@ export function DepartmentOverviewPanel({
       </Dialog>
 
       <Dialog
-        open={Boolean(flyerTarget)}
-        onOpenChange={(open) => {
-          if (!open) setFlyerTarget(null)
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Year flyer</DialogTitle>
-            <DialogDescription>
-              {flyerTarget?.name} — one flyer per year. Catalog uses this image.
-            </DialogDescription>
-          </DialogHeader>
-          <ProgramFlyerField
-            programId={flyerTarget?.id}
-            value={flyerUrl}
-            onValueChange={setFlyerUrl}
-            uploadOnly
-            hideHiddenInput
-          />
-          {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setFlyerTarget(null)} disabled={isPending}>
-              Cancel
-            </Button>
-            <Button onClick={handleFlyerSave} disabled={isPending}>
-              {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Save flyer
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        open={Boolean(archiveTarget)}
+        open={Boolean(closeTarget)}
         onOpenChange={(open) => {
           if (!open) {
-            setArchiveTarget(null)
+            setCloseTarget(null)
             setConfirmName("")
           }
         }}
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Archive</DialogTitle>
+            <DialogTitle>Close year</DialogTitle>
             <DialogDescription>
-              This makes {archiveTarget?.name} read-only and moves it to Reports. Confirm
-              payments and payroll are complete before continuing.
+              Marks {closeTarget?.name} as closed. Registrations and payments stay available
+              for reports and comparison; offerings stop taking new registrations.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
-            <Label htmlFor="confirm-archive">
-              Type <span className="font-medium">{archiveTarget?.name}</span> to confirm
+            <Label htmlFor="confirm-close-year">
+              Type <span className="font-medium">{closeTarget?.name}</span> to confirm
             </Label>
             <Input
-              id="confirm-archive"
+              id="confirm-close-year"
               value={confirmName}
               onChange={(e) => setConfirmName(e.target.value)}
               disabled={isPending}
@@ -625,22 +611,32 @@ export function DepartmentOverviewPanel({
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setArchiveTarget(null)}
+              onClick={() => setCloseTarget(null)}
               disabled={isPending}
             >
               Cancel
             </Button>
             <Button
-              variant="destructive"
-              onClick={handleArchive}
-              disabled={isPending || confirmName.trim() !== (archiveTarget?.name || "").trim()}
+              onClick={handleCloseYear}
+              disabled={isPending || confirmName.trim() !== (closeTarget?.name || "").trim()}
             >
               {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Archive
+              Close year
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <DepartmentYearConfigureDialog
+        departmentId={departmentId}
+        programId={configureTarget?.id ?? null}
+        programName={configureTarget?.name}
+        open={Boolean(configureTarget)}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) setConfigureTarget(null)
+        }}
+        onSaved={load}
+      />
     </div>
   )
 }

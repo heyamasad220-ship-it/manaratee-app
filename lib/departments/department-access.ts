@@ -2,18 +2,15 @@
 
 import { redirect } from "next/navigation"
 
+import { resolveDepartmentHeadship } from "@/lib/departments/department-headship"
+import type { DepartmentHeadship } from "@/lib/departments/department-headship"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { hasPermission, PERMISSIONS } from "@/lib/permissions/permissions"
 import { createClient } from "@/lib/supabase/server"
 
-export type DepartmentHeadship = {
-  organizationId: string
-  departmentId: string
-  staffId: string
-}
-
 /**
  * Active staff row marked Department Head for a department (linked via contact auth user).
+ * Type: import `DepartmentHeadship` from `@/lib/departments/department-headship` (not from this file).
  */
 export async function getDepartmentHeadshipForCurrentUser(): Promise<DepartmentHeadship | null> {
   const organizationId = await getSelectedOrganizationId()
@@ -25,44 +22,7 @@ export async function getDepartmentHeadshipForCurrentUser(): Promise<DepartmentH
   } = await supabase.auth.getUser()
   if (!user) return null
 
-  const { data: contact } = await supabase
-    .from("contacts")
-    .select("id")
-    .eq("organization_id", organizationId)
-    .eq("auth_user_id", user.id)
-    .maybeSingle()
-
-  if (!contact?.id) return null
-
-  const { data: staff, error } = await supabase
-    .from("staff")
-    .select("id, department_id, is_department_head, status")
-    .eq("organization_id", organizationId)
-    .eq("contact_id", contact.id)
-    .eq("is_department_head", true)
-    .not("department_id", "is", null)
-    .maybeSingle()
-
-  if (error) {
-    // Column may be missing until script 186 is applied.
-    if (
-      error.message.includes("is_department_head") ||
-      error.message.toLowerCase().includes("does not exist")
-    ) {
-      return null
-    }
-    console.warn("getDepartmentHeadshipForCurrentUser:", error.message)
-    return null
-  }
-
-  if (!staff?.department_id) return null
-  if (String(staff.status || "") === "inactive") return null
-
-  return {
-    organizationId,
-    departmentId: staff.department_id as string,
-    staffId: staff.id as string,
-  }
+  return resolveDepartmentHeadship(supabase, organizationId, user.id)
 }
 
 export async function canViewDepartment(departmentId: string): Promise<boolean> {

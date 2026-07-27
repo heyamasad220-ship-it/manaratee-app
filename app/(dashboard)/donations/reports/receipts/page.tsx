@@ -26,6 +26,7 @@ import {
   DonationMetricCard,
   DonationMetricCardGrid,
 } from "@/components/donations/donation-metric-card"
+import { DonationReportsTabs } from "@/components/donations/donation-reports-chrome"
 import { GivingStatementActions } from "@/components/donations/giving-statement-actions"
 import {
   getReceiptReportingSummaryAction,
@@ -175,6 +176,8 @@ export default function DonationsReceiptsReportPage() {
             statements for donors are below.
           </p>
         </div>
+
+        <DonationReportsTabs />
 
         <Card>
           <CardHeader>

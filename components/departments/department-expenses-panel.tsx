@@ -88,7 +88,7 @@ export function DepartmentExpensesPanel({
           .from("programs")
           .select("id, start_date, end_date")
           .eq("department_id", departmentId)
-          .in("status", ["draft", "active", "paused"]),
+          .in("status", ["draft", "active", "paused", "closed"]),
         supabase
           .from("program_expenses")
           .select(`
