@@ -4,6 +4,7 @@ import {
   reservationStatusBlocksBooking,
   type ConflictCheckReservation,
 } from "@/lib/reservations/reservation-conflict-rules"
+import { rangesOverlap } from "@/lib/reservations/reservation-time"
 
 import {
   formatVenueRentalDateTime,
@@ -280,25 +281,88 @@ export async function getActiveRentalAddons(
   }))
 }
 
-async function rentalHasConflicts(
+/**
+ * One range query for the whole queue instead of N+1 per reservation.
+ * (Sequential checks were taking minutes after bulk Google Form import.)
+ */
+async function loadRentalConflictFlags(
   organizationId: string,
-  reservations: RentalReservationRecord[]
-): Promise<boolean> {
-  for (const reservation of reservations) {
-    const blocking = await getBlockingReservationsForVenue(
-      organizationId,
-      reservation.venue_id,
-      reservation.start_at,
-      reservation.end_at,
-      reservation.id
-    )
-
-    if (blocking.length > 0) {
-      return true
-    }
+  reservationsByRental: Map<string, RentalReservationRecord[]>
+): Promise<Map<string, boolean>> {
+  const flags = new Map<string, boolean>()
+  for (const rentalId of reservationsByRental.keys()) {
+    flags.set(rentalId, false)
   }
 
-  return false
+  const allReservations: RentalReservationRecord[] = []
+  for (const reservations of reservationsByRental.values()) {
+    allReservations.push(...reservations)
+  }
+
+  if (allReservations.length === 0) {
+    return flags
+  }
+
+  let rangeStart = allReservations[0].start_at
+  let rangeEnd = allReservations[0].end_at
+  const venueIds = new Set<string>()
+
+  for (const reservation of allReservations) {
+    if (reservation.start_at < rangeStart) rangeStart = reservation.start_at
+    if (reservation.end_at > rangeEnd) rangeEnd = reservation.end_at
+    if (reservation.venue_id) venueIds.add(reservation.venue_id)
+  }
+
+  if (venueIds.size === 0) {
+    return flags
+  }
+
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from("resource_reservations")
+    .select("id, venue_id, start_at, end_at, status, source_id")
+    .eq("organization_id", organizationId)
+    .in("venue_id", Array.from(venueIds))
+    .lt("start_at", rangeEnd)
+    .gt("end_at", rangeStart)
+
+  if (error) {
+    if (error.code === "42P01") {
+      return flags
+    }
+    console.error(error)
+    throw new Error("Failed to load reservations for conflict check")
+  }
+
+  const blockingRows = (data || []).filter((row) =>
+    reservationStatusBlocksBooking(row.status as string | null)
+  )
+
+  for (const [rentalId, reservations] of reservationsByRental) {
+    let hasConflict = false
+
+    for (const reservation of reservations) {
+      const overlaps = blockingRows.some((row) => {
+        if (row.source_id === reservation.id) return false
+        if (row.venue_id !== reservation.venue_id) return false
+        return rangesOverlap(
+          new Date(reservation.start_at),
+          new Date(reservation.end_at),
+          new Date(row.start_at as string),
+          new Date(row.end_at as string)
+        )
+      })
+
+      if (overlaps) {
+        hasConflict = true
+        break
+      }
+    }
+
+    flags.set(rentalId, hasConflict)
+  }
+
+  return flags
 }
 
 type VenueRentalListRow = {
@@ -651,6 +715,10 @@ export async function getVenueRentalQueueRows(options?: {
     addonsByRental.set(rentalId, list)
   }
 
+  const conflictFlags = options?.skipConflictCheck
+    ? new Map<string, boolean>()
+    : await loadRentalConflictFlags(organizationId, reservationsByRental)
+
   const rows: VenueRentalQueueRow[] = []
 
   for (const rental of rentalRows) {
@@ -712,9 +780,7 @@ export async function getVenueRentalQueueRows(options?: {
       submittedAt,
       submittedAtLabel: formatVenueRentalDateTime(submittedAt),
       holdExpiresAt: rental.hold_expires_at,
-      hasConflict: options?.skipConflictCheck
-        ? false
-        : await rentalHasConflicts(organizationId, reservations),
+      hasConflict: conflictFlags.get(rental.id) === true,
     })
   }
 
@@ -738,16 +804,19 @@ export function getVenueRentalDashboardStats(
   return {
     awaitingApprovalCount: rows.filter(
       (row) =>
-        row.status === VENUE_RENTAL_STATUSES.awaitingSupervisorApproval ||
-        row.status === VENUE_RENTAL_STATUSES.submitted
+        row.status === VENUE_RENTAL_STATUSES.submitted ||
+        row.status === VENUE_RENTAL_STATUSES.pending ||
+        row.status === VENUE_RENTAL_STATUSES.awaitingSupervisorApproval
     ).length,
     awaitingPaymentCount: rows.filter(
+      (row) => row.status === VENUE_RENTAL_STATUSES.approvedPendingPayment
+    ).length,
+    confirmedCount: rows.filter(
       (row) =>
-        row.status === VENUE_RENTAL_STATUSES.approvedPendingPayment ||
+        row.status === VENUE_RENTAL_STATUSES.confirmed ||
         row.status === VENUE_RENTAL_STATUSES.depositPaid ||
         row.status === VENUE_RENTAL_STATUSES.securityDepositPaid
     ).length,
-    confirmedCount: rows.filter((row) => row.status === VENUE_RENTAL_STATUSES.confirmed).length,
     conflictCount: rows.filter((row) => row.hasConflict).length,
   }
 }
@@ -885,6 +954,16 @@ export async function getVenueRentalPaymentReportRows(): Promise<
       spaceLabel,
       eventStartAt: primary?.startAt ?? null,
       ...summary,
+      payments: payments
+        .filter((payment) => payment.payment_type !== RENTAL_PAYMENT_TYPES.refund)
+        .map((payment) => ({
+          id: payment.id,
+          paymentType: payment.payment_type,
+          status: payment.status,
+          amount: Number(payment.amount) || 0,
+          notes: payment.notes,
+          paidAt: payment.paid_at,
+        })),
     }
   })
 }

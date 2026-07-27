@@ -143,12 +143,12 @@ export function getCustomerFriendlyStatusLabel(status: VenueRentalStatus): strin
     case VENUE_RENTAL_STATUSES.awaitingSupervisorApproval:
     case VENUE_RENTAL_STATUSES.submitted:
       return "Request under review"
+    case VENUE_RENTAL_STATUSES.pending:
+      return "Pending — more information needed"
     case VENUE_RENTAL_STATUSES.approvedPendingPayment:
-      return "Approved — payment required"
+      return "Approved — pay deposit to confirm"
     case VENUE_RENTAL_STATUSES.depositPaid:
-      return "Deposit paid"
     case VENUE_RENTAL_STATUSES.securityDepositPaid:
-      return "Security deposit paid"
     case VENUE_RENTAL_STATUSES.confirmed:
       return "Confirmed"
     case VENUE_RENTAL_STATUSES.declined:

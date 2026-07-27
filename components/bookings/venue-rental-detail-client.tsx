@@ -24,6 +24,7 @@ import {
   forceBookVenueRentalWithOverride,
   markRentalPaymentPaid,
   markVenueRentalCompletedAndAwaitingRefund,
+  markVenueRentalPending,
 } from "@/lib/bookings/venue-rental-actions"
 import type { VenueRentalEmployeePricingSuggestion } from "@/lib/bookings/venue-rental-employee-pricing"
 import {
@@ -35,6 +36,7 @@ import {
   canStaffForceBookVenueRental,
   getVenueRentalCalendarColorClasses,
   getVenueRentalStatusLabel,
+  isVenueRentalReviewable,
   shouldCancelVenueRentalAfterPayment,
   summarizeOutstandingRentalPayments,
 } from "@/lib/bookings/venue-rental-status"
@@ -74,11 +76,7 @@ type VenueRentalDetailClientProps = {
 }
 
 function isAwaitingPaymentStatus(status: VenueRentalStatus): boolean {
-  return (
-    status === VENUE_RENTAL_STATUSES.approvedPendingPayment ||
-    status === VENUE_RENTAL_STATUSES.depositPaid ||
-    status === VENUE_RENTAL_STATUSES.securityDepositPaid
-  )
+  return status === VENUE_RENTAL_STATUSES.approvedPendingPayment
 }
 
 function formatMoney(value: number) {
@@ -103,11 +101,8 @@ export function VenueRentalDetailClient({
       ? String(employeePricing.suggestedDeposit)
       : "500"
   )
-  const [securityDepositAmount, setSecurityDepositAmount] = useState(
-    employeePricing?.eligible
-      ? String(employeePricing.suggestedSecurityDeposit)
-      : "250"
-  )
+  const [securityDepositAmount, setSecurityDepositAmount] = useState("0")
+  const [pendingNote, setPendingNote] = useState("")
   const [remainingBalanceAmount, setRemainingBalanceAmount] = useState(
     employeePricing?.eligible
       ? String(employeePricing.suggestedRemainingBalance)
@@ -297,14 +292,14 @@ export function VenueRentalDetailClient({
         </CardContent>
       </Card>
 
-      {canManage && canViewFinance && rental.status === VENUE_RENTAL_STATUSES.awaitingSupervisorApproval ? (
+      {canManage && canViewFinance && isVenueRentalReviewable(rental.status) ? (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Supervisor approval</CardTitle>
+            <CardTitle className="text-base">Review request</CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-4 md:grid-cols-3">
+          <CardContent className="grid gap-4 md:grid-cols-2">
             {employeePricing?.eligible ? (
-              <div className="md:col-span-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+              <div className="md:col-span-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
                 <p className="font-medium">
                   {employeePricing.label || "Full-time employee benefit"}
                 </p>
@@ -315,21 +310,13 @@ export function VenueRentalDetailClient({
                   {employeePricing.hours > 0
                     ? ` · ${employeePricing.hours} hr`
                     : ""}
-                  ). Security deposit is not discounted. Amounts below are
-                  prefilled — adjust if needed.
+                  ). Deposit and remaining balance below are prefilled — adjust if needed.
                 </p>
               </div>
             ) : null}
             <div className="grid gap-2">
-              <Label>Deposit (non-refundable)</Label>
+              <Label>Deposit (required to confirm)</Label>
               <Input value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} />
-            </div>
-            <div className="grid gap-2">
-              <Label>Security deposit (refundable)</Label>
-              <Input
-                value={securityDepositAmount}
-                onChange={(e) => setSecurityDepositAmount(e.target.value)}
-              />
             </div>
             <div className="grid gap-2">
               <Label>Remaining balance</Label>
@@ -338,7 +325,12 @@ export function VenueRentalDetailClient({
                 onChange={(e) => setRemainingBalanceAmount(e.target.value)}
               />
             </div>
-            <div className="md:col-span-3 flex flex-wrap gap-2">
+            <p className="md:col-span-2 text-sm text-muted-foreground">
+              After approval the customer must pay the deposit before the hold expires.
+              Paying the deposit confirms the booking. Card on file covers damage if needed
+              (security deposit not required).
+            </p>
+            <div className="md:col-span-2 flex flex-wrap gap-2">
               <Button
                 disabled={isPending}
                 onClick={() =>
@@ -346,17 +338,40 @@ export function VenueRentalDetailClient({
                     await approveVenueRentalRequest({
                       venueRentalId: rental.id,
                       depositAmount: Number(depositAmount || 0),
-                      securityDepositAmount: Number(securityDepositAmount || 0),
+                      securityDepositAmount: Number(securityDepositAmount || 0) || undefined,
                       remainingBalanceAmount: Number(remainingBalanceAmount || 0) || undefined,
                     })
                   })
                 }
               >
                 <CheckCircle2 className="mr-2 h-4 w-4" />
-                Approve & request payment
+                Approve & request deposit
+              </Button>
+              <Button
+                variant="secondary"
+                disabled={isPending}
+                onClick={() =>
+                  runAction(async () => {
+                    await markVenueRentalPending({
+                      venueRentalId: rental.id,
+                      note: pendingNote,
+                    })
+                  })
+                }
+              >
+                <Clock className="mr-2 h-4 w-4" />
+                Mark pending
               </Button>
             </div>
-            <div className="md:col-span-3 grid gap-2">
+            <div className="md:col-span-2 grid gap-2">
+              <Label>Pending note (optional)</Label>
+              <Input
+                value={pendingNote}
+                onChange={(e) => setPendingNote(e.target.value)}
+                placeholder="Waiting for floor plan, guest count, etc."
+              />
+            </div>
+            <div className="md:col-span-2 grid gap-2">
               <Label>Decline reason</Label>
               <Textarea value={declineReason} onChange={(e) => setDeclineReason(e.target.value)} />
               <Button
@@ -454,13 +469,15 @@ export function VenueRentalDetailClient({
                 </div>
               )
             })}
-            {paymentSummary.depositPaid && paymentSummary.securityPaid ? (
+            {paymentSummary.depositPaid ? (
               <p className="text-sm text-emerald-700">
-                Deposit and security deposit are paid. Rental is confirmed when both are recorded.
+                Deposit paid — booking is confirmed. Remaining balance (if any) is due before
+                the event; a reminder is sent two weeks out.
               </p>
             ) : (
               <p className="text-sm text-muted-foreground">
-                Booking confirms only after both deposit and security deposit are marked paid.
+                Booking is confirmed when the deposit is marked paid. Card on file covers
+                damage if needed.
               </p>
             )}
           </CardContent>

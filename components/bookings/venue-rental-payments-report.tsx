@@ -5,9 +5,13 @@ import { useEffect, useMemo, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { DollarSign, MoreHorizontal } from "lucide-react"
 
-import { recordVenueRentalPaymentReceived } from "@/lib/bookings/venue-rental-actions"
-import { getVenueRentalStatusBadgeClasses } from "@/lib/bookings/venue-rental-status"
+import {
+  deleteVenueRentalPaymentRecord,
+  recordVenueRentalPaymentReceived,
+  updateVenueRentalPaymentRecord,
+} from "@/lib/bookings/venue-rental-actions"
 import type {
+  RentalPaymentType,
   VenueRentalPaymentBalanceFilter,
   VenueRentalPaymentReportRow,
 } from "@/lib/bookings/venue-rental-types"
@@ -25,6 +29,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
@@ -52,7 +57,7 @@ import {
   slicePageItems,
 } from "@/lib/ui/list-pagination"
 
-type PaymentTypeOption = "deposit" | "security_deposit" | "remaining_balance"
+type PaymentTypeOption = "deposit" | "remaining_balance"
 
 type VenueRentalPaymentsReportProps = {
   rows: VenueRentalPaymentReportRow[]
@@ -81,6 +86,30 @@ function balanceLabel(filter: VenueRentalPaymentBalanceFilter) {
   }
 }
 
+function paymentTypeLabel(type: RentalPaymentType | PaymentTypeOption) {
+  switch (type) {
+    case "deposit":
+      return "Deposit"
+    case "remaining_balance":
+      return "Remaining balance"
+    case "addon_fee":
+      return "Add-on fee"
+    case "security_deposit":
+      return "Security deposit"
+    default:
+      return type
+  }
+}
+
+function toPaymentTypeOption(
+  type: RentalPaymentType
+): PaymentTypeOption {
+  if (type === "remaining_balance" || type === "addon_fee") {
+    return "remaining_balance"
+  }
+  return "deposit"
+}
+
 export function VenueRentalPaymentsReport({
   rows,
   canManage,
@@ -93,9 +122,12 @@ export function VenueRentalPaymentsReport({
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_LIST_PAGE_SIZE)
   const [receiveOpen, setReceiveOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
   const [selected, setSelected] = useState<VenueRentalPaymentReportRow | null>(
     null
   )
+  const [selectedPaymentId, setSelectedPaymentId] = useState("")
   const [paymentType, setPaymentType] = useState<PaymentTypeOption>("deposit")
   const [amount, setAmount] = useState("")
   const [notes, setNotes] = useState("")
@@ -144,6 +176,10 @@ export function VenueRentalPaymentsReport({
     )
   }, [filteredRows])
 
+  const selectedPayments = selected?.payments ?? []
+  const selectedPayment =
+    selectedPayments.find((payment) => payment.id === selectedPaymentId) ?? null
+
   function openReceive(row: VenueRentalPaymentReportRow) {
     setSelected(row)
     setError(null)
@@ -152,11 +188,6 @@ export function VenueRentalPaymentsReport({
     if (row.depositAmount > row.depositReceived) {
       setPaymentType("deposit")
       setAmount(String(Math.max(0, row.depositAmount - row.depositReceived) || row.depositAmount || ""))
-    } else if (row.securityAmount > row.securityReceived) {
-      setPaymentType("security_deposit")
-      setAmount(
-        String(Math.max(0, row.securityAmount - row.securityReceived) || row.securityAmount || "")
-      )
     } else if (row.remainingDue > 0) {
       setPaymentType("remaining_balance")
       setAmount(String(row.remainingDue))
@@ -166,6 +197,38 @@ export function VenueRentalPaymentsReport({
     }
 
     setReceiveOpen(true)
+  }
+
+  function openEdit(row: VenueRentalPaymentReportRow) {
+    const first = row.payments[0]
+    if (!first) return
+
+    setSelected(row)
+    setSelectedPaymentId(first.id)
+    setPaymentType(toPaymentTypeOption(first.paymentType))
+    setAmount(String(first.amount || ""))
+    setNotes(first.notes || "")
+    setError(null)
+    setEditOpen(true)
+  }
+
+  function openDelete(row: VenueRentalPaymentReportRow) {
+    const first = row.payments[0]
+    if (!first) return
+
+    setSelected(row)
+    setSelectedPaymentId(first.id)
+    setError(null)
+    setDeleteOpen(true)
+  }
+
+  function onEditPaymentSelect(paymentId: string) {
+    const payment = selected?.payments.find((item) => item.id === paymentId)
+    setSelectedPaymentId(paymentId)
+    if (!payment) return
+    setPaymentType(toPaymentTypeOption(payment.paymentType))
+    setAmount(String(payment.amount || ""))
+    setNotes(payment.notes || "")
   }
 
   function submitReceive() {
@@ -187,6 +250,51 @@ export function VenueRentalPaymentsReport({
           submitError instanceof Error
             ? submitError.message
             : "Failed to record payment"
+        )
+      }
+    })
+  }
+
+  function submitEdit() {
+    if (!selectedPaymentId) return
+    setError(null)
+    startTransition(async () => {
+      try {
+        await updateVenueRentalPaymentRecord({
+          paymentId: selectedPaymentId,
+          paymentType,
+          amount: Number(amount),
+          notes,
+        })
+        setEditOpen(false)
+        setSelected(null)
+        router.refresh()
+      } catch (submitError) {
+        setError(
+          submitError instanceof Error
+            ? submitError.message
+            : "Failed to update payment"
+        )
+      }
+    })
+  }
+
+  function submitDelete() {
+    if (!selectedPaymentId) return
+    setError(null)
+    startTransition(async () => {
+      try {
+        await deleteVenueRentalPaymentRecord({
+          paymentId: selectedPaymentId,
+        })
+        setDeleteOpen(false)
+        setSelected(null)
+        router.refresh()
+      } catch (submitError) {
+        setError(
+          submitError instanceof Error
+            ? submitError.message
+            : "Failed to delete payment"
         )
       }
     })
@@ -220,7 +328,7 @@ export function VenueRentalPaymentsReport({
       <Card className="overflow-hidden">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <Table className="min-w-[1000px]">
+            <Table className="min-w-[900px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>
@@ -277,7 +385,6 @@ export function VenueRentalPaymentsReport({
                       )}
                     </TableColumnHeaderFilter>
                   </TableHead>
-                  <TableHead>Status</TableHead>
                   <TableHead className="w-12" />
                 </TableRow>
               </TableHeader>
@@ -285,7 +392,7 @@ export function VenueRentalPaymentsReport({
                 {pagedRows.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={8}
+                      colSpan={7}
                       className="h-32 text-center text-muted-foreground"
                     >
                       No rentals match these filters.
@@ -293,7 +400,7 @@ export function VenueRentalPaymentsReport({
                   </TableRow>
                 ) : (
                   pagedRows.map((row) => {
-                    const colors = getVenueRentalStatusBadgeClasses(row.status)
+                    const hasPayments = row.payments.length > 0
                     return (
                       <TableRow key={row.id}>
                         <TableCell>
@@ -331,14 +438,6 @@ export function VenueRentalPaymentsReport({
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge
-                            variant="secondary"
-                            className={`${colors.bg} ${colors.text}`}
-                          >
-                            {row.statusLabel}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button
@@ -357,11 +456,27 @@ export function VenueRentalPaymentsReport({
                                 </Link>
                               </DropdownMenuItem>
                               {canManage ? (
-                                <DropdownMenuItem
-                                  onSelect={() => openReceive(row)}
-                                >
-                                  Receive payment
-                                </DropdownMenuItem>
+                                <>
+                                  <DropdownMenuItem
+                                    onSelect={() => openReceive(row)}
+                                  >
+                                    Receive payment
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    disabled={!hasPayments}
+                                    onSelect={() => openEdit(row)}
+                                  >
+                                    Edit payment
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    disabled={!hasPayments}
+                                    className="text-destructive focus:text-destructive"
+                                    onSelect={() => openDelete(row)}
+                                  >
+                                    Delete payment
+                                  </DropdownMenuItem>
+                                </>
                               ) : null}
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -421,7 +536,6 @@ export function VenueRentalPaymentsReport({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="deposit">Deposit</SelectItem>
-                  <SelectItem value="security_deposit">Security deposit</SelectItem>
                   <SelectItem value="remaining_balance">Remaining balance</SelectItem>
                 </SelectContent>
               </Select>
@@ -459,6 +573,174 @@ export function VenueRentalPaymentsReport({
             <Button onClick={submitReceive} disabled={isPending}>
               <DollarSign className="mr-2 h-4 w-4" />
               {isPending ? "Saving..." : "Record payment"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit payment</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {selected ? (
+              <p className="text-sm text-muted-foreground">
+                {selected.customerName}
+                {selected.eventTypeName ? ` · ${selected.eventTypeName}` : ""}
+              </p>
+            ) : null}
+            {error ? (
+              <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {error}
+              </div>
+            ) : null}
+            {selectedPayments.length > 1 ? (
+              <div className="space-y-2">
+                <Label>Payment</Label>
+                <Select
+                  value={selectedPaymentId}
+                  onValueChange={onEditPaymentSelect}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {selectedPayments.map((payment) => (
+                      <SelectItem key={payment.id} value={payment.id}>
+                        {paymentTypeLabel(payment.paymentType)} ·{" "}
+                        {formatMoney(payment.amount)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : selectedPayment ? (
+              <p className="text-sm text-muted-foreground">
+                {paymentTypeLabel(selectedPayment.paymentType)} ·{" "}
+                {formatMoney(selectedPayment.amount)}
+              </p>
+            ) : null}
+            <div className="space-y-2">
+              <Label>Payment type</Label>
+              <Select
+                value={paymentType}
+                onValueChange={(value) =>
+                  setPaymentType(value as PaymentTypeOption)
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="deposit">Deposit</SelectItem>
+                  <SelectItem value="remaining_balance">Remaining balance</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-payment-amount">Amount</Label>
+              <Input
+                id="edit-payment-amount"
+                type="number"
+                min={0}
+                step="0.01"
+                value={amount}
+                onChange={(event) => setAmount(event.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-payment-notes">Notes</Label>
+              <Textarea
+                id="edit-payment-notes"
+                rows={3}
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+                placeholder="Optional"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setEditOpen(false)}
+              disabled={isPending}
+            >
+              Cancel
+            </Button>
+            <Button onClick={submitEdit} disabled={isPending || !selectedPaymentId}>
+              {isPending ? "Saving..." : "Save changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete payment</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {selected ? (
+              <p className="text-sm text-muted-foreground">
+                {selected.customerName}
+                {selected.eventTypeName ? ` · ${selected.eventTypeName}` : ""}
+              </p>
+            ) : null}
+            {error ? (
+              <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {error}
+              </div>
+            ) : null}
+            {selectedPayments.length > 1 ? (
+              <div className="space-y-2">
+                <Label>Payment to delete</Label>
+                <Select
+                  value={selectedPaymentId}
+                  onValueChange={setSelectedPaymentId}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {selectedPayments.map((payment) => (
+                      <SelectItem key={payment.id} value={payment.id}>
+                        {paymentTypeLabel(payment.paymentType)} ·{" "}
+                        {formatMoney(payment.amount)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : selectedPayment ? (
+              <p className="text-sm">
+                Delete {paymentTypeLabel(selectedPayment.paymentType)} of{" "}
+                <span className="font-medium tabular-nums">
+                  {formatMoney(selectedPayment.amount)}
+                </span>
+                ?
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground">No payment selected.</p>
+            )}
+            <p className="text-sm text-muted-foreground">
+              This removes the payment record and recalculates the rental balance.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteOpen(false)}
+              disabled={isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={submitDelete}
+              disabled={isPending || !selectedPaymentId}
+            >
+              {isPending ? "Deleting..." : "Delete payment"}
             </Button>
           </DialogFooter>
         </DialogContent>

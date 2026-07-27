@@ -1,0 +1,102 @@
+{
+  "mode": "dry-run",
+  "orgId": "e057e00a-e4e3-4adf-9af5-f465db1894be",
+  "scanned": 148,
+  "alreadySet": 0,
+  "noEventTypeInNotes": 0,
+  "updated": 148,
+  "typesCreated": 14,
+  "errors": [],
+  "samples": [
+    {
+      "rentalId": "52f22091-ea80-4963-8eea-c7111893fdc4",
+      "raw": "Workshop",
+      "canonical": "Workshop",
+      "eventTypeId": "dry-run:workshop"
+    },
+    {
+      "rentalId": "bfd132be-29d1-4424-8b91-a219f45ff44a",
+      "raw": "Henna Party",
+      "canonical": "Henna Party",
+      "eventTypeId": "dry-run:henna-party"
+    },
+    {
+      "rentalId": "cea1f358-bd37-40cd-90c6-9191a3834592",
+      "raw": "Dinner (Aqiqa,  Ramadan Iftar, etc.)",
+      "canonical": "Dinner / Iftar",
+      "eventTypeId": "dry-run:dinner-iftar"
+    },
+    {
+      "rentalId": "737663d8-4db8-418c-8f9e-4dad213a4ef3",
+      "raw": "Dinner (Aqiqa,  Ramadan Iftar, etc.)",
+      "canonical": "Dinner / Iftar",
+      "eventTypeId": "dry-run:dinner-iftar"
+    },
+    {
+      "rentalId": "2dac884c-0d09-4009-ac42-ff07c5d1b0c7",
+      "raw": "Dinner (Aqiqa,  Ramadan Iftar, etc.)",
+      "canonical": "Dinner / Iftar",
+      "eventTypeId": "dry-run:dinner-iftar"
+    },
+    {
+      "rentalId": "117ca5cf-281f-4b47-96a1-1df8addf538d",
+      "raw": "Party (Wedding, Engagement, Bridal Shower, etc.)",
+      "canonical": "Wedding / Engagement Party",
+      "eventTypeId": "dry-run:wedding-engagement-party"
+    },
+    {
+      "rentalId": "bcb05e7e-245d-4c76-ab7e-f7a5d49955f1",
+      "raw": "Party (Wedding, Engagement, Bridal Shower, etc.)",
+      "canonical": "Wedding / Engagement Party",
+      "eventTypeId": "dry-run:wedding-engagement-party"
+    },
+    {
+      "rentalId": "e66ca354-3447-4102-8dcb-44cfb345960f",
+      "raw": "Conference, Seminar, Meeting, etc.",
+      "canonical": "Meeting",
+      "eventTypeId": "cb765532-de5c-4dd2-b47e-85029501b7b3"
+    },
+    {
+      "rentalId": "da88eacd-5554-4cc2-b6ce-c4aa4f5c2c74",
+      "raw": "Party (Wedding, Engagement, Bridal Shower, etc.)",
+      "canonical": "Wedding / Engagement Party",
+      "eventTypeId": "dry-run:wedding-engagement-party"
+    },
+    {
+      "rentalId": "105c3138-de47-4081-aaac-36a7080ab24b",
+      "raw": "Dinner (Aqiqa,  Ramadan Iftar, etc.)",
+      "canonical": "Dinner / Iftar",
+      "eventTypeId": "dry-run:dinner-iftar"
+    },
+    {
+      "rentalId": "59737d02-4148-4be1-acb4-4d87f954b6c8",
+      "raw": "Party (Wedding, Engagement, Bridal Shower, etc.)",
+      "canonical": "Wedding / Engagement Party",
+      "eventTypeId": "dry-run:wedding-engagement-party"
+    },
+    {
+      "rentalId": "09ee6c99-d619-46ce-84d5-f86d624f9655",
+      "raw": "Party (Wedding, Engagement, Bridal Shower, etc.)",
+      "canonical": "Wedding / Engagement Party",
+      "eventTypeId": "dry-run:wedding-engagement-party"
+    },
+    {
+      "rentalId": "2df50672-8555-4c05-b026-ccca964e20cb",
+      "raw": "Party (Wedding, Engagement, Bridal Shower, etc.)",
+      "canonical": "Wedding / Engagement Party",
+      "eventTypeId": "dry-run:wedding-engagement-party"
+    },
+    {
+      "rentalId": "fd111b2f-d82a-4e9f-80de-11dc634f5c78",
+      "raw": "Film festival",
+      "canonical": "Film Festival",
+      "eventTypeId": "dry-run:film-festival"
+    },
+    {
+      "rentalId": "31357ad3-fe4a-49ed-9bab-6ce4b150f6cc",
+      "raw": "Aqeeqa",
+      "canonical": "Aqeeqa",
+      "eventTypeId": "dry-run:aqeeqa"
+    }
+  ]
+}

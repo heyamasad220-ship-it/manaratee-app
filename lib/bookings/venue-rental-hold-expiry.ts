@@ -8,9 +8,10 @@ import {
 } from "./venue-rental-types"
 import { createServiceRoleClient } from "@/lib/supabase/service-role"
 
-/** Rentals awaiting required deposits that may expire when hold_expires_at passes. */
+/** Rentals awaiting deposit that may expire when hold_expires_at passes. */
 export const VENUE_RENTAL_HOLD_PAYMENT_STATUSES: VenueRentalStatus[] = [
   VENUE_RENTAL_STATUSES.approvedPendingPayment,
+  // Legacy partial-payment statuses (pre deposit→confirmed process)
   VENUE_RENTAL_STATUSES.depositPaid,
   VENUE_RENTAL_STATUSES.securityDepositPaid,
 ]

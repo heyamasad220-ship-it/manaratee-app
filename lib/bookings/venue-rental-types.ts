@@ -1,11 +1,16 @@
 export const VENUE_RENTAL_STATUSES = {
   draft: "draft",
   submitted: "submitted",
+  /** Admin waiting for more information from the customer before approving. */
+  pending: "pending",
+  /** @deprecated Prefer `submitted` / `pending`. Kept for legacy rows. */
   awaitingSupervisorApproval: "awaiting_supervisor_approval",
   declined: "declined",
   approvedPendingPayment: "approved_pending_payment",
   holdExpired: "hold_expired",
+  /** @deprecated Deposit paid now maps to `confirmed`. Kept for legacy rows. */
   depositPaid: "deposit_paid",
+  /** @deprecated Security deposit is not required for confirmation. */
   securityDepositPaid: "security_deposit_paid",
   confirmed: "confirmed",
   cancelledBeforePayment: "cancelled_before_payment",
@@ -251,6 +256,15 @@ export interface VenueRentalPaymentReportRow {
     securityId: string | null
     remainingId: string | null
   }
+  /** Non-refund payment lines for edit/delete from the Payments report. */
+  payments: Array<{
+    id: string
+    paymentType: RentalPaymentType
+    status: RentalPaymentStatus
+    amount: number
+    notes: string | null
+    paidAt: string | null
+  }>
 }
 
 export interface VenueRentalDashboardStats {

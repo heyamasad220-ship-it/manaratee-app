@@ -1,0 +1,124 @@
+{
+  "importTag": "VENUE_RENTAL_PAYMENTS_V1",
+  "mode": "execute",
+  "orgId": "e057e00a-e4e3-4adf-9af5-f465db1894be",
+  "nowIso": "2026-07-27T00:36:32.433Z",
+  "importedPaymentsFound": 102,
+  "importedPaymentsDeleted": 102,
+  "pastRentalsFound": 127,
+  "pastRentalsMarkedCompleted": 2,
+  "pastRentalsAlreadyCompleted": 125,
+  "pastRentalsCancelledSkipped": 7,
+  "futureRentalsResetAfterImport": 5,
+  "errors": [],
+  "sampleDeletedPayments": [
+    {
+      "id": "2c132a80-2ed3-40ab-8a94-504e01ec7e50",
+      "venueRentalId": "56db1bf9-3129-47a7-9218-36e46771da65",
+      "amount": 400,
+      "paymentType": "deposit",
+      "status": "paid_manually",
+      "paidAt": "2026-07-24T12:00:00+00:00"
+    },
+    {
+      "id": "0da9e8ba-6e01-4bdd-b130-c7db27e1cec3",
+      "venueRentalId": "200d77f4-bb65-4f4c-b72a-10a1103d8a8c",
+      "amount": 200,
+      "paymentType": "deposit",
+      "status": "paid_manually",
+      "paidAt": "2026-07-23T12:00:00+00:00"
+    },
+    {
+      "id": "d1d78925-004d-44b6-8078-7b3a9c7bfe9f",
+      "venueRentalId": "02464950-83ba-4bbd-9a2e-1735e7fd1b5e",
+      "amount": 120,
+      "paymentType": "deposit",
+      "status": "paid_manually",
+      "paidAt": "2026-07-08T12:00:00+00:00"
+    },
+    {
+      "id": "ca9de342-2849-4eda-9260-d1d69b5526c0",
+      "venueRentalId": "02464950-83ba-4bbd-9a2e-1735e7fd1b5e",
+      "amount": 800,
+      "paymentType": "remaining_balance",
+      "status": "paid_manually",
+      "paidAt": "2026-07-08T12:00:00+00:00"
+    },
+    {
+      "id": "08e559cf-c0f0-41c8-b16e-8fed92a13b59",
+      "venueRentalId": "aba5a7e9-99b0-4094-adcb-4e7fd050460e",
+      "amount": 1200,
+      "paymentType": "deposit",
+      "status": "paid_manually",
+      "paidAt": "2026-07-06T12:00:00+00:00"
+    },
+    {
+      "id": "24b383f2-8bed-4b75-a776-d307774d7ea3",
+      "venueRentalId": "cb47a176-3a7f-4344-81d8-c14dee3fa26d",
+      "amount": 550,
+      "paymentType": "deposit",
+      "status": "paid_manually",
+      "paidAt": "2026-06-18T12:00:00+00:00"
+    },
+    {
+      "id": "46b5331a-0424-4cf4-9601-a26b961766b7",
+      "venueRentalId": "3a2da149-0d2d-4650-93f7-f586057b8741",
+      "amount": 750,
+      "paymentType": "deposit",
+      "status": "paid_manually",
+      "paidAt": "2026-06-12T12:00:00+00:00"
+    },
+    {
+      "id": "1e87d214-2875-4d7d-b1c3-00fe9c45aebe",
+      "venueRentalId": "e3b8f378-cb20-4f53-aa2f-1424bc6485e2",
+      "amount": 650,
+      "paymentType": "deposit",
+      "status": "paid_manually",
+      "paidAt": "2026-06-04T12:00:00+00:00"
+    },
+    {
+      "id": "0fa57111-3298-4c26-9d93-b71c1aa90546",
+      "venueRentalId": "f8ddfc65-1ac7-4cf7-93ba-6fb33598ef8d",
+      "amount": 650,
+      "paymentType": "deposit",
+      "status": "paid_manually",
+      "paidAt": "2026-05-31T12:00:00+00:00"
+    },
+    {
+      "id": "3f05699b-ab97-43dc-b8a1-aec9c1740095",
+      "venueRentalId": "effa95fa-5f44-446e-994c-8ba83cbbf733",
+      "amount": 100,
+      "paymentType": "deposit",
+      "status": "paid_manually",
+      "paidAt": "2026-05-25T12:00:00+00:00"
+    },
+    {
+      "id": "0000ded2-2785-42e2-8ae7-8bdcbff2da0f",
+      "venueRentalId": "79b74364-1c63-430b-ae4c-91c6fe097d7c",
+      "amount": 350,
+      "paymentType": "deposit",
+      "status": "paid_manually",
+      "paidAt": "2026-05-24T12:00:00+00:00"
+    },
+    {
+      "id": "af4a5c87-0463-43e0-9abf-8f55466fe432",
+      "venueRentalId": "79b74364-1c63-430b-ae4c-91c6fe097d7c",
+      "amount": 450,
+      "paymentType": "remaining_balance",
+      "status": "paid_manually",
+      "paidAt": "2026-05-24T12:00:00+00:00"
+    }
+  ],
+  "sampleCompletedRentals": [
+    {
+      "id": "63f57a90-e7c6-4a48-b0ae-808f61b9f04f",
+      "fromStatus": "approved_pending_payment",
+      "endAt": "2026-07-18T01:30:00+00:00"
+    },
+    {
+      "id": "e069db91-d357-4944-a8e8-5b03a4e3b7af",
+      "fromStatus": "approved_pending_payment",
+      "endAt": "2026-07-27T00:00:00+00:00"
+    }
+  ]
+}

@@ -1,0 +1,230 @@
+{
+  "importTag": "VENUE_RENTAL_PAYMENTS_V1",
+  "mode": "dry-run",
+  "orgId": "e057e00a-e4e3-4adf-9af5-f465db1894be",
+  "csv": "C:/Users/danan/Downloads/Venue Rental Payments.csv",
+  "paymentRows": 263,
+  "matched": 102,
+  "skippedNoBooking": 161,
+  "skippedAlreadyImported": 0,
+  "paymentsCreated": 0,
+  "rentalsStatusUpdated": 0,
+  "errors": [],
+  "unmatchedSamples": [
+    {
+      "name": "Siliman",
+      "email": "gnirestx@gmail.com",
+      "phone": "9085238476",
+      "amount": 650,
+      "date": "2026-07-15"
+    },
+    {
+      "name": "Narmeen Mushtaq",
+      "email": "narmeen.mushtaq@gmail.com",
+      "phone": "8482190063",
+      "amount": 440,
+      "date": "2026-05-05"
+    },
+    {
+      "name": "Sohier Mohsen",
+      "email": "sohiermohsen@gmail.com",
+      "phone": "4698792485",
+      "amount": 830,
+      "date": "2026-04-30"
+    },
+    {
+      "name": "Ebrahim Aldamari",
+      "email": "ebrahimaldamari14@gmail.com",
+      "phone": "4699229011",
+      "amount": 1200,
+      "date": "2026-04-05"
+    },
+    {
+      "name": "Eaman Attia",
+      "email": "eaman.attia@gmail.com",
+      "phone": "8175133506",
+      "amount": 500,
+      "date": "2026-03-19"
+    },
+    {
+      "name": "Hadeel Ahmad",
+      "email": "hadeelah49@gmail.com",
+      "phone": "7088309037",
+      "amount": 500,
+      "date": "2026-02-27"
+    },
+    {
+      "name": "Anas Al Hallak",
+      "email": "amani.dietitian@gmail.com",
+      "phone": "7183145528",
+      "amount": 1370,
+      "date": "2026-02-26"
+    },
+    {
+      "name": "Hadeel Ahmad",
+      "email": "hadeelah49@gmail.com",
+      "phone": "7088309037",
+      "amount": 1100,
+      "date": "2026-02-25"
+    },
+    {
+      "name": "Sharif Asad",
+      "email": "sharif@floors4lesstx.com",
+      "phone": "2144155381",
+      "amount": 350,
+      "date": "2026-02-19"
+    },
+    {
+      "name": "Laith Ayasrah",
+      "email": "laithayasrah1996@gmail.com",
+      "phone": "6265589119",
+      "amount": 1030,
+      "date": "2026-02-01"
+    },
+    {
+      "name": "Anas Al Hallak",
+      "email": "amani.dietitian@gmail.com",
+      "phone": "7183145528",
+      "amount": 400,
+      "date": "2026-01-07"
+    },
+    {
+      "name": "Laith Ayasrah",
+      "email": "laithayasrah1996@gmail.com",
+      "phone": "6265589119",
+      "amount": 250,
+      "date": "2026-01-03"
+    },
+    {
+      "name": "hadeel Abu anbar",
+      "email": "hadeelanbar@icloud.com",
+      "phone": "2142811515",
+      "amount": 550,
+      "date": "2025-12-28"
+    },
+    {
+      "name": "MOHAMMED RAAHAT",
+      "email": "raahatam@gmail.com",
+      "phone": null,
+      "amount": 600,
+      "date": "2025-12-24"
+    },
+    {
+      "name": "salam shamait",
+      "email": "salam.shamait@gmail.com",
+      "phone": "4692305233",
+      "amount": 430,
+      "date": "2025-12-24"
+    }
+  ],
+  "matchedSamples": [
+    {
+      "name": "Anesha Karim",
+      "email": "aneshakarim123@gmail.com",
+      "amount": 400,
+      "date": "2026-07-24",
+      "rentalId": "56db1bf9-3129-47a7-9218-36e46771da65",
+      "rentalStatus": "deposit_paid",
+      "isRefund": false
+    },
+    {
+      "name": "Omar",
+      "email": "alachmotio@gmail.com",
+      "amount": 200,
+      "date": "2026-07-23",
+      "rentalId": "200d77f4-bb65-4f4c-b72a-10a1103d8a8c",
+      "rentalStatus": "deposit_paid",
+      "isRefund": false
+    },
+    {
+      "name": "Tariq Alsmadi",
+      "email": "smadi73@hotmail.com",
+      "amount": 120,
+      "date": "2026-07-08",
+      "rentalId": "02464950-83ba-4bbd-9a2e-1735e7fd1b5e",
+      "rentalStatus": "completed",
+      "isRefund": false
+    },
+    {
+      "name": "Tariq Alsmadi",
+      "email": "smadi73@hotmail.com",
+      "amount": 800,
+      "date": "2026-07-08",
+      "rentalId": "02464950-83ba-4bbd-9a2e-1735e7fd1b5e",
+      "rentalStatus": "completed",
+      "isRefund": false
+    },
+    {
+      "name": "Ahmad Kadado",
+      "email": "akadado@gmail.com",
+      "amount": 1200,
+      "date": "2026-07-06",
+      "rentalId": "aba5a7e9-99b0-4094-adcb-4e7fd050460e",
+      "rentalStatus": "completed",
+      "isRefund": false
+    },
+    {
+      "name": "Abdelsalam Mohammad",
+      "email": "aboodhamzeh373@gmail.com",
+      "amount": 550,
+      "date": "2026-06-18",
+      "rentalId": "cb47a176-3a7f-4344-81d8-c14dee3fa26d",
+      "rentalStatus": "completed",
+      "isRefund": false
+    },
+    {
+      "name": "Abeer Qandil",
+      "email": "abeer_qandil@yahoo.com",
+      "amount": 750,
+      "date": "2026-06-12",
+      "rentalId": "3a2da149-0d2d-4650-93f7-f586057b8741",
+      "rentalStatus": "approved_pending_payment",
+      "isRefund": false
+    },
+    {
+      "name": "Moussa Sanogo",
+      "email": "moussa200798@gmail.com",
+      "amount": 650,
+      "date": "2026-06-04",
+      "rentalId": "e3b8f378-cb20-4f53-aa2f-1424bc6485e2",
+      "rentalStatus": "completed",
+      "isRefund": false
+    },
+    {
+      "name": "Amani A Essa",
+      "email": "am.essa94@gmail.com",
+      "amount": 650,
+      "date": "2026-05-31",
+      "rentalId": "f8ddfc65-1ac7-4cf7-93ba-6fb33598ef8d",
+      "rentalStatus": "submitted",
+      "isRefund": false
+    },
+    {
+      "name": "Hadel Kailany",
+      "email": "kailanyhadeel@gmail.com",
+      "amount": 100,
+      "date": "2026-05-25",
+      "rentalId": "effa95fa-5f44-446e-994c-8ba83cbbf733",
+      "rentalStatus": "completed",
+      "isRefund": false
+    },
+    {
+      "name": "Isra Alinur",
+      "email": "alinurisra@gmail.com",
+      "amount": 350,
+      "date": "2026-05-24",
+      "rentalId": "79b74364-1c63-430b-ae4c-91c6fe097d7c",
+      "rentalStatus": "completed",
+      "isRefund": false
+    },
+    {
+      "name": "Isra Alinur",
+      "email": "alinurisra@gmail.com",
+      "amount": 450,
+      "date": "2026-05-24",
+      "rentalId": "79b74364-1c63-430b-ae4c-91c6fe097d7c",
+      "rentalStatus": "completed",
+      "isRefund": false
+    }
+  ]
+}

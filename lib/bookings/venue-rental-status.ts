@@ -4,12 +4,13 @@ import { VENUE_RENTAL_STATUSES } from "./venue-rental-types"
 const STATUS_LABELS: Record<VenueRentalStatus, string> = {
   draft: "Draft",
   submitted: "Submitted",
-  awaiting_supervisor_approval: "Awaiting Supervisor Approval",
+  pending: "Pending",
+  awaiting_supervisor_approval: "Pending",
   declined: "Declined",
   approved_pending_payment: "Awaiting Payment",
   hold_expired: "Hold Expired",
-  deposit_paid: "Deposit Paid",
-  security_deposit_paid: "Security Deposit Paid",
+  deposit_paid: "Confirmed",
+  security_deposit_paid: "Confirmed",
   confirmed: "Confirmed",
   cancelled_before_payment: "Cancelled",
   cancelled_after_payment: "Cancelled (After Payment)",
@@ -19,12 +20,25 @@ const STATUS_LABELS: Record<VenueRentalStatus, string> = {
   closed: "Closed",
 }
 
+/** Statuses where staff can approve, decline, or mark pending. */
+export const VENUE_RENTAL_REVIEWABLE_STATUSES: VenueRentalStatus[] = [
+  VENUE_RENTAL_STATUSES.submitted,
+  VENUE_RENTAL_STATUSES.pending,
+  VENUE_RENTAL_STATUSES.awaitingSupervisorApproval,
+]
+
+export function isVenueRentalReviewable(status: VenueRentalStatus): boolean {
+  return VENUE_RENTAL_REVIEWABLE_STATUSES.includes(status)
+}
+
 /** UI color mapping from spec: green / yellow / orange */
 export function getVenueRentalCalendarColor(
   status: VenueRentalStatus
 ): VenueRentalCalendarColor {
   switch (status) {
     case VENUE_RENTAL_STATUSES.confirmed:
+    case VENUE_RENTAL_STATUSES.depositPaid:
+    case VENUE_RENTAL_STATUSES.securityDepositPaid:
     case VENUE_RENTAL_STATUSES.completed:
     case VENUE_RENTAL_STATUSES.closed:
     case VENUE_RENTAL_STATUSES.securityDepositRefunded:
@@ -47,6 +61,8 @@ export function getVenueRentalStatusLabel(status: VenueRentalStatus): string {
 
 export function isVenueRentalAwaitingAction(status: VenueRentalStatus): boolean {
   return (
+    status === VENUE_RENTAL_STATUSES.submitted ||
+    status === VENUE_RENTAL_STATUSES.pending ||
     status === VENUE_RENTAL_STATUSES.awaitingSupervisorApproval ||
     status === VENUE_RENTAL_STATUSES.approvedPendingPayment ||
     status === VENUE_RENTAL_STATUSES.awaitingSecurityDepositRefundApproval
@@ -64,6 +80,8 @@ export function isVenueRentalTerminal(status: VenueRentalStatus): boolean {
 }
 
 const STAFF_CANCELLABLE_STATUSES = new Set<VenueRentalStatus>([
+  VENUE_RENTAL_STATUSES.submitted,
+  VENUE_RENTAL_STATUSES.pending,
   VENUE_RENTAL_STATUSES.awaitingSupervisorApproval,
   VENUE_RENTAL_STATUSES.approvedPendingPayment,
   VENUE_RENTAL_STATUSES.depositPaid,
@@ -77,6 +95,8 @@ export function canStaffCancelVenueRental(status: VenueRentalStatus): boolean {
 }
 
 const STAFF_FORCE_BOOK_STATUSES = new Set<VenueRentalStatus>([
+  VENUE_RENTAL_STATUSES.submitted,
+  VENUE_RENTAL_STATUSES.pending,
   VENUE_RENTAL_STATUSES.awaitingSupervisorApproval,
   VENUE_RENTAL_STATUSES.approvedPendingPayment,
   VENUE_RENTAL_STATUSES.depositPaid,
@@ -104,13 +124,10 @@ export function summarizeOutstandingRentalPayments(input: {
   const outstandingLabels: string[] = []
 
   if (!input.depositPaid) {
-    outstandingLabels.push("Deposit (non-refundable)")
+    outstandingLabels.push("Deposit (required to confirm)")
   }
 
-  if (!input.securityDepositPaid) {
-    outstandingLabels.push("Security deposit (refundable)")
-  }
-
+  // Security deposit is optional / not required for confirmation.
   if (input.remainingBalanceDue && !input.remainingPaid) {
     outstandingLabels.push("Remaining balance")
   }
@@ -127,11 +144,8 @@ export function shouldCancelVenueRentalAfterPayment(input: {
   depositPaid?: boolean
   securityDepositPaid?: boolean
 }): boolean {
-  if (input.status === VENUE_RENTAL_STATUSES.confirmed) {
-    return true
-  }
-
   if (
+    input.status === VENUE_RENTAL_STATUSES.confirmed ||
     input.status === VENUE_RENTAL_STATUSES.depositPaid ||
     input.status === VENUE_RENTAL_STATUSES.securityDepositPaid
   ) {
@@ -141,11 +155,20 @@ export function shouldCancelVenueRentalAfterPayment(input: {
   return Boolean(input.depositPaid || input.securityDepositPaid)
 }
 
+/** Booking is confirmed when the required rental deposit is paid. */
+export function isBookingDepositSatisfied(input: {
+  depositPaid: boolean
+  securityDepositPaid?: boolean
+}): boolean {
+  return input.depositPaid
+}
+
+/** @deprecated Use `isBookingDepositSatisfied` — security deposit is not required. */
 export function bothRequiredDepositsPaid(input: {
   depositPaid: boolean
   securityDepositPaid: boolean
 }): boolean {
-  return input.depositPaid && input.securityDepositPaid
+  return isBookingDepositSatisfied(input)
 }
 
 export function computeHoldExpiresAt(from: Date = new Date()): Date {
@@ -197,14 +220,13 @@ export function getVenueRentalStatusBadgeClasses(status: VenueRentalStatus): {
       return { bg: "bg-slate-100", text: "text-slate-700" }
     case VENUE_RENTAL_STATUSES.submitted:
       return { bg: "bg-sky-100", text: "text-sky-800" }
+    case VENUE_RENTAL_STATUSES.pending:
     case VENUE_RENTAL_STATUSES.awaitingSupervisorApproval:
       return { bg: "bg-indigo-100", text: "text-indigo-800" }
     case VENUE_RENTAL_STATUSES.approvedPendingPayment:
       return { bg: "bg-amber-100", text: "text-amber-900" }
     case VENUE_RENTAL_STATUSES.depositPaid:
-      return { bg: "bg-orange-100", text: "text-orange-900" }
     case VENUE_RENTAL_STATUSES.securityDepositPaid:
-      return { bg: "bg-yellow-100", text: "text-yellow-900" }
     case VENUE_RENTAL_STATUSES.confirmed:
       return { bg: "bg-emerald-100", text: "text-emerald-800" }
     case VENUE_RENTAL_STATUSES.completed:
@@ -260,6 +282,7 @@ export function getReservationStatusCalendarClasses(status: string): {
   return getVenueRentalCalendarColorClasses(getReservationStatusCalendarColor(status))
 }
 
+/** Remaining-balance reminder window: two weeks before the event. */
 export function shouldSendBalanceReminder(input: {
   eventStartAt: string
   remainingBalanceDue: boolean
@@ -272,7 +295,9 @@ export function shouldSendBalanceReminder(input: {
 
   const now = input.now ?? new Date()
   const eventStart = new Date(input.eventStartAt)
-  const leadMs = 7 * 24 * 60 * 60 * 1000
+  const leadMs = 14 * 24 * 60 * 60 * 1000
+  const msUntilEvent = eventStart.getTime() - now.getTime()
 
-  return eventStart.getTime() - now.getTime() >= leadMs
+  // Send when we are within 14 days of the event (and event is still in the future).
+  return msUntilEvent > 0 && msUntilEvent <= leadMs
 }

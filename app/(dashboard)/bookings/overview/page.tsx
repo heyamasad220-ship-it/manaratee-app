@@ -1,6 +1,9 @@
 import { Header } from "@/components/layout/header"
 import { VenueRentalUpcomingDashboard } from "@/components/bookings/venue-rental-upcoming-dashboard"
-import { getVenueRentalQueueRows } from "@/lib/bookings/venue-rental-queries"
+import {
+  getVenueRentalPaymentReportRows,
+  getVenueRentalQueueRows,
+} from "@/lib/bookings/venue-rental-queries"
 import {
   hasAnyPermission,
   PERMISSIONS,
@@ -15,15 +18,20 @@ export default async function BookingsDashboardPage() {
     PERMISSIONS.PROGRAMS_MANAGE
   )
 
-  const [rows, canManage] = await Promise.all([
-    getVenueRentalQueueRows(),
+  const [rows, paymentRows, canManage] = await Promise.all([
+    getVenueRentalQueueRows({ skipConflictCheck: true }),
+    getVenueRentalPaymentReportRows(),
     hasAnyPermission(PERMISSIONS.BOOKINGS_MANAGE, PERMISSIONS.PROGRAMS_MANAGE),
   ])
 
   return (
     <>
       <Header title="Venue Rentals" />
-      <VenueRentalUpcomingDashboard rows={rows} canManage={canManage} />
+      <VenueRentalUpcomingDashboard
+        rows={rows}
+        paymentRows={paymentRows}
+        canManage={canManage}
+      />
     </>
   )
 }

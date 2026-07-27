@@ -68,11 +68,7 @@ type VenueRentalRequestsQueueProps = {
 }
 
 function isAwaitingPaymentStatus(status: VenueRentalStatus): boolean {
-  return (
-    status === VENUE_RENTAL_STATUSES.approvedPendingPayment ||
-    status === VENUE_RENTAL_STATUSES.depositPaid ||
-    status === VENUE_RENTAL_STATUSES.securityDepositPaid
-  )
+  return status === VENUE_RENTAL_STATUSES.approvedPendingPayment
 }
 
 export function VenueRentalRequestsQueue({
@@ -100,11 +96,14 @@ export function VenueRentalRequestsQueue({
       const matchesStatus =
         statusFilter === "all" ||
         (statusFilter === "awaiting_approval" &&
-          (row.status === VENUE_RENTAL_STATUSES.awaitingSupervisorApproval ||
-            row.status === VENUE_RENTAL_STATUSES.submitted)) ||
+          (row.status === VENUE_RENTAL_STATUSES.submitted ||
+            row.status === VENUE_RENTAL_STATUSES.pending ||
+            row.status === VENUE_RENTAL_STATUSES.awaitingSupervisorApproval)) ||
         (statusFilter === "awaiting_payment" && isAwaitingPaymentStatus(row.status)) ||
         (statusFilter === "confirmed" &&
-          row.status === VENUE_RENTAL_STATUSES.confirmed) ||
+          (row.status === VENUE_RENTAL_STATUSES.confirmed ||
+            row.status === VENUE_RENTAL_STATUSES.depositPaid ||
+            row.status === VENUE_RENTAL_STATUSES.securityDepositPaid)) ||
         (statusFilter === "completed" &&
           row.status === VENUE_RENTAL_STATUSES.completed)
 

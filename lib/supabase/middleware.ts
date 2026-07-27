@@ -46,9 +46,10 @@ export async function updateSession(request: NextRequest) {
   const isProtectedPath = protectedPaths.some(path => request.nextUrl.pathname.startsWith(path))
   
   if (isProtectedPath && !user) {
-    // no user, potentially respond by redirecting the user to the login page
+    // Redirect to a clean login URL (do not preserve page query like ?tab=students)
     const url = request.nextUrl.clone()
     url.pathname = '/login'
+    url.search = ''
     return NextResponse.redirect(url)
   }
 

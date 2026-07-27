@@ -38,7 +38,7 @@ const DEFAULT_HOURS = 4
 const STATUS_MAP = {
   "": null, // resolved later from event date
   approved: "approved_pending_payment",
-  "deposit received": "deposit_paid",
+  "deposit received": "confirmed",
   complete: "completed",
   completed: "completed",
   cancelled: "cancelled_before_payment",
@@ -322,6 +322,7 @@ function reservationStatusForRental(rentalStatus) {
     rentalStatus === "confirmed" ||
     rentalStatus === "completed" ||
     rentalStatus === "closed" ||
+    // legacy aliases
     rentalStatus === "deposit_paid" ||
     rentalStatus === "security_deposit_paid"
   ) {

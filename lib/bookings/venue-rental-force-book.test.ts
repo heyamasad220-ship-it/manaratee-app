@@ -48,8 +48,7 @@ describe("venue rental force-book helpers", () => {
 
     assert.equal(unpaid.requiresPaymentAcknowledgement, true)
     assert.deepEqual(unpaid.outstandingLabels, [
-      "Deposit (non-refundable)",
-      "Security deposit (refundable)",
+      "Deposit (required to confirm)",
     ])
 
     const paid = summarizeOutstandingRentalPayments({

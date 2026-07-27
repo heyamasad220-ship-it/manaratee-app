@@ -1,0 +1,221 @@
+{
+  "importTag": "VENUE_RENTAL_GOOGLE_FORM_V1",
+  "mode": "execute",
+  "orgId": "e057e00a-e4e3-4adf-9af5-f465db1894be",
+  "csv": "C:/Users/danan/Downloads/Venue Rental (Responses) - Form Responses 1.csv",
+  "totalRows": 167,
+  "skippedNoBanquetYouth": 14,
+  "skippedBadDate": 0,
+  "skippedBadStart": 0,
+  "skippedMissingVenueRecord": 0,
+  "mergedDuplicates": 5,
+  "plannedRentals": 148,
+  "contactsMatched": 148,
+  "contactsCreated": 0,
+  "groupMemberships": 148,
+  "rentalsCreated": 148,
+  "reservationsCreated": 172,
+  "alreadyImported": 0,
+  "errors": [],
+  "sample": [
+    {
+      "name": "Shazia AlHassan",
+      "email": "shazia.alhassan@gmail.com",
+      "venues": [
+        "youth"
+      ],
+      "startAt": "2025-01-04T21:00:00.000Z",
+      "endAt": "2025-01-05T03:00:00.000Z",
+      "endTimeDefaulted": false,
+      "rentalStatus": "completed",
+      "sheetStatus": null,
+      "importKey": "156c97ea745508b3e7b93557"
+    },
+    {
+      "name": "Rema Nasir",
+      "email": "houseofelegancern@gmail.com",
+      "venues": [
+        "banquet"
+      ],
+      "startAt": "2025-03-10T23:30:00.000Z",
+      "endAt": "2025-03-11T03:30:00.000Z",
+      "endTimeDefaulted": true,
+      "rentalStatus": "completed",
+      "sheetStatus": null,
+      "importKey": "7fcf50ae2b81790275c885f5"
+    },
+    {
+      "name": "Mustafa Aljumaili",
+      "email": "mustafa.aljumaily1990@gmail.com",
+      "venues": [
+        "banquet"
+      ],
+      "startAt": "2025-03-24T00:00:00.000Z",
+      "endAt": "2025-03-24T04:00:00.000Z",
+      "endTimeDefaulted": true,
+      "rentalStatus": "completed",
+      "sheetStatus": null,
+      "importKey": "45b44483e22e9fa9f0e6f50d"
+    },
+    {
+      "name": "muhammad aftab diwan",
+      "email": "madiwan@gmail.com",
+      "venues": [
+        "banquet"
+      ],
+      "startAt": "2025-03-25T00:00:00.000Z",
+      "endAt": "2025-03-25T04:00:00.000Z",
+      "endTimeDefaulted": true,
+      "rentalStatus": "completed",
+      "sheetStatus": null,
+      "importKey": "bd8c535dd8b925001ad91cc8"
+    },
+    {
+      "name": "Ilsa Baloch",
+      "email": "ilsa.baloch2001@gmail.com",
+      "venues": [
+        "youth"
+      ],
+      "startAt": "2025-04-05T21:00:00.000Z",
+      "endAt": "2025-04-06T01:00:00.000Z",
+      "endTimeDefaulted": true,
+      "rentalStatus": "completed",
+      "sheetStatus": null,
+      "importKey": "7bcfbe647d6f5c762d589ebf"
+    },
+    {
+      "name": "Amirah Abidoye",
+      "email": "amirahabi@gmail.com",
+      "venues": [
+        "youth"
+      ],
+      "startAt": "2025-04-06T00:00:00.000Z",
+      "endAt": "2025-04-06T04:00:00.000Z",
+      "endTimeDefaulted": true,
+      "rentalStatus": "completed",
+      "sheetStatus": null,
+      "importKey": "0f97fb16db243e305a823b0f"
+    },
+    {
+      "name": "Zarah Lakhani",
+      "email": "zarah.lakhani@iamc.com",
+      "venues": [
+        "banquet",
+        "youth"
+      ],
+      "startAt": "2025-04-13T18:30:00.000Z",
+      "endAt": "2025-04-13T22:30:00.000Z",
+      "endTimeDefaulted": true,
+      "rentalStatus": "completed",
+      "sheetStatus": null,
+      "importKey": "d639809e89f63be27dac594d"
+    },
+    {
+      "name": "Fatma Swaleh",
+      "email": "fghalgan@yahoo.com",
+      "venues": [
+        "youth"
+      ],
+      "startAt": "2025-04-19T19:00:00.000Z",
+      "endAt": "2025-04-19T23:00:00.000Z",
+      "endTimeDefaulted": true,
+      "rentalStatus": "completed",
+      "sheetStatus": null,
+      "importKey": "f6973ddc900081fcbc012010"
+    },
+    {
+      "name": "Jaleel Mohammed",
+      "email": "baigsahaban121@gmail.com",
+      "venues": [
+        "youth"
+      ],
+      "startAt": "2025-04-26T23:00:00.000Z",
+      "endAt": "2025-04-27T03:00:00.000Z",
+      "endTimeDefaulted": true,
+      "rentalStatus": "completed",
+      "sheetStatus": null,
+      "importKey": "3dec96c26f78641646dfbaf8"
+    },
+    {
+      "name": "Ayeh Najjar",
+      "email": "ayehnajjar00@gmail.com",
+      "venues": [
+        "youth"
+      ],
+      "startAt": "2025-04-26T23:00:00.000Z",
+      "endAt": "2025-04-27T03:00:00.000Z",
+      "endTimeDefaulted": true,
+      "rentalStatus": "completed",
+      "sheetStatus": null,
+      "importKey": "d9cac6abb32d865380969fbd"
+    },
+    {
+      "name": "Faizan Syed",
+      "email": "faizan.syed@impathub.vote",
+      "venues": [
+        "banquet"
+      ],
+      "startAt": "2025-04-30T23:00:00.000Z",
+      "endAt": "2025-05-01T03:00:00.000Z",
+      "endTimeDefaulted": true,
+      "rentalStatus": "completed",
+      "sheetStatus": null,
+      "importKey": "d631684f4780c7da301c15a1"
+    },
+    {
+      "name": "Dr. Raed Omar Sbeit",
+      "email": "dr.raed.sbeit@gmail.com",
+      "venues": [
+        "banquet"
+      ],
+      "startAt": "2025-05-18T20:00:00.000Z",
+      "endAt": "2025-05-19T00:00:00.000Z",
+      "endTimeDefaulted": true,
+      "rentalStatus": "completed",
+      "sheetStatus": null,
+      "importKey": "6e7477d0faa85e65607e63c5"
+    }
+  ],
+  "skippedSamples": [
+    {
+      "reason": "not_banquet_or_youth",
+      "venue": "Main Prayer Hall - $0 (Donation is appreciated) (2 Hours) - Katb Kitab Ceremony",
+      "name": "Narmeen djedaini"
+    },
+    {
+      "reason": "not_banquet_or_youth",
+      "venue": "Main Prayer Hall - $0 (Donation is appreciated) (2 Hours) - Katb Kitab Ceremony",
+      "name": "Jad Hamdan"
+    },
+    {
+      "reason": "not_banquet_or_youth",
+      "venue": "Main Prayer Hall - $0 (Donation is appreciated) (2 Hours) - Katb Kitab Ceremony",
+      "name": "Ayman Mansour"
+    },
+    {
+      "reason": "not_banquet_or_youth",
+      "venue": "Main Prayer Hall - $0 (2 Hours) - Katb Kitab Ceremony",
+      "name": "Abdelrahman Abdelmaksoud"
+    },
+    {
+      "reason": "not_banquet_or_youth",
+      "venue": "Main Prayer Hall - Donation is appreciated (Only for Aza and Katb Ktab Ceremony)",
+      "name": "Noor Wadi"
+    },
+    {
+      "reason": "not_banquet_or_youth",
+      "venue": "Main Prayer Hall - $0",
+      "name": "Salah Elshanshory"
+    },
+    {
+      "reason": "not_banquet_or_youth",
+      "venue": "Main Prayer Hall - $0",
+      "name": "Rayan Ayman Abdulrahman"
+    },
+    {
+      "reason": "not_banquet_or_youth",
+      "venue": "Main Prayer Hall - $0",
+      "name": "Firas Tameemi"
+    }
+  ]
+}
