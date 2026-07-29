@@ -481,14 +481,8 @@ export function DepartmentOverviewPanel({
       {bundle.archivedPrograms.length > 0 ? (
         <p className="text-sm text-muted-foreground">
           {bundle.archivedPrograms.length} archived year
-          {bundle.archivedPrograms.length === 1 ? "" : "s"} — view under{" "}
-          <Link
-            href={departmentGroupWorkspaceHref(departmentId, { tab: "reports" })}
-            className="underline underline-offset-2"
-          >
-            Archive
-          </Link>
-          .
+          {bundle.archivedPrograms.length === 1 ? "" : "s"} (not shown in operating
+          tabs).
         </p>
       ) : null}
 

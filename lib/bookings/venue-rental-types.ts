@@ -100,6 +100,10 @@ export interface RentalReservationRecord {
   venue_id: string
   start_at: string
   end_at: string
+  /** Buffer before event start — occupied window on shared calendar. */
+  setup_minutes?: number
+  /** Buffer after event end — occupied window on shared calendar. */
+  cleanup_minutes?: number
   status: RentalReservationStatus
   hold_expires_at: string | null
   created_by: string | null
@@ -158,6 +162,16 @@ export interface SubmitVenueRentalInput {
   spaces: RentalSpaceSlotInput[]
   addons?: RentalAddonSelectionInput[]
   operationalSetup?: OperationalSetupInput
+}
+
+/** Staff-created rental on behalf of any contact (Requests → Add). */
+export interface CreateStaffVenueRentalInput {
+  billingContactId: string
+  venueRentalEventTypeId?: string | null
+  notes?: string | null
+  spaces: RentalSpaceSlotInput[]
+  expectedAttendance?: number | null
+  setupStyle?: string | null
 }
 
 export type PublicAvailabilityState =

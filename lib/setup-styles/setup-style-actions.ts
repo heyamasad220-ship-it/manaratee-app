@@ -94,6 +94,69 @@ export async function upsertRoomSetupStyle(input: UpsertRoomSetupStyleInput) {
   revalidatePath("/event-management/create")
 }
 
+export async function reorderRoomSetupStyles(orderedIds: string[]) {
+  const canManage = await hasAnyPermission(
+    PERMISSIONS.SPACES_MANAGE,
+    PERMISSIONS.BOOKINGS_MANAGE,
+    PERMISSIONS.EVENTS_MANAGE,
+    PERMISSIONS.PROGRAMS_MANAGE
+  )
+  if (!canManage) {
+    throw new Error("You do not have permission to manage setup styles.")
+  }
+
+  const uniqueIds = Array.from(new Set(orderedIds.filter(Boolean)))
+  if (uniqueIds.length === 0) {
+    return
+  }
+
+  const supabase = await createClient()
+  const organizationId = await getSelectedOrganizationId()
+
+  if (!organizationId) {
+    throw new Error("No organization selected")
+  }
+
+  const { data: existing, error: loadError } = await supabase
+    .from("room_setup_styles")
+    .select("id")
+    .eq("organization_id", organizationId)
+
+  if (loadError) {
+    console.error(loadError)
+    throw new Error("Failed to load setup styles for reorder.")
+  }
+
+  const allowedIds = new Set((existing || []).map((row) => row.id as string))
+  const orderedInOrg = uniqueIds.filter((id) => allowedIds.has(id))
+
+  if (orderedInOrg.length !== allowedIds.size) {
+    throw new Error("Setup style list is out of date. Refresh and try again.")
+  }
+
+  const updates = await Promise.all(
+    orderedInOrg.map((id, index) =>
+      supabase
+        .from("room_setup_styles")
+        .update({ sort_order: (index + 1) * 10 })
+        .eq("id", id)
+        .eq("organization_id", organizationId)
+    )
+  )
+
+  const failed = updates.find((result) => result.error)
+  if (failed?.error) {
+    console.error(failed.error)
+    throw new Error("Failed to save setup style order.")
+  }
+
+  revalidatePath("/facilities/settings/setup-styles")
+  revalidatePath("/event-management/settings/setup-styles")
+  revalidatePath("/event-management/request")
+  revalidatePath("/event-management/create")
+  revalidatePath("/bookings/requests")
+}
+
 export async function deleteRoomSetupStyle(id: string) {
   const canManage = await hasAnyPermission(
     PERMISSIONS.SPACES_MANAGE,

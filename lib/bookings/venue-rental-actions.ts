@@ -48,6 +48,7 @@ import {
   VENUE_RENTAL_STATUSES,
   type RentalAddonSelectionInput,
   type RentalSpaceSlotInput,
+  type CreateStaffVenueRentalInput,
   type SubmitVenueRentalInput,
   type VenueRentalStatus,
 } from "./venue-rental-types"
@@ -473,6 +474,145 @@ export async function submitVenueRentalRequest(input: SubmitVenueRentalInput) {
   }
 
   revalidateVenueRentalPaths()
+  return rental.id as string
+}
+
+/**
+ * Staff create a venue rental for any contact (individuals, orgs, groups).
+ * Sets billing_contact_id; customer_user_id comes from the contact's linked auth user when present.
+ */
+export async function createStaffVenueRentalRequest(input: CreateStaffVenueRentalInput) {
+  await assertCanManageVenueRentals()
+
+  const supabase = await createClient()
+  const organizationId = await resolveOrganizationId()
+
+  if (!organizationId) {
+    throw new Error("No organization selected")
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    throw new Error("You must be signed in to create a rental request.")
+  }
+
+  const billingContactId = input.billingContactId?.trim()
+  if (!billingContactId) {
+    throw new Error("Select a contact for this booking.")
+  }
+
+  const { data: contact, error: contactError } = await supabase
+    .from("contacts")
+    .select("id, auth_user_id")
+    .eq("organization_id", organizationId)
+    .eq("id", billingContactId)
+    .maybeSingle()
+
+  if (contactError || !contact) {
+    throw new Error("The selected contact could not be found.")
+  }
+
+  validateSpaces(input.spaces)
+  await assertVenuesInOrg(
+    organizationId,
+    input.spaces.map((space) => space.venueId)
+  )
+  await checkSpaceConflicts(organizationId, input.spaces)
+
+  const customerUserId = (contact.auth_user_id as string | null) || null
+  const expectedAttendance =
+    typeof input.expectedAttendance === "number" &&
+    Number.isFinite(input.expectedAttendance) &&
+    input.expectedAttendance > 0
+      ? Math.floor(input.expectedAttendance)
+      : null
+
+  const rentalInsertBase = {
+    organization_id: organizationId,
+    customer_user_id: customerUserId,
+    venue_rental_event_type_id: input.venueRentalEventTypeId || null,
+    status: VENUE_RENTAL_STATUSES.submitted,
+    notes: input.notes?.trim() || null,
+    expected_attendance: expectedAttendance,
+    created_by: user.id,
+  }
+
+  let rentalResult = await supabase
+    .from("venue_rentals")
+    .insert({
+      ...rentalInsertBase,
+      billing_contact_id: billingContactId,
+    })
+    .select("id")
+    .single()
+
+  if (
+    rentalResult.error?.message?.includes("billing_contact_id") &&
+    billingContactId
+  ) {
+    rentalResult = await supabase
+      .from("venue_rentals")
+      .insert(rentalInsertBase)
+      .select("id")
+      .single()
+  }
+
+  const { data: rental, error: rentalError } = rentalResult
+
+  if (rentalError || !rental) {
+    console.error(rentalError)
+    throw new Error(rentalError?.message || "Failed to create rental request")
+  }
+
+  const reservationRows = input.spaces.map((space) => ({
+    organization_id: organizationId,
+    venue_rental_id: rental.id,
+    venue_id: space.venueId,
+    start_at: space.startAt,
+    end_at: space.endAt,
+    status: RENTAL_RESERVATION_STATUSES.temporaryHold,
+    created_by: user.id,
+  }))
+
+  const { error: reservationError } = await supabase
+    .from("rental_reservations")
+    .insert(reservationRows)
+
+  if (reservationError) {
+    await supabase.from("venue_rentals").delete().eq("id", rental.id)
+    throw new Error(reservationError.message || "Failed to create temporary hold")
+  }
+
+  await syncOperationalBriefForVenueRental(rental.id as string, organizationId, user.id, {
+    operationalSetup: {
+      expectedAttendance,
+      setupStyle: input.setupStyle?.trim() || null,
+    },
+  })
+
+  fireModuleNotifications([
+    {
+      organizationId,
+      moduleKey: "venue_rentals",
+      audience: "staff",
+      eventKey: "request_submitted",
+      subject: "New venue rental request",
+      summary: "Staff created a new venue rental request.",
+      metadata: {
+        venueRentalId: rental.id,
+        billingContactId,
+        createdByStaff: true,
+      },
+    },
+  ])
+
+  await syncContactAffiliations(billingContactId, organizationId, supabase)
+
+  revalidateVenueRentalPaths()
+  revalidatePath(`/bookings/rentals/${rental.id}`)
   return rental.id as string
 }
 

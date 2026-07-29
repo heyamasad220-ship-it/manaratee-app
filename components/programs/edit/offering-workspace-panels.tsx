@@ -43,6 +43,7 @@ export function OfferingSchedulePanel({
       offering={offering}
       programId={programId}
       items={workspaceData.scheduleItems}
+      venues={workspaceData.venues}
     />
   )
 }

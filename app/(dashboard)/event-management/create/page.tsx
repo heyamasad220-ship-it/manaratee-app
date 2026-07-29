@@ -3,6 +3,10 @@ import { InternalEventForm } from "@/components/events/internal-event-form"
 import { getDepartments } from "@/lib/departments/department-queries"
 import { getEventTypes } from "@/lib/events/event-type-queries"
 import { getInternalEventFormDefaults } from "@/lib/events/internal-event-form-defaults"
+import {
+  mergeInternalEventFormDefaults,
+  resolveInternalEventFormReturnTo,
+} from "@/lib/events/internal-event-form-query"
 import { getActiveCalendarVenues } from "@/lib/bookings/venue-calendar-venues"
 import { getRoomSetupStyles } from "@/lib/setup-styles/setup-style-queries"
 import { getVendorHubVendorTypes } from "@/lib/vendor-hub/vendor-type-queries"
@@ -16,6 +20,8 @@ type PageProps = {
     venueId?: string
     start?: string
     end?: string
+    department?: string
+    returnTo?: string
   }>
 }
 
@@ -23,7 +29,10 @@ export default async function CreateInternalEventPage({ searchParams }: PageProp
   await requireAnyPermission(PERMISSIONS.EVENTS_MANAGE, PERMISSIONS.PROGRAMS_MANAGE)
 
   const params = await searchParams
-  const [departments, eventTypes, venues, defaults, setupStyles, vendorTypes] =
+  const departmentFromQuery = params?.department?.trim() || ""
+  const returnTo = resolveInternalEventFormReturnTo(params?.returnTo)
+
+  const [departments, eventTypes, venues, baseDefaults, setupStyles, vendorTypes] =
     await Promise.all([
       getDepartments(),
       getEventTypes({ activeOnly: true }),
@@ -32,6 +41,9 @@ export default async function CreateInternalEventPage({ searchParams }: PageProp
       getRoomSetupStyles({ activeOnly: true }),
       getVendorHubVendorTypes({ activeOnly: true }),
     ])
+
+  const defaults = mergeInternalEventFormDefaults(baseDefaults, departmentFromQuery)
+  const departmentExists = departments.some((department) => department.id === departmentFromQuery)
 
   return (
     <>
@@ -45,6 +57,8 @@ export default async function CreateInternalEventPage({ searchParams }: PageProp
         canManageSetupStyles
         vendorTypes={vendorTypes}
         canManageVendorTypes
+        lockDepartment={Boolean(departmentFromQuery && departmentExists)}
+        returnTo={returnTo}
         initialSlot={{
           venueId: params?.venueId || "",
           startAt: params?.start || "",

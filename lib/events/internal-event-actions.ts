@@ -236,7 +236,7 @@ async function assertInternalEventSpaceAvailable(input: {
 
   if (conflicts.length > 0) {
     throw new Error(
-      `Space is unavailable for the selected time (${conflicts.length} conflict${conflicts.length === 1 ? "" : "s"}).`
+      "That space and time is unavailable because another rental, event, program, or hold is already scheduled. Please choose a different time."
     )
   }
 }
@@ -720,6 +720,11 @@ export async function deleteInternalEvent(
     return { success: false, error: "No organization selected." }
   }
 
+  const blockers = await getInternalEventDeleteBlockers(id, organizationId)
+  if (blockers) {
+    return { success: false, error: blockers }
+  }
+
   const { error } = await supabase
     .from("internal_events")
     .delete()
@@ -732,8 +737,101 @@ export async function deleteInternalEvent(
   }
 
   revalidateInternalEventPaths()
+  revalidateTicketingPaths()
 
   return { success: true }
+}
+
+/**
+ * Returns a human-readable reason when an event must not be deleted, else null.
+ * Blocks on ticket orders or active childcare/volunteer/vendor registrations.
+ */
+export async function getInternalEventDeleteBlockers(
+  eventId: string,
+  organizationId?: string | null
+): Promise<string | null> {
+  const orgId = organizationId ?? (await getSelectedOrganizationId())
+  if (!orgId || !eventId) return null
+
+  const supabase = await createClient()
+
+  const [ordersResult, participationsResult, childcareEventResult] =
+    await Promise.all([
+      supabase
+        .from("ticket_orders")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", orgId)
+        .eq("internal_event_id", eventId),
+      supabase
+        .from("service_participations")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", orgId)
+        .eq("source_type", "internal_event")
+        .eq("source_id", eventId)
+        .in("status", ["pending", "confirmed"]),
+      supabase
+        .from("childcare_events")
+        .select("id")
+        .eq("organization_id", orgId)
+        .eq("source_type", "internal_event")
+        .eq("source_id", eventId)
+        .maybeSingle(),
+    ])
+
+  const reasons: string[] = []
+
+  if (!ordersResult.error && (ordersResult.count || 0) > 0) {
+    reasons.push("ticket orders")
+  }
+
+  if (
+    !participationsResult.error &&
+    (participationsResult.count || 0) > 0
+  ) {
+    reasons.push("volunteer, childcare provider, or vendor sign-ups")
+  }
+
+  if (!childcareEventResult.error && childcareEventResult.data?.id) {
+    const { count, error } = await supabase
+      .from("childcare_registrations")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", orgId)
+      .eq("childcare_event_id", childcareEventResult.data.id as string)
+      .neq("status", "cancelled")
+
+    if (!error && (count || 0) > 0) {
+      reasons.push("childcare registrations")
+    }
+  }
+
+  if (reasons.length === 0) return null
+
+  if (reasons.length === 1) {
+    return `This event has ${reasons[0]} and can't be deleted.`
+  }
+
+  const last = reasons[reasons.length - 1]
+  const head = reasons.slice(0, -1).join(", ")
+  return `This event has ${head}, and ${last}, and can't be deleted.`
+}
+
+export async function getInternalEventDeleteBlockersMap(
+  eventIds: string[]
+): Promise<Record<string, string | null>> {
+  const uniqueIds = Array.from(new Set(eventIds.filter(Boolean)))
+  const result: Record<string, string | null> = {}
+
+  if (uniqueIds.length === 0) {
+    return result
+  }
+
+  await Promise.all(
+    uniqueIds.map(async (eventId) => {
+      result[eventId] = await getInternalEventDeleteBlockers(eventId)
+    })
+  )
+
+  return result
 }
 
 export async function duplicateInternalEvent(

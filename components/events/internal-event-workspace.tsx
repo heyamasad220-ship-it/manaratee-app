@@ -1,11 +1,9 @@
 "use client"
 
-import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
   Calendar,
   MapPin,
-  Pencil,
   Building2,
   Tag,
   Heart,
@@ -15,6 +13,7 @@ import {
 } from "lucide-react"
 
 import { Header } from "@/components/layout/header"
+import { InternalEventCardActions } from "@/components/events/internal-event-card-actions"
 import { InternalEventChildcareTab } from "@/components/events/internal-event-childcare-tab"
 import {
   InternalEventModuleDisabledState,
@@ -23,7 +22,6 @@ import {
 import { InternalEventTicketingWorkspace } from "@/components/tickets/internal-event-ticketing-workspace"
 import { InternalEventStatusSelect } from "@/components/events/internal-event-status-select"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { getInternalEventStatusLabel } from "@/lib/events/internal-event-status"
@@ -71,6 +69,7 @@ function isWorkspaceTab(value: string | null): value is WorkspaceTab {
 export function InternalEventWorkspace({
   event,
   canManage,
+  deleteBlockedReason = null,
   participations = [],
   ticketTypes = [],
   childcareEvent = null,
@@ -79,6 +78,7 @@ export function InternalEventWorkspace({
 }: {
   event: InternalEventWithRelations
   canManage: boolean
+  deleteBlockedReason?: string | null
   participations?: ServiceParticipationWithContact[]
   ticketTypes?: EventTicketType[]
   childcareEvent?: ChildcareEventSummary | null
@@ -155,12 +155,12 @@ export function InternalEventWorkspace({
             {canManage ? (
               <>
                 <InternalEventStatusSelect eventId={event.id} status={event.status} />
-                <Button variant="outline" asChild>
-                  <Link href={editHref}>
-                    <Pencil className="mr-2 h-4 w-4" />
-                    Edit
-                  </Link>
-                </Button>
+                <InternalEventCardActions
+                  eventId={event.id}
+                  eventName={event.name}
+                  deleteBlockedReason={deleteBlockedReason}
+                  redirectAfterDelete="/event-management"
+                />
               </>
             ) : null}
           </div>

@@ -3,6 +3,7 @@ import { Suspense } from "react"
 
 import { InternalEventWorkspace } from "@/components/events/internal-event-workspace"
 import { getChildcareForInternalEvent } from "@/lib/child-care/childcare-registration-queries"
+import { getInternalEventDeleteBlockers } from "@/lib/events/internal-event-actions"
 import { getInternalEventById } from "@/lib/events/internal-event-queries"
 import { getParticipationsForSource } from "@/lib/service-participations/service-participation-queries"
 import { getEventTicketTypes } from "@/lib/tickets/ticket-type-actions"
@@ -54,11 +55,16 @@ export default async function InternalEventWorkspacePage({
     notFound()
   }
 
+  const deleteBlockedReason = canManage
+    ? await getInternalEventDeleteBlockers(id)
+    : null
+
   return (
     <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading event...</div>}>
       <InternalEventWorkspace
         event={event}
         canManage={canManage}
+        deleteBlockedReason={deleteBlockedReason}
         participations={participations}
         ticketTypes={ticketTypes}
         childcareEvent={childcare.childcareEvent}

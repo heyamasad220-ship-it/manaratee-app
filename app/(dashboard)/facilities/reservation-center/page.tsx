@@ -34,14 +34,14 @@ export default async function ReservationCenterPage() {
 
   return (
     <>
-      <Header title="Bookings" />
+      <Header title="Facilities" />
       <div className="flex flex-col gap-6 p-4 sm:p-6">
         <div>
           <h2 className="text-xl font-semibold">Reservation Center</h2>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
             {facilitiesOnly
-              ? "Operational hub for facility setup. Review upcoming reservations, conflicts, and setup briefs on the calendar."
-              : "Day-to-day facility operations: upcoming briefs, temporary holds, and schedule conflicts. See Overview for queue metrics and Calendar for the full schedule."}
+              ? "Operational hub for facility setup. Review upcoming reservations, conflicts, and setup briefs on the calendar. Create maintenance blocks and closures from Calendar."
+              : "Day-to-day facility operations: upcoming briefs, temporary holds, and schedule conflicts. Payments and rental approvals live in Venue Rentals."}
           </p>
           <div className="mt-3">
             <MasterCalendarLegend />
@@ -54,7 +54,6 @@ export default async function ReservationCenterPage() {
           upcomingBriefs={upcomingBriefs}
           temporaryHolds={temporaryHolds}
           conflicts={conflicts}
-          facilitiesOnly={facilitiesOnly}
         />
       </div>
     </>

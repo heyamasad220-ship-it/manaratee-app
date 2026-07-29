@@ -14,14 +14,12 @@ import {
 import type { TemporaryHoldRow, UpcomingOperationalBriefRow } from "@/lib/operational-briefs/operational-brief-queries"
 import { OPERATIONAL_BRIEF_SETUP_STATUS_LABELS } from "@/lib/operational-briefs/operational-brief-types"
 import type { MasterCalendarConflictPreview } from "@/lib/operational-briefs/reservation-center-queries"
-import { operationalBriefSourceHref } from "@/lib/operational-briefs/brief-source-path"
 import { formatTimeRange } from "@/lib/reservations/reservation-time"
 
 type ReservationCenterOpsPanelProps = {
   upcomingBriefs: UpcomingOperationalBriefRow[]
   temporaryHolds: TemporaryHoldRow[]
   conflicts: MasterCalendarConflictPreview
-  facilitiesOnly?: boolean
 }
 
 function sourceTypeLabel(sourceType: string) {
@@ -43,7 +41,6 @@ export function ReservationCenterOpsPanel({
   upcomingBriefs,
   temporaryHolds,
   conflicts,
-  facilitiesOnly = false,
 }: ReservationCenterOpsPanelProps) {
   return (
     <div className="grid gap-4 xl:grid-cols-2">
@@ -66,23 +63,12 @@ export function ReservationCenterOpsPanel({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {upcomingBriefs.map((brief) => {
-                    const sourceHref = operationalBriefSourceHref(
-                      brief.sourceType,
-                      brief.sourceId
-                    )
-
-                    return (
+                  {upcomingBriefs.map((brief) => (
                     <TableRow key={brief.id}>
                       <TableCell>
                         <div className="space-y-1">
                           <p className="font-medium">{brief.title}</p>
                           <Badge variant="outline">{sourceTypeLabel(brief.sourceType)}</Badge>
-                          {sourceHref && !facilitiesOnly ? (
-                            <Button variant="link" className="h-auto p-0 text-xs" asChild>
-                              <Link href={sourceHref}>Open source record</Link>
-                            </Button>
-                          ) : null}
                         </div>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
@@ -97,8 +83,7 @@ export function ReservationCenterOpsPanel({
                         </Badge>
                       </TableCell>
                     </TableRow>
-                    )
-                  })}
+                  ))}
                 </TableBody>
               </Table>
             </div>
@@ -118,12 +103,17 @@ export function ReservationCenterOpsPanel({
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Temporary holds</CardTitle>
-            <CardDescription>Active venue rental holds awaiting approval or payment.</CardDescription>
+            <CardDescription>
+              Active venue rental holds on the facility schedule (read-only here).
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {temporaryHolds.length ? (
               temporaryHolds.map((hold) => (
-                <div key={`${hold.venueRentalId}-${hold.startAt}`} className="rounded border p-3 text-sm">
+                <div
+                  key={`${hold.venueRentalId}-${hold.startAt}`}
+                  className="rounded border p-3 text-sm"
+                >
                   <div className="flex items-center justify-between gap-2">
                     <p className="font-medium">{hold.venueName}</p>
                     <Badge variant="outline">Hold</Badge>
@@ -135,13 +125,6 @@ export function ReservationCenterOpsPanel({
                     <p className="text-xs text-muted-foreground">
                       Expires {new Date(hold.holdExpiresAt).toLocaleString()}
                     </p>
-                  ) : null}
-                  {!facilitiesOnly ? (
-                    <Button variant="link" className="mt-1 h-auto p-0" asChild>
-                      <Link href={`/bookings/rentals/${hold.venueRentalId}`}>
-                        View rental workflow
-                      </Link>
-                    </Button>
                   ) : null}
                 </div>
               ))
@@ -155,14 +138,17 @@ export function ReservationCenterOpsPanel({
           <CardHeader>
             <CardTitle className="text-base">Schedule conflicts</CardTitle>
             <CardDescription>
-              Cross-module space overlaps detected this week ({conflicts.conflictCount} reservation
-              {conflicts.conflictCount === 1 ? "" : "s"}).
+              Rare overlaps (for example after a force-book override). New requests are blocked
+              when a space or time is already taken.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {conflicts.previews.length ? (
               conflicts.previews.map((preview) => (
-                <div key={preview.id} className="rounded border border-amber-200 bg-amber-50 p-3 text-sm">
+                <div
+                  key={preview.id}
+                  className="rounded border border-amber-200 bg-amber-50 p-3 text-sm"
+                >
                   <p className="font-medium text-amber-900">
                     {preview.titleA} ↔ {preview.titleB}
                   </p>

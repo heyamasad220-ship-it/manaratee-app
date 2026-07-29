@@ -21,6 +21,8 @@ export interface SubItem {
   permissionKeys?: string[]
   exact?: boolean
   children?: SubItem[]
+  /** Advanced Facilities-only nav (inventory, reservation center, ops overview). */
+  advancedFacilities?: boolean
 }
 
 export interface NavItem {

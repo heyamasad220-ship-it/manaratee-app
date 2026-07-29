@@ -1,5 +1,6 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js"
 import {
+  CAPABILITY_MODULE_SLUGS,
   CORE_MODULE_SLUGS,
   expandEnabledModuleSlugs,
   getModuleToggleTargets,
@@ -20,9 +21,15 @@ const MODULE_ENABLE_PERMISSION_SEEDS: Record<string, string[]> = {
     PERMISSIONS.EVENTS_MANAGE,
     PERMISSIONS.TICKETING_VIEW,
     PERMISSIONS.TICKETING_MANAGE,
+    PERMISSIONS.SPACES_VIEW,
     PERMISSIONS.REPORTS_VIEW,
   ],
-  programs: [PERMISSIONS.PROGRAMS_VIEW, PERMISSIONS.PROGRAMS_MANAGE, PERMISSIONS.REPORTS_VIEW],
+  programs: [
+    PERMISSIONS.PROGRAMS_VIEW,
+    PERMISSIONS.PROGRAMS_MANAGE,
+    PERMISSIONS.SPACES_VIEW,
+    PERMISSIONS.REPORTS_VIEW,
+  ],
   donations: [PERMISSIONS.DONATIONS_VIEW, PERMISSIONS.DONATIONS_MANAGE],
   workforce: [PERMISSIONS.STAFF_VIEW, PERMISSIONS.STAFF_MANAGE],
   membership: [PERMISSIONS.MEMBERSHIP_VIEW, PERMISSIONS.MEMBERSHIP_MANAGE],
@@ -417,7 +424,6 @@ export async function setOrganizationModuleEnabled(
 
   const admin = createAdminClient()
   const moduleIdsBySlug = await loadModuleSlugMap(admin)
-  const targets = getModuleToggleTargets(slug, enabled)
 
   const primaryModuleId = moduleIdsBySlug.get(slug)
   if (!primaryModuleId) {
@@ -426,21 +432,32 @@ export async function setOrganizationModuleEnabled(
     )
   }
 
-  for (const targetSlug of targets) {
-    const moduleId = moduleIdsBySlug.get(targetSlug)
-    if (!moduleId) continue
+  if (enabled) {
+    const targets = getModuleToggleTargets(slug, true)
+    for (const targetSlug of targets) {
+      const moduleId = moduleIdsBySlug.get(targetSlug)
+      if (!moduleId) continue
 
+      await upsertOrganizationModule(
+        admin,
+        organizationId,
+        moduleId,
+        true,
+        true
+      )
+    }
+    await seedAdminRolePermissionsForModule(admin, organizationId, slug)
+  } else {
     await upsertOrganizationModule(
       admin,
       organizationId,
-      moduleId,
-      enabled,
+      primaryModuleId,
+      false,
       true
     )
-  }
-
-  if (enabled) {
-    await seedAdminRolePermissionsForModule(admin, organizationId, slug)
+    // Recompute implied capabilities from remaining enabled products so we
+    // do not turn off spaces/ticketing still required by another module.
+    await syncImpliedModulesForOrganization(organizationId)
   }
 
   const { error: orgError } = await admin
@@ -486,11 +503,16 @@ export async function syncImpliedModulesForOrganization(organizationId: string) 
 
   const targetSlugs = expandEnabledModuleSlugs(enabledProductSlugs)
 
-  for (const slug of targetSlugs) {
-    if (!isCapabilityModuleSlug(slug)) continue
+  for (const slug of CAPABILITY_MODULE_SLUGS) {
     const moduleId = moduleIdsBySlug.get(slug)
     if (!moduleId) continue
 
-    await upsertOrganizationModule(admin, organizationId, moduleId, true, false)
+    await upsertOrganizationModule(
+      admin,
+      organizationId,
+      moduleId,
+      targetSlugs.has(slug),
+      false
+    )
   }
 }

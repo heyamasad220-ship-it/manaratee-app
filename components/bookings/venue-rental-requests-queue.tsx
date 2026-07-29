@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   Clock,
   MoreHorizontal,
+  Plus,
 } from "lucide-react"
 
 import { formatVenueRentalTimeRange } from "@/lib/bookings/venue-rental-format"
@@ -18,6 +19,12 @@ import type {
   VenueRentalStatus,
 } from "@/lib/bookings/venue-rental-types"
 import { VENUE_RENTAL_STATUSES } from "@/lib/bookings/venue-rental-types"
+import {
+  VenueRentalCreateDialog,
+  type VenueRentalCreateEventTypeOption,
+  type VenueRentalCreateVenueOption,
+} from "@/components/bookings/venue-rental-create-dialog"
+import type { RoomSetupStyle } from "@/lib/setup-styles/setup-style-types"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -65,6 +72,9 @@ type VenueRentalRequestsQueueProps = {
   canManage: boolean
   title?: string
   defaultStatusFilter?: StatusFilter
+  venues?: VenueRentalCreateVenueOption[]
+  eventTypes?: VenueRentalCreateEventTypeOption[]
+  setupStyles?: RoomSetupStyle[]
 }
 
 function isAwaitingPaymentStatus(status: VenueRentalStatus): boolean {
@@ -77,12 +87,16 @@ export function VenueRentalRequestsQueue({
   canManage,
   title = "Requests",
   defaultStatusFilter = "all",
+  venues = [],
+  eventTypes = [],
+  setupStyles = [],
 }: VenueRentalRequestsQueueProps) {
   const [customerFilterInput, setCustomerFilterInput] = useState("")
   const [customerFilter, setCustomerFilter] = useState("")
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(defaultStatusFilter)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_LIST_PAGE_SIZE)
+  const [createOpen, setCreateOpen] = useState(false)
 
   const filteredRows = useMemo(() => {
     return rows.filter((row) => {
@@ -132,8 +146,14 @@ export function VenueRentalRequestsQueue({
           STAFF_MAIN_CONTENT_STICKY_TOP_CLASS
         )}
       >
-        <div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-xl font-semibold text-foreground">{title}</h2>
+          {canManage ? (
+            <Button type="button" onClick={() => setCreateOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add
+            </Button>
+          ) : null}
         </div>
 
         <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
@@ -303,6 +323,16 @@ export function VenueRentalRequestsQueue({
           ) : null}
         </CardContent>
       </Card>
+
+      {canManage ? (
+        <VenueRentalCreateDialog
+          open={createOpen}
+          onOpenChange={setCreateOpen}
+          venues={venues}
+          eventTypes={eventTypes}
+          setupStyles={setupStyles}
+        />
+      ) : null}
     </div>
   )
 }

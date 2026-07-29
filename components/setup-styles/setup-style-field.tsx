@@ -20,7 +20,11 @@ type SetupStyleFieldProps = {
   onChange: (value: string) => void
   canManage?: boolean
   required?: boolean
+  allowEmpty?: boolean
+  disabled?: boolean
 }
+
+const EMPTY_SETUP_STYLE_VALUE = "__none__"
 
 export function SetupStyleField({
   id = "setup_style",
@@ -30,9 +34,13 @@ export function SetupStyleField({
   onChange,
   canManage = false,
   required = false,
+  allowEmpty = false,
+  disabled = false,
 }: SetupStyleFieldProps) {
   const selectedStyle = setupStyles.find((style) => style.name === value)
   const selectValue = selectedStyle?.name || (value ? value : undefined)
+  const resolvedValue =
+    allowEmpty && !selectValue ? EMPTY_SETUP_STYLE_VALUE : selectValue
 
   return (
     <div className="space-y-1.5">
@@ -53,14 +61,20 @@ export function SetupStyleField({
 
       {setupStyles.length > 0 ? (
         <Select
-          value={selectValue}
-          onValueChange={onChange}
+          value={resolvedValue}
+          onValueChange={(next) =>
+            onChange(next === EMPTY_SETUP_STYLE_VALUE ? "" : next)
+          }
           required={required}
+          disabled={disabled}
         >
           <SelectTrigger id={id} className="w-full bg-background">
             <SelectValue placeholder="Select setup style" />
           </SelectTrigger>
           <SelectContent>
+            {allowEmpty ? (
+              <SelectItem value={EMPTY_SETUP_STYLE_VALUE}>None</SelectItem>
+            ) : null}
             {setupStyles.map((style) => (
               <SelectItem key={style.id} value={style.name}>
                 {style.name}
@@ -75,6 +89,7 @@ export function SetupStyleField({
           onChange={(event) => onChange(event.target.value)}
           className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
           required={required}
+          disabled={disabled}
         >
           <option value="">Select setup style</option>
         </select>

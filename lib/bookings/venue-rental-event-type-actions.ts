@@ -123,10 +123,11 @@ export async function deleteVenueRentalEventType(id: string) {
 }
 
 function revalidateVenueRentalEventTypePaths() {
-  revalidatePath("/facilities/settings/event-types")
   revalidatePath("/bookings/settings/event-types")
+  revalidatePath("/facilities/settings/event-types")
   revalidatePath("/bookings/settings")
   revalidatePath("/bookings/overview")
+  revalidatePath("/bookings/requests")
   revalidatePath("/customer/rentals")
   revalidatePath("/customer/rentals/new")
 }

@@ -30,6 +30,8 @@ type OperationalBriefPanelProps = {
   reservation: CalendarReservation | null
   open: boolean
   onOpenChange: (open: boolean) => void
+  /** Facilities calendar: show contact/setup only — no source workflow links. */
+  hideSourceRecordLink?: boolean
 }
 
 function BriefField({
@@ -55,6 +57,7 @@ export function OperationalBriefPanel({
   reservation,
   open,
   onOpenChange,
+  hideSourceRecordLink = false,
 }: OperationalBriefPanelProps) {
   const [isPending, startTransition] = useTransition()
   const [brief, setBrief] = useState<OperationalBriefView | null>(null)
@@ -69,7 +72,9 @@ export function OperationalBriefPanel({
     startTransition(async () => {
       try {
         setError(null)
-        const loaded = await loadOperationalBriefForReservationAction(reservation)
+        const loaded = await loadOperationalBriefForReservationAction(reservation, {
+          hideSourceRecordLink,
+        })
         setBrief(loaded)
         setFacilityNotes(loaded?.facilityNotes ?? "")
       } catch (loadError) {
@@ -81,7 +86,7 @@ export function OperationalBriefPanel({
         )
       }
     })
-  }, [open, reservation])
+  }, [open, reservation, hideSourceRecordLink])
 
   const scheduleLabel =
     brief?.eventDate && brief.startTime && brief.endTime
@@ -138,7 +143,8 @@ export function OperationalBriefPanel({
                 <BriefField label="Special accommodations" value={brief.accessibilityNotes} />
                 <BriefField label="Special requests" value={brief.specialRequests} />
                 <BriefField label="Primary contact" value={brief.primaryContactName} />
-                <BriefField label="Primary phone" value={brief.primaryContactPhone} />
+                <BriefField label="Email" value={brief.primaryContactEmail} />
+                <BriefField label="Phone" value={brief.primaryContactPhone} />
                 <BriefField
                   label="Internal coordinator"
                   value={brief.internalCoordinatorName}
@@ -147,12 +153,10 @@ export function OperationalBriefPanel({
                   label="Coordinator phone"
                   value={brief.internalCoordinatorPhone}
                 />
-                {!brief.isFacilitiesOnly ? (
-                  <BriefField
-                    label="Coordinator email"
-                    value={brief.internalCoordinatorEmail}
-                  />
-                ) : null}
+                <BriefField
+                  label="Coordinator email"
+                  value={brief.internalCoordinatorEmail}
+                />
               </div>
 
               {brief.canEditSetupFields ? (
@@ -199,7 +203,7 @@ export function OperationalBriefPanel({
                 <BriefField label="Facility notes" value={brief.facilityNotes} />
               )}
 
-              {brief.canOpenSourceRecord && brief.sourceRecordHref ? (
+              {brief.canOpenSourceRecord && brief.sourceRecordHref && !hideSourceRecordLink ? (
                 <Button variant="outline" asChild className="w-full">
                   <Link href={brief.sourceRecordHref}>
                     Open source record

@@ -3,21 +3,9 @@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
-import {
-  CheckCircle2,
-  ChevronDown,
-  MoreHorizontal,
-  Pencil,
-  Ticket,
-} from "lucide-react"
+import { CheckCircle2, Ticket } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { Progress } from "@/components/ui/progress"
 import {
   Select,
@@ -77,7 +65,9 @@ function EventSalesStatusSelect({
         router.refresh()
       } catch (changeError) {
         setError(
-          changeError instanceof Error ? changeError.message : "Could not update status."
+          changeError instanceof Error
+            ? changeError.message
+            : "Could not update status."
         )
       }
     })
@@ -85,7 +75,11 @@ function EventSalesStatusSelect({
 
   return (
     <div className="space-y-1">
-      <Select value={value} onValueChange={handleChange} disabled={disabled || isPending}>
+      <Select
+        value={value}
+        onValueChange={handleChange}
+        disabled={disabled || isPending}
+      >
         <SelectTrigger
           className={cn(
             "h-8 w-[150px] border text-xs font-medium",
@@ -100,13 +94,13 @@ function EventSalesStatusSelect({
           </div>
         </SelectTrigger>
         <SelectContent>
-          {(Object.keys(TICKETING_SALES_STATUS_LABELS) as TicketingSalesStatus[]).map(
-            (status) => (
-              <SelectItem key={status} value={status}>
-                {TICKETING_SALES_STATUS_LABELS[status]}
-              </SelectItem>
-            )
-          )}
+          {(
+            Object.keys(TICKETING_SALES_STATUS_LABELS) as TicketingSalesStatus[]
+          ).map((status) => (
+            <SelectItem key={status} value={status}>
+              {TICKETING_SALES_STATUS_LABELS[status]}
+            </SelectItem>
+          ))}
         </SelectContent>
       </Select>
       {error ? <p className="text-xs text-red-600">{error}</p> : null}
@@ -127,7 +121,8 @@ export function TicketingOverviewTable({
         <Ticket className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
         <h3 className="text-lg font-semibold">No ticketed events yet</h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          Enable ticketing on an event in Event Management to start selling tickets.
+          Enable ticketing on an event in Event Management to start selling
+          tickets.
         </p>
         <Button className="mt-4" asChild>
           <Link href="/event-management">Go to Event Management</Link>
@@ -146,17 +141,19 @@ export function TicketingOverviewTable({
             <TableHead className="w-[90px] text-right">Issued</TableHead>
             <TableHead className="w-[110px] text-right">Remaining</TableHead>
             <TableHead className="w-[120px] text-right">Revenue</TableHead>
-            <TableHead className="w-[50px]" />
           </TableRow>
         </TableHeader>
         <TableBody>
           {events.map((event) => {
-            const location = event.venueName || event.locationLabel || "Location TBD"
+            const location =
+              event.venueName || event.locationLabel || "Location TBD"
             const schedule = formatEventSchedule(event.startAt, event.endAt)
             const progressValue =
               event.ticketsCapacity && event.ticketsCapacity > 0
                 ? Math.min(
-                    Math.round((event.ticketsIssued / event.ticketsCapacity) * 100),
+                    Math.round(
+                      (event.ticketsIssued / event.ticketsCapacity) * 100
+                    ),
                     100
                   )
                 : event.ticketsIssued > 0
@@ -193,40 +190,18 @@ export function TicketingOverviewTable({
                 <TableCell className="align-top text-right font-medium">
                   <div className="space-y-2">
                     <span>
-                      {event.ticketsRemaining == null ? "—" : event.ticketsRemaining}
+                      {event.ticketsRemaining == null
+                        ? "—"
+                        : event.ticketsRemaining}
                     </span>
-                    <Progress value={100 - progressValue} className="h-2 opacity-40" />
+                    <Progress
+                      value={100 - progressValue}
+                      className="h-2 opacity-40"
+                    />
                   </div>
                 </TableCell>
                 <TableCell className="align-top text-right font-medium">
                   {formatTicketPrice(event.revenueCents, event.currency)}
-                </TableCell>
-                <TableCell className="align-top">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem asChild>
-                        <Link href={`/event-management/${event.id}/edit`}>
-                          <Pencil className="mr-2 h-4 w-4" />
-                          Edit event &amp; tickets
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem asChild>
-                        <Link href={`/event-management/ticketing/orders?event=${event.id}`}>
-                          View orders
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem asChild>
-                        <Link href={`/event-management/${event.id}`}>
-                          Event workspace
-                        </Link>
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
                 </TableCell>
               </TableRow>
             )

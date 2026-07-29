@@ -78,7 +78,7 @@ export function assertNoReservationConflicts(
 
     if (conflicts.length > 0) {
       throw new Error(
-        `Space is unavailable for the selected time (${conflicts.length} conflict${conflicts.length === 1 ? "" : "s"}).`
+        "That space and time is unavailable because another rental, event, program, or hold is already scheduled. Please choose a different time."
       )
     }
   }

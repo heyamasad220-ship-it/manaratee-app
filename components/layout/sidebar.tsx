@@ -259,7 +259,7 @@ const moduleDisplayNameMap: Record<string, string> = {
   hr: WORKFORCE_MODULE_LABEL,
   donations: FUND_DEVELOPMENT_MODULE_LABEL,
   bookings: "Venue Rentals",
-  spaces: "Bookings",
+  spaces: "Facilities",
 }
 
 function resolveModuleNavSlug(slug: string) {
@@ -300,11 +300,22 @@ const moduleChildren: Record<string, SubItem[]> = {
     { label: "Dashboard", href: "/bookings/overview", matchPrefix: "/bookings/overview", permissionKey: "bookings.view" },
     { label: "Requests", href: "/bookings/requests", matchPrefix: "/bookings/requests", permissionKey: "bookings.view" },
     { label: "Payments", href: "/bookings/payments", matchPrefix: "/bookings/payments", permissionKey: "bookings.view" },
+    {
+      label: "Calendar",
+      href: "/facilities/calendar?sources=venue_rental",
+      matchPrefix: "/facilities/calendar",
+      permissionKey: "bookings.view",
+    },
     { label: "Settings", href: "/bookings/settings/notifications", matchPrefix: "/bookings/settings", permissionKey: "bookings.manage" },
   ],
   "event-management": [
     { label: "Dashboard", href: "/event-management/overview", matchPrefix: "/event-management/overview", permissionKey: "events.view" },
-    { label: "Calendar", href: "/facilities/calendar", matchPrefix: "/facilities/calendar", permissionKey: "events.view" },
+    {
+      label: "Calendar",
+      href: "/facilities/calendar?sources=internal_event",
+      matchPrefix: "/facilities/calendar",
+      permissionKey: "events.view",
+    },
     { label: "Events", href: "/event-management", matchPrefix: "/event-management", exact: true, permissionKey: "events.view" },
     { label: "Ticketing", href: "/event-management/ticketing", matchPrefix: "/event-management/ticketing", permissionKey: "ticketing.view" },
     {
@@ -312,33 +323,25 @@ const moduleChildren: Record<string, SubItem[]> = {
       href: "/event-management/reports",
       matchPrefix: "/event-management/reports",
       permissionKey: "reports.view",
-      children: [
-        {
-          label: "Overview",
-          href: "/event-management/reports",
-          matchPrefix: "/event-management/reports",
-          exact: true,
-          permissionKey: "reports.view",
-        },
-        {
-          label: "Childcare Registrations",
-          href: "/event-management/reports/childcare",
-          matchPrefix: "/event-management/reports/childcare",
-          permissionKey: "events.view",
-        },
-      ],
     },
     { label: "Settings", href: "/event-management/settings/notifications", matchPrefix: "/event-management/settings", permissionKey: "events.manage" },
   ],
   spaces: [
-    { label: "Overview", href: "/facilities/overview", matchPrefix: "/facilities/overview", permissionKey: "spaces.view" },
-    { label: "Reservation Center", href: "/facilities/reservation-center", matchPrefix: "/facilities/reservation-center", permissionKey: "spaces.view" },
+    { label: "Overview", href: "/facilities/overview", matchPrefix: "/facilities/overview", permissionKey: "spaces.view", advancedFacilities: true },
+    { label: "Reservation Center", href: "/facilities/reservation-center", matchPrefix: "/facilities/reservation-center", permissionKey: "spaces.view", advancedFacilities: true },
     { label: "Calendar", href: "/facilities/calendar", matchPrefix: "/facilities/calendar", alsoMatchPrefixes: ["/facilities/availability"], permissionKey: "spaces.view" },
+    {
+      label: "Inventory",
+      href: "/facilities/inventory",
+      matchPrefix: "/facilities/inventory",
+      alsoMatchPrefixes: ["/facilities/resources", "/facilities/settings/resources"],
+      permissionKey: "spaces.view",
+      advancedFacilities: true,
+    },
     {
       label: "Settings",
       href: "/facilities/settings/spaces",
       matchPrefix: "/facilities/settings",
-      alsoMatchPrefixes: ["/facilities/resources"],
       permissionKey: "spaces.view",
     },
   ],
@@ -353,6 +356,12 @@ const moduleChildren: Record<string, SubItem[]> = {
       label: "Schedule",
       href: "/programs/schedule",
       matchPrefix: "/programs/schedule",
+      permissionKey: "programs.view",
+    },
+    {
+      label: "Calendar",
+      href: "/facilities/calendar?sources=program_facility",
+      matchPrefix: "/facilities/calendar",
       permissionKey: "programs.view",
     },
     {
@@ -569,13 +578,34 @@ function buildNavItems(
     .map((row) => {
       const slug = normalizeModuleSlug(row.slug)
       const navSlug = resolveModuleNavSlug(slug)
-      const href = (moduleDefaultRouteOverride[navSlug] ?? row.route) || "/dashboard"
+      const hasVenueRentals = rows.some(
+        (candidate) => normalizeModuleSlug(candidate.slug) === "bookings"
+      )
+      const href =
+        navSlug === "spaces" && !hasVenueRentals
+          ? "/facilities/calendar"
+          : (moduleDefaultRouteOverride[navSlug] ?? row.route) || "/dashboard"
       const matchPrefix =
         moduleMatchPrefixOverride[navSlug] ??
         moduleMatchPrefixOverride[slug] ??
         href
       const iconName = row.icon_name || "Boxes"
       const Icon = iconMap[iconName] || Boxes
+      const rawChildren =
+        moduleChildren[navSlug] ||
+        moduleChildren[slug] ||
+        [
+          {
+            label: "Overview",
+            href,
+            matchPrefix: href,
+            permissionKey: modulePermissionMap[navSlug] ?? modulePermissionMap[slug],
+          },
+        ]
+      const children =
+        navSlug === "spaces" && !hasVenueRentals
+          ? rawChildren.filter((child) => !child.advancedFacilities)
+          : rawChildren
       return {
         label: moduleDisplayNameMap[navSlug] ?? moduleDisplayNameMap[slug] ?? row.name,
         href,
@@ -584,9 +614,7 @@ function buildNavItems(
         group: moduleGroupOverride[navSlug] ?? row.group_name,
         permissionKey: modulePermissionMap[navSlug] ?? modulePermissionMap[slug],
         moduleSlug: slug,
-        children: moduleChildren[navSlug] || moduleChildren[slug] || [
-          { label: "Overview", href, matchPrefix: href, permissionKey: modulePermissionMap[navSlug] ?? modulePermissionMap[slug] },
-        ],
+        children,
       }
     })
 

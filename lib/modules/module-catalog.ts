@@ -39,7 +39,10 @@ export const CAPABILITY_MODULE_SLUGS = [
 
 /** When a product module is enabled, these capability slugs are also enabled. */
 export const IMPLIED_MODULE_SLUGS: Record<string, readonly string[]> = {
-  "event-management": ["ticketing"],
+  /** Basic facility calendar, spaces, and conflict checking for campus events. */
+  "event-management": ["ticketing", "spaces"],
+  /** Basic facility calendar/availability for program sessions that use spaces. */
+  programs: ["spaces"],
   bookings: ["spaces"],
 }
 

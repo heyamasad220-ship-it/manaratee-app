@@ -9,7 +9,6 @@ import {
   CalendarClock,
   CalendarDays,
   DollarSign,
-  FileBarChart,
   Heart,
   LayoutDashboard,
   Loader2,
@@ -21,16 +20,15 @@ import {
 } from "lucide-react"
 
 import { DepartmentBudgetPanel } from "@/components/departments/department-budget-panel"
+import { DepartmentEventsPanel } from "@/components/departments/department-events-panel"
 import { DepartmentExpensesPanel } from "@/components/departments/department-expenses-panel"
 import { DepartmentGroupGivingPanel } from "@/components/departments/department-group-giving-panel"
 import { DepartmentOverviewPanel } from "@/components/departments/department-overview-panel"
 import { DepartmentPayrollPanel } from "@/components/departments/department-payroll-panel"
 import { DepartmentProgramsPanel } from "@/components/departments/department-programs-panel"
-import { DepartmentReportsPanel } from "@/components/departments/department-reports-panel"
 import { DepartmentSchedulePanel } from "@/components/departments/department-schedule-panel"
 import { DepartmentSettingsPanel } from "@/components/departments/department-settings-panel"
 import { DepartmentStudentsPanel } from "@/components/departments/department-students-panel"
-import { DonationGroupActivityPanel } from "@/components/donations/donation-group-activity-panel"
 import { DonationGroupEditForm } from "@/components/donations/donation-group-edit-form"
 import { Header } from "@/components/layout/header"
 import { Badge } from "@/components/ui/badge"
@@ -74,6 +72,8 @@ type DepartmentGroupWorkspaceClientProps = {
   departmentId: string
   /** When opened from Group Giving, prefer this back link context. */
   entryPoint?: "hr" | "donations"
+  canManageEvents?: boolean
+  canRequestEvents?: boolean
 }
 
 type GroupEditRecord = {
@@ -90,6 +90,8 @@ type GroupEditRecord = {
 export function DepartmentGroupWorkspaceClient({
   departmentId,
   entryPoint = "hr",
+  canManageEvents = false,
+  canRequestEvents = false,
 }: DepartmentGroupWorkspaceClientProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -345,10 +347,6 @@ export function DepartmentGroupWorkspaceClient({
               <Settings className="size-4" />
               Settings
             </TabsTrigger>
-            <TabsTrigger value="reports" className="gap-2">
-              <FileBarChart className="size-4" />
-              Archive
-            </TabsTrigger>
           </TabsList>
         </Tabs>
 
@@ -440,22 +438,17 @@ export function DepartmentGroupWorkspaceClient({
         ) : null}
 
         {resolvedTab === "activity" ? (
-          <DonationGroupActivityPanel
+          <DepartmentEventsPanel
             departmentId={department.id}
-            groupContactId={pair?.groupContactId}
+            departmentName={displayName}
+            canManageEvents={canManageEvents}
+            canRequestEvents={canRequestEvents}
             refreshToken={refreshToken}
           />
         ) : null}
 
         {resolvedTab === "settings" ? (
           <DepartmentSettingsPanel
-            departmentId={department.id}
-            departmentName={displayName}
-          />
-        ) : null}
-
-        {resolvedTab === "reports" ? (
-          <DepartmentReportsPanel
             departmentId={department.id}
             departmentName={displayName}
           />

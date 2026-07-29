@@ -19,6 +19,7 @@ import {
 import { getDepartments } from "@/lib/departments/department-queries"
 import { getEventTypes } from "@/lib/events/event-type-queries"
 import { getInternalEvents } from "@/lib/events/internal-event-queries"
+import { getInternalEventDeleteBlockersMap } from "@/lib/events/internal-event-actions"
 import { getInternalEventStatusLabel } from "@/lib/events/internal-event-status"
 import type { InternalEventWithRelations } from "@/lib/events/internal-event-types"
 import {
@@ -75,7 +76,15 @@ function matchesEvent(
   return matchesSearch && matchesStatus && matchesDepartment && matchesEventType
 }
 
-function EventCard({ event, canManage }: { event: InternalEventWithRelations; canManage: boolean }) {
+function EventCard({
+  event,
+  canManage,
+  deleteBlockedReason,
+}: {
+  event: InternalEventWithRelations
+  canManage: boolean
+  deleteBlockedReason?: string | null
+}) {
   return (
     <Card className="overflow-hidden">
       <div className="space-y-3 p-4">
@@ -116,7 +125,11 @@ function EventCard({ event, canManage }: { event: InternalEventWithRelations; ca
 
         {canManage ? (
           <div className="flex justify-end pt-1">
-            <InternalEventCardActions eventId={event.id} eventName={event.name} />
+            <InternalEventCardActions
+              eventId={event.id}
+              eventName={event.name}
+              deleteBlockedReason={deleteBlockedReason}
+            />
           </div>
         ) : null}
       </div>
@@ -127,9 +140,11 @@ function EventCard({ event, canManage }: { event: InternalEventWithRelations; ca
 function EventsTable({
   events,
   canManage,
+  deleteBlockers,
 }: {
   events: InternalEventWithRelations[]
   canManage: boolean
+  deleteBlockers: Record<string, string | null>
 }) {
   return (
     <Card>
@@ -180,6 +195,7 @@ function EventsTable({
                       eventId={event.id}
                       eventName={event.name}
                       compact
+                      deleteBlockedReason={deleteBlockers[event.id] ?? null}
                     />
                   ) : null}
                 </TableCell>
@@ -217,6 +233,9 @@ export default async function EventManagementCatalogPage({
 
   const filteredEvents = events.filter((event) => matchesEvent(event, filters))
   const viewMode = filters.view === "table" ? "table" : "cards"
+  const deleteBlockers = canManage
+    ? await getInternalEventDeleteBlockersMap(filteredEvents.map((event) => event.id))
+    : {}
 
   return (
     <>
@@ -274,11 +293,20 @@ export default async function EventManagementCatalogPage({
             ) : null}
           </Card>
         ) : viewMode === "table" ? (
-          <EventsTable events={filteredEvents} canManage={canManage} />
+          <EventsTable
+            events={filteredEvents}
+            canManage={canManage}
+            deleteBlockers={deleteBlockers}
+          />
         ) : (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {filteredEvents.map((event) => (
-              <EventCard key={event.id} event={event} canManage={canManage} />
+              <EventCard
+                key={event.id}
+                event={event}
+                canManage={canManage}
+                deleteBlockedReason={deleteBlockers[event.id] ?? null}
+              />
             ))}
           </div>
         )}

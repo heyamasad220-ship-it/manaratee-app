@@ -12,6 +12,7 @@ import {
   reservationSourceToBriefSource,
   toOperationalBriefView,
 } from "./operational-brief-payload"
+import { resolveContactById } from "./operational-brief-contact-resolver"
 import {
   getOperationalBriefById,
   getOperationalBriefByReservationId,
@@ -153,7 +154,8 @@ async function ensureBriefForReservation(
 }
 
 export async function loadOperationalBriefForReservationAction(
-  reservation: CalendarReservation
+  reservation: CalendarReservation,
+  options?: { hideSourceRecordLink?: boolean }
 ): Promise<OperationalBriefView | null> {
   await assertCanViewOperationalBriefs()
 
@@ -184,10 +186,24 @@ export async function loadOperationalBriefForReservationAction(
   if (!brief) return null
 
   const permissions = await buildPermissionContext()
+  const organizationId = await getSelectedOrganizationId()
+  let primaryContactEmail: string | null = null
+
+  if (organizationId && brief.primary_contact_person_id) {
+    const supabase = await createClient()
+    const contact = await resolveContactById(
+      supabase,
+      organizationId,
+      brief.primary_contact_person_id
+    )
+    primaryContactEmail = contact?.email ?? null
+  }
 
   return toOperationalBriefView(brief, permissions, {
     spacesLabel: extractSpacesLabel(brief.facility_notes, reservation),
     metadata: reservation.metadata,
+    primaryContactEmail,
+    hideSourceRecordLink: options?.hideSourceRecordLink === true,
   })
 }
 

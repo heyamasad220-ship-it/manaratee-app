@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { resolveOrganizationId } from "@/lib/organizations/resolve-organization-id"
 
-import { reservationStatusBlocksBooking } from "./reservation-conflict-rules"
+import { reservationStatusBlocksBooking, type ConflictCheckReservation } from "./reservation-conflict-rules"
 
 import {
   combineDateAndTime,
@@ -10,6 +10,7 @@ import {
   getWeekEnd,
   getWeekStart,
   rangesOverlap,
+  toDateParam,
 } from "./reservation-time"
 import type {
   CalendarContext,
@@ -51,11 +52,15 @@ type ProgramScheduleRow = {
   id: string
   organization_id: string
   program_id: string
+  offering_id?: string | null
   title: string
   day_of_week: string
   start_time: string
   end_time: string
   location: string | null
+  venue_id?: string | null
+  offering_start_date?: string | null
+  offering_end_date?: string | null
   programs?: { name: string } | null
 }
 
@@ -113,16 +118,26 @@ function mapReservationRow(row: ResourceReservationRow): CalendarReservation {
 function expandProgramScheduleRows(
   rows: ProgramScheduleRow[],
   rangeStart: Date,
-  rangeEnd: Date
+  rangeEnd: Date,
+  venueNameById?: Map<string, string>
 ): CalendarReservation[] {
   const reservations: CalendarReservation[] = []
   const cursor = new Date(rangeStart)
   cursor.setHours(0, 0, 0, 0)
 
   while (cursor <= rangeEnd) {
+    const cursorDateKey = toDateParam(cursor)
+
     for (const row of rows) {
       const dayIndex = dayNameToIndex(row.day_of_week)
       if (dayIndex === null || cursor.getDay() !== dayIndex) {
+        continue
+      }
+
+      if (row.offering_start_date && cursorDateKey < row.offering_start_date) {
+        continue
+      }
+      if (row.offering_end_date && cursorDateKey > row.offering_end_date) {
         continue
       }
 
@@ -136,15 +151,19 @@ function expandProgramScheduleRows(
         continue
       }
 
+      const venueId = row.venue_id || null
+      const venueName = venueId ? venueNameById?.get(venueId) ?? null : null
+      const programName = Array.isArray(row.programs)
+        ? row.programs[0]?.name
+        : row.programs?.name
+
       reservations.push({
-        id: `program-schedule-${row.id}-${cursor.toISOString().slice(0, 10)}`,
+        id: `program-schedule-${row.id}-${cursorDateKey}`,
         organizationId: row.organization_id,
-        venueId: null,
-        venueName: null,
-        spaceLabel: row.location,
-        title: row.programs?.name
-          ? `${row.programs.name}: ${row.title}`
-          : row.title,
+        venueId,
+        venueName,
+        spaceLabel: row.location || venueName,
+        title: programName ? `${programName}: ${row.title}` : row.title,
         description: null,
         startAt: startAt.toISOString(),
         endAt: endAt.toISOString(),
@@ -153,8 +172,10 @@ function expandProgramScheduleRows(
         status: "active",
         metadata: {
           program_id: row.program_id,
-          program_name: row.programs?.name ?? null,
+          offering_id: row.offering_id ?? null,
+          program_name: programName ?? null,
           schedule_title: row.title,
+          venue_id: venueId,
         },
         href: `/programs/${row.program_id}`,
       })
@@ -301,22 +322,48 @@ async function getProgramFacilityReservations(
 ) {
   const supabase = await createClient()
 
-  const { data, error } = await supabase
-    .from("program_schedule_items")
-    .select(
-      `
+  const withOfferingSelect = `
       id,
       organization_id,
       program_id,
+      offering_id,
       title,
       day_of_week,
       start_time,
       end_time,
       location,
-      programs:program_id ( name )
+      venue_id,
+      programs:program_id ( name ),
+      program_offerings:offering_id ( start_date, end_date )
     `
-    )
+
+  let { data, error } = await supabase
+    .from("program_schedule_items")
+    .select(withOfferingSelect)
     .eq("organization_id", organizationId)
+
+  if (error?.message?.includes("venue_id") || error?.code === "42703") {
+    const fallback = await supabase
+      .from("program_schedule_items")
+      .select(
+        `
+      id,
+      organization_id,
+      program_id,
+      offering_id,
+      title,
+      day_of_week,
+      start_time,
+      end_time,
+      location,
+      programs:program_id ( name ),
+      program_offerings:offering_id ( start_date, end_date )
+    `
+      )
+      .eq("organization_id", organizationId)
+    data = fallback.data
+    error = fallback.error
+  }
 
   if (error) {
     if (error.code === "42P01") {
@@ -326,23 +373,90 @@ async function getProgramFacilityReservations(
     return []
   }
 
-  return expandProgramScheduleRows(
-    (data || []) as ProgramScheduleRow[],
-    rangeStart,
-    rangeEnd
+  const { data: venues } = await supabase
+    .from("venues")
+    .select("id, name")
+    .eq("organization_id", organizationId)
+
+  const venueNameById = new Map(
+    (venues || []).map((venue) => [venue.id as string, venue.name as string])
   )
+
+  const rows: ProgramScheduleRow[] = (data || []).map((row: any) => {
+    const offering = Array.isArray(row.program_offerings)
+      ? row.program_offerings[0]
+      : row.program_offerings
+    return {
+      id: row.id,
+      organization_id: row.organization_id,
+      program_id: row.program_id,
+      offering_id: row.offering_id ?? null,
+      title: row.title,
+      day_of_week: row.day_of_week,
+      start_time: row.start_time,
+      end_time: row.end_time,
+      location: row.location,
+      venue_id: row.venue_id ?? null,
+      offering_start_date: offering?.start_date ?? null,
+      offering_end_date: offering?.end_date ?? null,
+      programs: row.programs,
+    }
+  })
+
+  return expandProgramScheduleRows(rows, rangeStart, rangeEnd, venueNameById)
+}
+
+export type GetCalendarDataOptions = {
+  /**
+   * Optional filter of source types for module calendar views.
+   * Still reads from the shared schedule (resource_reservations + program expand).
+   * Pass null/omit for the full Facilities calendar.
+   */
+  sourceTypes?: ReservationSourceType[] | null
+}
+
+function resolveStoredSourceTypes(
+  audience: CalendarAudience,
+  sourceTypes: ReservationSourceType[] | null | undefined
+): ReservationSourceType[] | null {
+  if (sourceTypes !== undefined && sourceTypes !== null) {
+    return sourceTypes.filter(
+      (type) => type !== RESERVATION_SOURCE_TYPES.programFacility
+    )
+  }
+
+  if (audienceShowsAllSourceTypes(audience)) {
+    return null
+  }
+
+  return getSourceTypesForContext("venue_rentals")
+}
+
+function shouldIncludeProgramSchedules(
+  audience: CalendarAudience,
+  sourceTypes: ReservationSourceType[] | null | undefined
+) {
+  if (!audienceIncludesProgramSchedules(audience)) {
+    return false
+  }
+
+  if (sourceTypes === undefined || sourceTypes === null) {
+    return true
+  }
+
+  return sourceTypes.includes(RESERVATION_SOURCE_TYPES.programFacility)
 }
 
 export async function getCalendarData(
   audience: CalendarAudience,
   anchorDate: Date,
-  view: CalendarViewMode = "grid"
+  view: CalendarViewMode = "grid",
+  options?: GetCalendarDataOptions
 ): Promise<CalendarData> {
   const organizationId = await resolveOrganizationId()
   const { start, end } = getRangeForView(view, anchorDate)
-  const sourceTypes = audienceShowsAllSourceTypes(audience)
-    ? null
-    : getSourceTypesForContext("venue_rentals")
+  const sourceTypes = options?.sourceTypes
+  const storedSourceTypes = resolveStoredSourceTypes(audience, sourceTypes)
 
   if (!organizationId) {
     return {
@@ -357,8 +471,8 @@ export async function getCalendarData(
 
   const [venues, storedReservations, programReservations] = await Promise.all([
     getCalendarVenues(venueOptions),
-    getStoredReservations(organizationId, start, end, sourceTypes),
-    audienceIncludesProgramSchedules(audience)
+    getStoredReservations(organizationId, start, end, storedSourceTypes),
+    shouldIncludeProgramSchedules(audience, sourceTypes)
       ? getProgramFacilityReservations(organizationId, start, end)
       : Promise.resolve([]),
   ])
@@ -394,6 +508,115 @@ export async function getCalendarDataByContext(
   return getCalendarData(audience, anchorDate, view)
 }
 
+function locationMatchesVenueName(
+  location: string | null | undefined,
+  venueName: string | null | undefined
+) {
+  const loc = location?.trim().toLowerCase()
+  const name = venueName?.trim().toLowerCase()
+  if (!loc || !name) return false
+  return loc === name || loc.includes(name) || name.includes(loc)
+}
+
+/**
+ * Expand recurring program schedule rows into blocking slots for a venue.
+ * Programs store a free-text location; match against the venue name.
+ */
+export async function getProgramBlockingReservationsForVenue(
+  organizationId: string,
+  venueId: string,
+  rangeStart: string,
+  rangeEnd: string
+): Promise<ConflictCheckReservation[]> {
+  const supabase = await createClient()
+
+  const { data: venue, error: venueError } = await supabase
+    .from("venues")
+    .select("id, name")
+    .eq("organization_id", organizationId)
+    .eq("id", venueId)
+    .maybeSingle()
+
+  if (venueError || !venue?.name) {
+    return []
+  }
+
+  const start = new Date(rangeStart)
+  const end = new Date(rangeEnd)
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return []
+  }
+
+  const programRows = await getProgramFacilityReservations(organizationId, start, end)
+
+  return programRows
+    .filter((row) => {
+      if (row.venueId) {
+        return row.venueId === venueId
+      }
+      return locationMatchesVenueName(row.spaceLabel, venue.name as string)
+    })
+    .map((row) => ({
+      id: row.id,
+      venueId,
+      startAt: row.startAt,
+      endAt: row.endAt,
+      status: row.status,
+    }))
+}
+
+/** Program slots matched to venues by location name — for public availability calendars. */
+export async function getProgramAvailabilityBlocksForOrg(
+  organizationId: string,
+  rangeStart: string,
+  rangeEnd: string
+): Promise<Array<{ venueId: string; startAt: string; endAt: string }>> {
+  const supabase = await createClient()
+  const start = new Date(rangeStart)
+  const end = new Date(rangeEnd)
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return []
+  }
+
+  const [{ data: venues }, programRows] = await Promise.all([
+    supabase
+      .from("venues")
+      .select("id, name")
+      .eq("organization_id", organizationId),
+    getProgramFacilityReservations(organizationId, start, end),
+  ])
+
+  if (!venues?.length || !programRows.length) {
+    return []
+  }
+
+  const blocks: Array<{ venueId: string; startAt: string; endAt: string }> = []
+
+  for (const row of programRows) {
+    if (row.venueId) {
+      blocks.push({
+        venueId: row.venueId,
+        startAt: row.startAt,
+        endAt: row.endAt,
+      })
+      continue
+    }
+
+    for (const venue of venues) {
+      if (!locationMatchesVenueName(row.spaceLabel, venue.name as string)) {
+        continue
+      }
+      blocks.push({
+        venueId: venue.id as string,
+        startAt: row.startAt,
+        endAt: row.endAt,
+      })
+    }
+  }
+
+  return blocks
+}
+
 export async function getConflictingReservations(
   organizationId: string,
   venueId: string | null,
@@ -422,7 +645,7 @@ export async function getConflictingReservations(
     return []
   }
 
-  return (data || []).filter((row) => {
+  const stored = (data || []).filter((row) => {
     if (!reservationStatusBlocksBooking(row.status as string)) {
       return false
     }
@@ -437,4 +660,28 @@ export async function getConflictingReservations(
 
     return true
   })
+
+  if (!venueId) {
+    return stored
+  }
+
+  const programBlocks = await getProgramBlockingReservationsForVenue(
+    organizationId,
+    venueId,
+    startAt,
+    endAt
+  )
+
+  const programAsRows = programBlocks.map((block) => ({
+    id: block.id,
+    title: "Program",
+    source_type: RESERVATION_SOURCE_TYPES.programFacility,
+    start_at: block.startAt,
+    end_at: block.endAt,
+    venue_id: venueId,
+    space_label: null as string | null,
+    status: block.status,
+  }))
+
+  return [...stored, ...programAsRows]
 }

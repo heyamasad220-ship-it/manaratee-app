@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { EventServiceRequirementsFields } from "@/components/events/event-service-requirements-fields"
 import { EventTicketingFields } from "@/components/events/event-ticketing-fields"
+import { FacilityVenueSelect } from "@/components/reservations/facility-venue-select"
 import { SetupStyleField } from "@/components/setup-styles/setup-style-field"
 import type { Department } from "@/lib/departments/department-types"
 import type { EventType } from "@/lib/events/event-type-types"
@@ -42,6 +43,7 @@ import {
 import { getEventTicketTypes } from "@/lib/tickets/ticket-type-actions"
 import type { InternalEventWithRelations } from "@/lib/events/internal-event-types"
 import type { InternalEventFormDefaults } from "@/lib/events/internal-event-form-defaults"
+import { isSafeReturnToPath } from "@/lib/navigation/return-to"
 import type { RoomSetupStyle } from "@/lib/setup-styles/setup-style-types"
 import type { VendorHubVendorType } from "@/lib/vendor-hub/vendor-type-types"
 
@@ -57,6 +59,9 @@ type InternalEventFormProps = (
         endAt?: string
       }
       defaults?: InternalEventFormDefaults
+      /** When true, department field is read-only (e.g. opened from department workspace). */
+      lockDepartment?: boolean
+      returnTo?: string | null
     }
   | {
       mode: "request"
@@ -70,6 +75,8 @@ type InternalEventFormProps = (
         endAt?: string
       }
       defaults?: InternalEventFormDefaults
+      lockDepartment?: boolean
+      returnTo?: string | null
     }
   | {
       mode: "edit"
@@ -92,6 +99,14 @@ export function InternalEventForm(props: InternalEventFormProps) {
 
   const formDefaults =
     props.mode === "create" || props.mode === "request" ? props.defaults : undefined
+  const lockDepartment =
+    (props.mode === "create" || props.mode === "request") &&
+    Boolean(props.lockDepartment && formDefaults?.departmentId)
+  const returnTo =
+    (props.mode === "create" || props.mode === "request") &&
+    isSafeReturnToPath(props.returnTo)
+      ? props.returnTo
+      : null
 
   const initial =
     props.mode === "edit"
@@ -267,7 +282,7 @@ export function InternalEventForm(props: InternalEventFormProps) {
           router.push(
             isMemberStaffRequest
               ? "/customer/staff/events"
-              : `/event-management/${id}`
+              : returnTo || `/event-management/${id}`
           )
           router.refresh()
           return
@@ -288,7 +303,7 @@ export function InternalEventForm(props: InternalEventFormProps) {
             ...servicePayload,
             ...ticketingPayload,
           })
-          router.push(`/event-management/${id}`)
+          router.push(returnTo || `/event-management/${id}`)
           router.refresh()
           return
         }
@@ -322,17 +337,22 @@ export function InternalEventForm(props: InternalEventFormProps) {
   const backHref =
     props.mode === "edit"
       ? `/event-management/${props.event.id}`
-      : props.mode === "request"
-        ? isMemberStaffRequest
-          ? "/customer/staff"
-          : "/facilities/calendar"
-        : "/event-management"
+      : returnTo
+        ? returnTo
+        : props.mode === "request"
+          ? isMemberStaffRequest
+            ? "/customer/staff"
+            : "/facilities/calendar"
+          : "/event-management"
 
   const isRequestMode = props.mode === "request"
 
   const prefilledDepartment =
     formDefaults?.departmentId &&
     props.departments.find((department) => department.id === formDefaults.departmentId)
+
+  const showLockedDepartment =
+    Boolean(prefilledDepartment) && (isRequestMode || lockDepartment)
 
   const selectClassName =
     "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
@@ -355,7 +375,7 @@ export function InternalEventForm(props: InternalEventFormProps) {
 
         <div className="space-y-1.5">
           <Label htmlFor="department">Department</Label>
-          {prefilledDepartment ? (
+          {showLockedDepartment && prefilledDepartment ? (
             <Input
               id="department"
               value={prefilledDepartment.name}
@@ -418,23 +438,15 @@ export function InternalEventForm(props: InternalEventFormProps) {
           />
         </div>
 
-        <div className="space-y-1.5">
-          <Label htmlFor="venue_id">Venue</Label>
-          <select
-            id="venue_id"
-            value={form.venue_id}
-            onChange={(event) => updateField("venue_id", event.target.value)}
-            className={selectClassName}
-            required
-          >
-            <option value="">Select venue</option>
-            {props.venues.map((venue) => (
-              <option key={venue.id} value={venue.id}>
-                {venue.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        <FacilityVenueSelect
+          id="venue_id"
+          label="Venue"
+          value={form.venue_id}
+          venues={props.venues}
+          allowNone={false}
+          required
+          onChange={(venueId) => updateField("venue_id", venueId)}
+        />
 
         <SetupStyleField
           value={operationalSetup.setupStyle}
@@ -491,25 +503,16 @@ export function InternalEventForm(props: InternalEventFormProps) {
           </div>
         </div>
 
-        <div className="space-y-1.5">
-          <Label htmlFor="venue_id">Venue</Label>
-          <select
-            id="venue_id"
-            value={form.venue_id}
-            onChange={(event) => updateField("venue_id", event.target.value)}
-            className={selectClassName}
-            required={isRequestMode}
-          >
-            <option value="">
-              {isRequestMode ? "Select venue" : "Select venue (optional)"}
-            </option>
-            {props.venues.map((venue) => (
-              <option key={venue.id} value={venue.id}>
-                {venue.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        <FacilityVenueSelect
+          id="venue_id"
+          label="Venue"
+          value={form.venue_id}
+          venues={props.venues}
+          allowNone={!isRequestMode}
+          required={isRequestMode}
+          noneLabel="No facility selected"
+          onChange={(venueId) => updateField("venue_id", venueId)}
+        />
       </>
     )
   }
@@ -739,20 +742,30 @@ export function InternalEventForm(props: InternalEventFormProps) {
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="department">Department</Label>
-            <select
-              id="department"
-              value={form.department_id}
-              onChange={(event) => updateField("department_id", event.target.value)}
-              className={selectClassName}
-              required
-            >
-              <option value="">Select department</option>
-              {props.departments.map((department) => (
-                <option key={department.id} value={department.id}>
-                  {department.name}
-                </option>
-              ))}
-            </select>
+            {showLockedDepartment && prefilledDepartment ? (
+              <Input
+                id="department"
+                value={prefilledDepartment.name}
+                readOnly
+                disabled
+                className="bg-muted"
+              />
+            ) : (
+              <select
+                id="department"
+                value={form.department_id}
+                onChange={(event) => updateField("department_id", event.target.value)}
+                className={selectClassName}
+                required
+              >
+                <option value="">Select department</option>
+                {props.departments.map((department) => (
+                  <option key={department.id} value={department.id}>
+                    {department.name}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
 
           <div className="space-y-2">

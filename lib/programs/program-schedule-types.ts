@@ -21,6 +21,8 @@ export interface ProgramScheduleItem {
   end_time: string
 
   location: string | null
+  /** Optional bookable venue for shared facility calendar / conflict checks. */
+  venue_id?: string | null
 
   instructor_name: string | null
   capacity: number | null

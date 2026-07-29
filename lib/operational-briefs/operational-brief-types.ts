@@ -123,6 +123,7 @@ export type OperationalBriefView = {
   facilityNotes: string | null
   primaryContactName: string | null
   primaryContactPhone: string | null
+  primaryContactEmail: string | null
   internalCoordinatorName: string | null
   internalCoordinatorPhone: string | null
   internalCoordinatorEmail: string | null

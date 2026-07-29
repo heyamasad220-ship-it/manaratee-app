@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 
-/** Venue rental event types are managed under Bookings → Settings → Event Types. */
-export default function EventTypesSettingsRedirectPage() {
-  redirect("/facilities/settings/event-types")
+/** Venue rental event types live under Venue Rentals → Settings → Event Types.
+ * Event Management will get its own event-type catalog later. */
+export default function EventManagementEventTypesRedirectPage() {
+  redirect("/bookings/settings/event-types")
 }

@@ -38,6 +38,7 @@ import {
   PROGRAM_SCHEDULE_DAYS,
   type ProgramScheduleDayOfWeek,
 } from "@/lib/programs/program-schedule-types"
+import { FacilityVenueSelect } from "@/components/reservations/facility-venue-select"
 import { cn } from "@/lib/utils"
 
 const DAY_SHORT: Record<ProgramScheduleDayOfWeek, string> = {
@@ -147,6 +148,7 @@ type ScheduleDraft = {
   start_time: string
   end_time: string
   location: string
+  venue_id: string
   instructor_name: string
   capacity: string
   recurring: boolean
@@ -159,6 +161,7 @@ const emptyDraft = (defaultTitle = ""): ScheduleDraft => ({
   start_time: "09:00",
   end_time: "10:00",
   location: "",
+  venue_id: "",
   instructor_name: "",
   capacity: "",
   recurring: true,
@@ -172,6 +175,7 @@ function itemToDraft(item: ProgramScheduleItem): ScheduleDraft {
     start_time: item.start_time?.slice(0, 5) || "09:00",
     end_time: item.end_time?.slice(0, 5) || "10:00",
     location: item.location || "",
+    venue_id: item.venue_id || "",
     instructor_name: item.instructor_name || "",
     capacity: item.capacity == null ? "" : String(item.capacity),
     recurring: false,
@@ -202,10 +206,12 @@ export function OfferingScheduleSummaryCard({
   offering,
   programId,
   items: initialItems,
+  venues = [],
 }: {
   offering: ProgramOffering
   programId: string
   items: ProgramScheduleItem[]
+  venues?: Array<{ id: string; name: string }>
 }) {
   const router = useRouter()
   const [items, setItems] = React.useState(initialItems)
@@ -263,6 +269,7 @@ export function OfferingScheduleSummaryCard({
           start_time: draft.start_time,
           end_time: draft.end_time,
           location: draft.location.trim() || undefined,
+          venue_id: draft.venue_id || null,
           instructor_name: draft.instructor_name.trim() || undefined,
           capacity: Number.isFinite(capacity) ? capacity : undefined,
         })
@@ -275,6 +282,7 @@ export function OfferingScheduleSummaryCard({
           start_time: draft.start_time,
           end_time: draft.end_time,
           location: draft.location.trim() || undefined,
+          venue_id: draft.venue_id || null,
           instructor_name: draft.instructor_name.trim() || undefined,
           capacity: Number.isFinite(capacity) ? capacity : undefined,
         })
@@ -287,6 +295,7 @@ export function OfferingScheduleSummaryCard({
           start_time: draft.start_time,
           end_time: draft.end_time,
           location: draft.location.trim() || undefined,
+          venue_id: draft.venue_id || null,
           instructor_name: draft.instructor_name.trim() || undefined,
           capacity: Number.isFinite(capacity) ? capacity : undefined,
         })
@@ -547,8 +556,24 @@ export function OfferingScheduleSummaryCard({
               </div>
             </div>
 
+            <FacilityVenueSelect
+              id="schedule-venue"
+              value={draft.venue_id}
+              venues={venues}
+              disabled={saving}
+              onChange={(venueId, venueName) =>
+                setDraft((current) => ({
+                  ...current,
+                  venue_id: venueId,
+                  location:
+                    venueName ||
+                    (venueId ? current.location : current.location),
+                }))
+              }
+            />
+
             <div className="space-y-2">
-              <Label htmlFor="schedule-location">Location</Label>
+              <Label htmlFor="schedule-location">Location label</Label>
               <Input
                 id="schedule-location"
                 value={draft.location}
@@ -558,7 +583,7 @@ export function OfferingScheduleSummaryCard({
                     location: event.target.value,
                   }))
                 }
-                placeholder="Optional"
+                placeholder="Optional display label"
               />
             </div>
 

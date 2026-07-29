@@ -4,7 +4,7 @@ import { useState, useTransition } from "react"
 import { Loader2, Pencil, Plus, Trash2 } from "lucide-react"
 
 import { Header } from "@/components/layout/header"
-import { FacilitiesSettingsNav } from "@/components/bookings/bookings-settings-nav"
+import { VenueRentalsSettingsNav } from "@/components/bookings/venue-rentals-settings-nav"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -124,17 +124,17 @@ export function VenueRentalEventTypesClient({
 
   return (
     <>
-      <Header title="Bookings" />
+      <Header title="Venue Rentals" />
 
       <div className="flex flex-col gap-6 p-4 sm:p-6">
         <div>
           <h2 className="text-xl font-semibold">Settings</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Configure spaces and facility options for your organization.
+            Configure venue rental options for your organization.
           </p>
         </div>
 
-        <FacilitiesSettingsNav />
+        <VenueRentalsSettingsNav />
 
         <Card>
           <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

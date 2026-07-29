@@ -1,11 +1,10 @@
 "use client"
 
-import { useState, useTransition } from "react"
-import { Loader2, Pencil, Plus, Trash2 } from "lucide-react"
+import { useEffect, useState, useTransition } from "react"
+import { GripVertical, Loader2, Pencil, Plus, Trash2 } from "lucide-react"
 
 import { Header } from "@/components/layout/header"
 import { FacilitiesSettingsNav } from "@/components/bookings/bookings-settings-nav"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -32,23 +31,36 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import {
   deleteRoomSetupStyle,
+  reorderRoomSetupStyles,
   upsertRoomSetupStyle,
 } from "@/lib/setup-styles/setup-style-actions"
 import type { RoomSetupStyle } from "@/lib/setup-styles/setup-style-types"
+import { cn } from "@/lib/utils"
 
 type SetupStyleFormState = {
   id?: string
   name: string
   description: string
   is_active: boolean
-  sort_order: number
 }
 
 const emptyForm: SetupStyleFormState = {
   name: "",
   description: "",
   is_active: true,
-  sort_order: 0,
+}
+
+function nextSortOrder(styles: RoomSetupStyle[]) {
+  const max = styles.reduce((highest, style) => Math.max(highest, style.sort_order), 0)
+  return max + 10
+}
+
+function moveItem<T>(items: T[], fromIndex: number, toIndex: number) {
+  if (fromIndex === toIndex) return items
+  const next = [...items]
+  const [moved] = next.splice(fromIndex, 1)
+  next.splice(toIndex, 0, moved)
+  return next
 }
 
 export function SetupStylesClient({
@@ -58,10 +70,17 @@ export function SetupStylesClient({
   setupStyles: RoomSetupStyle[]
   tablesAvailable?: boolean
 }) {
+  const [rows, setRows] = useState(setupStyles)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [form, setForm] = useState<SetupStyleFormState>(emptyForm)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
+  const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null)
+
+  useEffect(() => {
+    setRows(setupStyles)
+  }, [setupStyles])
 
   function openCreate() {
     setForm(emptyForm)
@@ -75,7 +94,6 @@ export function SetupStylesClient({
       name: setupStyle.name,
       description: setupStyle.description || "",
       is_active: setupStyle.is_active,
-      sort_order: setupStyle.sort_order,
     })
     setError(null)
     setDialogOpen(true)
@@ -91,7 +109,9 @@ export function SetupStylesClient({
           name: form.name,
           description: form.description,
           is_active: form.is_active,
-          sort_order: form.sort_order,
+          sort_order: form.id
+            ? rows.find((row) => row.id === form.id)?.sort_order ?? 0
+            : nextSortOrder(rows),
         })
         setDialogOpen(false)
       } catch (saveError) {
@@ -120,9 +140,42 @@ export function SetupStylesClient({
     })
   }
 
+  function persistOrder(nextRows: RoomSetupStyle[]) {
+    const previous = rows
+    setRows(nextRows)
+    startTransition(async () => {
+      try {
+        await reorderRoomSetupStyles(nextRows.map((row) => row.id))
+      } catch (reorderError) {
+        setRows(previous)
+        window.alert(
+          reorderError instanceof Error
+            ? reorderError.message
+            : "Failed to save setup style order"
+        )
+      }
+    })
+  }
+
+  function handleDrop(toIndex: number) {
+    if (draggedIndex === null || draggedIndex === toIndex) {
+      setDraggedIndex(null)
+      setDropTargetIndex(null)
+      return
+    }
+
+    const nextRows = moveItem(rows, draggedIndex, toIndex).map((row, index) => ({
+      ...row,
+      sort_order: (index + 1) * 10,
+    }))
+    setDraggedIndex(null)
+    setDropTargetIndex(null)
+    persistOrder(nextRows)
+  }
+
   return (
     <>
-      <Header title="Bookings" />
+      <Header title="Facilities" />
 
       <div className="flex flex-col gap-6 p-4 sm:p-6">
         <div>
@@ -135,7 +188,12 @@ export function SetupStylesClient({
         <FacilitiesSettingsNav />
 
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <h1 className="text-2xl font-semibold tracking-tight">Setup Styles</h1>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Setup Styles</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Drag rows to set the order shown on booking forms.
+            </p>
+          </div>
 
           <Button onClick={openCreate} disabled={!tablesAvailable}>
             <Plus className="mr-2 h-4 w-4" />
@@ -156,51 +214,97 @@ export function SetupStylesClient({
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10" />
                     <TableHead>Name</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Sort</TableHead>
                     <TableHead className="w-[120px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {setupStyles.map((setupStyle) => (
-                    <TableRow key={setupStyle.id}>
-                      <TableCell>
-                        <p className="font-medium">{setupStyle.name}</p>
-                        {setupStyle.description ? (
-                          <p className="text-xs text-muted-foreground">
-                            {setupStyle.description}
-                          </p>
-                        ) : null}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={setupStyle.is_active ? "default" : "secondary"}>
-                          {setupStyle.is_active ? "Active" : "Inactive"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{setupStyle.sort_order}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => openEdit(setupStyle)}
-                            disabled={isPending}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDelete(setupStyle)}
-                            disabled={isPending}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
+                  {rows.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">
+                        No setup styles yet. Add one to get started.
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ) : (
+                    rows.map((setupStyle, index) => (
+                      <TableRow
+                        key={setupStyle.id}
+                        className={cn(
+                          draggedIndex === index && "opacity-50",
+                          dropTargetIndex === index &&
+                            draggedIndex !== index &&
+                            "bg-primary/5 ring-1 ring-inset ring-primary/20"
+                        )}
+                        onDragOver={(event) => {
+                          event.preventDefault()
+                          event.dataTransfer.dropEffect = "move"
+                          setDropTargetIndex(index)
+                        }}
+                        onDragLeave={() => {
+                          setDropTargetIndex((current) =>
+                            current === index ? null : current
+                          )
+                        }}
+                        onDrop={(event) => {
+                          event.preventDefault()
+                          handleDrop(index)
+                        }}
+                      >
+                        <TableCell className="w-10 align-middle">
+                          <button
+                            type="button"
+                            draggable={!isPending}
+                            aria-label={`Reorder ${setupStyle.name}`}
+                            title="Drag to reorder"
+                            className="flex h-8 w-8 cursor-grab items-center justify-center rounded-md text-muted-foreground hover:bg-muted active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-50"
+                            disabled={isPending}
+                            onDragStart={(event) => {
+                              event.dataTransfer.effectAllowed = "move"
+                              event.dataTransfer.setData("text/plain", String(index))
+                              setDraggedIndex(index)
+                            }}
+                            onDragEnd={() => {
+                              setDraggedIndex(null)
+                              setDropTargetIndex(null)
+                            }}
+                          >
+                            <GripVertical className="h-4 w-4" />
+                          </button>
+                        </TableCell>
+                        <TableCell>
+                          <p className="font-medium">{setupStyle.name}</p>
+                          {setupStyle.description ? (
+                            <p className="text-xs text-muted-foreground">
+                              {setupStyle.description}
+                            </p>
+                          ) : null}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openEdit(setupStyle)}
+                              disabled={isPending}
+                              aria-label={`Edit ${setupStyle.name}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDelete(setupStyle)}
+                              disabled={isPending}
+                              aria-label={`Delete ${setupStyle.name}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
@@ -241,21 +345,6 @@ export function SetupStylesClient({
                   setForm((current) => ({ ...current, description: event.target.value }))
                 }
                 rows={3}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="style-sort">Sort order</Label>
-              <Input
-                id="style-sort"
-                type="number"
-                value={form.sort_order}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    sort_order: Number(event.target.value) || 0,
-                  }))
-                }
               />
             </div>
 

@@ -87,7 +87,7 @@ export async function fetchGroupActivityAction(
         title: (event.name as string | null)?.trim() || "Event",
         detail: event.status ? `Status: ${event.status}` : null,
         amount: null,
-        href: "/events/overview",
+        href: `/event-management/${event.id}`,
       })
     }
   }
@@ -125,7 +125,7 @@ export async function fetchDepartmentActivityAction(departmentId: string) {
       title: (event.name as string | null)?.trim() || "Event",
       detail: event.status ? `Status: ${event.status}` : null,
       amount: null,
-      href: "/events/overview",
+      href: `/event-management/${event.id}`,
     })
   }
 

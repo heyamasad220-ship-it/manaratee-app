@@ -95,9 +95,12 @@ export function toOperationalBriefView(
   options?: {
     spacesLabel?: string | null
     metadata?: Record<string, unknown> | null
+    primaryContactEmail?: string | null
+    hideSourceRecordLink?: boolean
   }
 ): OperationalBriefView {
-  const canOpenSourceRecord = canOpenSourceRecordForBrief(brief, permissions)
+  const canOpenSourceRecord =
+    !options?.hideSourceRecordLink && canOpenSourceRecordForBrief(brief, permissions)
   const href = canOpenSourceRecord ? resolveSourceRecordHref(brief) : null
 
   return {
@@ -121,6 +124,7 @@ export function toOperationalBriefView(
     facilityNotes: brief.facility_notes,
     primaryContactName: brief.primary_contact_name,
     primaryContactPhone: brief.primary_contact_phone,
+    primaryContactEmail: options?.primaryContactEmail ?? null,
     internalCoordinatorName: brief.internal_coordinator_name,
     internalCoordinatorPhone: brief.internal_coordinator_phone,
     internalCoordinatorEmail: brief.internal_coordinator_email,

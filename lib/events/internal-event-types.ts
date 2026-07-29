@@ -14,6 +14,10 @@ export interface InternalEvent {
   end_at: string | null
   venue_id: string | null
   location_label: string | null
+  /** Buffer before event start — occupied window on shared calendar. */
+  setup_minutes?: number
+  /** Buffer after event end — occupied window on shared calendar. */
+  cleanup_minutes?: number
   timezone: string | null
   requires_volunteers?: boolean
   requires_childcare?: boolean

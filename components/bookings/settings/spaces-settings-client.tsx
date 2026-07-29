@@ -221,7 +221,7 @@ export function SpacesSettingsClient({
 
   return (
     <>
-      <Header title="Bookings" />
+      <Header title="Facilities" />
 
       <div className="flex flex-col gap-6 p-6">
         <div>

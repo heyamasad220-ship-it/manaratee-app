@@ -12,20 +12,9 @@ const settingsTabs = [
     matchPrefix: "/facilities/settings/spaces",
   },
   {
-    label: "Resources",
-    href: "/facilities/settings/resources",
-    matchPrefix: "/facilities/settings/resources",
-    alsoMatchPrefixes: ["/facilities/resources"],
-  },
-  {
     label: "Setup Styles",
     href: "/facilities/settings/setup-styles",
     matchPrefix: "/facilities/settings/setup-styles",
-  },
-  {
-    label: "Event Types",
-    href: "/facilities/settings/event-types",
-    matchPrefix: "/facilities/settings/event-types",
   },
 ] as const
 

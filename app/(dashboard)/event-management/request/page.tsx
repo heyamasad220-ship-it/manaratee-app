@@ -5,6 +5,10 @@ import { Header } from "@/components/layout/header"
 import { getDepartments } from "@/lib/departments/department-queries"
 import { getEventTypes } from "@/lib/events/event-type-queries"
 import { getInternalEventFormDefaults } from "@/lib/events/internal-event-form-defaults"
+import {
+  mergeInternalEventFormDefaults,
+  resolveInternalEventFormReturnTo,
+} from "@/lib/events/internal-event-form-query"
 import { getActiveCalendarVenues } from "@/lib/bookings/venue-calendar-venues"
 import { getRoomSetupStyles } from "@/lib/setup-styles/setup-style-queries"
 import { getVendorHubVendorTypes } from "@/lib/vendor-hub/vendor-type-queries"
@@ -16,6 +20,8 @@ type PageProps = {
     venueId?: string
     start?: string
     end?: string
+    department?: string
+    returnTo?: string
   }>
 }
 
@@ -38,11 +44,14 @@ export default async function InternalEventRequestPage({ searchParams }: PagePro
   }
 
   const params = await searchParams
+  const departmentFromQuery = params?.department?.trim() || ""
+  const returnTo = resolveInternalEventFormReturnTo(params?.returnTo)
+
   const [
     departments,
     eventTypes,
     venues,
-    defaults,
+    baseDefaults,
     setupStyles,
     vendorTypes,
     canManageSetupStyles,
@@ -58,25 +67,30 @@ export default async function InternalEventRequestPage({ searchParams }: PagePro
     hasAnyPermission(PERMISSIONS.EVENTS_MANAGE, PERMISSIONS.PROGRAMS_MANAGE),
   ])
 
+  const defaults = mergeInternalEventFormDefaults(baseDefaults, departmentFromQuery)
+  const departmentExists = departments.some((department) => department.id === departmentFromQuery)
+
   return (
     <>
       <Header title="Event Management" />
       <InternalEventForm
-      mode="request"
-      departments={departments}
-      eventTypes={eventTypes}
-      venues={venues}
-      setupStyles={setupStyles}
-      canManageSetupStyles={canManageSetupStyles}
-      vendorTypes={vendorTypes}
-      canManageVendorTypes={canManageVendorTypes}
-      initialSlot={{
-        venueId: params?.venueId || "",
-        startAt: params?.start || "",
-        endAt: params?.end || "",
-      }}
-      defaults={defaults}
-    />
+        mode="request"
+        departments={departments}
+        eventTypes={eventTypes}
+        venues={venues}
+        setupStyles={setupStyles}
+        canManageSetupStyles={canManageSetupStyles}
+        vendorTypes={vendorTypes}
+        canManageVendorTypes={canManageVendorTypes}
+        lockDepartment={Boolean(departmentFromQuery && departmentExists)}
+        returnTo={returnTo}
+        initialSlot={{
+          venueId: params?.venueId || "",
+          startAt: params?.start || "",
+          endAt: params?.end || "",
+        }}
+        defaults={defaults}
+      />
     </>
   )
 }

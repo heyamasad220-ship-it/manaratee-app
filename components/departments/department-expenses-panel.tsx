@@ -129,7 +129,7 @@ export function DepartmentExpensesPanel({
     const openProgramList = openPrograms || []
     const openProgramIds = new Set(openProgramList.map((row) => row.id as string))
 
-    // Open years only — archived-year expenses belong under Archive reports.
+    // Open years only — archived-year expenses are excluded from operating Financial.
     const rows = ((data || []) as DepartmentExpenseRow[]).filter((row) => {
       const programId = row.program_id || row.program?.id || null
       if (programId) {

@@ -10,6 +10,7 @@ import { getAllRegistrationOptionsForOffering } from "@/lib/programs/program-reg
 import { getProgramSessionsForOffering } from "@/lib/programs/program-session-queries"
 import { getOfferingScheduleItems } from "@/lib/programs/program-schedule-queries"
 import { getStaffAssignmentsForOffering } from "@/lib/programs/program-staff-assignment-queries"
+import { getVenues } from "@/lib/bookings/venue-queries"
 import type {
   OfferingWorkspaceData,
   OfferingWorkspaceDataMap,
@@ -30,6 +31,7 @@ export async function getOfferingWorkspaceData(
     billingSchedule,
     discountTags,
     registrationQuestions,
+    venues,
   ] = await Promise.all([
     getAllRegistrationOptionsForOffering(offering.id),
     getFeePlanBundleForOffering(offering.id, organizationId),
@@ -46,6 +48,7 @@ export async function getOfferingWorkspaceData(
     }),
     getActiveDiscountTags().catch(() => []),
     getRegistrationQuestionsForOffering(offering.id, organizationId),
+    getVenues().catch(() => []),
   ])
 
   return {
@@ -63,6 +66,9 @@ export async function getOfferingWorkspaceData(
       name: tag.name as string,
     })),
     registrationQuestions,
+    venues: (venues || [])
+      .filter((venue) => venue.status === "active")
+      .map((venue) => ({ id: venue.id, name: venue.name })),
   }
 }
 

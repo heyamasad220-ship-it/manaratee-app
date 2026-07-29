@@ -161,7 +161,12 @@ function buildColumns(data: CalendarData): CalendarColumn[] {
   return columns
 }
 
-function buildEventRequestHref(day: Date, hour: number, column: CalendarColumn) {
+function buildEventRequestHref(
+  day: Date,
+  hour: number,
+  column: CalendarColumn,
+  options?: { departmentId?: string | null; returnTo?: string | null }
+) {
   const start = new Date(day)
   start.setHours(hour, 0, 0, 0)
   const end = new Date(start)
@@ -173,6 +178,12 @@ function buildEventRequestHref(day: Date, hour: number, column: CalendarColumn) 
   }
   params.set("start", start.toISOString())
   params.set("end", end.toISOString())
+  if (options?.departmentId) {
+    params.set("department", options.departmentId)
+  }
+  if (options?.returnTo) {
+    params.set("returnTo", options.returnTo)
+  }
 
   return `/event-management/request?${params.toString()}`
 }
@@ -604,6 +615,27 @@ export function ReservationCalendar({
   }, [currentDate])
 
   const columns = useMemo(() => buildColumns(data), [data])
+  const eventRequestDepartmentId = searchParams.get("department")?.trim() || null
+  const eventRequestReturnTo = searchParams.get("returnTo")?.trim() || null
+  const eventRequestContext = useMemo(
+    () => ({
+      departmentId: eventRequestDepartmentId,
+      returnTo: eventRequestReturnTo,
+    }),
+    [eventRequestDepartmentId, eventRequestReturnTo]
+  )
+
+  const requestEventHref = useMemo(() => {
+    const params = new URLSearchParams()
+    if (eventRequestDepartmentId) {
+      params.set("department", eventRequestDepartmentId)
+    }
+    if (eventRequestReturnTo) {
+      params.set("returnTo", eventRequestReturnTo)
+    }
+    const query = params.toString()
+    return query ? `/event-management/request?${query}` : "/event-management/request"
+  }, [eventRequestDepartmentId, eventRequestReturnTo])
 
   const sourceTypesInView = useMemo(
     () => Array.from(new Set(data.reservations.map((item) => item.sourceType))),
@@ -634,6 +666,7 @@ export function ReservationCalendar({
     const params = new URLSearchParams(searchParams.toString())
     if (next.date) params.set("date", next.date)
     if (next.view) params.set("view", next.view)
+    // Preserve ?sources= so module filtered calendars stay filtered.
 
     const pathname = CALENDAR_AUDIENCE_PATHS[audience]
 
@@ -660,11 +693,11 @@ export function ReservationCalendar({
   }
 
   function handleEmptySlotClick(day: Date, hour: number, column: CalendarColumn) {
-    router.push(buildEventRequestHref(day, hour, column))
+    router.push(buildEventRequestHref(day, hour, column, eventRequestContext))
   }
 
   function handleEmptyCellClick(day: Date, column: CalendarColumn) {
-    router.push(buildEventRequestHref(day, 9, column))
+    router.push(buildEventRequestHref(day, 9, column, eventRequestContext))
   }
 
   function goToDate(date: Date) {
@@ -727,7 +760,7 @@ export function ReservationCalendar({
           <div className="flex flex-wrap items-center gap-2">
             {canPlanEvents ? (
               <Button asChild size="sm">
-                <Link href="/event-management/request">
+                <Link href={requestEventHref}>
                   <Plus className="mr-2 h-4 w-4" />
                   Request Event
                 </Link>
@@ -922,6 +955,7 @@ export function ReservationCalendar({
         reservation={selectedReservation}
         open={briefOpen}
         onOpenChange={setBriefOpen}
+        hideSourceRecordLink={isOps}
       />
 
       <Dialog open={blockOpen} onOpenChange={setBlockOpen}>

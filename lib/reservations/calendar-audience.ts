@@ -5,6 +5,9 @@ import type {
 } from "@/lib/reservations/reservation-types"
 import { SOURCE_TYPE_LABELS } from "@/lib/reservations/reservation-types"
 
+/** Who is viewing the shared facility calendar (controls masking + venue options). */
+export type CalendarAudience = "staff" | "ops" | "customer"
+
 export const CALENDAR_AUDIENCE_LABELS: Record<CalendarAudience, string> = {
   staff: "Calendar",
   ops: "Calendar",

@@ -24,6 +24,8 @@ export type OfferingWorkspaceData = {
   /** Active org discount tags for member/staff pricing rules. */
   discountTags: Array<{ id: string; name: string }>
   registrationQuestions: ProgramOfferingRegistrationQuestion[]
+  /** Bookable/active venues for facility linking on schedule items. */
+  venues: Array<{ id: string; name: string }>
 }
 
 export type OfferingWorkspaceDataMap = Record<string, OfferingWorkspaceData>

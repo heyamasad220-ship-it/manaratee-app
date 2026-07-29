@@ -11,7 +11,11 @@ import {
   parseCalendarDate,
   toDateParam,
 } from "@/lib/reservations/reservation-time"
-import type { CalendarViewMode } from "@/lib/reservations/reservation-types"
+import {
+  RESERVATION_SOURCE_TYPES,
+  type CalendarViewMode,
+  type ReservationSourceType,
+} from "@/lib/reservations/reservation-types"
 import {
   hasAnyPermission,
   PERMISSIONS,
@@ -19,12 +23,49 @@ import {
   type PermissionKey,
 } from "@/lib/permissions/permissions"
 
+const VALID_SOURCE_TYPES = new Set<string>(
+  Object.values(RESERVATION_SOURCE_TYPES)
+)
+
 function getSearchParam(
   params: Record<string, string | string[] | undefined> | undefined,
   key: string
 ) {
   const value = params?.[key]
   return Array.isArray(value) ? value[0] : value
+}
+
+function parseSourceTypesParam(
+  value: string | undefined
+): ReservationSourceType[] | null {
+  if (!value?.trim()) return null
+
+  const parsed = value
+    .split(",")
+    .map((part) => part.trim())
+    .filter((part): part is ReservationSourceType =>
+      VALID_SOURCE_TYPES.has(part)
+    )
+
+  return parsed.length > 0 ? parsed : null
+}
+
+function calendarTitleForSources(
+  sourceTypes: ReservationSourceType[] | null,
+  fallback: string
+) {
+  if (!sourceTypes || sourceTypes.length !== 1) return fallback
+
+  switch (sourceTypes[0]) {
+    case RESERVATION_SOURCE_TYPES.venueRental:
+      return "Venue Rentals Calendar"
+    case RESERVATION_SOURCE_TYPES.internalEvent:
+      return "Events Calendar"
+    case RESERVATION_SOURCE_TYPES.programFacility:
+      return "Programs Calendar"
+    default:
+      return fallback
+  }
 }
 
 async function AudienceCalendarPageContent({
@@ -46,9 +87,10 @@ async function AudienceCalendarPageContent({
   const viewParam = getSearchParam(resolved, "view")
   const view: CalendarViewMode =
     viewParam === "grid" || viewParam === "week" ? "grid" : "day"
+  const sourceTypes = parseSourceTypesParam(getSearchParam(resolved, "sources"))
 
   const [data, canManageBlocks, canPlanEvents] = await Promise.all([
-    getCalendarData(audience, anchorDate, view),
+    getCalendarData(audience, anchorDate, view, { sourceTypes }),
     hasAnyPermission(
       PERMISSIONS.BOOKINGS_MANAGE,
       PERMISSIONS.SPACES_MANAGE,
@@ -62,18 +104,26 @@ async function AudienceCalendarPageContent({
     ),
   ])
 
+  const resolvedTitle =
+    headerTitle ||
+    calendarTitleForSources(sourceTypes, CALENDAR_AUDIENCE_LABELS[audience])
+
   return (
     <ReservationCalendar
       audience={audience}
       initialData={data}
       initialDate={dateParam || toDateParam(anchorDate)}
       initialView={view}
-      canManageBlocks={canManageBlocks && audience === "ops"}
+      canManageBlocks={canManageBlocks && audience === "ops" && !sourceTypes}
       canPlanEvents={
         canPlanEvents && (audience === "staff" || audience === "ops")
       }
-      headerTitle={headerTitle || CALENDAR_AUDIENCE_LABELS[audience]}
-      description={CALENDAR_AUDIENCE_DESCRIPTIONS[audience]}
+      headerTitle={resolvedTitle}
+      description={
+        sourceTypes
+          ? "Filtered view of the shared facility schedule — same data as Facilities Calendar."
+          : CALENDAR_AUDIENCE_DESCRIPTIONS[audience]
+      }
     />
   )
 }

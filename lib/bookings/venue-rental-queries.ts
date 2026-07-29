@@ -4,6 +4,7 @@ import {
   reservationStatusBlocksBooking,
   type ConflictCheckReservation,
 } from "@/lib/reservations/reservation-conflict-rules"
+import { getProgramAvailabilityBlocksForOrg, getProgramBlockingReservationsForVenue } from "@/lib/reservations/reservation-queries"
 import { rangesOverlap } from "@/lib/reservations/reservation-time"
 
 import {
@@ -119,7 +120,7 @@ export async function getBlockingReservationsForVenue(
     throw new Error("Failed to load reservations for conflict check")
   }
 
-  return (data || [])
+  const stored = (data || [])
     .filter((row) => {
       if (excludeSourceId && row.source_id === excludeSourceId) {
         return false
@@ -134,6 +135,15 @@ export async function getBlockingReservationsForVenue(
       endAt: row.end_at as string,
       status: row.status as string,
     }))
+
+  const programBlocks = await getProgramBlockingReservationsForVenue(
+    organizationId,
+    venueId,
+    rangeStart,
+    rangeEnd
+  )
+
+  return [...stored, ...programBlocks]
 }
 
 export async function getVenueRentalById(id: string): Promise<VenueRentalRecord | null> {
@@ -244,13 +254,21 @@ export async function getPublicAvailabilityBlocks(
     throw new Error("Failed to load public availability")
   }
 
-  return (data || [])
+  const stored = (data || [])
     .filter((row) => reservationStatusBlocksBooking(row.status as string))
     .map((row) => ({
       venueId: row.venue_id as string,
       startAt: row.start_at as string,
       endAt: row.end_at as string,
     }))
+
+  const programBlocks = await getProgramAvailabilityBlocksForOrg(
+    organizationId,
+    rangeStart,
+    rangeEnd
+  )
+
+  return [...stored, ...programBlocks]
 }
 
 export async function getActiveRentalAddons(
@@ -338,11 +356,24 @@ async function loadRentalConflictFlags(
     reservationStatusBlocksBooking(row.status as string | null)
   )
 
+  const programBlocksByVenue = new Map<string, ConflictCheckReservation[]>()
+  await Promise.all(
+    Array.from(venueIds).map(async (venueId) => {
+      const blocks = await getProgramBlockingReservationsForVenue(
+        organizationId,
+        venueId,
+        rangeStart,
+        rangeEnd
+      )
+      programBlocksByVenue.set(venueId, blocks)
+    })
+  )
+
   for (const [rentalId, reservations] of reservationsByRental) {
     let hasConflict = false
 
     for (const reservation of reservations) {
-      const overlaps = blockingRows.some((row) => {
+      const overlapsStored = blockingRows.some((row) => {
         if (row.source_id === reservation.id) return false
         if (row.venue_id !== reservation.venue_id) return false
         return rangesOverlap(
@@ -353,7 +384,22 @@ async function loadRentalConflictFlags(
         )
       })
 
-      if (overlaps) {
+      if (overlapsStored) {
+        hasConflict = true
+        break
+      }
+
+      const programBlocks = programBlocksByVenue.get(reservation.venue_id) || []
+      const overlapsProgram = programBlocks.some((block) =>
+        rangesOverlap(
+          new Date(reservation.start_at),
+          new Date(reservation.end_at),
+          new Date(block.startAt),
+          new Date(block.endAt)
+        )
+      )
+
+      if (overlapsProgram) {
         hasConflict = true
         break
       }

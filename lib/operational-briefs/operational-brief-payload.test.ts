@@ -68,6 +68,24 @@ test("toOperationalBriefView hides source record link for facility-only viewers"
   )
 })
 
+test("toOperationalBriefView hides source record when facilities schedule view requests it", () => {
+  const view = toOperationalBriefView(
+    sampleBrief,
+    {
+      canOpenVenueRentalRecord: true,
+      canOpenInternalEventRecord: false,
+      canOpenProgramRecord: false,
+      canEditSetupFields: false,
+      isFacilitiesOnly: false,
+    },
+    { hideSourceRecordLink: true, primaryContactEmail: "alex@example.com" }
+  )
+
+  assert.equal(view.canOpenSourceRecord, false)
+  assert.equal(view.sourceRecordHref, null)
+  assert.equal(view.primaryContactEmail, "alex@example.com")
+})
+
 test("toOperationalBriefView exposes source record link only for module managers", () => {
   const view = toOperationalBriefView(sampleBrief, {
     canOpenVenueRentalRecord: true,

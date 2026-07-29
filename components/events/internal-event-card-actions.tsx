@@ -82,20 +82,27 @@ export function InternalEventCardActions({
   eventId,
   eventName,
   compact = false,
+  deleteBlockedReason = null,
+  redirectAfterDelete = "/event-management",
 }: {
   eventId: string
   eventName: string
   compact?: boolean
+  /** When set, delete is disabled and this reason is shown. */
+  deleteBlockedReason?: string | null
+  /** Where to go after a successful delete (workspace should leave the event page). */
+  redirectAfterDelete?: string
 }) {
   const router = useRouter()
   const [pendingAction, setPendingAction] = React.useState<"copy" | "delete" | null>(
     null
   )
   const [feedback, setFeedback] = React.useState<string | null>(null)
+  const deleteDisabled = Boolean(deleteBlockedReason)
 
   function showFeedback(message: string) {
     setFeedback(message)
-    window.setTimeout(() => setFeedback(null), 2500)
+    window.setTimeout(() => setFeedback(null), 4000)
   }
 
   async function handleCopyEvent() {
@@ -120,6 +127,8 @@ export function InternalEventCardActions({
   }
 
   async function handleDeleteEvent() {
+    if (deleteDisabled) return
+
     setPendingAction("delete")
     setFeedback(null)
 
@@ -131,6 +140,7 @@ export function InternalEventCardActions({
         return
       }
 
+      router.push(redirectAfterDelete)
       router.refresh()
     } catch {
       showFeedback("Failed to delete event.")
@@ -149,47 +159,71 @@ export function InternalEventCardActions({
           <Pencil className="h-4 w-4" />
         </ActionIconButton>
 
-        <AlertDialog>
+        {deleteDisabled ? (
           <Tooltip>
             <TooltipTrigger asChild>
-              <AlertDialogTrigger asChild>
+              <span className="inline-flex">
                 <Button
                   type="button"
                   variant="outline"
                   size="icon"
-                  className="h-8 w-8 text-destructive hover:text-destructive"
-                  aria-label="Delete event"
-                  disabled={pendingAction === "delete"}
+                  className="h-8 w-8 text-muted-foreground"
+                  aria-label="Delete event unavailable"
+                  disabled
                 >
-                  {pendingAction === "delete" ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Trash2 className="h-4 w-4" />
-                  )}
+                  <Trash2 className="h-4 w-4" />
                 </Button>
-              </AlertDialogTrigger>
+              </span>
             </TooltipTrigger>
-            <TooltipContent>Delete event</TooltipContent>
+            <TooltipContent className="max-w-xs">
+              {deleteBlockedReason}
+            </TooltipContent>
           </Tooltip>
+        ) : (
+          <AlertDialog>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 text-destructive hover:text-destructive"
+                    aria-label="Delete event"
+                    disabled={pendingAction === "delete"}
+                  >
+                    {pendingAction === "delete" ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                  </Button>
+                </AlertDialogTrigger>
+              </TooltipTrigger>
+              <TooltipContent>Delete event</TooltipContent>
+            </Tooltip>
 
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete {eventName}?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This permanently removes the event and its calendar reservation.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                onClick={() => void handleDeleteEvent()}
-              >
-                Delete
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete {eventName}?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This permanently removes the event and its calendar
+                  reservation. Events with ticket orders or registrations cannot
+                  be deleted.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  onClick={() => void handleDeleteEvent()}
+                >
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
 
         <ActionIconButton
           label="Copy event"
@@ -201,7 +235,7 @@ export function InternalEventCardActions({
       </div>
 
       {feedback ? (
-        <p className="text-xs text-muted-foreground">{feedback}</p>
+        <p className="text-xs text-destructive">{feedback}</p>
       ) : null}
     </div>
   )

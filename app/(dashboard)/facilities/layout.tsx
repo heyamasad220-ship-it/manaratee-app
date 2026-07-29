@@ -1,10 +1,10 @@
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
-  title: "Bookings",
+  title: "Facilities",
 }
 
-export default function FacilitiesBookingsLayout({
+export default function FacilitiesLayout({
   children,
 }: {
   children: React.ReactNode

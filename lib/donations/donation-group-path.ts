@@ -12,7 +12,6 @@ export type GroupWorkspaceTab =
   | "financial"
   | "group-giving"
   | "activity"
-  | "reports"
   | "settings"
 
 /** Sub-tabs under Department → Financial. */
@@ -109,10 +108,13 @@ export function mapDonationTabToWorkspaceTab(
     tab === "students" ||
     tab === "schedule" ||
     tab === "activity" ||
-    tab === "reports" ||
     tab === "settings"
   ) {
     return tab
+  }
+  // Legacy Archive / Reports tab removed — fall through to Overview.
+  if (tab === "reports") {
+    return "overview"
   }
   // Legacy Employees tab → Financial / Payroll.
   if (tab === "employees") {
@@ -159,10 +161,13 @@ export function parseDepartmentWorkspaceTab(
     tab === "financial" ||
     tab === "group-giving" ||
     tab === "activity" ||
-    tab === "reports" ||
     tab === "settings"
   ) {
     return tab
+  }
+  // Legacy Archive / Reports tab removed.
+  if (tab === "reports") {
+    return "overview"
   }
   // Legacy Employees tab → Financial / Payroll.
   if (tab === "employees") {
