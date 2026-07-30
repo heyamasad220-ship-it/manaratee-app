@@ -42,6 +42,7 @@ function baseRental(overrides: Partial<VenueRentalQueueRow> = {}): VenueRentalQu
     submittedAtLabel: "May 1, 2026",
     holdExpiresAt: null,
     hasConflict: false,
+    hasReceivedPayment: false,
     ...overrides,
   }
 }

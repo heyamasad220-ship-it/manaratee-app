@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useMemo, useRef, useState, useTransition } from "react"
+import { useEffect, useMemo, useRef, useState, useTransition } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
   Ban,
@@ -13,6 +13,7 @@ import {
   TriangleAlert,
 } from "lucide-react"
 
+import { FacilityEventRequestDrawer } from "@/components/events/facility-event-request-drawer"
 import { Header } from "@/components/layout/header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -34,6 +35,7 @@ import {
 } from "@/components/ui/popover"
 import { Textarea } from "@/components/ui/textarea"
 import { TimeInput } from "@/components/ui/time-input"
+import { CREATE_EVENT_CTA_LABEL } from "@/lib/events/facility-event-request-href"
 import type { CalendarAudience } from "@/lib/reservations/calendar-audience"
 import { CALENDAR_AUDIENCE_PATHS } from "@/lib/reservations/calendar-audience"
 import { createReservationBlock } from "@/lib/reservations/reservation-actions"
@@ -75,6 +77,18 @@ type ReservationCalendarProps = {
   canPlanEvents?: boolean
   headerTitle?: string
   description?: string
+  eventFormOptions?: FacilityEventFormOptions | null
+}
+
+export type FacilityEventFormOptions = {
+  departments: { id: string; name: string }[]
+  eventTypes: { id: string; name: string }[]
+  venues: { id: string; name: string }[]
+  setupStyles: import("@/lib/setup-styles/setup-style-types").RoomSetupStyle[]
+  defaults: {
+    departmentId: string | null
+    user: { id: string; name: string } | null
+  }
 }
 
 type CalendarColumn = {
@@ -159,33 +173,6 @@ function buildColumns(data: CalendarData): CalendarColumn[] {
   }
 
   return columns
-}
-
-function buildEventRequestHref(
-  day: Date,
-  hour: number,
-  column: CalendarColumn,
-  options?: { departmentId?: string | null; returnTo?: string | null }
-) {
-  const start = new Date(day)
-  start.setHours(hour, 0, 0, 0)
-  const end = new Date(start)
-  end.setHours(hour + 1, 0, 0, 0)
-
-  const params = new URLSearchParams()
-  if (column.venueId) {
-    params.set("venueId", column.venueId)
-  }
-  params.set("start", start.toISOString())
-  params.set("end", end.toISOString())
-  if (options?.departmentId) {
-    params.set("department", options.departmentId)
-  }
-  if (options?.returnTo) {
-    params.set("returnTo", options.returnTo)
-  }
-
-  return `/event-management/request?${params.toString()}`
 }
 
 function formatReservationStartTime(iso: string) {
@@ -445,7 +432,7 @@ function DayView({
                   role={canClickSlot ? "button" : undefined}
                   tabIndex={canClickSlot ? 0 : undefined}
                   title={
-                    canClickSlot ? "Click to request an event in this slot" : undefined
+                    canClickSlot ? "Click to create an event in this slot" : undefined
                   }
                 >
                   {items.map((reservation) => (
@@ -546,7 +533,7 @@ function GridView({
                     role={canClickCell ? "button" : undefined}
                     tabIndex={canClickCell ? 0 : undefined}
                     title={
-                      canClickCell ? "Click to request an event on this day" : undefined
+                      canClickCell ? "Click to create an event on this day" : undefined
                     }
                   >
                     {cellReservations.map((reservation) => (
@@ -576,6 +563,7 @@ export function ReservationCalendar({
   canPlanEvents = false,
   headerTitle,
   description,
+  eventFormOptions = null,
 }: ReservationCalendarProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -586,7 +574,15 @@ export function ReservationCalendar({
   const [selectedReservation, setSelectedReservation] =
     useState<CalendarReservation | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [eventDrawerOpen, setEventDrawerOpen] = useState(false)
+  const [eventSlot, setEventSlot] = useState<{
+    venueId?: string
+    startAt?: string
+    endAt?: string
+  } | null>(null)
+  const [editEventId, setEditEventId] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const autoOpenedRef = useRef(false)
 
   const currentDate = useMemo(
     () => new Date(`${initialDate}T12:00:00`),
@@ -617,25 +613,33 @@ export function ReservationCalendar({
   const columns = useMemo(() => buildColumns(data), [data])
   const eventRequestDepartmentId = searchParams.get("department")?.trim() || null
   const eventRequestReturnTo = searchParams.get("returnTo")?.trim() || null
-  const eventRequestContext = useMemo(
-    () => ({
-      departmentId: eventRequestDepartmentId,
-      returnTo: eventRequestReturnTo,
-    }),
-    [eventRequestDepartmentId, eventRequestReturnTo]
-  )
+  const queryVenueId = searchParams.get("venueId")?.trim() || ""
+  const queryStart = searchParams.get("start")?.trim() || ""
+  const queryEnd = searchParams.get("end")?.trim() || ""
+  const shouldAutoOpen = searchParams.get("openNew") === "1"
 
-  const requestEventHref = useMemo(() => {
-    const params = new URLSearchParams()
-    if (eventRequestDepartmentId) {
-      params.set("department", eventRequestDepartmentId)
-    }
-    if (eventRequestReturnTo) {
-      params.set("returnTo", eventRequestReturnTo)
-    }
-    const query = params.toString()
-    return query ? `/event-management/request?${query}` : "/event-management/request"
-  }, [eventRequestDepartmentId, eventRequestReturnTo])
+  const prefilledDepartmentId =
+    eventRequestDepartmentId || eventFormOptions?.defaults.departmentId || null
+
+  useEffect(() => {
+    if (!canPlanEvents || !eventFormOptions || autoOpenedRef.current) return
+    if (!shouldAutoOpen && !queryStart && !queryVenueId) return
+
+    autoOpenedRef.current = true
+    setEventSlot({
+      venueId: queryVenueId || undefined,
+      startAt: queryStart || undefined,
+      endAt: queryEnd || undefined,
+    })
+    setEventDrawerOpen(true)
+  }, [
+    canPlanEvents,
+    eventFormOptions,
+    shouldAutoOpen,
+    queryStart,
+    queryVenueId,
+    queryEnd,
+  ])
 
   const sourceTypesInView = useMemo(
     () => Array.from(new Set(data.reservations.map((item) => item.sourceType))),
@@ -655,11 +659,22 @@ export function ReservationCalendar({
       isOps,
       conflicts,
       onSelectReservation: (reservation) => {
+        if (
+          reservation.sourceType === RESERVATION_SOURCE_TYPES.internalEvent &&
+          reservation.sourceId &&
+          eventFormOptions
+        ) {
+          setEditEventId(reservation.sourceId)
+          setEventSlot(null)
+          setEventDrawerOpen(true)
+          return
+        }
+
         setSelectedReservation(reservation)
         setBriefOpen(true)
       },
     }),
-    [isOps, conflicts]
+    [isOps, conflicts, eventFormOptions]
   )
 
   function pushParams(next: { date?: string; view?: CalendarViewMode }) {
@@ -692,12 +707,53 @@ export function ReservationCalendar({
     })
   }
 
+  function clearEventCreateQueryParams() {
+    const params = new URLSearchParams(searchParams.toString())
+    let changed = false
+    for (const key of ["openNew", "venueId", "start", "end"]) {
+      if (params.has(key)) {
+        params.delete(key)
+        changed = true
+      }
+    }
+    if (!changed) return
+    const pathname = CALENDAR_AUDIENCE_PATHS[audience]
+    const query = params.toString()
+    router.replace(query ? `${pathname}?${query}` : pathname)
+  }
+
+  function openEventDrawer(slot?: {
+    venueId?: string
+    startAt?: string
+    endAt?: string
+  } | null) {
+    setEditEventId(null)
+    setEventSlot(slot || null)
+    setEventDrawerOpen(true)
+  }
+
   function handleEmptySlotClick(day: Date, hour: number, column: CalendarColumn) {
-    router.push(buildEventRequestHref(day, hour, column, eventRequestContext))
+    const start = new Date(day)
+    start.setHours(hour, 0, 0, 0)
+    const end = new Date(start)
+    end.setHours(hour + 1, 0, 0, 0)
+    openEventDrawer({
+      venueId: column.venueId || undefined,
+      startAt: start.toISOString(),
+      endAt: end.toISOString(),
+    })
   }
 
   function handleEmptyCellClick(day: Date, column: CalendarColumn) {
-    router.push(buildEventRequestHref(day, 9, column, eventRequestContext))
+    const start = new Date(day)
+    start.setHours(9, 0, 0, 0)
+    const end = new Date(day)
+    end.setHours(10, 0, 0, 0)
+    openEventDrawer({
+      venueId: column.venueId || undefined,
+      startAt: start.toISOString(),
+      endAt: end.toISOString(),
+    })
   }
 
   function goToDate(date: Date) {
@@ -758,12 +814,10 @@ export function ReservationCalendar({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {canPlanEvents ? (
-              <Button asChild size="sm">
-                <Link href={requestEventHref}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Request Event
-                </Link>
+            {canPlanEvents && eventFormOptions ? (
+              <Button size="sm" onClick={() => openEventDrawer(null)}>
+                <Plus className="mr-2 h-4 w-4" />
+                {CREATE_EVENT_CTA_LABEL}
               </Button>
             ) : null}
             {canManageBlocks ? (
@@ -1052,6 +1106,44 @@ export function ReservationCalendar({
           </form>
         </DialogContent>
       </Dialog>
+
+      {eventFormOptions ? (
+        <FacilityEventRequestDrawer
+          open={eventDrawerOpen}
+          onOpenChange={(next) => {
+            setEventDrawerOpen(next)
+            if (!next) {
+              setEditEventId(null)
+              setEventSlot(null)
+              clearEventCreateQueryParams()
+            }
+          }}
+          departments={eventFormOptions.departments}
+          eventTypes={eventFormOptions.eventTypes}
+          venues={eventFormOptions.venues}
+          setupStyles={eventFormOptions.setupStyles}
+          canManageSetupStyles
+          defaults={{
+            departmentId: prefilledDepartmentId,
+            user: eventFormOptions.defaults.user,
+          }}
+          lockDepartment={Boolean(eventRequestDepartmentId)}
+          initialSlot={eventSlot}
+          editEventId={editEventId}
+          onSubmitted={() => {
+            setEventDrawerOpen(false)
+            setEditEventId(null)
+            setEventSlot(null)
+            clearEventCreateQueryParams()
+            if (eventRequestReturnTo) {
+              router.push(eventRequestReturnTo)
+              router.refresh()
+              return
+            }
+            router.refresh()
+          }}
+        />
+      ) : null}
     </>
   )
 }

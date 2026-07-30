@@ -13,6 +13,11 @@ import {
   fetchDepartmentActivityAction,
   type GroupActivityItem,
 } from "@/lib/donations/donation-group-activity-actions"
+import {
+  buildFacilitiesBookSpaceHref,
+  CREATE_EVENT_CTA_LABEL,
+  VIEW_MASTER_CALENDAR_CTA_LABEL,
+} from "@/lib/events/facility-event-request-href"
 import { getInternalEventDeleteBlockersMap } from "@/lib/events/internal-event-actions"
 import { getInternalEventStatusLabel } from "@/lib/events/internal-event-status"
 
@@ -51,14 +56,20 @@ function departmentEventsReturnTo(departmentId: string) {
   return `/workforce/departments/${departmentId}?tab=activity`
 }
 
-/** Create Event → events calendar with department locked for slot request. */
-function createEventHref(departmentId: string) {
+function bookSpaceHref(departmentId: string) {
+  return buildFacilitiesBookSpaceHref({
+    departmentId,
+    returnTo: departmentEventsReturnTo(departmentId),
+    openNew: true,
+  })
+}
+
+function collaborationCalendarHref(departmentId: string) {
   const params = new URLSearchParams({
-    sources: "internal_event",
     department: departmentId,
     returnTo: departmentEventsReturnTo(departmentId),
   })
-  return `/facilities/calendar?${params.toString()}`
+  return `/event-management/calendar?${params.toString()}`
 }
 
 function eventIdFromItem(item: GroupActivityItem) {
@@ -137,18 +148,28 @@ export function DepartmentEventsPanel({
         <div>
           <h2 className="text-lg font-semibold tracking-tight">Events</h2>
           <p className="text-sm text-muted-foreground">
-            {departmentName} department events. Create Event opens the calendar so you can pick a
-            time and submit a request.
+            View the Master Calendar for department collaboration, then create events from
+            Facilities (department and requester are prefilled). All submissions go for approval.
           </p>
         </div>
-        {canRequestEvents ? (
-          <Button size="sm" asChild>
-            <Link href={createEventHref(departmentId)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Create event
-            </Link>
-          </Button>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          {canRequestEvents || canManageEvents ? (
+            <Button variant="outline" size="sm" asChild>
+              <Link href={collaborationCalendarHref(departmentId)}>
+                <CalendarDays className="mr-2 h-4 w-4" />
+                {VIEW_MASTER_CALENDAR_CTA_LABEL}
+              </Link>
+            </Button>
+          ) : null}
+          {canRequestEvents || canManageEvents ? (
+            <Button size="sm" asChild>
+              <Link href={bookSpaceHref(departmentId)}>
+                <Plus className="mr-2 h-4 w-4" />
+                {CREATE_EVENT_CTA_LABEL}
+              </Link>
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       <StatCardsRow equal columns={4}>

@@ -4,6 +4,7 @@ import {
   getVenueRentalPaymentReportRows,
   getVenueRentalQueueRows,
 } from "@/lib/bookings/venue-rental-queries"
+import { completePastConfirmedVenueRentals } from "@/lib/bookings/venue-rental-actions"
 import {
   hasAnyPermission,
   PERMISSIONS,
@@ -17,6 +18,8 @@ export default async function BookingsDashboardPage() {
     PERMISSIONS.PROGRAMS_VIEW,
     PERMISSIONS.PROGRAMS_MANAGE
   )
+
+  await completePastConfirmedVenueRentals()
 
   const [rows, paymentRows, canManage] = await Promise.all([
     getVenueRentalQueueRows({ skipConflictCheck: true }),

@@ -16,7 +16,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { EventServiceRequirementsFields } from "@/components/events/event-service-requirements-fields"
 import { EventTicketingFields } from "@/components/events/event-ticketing-fields"
-import { FacilityVenueSelect } from "@/components/reservations/facility-venue-select"
+import { FacilityVenueMultiSelect } from "@/components/reservations/facility-venue-multi-select"
 import { SetupStyleField } from "@/components/setup-styles/setup-style-field"
 import type { Department } from "@/lib/departments/department-types"
 import type { EventType } from "@/lib/events/event-type-types"
@@ -43,6 +43,13 @@ import {
 import { getEventTicketTypes } from "@/lib/tickets/ticket-type-actions"
 import type { InternalEventWithRelations } from "@/lib/events/internal-event-types"
 import type { InternalEventFormDefaults } from "@/lib/events/internal-event-form-defaults"
+import {
+  INTERNAL_EVENT_LOCATION_TYPE_LABELS,
+  INTERNAL_EVENT_LOCATION_TYPES,
+  inferInternalEventLocationType,
+  isInternalEventLocationType,
+  type InternalEventLocationType,
+} from "@/lib/events/internal-event-location"
 import { isSafeReturnToPath } from "@/lib/navigation/return-to"
 import type { RoomSetupStyle } from "@/lib/setup-styles/setup-style-types"
 import type { VendorHubVendorType } from "@/lib/vendor-hub/vendor-type-types"
@@ -108,6 +115,17 @@ export function InternalEventForm(props: InternalEventFormProps) {
       ? props.returnTo
       : null
 
+  const initialVenueIds =
+    props.mode === "edit"
+      ? props.event.venue_ids?.length
+        ? props.event.venue_ids
+        : props.event.venue_id
+          ? [props.event.venue_id]
+          : []
+      : props.initialSlot?.venueId
+        ? [props.initialSlot.venueId]
+        : []
+
   const initial =
     props.mode === "edit"
       ? {
@@ -118,8 +136,13 @@ export function InternalEventForm(props: InternalEventFormProps) {
           status: props.event.status,
           start_at: toDatetimeLocalValue(props.event.start_at),
           end_at: toDatetimeLocalValue(props.event.end_at),
-          venue_id: props.event.venue_id || "",
-          location_label: props.event.location_label || "",
+          venue_ids: initialVenueIds,
+          location_type: inferInternalEventLocationType(props.event),
+          location_label:
+            props.event.location_type === INTERNAL_EVENT_LOCATION_TYPES.online
+              ? ""
+              : props.event.location_label || "",
+          location_address: props.event.location_address || "",
         }
       : props.mode === "request"
         ? {
@@ -134,8 +157,10 @@ export function InternalEventForm(props: InternalEventFormProps) {
             end_at: props.initialSlot?.endAt
               ? toDatetimeLocalValue(props.initialSlot.endAt)
               : "",
-            venue_id: props.initialSlot?.venueId || "",
+            venue_ids: initialVenueIds,
+            location_type: INTERNAL_EVENT_LOCATION_TYPES.facility as InternalEventLocationType | "",
             location_label: "",
+            location_address: "",
           }
         : {
             name: "",
@@ -143,10 +168,22 @@ export function InternalEventForm(props: InternalEventFormProps) {
             department_id: formDefaults?.departmentId || "",
             event_type_id: props.eventTypes[0]?.id || "",
             status: "draft" as InternalEventStatus,
-            start_at: props.mode === "create" ? props.initialSlot?.startAt || "" : "",
-            end_at: props.mode === "create" ? props.initialSlot?.endAt || "" : "",
-            venue_id: props.mode === "create" ? props.initialSlot?.venueId || "" : "",
+            start_at: props.mode === "create"
+              ? props.initialSlot?.startAt
+                ? toDatetimeLocalValue(props.initialSlot.startAt)
+                : ""
+              : "",
+            end_at: props.mode === "create"
+              ? props.initialSlot?.endAt
+                ? toDatetimeLocalValue(props.initialSlot.endAt)
+                : ""
+              : "",
+            venue_ids: initialVenueIds,
+            location_type: (props.mode === "create" && props.initialSlot?.venueId
+              ? INTERNAL_EVENT_LOCATION_TYPES.facility
+              : "") as InternalEventLocationType | "",
             location_label: "",
+            location_address: "",
           }
 
   const requestOrigin =
@@ -256,6 +293,65 @@ export function InternalEventForm(props: InternalEventFormProps) {
     })
   }
 
+  function setLocationType(next: InternalEventLocationType | "") {
+    setForm((current) => ({
+      ...current,
+      location_type: next,
+      venue_ids:
+        next === INTERNAL_EVENT_LOCATION_TYPES.facility ? current.venue_ids : [],
+      location_label:
+        next === INTERNAL_EVENT_LOCATION_TYPES.external
+          ? current.location_type === INTERNAL_EVENT_LOCATION_TYPES.external
+            ? current.location_label
+            : ""
+          : "",
+      location_address:
+        next === INTERNAL_EVENT_LOCATION_TYPES.external ? current.location_address : "",
+    }))
+  }
+
+  const showFacilityLocation =
+    props.mode === "request" ||
+    form.location_type === INTERNAL_EVENT_LOCATION_TYPES.facility
+  const showExternalLocation =
+    props.mode !== "request" &&
+    form.location_type === INTERNAL_EVENT_LOCATION_TYPES.external
+  const showFacilitySetup = showFacilityLocation
+
+  function locationPayload() {
+    if (props.mode === "request") {
+      return {
+        location_type: INTERNAL_EVENT_LOCATION_TYPES.facility as InternalEventLocationType,
+        venue_id: form.venue_ids[0] || null,
+        venue_ids: form.venue_ids,
+        location_label: form.location_label || null,
+        location_address: null as string | null,
+      }
+    }
+
+    if (!isInternalEventLocationType(form.location_type)) {
+      throw new Error("Select where this event takes place.")
+    }
+
+    const isFacility = form.location_type === INTERNAL_EVENT_LOCATION_TYPES.facility
+
+    return {
+      location_type: form.location_type,
+      venue_id: isFacility ? form.venue_ids[0] || null : null,
+      venue_ids: isFacility ? form.venue_ids : [],
+      location_label:
+        form.location_type === INTERNAL_EVENT_LOCATION_TYPES.external
+          ? form.location_label
+          : form.location_type === INTERNAL_EVENT_LOCATION_TYPES.online
+            ? "Online"
+            : form.location_label || null,
+      location_address:
+        form.location_type === INTERNAL_EVENT_LOCATION_TYPES.external
+          ? form.location_address
+          : null,
+    }
+  }
+
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
     setError(null)
@@ -266,6 +362,7 @@ export function InternalEventForm(props: InternalEventFormProps) {
         const ticketingPayload = buildTicketingPayload(ticketing)
 
         if (props.mode === "request") {
+          const location = locationPayload()
           const id = await submitInternalEventRequest({
             name: form.name,
             description: form.description,
@@ -273,8 +370,7 @@ export function InternalEventForm(props: InternalEventFormProps) {
             event_type_id: form.event_type_id,
             start_at: form.start_at || null,
             end_at: form.end_at || null,
-            venue_id: form.venue_id || null,
-            location_label: form.location_label,
+            ...location,
             operationalSetup: buildOperationalSetupPayload(),
             ...servicePayload,
             ...ticketingPayload,
@@ -289,6 +385,7 @@ export function InternalEventForm(props: InternalEventFormProps) {
         }
 
         if (props.mode === "create") {
+          const location = locationPayload()
           const id = await createInternalEvent({
             name: form.name,
             description: form.description,
@@ -297,9 +394,10 @@ export function InternalEventForm(props: InternalEventFormProps) {
             status: form.status,
             start_at: form.start_at || null,
             end_at: form.end_at || null,
-            venue_id: form.venue_id || null,
-            location_label: form.location_label,
-            operationalSetup: buildOperationalSetupPayload(),
+            ...location,
+            operationalSetup: showFacilitySetup
+              ? buildOperationalSetupPayload()
+              : undefined,
             ...servicePayload,
             ...ticketingPayload,
           })
@@ -308,6 +406,7 @@ export function InternalEventForm(props: InternalEventFormProps) {
           return
         }
 
+        const location = locationPayload()
         await updateInternalEvent({
           id: props.event.id,
           name: form.name,
@@ -317,9 +416,10 @@ export function InternalEventForm(props: InternalEventFormProps) {
           status: form.status,
           start_at: form.start_at || null,
           end_at: form.end_at || null,
-          venue_id: form.venue_id || null,
-          location_label: form.location_label,
-          operationalSetup: buildOperationalSetupPayload(),
+          ...location,
+          operationalSetup: showFacilitySetup
+            ? buildOperationalSetupPayload()
+            : undefined,
           ...servicePayload,
           ...ticketingPayload,
         })
@@ -438,14 +538,13 @@ export function InternalEventForm(props: InternalEventFormProps) {
           />
         </div>
 
-        <FacilityVenueSelect
-          id="venue_id"
+        <FacilityVenueMultiSelect
+          id="venue_ids"
           label="Venue"
-          value={form.venue_id}
+          value={form.venue_ids}
           venues={props.venues}
-          allowNone={false}
           required
-          onChange={(venueId) => updateField("venue_id", venueId)}
+          onChange={(venueIds) => updateField("venue_ids", venueIds)}
         />
 
         <SetupStyleField
@@ -479,41 +578,201 @@ export function InternalEventForm(props: InternalEventFormProps) {
     )
   }
 
-  function renderScheduleAndLocation() {
+  function renderStartEnd() {
     return (
-      <>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="start_at">Start</Label>
-            <DateTimeInput
-              id="start_at"
-              value={form.start_at}
-              onChange={(value) => updateField("start_at", value)}
-            />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="space-y-1.5">
+          <Label htmlFor="start_at">Start</Label>
+          <DateTimeInput
+            id="start_at"
+            value={form.start_at}
+            onChange={(value) => updateField("start_at", value)}
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="end_at">End</Label>
+          <DateTimeInput
+            id="end_at"
+            value={form.end_at}
+            min={form.start_at || undefined}
+            onChange={(value) => updateField("end_at", value)}
+          />
+        </div>
+      </div>
+    )
+  }
+
+  function renderLocationFields() {
+    return (
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="location_type">Location</Label>
+          <select
+            id="location_type"
+            value={form.location_type}
+            onChange={(event) =>
+              setLocationType(
+                (event.target.value || "") as InternalEventLocationType | ""
+              )
+            }
+            className={selectClassName}
+            required
+          >
+            <option value="">Select location</option>
+            <option value={INTERNAL_EVENT_LOCATION_TYPES.facility}>
+              {INTERNAL_EVENT_LOCATION_TYPE_LABELS.facility}
+            </option>
+            <option value={INTERNAL_EVENT_LOCATION_TYPES.online}>
+              {INTERNAL_EVENT_LOCATION_TYPE_LABELS.online}
+            </option>
+            <option value={INTERNAL_EVENT_LOCATION_TYPES.external}>
+              {INTERNAL_EVENT_LOCATION_TYPE_LABELS.external}
+            </option>
+          </select>
+          <p className="text-xs text-muted-foreground">
+            Facility events can be requested for approval. Online and external
+            venues are created directly.
+          </p>
+        </div>
+
+        {showFacilityLocation ? (
+          <FacilityVenueMultiSelect
+            id="venue_ids"
+            label="Venue"
+            value={form.venue_ids}
+            venues={props.venues}
+            required
+            onChange={(venueIds) => updateField("venue_ids", venueIds)}
+          />
+        ) : null}
+
+        {showExternalLocation ? (
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="location_label">Venue name</Label>
+              <Input
+                id="location_label"
+                value={form.location_label}
+                onChange={(event) => updateField("location_label", event.target.value)}
+                placeholder="Hotel ballroom, restaurant, …"
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="location_address">Address</Label>
+              <Textarea
+                id="location_address"
+                value={form.location_address}
+                onChange={(event) =>
+                  updateField("location_address", event.target.value)
+                }
+                rows={2}
+                placeholder="Street, city, state"
+                required
+              />
+            </div>
+          </div>
+        ) : null}
+
+        {showFacilitySetup ? renderOperationalSetup(true) : null}
+      </div>
+    )
+  }
+
+  function renderCreateEditBasics() {
+    return (
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="name">Event name</Label>
+          <Input
+            id="name"
+            value={form.name}
+            onChange={(event) => updateField("name", event.target.value)}
+            placeholder="Community Iftar"
+            required
+          />
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="department">Department</Label>
+            {showLockedDepartment && prefilledDepartment ? (
+              <Input
+                id="department"
+                value={prefilledDepartment.name}
+                readOnly
+                disabled
+                className="bg-muted"
+              />
+            ) : (
+              <select
+                id="department"
+                value={form.department_id}
+                onChange={(event) => updateField("department_id", event.target.value)}
+                className={selectClassName}
+                required
+              >
+                <option value="">Select department</option>
+                {props.departments.map((department) => (
+                  <option key={department.id} value={department.id}>
+                    {department.name}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="end_at">End</Label>
-            <DateTimeInput
-              id="end_at"
-              value={form.end_at}
-              min={form.start_at || undefined}
-              onChange={(value) => updateField("end_at", value)}
-            />
+          <div className="space-y-2">
+            <Label htmlFor="event_type">Event type</Label>
+            <select
+              id="event_type"
+              value={form.event_type_id}
+              onChange={(event) => updateField("event_type_id", event.target.value)}
+              className={selectClassName}
+              required
+            >
+              <option value="">Select type</option>
+              {props.eventTypes.map((eventType) => (
+                <option key={eventType.id} value={eventType.id}>
+                  {eventType.name}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 
-        <FacilityVenueSelect
-          id="venue_id"
-          label="Venue"
-          value={form.venue_id}
-          venues={props.venues}
-          allowNone={!isRequestMode}
-          required={isRequestMode}
-          noneLabel="No facility selected"
-          onChange={(venueId) => updateField("venue_id", venueId)}
-        />
-      </>
+        <div className="space-y-2">
+          <Label htmlFor="status">Status</Label>
+          <select
+            id="status"
+            value={form.status}
+            onChange={(event) =>
+              updateField("status", event.target.value as InternalEventStatus)
+            }
+            className={selectClassName}
+          >
+            {statusOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {renderStartEnd()}
+
+        <div className="space-y-2">
+          <Label htmlFor="description">Description</Label>
+          <Textarea
+            id="description"
+            value={form.description}
+            onChange={(event) => updateField("description", event.target.value)}
+            rows={4}
+            placeholder="Optional details for staff planning"
+          />
+        </div>
+      </div>
     )
   }
 
@@ -641,7 +900,7 @@ export function InternalEventForm(props: InternalEventFormProps) {
       className={
         isRequestMode
           ? "mx-auto flex w-full max-w-6xl flex-col gap-4 p-4 sm:p-6"
-          : "mx-auto flex w-full max-w-3xl flex-col gap-6 p-6"
+          : "mx-auto flex w-full max-w-6xl flex-col gap-6 p-6"
       }
     >
       <div className="flex items-center gap-3">
@@ -660,8 +919,8 @@ export function InternalEventForm(props: InternalEventFormProps) {
           </h1>
           <p className="text-sm text-muted-foreground">
             {isRequestMode
-              ? "Submit a department event request for supervisor approval."
-              : "Department-owned internal events for your organization."}
+              ? "Request a facility space for supervisor approval."
+              : "Online and external events publish directly. Facility space still uses Request Event when approval is needed."}
           </p>
         </div>
       </div>
@@ -727,117 +986,31 @@ export function InternalEventForm(props: InternalEventFormProps) {
             </div>
           </div>
         ) : (
-          <>
-        <div className="space-y-2">
-          <Label htmlFor="name">Event name</Label>
-          <Input
-            id="name"
-            value={form.name}
-            onChange={(event) => updateField("name", event.target.value)}
-            placeholder="Community Iftar"
-            required
-          />
-        </div>
+          <div className="space-y-8">
+            <div className="grid gap-8 lg:grid-cols-2 lg:gap-10">
+              {renderCreateEditBasics()}
+              {renderLocationFields()}
+            </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="department">Department</Label>
-            {showLockedDepartment && prefilledDepartment ? (
-              <Input
-                id="department"
-                value={prefilledDepartment.name}
-                readOnly
-                disabled
-                className="bg-muted"
+            <div className="grid gap-8 border-t pt-8 lg:grid-cols-2 lg:gap-10">
+              <EventServiceRequirementsFields
+                value={serviceRequirements}
+                onChange={setServiceRequirements}
+                vendorTypes={props.vendorTypes}
+                canManageVendorTypes={props.canManageVendorTypes}
               />
-            ) : (
-              <select
-                id="department"
-                value={form.department_id}
-                onChange={(event) => updateField("department_id", event.target.value)}
-                className={selectClassName}
-                required
-              >
-                <option value="">Select department</option>
-                {props.departments.map((department) => (
-                  <option key={department.id} value={department.id}>
-                    {department.name}
-                  </option>
-                ))}
-              </select>
-            )}
+
+              {ticketingLoaded ? (
+                <EventTicketingFields value={ticketing} onChange={setTicketing} />
+              ) : (
+                <div className="rounded-lg border p-4 text-sm text-muted-foreground">
+                  Loading ticketing settings...
+                </div>
+              )}
+            </div>
+
+            {renderFormActions()}
           </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="event_type">Event type</Label>
-            <select
-              id="event_type"
-              value={form.event_type_id}
-              onChange={(event) => updateField("event_type_id", event.target.value)}
-              className={selectClassName}
-              required
-            >
-              <option value="">Select type</option>
-              {props.eventTypes.map((eventType) => (
-                <option key={eventType.id} value={eventType.id}>
-                  {eventType.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {!isRequestMode ? (
-          <div className="space-y-2">
-            <Label htmlFor="status">Status</Label>
-            <select
-              id="status"
-              value={form.status}
-              onChange={(event) =>
-                updateField("status", event.target.value as InternalEventStatus)
-              }
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm sm:max-w-xs"
-            >
-              {statusOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        ) : null}
-
-        {renderScheduleAndLocation()}
-
-        <div className="space-y-2">
-          <Label htmlFor="description">Description</Label>
-          <Textarea
-            id="description"
-            value={form.description}
-            onChange={(event) => updateField("description", event.target.value)}
-            rows={4}
-            placeholder="Optional details for staff planning"
-          />
-        </div>
-
-        <EventServiceRequirementsFields
-          value={serviceRequirements}
-          onChange={setServiceRequirements}
-          vendorTypes={props.vendorTypes}
-          canManageVendorTypes={props.canManageVendorTypes}
-        />
-
-        {ticketingLoaded ? (
-          <EventTicketingFields value={ticketing} onChange={setTicketing} />
-        ) : (
-          <div className="rounded-lg border p-4 text-sm text-muted-foreground">
-            Loading ticketing settings...
-          </div>
-        )}
-
-        {renderOperationalSetup()}
-        {renderFormActions()}
-          </>
         )}
       </form>
     </div>

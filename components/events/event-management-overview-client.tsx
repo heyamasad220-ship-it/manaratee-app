@@ -30,6 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { CREATE_EVENT_CTA_LABEL } from "@/lib/events/facility-event-request-href"
 import {
   Table,
   TableBody,
@@ -190,9 +191,9 @@ export function EventManagementOverviewClient({
           <div className="flex items-center gap-3">
             {canManage ? (
               <Button asChild size="sm">
-                <Link href="/event-management/create">
+                <Link href="/facilities/calendar?openNew=1">
                   <Plus className="mr-2 h-4 w-4" />
-                  Create Event
+                  {CREATE_EVENT_CTA_LABEL}
                 </Link>
               </Button>
             ) : null}
@@ -299,7 +300,7 @@ export function EventManagementOverviewClient({
             <CardContent className="p-0">
               {data.recentEvents.length === 0 ? (
                 <div className="px-6 py-10 text-center text-sm text-muted-foreground">
-                  No events yet. Create your first internal event to get started.
+                  No events yet. Create an event from Facilities calendar to get started.
                 </div>
               ) : (
                 <div className="overflow-x-auto">

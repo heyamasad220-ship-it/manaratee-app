@@ -27,6 +27,7 @@ import {
   PERMISSIONS,
   requireAnyPermission,
 } from "@/lib/permissions/permissions"
+import { CREATE_EVENT_CTA_LABEL } from "@/lib/events/facility-event-request-href"
 
 type PageSearchParams = {
   q?: string
@@ -252,9 +253,9 @@ export default async function EventManagementCatalogPage({
 
           {canManage ? (
             <Button asChild>
-              <Link href="/event-management/create">
+              <Link href="/facilities/calendar?openNew=1">
                 <Plus className="mr-2 h-4 w-4" />
-                Create Event
+                {CREATE_EVENT_CTA_LABEL}
               </Link>
             </Button>
           ) : null}
@@ -285,9 +286,9 @@ export default async function EventManagementCatalogPage({
             </p>
             {canManage ? (
               <Button className="mt-4" asChild>
-                <Link href="/event-management/create">
+                <Link href="/facilities/calendar?openNew=1">
                   <Plus className="mr-2 h-4 w-4" />
-                  Create Event
+                  {CREATE_EVENT_CTA_LABEL}
                 </Link>
               </Button>
             ) : null}

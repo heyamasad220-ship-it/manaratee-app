@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, Suspense } from "react"
+import { useState, useEffect, useCallback, useRef, Suspense } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { usePathname, useSearchParams } from "next/navigation"
@@ -278,6 +278,7 @@ const moduleDefaultRouteOverride: Record<string, string> = {
   workforce: "/workforce",
   hr: "/workforce",
   finance: "/finance/transactions",
+  bookings: "/bookings/overview",
 }
 
 /** Broader than default href so all module routes stay under the parent (breadcrumb + active). */
@@ -311,9 +312,9 @@ const moduleChildren: Record<string, SubItem[]> = {
   "event-management": [
     { label: "Dashboard", href: "/event-management/overview", matchPrefix: "/event-management/overview", permissionKey: "events.view" },
     {
-      label: "Calendar",
-      href: "/facilities/calendar?sources=internal_event",
-      matchPrefix: "/facilities/calendar",
+      label: "Master Calendar",
+      href: "/event-management/calendar",
+      matchPrefix: "/event-management/calendar",
       permissionKey: "events.view",
     },
     { label: "Events", href: "/event-management", matchPrefix: "/event-management", exact: true, permissionKey: "events.view" },
@@ -819,9 +820,15 @@ function SidebarSelectionSync() {
   const searchParams = useSearchParams()
   const search = searchParams.toString()
   const { navItems, closeModuleDrawer, ensureSubExpanded } = useSidebarContext()
+  const previousPathnameRef = useRef(pathname)
 
   useEffect(() => {
-    closeModuleDrawer()
+    // Close the module drawer only after a real route change — not when the
+    // drawer opens or when sidebar modules finish loading.
+    if (previousPathnameRef.current !== pathname) {
+      previousPathnameRef.current = pathname
+      closeModuleDrawer()
+    }
 
     if (pathname === "/dashboard") {
       return

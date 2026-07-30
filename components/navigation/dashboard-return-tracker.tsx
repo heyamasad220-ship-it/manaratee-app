@@ -13,11 +13,12 @@ import {
 export function DashboardReturnTracker() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const search = searchParams.toString()
 
   useEffect(() => {
     if (!pathname || isContactProfilePath(pathname)) return
-    writeStoredReturnToPath(buildCurrentPath(pathname, searchParams.toString()))
-  }, [pathname, searchParams])
+    writeStoredReturnToPath(buildCurrentPath(pathname, search))
+  }, [pathname, search])
 
   return null
 }

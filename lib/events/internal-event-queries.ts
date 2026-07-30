@@ -13,6 +13,29 @@ const EVENT_SELECT = `
   venues:venue_id ( id, name )
 `
 
+export async function getInternalEventVenueIds(eventId: string): Promise<string[]> {
+  const supabase = await createClient()
+  const organizationId = await getSelectedOrganizationId()
+
+  if (!organizationId) {
+    return []
+  }
+
+  const { data, error } = await supabase
+    .from("internal_event_venues")
+    .select("venue_id")
+    .eq("organization_id", organizationId)
+    .eq("internal_event_id", eventId)
+
+  if (error) {
+    // Junction table may not exist until migration 211 is applied.
+    console.error(error)
+    return []
+  }
+
+  return (data || []).map((row) => row.venue_id as string).filter(Boolean)
+}
+
 export async function getInternalEvents() {
   const supabase = await createClient()
   const organizationId = await getSelectedOrganizationId()

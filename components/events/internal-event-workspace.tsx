@@ -15,6 +15,8 @@ import {
 import { Header } from "@/components/layout/header"
 import { InternalEventCardActions } from "@/components/events/internal-event-card-actions"
 import { InternalEventChildcareTab } from "@/components/events/internal-event-childcare-tab"
+import { InternalEventFlyerCard } from "@/components/events/internal-event-flyer-card"
+import { InternalEventModuleSetupPanel } from "@/components/events/internal-event-module-setup-panel"
 import {
   InternalEventModuleDisabledState,
   InternalEventParticipationsPanel,
@@ -25,11 +27,7 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { getInternalEventStatusLabel } from "@/lib/events/internal-event-status"
-import {
-  formatChildcareAgeGroupLabel,
-  parseServiceRequirements,
-  summarizeVendorRequirements,
-} from "@/lib/events/event-service-requirements"
+import { formatInternalEventLocation } from "@/lib/events/internal-event-location"
 import type { InternalEventWithRelations } from "@/lib/events/internal-event-types"
 import type {
   ChildcareEventSummary,
@@ -37,6 +35,7 @@ import type {
 } from "@/lib/child-care/childcare-registration-types"
 import type { EventTicketType } from "@/lib/tickets/ticket-types"
 import type { ServiceParticipationWithContact } from "@/lib/service-participations/service-participation-types"
+import type { VendorHubVendorType } from "@/lib/vendor-hub/vendor-type-types"
 
 const WORKSPACE_TABS = [
   { value: "overview", label: "Overview" },
@@ -74,6 +73,7 @@ export function InternalEventWorkspace({
   ticketTypes = [],
   childcareEvent = null,
   childcareRegistrations = [],
+  vendorTypes = [],
   initialTab = "overview",
 }: {
   event: InternalEventWithRelations
@@ -83,6 +83,7 @@ export function InternalEventWorkspace({
   ticketTypes?: EventTicketType[]
   childcareEvent?: ChildcareEventSummary | null
   childcareRegistrations?: ChildcareRegistration[]
+  vendorTypes?: VendorHubVendorType[]
   initialTab?: WorkspaceTab
 }) {
   const router = useRouter()
@@ -92,8 +93,6 @@ export function InternalEventWorkspace({
 
   const departmentName = event.departments?.name || "Unknown department"
   const eventTypeName = event.event_types?.name || "Unknown type"
-  const serviceConfig = parseServiceRequirements(event.service_requirements)
-  const editHref = `/event-management/${event.id}/edit`
 
   const volunteerParticipations = participations.filter(
     (row) => row.participation_type === "volunteer"
@@ -213,150 +212,32 @@ export function InternalEventWorkspace({
                     <div>
                       <p className="font-medium">Location</p>
                       <p className="text-muted-foreground">
-                        {event.venues?.name || event.location_label || "Not specified"}
+                        {formatInternalEventLocation(event)}
                       </p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Description</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="whitespace-pre-wrap text-sm text-muted-foreground">
-                    {event.description || "No description provided."}
-                  </p>
-                </CardContent>
-              </Card>
+              <div className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Description</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="whitespace-pre-wrap text-sm text-muted-foreground">
+                      {event.description || "No description provided."}
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <InternalEventFlyerCard
+                  eventId={event.id}
+                  flyerUrl={event.flyer_url ?? null}
+                  canManage={canManage}
+                />
+              </div>
             </div>
-
-            <Card className="mt-6">
-              <CardHeader>
-                <CardTitle className="text-base">Modules</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Quick summary of ticketing, volunteers, childcare, and vendors for this event.
-                </p>
-              </CardHeader>
-              <CardContent className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                <ModuleSummaryCard
-                  label="Ticketing"
-                  enabled={event.requires_ticketing === true}
-                  summary={
-                    event.requires_ticketing
-                      ? `${ticketTypes.filter((type) => type.is_active).length} ticket type(s)`
-                      : "Not enabled"
-                  }
-                  tab="ticketing"
-                  onOpenTab={handleTabChange}
-                />
-                <ModuleSummaryCard
-                  label="Volunteers"
-                  enabled={event.requires_volunteers === true}
-                  summary={
-                    event.requires_volunteers
-                      ? `${volunteerParticipations.length} sign-up(s)`
-                      : "Not enabled"
-                  }
-                  tab="volunteers"
-                  onOpenTab={handleTabChange}
-                />
-                <ModuleSummaryCard
-                  label="Childcare"
-                  enabled={event.requires_childcare === true}
-                  summary={
-                    event.requires_childcare
-                      ? `${childcareRegistrations.length} registration(s)`
-                      : "Not enabled"
-                  }
-                  tab="childcare"
-                  onOpenTab={handleTabChange}
-                />
-                <ModuleSummaryCard
-                  label="Vendors"
-                  enabled={event.requires_vendors === true}
-                  summary={
-                    event.requires_vendors
-                      ? `${vendorParticipations.length} sign-up(s)`
-                      : "Not enabled"
-                  }
-                  tab="vendors"
-                  onOpenTab={handleTabChange}
-                />
-              </CardContent>
-            </Card>
-
-            {(event.requires_volunteers ||
-              event.requires_childcare ||
-              event.requires_vendors) && (
-              <Card className="mt-6">
-                <CardHeader>
-                  <CardTitle className="text-base">Service requirements</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4 text-sm">
-                  {event.requires_volunteers ? (
-                    <div>
-                      <p className="font-medium">Volunteers</p>
-                      <p className="text-muted-foreground">
-                        {serviceConfig.volunteers?.maxVolunteers
-                          ? `Up to ${serviceConfig.volunteers.maxVolunteers} volunteers`
-                          : "Volunteer sign-ups enabled"}
-                        {serviceConfig.volunteers?.roles?.length
-                          ? ` · ${serviceConfig.volunteers.roles.map((role) => `${role.name} (${role.slots})`).join(", ")}`
-                          : ""}
-                      </p>
-                    </div>
-                  ) : null}
-                  {event.requires_childcare ? (
-                    <div>
-                      <p className="font-medium">Childcare</p>
-                      <p className="text-muted-foreground">
-                        {[
-                          ...(serviceConfig.childcare?.ageGroups?.length
-                            ? serviceConfig.childcare.ageGroups.map(
-                                (group) =>
-                                  `${formatChildcareAgeGroupLabel(group.ageRange)} (cap ${group.capacity})`
-                              )
-                            : [
-                                serviceConfig.childcare?.ageRange
-                                  ? `Ages ${serviceConfig.childcare.ageRange}`
-                                  : null,
-                                serviceConfig.childcare?.capacity
-                                  ? `Capacity ${serviceConfig.childcare.capacity}`
-                                  : null,
-                              ]),
-                          serviceConfig.childcare?.registrationDeadline
-                            ? `Deadline ${serviceConfig.childcare.registrationDeadline}`
-                            : null,
-                        ]
-                          .flat()
-                          .filter(Boolean)
-                          .join(" · ") || "Childcare enabled for this event"}
-                      </p>
-                    </div>
-                  ) : null}
-                  {event.requires_vendors ? (
-                    <div>
-                      <p className="font-medium">Vendors</p>
-                      <p className="text-muted-foreground">
-                        {[
-                          ...summarizeVendorRequirements(serviceConfig.vendors),
-                          serviceConfig.vendors?.applicationDeadline
-                            ? `Apply by ${serviceConfig.vendors.applicationDeadline}`
-                            : null,
-                          serviceConfig.vendors?.approvalRequired === false
-                            ? "Auto-approve vendors"
-                            : "Approval required",
-                        ]
-                          .filter(Boolean)
-                          .join(" · ") || "Vendor participation enabled"}
-                      </p>
-                    </div>
-                  ) : null}
-                </CardContent>
-              </Card>
-            )}
           </TabsContent>
 
           <TabsContent value="ticketing" className="mt-0">
@@ -368,97 +249,129 @@ export function InternalEventWorkspace({
                 ticketingConfig={event.ticketing_config}
                 canManage={canManage}
               />
+            ) : canManage ? (
+              <InternalEventModuleSetupPanel
+                event={event}
+                module="ticketing"
+                ticketTypes={ticketTypes}
+                title="Ticketing"
+                description="Enable ticketing to sell tickets, track orders, and manage capacity for this event."
+              />
             ) : (
               <InternalEventModuleDisabledState
                 title="Ticketing"
-                description="Enable ticketing to sell tickets, track orders, and manage capacity for this event."
-                editHref={editHref}
+                description="Ticketing is not enabled for this event."
               />
             )}
           </TabsContent>
 
           <TabsContent value="volunteers" className="mt-0">
             {event.requires_volunteers ? (
-              <InternalEventParticipationsPanel
-                participations={volunteerParticipations}
-                canManage={canManage}
-                participationType="volunteer"
+              <div className="space-y-6">
+                {canManage ? (
+                  <InternalEventModuleSetupPanel
+                    event={event}
+                    module="volunteers"
+                    title="Volunteer settings"
+                    description="Update roles and capacity for volunteer sign-ups."
+                  />
+                ) : null}
+                <InternalEventParticipationsPanel
+                  participations={volunteerParticipations}
+                  canManage={canManage}
+                  participationType="volunteer"
+                  title="Volunteers"
+                  description="Volunteers who signed up for this event. Confirm or decline pending submissions."
+                  emptyMessage="No volunteer sign-ups yet."
+                />
+              </div>
+            ) : canManage ? (
+              <InternalEventModuleSetupPanel
+                event={event}
+                module="volunteers"
                 title="Volunteers"
-                description="Volunteers who signed up for this event. Confirm or decline pending submissions."
-                emptyMessage="No volunteer sign-ups yet."
+                description="Enable volunteers to collect sign-ups and manage roles for this event."
               />
             ) : (
               <InternalEventModuleDisabledState
                 title="Volunteers"
-                description="Enable volunteers to collect sign-ups and manage roles for this event."
-                editHref={editHref}
+                description="Volunteers are not enabled for this event."
               />
             )}
           </TabsContent>
 
           <TabsContent value="childcare" className="mt-0">
             {event.requires_childcare ? (
-              <InternalEventChildcareTab
+              <div className="space-y-6">
+                {canManage ? (
+                  <InternalEventModuleSetupPanel
+                    event={event}
+                    module="childcare"
+                    title="Childcare settings"
+                    description="Update age groups, capacity, and registration deadline."
+                  />
+                ) : null}
+                <InternalEventChildcareTab
+                  event={event}
+                  childcareEvent={childcareEvent}
+                  registrations={childcareRegistrations}
+                  providerParticipations={providerParticipations}
+                  canManage={canManage}
+                />
+              </div>
+            ) : canManage ? (
+              <InternalEventModuleSetupPanel
                 event={event}
-                childcareEvent={childcareEvent}
-                registrations={childcareRegistrations}
-                providerParticipations={providerParticipations}
-                canManage={canManage}
+                module="childcare"
+                title="Childcare"
+                description="Enable childcare to register children and assign providers for this event."
               />
             ) : (
               <InternalEventModuleDisabledState
                 title="Childcare"
-                description="Enable childcare to register children and assign providers for this event."
-                editHref={editHref}
+                description="Childcare is not enabled for this event."
               />
             )}
           </TabsContent>
 
           <TabsContent value="vendors" className="mt-0">
             {event.requires_vendors ? (
-              <InternalEventParticipationsPanel
-                participations={vendorParticipations}
-                canManage={canManage}
-                participationType="vendor"
+              <div className="space-y-6">
+                {canManage ? (
+                  <InternalEventModuleSetupPanel
+                    event={event}
+                    module="vendors"
+                    vendorTypes={vendorTypes}
+                    title="Vendor settings"
+                    description="Update vendor types, fees, and application settings."
+                  />
+                ) : null}
+                <InternalEventParticipationsPanel
+                  participations={vendorParticipations}
+                  canManage={canManage}
+                  participationType="vendor"
+                  title="Vendors"
+                  description="Vendors who applied to participate in this event."
+                  emptyMessage="No vendor sign-ups yet."
+                />
+              </div>
+            ) : canManage ? (
+              <InternalEventModuleSetupPanel
+                event={event}
+                module="vendors"
+                vendorTypes={vendorTypes}
                 title="Vendors"
-                description="Vendors who applied to participate in this event."
-                emptyMessage="No vendor sign-ups yet."
+                description="Enable vendors to accept applications and manage booth participation."
               />
             ) : (
               <InternalEventModuleDisabledState
                 title="Vendors"
-                description="Enable vendors to accept applications and manage booth participation."
-                editHref={editHref}
+                description="Vendors are not enabled for this event."
               />
             )}
           </TabsContent>
         </Tabs>
       </div>
     </>
-  )
-}
-
-function ModuleSummaryCard({
-  label,
-  enabled,
-  summary,
-  tab,
-  onOpenTab,
-}: {
-  label: string
-  enabled: boolean
-  summary: string
-  tab: WorkspaceTab
-  onOpenTab: (tab: WorkspaceTab) => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={() => onOpenTab(tab)}
-      className="rounded-lg border bg-card p-4 text-left transition-colors hover:bg-muted/40"
-    >
-      <p className="text-sm font-medium">{label}</p>
-      <p className="mt-1 text-xs text-muted-foreground">{enabled ? summary : "Not enabled"}</p>
-    </button>
   )
 }

@@ -1,7 +1,6 @@
 "use client"
 
 import { useTransition } from "react"
-import Link from "next/link"
 import { Loader2 } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -156,11 +155,9 @@ export function InternalEventParticipationsPanel({
 export function InternalEventModuleDisabledState({
   title,
   description,
-  editHref,
 }: {
   title: string
   description: string
-  editHref: string
 }) {
   return (
     <Card>
@@ -168,11 +165,6 @@ export function InternalEventModuleDisabledState({
         <CardTitle className="text-base">{title}</CardTitle>
         <p className="text-sm text-muted-foreground">{description}</p>
       </CardHeader>
-      <CardContent>
-        <Button variant="outline" asChild>
-          <Link href={editHref}>Enable in event settings</Link>
-        </Button>
-      </CardContent>
     </Card>
   )
 }

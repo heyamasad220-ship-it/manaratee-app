@@ -23,6 +23,11 @@ type EventServiceRequirementsFieldsProps = {
   onChange: (next: EventServiceRequirementsFormState) => void
   vendorTypes?: VendorHubVendorType[]
   canManageVendorTypes?: boolean
+  /** Limit which service modules are shown (default: all). */
+  visibleModules?: Array<"volunteers" | "childcare" | "vendors">
+  hideHeader?: boolean
+  /** Hide Enable switches and always show settings (parent owns enable/save). */
+  hideEnableSwitch?: boolean
 }
 
 export function EventServiceRequirementsFields({
@@ -30,7 +35,14 @@ export function EventServiceRequirementsFields({
   onChange,
   vendorTypes = [],
   canManageVendorTypes = false,
+  visibleModules,
+  hideHeader = false,
+  hideEnableSwitch = false,
 }: EventServiceRequirementsFieldsProps) {
+  const showVolunteers = !visibleModules || visibleModules.includes("volunteers")
+  const showChildcare = !visibleModules || visibleModules.includes("childcare")
+  const showVendors = !visibleModules || visibleModules.includes("vendors")
+
   function update(partial: Partial<EventServiceRequirementsFormState>) {
     onChange({ ...value, ...partial })
   }
@@ -373,16 +385,20 @@ export function EventServiceRequirementsFields({
 
   return (
     <div className="space-y-4 rounded-lg border p-4">
-      <div>
-        <h3 className="text-sm font-semibold">Service requirements</h3>
-        <p className="text-xs text-muted-foreground">
-          Turn on modules this event needs. Volunteers and childcare providers come from
-          workforce contacts; vendors are events-only.
-        </p>
-      </div>
+      {hideHeader ? null : (
+        <div>
+          <h3 className="text-sm font-semibold">Service requirements</h3>
+          <p className="text-xs text-muted-foreground">
+            Turn on modules this event needs. Volunteers and childcare providers come from
+            workforce contacts; vendors are events-only.
+          </p>
+        </div>
+      )}
 
       <div className="flex flex-col gap-3">
+        {showVolunteers ? (
         <div className="overflow-hidden rounded-lg border">
+          {hideEnableSwitch ? null : (
           <div className="flex items-center justify-between p-3">
             <div className="flex items-center gap-2">
               <Heart className="h-4 w-4 text-muted-foreground" />
@@ -410,10 +426,14 @@ export function EventServiceRequirementsFields({
               }}
             />
           </div>
-          {value.requiresVolunteers ? renderVolunteerSettings() : null}
+          )}
+          {hideEnableSwitch || value.requiresVolunteers ? renderVolunteerSettings() : null}
         </div>
+        ) : null}
 
+        {showChildcare ? (
         <div className="overflow-hidden rounded-lg border">
+          {hideEnableSwitch ? null : (
           <div className="flex items-center justify-between p-3">
             <div className="flex items-center gap-2">
               <Baby className="h-4 w-4 text-muted-foreground" />
@@ -441,10 +461,14 @@ export function EventServiceRequirementsFields({
               }}
             />
           </div>
-          {value.requiresChildcare ? renderChildcareSettings() : null}
+          )}
+          {hideEnableSwitch || value.requiresChildcare ? renderChildcareSettings() : null}
         </div>
+        ) : null}
 
+        {showVendors ? (
         <div className="overflow-hidden rounded-lg border">
+          {hideEnableSwitch ? null : (
           <div className="flex items-center justify-between p-3">
             <div className="flex items-center gap-2">
               <Store className="h-4 w-4 text-muted-foreground" />
@@ -478,8 +502,10 @@ export function EventServiceRequirementsFields({
               }}
             />
           </div>
-          {value.requiresVendors ? renderVendorSettings() : null}
+          )}
+          {hideEnableSwitch || value.requiresVendors ? renderVendorSettings() : null}
         </div>
+        ) : null}
       </div>
     </div>
   )

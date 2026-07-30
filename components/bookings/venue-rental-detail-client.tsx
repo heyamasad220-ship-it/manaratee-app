@@ -22,10 +22,10 @@ import {
   declineVenueRentalRequest,
   extendVenueRentalHold,
   forceBookVenueRentalWithOverride,
-  markRentalPaymentPaid,
   markVenueRentalCompletedAndAwaitingRefund,
   markVenueRentalPending,
 } from "@/lib/bookings/venue-rental-actions"
+import { VenueRentalFinancialPanel } from "@/components/bookings/venue-rental-financial-panel"
 import type { VenueRentalEmployeePricingSuggestion } from "@/lib/bookings/venue-rental-employee-pricing"
 import {
   formatVenueRentalSpaceLine,
@@ -73,10 +73,32 @@ type VenueRentalDetailClientProps = {
   canManage: boolean
   canViewFinance: boolean
   employeePricing?: VenueRentalEmployeePricingSuggestion | null
+  financialAction?: string | null
+  /** Where the user opened this rental from (controls back link). */
+  from?: string | null
+  quotedCharges?: {
+    spaceFee: number
+    addonFees: number
+    totalCharges: number
+    hours: number
+  } | null
 }
 
 function isAwaitingPaymentStatus(status: VenueRentalStatus): boolean {
   return status === VENUE_RENTAL_STATUSES.approvedPendingPayment
+}
+
+function resolveVenueRentalBackNavigation(from: string | null): {
+  href: string
+  label: string
+} {
+  if (from === "payments") {
+    return { href: "/bookings/payments", label: "Back to Payments" }
+  }
+  if (from === "overview") {
+    return { href: "/bookings/overview", label: "Back to Overview" }
+  }
+  return { href: "/bookings/requests", label: "Back to Requests" }
 }
 
 function formatMoney(value: number) {
@@ -92,8 +114,12 @@ export function VenueRentalDetailClient({
   canManage,
   canViewFinance,
   employeePricing = null,
+  financialAction = null,
+  from = null,
+  quotedCharges = null,
 }: VenueRentalDetailClientProps) {
   const router = useRouter()
+  const backNav = resolveVenueRentalBackNavigation(from)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [depositAmount, setDepositAmount] = useState(
@@ -123,6 +149,7 @@ export function VenueRentalDetailClient({
     const paidStatuses = new Set<string>([
       RENTAL_PAYMENT_STATUSES.paidManually,
       RENTAL_PAYMENT_STATUSES.paidStripeLater,
+      RENTAL_PAYMENT_STATUSES.completed,
     ])
 
     const deposit = payments.find((payment) => payment.payment_type === RENTAL_PAYMENT_TYPES.deposit)
@@ -213,15 +240,15 @@ export function VenueRentalDetailClient({
     <div className="space-y-6 p-4 sm:p-6">
       <div className="flex items-center gap-3">
         <Button variant="outline" size="sm" asChild>
-          <Link href="/bookings/requests">
+          <Link href={backNav.href}>
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to requests
+            {backNav.label}
           </Link>
         </Button>
         <div>
           <h2 className="text-xl font-semibold">Rental {rental.shortId}</h2>
           <p className="text-sm text-muted-foreground">
-            Submitted {rental.submittedAtLabel}
+            Requested {rental.submittedAtLabel}
           </p>
         </div>
       </div>
@@ -423,65 +450,14 @@ export function VenueRentalDetailClient({
         </Card>
       ) : null}
 
-      {canViewFinance && payments.length ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Payments</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {payments.map((payment) => {
-              const isPaid =
-                payment.status === RENTAL_PAYMENT_STATUSES.paidManually ||
-                payment.status === RENTAL_PAYMENT_STATUSES.paidStripeLater
-
-              return (
-                <div
-                  key={payment.id}
-                  className="flex flex-col gap-2 rounded border p-3 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div>
-                    <p className="font-medium capitalize">
-                      {payment.payment_type.replace(/_/g, " ")}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      ${Number(payment.amount).toFixed(2)} · {payment.status.replace(/_/g, " ")}
-                    </p>
-                    {payment.payment_type === RENTAL_PAYMENT_TYPES.deposit ? (
-                      <p className="text-xs text-muted-foreground">Non-refundable</p>
-                    ) : null}
-                  </div>
-                  {canManage && !isPaid && payment.payment_type !== RENTAL_PAYMENT_TYPES.refund ? (
-                    <Button
-                      size="sm"
-                      disabled={isPending}
-                      onClick={() =>
-                        runAction(async () => {
-                          await markRentalPaymentPaid({
-                            paymentId: payment.id,
-                            status: "paid_manually",
-                          })
-                        })
-                      }
-                    >
-                      Mark paid manually
-                    </Button>
-                  ) : null}
-                </div>
-              )
-            })}
-            {paymentSummary.depositPaid ? (
-              <p className="text-sm text-emerald-700">
-                Deposit paid — booking is confirmed. Remaining balance (if any) is due before
-                the event; a reminder is sent two weeks out.
-              </p>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Booking is confirmed when the deposit is marked paid. Card on file covers
-                damage if needed.
-              </p>
-            )}
-          </CardContent>
-        </Card>
+      {canViewFinance ? (
+        <VenueRentalFinancialPanel
+          rental={rental}
+          payments={payments}
+          canManage={canManage}
+          initialAction={financialAction}
+          quotedCharges={quotedCharges}
+        />
       ) : null}
 
       {canManage && rental.status === VENUE_RENTAL_STATUSES.confirmed ? (

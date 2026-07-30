@@ -8,6 +8,16 @@ import { getProgramAvailabilityBlocksForOrg, getProgramBlockingReservationsForVe
 import { rangesOverlap } from "@/lib/reservations/reservation-time"
 
 import {
+  buildVenueRateLookup,
+  computeVenueRentalQuotedCharges,
+} from "./venue-rental-quote"
+import {
+  deriveVenueRentalPaymentLedgerStatus,
+  deriveVenueRentalStaffNextAction,
+  rentalHasFinancialActivity,
+  summarizeVenueRentalPaymentLedger,
+} from "./venue-rental-payment-ledger"
+import {
   formatVenueRentalDateTime,
   formatVenueRentalSpaceLine,
   resolveVenueRentalEventTypeName,
@@ -17,9 +27,11 @@ import {
 import {
   getVenueRentalCalendarColor,
   getVenueRentalStatusLabel,
+  isVenueRentalPaymentReceivedStatus,
 } from "./venue-rental-status"
 import type {
   RentalAddonCatalogItem,
+  RentalAddonSettingsItem,
   RentalPaymentRecord,
   RentalReservationRecord,
   PublicAvailabilityBlock,
@@ -30,7 +42,6 @@ import type {
   VenueRentalStatus,
 } from "./venue-rental-types"
 import {
-  RENTAL_PAYMENT_STATUSES,
   RENTAL_PAYMENT_TYPES,
   VENUE_RENTAL_STATUSES,
 } from "./venue-rental-types"
@@ -272,14 +283,19 @@ export async function getPublicAvailabilityBlocks(
 }
 
 export async function getActiveRentalAddons(
-  organizationId: string
+  organizationId?: string | null
 ): Promise<RentalAddonCatalogItem[]> {
   const supabase = await createClient()
+  const orgId = organizationId ?? (await resolveOrganizationId())
+
+  if (!orgId) {
+    return []
+  }
 
   const { data, error } = await supabase
     .from("rental_addons")
     .select("id, name, description, default_price")
-    .eq("organization_id", organizationId)
+    .eq("organization_id", orgId)
     .eq("is_active", true)
     .order("sort_order", { ascending: true })
 
@@ -296,6 +312,43 @@ export async function getActiveRentalAddons(
     name: row.name as string,
     description: (row.description as string | null) ?? null,
     defaultPrice: Number(row.default_price || 0),
+  }))
+}
+
+/** All rental add-ons for Venue Rentals → Settings → Add-ons (includes inactive). */
+export async function getRentalAddonsForSettings(): Promise<
+  RentalAddonSettingsItem[]
+> {
+  const supabase = await createClient()
+  const organizationId = await resolveOrganizationId()
+
+  if (!organizationId) {
+    return []
+  }
+
+  const { data, error } = await supabase
+    .from("rental_addons")
+    .select("id, name, slug, description, default_price, is_active, sort_order")
+    .eq("organization_id", organizationId)
+    .order("sort_order", { ascending: true })
+    .order("name", { ascending: true })
+
+  if (error) {
+    if (error.code === "42P01") {
+      return []
+    }
+    console.error(error)
+    throw new Error("Failed to load rental add-ons")
+  }
+
+  return (data || []).map((row) => ({
+    id: row.id as string,
+    name: row.name as string,
+    slug: row.slug as string,
+    description: (row.description as string | null) ?? null,
+    defaultPrice: Number(row.default_price || 0),
+    isActive: Boolean(row.is_active),
+    sortOrder: Number(row.sort_order || 0),
   }))
 }
 
@@ -674,7 +727,7 @@ export async function getVenueRentalQueueRows(options?: {
     new Set(rentalRows.map((row) => row.billing_contact_id).filter(Boolean))
   ) as string[]
 
-  const [reservationsResult, addonsResult, profilesResult, eventTypesResult, billingContactMap, linkedContactMap] =
+  const [reservationsResult, addonsResult, profilesResult, eventTypesResult, billingContactMap, linkedContactMap, paymentsResult] =
     await Promise.all([
       supabase
         .from("rental_reservations")
@@ -703,6 +756,11 @@ export async function getVenueRentalQueueRows(options?: {
         : Promise.resolve({ data: [] }),
       loadBillingContactsById(supabase, organizationId, billingContactIds),
       loadLinkedCustomerContactsByAuthUserId(supabase, organizationId, customerIds),
+      supabase
+        .from("rental_payments")
+        .select("venue_rental_id, status")
+        .eq("organization_id", organizationId)
+        .in("venue_rental_id", rentalIds),
     ])
 
   const venueIds = Array.from(
@@ -759,6 +817,13 @@ export async function getVenueRentalQueueRows(options?: {
       unitPrice: Number(row.unit_price || 0),
     })
     addonsByRental.set(rentalId, list)
+  }
+
+  const paidRentals = new Set<string>()
+  for (const payment of paymentsResult.data || []) {
+    if (isVenueRentalPaymentReceivedStatus(String(payment.status || ""))) {
+      paidRentals.add(payment.venue_rental_id as string)
+    }
   }
 
   const conflictFlags = options?.skipConflictCheck
@@ -827,14 +892,26 @@ export async function getVenueRentalQueueRows(options?: {
       submittedAtLabel: formatVenueRentalDateTime(submittedAt),
       holdExpiresAt: rental.hold_expires_at,
       hasConflict: conflictFlags.get(rental.id) === true,
+      hasReceivedPayment: paidRentals.has(rental.id),
     })
   }
 
-  rows.sort(
-    (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
-  )
+  rows.sort((a, b) => {
+    const aStart = earliestQueueSpaceStart(a.spaces)
+    const bStart = earliestQueueSpaceStart(b.spaces)
+    return aStart - bStart
+  })
 
   return rows
+}
+
+function earliestQueueSpaceStart(
+  spaces: { startAt: string }[]
+): number {
+  if (spaces.length === 0) {
+    return Number.POSITIVE_INFINITY
+  }
+  return Math.min(...spaces.map((space) => new Date(space.startAt).getTime()))
 }
 
 export async function getVenueRentalDetailRow(
@@ -848,12 +925,11 @@ export function getVenueRentalDashboardStats(
   rows: VenueRentalQueueRow[]
 ): VenueRentalDashboardStats {
   return {
+    /** Newly received requests (not yet marked Pending / Approved). */
     awaitingApprovalCount: rows.filter(
-      (row) =>
-        row.status === VENUE_RENTAL_STATUSES.submitted ||
-        row.status === VENUE_RENTAL_STATUSES.pending ||
-        row.status === VENUE_RENTAL_STATUSES.awaitingSupervisorApproval
+      (row) => row.status === VENUE_RENTAL_STATUSES.submitted
     ).length,
+    /** Approved — deposit still outstanding. */
     awaitingPaymentCount: rows.filter(
       (row) => row.status === VENUE_RENTAL_STATUSES.approvedPendingPayment
     ).length,
@@ -867,81 +943,22 @@ export function getVenueRentalDashboardStats(
   }
 }
 
-function isPaidPaymentStatus(status: string) {
-  return (
-    status === RENTAL_PAYMENT_STATUSES.paidManually ||
-    status === RENTAL_PAYMENT_STATUSES.paidStripeLater
-  )
-}
-
-function summarizePaymentsForRental(payments: RentalPaymentRecord[]) {
-  let depositAmount = 0
-  let depositReceived = 0
-  let securityAmount = 0
-  let securityReceived = 0
-  let remainingAmount = 0
-  let remainingReceived = 0
-  let unpaidDepositId: string | null = null
-  let unpaidSecurityId: string | null = null
-  let unpaidRemainingId: string | null = null
-
-  for (const payment of payments) {
-    if (payment.payment_type === RENTAL_PAYMENT_TYPES.refund) continue
-    const amount = Number(payment.amount) || 0
-    const paid = isPaidPaymentStatus(payment.status)
-
-    if (payment.payment_type === RENTAL_PAYMENT_TYPES.deposit) {
-      depositAmount += amount
-      if (paid) depositReceived += amount
-      else if (!unpaidDepositId) unpaidDepositId = payment.id
-    } else if (payment.payment_type === RENTAL_PAYMENT_TYPES.securityDeposit) {
-      securityAmount += amount
-      if (paid) securityReceived += amount
-      else if (!unpaidSecurityId) unpaidSecurityId = payment.id
-    } else if (
-      payment.payment_type === RENTAL_PAYMENT_TYPES.remainingBalance ||
-      payment.payment_type === RENTAL_PAYMENT_TYPES.addonFee
-    ) {
-      remainingAmount += amount
-      if (paid) remainingReceived += amount
-      else if (
-        payment.payment_type === RENTAL_PAYMENT_TYPES.remainingBalance &&
-        !unpaidRemainingId
-      ) {
-        unpaidRemainingId = payment.id
-      }
-    }
-  }
-
-  const totalFee = depositAmount + securityAmount + remainingAmount
-  const amountReceived = depositReceived + securityReceived + remainingReceived
-  const remainingDue = Math.max(0, remainingAmount - remainingReceived)
-  const balanceDue = Math.max(0, totalFee - amountReceived)
-
-  let paymentBalance: VenueRentalPaymentReportRow["paymentBalance"] = "no_payments"
-  if (payments.some((p) => p.payment_type !== RENTAL_PAYMENT_TYPES.refund)) {
-    if (balanceDue <= 0 && amountReceived > 0) paymentBalance = "paid"
-    else if (amountReceived > 0 && balanceDue > 0) paymentBalance = "partial"
-    else paymentBalance = "unpaid"
-  }
-
-  return {
-    totalFee,
-    depositAmount,
-    depositReceived,
-    securityAmount,
-    securityReceived,
-    remainingAmount,
-    remainingReceived,
-    remainingDue,
-    amountReceived,
-    balanceDue,
-    paymentBalance,
-    unpaidPaymentIds: {
-      depositId: unpaidDepositId,
-      securityId: unpaidSecurityId,
-      remainingId: unpaidRemainingId,
-    },
+function legacyPaymentBalanceFromStatus(
+  status: VenueRentalPaymentReportRow["paymentStatus"]
+): VenueRentalPaymentReportRow["paymentBalance"] {
+  switch (status) {
+    case "paid":
+    case "complimentary":
+    case "refunded":
+      return "paid"
+    case "partial":
+    case "overdue":
+    case "refund_due":
+      return "partial"
+    case "unpaid":
+      return "unpaid"
+    default:
+      return "no_payments"
   }
 }
 
@@ -962,19 +979,57 @@ export async function getVenueRentalPaymentReportRows(): Promise<
   }
 
   const rentalIds = queueRows.map((row) => row.id)
-  const { data: paymentRows, error } = await supabase
-    .from("rental_payments")
-    .select("*")
-    .eq("organization_id", organizationId)
-    .in("venue_rental_id", rentalIds)
+  const venueIds = Array.from(
+    new Set(queueRows.flatMap((row) => row.spaces.map((space) => space.venueId)))
+  )
 
-  if (error && error.code !== "42P01") {
-    console.error(error)
+  const [paymentsResult, venuesResult, dayPricingResult] = await Promise.all([
+    supabase
+      .from("rental_payments")
+      .select("*")
+      .eq("organization_id", organizationId)
+      .in("venue_rental_id", rentalIds),
+    venueIds.length
+      ? supabase
+          .from("venues")
+          .select("id, hourly_rate, peak_hourly_rate, base_price, peak_flat_price")
+          .eq("organization_id", organizationId)
+          .in("id", venueIds)
+      : Promise.resolve({ data: [], error: null }),
+    venueIds.length
+      ? supabase
+          .from("rental_space_pricing")
+          .select("venue_id, day_of_week, hourly_price, flat_price, is_active")
+          .eq("organization_id", organizationId)
+          .in("venue_id", venueIds)
+          .eq("is_active", true)
+      : Promise.resolve({ data: [], error: null }),
+  ])
+
+  if (paymentsResult.error && paymentsResult.error.code !== "42P01") {
+    console.error(paymentsResult.error)
     throw new Error("Failed to load rental payments")
   }
 
+  const rates = buildVenueRateLookup({
+    venues: (venuesResult.data || []) as Array<{
+      id: string
+      hourly_rate?: number | null
+      peak_hourly_rate?: number | null
+      base_price?: number | null
+      peak_flat_price?: number | null
+    }>,
+    dayPricing: (dayPricingResult.data || []) as Array<{
+      venue_id: string
+      day_of_week: number
+      hourly_price?: number | null
+      flat_price?: number | null
+      is_active?: boolean | null
+    }>,
+  })
+
   const paymentsByRental = new Map<string, RentalPaymentRecord[]>()
-  for (const payment of (paymentRows || []) as RentalPaymentRecord[]) {
+  for (const payment of (paymentsResult.data || []) as RentalPaymentRecord[]) {
     const list = paymentsByRental.get(payment.venue_rental_id) || []
     list.push(payment)
     paymentsByRental.set(payment.venue_rental_id, list)
@@ -982,11 +1037,46 @@ export async function getVenueRentalPaymentReportRows(): Promise<
 
   return queueRows.map((row) => {
     const payments = paymentsByRental.get(row.id) || []
-    const summary = summarizePaymentsForRental(payments)
+    const summary = summarizeVenueRentalPaymentLedger(payments)
+    // Space + date fee only for now; add-ons stay $0 until staff updates them.
+    const quote = computeVenueRentalQuotedCharges(row.spaces, [], rates)
+    const totalCharges = quote.spaceFee
+    const balanceDue = Math.max(
+      0,
+      totalCharges - summary.amountReceived - summary.appliedCredits
+    )
+    const unappliedCredit = Math.max(
+      0,
+      summary.amountReceived + summary.appliedCredits - totalCharges
+    )
     const primary = row.spaces[0]
+    const spaceName = primary?.venueName || "—"
     const spaceLabel = primary
       ? formatVenueRentalSpaceLine(primary.venueName, primary.startAt, primary.endAt)
       : "—"
+    const paymentStatus = deriveVenueRentalPaymentLedgerStatus({
+      rentalStatus: row.status,
+      totalCharges,
+      amountReceived: summary.amountReceived,
+      balanceDue,
+      unappliedCredit,
+      refundableSecurity: summary.refundableSecurity,
+      refundedAmount: summary.refundedAmount,
+      paymentDueAt: summary.paymentDueAt,
+    })
+    const nextAction = deriveVenueRentalStaffNextAction({
+      rentalId: row.id,
+      paymentStatus,
+      balanceDue,
+    })
+    const hasFinancialActivity = rentalHasFinancialActivity({
+      totalCharges,
+      amountReceived: summary.amountReceived,
+      refundedAmount: summary.refundedAmount,
+      balanceDue,
+      paymentStatus,
+      paymentCount: payments.length,
+    })
 
     return {
       id: row.id,
@@ -998,8 +1088,37 @@ export async function getVenueRentalPaymentReportRows(): Promise<
       customerPhone: row.customerPhone,
       eventTypeName: row.eventTypeName,
       spaceLabel,
+      spaceName,
+      venueIds: row.spaces.map((space) => space.venueId),
       eventStartAt: primary?.startAt ?? null,
-      ...summary,
+      eventEndAt: primary?.endAt ?? null,
+      totalCharges,
+      quotedSpaceFee: quote.spaceFee,
+      quotedAddonFees: 0,
+      totalFee: totalCharges,
+      depositAmount: summary.depositAmount,
+      depositReceived: summary.depositReceived,
+      securityAmount: summary.securityAmount,
+      securityReceived: summary.securityReceived,
+      remainingAmount: summary.remainingAmount,
+      remainingReceived: summary.remainingReceived,
+      remainingDue: summary.remainingDue,
+      amountReceived: summary.amountReceived,
+      refundedAmount: summary.refundedAmount,
+      appliedCredits: summary.appliedCredits,
+      unappliedCredit,
+      refundableSecurity: summary.refundableSecurity,
+      balanceDue,
+      paymentDueAt: summary.paymentDueAt,
+      paymentStatus,
+      nextActionLabel: nextAction.label,
+      nextActionKey: nextAction.key,
+      nextActionHref: nextAction.href,
+      hasFinancialActivity,
+      hasOnlinePayment: summary.hasOnlinePayment,
+      hasManualPayment: summary.hasManualPayment,
+      paymentBalance: legacyPaymentBalanceFromStatus(paymentStatus),
+      unpaidPaymentIds: summary.unpaidPaymentIds,
       payments: payments
         .filter((payment) => payment.payment_type !== RENTAL_PAYMENT_TYPES.refund)
         .map((payment) => ({
@@ -1009,6 +1128,12 @@ export async function getVenueRentalPaymentReportRows(): Promise<
           amount: Number(payment.amount) || 0,
           notes: payment.notes,
           paidAt: payment.paid_at,
+          dueAt: payment.due_at,
+          paymentMethod: payment.payment_method ?? null,
+          referenceNumber: payment.reference_number ?? null,
+          recordedBy: payment.recorded_by ?? null,
+          receiptUrl: payment.receipt_url ?? null,
+          stripePaymentIntentId: payment.stripe_payment_intent_id,
         })),
     }
   })
@@ -1019,4 +1144,65 @@ export async function getCustomerVenueRentals(
   organizationId: string
 ): Promise<VenueRentalQueueRow[]> {
   return getVenueRentalQueueRows({ customerUserId, organizationId })
+}
+
+/** Quoted space + addon totals for a rental (same basis as Payments Total Charges). */
+export async function getVenueRentalQuotedCharges(
+  rental: Pick<VenueRentalQueueRow, "spaces" | "addons">
+): Promise<{
+  spaceFee: number
+  addonFees: number
+  totalCharges: number
+  hours: number
+}> {
+  const supabase = await createClient()
+  const organizationId = await resolveOrganizationId()
+  if (!organizationId) {
+    return { spaceFee: 0, addonFees: 0, totalCharges: 0, hours: 0 }
+  }
+
+  const venueIds = Array.from(new Set(rental.spaces.map((space) => space.venueId)))
+  if (!venueIds.length) {
+    return { spaceFee: 0, addonFees: 0, totalCharges: 0, hours: 0 }
+  }
+
+  const [venuesResult, dayPricingResult] = await Promise.all([
+    supabase
+      .from("venues")
+      .select("id, hourly_rate, peak_hourly_rate, base_price, peak_flat_price")
+      .eq("organization_id", organizationId)
+      .in("id", venueIds),
+    supabase
+      .from("rental_space_pricing")
+      .select("venue_id, day_of_week, hourly_price, flat_price, is_active")
+      .eq("organization_id", organizationId)
+      .in("venue_id", venueIds)
+      .eq("is_active", true),
+  ])
+
+  const rates = buildVenueRateLookup({
+    venues: (venuesResult.data || []) as Array<{
+      id: string
+      hourly_rate?: number | null
+      peak_hourly_rate?: number | null
+      base_price?: number | null
+      peak_flat_price?: number | null
+    }>,
+    dayPricing: (dayPricingResult.data || []) as Array<{
+      venue_id: string
+      day_of_week: number
+      hourly_price?: number | null
+      flat_price?: number | null
+      is_active?: boolean | null
+    }>,
+  })
+
+  // Detail Financial: space fee from rates; add-ons left at $0 for now.
+  const quote = computeVenueRentalQuotedCharges(rental.spaces, [], rates)
+  return {
+    spaceFee: quote.spaceFee,
+    addonFees: 0,
+    totalCharges: quote.spaceFee,
+    hours: quote.hours,
+  }
 }

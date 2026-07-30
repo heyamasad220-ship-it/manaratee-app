@@ -270,7 +270,7 @@ export function VenueRentalUpcomingDashboard({
                         </TableCell>
                         <TableCell>
                           <Button variant="outline" size="sm" asChild>
-                            <Link href={`/bookings/rentals/${row.id}`}>
+                            <Link href={`/bookings/rentals/${row.id}?from=overview`}>
                               {canManage ? "Open" : "View"}
                             </Link>
                           </Button>

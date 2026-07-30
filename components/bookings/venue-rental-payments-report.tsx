@@ -1,39 +1,21 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useMemo, useState, useTransition } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { DollarSign, MoreHorizontal } from "lucide-react"
+import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react"
 
 import {
-  deleteVenueRentalPaymentRecord,
-  recordVenueRentalPaymentReceived,
-  updateVenueRentalPaymentRecord,
-} from "@/lib/bookings/venue-rental-actions"
-import type {
-  RentalPaymentType,
-  VenueRentalPaymentBalanceFilter,
-  VenueRentalPaymentReportRow,
-} from "@/lib/bookings/venue-rental-types"
+  matchesVenueRentalPaymentLedgerView,
+  venueRentalPaymentLedgerStatusLabel,
+  type VenueRentalPaymentLedgerSortKey,
+  type VenueRentalPaymentLedgerStatus,
+  type VenueRentalStaffNextActionKey,
+} from "@/lib/bookings/venue-rental-payment-ledger"
+import type { VenueRentalPaymentReportRow } from "@/lib/bookings/venue-rental-types"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { ListPagination } from "@/components/ui/list-pagination"
 import {
   Select,
@@ -51,17 +33,24 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { TableColumnHeaderFilter } from "@/components/ui/table-column-header-filter"
-import { Textarea } from "@/components/ui/textarea"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import {
   DEFAULT_LIST_PAGE_SIZE,
   slicePageItems,
 } from "@/lib/ui/list-pagination"
 
-type PaymentTypeOption = "deposit" | "remaining_balance"
-
 type VenueRentalPaymentsReportProps = {
   rows: VenueRentalPaymentReportRow[]
-  canManage: boolean
+}
+
+type SortState = {
+  key: VenueRentalPaymentLedgerSortKey
+  direction: "asc" | "desc"
 }
 
 function formatMoney(value: number) {
@@ -71,88 +60,153 @@ function formatMoney(value: number) {
   }).format(Number(value) || 0)
 }
 
-function balanceLabel(filter: VenueRentalPaymentBalanceFilter) {
-  switch (filter) {
+function formatEventDate(value: string | null) {
+  if (!value) return "—"
+  return new Date(value).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  })
+}
+
+function formatEventTime(startAt: string | null, endAt: string | null) {
+  if (!startAt) return null
+  const start = new Date(startAt)
+  const startLabel = start.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  })
+  if (!endAt) return startLabel
+  const end = new Date(endAt)
+  const endLabel = end.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  })
+  return `${startLabel} – ${endLabel}`
+}
+
+function paymentStatusBadgeVariant(
+  status: VenueRentalPaymentLedgerStatus
+): "default" | "secondary" | "outline" | "destructive" {
+  switch (status) {
     case "paid":
-      return "Paid"
+    case "complimentary":
+    case "refunded":
+      return "default"
+    case "overdue":
+    case "refund_due":
+      return "destructive"
     case "partial":
-      return "Partial"
-    case "unpaid":
-      return "Unpaid"
-    case "no_payments":
-      return "No payments"
+      return "outline"
     default:
-      return "All"
+      return "secondary"
   }
 }
 
-function paymentTypeLabel(type: RentalPaymentType | PaymentTypeOption) {
-  switch (type) {
-    case "deposit":
-      return "Deposit"
-    case "remaining_balance":
-      return "Remaining balance"
-    case "addon_fee":
-      return "Add-on fee"
-    case "security_deposit":
-      return "Security deposit"
-    default:
-      return type
-  }
-}
-
-function toPaymentTypeOption(
-  type: RentalPaymentType
-): PaymentTypeOption {
-  if (type === "remaining_balance" || type === "addon_fee") {
-    return "remaining_balance"
-  }
-  return "deposit"
-}
+const NEXT_ACTION_FILTER_OPTIONS: Array<{
+  value: VenueRentalStaffNextActionKey | "all"
+  label: string
+}> = [
+  { value: "all", label: "All" },
+  { value: "add_charges", label: "Add Charges" },
+  { value: "collect_payment", label: "Collect Payment" },
+  { value: "collect_remaining", label: "Collect Remaining Balance" },
+  { value: "review_overdue", label: "Review Overdue Balance" },
+  { value: "send_reminder", label: "Send Payment Reminder" },
+  { value: "process_refund", label: "Process Refund" },
+  { value: "view_history", label: "View Payment History" },
+  { value: "none", label: "No Action Needed" },
+]
 
 export function VenueRentalPaymentsReport({
   rows,
-  canManage,
 }: VenueRentalPaymentsReportProps) {
   const router = useRouter()
   const [customerFilterInput, setCustomerFilterInput] = useState("")
   const [customerFilter, setCustomerFilter] = useState("")
-  const [balanceFilter, setBalanceFilter] =
-    useState<VenueRentalPaymentBalanceFilter>("all")
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState<
+    VenueRentalPaymentLedgerStatus | "all"
+  >("all")
+  const [nextActionFilter, setNextActionFilter] = useState<
+    VenueRentalStaffNextActionKey | "all"
+  >("all")
+  const [sort, setSort] = useState<SortState>({
+    key: "event_date",
+    direction: "asc",
+  })
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_LIST_PAGE_SIZE)
-  const [receiveOpen, setReceiveOpen] = useState(false)
-  const [editOpen, setEditOpen] = useState(false)
-  const [deleteOpen, setDeleteOpen] = useState(false)
-  const [selected, setSelected] = useState<VenueRentalPaymentReportRow | null>(
-    null
-  )
-  const [selectedPaymentId, setSelectedPaymentId] = useState("")
-  const [paymentType, setPaymentType] = useState<PaymentTypeOption>("deposit")
-  const [amount, setAmount] = useState("")
-  const [notes, setNotes] = useState("")
-  const [error, setError] = useState<string | null>(null)
-  const [isPending, startTransition] = useTransition()
 
   const filteredRows = useMemo(() => {
-    return rows.filter((row) => {
-      const query = customerFilter.toLowerCase()
-      const matchesCustomer =
-        !query ||
+    const query = customerFilter.trim().toLowerCase()
+
+    const matched = rows.filter((row) => {
+      const matchesFinancialView = matchesVenueRentalPaymentLedgerView(
+        "financial",
+        row.paymentStatus,
+        {
+          includeNoCharges: false,
+          hasFinancialActivity: row.hasFinancialActivity,
+        }
+      )
+      if (!matchesFinancialView) return false
+
+      if (paymentStatusFilter !== "all" && row.paymentStatus !== paymentStatusFilter) {
+        return false
+      }
+
+      if (nextActionFilter !== "all" && row.nextActionKey !== nextActionFilter) {
+        return false
+      }
+
+      if (!query) return true
+
+      return (
         row.customerName.toLowerCase().includes(query) ||
         (row.customerEmail || "").toLowerCase().includes(query) ||
         (row.customerPhone || "").toLowerCase().includes(query)
-
-      const matchesBalance =
-        balanceFilter === "all" || row.paymentBalance === balanceFilter
-
-      return matchesCustomer && matchesBalance
+      )
     })
-  }, [rows, customerFilter, balanceFilter])
+
+    const direction = sort.direction === "asc" ? 1 : -1
+    return [...matched].sort((a, b) => {
+      const compare = (left: number | string | null, right: number | string | null) => {
+        if (left == null && right == null) return 0
+        if (left == null) return 1
+        if (right == null) return -1
+        if (typeof left === "number" && typeof right === "number") {
+          return (left - right) * direction
+        }
+        return String(left).localeCompare(String(right)) * direction
+      }
+
+      switch (sort.key) {
+        case "total_charges":
+          return compare(a.totalCharges, b.totalCharges)
+        case "received":
+          return compare(a.amountReceived, b.amountReceived)
+        case "balance_due":
+          return compare(a.balanceDue, b.balanceDue)
+        case "due_date":
+          return compare(
+            a.paymentDueAt ? new Date(a.paymentDueAt).getTime() : null,
+            b.paymentDueAt ? new Date(b.paymentDueAt).getTime() : null
+          )
+        case "customer":
+          return compare(a.customerName.toLowerCase(), b.customerName.toLowerCase())
+        case "event_date":
+        default:
+          return compare(
+            a.eventStartAt ? new Date(a.eventStartAt).getTime() : null,
+            b.eventStartAt ? new Date(b.eventStartAt).getTime() : null
+          )
+      }
+    })
+  }, [rows, customerFilter, paymentStatusFilter, nextActionFilter, sort])
 
   useEffect(() => {
     setPage(1)
-  }, [customerFilter, balanceFilter])
+  }, [customerFilter, paymentStatusFilter, nextActionFilter, sort])
 
   const currentPage = Math.min(
     page,
@@ -164,588 +218,326 @@ export function VenueRentalPaymentsReport({
   )
 
   const totals = useMemo(() => {
+    const now = Date.now()
     return filteredRows.reduce(
       (acc, row) => {
-        acc.totalFee += row.totalFee
-        acc.depositReceived += row.depositReceived
-        acc.remainingDue += row.remainingDue
-        acc.balanceDue += row.balanceDue
+        acc.totalCharges += row.totalCharges
+        acc.paymentsReceived += row.amountReceived
+        if (row.balanceDue > 0) acc.outstandingBalance += row.balanceDue
+        const dueMs = row.paymentDueAt ? new Date(row.paymentDueAt).getTime() : null
+        if (row.balanceDue > 0 && dueMs != null && dueMs < now) {
+          acc.pastDue += row.balanceDue
+        }
         return acc
       },
-      { totalFee: 0, depositReceived: 0, remainingDue: 0, balanceDue: 0 }
+      {
+        totalCharges: 0,
+        paymentsReceived: 0,
+        outstandingBalance: 0,
+        pastDue: 0,
+      }
     )
   }, [filteredRows])
 
-  const selectedPayments = selected?.payments ?? []
-  const selectedPayment =
-    selectedPayments.find((payment) => payment.id === selectedPaymentId) ?? null
-
-  function openReceive(row: VenueRentalPaymentReportRow) {
-    setSelected(row)
-    setError(null)
-    setNotes("")
-
-    if (row.depositAmount > row.depositReceived) {
-      setPaymentType("deposit")
-      setAmount(String(Math.max(0, row.depositAmount - row.depositReceived) || row.depositAmount || ""))
-    } else if (row.remainingDue > 0) {
-      setPaymentType("remaining_balance")
-      setAmount(String(row.remainingDue))
-    } else {
-      setPaymentType("deposit")
-      setAmount("")
-    }
-
-    setReceiveOpen(true)
-  }
-
-  function openEdit(row: VenueRentalPaymentReportRow) {
-    const first = row.payments[0]
-    if (!first) return
-
-    setSelected(row)
-    setSelectedPaymentId(first.id)
-    setPaymentType(toPaymentTypeOption(first.paymentType))
-    setAmount(String(first.amount || ""))
-    setNotes(first.notes || "")
-    setError(null)
-    setEditOpen(true)
-  }
-
-  function openDelete(row: VenueRentalPaymentReportRow) {
-    const first = row.payments[0]
-    if (!first) return
-
-    setSelected(row)
-    setSelectedPaymentId(first.id)
-    setError(null)
-    setDeleteOpen(true)
-  }
-
-  function onEditPaymentSelect(paymentId: string) {
-    const payment = selected?.payments.find((item) => item.id === paymentId)
-    setSelectedPaymentId(paymentId)
-    if (!payment) return
-    setPaymentType(toPaymentTypeOption(payment.paymentType))
-    setAmount(String(payment.amount || ""))
-    setNotes(payment.notes || "")
-  }
-
-  function submitReceive() {
-    if (!selected) return
-    setError(null)
-    startTransition(async () => {
-      try {
-        await recordVenueRentalPaymentReceived({
-          venueRentalId: selected.id,
-          paymentType,
-          amount: Number(amount),
-          notes,
-        })
-        setReceiveOpen(false)
-        setSelected(null)
-        router.refresh()
-      } catch (submitError) {
-        setError(
-          submitError instanceof Error
-            ? submitError.message
-            : "Failed to record payment"
-        )
-      }
-    })
-  }
-
-  function submitEdit() {
-    if (!selectedPaymentId) return
-    setError(null)
-    startTransition(async () => {
-      try {
-        await updateVenueRentalPaymentRecord({
-          paymentId: selectedPaymentId,
-          paymentType,
-          amount: Number(amount),
-          notes,
-        })
-        setEditOpen(false)
-        setSelected(null)
-        router.refresh()
-      } catch (submitError) {
-        setError(
-          submitError instanceof Error
-            ? submitError.message
-            : "Failed to update payment"
-        )
-      }
-    })
-  }
-
-  function submitDelete() {
-    if (!selectedPaymentId) return
-    setError(null)
-    startTransition(async () => {
-      try {
-        await deleteVenueRentalPaymentRecord({
-          paymentId: selectedPaymentId,
-        })
-        setDeleteOpen(false)
-        setSelected(null)
-        router.refresh()
-      } catch (submitError) {
-        setError(
-          submitError instanceof Error
-            ? submitError.message
-            : "Failed to delete payment"
-        )
-      }
-    })
+  function toggleSort(key: VenueRentalPaymentLedgerSortKey) {
+    setSort((current) =>
+      current.key === key
+        ? { key, direction: current.direction === "asc" ? "desc" : "asc" }
+        : { key, direction: key === "customer" ? "asc" : "desc" }
+    )
   }
 
   return (
-    <div className="flex flex-col gap-4 sm:gap-6 p-4 sm:p-6">
-      <div>
-        <h2 className="text-xl font-semibold text-foreground">Payments</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Rental fees, deposits received, and remaining balances.
-        </p>
-      </div>
+    <TooltipProvider>
+      <div className="flex flex-col gap-4 sm:gap-6 p-4 sm:p-6">
+        <div>
+          <h2 className="text-xl font-semibold text-foreground">Payments</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Financial ledger and receivables for venue rentals. Use Requests for
+            approvals, scheduling, and rental details.
+          </p>
+        </div>
 
-      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
-        <SummaryCard label="Total fees" value={formatMoney(totals.totalFee)} />
-        <SummaryCard
-          label="Deposits received"
-          value={formatMoney(totals.depositReceived)}
-        />
-        <SummaryCard
-          label="Remaining due"
-          value={formatMoney(totals.remainingDue)}
-        />
-        <SummaryCard
-          label="Balance due"
-          value={formatMoney(totals.balanceDue)}
-        />
-      </div>
+        <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
+          <SummaryCard
+            label="Total Charges"
+            value={formatMoney(totals.totalCharges)}
+          />
+          <SummaryCard
+            label="Payments Received"
+            value={formatMoney(totals.paymentsReceived)}
+          />
+          <SummaryCard
+            label="Outstanding Balance"
+            value={formatMoney(totals.outstandingBalance)}
+          />
+          <SummaryCard label="Past Due" value={formatMoney(totals.pastDue)} />
+        </div>
 
-      <Card className="overflow-hidden">
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table className="min-w-[900px]">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>
-                    <TableColumnHeaderFilter
-                      label="Customer"
-                      active={Boolean(customerFilter.trim())}
-                    >
-                      {({ close }) => (
-                        <Input
-                          placeholder="Search by name, email, or phone"
-                          value={customerFilterInput}
-                          onChange={(event) => {
-                            setCustomerFilterInput(event.target.value)
-                            setCustomerFilter(event.target.value)
-                          }}
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter") {
-                              setCustomerFilter(customerFilterInput)
-                              close()
-                            }
-                          }}
-                        />
-                      )}
-                    </TableColumnHeaderFilter>
-                  </TableHead>
-                  <TableHead>Event / space</TableHead>
-                  <TableHead className="text-right">Total fee</TableHead>
-                  <TableHead className="text-right">Deposit received</TableHead>
-                  <TableHead className="text-right">Remaining</TableHead>
-                  <TableHead>
-                    <TableColumnHeaderFilter
-                      label="Balance"
-                      active={balanceFilter !== "all"}
-                    >
-                      {({ close }) => (
-                        <Select
-                          value={balanceFilter}
-                          onValueChange={(value) => {
-                            setBalanceFilter(value as VenueRentalPaymentBalanceFilter)
-                            close()
-                          }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Filter balance" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All</SelectItem>
-                            <SelectItem value="unpaid">Unpaid</SelectItem>
-                            <SelectItem value="partial">Partial</SelectItem>
-                            <SelectItem value="paid">Paid</SelectItem>
-                            <SelectItem value="no_payments">No payments</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      )}
-                    </TableColumnHeaderFilter>
-                  </TableHead>
-                  <TableHead className="w-12" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {pagedRows.length === 0 ? (
+        <Card className="overflow-hidden">
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table className="min-w-[1100px]">
+                <TableHeader>
                   <TableRow>
-                    <TableCell
-                      colSpan={7}
-                      className="h-32 text-center text-muted-foreground"
-                    >
-                      No rentals match these filters.
-                    </TableCell>
+                    <TableHead>
+                      <TableColumnHeaderFilter
+                        label="Customer"
+                        active={Boolean(customerFilter.trim())}
+                      >
+                        {({ close }) => (
+                          <Input
+                            placeholder="Search name, email, or phone"
+                            value={customerFilterInput}
+                            onChange={(event) => {
+                              setCustomerFilterInput(event.target.value)
+                              setCustomerFilter(event.target.value)
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") {
+                                setCustomerFilter(customerFilterInput)
+                                close()
+                              }
+                            }}
+                          />
+                        )}
+                      </TableColumnHeaderFilter>
+                    </TableHead>
+                    <TableHead>Event / Space</TableHead>
+                    <TableHead>
+                      <SortableHeader
+                        label="Event Date"
+                        active={sort.key === "event_date"}
+                        direction={sort.direction}
+                        onClick={() => toggleSort("event_date")}
+                      />
+                    </TableHead>
+                    <TableHead className="text-right">
+                      <SortableHeader
+                        label="Total Charges"
+                        active={sort.key === "total_charges"}
+                        direction={sort.direction}
+                        onClick={() => toggleSort("total_charges")}
+                        align="right"
+                      />
+                    </TableHead>
+                    <TableHead className="text-right">
+                      <SortableHeader
+                        label="Received"
+                        active={sort.key === "received"}
+                        direction={sort.direction}
+                        onClick={() => toggleSort("received")}
+                        align="right"
+                      />
+                    </TableHead>
+                    <TableHead className="text-right">
+                      <SortableHeader
+                        label="Balance Due"
+                        active={sort.key === "balance_due"}
+                        direction={sort.direction}
+                        onClick={() => toggleSort("balance_due")}
+                        align="right"
+                      />
+                    </TableHead>
+                    <TableHead>
+                      <TableColumnHeaderFilter
+                        label="Payment Status"
+                        active={paymentStatusFilter !== "all"}
+                      >
+                        {({ close }) => (
+                          <Select
+                            value={paymentStatusFilter}
+                            onValueChange={(value) => {
+                              setPaymentStatusFilter(
+                                value as VenueRentalPaymentLedgerStatus | "all"
+                              )
+                              close()
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Filter status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All</SelectItem>
+                              <SelectItem value="no_charges">No Charges</SelectItem>
+                              <SelectItem value="complimentary">
+                                Complimentary
+                              </SelectItem>
+                              <SelectItem value="unpaid">Unpaid</SelectItem>
+                              <SelectItem value="partial">Partial</SelectItem>
+                              <SelectItem value="paid">Paid</SelectItem>
+                              <SelectItem value="overdue">Overdue</SelectItem>
+                              <SelectItem value="refund_due">Refund Due</SelectItem>
+                              <SelectItem value="refunded">Refunded</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </TableColumnHeaderFilter>
+                    </TableHead>
+                    <TableHead>
+                      <TableColumnHeaderFilter
+                        label="Next Action"
+                        active={nextActionFilter !== "all"}
+                      >
+                        {({ close }) => (
+                          <Select
+                            value={nextActionFilter}
+                            onValueChange={(value) => {
+                              setNextActionFilter(
+                                value as VenueRentalStaffNextActionKey | "all"
+                              )
+                              close()
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Filter action" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {NEXT_ACTION_FILTER_OPTIONS.map((option) => (
+                                <SelectItem key={option.value} value={option.value}>
+                                  {option.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </TableColumnHeaderFilter>
+                    </TableHead>
                   </TableRow>
-                ) : (
-                  pagedRows.map((row) => {
-                    const hasPayments = row.payments.length > 0
-                    return (
-                      <TableRow key={row.id}>
-                        <TableCell>
-                          <div className="font-medium">{row.customerName}</div>
-                          {row.customerEmail ? (
-                            <div className="text-xs text-muted-foreground">
-                              {row.customerEmail}
+                </TableHeader>
+                <TableBody>
+                  {pagedRows.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={8}
+                        className="h-32 text-center text-muted-foreground"
+                      >
+                        No rentals match these filters.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    pagedRows.map((row) => {
+                      const timeLabel = formatEventTime(
+                        row.eventStartAt,
+                        row.eventEndAt
+                      )
+                      return (
+                        <TableRow
+                          key={row.id}
+                          className="cursor-pointer"
+                          onClick={() =>
+                            router.push(
+                              `/bookings/rentals/${row.id}?tab=financial&from=payments`
+                            )
+                          }
+                        >
+                          <TableCell>
+                            {row.customerPhone ? (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className="text-left">
+                                    <div className="font-medium">
+                                      {row.customerName}
+                                    </div>
+                                    {row.customerEmail ? (
+                                      <div className="text-xs text-muted-foreground">
+                                        {row.customerEmail}
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  Phone: {row.customerPhone}
+                                </TooltipContent>
+                              </Tooltip>
+                            ) : (
+                              <div>
+                                <div className="font-medium">{row.customerName}</div>
+                                {row.customerEmail ? (
+                                  <div className="text-xs text-muted-foreground">
+                                    {row.customerEmail}
+                                  </div>
+                                ) : null}
+                              </div>
+                            )}
+                          </TableCell>
+                          <TableCell className="max-w-[220px] text-sm">
+                            <div className="font-medium">
+                              {row.eventTypeName || "Venue rental"}
                             </div>
-                          ) : null}
-                        </TableCell>
-                        <TableCell className="max-w-[260px] text-sm">
-                          {row.eventTypeName ? (
-                            <div className="font-medium">{row.eventTypeName}</div>
-                          ) : null}
-                          <div className="text-muted-foreground">{row.spaceLabel}</div>
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {row.totalFee > 0 ? formatMoney(row.totalFee) : "—"}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {row.depositReceived > 0
-                            ? formatMoney(row.depositReceived)
-                            : "—"}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {row.remainingDue > 0
-                            ? formatMoney(row.remainingDue)
-                            : row.remainingAmount > 0
-                              ? formatMoney(0)
-                              : "—"}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary">
-                            {balanceLabel(row.paymentBalance)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
+                            <div className="text-muted-foreground">
+                              {row.spaceName}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="font-medium">
+                              {formatEventDate(row.eventStartAt)}
+                            </div>
+                            {timeLabel ? (
+                              <div className="text-xs text-muted-foreground">
+                                {timeLabel}
+                              </div>
+                            ) : null}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {formatMoney(row.totalCharges)}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {formatMoney(row.amountReceived)}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {formatMoney(row.balanceDue)}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={paymentStatusBadgeVariant(row.paymentStatus)}
+                            >
+                              {venueRentalPaymentLedgerStatusLabel(row.paymentStatus)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell
+                            className="text-sm"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            {row.nextActionHref && row.nextActionKey !== "none" ? (
+                              <Link
+                                href={row.nextActionHref}
+                                className="font-medium text-primary hover:underline"
                               >
-                                <MoreHorizontal className="h-4 w-4" />
-                                <span className="sr-only">Payment actions</span>
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem asChild>
-                                <Link href={`/bookings/rentals/${row.id}`}>
-                                  Open rental
-                                </Link>
-                              </DropdownMenuItem>
-                              {canManage ? (
-                                <>
-                                  <DropdownMenuItem
-                                    onSelect={() => openReceive(row)}
-                                  >
-                                    Receive payment
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem
-                                    disabled={!hasPayments}
-                                    onSelect={() => openEdit(row)}
-                                  >
-                                    Edit payment
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    disabled={!hasPayments}
-                                    className="text-destructive focus:text-destructive"
-                                    onSelect={() => openDelete(row)}
-                                  >
-                                    Delete payment
-                                  </DropdownMenuItem>
-                                </>
-                              ) : null}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })
-                )}
-              </TableBody>
-            </Table>
-          </div>
-          {filteredRows.length > 0 ? (
-            <div className="border-t border-border px-3 py-3 sm:px-4">
-              <ListPagination
-                page={currentPage}
-                pageSize={pageSize}
-                total={filteredRows.length}
-                entryLabel="rentals"
-                onPageChange={setPage}
-                onPageSizeChange={(next) => {
-                  setPageSize(next)
-                  setPage(1)
-                }}
-              />
+                                {row.nextActionLabel}
+                              </Link>
+                            ) : (
+                              <span className="text-muted-foreground">
+                                {row.nextActionLabel}
+                              </span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })
+                  )}
+                </TableBody>
+              </Table>
             </div>
-          ) : null}
-        </CardContent>
-      </Card>
-
-      <Dialog open={receiveOpen} onOpenChange={setReceiveOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Receive payment</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            {selected ? (
-              <p className="text-sm text-muted-foreground">
-                {selected.customerName}
-                {selected.eventTypeName ? ` · ${selected.eventTypeName}` : ""}
-              </p>
-            ) : null}
-            {error ? (
-              <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                {error}
+            {filteredRows.length > 0 ? (
+              <div className="border-t border-border px-3 py-3 sm:px-4">
+                <ListPagination
+                  page={currentPage}
+                  pageSize={pageSize}
+                  total={filteredRows.length}
+                  entryLabel="rentals"
+                  onPageChange={setPage}
+                  onPageSizeChange={(next) => {
+                    setPageSize(next)
+                    setPage(1)
+                  }}
+                />
               </div>
             ) : null}
-            <div className="space-y-2">
-              <Label>Payment type</Label>
-              <Select
-                value={paymentType}
-                onValueChange={(value) =>
-                  setPaymentType(value as PaymentTypeOption)
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="deposit">Deposit</SelectItem>
-                  <SelectItem value="remaining_balance">Remaining balance</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="payment-amount">Amount</Label>
-              <Input
-                id="payment-amount"
-                type="number"
-                min={0}
-                step="0.01"
-                value={amount}
-                onChange={(event) => setAmount(event.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="payment-notes">Notes</Label>
-              <Textarea
-                id="payment-notes"
-                rows={3}
-                value={notes}
-                onChange={(event) => setNotes(event.target.value)}
-                placeholder="Optional"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setReceiveOpen(false)}
-              disabled={isPending}
-            >
-              Cancel
-            </Button>
-            <Button onClick={submitReceive} disabled={isPending}>
-              <DollarSign className="mr-2 h-4 w-4" />
-              {isPending ? "Saving..." : "Record payment"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit payment</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            {selected ? (
-              <p className="text-sm text-muted-foreground">
-                {selected.customerName}
-                {selected.eventTypeName ? ` · ${selected.eventTypeName}` : ""}
-              </p>
-            ) : null}
-            {error ? (
-              <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                {error}
-              </div>
-            ) : null}
-            {selectedPayments.length > 1 ? (
-              <div className="space-y-2">
-                <Label>Payment</Label>
-                <Select
-                  value={selectedPaymentId}
-                  onValueChange={onEditPaymentSelect}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {selectedPayments.map((payment) => (
-                      <SelectItem key={payment.id} value={payment.id}>
-                        {paymentTypeLabel(payment.paymentType)} ·{" "}
-                        {formatMoney(payment.amount)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ) : selectedPayment ? (
-              <p className="text-sm text-muted-foreground">
-                {paymentTypeLabel(selectedPayment.paymentType)} ·{" "}
-                {formatMoney(selectedPayment.amount)}
-              </p>
-            ) : null}
-            <div className="space-y-2">
-              <Label>Payment type</Label>
-              <Select
-                value={paymentType}
-                onValueChange={(value) =>
-                  setPaymentType(value as PaymentTypeOption)
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="deposit">Deposit</SelectItem>
-                  <SelectItem value="remaining_balance">Remaining balance</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-payment-amount">Amount</Label>
-              <Input
-                id="edit-payment-amount"
-                type="number"
-                min={0}
-                step="0.01"
-                value={amount}
-                onChange={(event) => setAmount(event.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-payment-notes">Notes</Label>
-              <Textarea
-                id="edit-payment-notes"
-                rows={3}
-                value={notes}
-                onChange={(event) => setNotes(event.target.value)}
-                placeholder="Optional"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setEditOpen(false)}
-              disabled={isPending}
-            >
-              Cancel
-            </Button>
-            <Button onClick={submitEdit} disabled={isPending || !selectedPaymentId}>
-              {isPending ? "Saving..." : "Save changes"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete payment</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            {selected ? (
-              <p className="text-sm text-muted-foreground">
-                {selected.customerName}
-                {selected.eventTypeName ? ` · ${selected.eventTypeName}` : ""}
-              </p>
-            ) : null}
-            {error ? (
-              <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                {error}
-              </div>
-            ) : null}
-            {selectedPayments.length > 1 ? (
-              <div className="space-y-2">
-                <Label>Payment to delete</Label>
-                <Select
-                  value={selectedPaymentId}
-                  onValueChange={setSelectedPaymentId}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {selectedPayments.map((payment) => (
-                      <SelectItem key={payment.id} value={payment.id}>
-                        {paymentTypeLabel(payment.paymentType)} ·{" "}
-                        {formatMoney(payment.amount)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ) : selectedPayment ? (
-              <p className="text-sm">
-                Delete {paymentTypeLabel(selectedPayment.paymentType)} of{" "}
-                <span className="font-medium tabular-nums">
-                  {formatMoney(selectedPayment.amount)}
-                </span>
-                ?
-              </p>
-            ) : (
-              <p className="text-sm text-muted-foreground">No payment selected.</p>
-            )}
-            <p className="text-sm text-muted-foreground">
-              This removes the payment record and recalculates the rental balance.
-            </p>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setDeleteOpen(false)}
-              disabled={isPending}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={submitDelete}
-              disabled={isPending || !selectedPaymentId}
-            >
-              {isPending ? "Deleting..." : "Delete payment"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+          </CardContent>
+        </Card>
+      </div>
+    </TooltipProvider>
   )
 }
 
@@ -757,5 +549,33 @@ function SummaryCard({ label, value }: { label: string; value: string }) {
         <p className="text-2xl font-bold tabular-nums">{value}</p>
       </CardContent>
     </Card>
+  )
+}
+
+function SortableHeader({
+  label,
+  active,
+  direction,
+  onClick,
+  align = "left",
+}: {
+  label: string
+  active: boolean
+  direction: "asc" | "desc"
+  onClick: () => void
+  align?: "left" | "right"
+}) {
+  const Icon = !active ? ArrowUpDown : direction === "asc" ? ArrowUp : ArrowDown
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex items-center gap-1 font-medium hover:text-foreground ${
+        align === "right" ? "w-full justify-end" : ""
+      }`}
+    >
+      {label}
+      <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+    </button>
   )
 }

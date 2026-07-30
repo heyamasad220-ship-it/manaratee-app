@@ -44,8 +44,19 @@ export async function updateSession(request: NextRequest) {
   // Protected routes - redirect to login if no user
   const protectedPaths = ['/dashboard', '/bookings', '/events', '/event-management', '/facilities', '/contacts', '/donations', '/workforce', '/hr', '/programs', '/finance', '/bazaar', '/vendor-hub', '/billing', '/settings', '/reports', '/customer', '/my-classes', '/sign-ups', '/child-care', '/people-management', '/membership']
   const isProtectedPath = protectedPaths.some(path => request.nextUrl.pathname.startsWith(path))
-  
-  if (isProtectedPath && !user) {
+
+  // Only force login when there is clearly no session cookie. Transient getUser()
+  // failures (auth lock races under concurrent layout fetches) must not bounce
+  // an otherwise signed-in user between /login and the dashboard forever.
+  const hasSupabaseAuthCookie = request.cookies
+    .getAll()
+    .some(
+      (cookie) =>
+        cookie.name.startsWith("sb-") &&
+        (cookie.name.includes("auth-token") || cookie.name.includes("access-token"))
+    )
+
+  if (isProtectedPath && !user && !hasSupabaseAuthCookie) {
     // Redirect to a clean login URL (do not preserve page query like ?tab=students)
     const url = request.nextUrl.clone()
     url.pathname = '/login'

@@ -23,13 +23,16 @@ import { assertNoReservationConflicts } from "@/lib/reservations/reservation-con
 import {
   computeHoldExpiresAt,
   canStaffCancelVenueRental,
+  canStaffDeleteVenueRental,
   canStaffForceBookVenueRental,
+  isVenueRentalPaymentReceivedStatus,
   isVenueRentalReviewable,
   shouldCancelVenueRentalAfterPayment,
   summarizeOutstandingRentalPayments,
   VENUE_RENTAL_FORCE_BOOK_STATUSES,
 } from "./venue-rental-status"
 import { expireVenueRentalHoldsForScope } from "./venue-rental-hold-expiry"
+import { completePastConfirmedVenueRentalsForScope } from "./venue-rental-auto-complete"
 import { getBlockingReservationsForVenue } from "./venue-rental-queries"
 import {
   assertLegacyVenueBookingAvailableForMigration,
@@ -42,16 +45,24 @@ import { fireModuleNotifications } from "@/lib/notifications/dispatch-module-not
 import { normalizeVenueUsageTag } from "@/lib/bookings/venue-usage"
 import {
   RENTAL_CONTRACT_STATUSES,
+  RENTAL_PAYMENT_METHODS,
   RENTAL_PAYMENT_STATUSES,
   RENTAL_PAYMENT_TYPES,
   RENTAL_RESERVATION_STATUSES,
   VENUE_RENTAL_STATUSES,
-  type RentalAddonSelectionInput,
-  type RentalSpaceSlotInput,
   type CreateStaffVenueRentalInput,
+  type RentalAddonSelectionInput,
+  type RentalPaymentMethod,
+  type RentalPaymentType,
+  type RentalSpaceSlotInput,
   type SubmitVenueRentalInput,
   type VenueRentalStatus,
 } from "./venue-rental-types"
+import {
+  canEditPendingCharge,
+  isCompletedPaymentStatus,
+  isPendingPaymentStatus,
+} from "./venue-rental-payment-ledger"
 
 const CALENDAR_PATHS = [
   "/facilities/availability",
@@ -593,6 +604,15 @@ export async function createStaffVenueRentalRequest(input: CreateStaffVenueRenta
     },
   })
 
+  try {
+    await insertSelectedAddons(organizationId, rental.id as string, input.addons)
+  } catch (addonError) {
+    await supabase.from("rental_selected_addons").delete().eq("venue_rental_id", rental.id)
+    await supabase.from("rental_reservations").delete().eq("venue_rental_id", rental.id)
+    await supabase.from("venue_rentals").delete().eq("id", rental.id)
+    throw addonError
+  }
+
   fireModuleNotifications([
     {
       organizationId,
@@ -1054,8 +1074,15 @@ export async function recordVenueRentalPaymentReceived(input: {
     | "deposit"
     | "security_deposit"
     | "remaining_balance"
+    | "installment"
+    | "addon_fee"
+    | "cleaning_fee"
   amount: number
   notes?: string
+  paymentMethod?: RentalPaymentMethod
+  paymentDate?: string
+  referenceNumber?: string
+  receiptUrl?: string
 }) {
   await assertCanManageVenueRentals()
 
@@ -1064,12 +1091,15 @@ export async function recordVenueRentalPaymentReceived(input: {
     throw new Error("Enter a payment amount greater than zero.")
   }
 
-  const paymentType =
-    input.paymentType === "deposit"
-      ? RENTAL_PAYMENT_TYPES.deposit
-      : input.paymentType === "security_deposit"
-        ? RENTAL_PAYMENT_TYPES.securityDeposit
-        : RENTAL_PAYMENT_TYPES.remainingBalance
+  const paymentType = input.paymentType as RentalPaymentType
+  const paymentMethod = input.paymentMethod || RENTAL_PAYMENT_METHODS.other
+  const paidAt = input.paymentDate
+    ? new Date(input.paymentDate).toISOString()
+    : new Date().toISOString()
+
+  if (Number.isNaN(new Date(paidAt).getTime())) {
+    throw new Error("Enter a valid payment date.")
+  }
 
   const supabase = await createClient()
   const organizationId = await resolveOrganizationId()
@@ -1077,6 +1107,10 @@ export async function recordVenueRentalPaymentReceived(input: {
   if (!organizationId) {
     throw new Error("No organization selected")
   }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
   const { data: rental } = await supabase
     .from("venue_rentals")
@@ -1101,25 +1135,30 @@ export async function recordVenueRentalPaymentReceived(input: {
     throw new Error(listError.message || "Failed to load payment records.")
   }
 
-  const unpaid = (existingPayments || []).find(
-    (payment) =>
-      payment.status !== RENTAL_PAYMENT_STATUSES.paidManually &&
-      payment.status !== RENTAL_PAYMENT_STATUSES.paidStripeLater &&
-      payment.status !== RENTAL_PAYMENT_STATUSES.refunded
+  const unpaid = (existingPayments || []).find((payment) =>
+    isPendingPaymentStatus(String(payment.status || ""))
   )
 
   let paymentId = unpaid?.id as string | undefined
   const noteText = input.notes?.trim() || null
+  const referenceNumber = input.referenceNumber?.trim() || null
+  const receiptUrl = input.receiptUrl?.trim() || null
+
+  const paidFields = {
+    amount,
+    status: RENTAL_PAYMENT_STATUSES.paidManually,
+    paid_at: paidAt,
+    notes: noteText,
+    payment_method: paymentMethod,
+    reference_number: referenceNumber,
+    recorded_by: user?.id ?? null,
+    receipt_url: receiptUrl,
+  }
 
   if (paymentId) {
     const { error } = await supabase
       .from("rental_payments")
-      .update({
-        amount,
-        status: RENTAL_PAYMENT_STATUSES.paidManually,
-        paid_at: new Date().toISOString(),
-        notes: noteText,
-      })
+      .update(paidFields)
       .eq("id", paymentId)
       .eq("organization_id", organizationId)
 
@@ -1133,10 +1172,7 @@ export async function recordVenueRentalPaymentReceived(input: {
         organization_id: organizationId,
         venue_rental_id: input.venueRentalId,
         payment_type: paymentType,
-        status: RENTAL_PAYMENT_STATUSES.paidManually,
-        amount,
-        paid_at: new Date().toISOString(),
-        notes: noteText,
+        ...paidFields,
       })
       .select("id")
       .single()
@@ -1177,6 +1213,281 @@ export async function recordVenueRentalPaymentReceived(input: {
         paymentType,
         amount,
       },
+    },
+  ])
+
+  revalidateVenueRentalPaths()
+}
+
+/** Add a pending charge line (does not mark received). */
+export async function addVenueRentalCharge(input: {
+  venueRentalId: string
+  paymentType:
+    | "deposit"
+    | "security_deposit"
+    | "remaining_balance"
+    | "addon_fee"
+    | "cleaning_fee"
+    | "adjustment"
+    | "discount"
+    | "installment"
+  amount: number
+  dueAt?: string | null
+  notes?: string
+}) {
+  await assertCanManageVenueRentals()
+
+  const amount = Number(input.amount)
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new Error("Enter a charge amount greater than zero.")
+  }
+
+  const supabase = await createClient()
+  const organizationId = await resolveOrganizationId()
+  if (!organizationId) throw new Error("No organization selected")
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  const { data: rental } = await supabase
+    .from("venue_rentals")
+    .select("id")
+    .eq("id", input.venueRentalId)
+    .eq("organization_id", organizationId)
+    .maybeSingle()
+
+  if (!rental) throw new Error("Venue rental not found.")
+
+  const { error } = await supabase.from("rental_payments").insert({
+    organization_id: organizationId,
+    venue_rental_id: input.venueRentalId,
+    payment_type: input.paymentType,
+    status: RENTAL_PAYMENT_STATUSES.paymentRequested,
+    amount,
+    due_at: input.dueAt || null,
+    notes: input.notes?.trim() || null,
+    recorded_by: user?.id ?? null,
+  })
+
+  if (error) {
+    throw new Error(error.message || "Failed to add charge.")
+  }
+
+  revalidateVenueRentalPaths()
+}
+
+/** Apply a completed credit (reduces balance due without rewriting payments). */
+export async function applyVenueRentalCredit(input: {
+  venueRentalId: string
+  amount: number
+  notes?: string
+  referenceNumber?: string
+}) {
+  await assertCanManageVenueRentals()
+
+  const amount = Number(input.amount)
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new Error("Enter a credit amount greater than zero.")
+  }
+
+  const supabase = await createClient()
+  const organizationId = await resolveOrganizationId()
+  if (!organizationId) throw new Error("No organization selected")
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  const { error } = await supabase.from("rental_payments").insert({
+    organization_id: organizationId,
+    venue_rental_id: input.venueRentalId,
+    payment_type: RENTAL_PAYMENT_TYPES.credit,
+    status: RENTAL_PAYMENT_STATUSES.completed,
+    amount,
+    paid_at: new Date().toISOString(),
+    notes: input.notes?.trim() || null,
+    reference_number: input.referenceNumber?.trim() || null,
+    recorded_by: user?.id ?? null,
+    payment_method: RENTAL_PAYMENT_METHODS.other,
+  })
+
+  if (error) {
+    throw new Error(error.message || "Failed to apply credit.")
+  }
+
+  revalidateVenueRentalPaths()
+}
+
+/**
+ * Confirm an online/Stripe settlement server-side.
+ * Idempotent on stripe_payment_intent_id (unique index from script 215).
+ */
+export async function recordVenueRentalOnlinePaymentConfirmed(input: {
+  venueRentalId: string
+  amount: number
+  stripePaymentIntentId: string
+  paymentType?:
+    | "deposit"
+    | "security_deposit"
+    | "remaining_balance"
+    | "installment"
+  notes?: string
+}) {
+  await assertCanManageVenueRentals()
+
+  const amount = Number(input.amount)
+  const intentId = input.stripePaymentIntentId.trim()
+  if (!intentId) throw new Error("Provider payment id is required.")
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new Error("Enter a payment amount greater than zero.")
+  }
+
+  const supabase = await createClient()
+  const organizationId = await resolveOrganizationId()
+  if (!organizationId) throw new Error("No organization selected")
+
+  const { data: existing } = await supabase
+    .from("rental_payments")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("stripe_payment_intent_id", intentId)
+    .maybeSingle()
+
+  if (existing) {
+    return { paymentId: existing.id as string, created: false }
+  }
+
+  const paymentType = (input.paymentType ||
+    RENTAL_PAYMENT_TYPES.deposit) as RentalPaymentType
+
+  const { data: created, error } = await supabase
+    .from("rental_payments")
+    .insert({
+      organization_id: organizationId,
+      venue_rental_id: input.venueRentalId,
+      payment_type: paymentType,
+      status: RENTAL_PAYMENT_STATUSES.paidStripeLater,
+      amount,
+      paid_at: new Date().toISOString(),
+      notes: input.notes?.trim() || null,
+      payment_method: RENTAL_PAYMENT_METHODS.online,
+      stripe_payment_intent_id: intentId,
+    })
+    .select("id")
+    .single()
+
+  if (error) {
+    if (error.code === "23505") {
+      const { data: raced } = await supabase
+        .from("rental_payments")
+        .select("id")
+        .eq("stripe_payment_intent_id", intentId)
+        .maybeSingle()
+      if (raced) return { paymentId: raced.id as string, created: false }
+    }
+    throw new Error(error.message || "Failed to record online payment.")
+  }
+
+  await syncVenueRentalStatusAfterPayment(input.venueRentalId, organizationId)
+  revalidateVenueRentalPaths()
+  return { paymentId: created.id as string, created: true }
+}
+
+/** Void a completed payment — keeps audit trail (does not delete). */
+export async function voidVenueRentalPaymentRecord(input: {
+  paymentId: string
+  reason?: string
+}) {
+  await assertCanManageVenueRentals()
+
+  const supabase = await createClient()
+  const organizationId = await resolveOrganizationId()
+  if (!organizationId) throw new Error("No organization selected")
+
+  const { data: payment, error: paymentError } = await supabase
+    .from("rental_payments")
+    .select("id, venue_rental_id, status, notes")
+    .eq("id", input.paymentId)
+    .eq("organization_id", organizationId)
+    .maybeSingle()
+
+  if (paymentError || !payment) {
+    throw new Error("Payment record not found.")
+  }
+
+  if (!isCompletedPaymentStatus(String(payment.status || ""))) {
+    throw new Error("Only completed payments can be voided. Delete pending charges instead.")
+  }
+
+  const reason = input.reason?.trim()
+  const notes = [payment.notes, reason ? `Voided: ${reason}` : "Voided"]
+    .filter(Boolean)
+    .join(" · ")
+
+  const { error } = await supabase
+    .from("rental_payments")
+    .update({
+      status: RENTAL_PAYMENT_STATUSES.voided,
+      notes,
+    })
+    .eq("id", input.paymentId)
+    .eq("organization_id", organizationId)
+
+  if (error) {
+    throw new Error(error.message || "Failed to void payment.")
+  }
+
+  await syncVenueRentalStatusAfterPayment(
+    payment.venue_rental_id as string,
+    organizationId
+  )
+  revalidateVenueRentalPaths()
+}
+
+/** Staff-triggered payment reminder notification. */
+export async function sendVenueRentalPaymentReminder(input: {
+  venueRentalId: string
+}) {
+  await assertCanManageVenueRentals()
+
+  const supabase = await createClient()
+  const organizationId = await resolveOrganizationId()
+  if (!organizationId) throw new Error("No organization selected")
+
+  const { data: rental } = await supabase
+    .from("venue_rentals")
+    .select("id")
+    .eq("id", input.venueRentalId)
+    .eq("organization_id", organizationId)
+    .maybeSingle()
+
+  if (!rental) throw new Error("Venue rental not found.")
+
+  await supabase
+    .from("venue_rentals")
+    .update({ event_reminder_sent_at: new Date().toISOString() })
+    .eq("id", input.venueRentalId)
+    .eq("organization_id", organizationId)
+
+  fireModuleNotifications([
+    {
+      organizationId,
+      moduleKey: "venue_rentals",
+      audience: "customer",
+      eventKey: "balance_reminder",
+      subject: "Venue rental payment reminder",
+      summary: "A payment reminder was sent for your venue rental.",
+      metadata: { venueRentalId: input.venueRentalId },
+    },
+    {
+      organizationId,
+      moduleKey: "venue_rentals",
+      audience: "staff",
+      eventKey: "balance_reminder",
+      subject: "Venue rental payment reminder sent",
+      summary: "A payment reminder was sent to the customer.",
+      metadata: { venueRentalId: input.venueRentalId },
     },
   ])
 
@@ -1232,6 +1543,12 @@ export async function updateVenueRentalPaymentRecord(input: {
     throw new Error("This payment has already been refunded.")
   }
 
+  if (!canEditPendingCharge(String(payment.status || ""))) {
+    throw new Error(
+      "Completed payments cannot be edited. Void and record a correction instead."
+    )
+  }
+
   const { error } = await supabase
     .from("rental_payments")
     .update({
@@ -1267,7 +1584,7 @@ export async function deleteVenueRentalPaymentRecord(input: {
 
   const { data: payment, error: paymentError } = await supabase
     .from("rental_payments")
-    .select("id, venue_rental_id, payment_type")
+    .select("id, venue_rental_id, payment_type, status")
     .eq("id", input.paymentId)
     .eq("organization_id", organizationId)
     .maybeSingle()
@@ -1278,6 +1595,12 @@ export async function deleteVenueRentalPaymentRecord(input: {
 
   if (payment.payment_type === RENTAL_PAYMENT_TYPES.refund) {
     throw new Error("Refund rows cannot be deleted here.")
+  }
+
+  if (!canEditPendingCharge(String(payment.status || ""))) {
+    throw new Error(
+      "Completed payments cannot be deleted. Void the payment to preserve the audit trail."
+    )
   }
 
   const { error } = await supabase
@@ -1321,6 +1644,7 @@ async function syncVenueRentalStatusAfterPayment(
   const paidStatuses = new Set<string>([
     RENTAL_PAYMENT_STATUSES.paidManually,
     RENTAL_PAYMENT_STATUSES.paidStripeLater,
+    RENTAL_PAYMENT_STATUSES.completed,
   ])
 
   const paidTypes = new Set(
@@ -1411,6 +1735,28 @@ export async function expireVenueRentalHolds(now = new Date()) {
   }
 
   return result.expiredCount
+}
+
+/** Mark confirmed rentals Completed when their last reserved slot has ended. */
+export async function completePastConfirmedVenueRentals(now = new Date()) {
+  const supabase = await createClient()
+  const organizationId = await resolveOrganizationId()
+
+  if (!organizationId) {
+    return 0
+  }
+
+  const result = await completePastConfirmedVenueRentalsForScope({
+    supabase,
+    organizationId,
+    now,
+  })
+
+  if (result.completedCount > 0) {
+    revalidateVenueRentalPaths()
+  }
+
+  return result.completedCount
 }
 
 export async function markVenueRentalCompletedAndAwaitingRefund(input: {
@@ -1523,6 +1869,7 @@ export async function approveSecurityDepositRefund(input: {
   const paidStatuses = new Set<string>([
     RENTAL_PAYMENT_STATUSES.paidManually,
     RENTAL_PAYMENT_STATUSES.paidStripeLater,
+    RENTAL_PAYMENT_STATUSES.completed,
   ])
 
   const securityDepositPaid = (payments || [])
@@ -1659,6 +2006,7 @@ export async function forceBookVenueRentalWithOverride(input: {
   const paidStatuses = new Set<string>([
     RENTAL_PAYMENT_STATUSES.paidManually,
     RENTAL_PAYMENT_STATUSES.paidStripeLater,
+    RENTAL_PAYMENT_STATUSES.completed,
   ])
 
   const depositPaid = (paymentRows || []).some(
@@ -1801,6 +2149,7 @@ export async function cancelVenueRental(input: {
   const paidStatuses = new Set<string>([
     RENTAL_PAYMENT_STATUSES.paidManually,
     RENTAL_PAYMENT_STATUSES.paidStripeLater,
+    RENTAL_PAYMENT_STATUSES.completed,
   ])
 
   const depositPaid = (paymentRows || []).some(
@@ -1896,6 +2245,86 @@ export async function cancelVenueRental(input: {
   ])
 
   revalidateVenueRentalPaths()
+}
+
+/**
+ * Hard-delete a mistaken rental request when no payment has been received.
+ * Cascades to rental_reservations (and removes resource_reservations via DB sync).
+ */
+export async function deleteVenueRentalRequest(input: {
+  venueRentalId: string
+}) {
+  await assertCanManageVenueRentals()
+
+  const supabase = await createClient()
+  const organizationId = await resolveOrganizationId()
+
+  if (!organizationId) {
+    throw new Error("No organization selected")
+  }
+
+  const { data: rental, error: rentalError } = await supabase
+    .from("venue_rentals")
+    .select("id, status")
+    .eq("id", input.venueRentalId)
+    .eq("organization_id", organizationId)
+    .maybeSingle()
+
+  if (rentalError || !rental) {
+    throw new Error("Rental request not found.")
+  }
+
+  const { data: paymentRows, error: paymentsError } = await supabase
+    .from("rental_payments")
+    .select("status")
+    .eq("venue_rental_id", input.venueRentalId)
+    .eq("organization_id", organizationId)
+
+  if (paymentsError) {
+    throw new Error("Failed to load rental payments.")
+  }
+
+  const hasReceivedPayment = (paymentRows || []).some((payment) =>
+    isVenueRentalPaymentReceivedStatus(String(payment.status || ""))
+  )
+
+  if (!canStaffDeleteVenueRental(hasReceivedPayment)) {
+    throw new Error(
+      "This rental has received payment and cannot be deleted. Cancel it instead."
+    )
+  }
+
+  // Ensure calendar blocks are released even if cascade/trigger order differs.
+  const { data: reservationRows } = await supabase
+    .from("rental_reservations")
+    .select("id")
+    .eq("venue_rental_id", input.venueRentalId)
+    .eq("organization_id", organizationId)
+
+  const reservationIds = (reservationRows || []).map((row) => row.id as string)
+  if (reservationIds.length > 0) {
+    await supabase
+      .from("resource_reservations")
+      .delete()
+      .eq("organization_id", organizationId)
+      .eq("source_type", "venue_rental")
+      .in("source_id", reservationIds)
+  }
+
+  const { error: deleteError } = await supabase
+    .from("venue_rentals")
+    .delete()
+    .eq("id", input.venueRentalId)
+    .eq("organization_id", organizationId)
+
+  if (deleteError) {
+    throw new Error(deleteError.message || "Failed to delete rental request.")
+  }
+
+  revalidateVenueRentalPaths()
+  revalidatePath("/facilities/calendar")
+  revalidatePath("/facilities/overview")
+  revalidatePath("/facilities/reservation-center")
 }
 
 /**

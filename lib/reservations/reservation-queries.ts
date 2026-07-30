@@ -629,7 +629,7 @@ export async function getConflictingReservations(
 
   let query = supabase
     .from("resource_reservations")
-    .select("id, title, source_type, start_at, end_at, venue_id, space_label, status")
+    .select("id, title, source_type, source_id, start_at, end_at, venue_id, space_label, status")
     .eq("organization_id", organizationId)
     .lt("start_at", endAt)
     .gt("end_at", startAt)

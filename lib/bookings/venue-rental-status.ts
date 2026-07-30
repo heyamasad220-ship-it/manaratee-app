@@ -1,5 +1,5 @@
 import type { VenueRentalCalendarColor, VenueRentalStatus } from "./venue-rental-types"
-import { VENUE_RENTAL_STATUSES } from "./venue-rental-types"
+import { RENTAL_PAYMENT_STATUSES, VENUE_RENTAL_STATUSES } from "./venue-rental-types"
 
 const STATUS_LABELS: Record<VenueRentalStatus, string> = {
   draft: "Draft",
@@ -7,13 +7,14 @@ const STATUS_LABELS: Record<VenueRentalStatus, string> = {
   pending: "Pending",
   awaiting_supervisor_approval: "Pending",
   declined: "Declined",
-  approved_pending_payment: "Awaiting Payment",
+  /** Staff label: Approved (deposit still due). Customer copy stays more specific. */
+  approved_pending_payment: "Approved",
   hold_expired: "Hold Expired",
   deposit_paid: "Confirmed",
   security_deposit_paid: "Confirmed",
   confirmed: "Confirmed",
   cancelled_before_payment: "Cancelled",
-  cancelled_after_payment: "Cancelled (After Payment)",
+  cancelled_after_payment: "Cancelled",
   completed: "Completed",
   awaiting_security_deposit_refund_approval: "Awaiting Refund Approval",
   security_deposit_refunded: "Security Deposit Refunded",
@@ -29,6 +30,20 @@ export const VENUE_RENTAL_REVIEWABLE_STATUSES: VenueRentalStatus[] = [
 
 export function isVenueRentalReviewable(status: VenueRentalStatus): boolean {
   return VENUE_RENTAL_REVIEWABLE_STATUSES.includes(status)
+}
+
+/** Paid payment statuses that block hard-delete of a mistaken request. */
+export function isVenueRentalPaymentReceivedStatus(status: string): boolean {
+  return (
+    status === RENTAL_PAYMENT_STATUSES.paidManually ||
+    status === RENTAL_PAYMENT_STATUSES.paidStripeLater ||
+    status === RENTAL_PAYMENT_STATUSES.completed
+  )
+}
+
+/** Staff may hard-delete a rental only when no payment has been received. */
+export function canStaffDeleteVenueRental(hasReceivedPayment: boolean): boolean {
+  return !hasReceivedPayment
 }
 
 /** UI color mapping from spec: green / yellow / orange */

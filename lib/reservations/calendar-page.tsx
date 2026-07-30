@@ -1,6 +1,7 @@
 import { Suspense } from "react"
 
 import { ReservationCalendar } from "@/components/reservations/reservation-calendar"
+import type { FacilityEventFormOptions } from "@/components/reservations/reservation-calendar"
 import type { CalendarAudience } from "@/lib/reservations/calendar-audience"
 import {
   CALENDAR_AUDIENCE_DESCRIPTIONS,
@@ -22,6 +23,11 @@ import {
   requireAnyPermission,
   type PermissionKey,
 } from "@/lib/permissions/permissions"
+import { getDepartments } from "@/lib/departments/department-queries"
+import { getEventTypes } from "@/lib/events/event-type-queries"
+import { getInternalEventFormDefaults } from "@/lib/events/internal-event-form-defaults"
+import { getActiveCalendarVenues } from "@/lib/bookings/venue-calendar-venues"
+import { getRoomSetupStyles } from "@/lib/setup-styles/setup-style-queries"
 
 const VALID_SOURCE_TYPES = new Set<string>(
   Object.values(RESERVATION_SOURCE_TYPES)
@@ -68,6 +74,28 @@ function calendarTitleForSources(
   }
 }
 
+async function loadEventFormOptions(
+  canPlanEvents: boolean
+): Promise<FacilityEventFormOptions | null> {
+  if (!canPlanEvents) return null
+
+  const [departments, eventTypes, venues, setupStyles, defaults] = await Promise.all([
+    getDepartments(),
+    getEventTypes({ activeOnly: true }),
+    getActiveCalendarVenues(),
+    getRoomSetupStyles({ activeOnly: true }),
+    getInternalEventFormDefaults(),
+  ])
+
+  return {
+    departments: departments.map((d) => ({ id: d.id, name: d.name })),
+    eventTypes: eventTypes.map((t) => ({ id: t.id, name: t.name })),
+    venues: venues.map((v) => ({ id: v.id, name: v.name })),
+    setupStyles,
+    defaults,
+  }
+}
+
 async function AudienceCalendarPageContent({
   audience,
   searchParams,
@@ -104,6 +132,10 @@ async function AudienceCalendarPageContent({
     ),
   ])
 
+  const planEvents =
+    canPlanEvents && (audience === "staff" || audience === "ops")
+  const eventFormOptions = await loadEventFormOptions(planEvents)
+
   const resolvedTitle =
     headerTitle ||
     calendarTitleForSources(sourceTypes, CALENDAR_AUDIENCE_LABELS[audience])
@@ -115,9 +147,8 @@ async function AudienceCalendarPageContent({
       initialDate={dateParam || toDateParam(anchorDate)}
       initialView={view}
       canManageBlocks={canManageBlocks && audience === "ops" && !sourceTypes}
-      canPlanEvents={
-        canPlanEvents && (audience === "staff" || audience === "ops")
-      }
+      canPlanEvents={planEvents}
+      eventFormOptions={eventFormOptions}
       headerTitle={resolvedTitle}
       description={
         sourceTypes

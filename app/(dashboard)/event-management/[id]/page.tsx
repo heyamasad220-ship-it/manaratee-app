@@ -7,6 +7,7 @@ import { getInternalEventDeleteBlockers } from "@/lib/events/internal-event-acti
 import { getInternalEventById } from "@/lib/events/internal-event-queries"
 import { getParticipationsForSource } from "@/lib/service-participations/service-participation-queries"
 import { getEventTicketTypes } from "@/lib/tickets/ticket-type-actions"
+import { getVendorHubVendorTypes } from "@/lib/vendor-hub/vendor-type-queries"
 import {
   hasAnyPermission,
   PERMISSIONS,
@@ -43,13 +44,15 @@ export default async function InternalEventWorkspacePage({
   const { tab } = await searchParams
   const initialTab = parseWorkspaceTab(tab)
 
-  const [event, canManage, participations, ticketTypes, childcare] = await Promise.all([
-    getInternalEventById(id),
-    hasAnyPermission(PERMISSIONS.EVENTS_MANAGE, PERMISSIONS.PROGRAMS_MANAGE),
-    getParticipationsForSource({ sourceType: "internal_event", sourceId: id }),
-    getEventTicketTypes(id),
-    getChildcareForInternalEvent(id),
-  ])
+  const [event, canManage, participations, ticketTypes, childcare, vendorTypes] =
+    await Promise.all([
+      getInternalEventById(id),
+      hasAnyPermission(PERMISSIONS.EVENTS_MANAGE, PERMISSIONS.PROGRAMS_MANAGE),
+      getParticipationsForSource({ sourceType: "internal_event", sourceId: id }),
+      getEventTicketTypes(id),
+      getChildcareForInternalEvent(id),
+      getVendorHubVendorTypes({ activeOnly: true }),
+    ])
 
   if (!event) {
     notFound()
@@ -69,6 +72,7 @@ export default async function InternalEventWorkspacePage({
         ticketTypes={ticketTypes}
         childcareEvent={childcare.childcareEvent}
         childcareRegistrations={childcare.registrations}
+        vendorTypes={vendorTypes}
         initialTab={initialTab}
       />
     </Suspense>

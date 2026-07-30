@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation"
 
 import { createClient } from "@/lib/supabase/client"
 import { getBrowserAuthUser } from "@/lib/supabase/browser-auth-user"
-import { getCurrentOrganizationContext, clearSelectedOrganizationIdCache } from "@/lib/current-organization"
+import { getCurrentOrganizationContext } from "@/lib/current-organization"
 import { isOrganizationSystemAdmin } from "@/lib/organizations/organization-system-admin"
 import {
   isFacilitiesOnlyAccess,
@@ -23,7 +23,6 @@ export function DashboardAccessGuard() {
     let cancelled = false
 
     async function enforceFacilitiesScope() {
-      clearSelectedOrganizationIdCache()
       const supabase = createClient()
       const user = await getBrowserAuthUser(supabase)
 

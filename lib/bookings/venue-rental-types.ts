@@ -41,6 +41,11 @@ export const RENTAL_PAYMENT_TYPES = {
   remainingBalance: "remaining_balance",
   addonFee: "addon_fee",
   refund: "refund",
+  installment: "installment",
+  cleaningFee: "cleaning_fee",
+  credit: "credit",
+  adjustment: "adjustment",
+  discount: "discount",
 } as const
 
 export type RentalPaymentType =
@@ -52,10 +57,27 @@ export const RENTAL_PAYMENT_STATUSES = {
   paidManually: "paid_manually",
   paidStripeLater: "paid_stripe_later",
   refunded: "refunded",
+  pending: "pending",
+  completed: "completed",
+  failed: "failed",
+  voided: "voided",
+  partiallyRefunded: "partially_refunded",
 } as const
 
 export type RentalPaymentStatus =
   (typeof RENTAL_PAYMENT_STATUSES)[keyof typeof RENTAL_PAYMENT_STATUSES]
+
+export const RENTAL_PAYMENT_METHODS = {
+  cash: "cash",
+  check: "check",
+  ach: "ach",
+  cardTerminal: "card_terminal",
+  online: "online",
+  other: "other",
+} as const
+
+export type RentalPaymentMethod =
+  (typeof RENTAL_PAYMENT_METHODS)[keyof typeof RENTAL_PAYMENT_METHODS]
 
 export const RENTAL_CONTRACT_STATUSES = {
   generated: "generated",
@@ -123,6 +145,10 @@ export interface RentalPaymentRecord {
   paid_at: string | null
   notes: string | null
   stripe_payment_intent_id: string | null
+  payment_method?: RentalPaymentMethod | null
+  reference_number?: string | null
+  recorded_by?: string | null
+  receipt_url?: string | null
   created_at: string
   updated_at: string
 }
@@ -154,6 +180,10 @@ export interface RentalAddonSelectionInput {
 }
 
 import type { OperationalSetupInput } from "@/lib/operational-briefs/operational-setup-input"
+import type {
+  VenueRentalPaymentLedgerStatus,
+  VenueRentalStaffNextAction,
+} from "@/lib/bookings/venue-rental-payment-ledger"
 
 export interface SubmitVenueRentalInput {
   venueRentalEventTypeId?: string | null
@@ -170,6 +200,7 @@ export interface CreateStaffVenueRentalInput {
   venueRentalEventTypeId?: string | null
   notes?: string | null
   spaces: RentalSpaceSlotInput[]
+  addons?: RentalAddonSelectionInput[]
   expectedAttendance?: number | null
   setupStyle?: string | null
 }
@@ -234,6 +265,8 @@ export interface VenueRentalQueueRow {
   submittedAtLabel: string
   holdExpiresAt: string | null
   hasConflict: boolean
+  /** True when any deposit/security/balance payment has been marked paid. */
+  hasReceivedPayment: boolean
 }
 
 export type VenueRentalPaymentBalanceFilter =
@@ -242,6 +275,9 @@ export type VenueRentalPaymentBalanceFilter =
   | "partial"
   | "paid"
   | "no_payments"
+
+/** @deprecated Prefer VenueRentalPaymentLedgerStatus from venue-rental-payment-ledger. */
+export type VenueRentalPaymentReportBalance = VenueRentalPaymentBalanceFilter
 
 export interface VenueRentalPaymentReportRow {
   id: string
@@ -253,7 +289,17 @@ export interface VenueRentalPaymentReportRow {
   customerPhone: string | null
   eventTypeName: string | null
   spaceLabel: string
+  spaceName: string
+  venueIds: string[]
   eventStartAt: string | null
+  eventEndAt: string | null
+  /** Full charged amount (fee + add-ons + security + adjustments). */
+  totalCharges: number
+  /** Space rental fee from requested slots × venue rates. */
+  quotedSpaceFee: number
+  /** Sum of selected add-ons at submission (qty × unit price). */
+  quotedAddonFees: number
+  /** @deprecated Alias of totalCharges for older call sites. */
   totalFee: number
   depositAmount: number
   depositReceived: number
@@ -263,7 +309,20 @@ export interface VenueRentalPaymentReportRow {
   remainingReceived: number
   remainingDue: number
   amountReceived: number
+  refundedAmount: number
+  appliedCredits: number
+  unappliedCredit: number
+  refundableSecurity: number
   balanceDue: number
+  paymentDueAt: string | null
+  paymentStatus: VenueRentalPaymentLedgerStatus
+  nextActionLabel: string
+  nextActionKey: VenueRentalStaffNextAction["key"]
+  nextActionHref: string | null
+  hasFinancialActivity: boolean
+  hasOnlinePayment: boolean
+  hasManualPayment: boolean
+  /** @deprecated Prefer paymentStatus. */
   paymentBalance: VenueRentalPaymentBalanceFilter
   unpaidPaymentIds: {
     depositId: string | null
@@ -278,6 +337,12 @@ export interface VenueRentalPaymentReportRow {
     amount: number
     notes: string | null
     paidAt: string | null
+    dueAt: string | null
+    paymentMethod: RentalPaymentMethod | null
+    referenceNumber: string | null
+    recordedBy: string | null
+    receiptUrl: string | null
+    stripePaymentIntentId: string | null
   }>
 }
 
@@ -293,4 +358,15 @@ export interface RentalAddonCatalogItem {
   name: string
   description: string | null
   defaultPrice: number
+}
+
+/** Staff settings catalog row (includes inactive). */
+export interface RentalAddonSettingsItem {
+  id: string
+  name: string
+  slug: string
+  description: string | null
+  defaultPrice: number
+  isActive: boolean
+  sortOrder: number
 }

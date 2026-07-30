@@ -89,9 +89,6 @@ export function InternalEventTicketingWorkspace({
                 View orders
               </Link>
             </Button>
-            <Button variant="outline" size="sm" asChild>
-              <Link href={`/event-management/${eventId}/edit`}>Edit ticket types</Link>
-            </Button>
           </div>
         </CardHeader>
         <CardContent className="space-y-4 text-sm">

@@ -16,10 +16,15 @@ const settingsTabs = [
     href: "/bookings/settings/event-types",
     matchPrefix: "/bookings/settings/event-types",
   },
+  {
+    label: "Add-ons",
+    href: "/bookings/settings/addons",
+    matchPrefix: "/bookings/settings/addons",
+  },
 ] as const
 
 export function VenueRentalsSettingsNav() {
-  const pathname = usePathname()
+  const pathname = usePathname() ?? ""
 
   return (
     <nav className="flex gap-1 border-b border-border">
@@ -30,6 +35,7 @@ export function VenueRentalsSettingsNav() {
           <Link
             key={tab.href}
             href={tab.href}
+            prefetch={false}
             className={cn(
               "-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors",
               isActive

@@ -24,7 +24,6 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent } from "@/components/ui/card"
-import { NewBookingRequestDrawer } from "@/components/bookings/new-booking-request-drawer"
 import { BookingStatus } from "@/lib/status-badges"
 import type {
   CalendarSlotSelection,
@@ -361,15 +360,6 @@ export function EventsCalendar({
       {activeView === "Month" && (
         <MonthView currentDate={currentDate} onSlotClick={handleSlotClick} spaceFilter={spaceFilter} />
       )}
-
-      {!isEventsVariant ? (
-        <NewBookingRequestDrawer
-          open={showAddEventDialog}
-          onOpenChange={setShowAddEventDialog}
-          initialDate={selectedSlot?.date}
-          initialHour={selectedSlot?.hour}
-        />
-      ) : null}
 
       {/* Block Slot Dialog */}
       <Dialog open={showBlockDialog} onOpenChange={setShowBlockDialog}>

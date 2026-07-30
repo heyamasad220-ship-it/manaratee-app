@@ -20,9 +20,15 @@ import type { EventTicketingFormState } from "@/lib/tickets/ticket-types"
 type EventTicketingFieldsProps = {
   value: EventTicketingFormState
   onChange: (next: EventTicketingFormState) => void
+  /** Hide the Enable switch when the parent already handles enable/save. */
+  hideEnableSwitch?: boolean
 }
 
-export function EventTicketingFields({ value, onChange }: EventTicketingFieldsProps) {
+export function EventTicketingFields({
+  value,
+  onChange,
+  hideEnableSwitch = false,
+}: EventTicketingFieldsProps) {
   function update(partial: Partial<EventTicketingFormState>) {
     onChange({ ...value, ...partial })
   }
@@ -60,6 +66,8 @@ export function EventTicketingFields({ value, onChange }: EventTicketingFieldsPr
     })
   }
 
+  const showDetails = hideEnableSwitch || value.requiresTicketing
+
   return (
     <div className="space-y-4 rounded-lg border p-4">
       <div className="flex items-start justify-between gap-4">
@@ -72,19 +80,21 @@ export function EventTicketingFields({ value, onChange }: EventTicketingFieldsPr
             Sell tickets for dinners, seminars, galas, and other ticketed events.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Label htmlFor="requires-ticketing" className="text-sm">
-            Enable ticketing
-          </Label>
-          <Switch
-            id="requires-ticketing"
-            checked={value.requiresTicketing}
-            onCheckedChange={(checked) => update({ requiresTicketing: checked })}
-          />
-        </div>
+        {hideEnableSwitch ? null : (
+          <div className="flex items-center gap-2">
+            <Label htmlFor="requires-ticketing" className="text-sm">
+              Enable ticketing
+            </Label>
+            <Switch
+              id="requires-ticketing"
+              checked={value.requiresTicketing}
+              onCheckedChange={(checked) => update({ requiresTicketing: checked })}
+            />
+          </div>
+        )}
       </div>
 
-      {value.requiresTicketing ? (
+      {showDetails ? (
         <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">

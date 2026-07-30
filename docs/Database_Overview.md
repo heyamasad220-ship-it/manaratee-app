@@ -212,7 +212,9 @@ npm run validate:contacts-security -- --post-m4   # after 111
 * program_capacity_groups — S2 `offering_id` required (`177`); `program_id` retained for queries
 * program_schedule_items — S3 `offering_id` required (`178`); weekly class times edited on offering Schedule tab; optional `venue_id` for shared facility calendar/conflicts (`209`)
 * departments — RLS repair: `scripts/164_departments_rls_policies.sql` (org members can manage). App writes also authorize then use service role when needed. **`flyer_url` (migration `203`):** optional department flyer shown on HR → Departments cards.
-* venues — Spaces catalog under Facilities → Settings. **`color` + `flyer_url` (migration `204`):** card branding on Spaces settings (3-column grid like Departments). **Required:** run `scripts/204_venue_color_flyer.sql` in Supabase SQL Editor (includes `NOTIFY pgrst, 'reload schema'`) or color/flyer will not persist. **Per-day hours/rates:** `rental_space_pricing` (from `046`; seed `205`) — Sunday–Saturday open hours + flat/hourly; Spaces edit form replaces peak/non-peak buckets. **Calendar:** Facilities sidebar **Calendar** is `/facilities/calendar` (merged former Space Availability + Schedule); `/facilities/availability` redirects there. Module filtered views use `?sources=` against the same `resource_reservations` (+ program expand). **Overview:** `/facilities/overview` is the Facilities landing (read-only schedule metrics). **Inventory:** `facility_inventory_items` (migrations `207` + `208`) — Facilities → Inventory catalog with category, size/style/color, quantity, location, purchased_at, unit_cost, notes, active, sort_order. **Shared scheduling (migration `209`):** `program_schedule_items.venue_id`; `setup_minutes` / `cleanup_minutes` on `rental_reservations` and `internal_events` expand occupied windows in sync triggers to `resource_reservations`. Run **`scripts/209_shared_scheduling_foundation.sql`** after `208`.
+* venues — Spaces catalog under Facilities → Settings. **`color` + `flyer_url` (migration `204`):** card branding on Spaces settings (3-column grid like Departments). **Required:** run `scripts/204_venue_color_flyer.sql` in Supabase SQL Editor (includes `NOTIFY pgrst, 'reload schema'`) or color/flyer will not persist. **Per-day hours/rates:** `rental_space_pricing` (from `046`; seed `205`) — Sunday–Saturday open hours + flat/hourly; Spaces edit form replaces peak/non-peak buckets. **Calendar:** Facilities sidebar **Calendar** is `/facilities/calendar` (merged former Space Availability + Schedule); `/facilities/availability` redirects there. Module filtered views use `?sources=` against the same `resource_reservations` (+ program expand). **Overview:** `/facilities/overview` is the Facilities landing (read-only schedule metrics). **Inventory:** `facility_inventory_items` (migrations `207` + `208`) — Facilities → Inventory catalog with category, size/style/color, quantity, location, purchased_at, unit_cost, notes, active, sort_order. **Shared scheduling (migration `209`):** `program_schedule_items.venue_id`; `setup_minutes` / `cleanup_minutes` on `rental_reservations` and `internal_events` expand occupied windows in sync triggers to `resource_reservations`. Run **`scripts/209_shared_scheduling_foundation.sql`** after `208`. **Event location types (`210`):** `internal_events.location_type`, `location_address`. **Multi-venue events (`211`):** `internal_event_venues` junction; sync creates one `resource_reservations` row per venue; `internal_events.venue_id` remains primary. Run **`210`** then **`211`**. If submit fails with ON CONFLICT on resource_reservations, run **`212_fix_internal_event_sync_on_conflict.sql`**.
+* internal_event_venues — Facility spaces for an internal event (`211`). Unique `(internal_event_id, venue_id)`. Backfilled from `internal_events.venue_id`.
+* internal_events — **`flyer_url` (migration `214`):** optional event flyer on workspace Overview; uploads reuse `program-flyers` storage. Run `scripts/214_internal_event_flyer_url.sql` in Supabase SQL Editor (`NOTIFY pgrst, 'reload schema'`).
 * age_groups
 * program_sessions
 * program_schedule_items
@@ -537,6 +539,9 @@ staff_compliance.staff_id → staff.id
 * venues
 * facility_inventory_items (migrations `207` + `208` — Facilities → Inventory catalog)
 * venue_bookings
+* venue_rentals / rental_reservations / rental_payments (Venue Rentals workflow)
+
+**`rental_payments` ledger (migration `215`):** Charges and settlements share `rental_payments` rows. Totals (charges / received / credits / balance due) are **derived** in app code — not manually editable caches. Columns: `payment_method`, `reference_number`, `recorded_by`, `receipt_url`; types include installment / cleaning_fee / credit / adjustment / discount; statuses include pending / completed / failed / voided / partially_refunded (legacy paid_* statuses remain). Unique index on `stripe_payment_intent_id` for online idempotency. Completed payments are voided for corrections; pending charges may still be deleted.
 
 Key relationships:
 
@@ -545,6 +550,7 @@ schedule_activities.age_group_id → age_groups.id
 schedule_activities.category_id → schedule_categories.id
 schedule_activities.program_id → programs.id
 schedule_activities.session_id → schedule_sessions.id
+rental_payments.venue_rental_id → venue_rentals.id
 ```
 
 ---
