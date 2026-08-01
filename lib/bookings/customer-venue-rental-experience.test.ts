@@ -26,6 +26,7 @@ function baseRental(overrides: Partial<VenueRentalQueueRow> = {}): VenueRentalQu
     billingContactId: null,
     billingContactName: null,
     billingContactType: null,
+    eventTypeId: null,
     eventTypeName: "Birthday Party",
     spaces: [
       {
@@ -43,6 +44,10 @@ function baseRental(overrides: Partial<VenueRentalQueueRow> = {}): VenueRentalQu
     holdExpiresAt: null,
     hasConflict: false,
     hasReceivedPayment: false,
+    policiesSentAt: null,
+    policiesAgreedAt: null,
+    policiesDocumentUrlSnapshot: null,
+    pricingGuideUrlSnapshot: null,
     ...overrides,
   }
 }

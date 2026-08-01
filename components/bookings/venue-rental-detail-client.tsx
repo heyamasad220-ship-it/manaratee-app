@@ -22,15 +22,13 @@ import {
   declineVenueRentalRequest,
   extendVenueRentalHold,
   forceBookVenueRentalWithOverride,
+  markVenueRentalCompleted,
   markVenueRentalCompletedAndAwaitingRefund,
   markVenueRentalPending,
 } from "@/lib/bookings/venue-rental-actions"
 import { VenueRentalFinancialPanel } from "@/components/bookings/venue-rental-financial-panel"
+import { VenueRentalCustomerCard } from "@/components/bookings/venue-rental-customer-card"
 import type { VenueRentalEmployeePricingSuggestion } from "@/lib/bookings/venue-rental-employee-pricing"
-import {
-  formatVenueRentalSpaceLine,
-  getVenueRentalDisplayNotes,
-} from "@/lib/bookings/venue-rental-format"
 import {
   canStaffCancelVenueRental,
   canStaffForceBookVenueRental,
@@ -42,6 +40,7 @@ import {
 } from "@/lib/bookings/venue-rental-status"
 import type {
   RentalPaymentRecord,
+  VenueRentalOrgSettings,
   VenueRentalQueueRow,
   VenueRentalStatus,
 } from "@/lib/bookings/venue-rental-types"
@@ -80,8 +79,19 @@ type VenueRentalDetailClientProps = {
     spaceFee: number
     addonFees: number
     totalCharges: number
-    hours: number
+    hours?: number
+    discountAmount?: number
   } | null
+  venues?: Array<{ id: string; name: string }>
+  eventTypes?: Array<{ id: string; name: string }>
+  addons?: Array<{
+    id: string
+    name: string
+    slug: string
+    description: string | null
+    defaultPrice: number
+  }>
+  orgSettings?: VenueRentalOrgSettings | null
 }
 
 function isAwaitingPaymentStatus(status: VenueRentalStatus): boolean {
@@ -117,17 +127,26 @@ export function VenueRentalDetailClient({
   financialAction = null,
   from = null,
   quotedCharges = null,
+  venues = [],
+  eventTypes = [],
+  addons = [],
+  orgSettings = null,
 }: VenueRentalDetailClientProps) {
   const router = useRouter()
   const backNav = resolveVenueRentalBackNavigation(from)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  const securityDepositEnabled = Boolean(orgSettings?.securityDepositEnabled)
   const [depositAmount, setDepositAmount] = useState(
     employeePricing?.eligible
       ? String(employeePricing.suggestedDeposit)
       : "500"
   )
-  const [securityDepositAmount, setSecurityDepositAmount] = useState("0")
+  const [securityDepositAmount, setSecurityDepositAmount] = useState(
+    securityDepositEnabled && orgSettings?.defaultSecurityDepositAmount != null
+      ? String(orgSettings.defaultSecurityDepositAmount)
+      : "0"
+  )
   const [pendingNote, setPendingNote] = useState("")
   const [remainingBalanceAmount, setRemainingBalanceAmount] = useState(
     employeePricing?.eligible
@@ -142,6 +161,16 @@ export function VenueRentalDetailClient({
   const [showCancelDialog, setShowCancelDialog] = useState(false)
   const [forceBookReason, setForceBookReason] = useState("")
   const [showForceBookDialog, setShowForceBookDialog] = useState(false)
+  const [bypassPolicyAgreement, setBypassPolicyAgreement] = useState(false)
+
+  const requiresPolicyAgreement = Boolean(
+    rental.policiesDocumentUrlSnapshot ||
+      rental.pricingGuideUrlSnapshot ||
+      rental.policiesSentAt
+  )
+  const policiesAgreed = Boolean(rental.policiesAgreedAt)
+  const canApprovePolicies =
+    !requiresPolicyAgreement || policiesAgreed || bypassPolicyAgreement
 
   const statusClasses = getVenueRentalCalendarColorClasses(rental.calendarColor)
 
@@ -198,8 +227,6 @@ export function VenueRentalDetailClient({
       remainingPaid,
     })
   }, [paymentSummary.depositPaid, paymentSummary.securityPaid, payments])
-
-  const displayNotes = getVenueRentalDisplayNotes(rental.notes)
 
   async function submitCancellation() {
     await cancelVenueRental({
@@ -277,47 +304,12 @@ export function VenueRentalDetailClient({
         ) : null}
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Customer</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm">
-          <p className="font-medium">{rental.customerName}</p>
-          <p className="text-muted-foreground">
-            {rental.customerEmail || "No email on file"}
-          </p>
-          <p className="text-muted-foreground">
-            {rental.customerPhone || "No phone on file"}
-          </p>
-          {rental.eventTypeName ? (
-            <p>Event type: {rental.eventTypeName}</p>
-          ) : null}
-          {rental.spaces.map((space) => (
-            <p key={`${space.venueId}-${space.startAt}`}>
-              {formatVenueRentalSpaceLine(
-                space.venueName,
-                space.startAt,
-                space.endAt
-              )}
-            </p>
-          ))}
-          {displayNotes ? (
-            <p className="whitespace-pre-wrap text-muted-foreground">{displayNotes}</p>
-          ) : null}
-          {rental.addons.length ? (
-            <div className="pt-1">
-              <p className="mb-1 font-medium">Add-ons</p>
-              <ul className="space-y-1 text-muted-foreground">
-                {rental.addons.map((addon) => (
-                  <li key={addon.id}>
-                    {addon.name} × {addon.quantity}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
+      <VenueRentalCustomerCard
+        rental={rental}
+        canManage={canManage}
+        venues={venues}
+        eventTypes={eventTypes}
+      />
 
       {canManage && canViewFinance && isVenueRentalReviewable(rental.status) ? (
         <Card>
@@ -325,6 +317,49 @@ export function VenueRentalDetailClient({
             <CardTitle className="text-base">Review request</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-2">
+            {requiresPolicyAgreement ? (
+              <div
+                className={`md:col-span-2 rounded-md border px-3 py-2 text-sm ${
+                  policiesAgreed
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                    : "border-amber-200 bg-amber-50 text-amber-950"
+                }`}
+              >
+                {policiesAgreed ? (
+                  <p>
+                    Customer agreed to policies
+                    {rental.policiesAgreedAt
+                      ? ` on ${new Date(rental.policiesAgreedAt).toLocaleString()}`
+                      : ""}
+                    .
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="font-medium">
+                      Waiting for customer to agree to policies
+                    </p>
+                    <p className="text-amber-900/90">
+                      Documents were sent with the request. Approve is blocked until
+                      they agree in the customer portal, unless you bypass below.
+                    </p>
+                    <label className="flex items-start gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        className="mt-1"
+                        checked={bypassPolicyAgreement}
+                        onChange={(event) =>
+                          setBypassPolicyAgreement(event.target.checked)
+                        }
+                      />
+                      <span>
+                        Bypass policy agreement for this approval (exception /
+                        walk-in)
+                      </span>
+                    </label>
+                  </div>
+                )}
+              </div>
+            ) : null}
             {employeePricing?.eligible ? (
               <div className="md:col-span-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
                 <p className="font-medium">
@@ -352,21 +387,38 @@ export function VenueRentalDetailClient({
                 onChange={(e) => setRemainingBalanceAmount(e.target.value)}
               />
             </div>
+            {securityDepositEnabled ? (
+              <div className="grid gap-2">
+                <Label>Security deposit (refundable)</Label>
+                <Input
+                  value={securityDepositAmount}
+                  onChange={(e) => setSecurityDepositAmount(e.target.value)}
+                />
+              </div>
+            ) : null}
             <p className="md:col-span-2 text-sm text-muted-foreground">
               After approval the customer must pay the deposit before the hold expires.
-              Paying the deposit confirms the booking. Card on file covers damage if needed
-              (security deposit not required).
+              Paying the deposit confirms the booking.
+              {securityDepositEnabled
+                ? " A refundable security deposit can be collected and returned after the event."
+                : " Card on file covers damage or extras if needed (security deposit not required for this organization)."}
             </p>
             <div className="md:col-span-2 flex flex-wrap gap-2">
               <Button
-                disabled={isPending}
+                disabled={isPending || !canApprovePolicies}
                 onClick={() =>
                   runAction(async () => {
                     await approveVenueRentalRequest({
                       venueRentalId: rental.id,
                       depositAmount: Number(depositAmount || 0),
-                      securityDepositAmount: Number(securityDepositAmount || 0) || undefined,
+                      securityDepositAmount: securityDepositEnabled
+                        ? Number(securityDepositAmount || 0) || undefined
+                        : undefined,
                       remainingBalanceAmount: Number(remainingBalanceAmount || 0) || undefined,
+                      bypassPolicyAgreement:
+                        requiresPolicyAgreement &&
+                        !policiesAgreed &&
+                        bypassPolicyAgreement,
                     })
                   })
                 }
@@ -457,33 +509,71 @@ export function VenueRentalDetailClient({
           canManage={canManage}
           initialAction={financialAction}
           quotedCharges={quotedCharges}
+          addons={addons}
+          securityDepositEnabled={securityDepositEnabled}
         />
       ) : null}
 
-      {canManage && rental.status === VENUE_RENTAL_STATUSES.confirmed ? (
+      {canManage &&
+      (rental.status === VENUE_RENTAL_STATUSES.confirmed ||
+        rental.status === VENUE_RENTAL_STATUSES.depositPaid ||
+        rental.status === VENUE_RENTAL_STATUSES.securityDepositPaid) ? (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Post-event inspection</CardTitle>
+            <CardTitle className="text-base">
+              {securityDepositEnabled || paymentSummary.securityPaid
+                ? "Post-event inspection"
+                : "Complete rental"}
+            </CardTitle>
           </CardHeader>
-          <CardContent>
-            <Button
-              disabled={isPending}
-              onClick={() =>
-                runAction(async () => {
-                  await markVenueRentalCompletedAndAwaitingRefund({
-                    venueRentalId: rental.id,
-                  })
-                })
-              }
-            >
-              Mark completed &amp; awaiting refund approval
-            </Button>
+          <CardContent className="space-y-3">
+            {securityDepositEnabled || paymentSummary.securityPaid ? (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  After the event, mark inspection complete to start the security
+                  deposit refund review.
+                </p>
+                <Button
+                  disabled={isPending}
+                  onClick={() =>
+                    runAction(async () => {
+                      await markVenueRentalCompletedAndAwaitingRefund({
+                        venueRentalId: rental.id,
+                      })
+                    })
+                  }
+                >
+                  Mark completed &amp; awaiting refund approval
+                </Button>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  Rentals also auto-complete after the event ends. Use this if you
+                  need to close the booking manually. Charge extras (damage,
+                  cleaning) from Financial → Add charge.
+                </p>
+                <Button
+                  disabled={isPending}
+                  onClick={() =>
+                    runAction(async () => {
+                      await markVenueRentalCompleted({
+                        venueRentalId: rental.id,
+                      })
+                    })
+                  }
+                >
+                  Mark completed
+                </Button>
+              </>
+            )}
           </CardContent>
         </Card>
       ) : null}
 
       {canManage &&
       canViewFinance &&
+      (securityDepositEnabled || paymentSummary.securityPaid) &&
       rental.status === VENUE_RENTAL_STATUSES.awaitingSecurityDepositRefundApproval ? (
         <Card>
           <CardHeader>

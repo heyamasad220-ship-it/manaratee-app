@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation"
 
 export default function BookingsSettingsPage() {
-  redirect("/bookings/settings/notifications")
+  redirect("/bookings/settings/general")
 }

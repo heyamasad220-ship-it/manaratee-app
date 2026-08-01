@@ -5,7 +5,6 @@ import { Loader2, Pencil, Plus, Trash2 } from "lucide-react"
 
 import { Header } from "@/components/layout/header"
 import { VenueRentalsSettingsNav } from "@/components/bookings/venue-rentals-settings-nav"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -22,7 +21,6 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
 import {
   Table,
   TableBody,
@@ -42,15 +40,11 @@ type EventTypeFormState = {
   id?: string
   name: string
   description: string
-  is_active: boolean
-  sort_order: number
 }
 
 const emptyForm = (): EventTypeFormState => ({
   name: "",
   description: "",
-  is_active: true,
-  sort_order: 0,
 })
 
 export function VenueRentalEventTypesClient({
@@ -74,8 +68,6 @@ export function VenueRentalEventTypesClient({
       id: row.id,
       name: row.name,
       description: row.description || "",
-      is_active: row.is_active,
-      sort_order: row.sort_order,
     })
     setError(null)
     setDialogOpen(true)
@@ -90,8 +82,6 @@ export function VenueRentalEventTypesClient({
           id: form.id,
           name: form.name,
           description: form.description,
-          is_active: form.is_active,
-          sort_order: form.sort_order,
         })
         setDialogOpen(false)
       } catch (saveError) {
@@ -149,8 +139,6 @@ export function VenueRentalEventTypesClient({
               <TableHeader>
                 <TableRow>
                   <TableHead className="sr-only">Event type</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Sort</TableHead>
                   <TableHead className="w-[120px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -158,7 +146,7 @@ export function VenueRentalEventTypesClient({
                 {venueRentalEventTypes.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={4}
+                      colSpan={2}
                       className="h-24 text-center text-muted-foreground"
                     >
                       No event types yet.
@@ -175,12 +163,6 @@ export function VenueRentalEventTypesClient({
                           </p>
                         ) : null}
                       </TableCell>
-                      <TableCell>
-                        <Badge variant={row.is_active ? "default" : "secondary"}>
-                          {row.is_active ? "Active" : "Inactive"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{row.sort_order}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
                           <Button
@@ -250,36 +232,6 @@ export function VenueRentalEventTypesClient({
                 }
                 rows={3}
                 placeholder="Optional description for staff"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="type-sort">Sort order</Label>
-              <Input
-                id="type-sort"
-                type="number"
-                value={form.sort_order}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    sort_order: Number(event.target.value) || 0,
-                  }))
-                }
-              />
-            </div>
-
-            <div className="flex items-center justify-between rounded-md border p-3">
-              <div>
-                <p className="text-sm font-medium">Active</p>
-                <p className="text-xs text-muted-foreground">
-                  Inactive types are hidden on new forms.
-                </p>
-              </div>
-              <Switch
-                checked={form.is_active}
-                onCheckedChange={(checked) =>
-                  setForm((current) => ({ ...current, is_active: checked }))
-                }
               />
             </div>
           </div>

@@ -6,6 +6,7 @@ import { CustomerRentalDocumentsSection } from "@/components/customer/rentals/cu
 import { CustomerRentalMessagesPlaceholder } from "@/components/customer/rentals/customer-rental-messages-placeholder"
 import { CustomerRentalNextActionPanel } from "@/components/customer/rentals/customer-rental-next-action-panel"
 import { CustomerRentalPaymentsSection } from "@/components/customer/rentals/customer-rental-payments-section"
+import { CustomerRentalPoliciesAgreement } from "@/components/customer/rentals/customer-rental-policies-agreement"
 import { CustomerRentalRentalDetailsSection } from "@/components/customer/rentals/customer-rental-details-section"
 import { CustomerRentalTimeline } from "@/components/customer/rentals/customer-rental-timeline"
 import { Button } from "@/components/ui/button"
@@ -15,7 +16,10 @@ import {
   getCustomerRentalNextAction,
   getCustomerRentalTimelineStages,
 } from "@/lib/bookings/customer-venue-rental-experience"
-import { getVenueRentalCalendarColorClasses } from "@/lib/bookings/venue-rental-status"
+import {
+  getVenueRentalCalendarColorClasses,
+  isVenueRentalReviewable,
+} from "@/lib/bookings/venue-rental-status"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 
@@ -57,6 +61,14 @@ export function CustomerRentalDetailView({ detail }: CustomerRentalDetailViewPro
       </div>
 
       <CustomerRentalNextActionPanel nextAction={nextAction} contract={contract} />
+
+      <CustomerRentalPoliciesAgreement
+        venueRentalId={rental.id}
+        policiesDocumentUrl={rental.policiesDocumentUrlSnapshot}
+        pricingGuideUrl={rental.pricingGuideUrlSnapshot}
+        policiesAgreedAt={rental.policiesAgreedAt}
+        canAgree={isVenueRentalReviewable(rental.status)}
+      />
 
       <CustomerRentalTimeline stages={timelineStages} />
 

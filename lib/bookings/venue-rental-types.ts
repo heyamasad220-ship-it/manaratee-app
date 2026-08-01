@@ -256,6 +256,7 @@ export interface VenueRentalQueueRow {
   billingContactId: string | null
   billingContactName: string | null
   billingContactType: "individual" | "organization" | null
+  eventTypeId: string | null
   eventTypeName: string | null
   spaces: VenueRentalSpaceSummary[]
   addons: VenueRentalAddonSummary[]
@@ -267,6 +268,20 @@ export interface VenueRentalQueueRow {
   hasConflict: boolean
   /** True when any deposit/security/balance payment has been marked paid. */
   hasReceivedPayment: boolean
+  /** When org policy docs were stamped for this rental (submit). */
+  policiesSentAt: string | null
+  /** When the customer agreed to org policy/pricing documents. */
+  policiesAgreedAt: string | null
+  policiesDocumentUrlSnapshot: string | null
+  pricingGuideUrlSnapshot: string | null
+}
+
+/** Staff in-place edit of rental request details (spaces, notes, event type). */
+export interface UpdateVenueRentalRequestDetailsInput {
+  venueRentalId: string
+  venueRentalEventTypeId?: string | null
+  notes?: string | null
+  spaces: RentalSpaceSlotInput[]
 }
 
 export type VenueRentalPaymentBalanceFilter =
@@ -356,6 +371,7 @@ export interface VenueRentalDashboardStats {
 export interface RentalAddonCatalogItem {
   id: string
   name: string
+  slug: string
   description: string | null
   defaultPrice: number
 }
@@ -367,6 +383,37 @@ export interface RentalAddonSettingsItem {
   slug: string
   description: string | null
   defaultPrice: number
+  isActive: boolean
+  sortOrder: number
+}
+
+export type VenueRentalDiscountType = "fixed" | "percent"
+
+/** Per-org Venue Rentals → Settings → General. */
+export type VenueRentalApprovalMode = "manual" | "auto_after_agreement"
+
+export interface VenueRentalOrgSettings {
+  securityDepositEnabled: boolean
+  defaultSecurityDepositAmount: number | null
+  policiesDocumentUrl: string | null
+  policiesDocumentName: string | null
+  pricingGuideUrl: string | null
+  pricingGuideName: string | null
+  /** manual = staff approve after agree; auto_after_agreement = approve on agree. */
+  approvalMode: VenueRentalApprovalMode
+}
+
+/** Staff Settings → Discounts catalog row. */
+export interface VenueRentalDiscountPolicySettingsItem {
+  id: string
+  name: string
+  description: string | null
+  discountType: VenueRentalDiscountType
+  amount: number
+  requiresMultiVenue: boolean
+  minVenues: number
+  discountTagId: string | null
+  discountTagName: string | null
   isActive: boolean
   sortOrder: number
 }

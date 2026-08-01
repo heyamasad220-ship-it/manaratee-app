@@ -10,12 +10,12 @@
   "skippedMissingVenueRecord": 0,
   "mergedDuplicates": 5,
   "plannedRentals": 148,
-  "contactsMatched": 148,
+  "contactsMatched": 142,
   "contactsCreated": 0,
-  "groupMemberships": 148,
-  "rentalsCreated": 148,
-  "reservationsCreated": 172,
-  "alreadyImported": 0,
+  "groupMemberships": 142,
+  "rentalsCreated": 142,
+  "reservationsCreated": 164,
+  "alreadyImported": 6,
   "errors": [],
   "sample": [
     {
@@ -217,5 +217,6 @@
       "venue": "Main Prayer Hall - $0",
       "name": "Firas Tameemi"
     }
-  ]
+  ],
+  "eventTypesCreated": 4
 }

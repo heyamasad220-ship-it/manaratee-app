@@ -97,6 +97,12 @@ export const VENUE_RENTAL_STAFF_NOTIFICATION_EVENTS: NotificationEventDefinition
     defaultEnabled: true,
   },
   {
+    key: "policies_agreed",
+    label: "Policies agreed",
+    description: "Notify staff when a customer agrees to policies and is ready for review.",
+    defaultEnabled: true,
+  },
+  {
     key: "payment_received",
     label: "Payment received",
     description: "Notify staff when a rental payment is recorded.",
@@ -118,6 +124,13 @@ export const VENUE_RENTAL_STAFF_NOTIFICATION_EVENTS: NotificationEventDefinition
 
 export const VENUE_RENTAL_CUSTOMER_NOTIFICATION_EVENTS: NotificationEventDefinition[] =
   [
+    {
+      key: "policies_documents_sent",
+      label: "Policies documents sent",
+      description:
+        "Notify the customer to review and agree to policies/pricing after a request is submitted.",
+      defaultEnabled: true,
+    },
     {
       key: "request_received",
       label: "Request received",

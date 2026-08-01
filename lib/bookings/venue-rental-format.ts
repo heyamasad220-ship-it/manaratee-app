@@ -168,6 +168,9 @@ export function formatVenueRentalSpaceLine(
   return `${venueName}, ${date}, ${time}`
 }
 
+const GOOGLE_FORM_NOTES_BODY =
+  /^Notes:\s*([\s\S]+?)(?=\n(?:\[|VENUE_RENTAL_|Form submitted|Sheet |Event type|Setup:|Food:|Special needs|Admission|\(Payments)|$)/im
+
 /**
  * Hide Google Form import metadata from staff UI; keep only the customer's Notes line when present.
  */
@@ -177,12 +180,70 @@ export function getVenueRentalDisplayNotes(
   if (!notes?.trim()) return null
 
   if (/VENUE_RENTAL_GOOGLE_FORM_V1/i.test(notes)) {
-    const match = notes.match(
-      /^Notes:\s*(.+?)(?=\n(?:\[|VENUE_RENTAL_|Form submitted|Sheet |Event type|Setup:|Food:|Special needs|Admission|\(Payments)|$)/ims
-    )
+    const match = notes.match(GOOGLE_FORM_NOTES_BODY)
     const customerNotes = match?.[1]?.trim()
     return customerNotes || null
   }
 
   return notes.trim()
+}
+
+/**
+ * Write customer-facing notes back without wiping Google Form import metadata
+ * (or staff-appended Pending/Cancel lines on non-import rentals).
+ */
+export function mergeVenueRentalCustomerNotes(
+  existingNotes: string | null | undefined,
+  customerNotes: string | null | undefined
+): string | null {
+  const next = customerNotes?.trim() || ""
+  const existing = existingNotes?.trim() || ""
+
+  if (!existing) {
+    return next || null
+  }
+
+  if (/VENUE_RENTAL_GOOGLE_FORM_V1/i.test(existing)) {
+    if (GOOGLE_FORM_NOTES_BODY.test(existing)) {
+      const replaced = existing.replace(
+        GOOGLE_FORM_NOTES_BODY,
+        next ? `Notes: ${next}` : "Notes:"
+      )
+      return replaced.replace(/\nNotes:\s*\n/g, "\n").trim() || existing
+    }
+
+    if (!next) {
+      return existing
+    }
+
+    return `Notes: ${next}\n${existing}`
+  }
+
+  return next || null
+}
+
+/** Keep import "Event type:" line in sync when staff change the catalog event type. */
+export function mergeVenueRentalEventTypeInNotes(
+  existingNotes: string | null | undefined,
+  eventTypeName: string | null | undefined
+): string | null {
+  const existing = existingNotes?.trim() || ""
+  const name = eventTypeName?.trim() || ""
+
+  if (!existing) {
+    return existing || null
+  }
+
+  if (/^Event type:\s*/im.test(existing)) {
+    if (!name) {
+      return existing.replace(/^Event type:\s*.+$/im, "").replace(/\n{3,}/g, "\n\n").trim() || null
+    }
+    return existing.replace(/^Event type:\s*.+$/im, `Event type: ${name}`)
+  }
+
+  if (!name || !/VENUE_RENTAL_GOOGLE_FORM_V1/i.test(existing)) {
+    return existing || null
+  }
+
+  return `${existing}\nEvent type: ${name}`
 }

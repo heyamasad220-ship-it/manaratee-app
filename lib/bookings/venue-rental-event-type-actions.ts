@@ -19,8 +19,6 @@ type UpsertVenueRentalEventTypeInput = {
   id?: string
   name: string
   description?: string | null
-  is_active?: boolean
-  sort_order?: number
 }
 
 async function assertCanManageVenueRentalEventTypes() {
@@ -56,23 +54,17 @@ export async function upsertVenueRentalEventType(
     throw new Error("Event type name must contain letters or numbers.")
   }
 
-  const payload = {
-    organization_id: organizationId,
-    name,
-    slug,
-    description: input.description?.trim() || null,
-    is_active: input.is_active ?? true,
-    sort_order: input.sort_order ?? 0,
-  }
+  const description = input.description?.trim() || null
 
   if (input.id) {
     const { error } = await supabase
       .from("venue_rental_event_types")
       .update({
         name,
-        description: input.description?.trim() || null,
-        is_active: input.is_active ?? true,
-        sort_order: input.sort_order ?? 0,
+        slug,
+        description,
+        // Always keep edited types available on forms; remove via delete instead.
+        is_active: true,
       })
       .eq("id", input.id)
       .eq("organization_id", organizationId)
@@ -82,9 +74,14 @@ export async function upsertVenueRentalEventType(
       throw new Error("Failed to update event type")
     }
   } else {
-    const { error } = await supabase
-      .from("venue_rental_event_types")
-      .insert(payload)
+    const { error } = await supabase.from("venue_rental_event_types").insert({
+      organization_id: organizationId,
+      name,
+      slug,
+      description,
+      is_active: true,
+      sort_order: 0,
+    })
 
     if (error) {
       console.error(error)

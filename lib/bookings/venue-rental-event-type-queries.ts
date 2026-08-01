@@ -19,7 +19,6 @@ export async function getVenueRentalEventTypes(options?: {
     .from("venue_rental_event_types")
     .select("*")
     .eq("organization_id", organizationId)
-    .order("sort_order", { ascending: true })
     .order("name", { ascending: true })
 
   if (options?.activeOnly) {

@@ -136,6 +136,62 @@ export function isPendingPaymentStatus(status: string) {
   )
 }
 
+/** Map a catalog add-on to the ledger payment_type used for Add charge. */
+export function venueRentalChargePaymentTypeForAddon(input: {
+  slug?: string | null
+  name?: string | null
+}): "addon_fee" | "cleaning_fee" | "adjustment" {
+  const slug = (input.slug || "").trim().toLowerCase()
+  const name = (input.name || "").trim().toLowerCase()
+
+  if (
+    slug === "extra-cleaning" ||
+    slug === "cleaning-fee" ||
+    name === "extra cleaning"
+  ) {
+    return "cleaning_fee"
+  }
+
+  if (
+    slug === "damage-charge" ||
+    slug === "damage" ||
+    name === "damage charge" ||
+    name.startsWith("damage")
+  ) {
+    return "adjustment"
+  }
+
+  return "addon_fee"
+}
+
+/** Resolve a staff-entered fixed/$ or % discount into a positive dollar amount. */
+export function resolveVenueRentalDiscountDollarAmount(input: {
+  discountType: "fixed" | "percent"
+  amount: number
+  /** Total charges (or other basis) used when discountType is percent. */
+  basisAmount?: number
+}): number {
+  const amount = Number(input.amount)
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new Error("Enter a discount amount greater than zero.")
+  }
+
+  if (input.discountType === "fixed") {
+    return Math.round(amount * 100) / 100
+  }
+
+  if (amount > 100) {
+    throw new Error("Percent discount cannot exceed 100%.")
+  }
+
+  const basis = Number(input.basisAmount)
+  if (!Number.isFinite(basis) || basis <= 0) {
+    throw new Error("Cannot apply a percent discount when total charges are zero.")
+  }
+
+  return Math.round(basis * (amount / 100) * 100) / 100
+}
+
 export function transactionStatusLabel(status: string): string {
   switch (status) {
     case RENTAL_PAYMENT_STATUSES.unpaid:
@@ -168,7 +224,7 @@ export function paymentMethodLabel(method: string | null | undefined): string {
     case RENTAL_PAYMENT_METHODS.ach:
       return "ACH"
     case RENTAL_PAYMENT_METHODS.cardTerminal:
-      return "Card terminal"
+      return "Credit / debit card"
     case RENTAL_PAYMENT_METHODS.online:
       return "Online"
     case RENTAL_PAYMENT_METHODS.other:
@@ -545,6 +601,7 @@ export function deriveVenueRentalStaffNextAction(input: {
 }
 
 export function rentalHasFinancialActivity(input: {
+  rentalStatus: VenueRentalStatus
   totalCharges: number
   amountReceived: number
   refundedAmount: number
@@ -552,6 +609,23 @@ export function rentalHasFinancialActivity(input: {
   paymentStatus: VenueRentalPaymentLedgerStatus
   paymentCount: number
 }): boolean {
+  // Declined / cancelled-before-payment / hold expired with no money collected
+  // never belong on Payments — there is nothing to collect or refund.
+  if (
+    !venueRentalHasCollectedOrRefundedFunds({
+      amountReceived: input.amountReceived,
+      refundedAmount: input.refundedAmount,
+    }) &&
+    isVenueRentalExcludedFromPaymentsWithoutCollection(input.rentalStatus)
+  ) {
+    return false
+  }
+
+  // Cancelled after payment always stays on Payments for refund / settlement.
+  if (input.rentalStatus === VENUE_RENTAL_STATUSES.cancelledAfterPayment) {
+    return true
+  }
+
   if (input.paymentCount > 0) return true
   if (input.totalCharges > 0) return true
   if (input.amountReceived > 0) return true
@@ -565,6 +639,24 @@ export function rentalHasFinancialActivity(input: {
     return true
   }
   return false
+}
+
+/** Statuses that must not appear on Payments unless money was already collected. */
+export function isVenueRentalExcludedFromPaymentsWithoutCollection(
+  status: VenueRentalStatus
+): boolean {
+  return (
+    status === VENUE_RENTAL_STATUSES.declined ||
+    status === VENUE_RENTAL_STATUSES.cancelledBeforePayment ||
+    status === VENUE_RENTAL_STATUSES.holdExpired
+  )
+}
+
+export function venueRentalHasCollectedOrRefundedFunds(input: {
+  amountReceived: number
+  refundedAmount: number
+}): boolean {
+  return input.amountReceived > 0 || input.refundedAmount > 0
 }
 
 export function matchesVenueRentalPaymentLedgerView(

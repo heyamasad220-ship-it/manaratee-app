@@ -1,19 +1,15 @@
 "use client"
 
-import { useEffect, useMemo, useState, useTransition } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import {
   Clock,
   DollarSign,
-  MoreHorizontal,
   Plus,
 } from "lucide-react"
 
 import { formatVenueRentalTimeRange } from "@/lib/bookings/venue-rental-format"
-import {
-  getVenueRentalStatusBadgeClasses,
-  isVenueRentalReviewable,
-} from "@/lib/bookings/venue-rental-status"
+import { getVenueRentalStatusBadgeClasses } from "@/lib/bookings/venue-rental-status"
 import type {
   VenueRentalDashboardStats,
   VenueRentalQueueRow,
@@ -21,45 +17,16 @@ import type {
 } from "@/lib/bookings/venue-rental-types"
 import { VENUE_RENTAL_STATUSES } from "@/lib/bookings/venue-rental-types"
 import {
-  approveVenueRentalRequest,
-  markVenueRentalPending,
-} from "@/lib/bookings/venue-rental-actions"
-import {
   VenueRentalCreateDialog,
   type VenueRentalCreateEventTypeOption,
   type VenueRentalCreateVenueOption,
 } from "@/components/bookings/venue-rental-create-dialog"
 import type { RoomSetupStyle } from "@/lib/setup-styles/setup-style-types"
 import type { RentalAddonCatalogItem } from "@/lib/bookings/venue-rental-types"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { ListPagination } from "@/components/ui/list-pagination"
 import { StatCard } from "@/components/ui/stat-card"
 import {
@@ -107,14 +74,6 @@ type VenueRentalRequestsQueueProps = {
   addons?: RentalAddonCatalogItem[]
 }
 
-function isConfirmedRequestStatus(status: VenueRentalStatus): boolean {
-  return (
-    status === VENUE_RENTAL_STATUSES.confirmed ||
-    status === VENUE_RENTAL_STATUSES.depositPaid ||
-    status === VENUE_RENTAL_STATUSES.securityDepositPaid
-  )
-}
-
 function isPendingRequestStatus(status: VenueRentalStatus): boolean {
   return (
     status === VENUE_RENTAL_STATUSES.pending ||
@@ -122,20 +81,19 @@ function isPendingRequestStatus(status: VenueRentalStatus): boolean {
   )
 }
 
-function isCancelledRequestStatus(status: VenueRentalStatus): boolean {
-  return (
-    status === VENUE_RENTAL_STATUSES.cancelledBeforePayment ||
-    status === VENUE_RENTAL_STATUSES.cancelledAfterPayment
-  )
-}
-
-/** Post-intake statuses hidden from the working All queue (handled on Payments / history). */
 function isHistoryRequestStatus(status: VenueRentalStatus): boolean {
   return (
-    isConfirmedRequestStatus(status) ||
+    status === VENUE_RENTAL_STATUSES.confirmed ||
+    status === VENUE_RENTAL_STATUSES.depositPaid ||
+    status === VENUE_RENTAL_STATUSES.securityDepositPaid ||
     status === VENUE_RENTAL_STATUSES.completed ||
-    isCancelledRequestStatus(status) ||
-    status === VENUE_RENTAL_STATUSES.declined
+    status === VENUE_RENTAL_STATUSES.cancelledBeforePayment ||
+    status === VENUE_RENTAL_STATUSES.cancelledAfterPayment ||
+    status === VENUE_RENTAL_STATUSES.declined ||
+    status === VENUE_RENTAL_STATUSES.holdExpired ||
+    status === VENUE_RENTAL_STATUSES.awaitingSecurityDepositRefundApproval ||
+    status === VENUE_RENTAL_STATUSES.securityDepositRefunded ||
+    status === VENUE_RENTAL_STATUSES.closed
   )
 }
 
@@ -144,22 +102,27 @@ function matchesStatusFilter(
   statusFilter: StatusFilter
 ): boolean {
   if (statusFilter === "all") return true
-  if (statusFilter === "submitted") {
-    return status === VENUE_RENTAL_STATUSES.submitted
-  }
+  if (statusFilter === "submitted") return status === VENUE_RENTAL_STATUSES.submitted
   if (statusFilter === "pending") return isPendingRequestStatus(status)
   if (statusFilter === "approved") {
     return status === VENUE_RENTAL_STATUSES.approvedPendingPayment
   }
-  if (statusFilter === "confirmed") return isConfirmedRequestStatus(status)
-  if (statusFilter === "completed") {
-    return status === VENUE_RENTAL_STATUSES.completed
+  if (statusFilter === "confirmed") {
+    return (
+      status === VENUE_RENTAL_STATUSES.confirmed ||
+      status === VENUE_RENTAL_STATUSES.depositPaid ||
+      status === VENUE_RENTAL_STATUSES.securityDepositPaid
+    )
   }
-  if (statusFilter === "cancelled") return isCancelledRequestStatus(status)
-  if (statusFilter === "declined") {
-    return status === VENUE_RENTAL_STATUSES.declined
+  if (statusFilter === "completed") return status === VENUE_RENTAL_STATUSES.completed
+  if (statusFilter === "cancelled") {
+    return (
+      status === VENUE_RENTAL_STATUSES.cancelledBeforePayment ||
+      status === VENUE_RENTAL_STATUSES.cancelledAfterPayment
+    )
   }
-  return false
+  if (statusFilter === "declined") return status === VENUE_RENTAL_STATUSES.declined
+  return true
 }
 
 export function VenueRentalRequestsQueue({
@@ -174,20 +137,12 @@ export function VenueRentalRequestsQueue({
   addons = [],
 }: VenueRentalRequestsQueueProps) {
   const router = useRouter()
-  const [isPending, startTransition] = useTransition()
   const [customerFilterInput, setCustomerFilterInput] = useState("")
   const [customerFilter, setCustomerFilter] = useState("")
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(defaultStatusFilter)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_LIST_PAGE_SIZE)
   const [createOpen, setCreateOpen] = useState(false)
-  const [actionError, setActionError] = useState<string | null>(null)
-
-  const [approveRow, setApproveRow] = useState<VenueRentalQueueRow | null>(null)
-  const [depositAmount, setDepositAmount] = useState("0")
-  const [remainingBalanceAmount, setRemainingBalanceAmount] = useState("0")
-
-  const [pendingRow, setPendingRow] = useState<VenueRentalQueueRow | null>(null)
 
   const filteredRows = useMemo(() => {
     const showHistory =
@@ -222,6 +177,14 @@ export function VenueRentalRequestsQueue({
     setPage(1)
   }, [customerFilter, statusFilter])
 
+  useEffect(() => {
+    const timer = window.setTimeout(
+      () => setCustomerFilter(customerFilterInput.trim()),
+      250
+    )
+    return () => window.clearTimeout(timer)
+  }, [customerFilterInput])
+
   const currentPage = Math.min(
     page,
     Math.max(1, Math.ceil(filteredRows.length / pageSize) || 1)
@@ -230,19 +193,6 @@ export function VenueRentalRequestsQueue({
     () => slicePageItems(filteredRows, currentPage, pageSize),
     [filteredRows, currentPage, pageSize]
   )
-
-  function runAction(action: () => Promise<void>, onDone?: () => void) {
-    setActionError(null)
-    startTransition(async () => {
-      try {
-        await action()
-        onDone?.()
-        router.refresh()
-      } catch (error) {
-        setActionError(error instanceof Error ? error.message : "Action failed.")
-      }
-    })
-  }
 
   return (
     <div className="flex flex-col gap-4 sm:gap-6 p-4 sm:p-6">
@@ -282,39 +232,29 @@ export function VenueRentalRequestsQueue({
         </div>
       </div>
 
-      {actionError ? (
-        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          {actionError}
-        </div>
-      ) : null}
-
-      <Card className="overflow-hidden">
+      <Card>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <Table className="min-w-[700px]">
+            <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>
                     <TableColumnHeaderFilter
                       label="Customer"
-                      active={Boolean(customerFilter.trim())}
+                      active={Boolean(customerFilter)}
+                      onClear={() => {
+                        setCustomerFilterInput("")
+                        setCustomerFilter("")
+                      }}
                     >
-                      {({ close }) => (
-                        <Input
-                          placeholder="Search by name, email, or phone"
-                          value={customerFilterInput}
-                          onChange={(event) => {
-                            setCustomerFilterInput(event.target.value)
-                            setCustomerFilter(event.target.value)
-                          }}
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter") {
-                              setCustomerFilter(customerFilterInput)
-                              close()
-                            }
-                          }}
-                        />
-                      )}
+                      <Input
+                        value={customerFilterInput}
+                        onChange={(event) =>
+                          setCustomerFilterInput(event.target.value)
+                        }
+                        placeholder="Search name, email, phone"
+                        className="h-8"
+                      />
                     </TableColumnHeaderFilter>
                   </TableHead>
                   <TableHead>Date / Spaces</TableHead>
@@ -323,46 +263,45 @@ export function VenueRentalRequestsQueue({
                     <TableColumnHeaderFilter
                       label="Status"
                       active={statusFilter !== "all"}
+                      onClear={() => setStatusFilter("all")}
                     >
-                      {({ close }) => (
-                        <Select
-                          value={statusFilter}
-                          onValueChange={(value) => {
-                            setStatusFilter(value as StatusFilter)
-                            close()
-                          }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select status" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All</SelectItem>
-                            <SelectItem value="submitted">Submitted</SelectItem>
-                            <SelectItem value="pending">Pending</SelectItem>
-                            <SelectItem value="approved">Approved</SelectItem>
-                            <SelectItem value="confirmed">Confirmed</SelectItem>
-                            <SelectItem value="completed">Completed</SelectItem>
-                            <SelectItem value="cancelled">Cancelled</SelectItem>
-                            <SelectItem value="declined">Declined</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      )}
+                      <Select
+                        value={statusFilter}
+                        onValueChange={(value) =>
+                          setStatusFilter(value as StatusFilter)
+                        }
+                      >
+                        <SelectTrigger className="h-8">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All</SelectItem>
+                          <SelectItem value="submitted">Submitted</SelectItem>
+                          <SelectItem value="pending">Pending</SelectItem>
+                          <SelectItem value="approved">Approved</SelectItem>
+                          <SelectItem value="confirmed">Confirmed</SelectItem>
+                          <SelectItem value="completed">Completed</SelectItem>
+                          <SelectItem value="cancelled">Cancelled</SelectItem>
+                          <SelectItem value="declined">Declined</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </TableColumnHeaderFilter>
                   </TableHead>
-                  <TableHead className="w-12" />
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {pagedRows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
+                    <TableCell
+                      colSpan={4}
+                      className="h-32 text-center text-muted-foreground"
+                    >
                       No venue rental requests found.
                     </TableCell>
                   </TableRow>
                 ) : (
                   pagedRows.map((row) => {
                     const colors = getVenueRentalStatusBadgeClasses(row.status)
-                    const canReview = canManage && isVenueRentalReviewable(row.status)
                     return (
                       <TableRow
                         key={row.id}
@@ -391,7 +330,10 @@ export function VenueRentalRequestsQueue({
                               className="py-0.5 text-sm"
                             >
                               <div className="font-medium">
-                                {formatVenueRentalTimeRange(space.startAt, space.endAt)}
+                                {formatVenueRentalTimeRange(
+                                  space.startAt,
+                                  space.endAt
+                                )}
                               </div>
                               <div className="text-xs text-muted-foreground">
                                 {space.venueName}
@@ -403,40 +345,12 @@ export function VenueRentalRequestsQueue({
                           {row.eventTypeName || "—"}
                         </TableCell>
                         <TableCell>
-                          <Badge variant="secondary" className={`${colors.bg} ${colors.text}`}>
+                          <Badge
+                            variant="secondary"
+                            className={`${colors.bg} ${colors.text}`}
+                          >
                             {row.statusLabel}
                           </Badge>
-                        </TableCell>
-                        <TableCell onClick={(event) => event.stopPropagation()}>
-                          {canReview ? (
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8"
-                                  disabled={isPending}
-                                >
-                                  <MoreHorizontal className="h-4 w-4" />
-                                  <span className="sr-only">Request actions</span>
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem
-                                  onSelect={() => {
-                                    setDepositAmount("0")
-                                    setRemainingBalanceAmount("0")
-                                    setApproveRow(row)
-                                  }}
-                                >
-                                  Approve
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onSelect={() => setPendingRow(row)}>
-                                  Pending
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          ) : null}
                         </TableCell>
                       </TableRow>
                     )
@@ -473,116 +387,6 @@ export function VenueRentalRequestsQueue({
           addons={addons}
         />
       ) : null}
-
-      <Dialog
-        open={Boolean(approveRow)}
-        onOpenChange={(open) => {
-          if (!open) setApproveRow(null)
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Approve request</DialogTitle>
-            <DialogDescription>
-              {approveRow
-                ? `Approve ${approveRow.customerName}'s request and request deposit payment.`
-                : "Approve this venue rental request."}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-2">
-            <div className="grid gap-2">
-              <Label htmlFor="queue-deposit">Deposit</Label>
-              <Input
-                id="queue-deposit"
-                type="number"
-                min={0}
-                step="0.01"
-                value={depositAmount}
-                onChange={(event) => setDepositAmount(event.target.value)}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="queue-remaining">Remaining balance</Label>
-              <Input
-                id="queue-remaining"
-                type="number"
-                min={0}
-                step="0.01"
-                value={remainingBalanceAmount}
-                onChange={(event) => setRemainingBalanceAmount(event.target.value)}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setApproveRow(null)}
-              disabled={isPending}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              disabled={isPending || !approveRow}
-              onClick={() => {
-                if (!approveRow) return
-                const rentalId = approveRow.id
-                runAction(
-                  async () => {
-                    await approveVenueRentalRequest({
-                      venueRentalId: rentalId,
-                      depositAmount: Number(depositAmount || 0),
-                      remainingBalanceAmount:
-                        Number(remainingBalanceAmount || 0) || undefined,
-                    })
-                  },
-                  () => setApproveRow(null)
-                )
-              }}
-            >
-              {isPending ? "Approving…" : "Approve"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <AlertDialog
-        open={Boolean(pendingRow)}
-        onOpenChange={(open) => {
-          if (!open) setPendingRow(null)
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Mark as pending?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {pendingRow
-                ? `Move ${pendingRow.customerName}'s request to Pending while you wait for more details.`
-                : "Mark this request as pending."}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={isPending || !pendingRow}
-              onClick={(event) => {
-                event.preventDefault()
-                if (!pendingRow) return
-                const rentalId = pendingRow.id
-                runAction(
-                  async () => {
-                    await markVenueRentalPending({ venueRentalId: rentalId })
-                  },
-                  () => setPendingRow(null)
-                )
-              }}
-            >
-              {isPending ? "Saving…" : "Mark pending"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   )
 }

@@ -129,6 +129,8 @@ discount_tags.organization_id → organizations.id
 **Employee benefit (migration `184`):** `organization_employee_benefits` defaults to 50% off for active full-time staff on programs + venue rentals (`applies_to_ticketing = false`). Quote engine wraps `compute_program_registration_quote` to apply the benefit when the registrant or participant is active FTE.
 
 **Discount tag auto-apply (migration `202`):** `discount_tags` gains `percent_off`, `auto_apply`, `applies_to_programs`, `applies_to_venue_rentals`, `applies_to_ticketing`. Custom tags (e.g. Top Donor) are assigned on contact Overview; when `auto_apply` is on, checkout uses the best matching tag percent for programs (quote SQL) and venue rentals (pricing suggestion). FTE benefit still wins vs a weaker tag percent. Function: `contact_best_auto_apply_tag_discount`.
+
+**Venue rental discount policies (migration `217`):** `venue_rental_discount_policies` — org catalog of optional fixed/$ or % discounts with `requires_multi_venue` / `min_venues` and optional `discount_tag_id` → `discount_tags`. Applied to space-fee quotes on Payments / Financial (largest matching savings wins).
 **Customer role (migration `137_customer_role_merge.sql`, split in `175`, fix `197`):** Migration 137 unified `program_participant`, `event_attendee`, and `venue_rental_customer` into `customer`. **`175_split_customer_programs_affiliation.sql`** restores **`program_participant`** (UI label **Programs**) for enrollments. **`197_fix_sync_affiliations_programs_payer.sql`** repairs `sync_contact_affiliations` (removed invalid `vendors.contact_id`) and grants Programs for **participant, registrant, or payer** (and paid `program_charges`). **`customer`** remains for completed ticket orders and qualifying venue rentals (billing contact) only. Both are sticky once earned. Org auto-sync: Programs → `programs` module; Customer → `event-management` / `ticketing` / `bookings`. If `sync_contact_affiliations` fails with missing `billing_contact_id`, apply **`147_venue_rentals_billing_contact_id.sql`**.
 
 **Participation roles (superseded by `137`):** Migration `101_contact_participation_roles.sql` originally added separate participation roles; `137` consolidates them into `customer`.
@@ -542,6 +544,12 @@ staff_compliance.staff_id → staff.id
 * venue_rentals / rental_reservations / rental_payments (Venue Rentals workflow)
 
 **`rental_payments` ledger (migration `215`):** Charges and settlements share `rental_payments` rows. Totals (charges / received / credits / balance due) are **derived** in app code — not manually editable caches. Columns: `payment_method`, `reference_number`, `recorded_by`, `receipt_url`; types include installment / cleaning_fee / credit / adjustment / discount; statuses include pending / completed / failed / voided / partially_refunded (legacy paid_* statuses remain). Unique index on `stripe_payment_intent_id` for online idempotency. Completed payments are voided for corrections; pending charges may still be deleted.
+
+**Venue rental calendar sync fix (`218`):** After multi-venue indexes, `sync_rental_reservation_to_resource` must not use `ON CONFLICT (organization_id, source_type, source_id) WHERE source_id IS NOT NULL`. Run `scripts/218_fix_venue_rental_reservation_sync.sql` if editing rental spaces/dates fails with that Postgres error.
+
+**Post-event add-ons (`219`):** Seeds **Extra Cleaning** and **Damage Charge** into `rental_addons` for Financial → Add charge. Run `scripts/219_venue_rental_post_event_addons.sql`.
+
+**Venue rental org settings (`220` + `221`):** `venue_rental_settings` (1 row per org) — `security_deposit_enabled` (default false), optional `default_security_deposit_amount`, customer document URLs/names (`policies_document_*`, `pricing_guide_*`), and `approval_mode` (`manual` | `auto_after_agreement`). Storage bucket `venue-rental-docs`. Per-rental: `venue_rentals.policies_sent_at`, `policies_agreed_at`, document URL snapshots. Run `scripts/220_venue_rental_org_settings.sql` then `scripts/221_venue_rental_customer_documents.sql`.
 
 Key relationships:
 

@@ -6,7 +6,9 @@ import {
   deriveVenueRentalStaffNextAction,
   matchesVenueRentalPaymentLedgerView,
   rentalHasFinancialActivity,
+  resolveVenueRentalDiscountDollarAmount,
   summarizeVenueRentalPaymentLedger,
+  venueRentalChargePaymentTypeForAddon,
 } from "./venue-rental-payment-ledger"
 import {
   RENTAL_PAYMENT_STATUSES,
@@ -268,6 +270,7 @@ describe("rentalHasFinancialActivity", () => {
   it("requires meaningful financial signal", () => {
     assert.equal(
       rentalHasFinancialActivity({
+        rentalStatus: VENUE_RENTAL_STATUSES.confirmed,
         totalCharges: 0,
         amountReceived: 0,
         refundedAmount: 0,
@@ -280,6 +283,7 @@ describe("rentalHasFinancialActivity", () => {
 
     assert.equal(
       rentalHasFinancialActivity({
+        rentalStatus: VENUE_RENTAL_STATUSES.approvedPendingPayment,
         totalCharges: 100,
         amountReceived: 0,
         refundedAmount: 0,
@@ -288,6 +292,106 @@ describe("rentalHasFinancialActivity", () => {
         paymentCount: 1,
       }),
       true
+    )
+  })
+
+  it("hides declined and cancelled-before-payment when nothing was collected", () => {
+    assert.equal(
+      rentalHasFinancialActivity({
+        rentalStatus: VENUE_RENTAL_STATUSES.declined,
+        totalCharges: 800,
+        amountReceived: 0,
+        refundedAmount: 0,
+        balanceDue: 800,
+        paymentStatus: "unpaid",
+        paymentCount: 0,
+      }),
+      false
+    )
+
+    assert.equal(
+      rentalHasFinancialActivity({
+        rentalStatus: VENUE_RENTAL_STATUSES.cancelledBeforePayment,
+        totalCharges: 2000,
+        amountReceived: 0,
+        refundedAmount: 0,
+        balanceDue: 2000,
+        paymentStatus: "unpaid",
+        paymentCount: 1,
+      }),
+      false
+    )
+  })
+
+  it("keeps cancelled-after-payment on Payments for refund settlement", () => {
+    assert.equal(
+      rentalHasFinancialActivity({
+        rentalStatus: VENUE_RENTAL_STATUSES.cancelledAfterPayment,
+        totalCharges: 2000,
+        amountReceived: 500,
+        refundedAmount: 0,
+        balanceDue: 1500,
+        paymentStatus: "partial",
+        paymentCount: 1,
+      }),
+      true
+    )
+  })
+})
+
+describe("resolveVenueRentalDiscountDollarAmount", () => {
+  it("returns fixed amounts and percent of basis", () => {
+    assert.equal(
+      resolveVenueRentalDiscountDollarAmount({
+        discountType: "fixed",
+        amount: 150,
+      }),
+      150
+    )
+    assert.equal(
+      resolveVenueRentalDiscountDollarAmount({
+        discountType: "percent",
+        amount: 20,
+        basisAmount: 1000,
+      }),
+      200
+    )
+  })
+
+  it("rejects invalid percent input", () => {
+    assert.throws(() =>
+      resolveVenueRentalDiscountDollarAmount({
+        discountType: "percent",
+        amount: 120,
+        basisAmount: 1000,
+      })
+    )
+    assert.throws(() =>
+      resolveVenueRentalDiscountDollarAmount({
+        discountType: "percent",
+        amount: 10,
+        basisAmount: 0,
+      })
+    )
+  })
+})
+
+describe("venueRentalChargePaymentTypeForAddon", () => {
+  it("maps cleaning and damage add-ons to ledger types", () => {
+    assert.equal(
+      venueRentalChargePaymentTypeForAddon({ slug: "extra-cleaning" }),
+      "cleaning_fee"
+    )
+    assert.equal(
+      venueRentalChargePaymentTypeForAddon({ slug: "damage-charge" }),
+      "adjustment"
+    )
+    assert.equal(
+      venueRentalChargePaymentTypeForAddon({
+        slug: "table-covers",
+        name: "Table Covers",
+      }),
+      "addon_fee"
     )
   })
 })

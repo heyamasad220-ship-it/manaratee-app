@@ -2,27 +2,34 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
-import { DollarSign } from "lucide-react"
+import { Ban, DollarSign, Pencil } from "lucide-react"
 
 import {
   addVenueRentalCharge,
   applyVenueRentalCredit,
+  applyVenueRentalDiscount,
   recordVenueRentalPaymentReceived,
   sendVenueRentalPaymentReminder,
+  updateVenueRentalTransactionDetails,
   voidVenueRentalPaymentRecord,
 } from "@/lib/bookings/venue-rental-actions"
 import {
   buildVenueRentalChargeBreakdown,
+  canEditPendingCharge,
   deriveVenueRentalPaymentLedgerStatus,
   deriveVenueRentalStaffNextAction,
+  isCompletedPaymentStatus,
   paymentMethodLabel,
   paymentTypeHistoryLabel,
+  resolveVenueRentalDiscountDollarAmount,
   summarizeVenueRentalPaymentLedger,
   transactionStatusLabel,
   venueRentalPaymentLedgerStatusLabel,
 } from "@/lib/bookings/venue-rental-payment-ledger"
 import {
   RENTAL_PAYMENT_METHODS,
+  VENUE_RENTAL_STATUSES,
+  type RentalAddonCatalogItem,
   type RentalPaymentMethod,
   type RentalPaymentRecord,
   type VenueRentalQueueRow,
@@ -56,15 +63,7 @@ import {
 } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
 
-type ChargeTypeOption =
-  | "deposit"
-  | "security_deposit"
-  | "remaining_balance"
-  | "addon_fee"
-  | "cleaning_fee"
-  | "adjustment"
-  | "discount"
-  | "installment"
+type DiscountTypeOption = "fixed" | "percent"
 
 type PaymentTypeOption =
   | "deposit"
@@ -85,8 +84,13 @@ type VenueRentalFinancialPanelProps = {
     spaceFee: number
     addonFees: number
     totalCharges: number
-    hours: number
+    hours?: number
+    discountAmount?: number
   } | null
+  /** Active catalog from Venue Rentals → Settings → Add-ons. */
+  addons?: RentalAddonCatalogItem[]
+  /** When false, hide security deposit payment type (org policy). */
+  securityDepositEnabled?: boolean
 }
 
 function formatMoney(value: number) {
@@ -111,6 +115,8 @@ export function VenueRentalFinancialPanel({
   canManage,
   initialAction = null,
   quotedCharges = null,
+  addons = [],
+  securityDepositEnabled = false,
 }: VenueRentalFinancialPanelProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -119,9 +125,20 @@ export function VenueRentalFinancialPanel({
   const [recordOpen, setRecordOpen] = useState(false)
   const [chargeOpen, setChargeOpen] = useState(false)
   const [creditOpen, setCreditOpen] = useState(false)
+  const [discountOpen, setDiscountOpen] = useState(false)
   const [voidOpen, setVoidOpen] = useState(false)
   const [voidPaymentId, setVoidPaymentId] = useState("")
   const [voidReason, setVoidReason] = useState("")
+  const [editOpen, setEditOpen] = useState(false)
+  const [editPayment, setEditPayment] = useState<RentalPaymentRecord | null>(null)
+  const [editMethod, setEditMethod] = useState<RentalPaymentMethod | "">(
+    RENTAL_PAYMENT_METHODS.cash
+  )
+  const [editReference, setEditReference] = useState("")
+  const [editNotes, setEditNotes] = useState("")
+  const [editDate, setEditDate] = useState("")
+  const [editAmount, setEditAmount] = useState("")
+  const [editReceiptUrl, setEditReceiptUrl] = useState("")
 
   const [paymentType, setPaymentType] = useState<PaymentTypeOption>("deposit")
   const [amount, setAmount] = useState("")
@@ -135,8 +152,9 @@ export function VenueRentalFinancialPanel({
   const [notes, setNotes] = useState("")
   const [receiptUrl, setReceiptUrl] = useState("")
 
-  const [chargeType, setChargeType] = useState<ChargeTypeOption>("remaining_balance")
-  const [chargeAmount, setChargeAmount] = useState("")
+  const [chargeAddonId, setChargeAddonId] = useState("")
+  const [chargeQuantity, setChargeQuantity] = useState("1")
+  const [chargeUnitPrice, setChargeUnitPrice] = useState("")
   const [chargeDueAt, setChargeDueAt] = useState("")
   const [chargeNotes, setChargeNotes] = useState("")
 
@@ -144,12 +162,22 @@ export function VenueRentalFinancialPanel({
   const [creditNotes, setCreditNotes] = useState("")
   const [creditReference, setCreditReference] = useState("")
 
+  const [discountType, setDiscountType] = useState<DiscountTypeOption>("fixed")
+  const [discountAmount, setDiscountAmount] = useState("")
+  const [discountNotes, setDiscountNotes] = useState("")
+  const [discountReference, setDiscountReference] = useState("")
+
   const summary = useMemo(
     () => summarizeVenueRentalPaymentLedger(payments),
     [payments]
   )
-  const totalCharges =
-    quotedCharges?.totalCharges ?? summary.totalCharges
+  const ledgerExtras =
+    summary.cleaningFeeAmount +
+    summary.addonFeeAmount +
+    summary.adjustmentAmount
+  const totalCharges = quotedCharges
+    ? quotedCharges.totalCharges + ledgerExtras
+    : summary.totalCharges
   const balanceDue = Math.max(
     0,
     totalCharges - summary.amountReceived - summary.appliedCredits
@@ -160,13 +188,44 @@ export function VenueRentalFinancialPanel({
   )
   const charges = useMemo(() => {
     const breakdown = buildVenueRentalChargeBreakdown(summary)
+    const policyDiscount = quotedCharges?.discountAmount ?? 0
     return {
       ...breakdown,
       rentalFee: quotedCharges?.spaceFee ?? breakdown.rentalFee,
-      addonFees: quotedCharges?.addonFees ?? breakdown.addonFees,
+      addonFees:
+        (quotedCharges?.addonFees ?? 0) + summary.addonFeeAmount,
+      cleaningFee: summary.cleaningFeeAmount,
+      adjustments: summary.adjustmentAmount,
+      discounts: policyDiscount + summary.discountAmount,
       totalCharges,
     }
   }, [summary, quotedCharges, totalCharges])
+
+  const selectedChargeAddon = useMemo(
+    () => addons.find((addon) => addon.id === chargeAddonId) || null,
+    [addons, chargeAddonId]
+  )
+
+  const chargeLineTotal = useMemo(() => {
+    const qty = Number.parseInt(chargeQuantity, 10)
+    const unit = Number(chargeUnitPrice)
+    if (!Number.isFinite(qty) || qty <= 0 || !Number.isFinite(unit) || unit < 0) {
+      return null
+    }
+    return Math.round(qty * unit * 100) / 100
+  }, [chargeQuantity, chargeUnitPrice])
+
+  const discountPreview = useMemo(() => {
+    try {
+      return resolveVenueRentalDiscountDollarAmount({
+        discountType,
+        amount: Number(discountAmount),
+        basisAmount: totalCharges,
+      })
+    } catch {
+      return null
+    }
+  }, [discountType, discountAmount, totalCharges])
   const paymentStatus = useMemo(
     () =>
       deriveVenueRentalPaymentLedgerStatus({
@@ -213,7 +272,10 @@ export function VenueRentalFinancialPanel({
     setNotes("")
     setReceiptUrl("")
     setError(null)
-    if (summary.depositAmount > summary.depositReceived) {
+    const awaitingDeposit =
+      rental.status === VENUE_RENTAL_STATUSES.approvedPendingPayment ||
+      summary.depositAmount > summary.depositReceived
+    if (awaitingDeposit) {
       setPaymentType("deposit")
     } else {
       setPaymentType("remaining_balance")
@@ -224,6 +286,24 @@ export function VenueRentalFinancialPanel({
   function openRecord() {
     resetPaymentForm()
     setRecordOpen(true)
+  }
+
+  function openEdit(payment: RentalPaymentRecord) {
+    setEditPayment(payment)
+    setEditMethod(
+      (payment.payment_method as RentalPaymentMethod | null) ||
+        RENTAL_PAYMENT_METHODS.cash
+    )
+    setEditReference(payment.reference_number || "")
+    setEditNotes(payment.notes || "")
+    const dateSource = payment.paid_at || payment.created_at
+    setEditDate(
+      dateSource ? new Date(dateSource).toISOString().slice(0, 10) : ""
+    )
+    setEditAmount(String(Number(payment.amount) || 0))
+    setEditReceiptUrl(payment.receipt_url || "")
+    setError(null)
+    setEditOpen(true)
   }
 
   function run(action: () => Promise<void>) {
@@ -273,7 +353,10 @@ export function VenueRentalFinancialPanel({
             <Button size="sm" variant="outline" onClick={() => setCreditOpen(true)}>
               Apply Credit
             </Button>
-            {summary.balanceDue > 0 ? (
+            <Button size="sm" variant="outline" onClick={() => setDiscountOpen(true)}>
+              Apply Discount
+            </Button>
+            {balanceDue > 0 ? (
               <Button
                 size="sm"
                 variant="outline"
@@ -334,8 +417,18 @@ export function VenueRentalFinancialPanel({
                 <dd className="tabular-nums">{formatMoney(summary.amountReceived)}</dd>
               </div>
               <div className="flex justify-between gap-4">
+                <dt className="text-muted-foreground">Discounts</dt>
+                <dd className="tabular-nums">
+                  {formatMoney(summary.discountAmount)}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-4">
                 <dt className="text-muted-foreground">Credits</dt>
-                <dd className="tabular-nums">{formatMoney(summary.appliedCredits)}</dd>
+                <dd className="tabular-nums">
+                  {formatMoney(
+                    Math.max(0, summary.appliedCredits - summary.discountAmount)
+                  )}
+                </dd>
               </div>
               <div className="flex justify-between gap-4">
                 <dt className="text-muted-foreground">Refunded</dt>
@@ -427,21 +520,37 @@ export function VenueRentalFinancialPanel({
                       </TableCell>
                       <TableCell>
                         {canManage &&
-                        (payment.status === "paid_manually" ||
-                          payment.status === "paid_stripe_later" ||
-                          payment.status === "completed") ? (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="text-destructive"
-                            onClick={() => {
-                              setVoidPaymentId(payment.id)
-                              setVoidReason("")
-                              setVoidOpen(true)
-                            }}
-                          >
-                            Void
-                          </Button>
+                        (isCompletedPaymentStatus(payment.status) ||
+                          canEditPendingCharge(payment.status)) ? (
+                          <div className="flex items-center gap-1">
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              aria-label="Edit transaction"
+                              title="Edit"
+                              onClick={() => openEdit(payment)}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            {isCompletedPaymentStatus(payment.status) ? (
+                              <Button
+                                type="button"
+                                size="icon"
+                                variant="ghost"
+                                className="text-destructive"
+                                aria-label="Void transaction"
+                                title="Void"
+                                onClick={() => {
+                                  setVoidPaymentId(payment.id)
+                                  setVoidReason("")
+                                  setVoidOpen(true)
+                                }}
+                              >
+                                <Ban className="h-4 w-4" />
+                              </Button>
+                            ) : null}
+                          </div>
                         ) : payment.receipt_url ? (
                           <Button size="sm" variant="ghost" asChild>
                             <a
@@ -461,8 +570,8 @@ export function VenueRentalFinancialPanel({
             </Table>
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
-            Corrections use voids, refunds, credits, or adjustments — completed
-            transactions are not overwritten.
+            Edit method, reference, notes, or date on a transaction. To correct a
+            completed amount, void it and record a new payment.
           </p>
         </div>
       </CardContent>
@@ -491,7 +600,9 @@ export function VenueRentalFinancialPanel({
                   <SelectItem value="deposit">Deposit</SelectItem>
                   <SelectItem value="installment">Installment</SelectItem>
                   <SelectItem value="remaining_balance">Final Payment</SelectItem>
-                  <SelectItem value="security_deposit">Security Deposit</SelectItem>
+                  {securityDepositEnabled ? (
+                    <SelectItem value="security_deposit">Security Deposit</SelectItem>
+                  ) : null}
                   <SelectItem value="cleaning_fee">Cleaning Fee</SelectItem>
                   <SelectItem value="addon_fee">Add-on / Equipment</SelectItem>
                 </SelectContent>
@@ -534,7 +645,7 @@ export function VenueRentalFinancialPanel({
                   <SelectItem value="cash">Cash</SelectItem>
                   <SelectItem value="check">Check</SelectItem>
                   <SelectItem value="ach">ACH</SelectItem>
-                  <SelectItem value="card_terminal">Card terminal</SelectItem>
+                  <SelectItem value="card_terminal">Credit / debit card</SelectItem>
                   <SelectItem value="online">Online</SelectItem>
                   <SelectItem value="other">Other</SelectItem>
                 </SelectContent>
@@ -595,44 +706,104 @@ export function VenueRentalFinancialPanel({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={chargeOpen} onOpenChange={setChargeOpen}>
+      <Dialog
+        open={chargeOpen}
+        onOpenChange={(open) => {
+          setChargeOpen(open)
+          if (open) {
+            const first = addons[0]
+            setChargeAddonId(first?.id || "")
+            setChargeQuantity("1")
+            setChargeUnitPrice(
+              first ? String(Number(first.defaultPrice) || 0) : ""
+            )
+            setChargeDueAt("")
+            setChargeNotes("")
+            setError(null)
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add charge</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Charge type</Label>
-              <Select
-                value={chargeType}
-                onValueChange={(value) => setChargeType(value as ChargeTypeOption)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="deposit">Deposit</SelectItem>
-                  <SelectItem value="remaining_balance">Rental / final balance</SelectItem>
-                  <SelectItem value="security_deposit">Security deposit</SelectItem>
-                  <SelectItem value="cleaning_fee">Cleaning fee</SelectItem>
-                  <SelectItem value="addon_fee">Equipment / add-on</SelectItem>
-                  <SelectItem value="installment">Installment</SelectItem>
-                  <SelectItem value="adjustment">Adjustment</SelectItem>
-                  <SelectItem value="discount">Discount</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="charge-amount">Amount</Label>
-              <Input
-                id="charge-amount"
-                type="number"
-                min={0}
-                step="0.01"
-                value={chargeAmount}
-                onChange={(event) => setChargeAmount(event.target.value)}
-              />
-            </div>
+            <p className="text-sm text-muted-foreground">
+              Charge catalog add-ons (table covers, chair covers, etc.) or
+              post-event fees like Extra Cleaning and Damage. Manage the list in
+              Venue Rentals → Settings → Add-ons.
+            </p>
+            {addons.length === 0 ? (
+              <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                No active add-ons yet. Add items under Settings → Add-ons, then
+                return here to charge them.
+              </div>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <Label>Add-on / fee</Label>
+                  <Select
+                    value={chargeAddonId}
+                    onValueChange={(value) => {
+                      setChargeAddonId(value)
+                      const addon = addons.find((item) => item.id === value)
+                      setChargeUnitPrice(
+                        addon ? String(Number(addon.defaultPrice) || 0) : ""
+                      )
+                      setChargeQuantity("1")
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select an add-on" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {addons.map((addon) => (
+                        <SelectItem key={addon.id} value={addon.id}>
+                          {addon.name}
+                          {addon.defaultPrice > 0
+                            ? ` · ${formatMoney(addon.defaultPrice)}`
+                            : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedChargeAddon?.description ? (
+                    <p className="text-xs text-muted-foreground">
+                      {selectedChargeAddon.description}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="charge-qty">Quantity</Label>
+                    <Input
+                      id="charge-qty"
+                      type="number"
+                      min={1}
+                      step="1"
+                      value={chargeQuantity}
+                      onChange={(event) => setChargeQuantity(event.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="charge-unit">Unit price ($)</Label>
+                    <Input
+                      id="charge-unit"
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={chargeUnitPrice}
+                      onChange={(event) => setChargeUnitPrice(event.target.value)}
+                    />
+                  </div>
+                </div>
+                {chargeLineTotal != null ? (
+                  <p className="text-sm font-medium">
+                    Line total: {formatMoney(chargeLineTotal)}
+                  </p>
+                ) : null}
+              </>
+            )}
             <div className="space-y-2">
               <Label htmlFor="charge-due">Due date (optional)</Label>
               <Input
@@ -649,6 +820,7 @@ export function VenueRentalFinancialPanel({
                 rows={3}
                 value={chargeNotes}
                 onChange={(event) => setChargeNotes(event.target.value)}
+                placeholder="Optional details (e.g. damaged chairs, overtime cleanup)"
               />
             </div>
           </div>
@@ -657,21 +829,31 @@ export function VenueRentalFinancialPanel({
               Cancel
             </Button>
             <Button
-              disabled={isPending}
+              disabled={
+                isPending ||
+                !chargeAddonId ||
+                chargeLineTotal == null ||
+                chargeLineTotal <= 0
+              }
               onClick={() =>
                 run(async () => {
                   await addVenueRentalCharge({
                     venueRentalId: rental.id,
-                    paymentType: chargeType,
-                    amount: Number(chargeAmount),
+                    rentalAddonId: chargeAddonId,
+                    quantity: Number.parseInt(chargeQuantity, 10) || 1,
+                    unitPrice: Number(chargeUnitPrice),
+                    amount: chargeLineTotal ?? undefined,
                     dueAt: chargeDueAt
                       ? new Date(`${chargeDueAt}T12:00:00`).toISOString()
                       : null,
                     notes: chargeNotes,
                   })
                   setChargeOpen(false)
-                  setChargeAmount("")
+                  setChargeAddonId("")
+                  setChargeQuantity("1")
+                  setChargeUnitPrice("")
                   setChargeNotes("")
+                  setChargeDueAt("")
                 })
               }
             >
@@ -687,6 +869,10 @@ export function VenueRentalFinancialPanel({
             <DialogTitle>Apply credit</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Credits reduce balance due (goodwill, overpayment, etc.). For a
+              price reduction, use Apply Discount instead.
+            </p>
             <div className="space-y-2">
               <Label htmlFor="credit-amount">Amount</Label>
               <Input
@@ -738,6 +924,222 @@ export function VenueRentalFinancialPanel({
               }
             >
               {isPending ? "Saving..." : "Apply credit"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={discountOpen} onOpenChange={setDiscountOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Apply discount</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              One-time discount for this rental. Percent is calculated from
+              current total charges ({formatMoney(totalCharges)}).
+            </p>
+            <div className="space-y-2">
+              <Label>Discount type</Label>
+              <Select
+                value={discountType}
+                onValueChange={(value) =>
+                  setDiscountType(value as DiscountTypeOption)
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="fixed">Fixed amount ($)</SelectItem>
+                  <SelectItem value="percent">Percentage (%)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="discount-amount">
+                {discountType === "percent" ? "Percent" : "Amount ($)"}
+              </Label>
+              <Input
+                id="discount-amount"
+                type="number"
+                min={0}
+                max={discountType === "percent" ? 100 : undefined}
+                step={discountType === "percent" ? "1" : "0.01"}
+                value={discountAmount}
+                onChange={(event) => setDiscountAmount(event.target.value)}
+              />
+              {discountPreview != null ? (
+                <p className="text-xs text-muted-foreground">
+                  Discount applied: {formatMoney(discountPreview)}
+                </p>
+              ) : null}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="discount-ref">Reference</Label>
+              <Input
+                id="discount-ref"
+                value={discountReference}
+                onChange={(event) => setDiscountReference(event.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="discount-notes">Notes</Label>
+              <Textarea
+                id="discount-notes"
+                rows={3}
+                value={discountNotes}
+                onChange={(event) => setDiscountNotes(event.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDiscountOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={isPending || discountPreview == null}
+              onClick={() =>
+                run(async () => {
+                  await applyVenueRentalDiscount({
+                    venueRentalId: rental.id,
+                    discountType,
+                    amount: Number(discountAmount),
+                    basisAmount: totalCharges,
+                    notes: discountNotes,
+                    referenceNumber: discountReference,
+                  })
+                  setDiscountOpen(false)
+                  setDiscountType("fixed")
+                  setDiscountAmount("")
+                  setDiscountNotes("")
+                  setDiscountReference("")
+                })
+              }
+            >
+              {isPending ? "Saving..." : "Apply discount"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={editOpen}
+        onOpenChange={(open) => {
+          setEditOpen(open)
+          if (!open) setEditPayment(null)
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit transaction</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {editPayment ? (
+              <p className="text-sm text-muted-foreground">
+                {paymentTypeHistoryLabel(editPayment.payment_type)} ·{" "}
+                {transactionStatusLabel(editPayment.status)}
+                {canEditPendingCharge(editPayment.status)
+                  ? " — amount can be updated while pending."
+                  : " — change method, date, reference, or notes. Void to correct amount."}
+              </p>
+            ) : null}
+            {canEditPendingCharge(editPayment?.status || "") ? (
+              <div className="space-y-2">
+                <Label htmlFor="edit-amount">Amount</Label>
+                <Input
+                  id="edit-amount"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={editAmount}
+                  onChange={(event) => setEditAmount(event.target.value)}
+                />
+              </div>
+            ) : null}
+            <div className="space-y-2">
+              <Label>Payment method</Label>
+              <Select
+                value={editMethod || RENTAL_PAYMENT_METHODS.other}
+                onValueChange={(value) =>
+                  setEditMethod(value as RentalPaymentMethod)
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="check">Check</SelectItem>
+                  <SelectItem value="ach">ACH</SelectItem>
+                  <SelectItem value="card_terminal">Credit / debit card</SelectItem>
+                  <SelectItem value="online">Online</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-date">Payment date</Label>
+              <Input
+                id="edit-date"
+                type="date"
+                value={editDate}
+                onChange={(event) => setEditDate(event.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-ref">Reference / check number</Label>
+              <Input
+                id="edit-ref"
+                value={editReference}
+                onChange={(event) => setEditReference(event.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-receipt">Receipt URL</Label>
+              <Input
+                id="edit-receipt"
+                value={editReceiptUrl}
+                onChange={(event) => setEditReceiptUrl(event.target.value)}
+                placeholder="https://..."
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-notes">Notes</Label>
+              <Textarea
+                id="edit-notes"
+                rows={3}
+                value={editNotes}
+                onChange={(event) => setEditNotes(event.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={isPending || !editPayment}
+              onClick={() =>
+                run(async () => {
+                  if (!editPayment) return
+                  await updateVenueRentalTransactionDetails({
+                    paymentId: editPayment.id,
+                    paymentMethod: editMethod || null,
+                    referenceNumber: editReference,
+                    notes: editNotes,
+                    paymentDate: editDate || null,
+                    receiptUrl: editReceiptUrl,
+                    amount: canEditPendingCharge(editPayment.status)
+                      ? Number(editAmount)
+                      : undefined,
+                  })
+                  setEditOpen(false)
+                  setEditPayment(null)
+                })
+              }
+            >
+              {isPending ? "Saving..." : "Save changes"}
             </Button>
           </DialogFooter>
         </DialogContent>

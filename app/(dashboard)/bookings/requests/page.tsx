@@ -6,7 +6,10 @@ import {
   getVenueRentalDashboardStats,
   getVenueRentalQueueRows,
 } from "@/lib/bookings/venue-rental-queries"
-import { completePastConfirmedVenueRentals } from "@/lib/bookings/venue-rental-actions"
+import {
+  completePastConfirmedVenueRentals,
+  reconcileApprovedVenueRentalsWithPayments,
+} from "@/lib/bookings/venue-rental-actions"
 import { getVenueRentalEventTypes } from "@/lib/bookings/venue-rental-event-type-queries"
 import { getRoomSetupStyles } from "@/lib/setup-styles/setup-style-queries"
 import {
@@ -25,6 +28,8 @@ export default async function BookingsRequestsPage() {
 
   // Keep Completed in sync when staff open the queue (cron also runs hourly).
   await completePastConfirmedVenueRentals()
+  // Approved + payment already on ledger → Confirmed (repairs stuck rows).
+  await reconcileApprovedVenueRentalsWithPayments()
 
   const [rows, canManage, venuesWithStats, eventTypes, setupStyles, addons] =
     await Promise.all([

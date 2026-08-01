@@ -12,6 +12,10 @@ import {
   computeVenueRentalQuotedCharges,
 } from "./venue-rental-quote"
 import {
+  applyVenueRentalDiscountPolicies,
+  type VenueRentalDiscountPolicyRule,
+} from "./venue-rental-discount-policies"
+import {
   deriveVenueRentalPaymentLedgerStatus,
   deriveVenueRentalStaffNextAction,
   rentalHasFinancialActivity,
@@ -32,6 +36,9 @@ import {
 import type {
   RentalAddonCatalogItem,
   RentalAddonSettingsItem,
+  VenueRentalDiscountPolicySettingsItem,
+  VenueRentalDiscountType,
+  VenueRentalOrgSettings,
   RentalPaymentRecord,
   RentalReservationRecord,
   PublicAvailabilityBlock,
@@ -111,9 +118,17 @@ export async function getBlockingReservationsForVenue(
   venueId: string,
   rangeStart: string,
   rangeEnd: string,
-  excludeSourceId?: string
+  excludeSourceId?: string | string[]
 ): Promise<ConflictCheckReservation[]> {
   const supabase = await createClient()
+  const excludeSourceIds = new Set(
+    (Array.isArray(excludeSourceId)
+      ? excludeSourceId
+      : excludeSourceId
+        ? [excludeSourceId]
+        : []
+    ).filter(Boolean)
+  )
 
   const { data, error } = await supabase
     .from("resource_reservations")
@@ -133,7 +148,7 @@ export async function getBlockingReservationsForVenue(
 
   const stored = (data || [])
     .filter((row) => {
-      if (excludeSourceId && row.source_id === excludeSourceId) {
+      if (row.source_id && excludeSourceIds.has(row.source_id as string)) {
         return false
       }
 
@@ -294,7 +309,7 @@ export async function getActiveRentalAddons(
 
   const { data, error } = await supabase
     .from("rental_addons")
-    .select("id, name, description, default_price")
+    .select("id, name, slug, description, default_price")
     .eq("organization_id", orgId)
     .eq("is_active", true)
     .order("sort_order", { ascending: true })
@@ -303,6 +318,26 @@ export async function getActiveRentalAddons(
     if (error.code === "42P01") {
       return []
     }
+    // Older DBs may not have slug selected yet; retry without crashing callers.
+    if (error.message?.includes("slug")) {
+      const fallback = await supabase
+        .from("rental_addons")
+        .select("id, name, description, default_price")
+        .eq("organization_id", orgId)
+        .eq("is_active", true)
+        .order("sort_order", { ascending: true })
+      if (fallback.error) {
+        console.error(fallback.error)
+        throw new Error("Failed to load rental add-ons")
+      }
+      return (fallback.data || []).map((row) => ({
+        id: row.id as string,
+        name: row.name as string,
+        slug: "",
+        description: (row.description as string | null) ?? null,
+        defaultPrice: Number(row.default_price || 0),
+      }))
+    }
     console.error(error)
     throw new Error("Failed to load rental add-ons")
   }
@@ -310,9 +345,91 @@ export async function getActiveRentalAddons(
   return (data || []).map((row) => ({
     id: row.id as string,
     name: row.name as string,
+    slug: (row.slug as string | null) || "",
     description: (row.description as string | null) ?? null,
     defaultPrice: Number(row.default_price || 0),
   }))
+}
+
+const DEFAULT_VENUE_RENTAL_ORG_SETTINGS: VenueRentalOrgSettings = {
+  securityDepositEnabled: false,
+  defaultSecurityDepositAmount: null,
+  policiesDocumentUrl: null,
+  policiesDocumentName: null,
+  pricingGuideUrl: null,
+  pricingGuideName: null,
+  approvalMode: "manual",
+}
+
+/** Per-org Venue Rentals settings (Settings → General). Missing row = defaults. */
+export async function getVenueRentalOrgSettings(
+  organizationId?: string | null
+): Promise<VenueRentalOrgSettings> {
+  const supabase = await createClient()
+  const orgId = organizationId ?? (await resolveOrganizationId())
+
+  if (!orgId) {
+    return { ...DEFAULT_VENUE_RENTAL_ORG_SETTINGS }
+  }
+
+  const { data, error } = await supabase
+    .from("venue_rental_settings")
+    .select(
+      "security_deposit_enabled, default_security_deposit_amount, policies_document_url, policies_document_name, pricing_guide_url, pricing_guide_name, approval_mode"
+    )
+    .eq("organization_id", orgId)
+    .maybeSingle()
+
+  if (error) {
+    if (error.code === "42P01") {
+      return { ...DEFAULT_VENUE_RENTAL_ORG_SETTINGS }
+    }
+    // Pre-migration 221: fall back to security-deposit columns only.
+    if (
+      error.code === "42703" ||
+      error.code === "PGRST204" ||
+      error.message?.toLowerCase().includes("does not exist")
+    ) {
+      const legacy = await supabase
+        .from("venue_rental_settings")
+        .select("security_deposit_enabled, default_security_deposit_amount")
+        .eq("organization_id", orgId)
+        .maybeSingle()
+      if (legacy.error || !legacy.data) {
+        return { ...DEFAULT_VENUE_RENTAL_ORG_SETTINGS }
+      }
+      const defaultAmount = legacy.data.default_security_deposit_amount
+      return {
+        ...DEFAULT_VENUE_RENTAL_ORG_SETTINGS,
+        securityDepositEnabled: Boolean(legacy.data.security_deposit_enabled),
+        defaultSecurityDepositAmount:
+          defaultAmount == null ? null : Number(defaultAmount) || 0,
+      }
+    }
+    console.error(error)
+    throw new Error("Failed to load venue rental settings")
+  }
+
+  if (!data) {
+    return { ...DEFAULT_VENUE_RENTAL_ORG_SETTINGS }
+  }
+
+  const defaultAmount = data.default_security_deposit_amount
+  const approvalMode =
+    data.approval_mode === "auto_after_agreement"
+      ? "auto_after_agreement"
+      : "manual"
+
+  return {
+    securityDepositEnabled: Boolean(data.security_deposit_enabled),
+    defaultSecurityDepositAmount:
+      defaultAmount == null ? null : Number(defaultAmount) || 0,
+    policiesDocumentUrl: (data.policies_document_url as string | null) || null,
+    policiesDocumentName: (data.policies_document_name as string | null) || null,
+    pricingGuideUrl: (data.pricing_guide_url as string | null) || null,
+    pricingGuideName: (data.pricing_guide_name as string | null) || null,
+    approvalMode,
+  }
 }
 
 /** All rental add-ons for Venue Rentals → Settings → Add-ons (includes inactive). */
@@ -350,6 +467,152 @@ export async function getRentalAddonsForSettings(): Promise<
     isActive: Boolean(row.is_active),
     sortOrder: Number(row.sort_order || 0),
   }))
+}
+
+function mapVenueRentalDiscountPolicyRow(
+  row: Record<string, unknown>
+): VenueRentalDiscountPolicySettingsItem {
+  const tagRel = row.discount_tags as
+    | { id: string; name: string }
+    | { id: string; name: string }[]
+    | null
+  const tag = Array.isArray(tagRel) ? tagRel[0] : tagRel
+
+  return {
+    id: String(row.id),
+    name: String(row.name || ""),
+    description: (row.description as string | null) ?? null,
+    discountType: (row.discount_type as VenueRentalDiscountType) || "fixed",
+    amount: Number(row.amount || 0),
+    requiresMultiVenue: Boolean(row.requires_multi_venue),
+    minVenues: Math.max(2, Number(row.min_venues || 2)),
+    discountTagId: (row.discount_tag_id as string | null) ?? null,
+    discountTagName: tag?.name ?? null,
+    isActive: Boolean(row.is_active),
+    sortOrder: Number(row.sort_order || 0),
+  }
+}
+
+/** All discount policies for Venue Rentals → Settings → Discounts. */
+export async function getVenueRentalDiscountPoliciesForSettings(): Promise<
+  VenueRentalDiscountPolicySettingsItem[]
+> {
+  const supabase = await createClient()
+  const organizationId = await resolveOrganizationId()
+
+  if (!organizationId) {
+    return []
+  }
+
+  const { data, error } = await supabase
+    .from("venue_rental_discount_policies")
+    .select(
+      "id, name, description, discount_type, amount, requires_multi_venue, min_venues, discount_tag_id, is_active, sort_order, discount_tags:discount_tag_id ( id, name )"
+    )
+    .eq("organization_id", organizationId)
+    .order("sort_order", { ascending: true })
+    .order("name", { ascending: true })
+
+  if (error) {
+    if (error.code === "42P01") {
+      return []
+    }
+    console.error(error)
+    throw new Error("Failed to load rental discount policies")
+  }
+
+  return (data || []).map((row) =>
+    mapVenueRentalDiscountPolicyRow(row as Record<string, unknown>)
+  )
+}
+
+/** Active discount policies for quoting / Payments. */
+export async function getActiveVenueRentalDiscountPolicies(
+  organizationId?: string | null
+): Promise<VenueRentalDiscountPolicyRule[]> {
+  const supabase = await createClient()
+  const orgId = organizationId ?? (await resolveOrganizationId())
+  if (!orgId) return []
+
+  const { data, error } = await supabase
+    .from("venue_rental_discount_policies")
+    .select(
+      "id, name, discount_type, amount, requires_multi_venue, min_venues, discount_tag_id, is_active"
+    )
+    .eq("organization_id", orgId)
+    .eq("is_active", true)
+    .order("sort_order", { ascending: true })
+
+  if (error) {
+    if (error.code === "42P01") {
+      return []
+    }
+    console.error(error)
+    return []
+  }
+
+  return (data || []).map((row) => ({
+    id: String(row.id),
+    name: String(row.name || ""),
+    discountType: (row.discount_type as VenueRentalDiscountType) || "fixed",
+    amount: Number(row.amount || 0),
+    requiresMultiVenue: Boolean(row.requires_multi_venue),
+    minVenues: Math.max(2, Number(row.min_venues || 2)),
+    discountTagId: (row.discount_tag_id as string | null) ?? null,
+    isActive: true,
+  }))
+}
+
+async function loadDiscountTagIdsByContactId(
+  organizationId: string,
+  contactIds: string[]
+): Promise<Map<string, string[]>> {
+  const result = new Map<string, string[]>()
+  if (!contactIds.length) return result
+
+  const supabase = await createClient()
+  const { data: contacts, error } = await supabase
+    .from("contacts")
+    .select("id, person_id")
+    .eq("organization_id", organizationId)
+    .in("id", contactIds)
+
+  if (error || !contacts?.length) {
+    return result
+  }
+
+  const personIds = Array.from(
+    new Set(
+      contacts
+        .map((row) => row.person_id as string | null)
+        .filter((id): id is string => Boolean(id))
+    )
+  )
+
+  if (!personIds.length) return result
+
+  const { data: tags } = await supabase
+    .from("person_tags")
+    .select("person_id, tag_id")
+    .in("person_id", personIds)
+
+  const tagsByPerson = new Map<string, string[]>()
+  for (const row of tags || []) {
+    const personId = row.person_id as string
+    const list = tagsByPerson.get(personId) || []
+    list.push(row.tag_id as string)
+    tagsByPerson.set(personId, list)
+  }
+
+  for (const contact of contacts) {
+    const personId = contact.person_id as string | null
+    result.set(
+      contact.id as string,
+      personId ? tagsByPerson.get(personId) || [] : []
+    )
+  }
+
+  return result
 }
 
 /**
@@ -475,10 +738,34 @@ type VenueRentalListRow = {
   created_at: string
   approved_at: string | null
   venue_rental_event_type_id: string | null
+  policies_sent_at: string | null
+  policies_agreed_at: string | null
+  policies_document_url_snapshot: string | null
+  pricing_guide_url_snapshot: string | null
 }
 
 const VENUE_RENTAL_LIST_BASE_SELECT =
   "id, status, notes, expected_attendance, customer_user_id, hold_expires_at, created_at, approved_at, venue_rental_event_type_id"
+
+const VENUE_RENTAL_LIST_POLICY_SELECT =
+  `${VENUE_RENTAL_LIST_BASE_SELECT}, policies_sent_at, policies_agreed_at, policies_document_url_snapshot, pricing_guide_url_snapshot`
+
+function withEmptyPolicyFields<T extends object>(
+  row: T
+): T & {
+  policies_sent_at: null
+  policies_agreed_at: null
+  policies_document_url_snapshot: null
+  pricing_guide_url_snapshot: null
+} {
+  return {
+    ...row,
+    policies_sent_at: null,
+    policies_agreed_at: null,
+    policies_document_url_snapshot: null,
+    pricing_guide_url_snapshot: null,
+  }
+}
 
 function isMissingDbColumnError(
   error: { code?: string; message?: string } | null,
@@ -518,20 +805,78 @@ async function loadVenueRentalListRows(
     return query
   }
 
-  const withBillingSelect = `${VENUE_RENTAL_LIST_BASE_SELECT}, billing_contact_id`
-  const { data: withBillingData, error: withBillingError } = await runQuery(withBillingSelect)
+  const withPolicySelect = `${VENUE_RENTAL_LIST_POLICY_SELECT}, billing_contact_id`
+  const { data: withPolicyData, error: withPolicyError } =
+    await runQuery(withPolicySelect)
 
-  if (!withBillingError) {
-    return (withBillingData || []) as VenueRentalListRow[]
+  if (!withPolicyError) {
+    return (withPolicyData || []) as VenueRentalListRow[]
   }
 
-  if (withBillingError.code === "42P01") {
+  if (withPolicyError.code === "42P01") {
     return []
   }
 
-  if (isMissingDbColumnError(withBillingError, "billing_contact_id")) {
+  // Pre-migration 221: retry without policy columns.
+  if (
+    isMissingDbColumnError(withPolicyError, "policies_sent_at") ||
+    isMissingDbColumnError(withPolicyError, "policies_agreed_at")
+  ) {
+    const withBillingSelect = `${VENUE_RENTAL_LIST_BASE_SELECT}, billing_contact_id`
+    const { data: withBillingData, error: withBillingError } =
+      await runQuery(withBillingSelect)
+
+    if (!withBillingError) {
+      return ((withBillingData || []) as Omit<
+        VenueRentalListRow,
+        | "policies_sent_at"
+        | "policies_agreed_at"
+        | "policies_document_url_snapshot"
+        | "pricing_guide_url_snapshot"
+      >[]).map((row) => withEmptyPolicyFields(row))
+    }
+
+    if (withBillingError.code === "42P01") {
+      return []
+    }
+
+    if (isMissingDbColumnError(withBillingError, "billing_contact_id")) {
+      const { data: fallbackData, error: fallbackError } = await runQuery(
+        VENUE_RENTAL_LIST_BASE_SELECT
+      )
+
+      if (fallbackError) {
+        if (fallbackError.code === "42P01") {
+          return []
+        }
+        console.error(fallbackError)
+        throw new Error("Failed to load venue rentals")
+      }
+
+      return (
+        (fallbackData || []) as Omit<
+          VenueRentalListRow,
+          | "billing_contact_id"
+          | "policies_sent_at"
+          | "policies_agreed_at"
+          | "policies_document_url_snapshot"
+          | "pricing_guide_url_snapshot"
+        >[]
+      ).map((row) =>
+        withEmptyPolicyFields({
+          ...row,
+          billing_contact_id: null,
+        })
+      )
+    }
+
+    console.error(withBillingError)
+    throw new Error("Failed to load venue rentals")
+  }
+
+  if (isMissingDbColumnError(withPolicyError, "billing_contact_id")) {
     const { data: fallbackData, error: fallbackError } = await runQuery(
-      VENUE_RENTAL_LIST_BASE_SELECT
+      VENUE_RENTAL_LIST_POLICY_SELECT
     )
 
     if (fallbackError) {
@@ -542,15 +887,15 @@ async function loadVenueRentalListRows(
       throw new Error("Failed to load venue rentals")
     }
 
-    return ((fallbackData || []) as Omit<VenueRentalListRow, "billing_contact_id">[]).map(
-      (row) => ({
-        ...row,
-        billing_contact_id: null,
-      })
-    )
+    return (
+      (fallbackData || []) as Omit<VenueRentalListRow, "billing_contact_id">[]
+    ).map((row) => ({
+      ...row,
+      billing_contact_id: null,
+    }))
   }
 
-  console.error(withBillingError)
+  console.error(withPolicyError)
   throw new Error("Failed to load venue rentals")
 }
 
@@ -873,6 +1218,7 @@ export async function getVenueRentalQueueRows(options?: {
       billingContactId: rental.billing_contact_id,
       billingContactName: billingContact?.name ?? null,
       billingContactType: billingContact?.contactType ?? null,
+      eventTypeId: rental.venue_rental_event_type_id,
       eventTypeName: resolveVenueRentalEventTypeName(
         rental.notes,
         rental.venue_rental_event_type_id
@@ -893,6 +1239,10 @@ export async function getVenueRentalQueueRows(options?: {
       holdExpiresAt: rental.hold_expires_at,
       hasConflict: conflictFlags.get(rental.id) === true,
       hasReceivedPayment: paidRentals.has(rental.id),
+      policiesSentAt: rental.policies_sent_at ?? null,
+      policiesAgreedAt: rental.policies_agreed_at ?? null,
+      policiesDocumentUrlSnapshot: rental.policies_document_url_snapshot ?? null,
+      pricingGuideUrlSnapshot: rental.pricing_guide_url_snapshot ?? null,
     })
   }
 
@@ -983,7 +1333,8 @@ export async function getVenueRentalPaymentReportRows(): Promise<
     new Set(queueRows.flatMap((row) => row.spaces.map((space) => space.venueId)))
   )
 
-  const [paymentsResult, venuesResult, dayPricingResult] = await Promise.all([
+  const [paymentsResult, venuesResult, dayPricingResult, discountPolicies, tagIdsByContact] =
+    await Promise.all([
     supabase
       .from("rental_payments")
       .select("*")
@@ -1004,6 +1355,17 @@ export async function getVenueRentalPaymentReportRows(): Promise<
           .in("venue_id", venueIds)
           .eq("is_active", true)
       : Promise.resolve({ data: [], error: null }),
+    getActiveVenueRentalDiscountPolicies(organizationId),
+    loadDiscountTagIdsByContactId(
+      organizationId,
+      Array.from(
+        new Set(
+          queueRows
+            .map((row) => row.billingContactId)
+            .filter((id): id is string => Boolean(id))
+        )
+      )
+    ),
   ])
 
   if (paymentsResult.error && paymentsResult.error.code !== "42P01") {
@@ -1040,7 +1402,16 @@ export async function getVenueRentalPaymentReportRows(): Promise<
     const summary = summarizeVenueRentalPaymentLedger(payments)
     // Space + date fee only for now; add-ons stay $0 until staff updates them.
     const quote = computeVenueRentalQuotedCharges(row.spaces, [], rates)
-    const totalCharges = quote.spaceFee
+    const contactTagIds = row.billingContactId
+      ? tagIdsByContact.get(row.billingContactId) || []
+      : []
+    const discounted = applyVenueRentalDiscountPolicies({
+      spaceFee: quote.spaceFee,
+      venueCount: row.spaces.length,
+      contactTagIds,
+      policies: discountPolicies,
+    })
+    const totalCharges = discounted.totalCharges
     const balanceDue = Math.max(
       0,
       totalCharges - summary.amountReceived - summary.appliedCredits
@@ -1070,6 +1441,7 @@ export async function getVenueRentalPaymentReportRows(): Promise<
       balanceDue,
     })
     const hasFinancialActivity = rentalHasFinancialActivity({
+      rentalStatus: row.status,
       totalCharges,
       amountReceived: summary.amountReceived,
       refundedAmount: summary.refundedAmount,
@@ -1146,39 +1518,58 @@ export async function getCustomerVenueRentals(
   return getVenueRentalQueueRows({ customerUserId, organizationId })
 }
 
-/** Quoted space + addon totals for a rental (same basis as Payments Total Charges). */
+/** Quoted space fee (− optional Settings discounts); add-ons $0 for now. */
 export async function getVenueRentalQuotedCharges(
-  rental: Pick<VenueRentalQueueRow, "spaces" | "addons">
+  rental: Pick<VenueRentalQueueRow, "spaces" | "addons" | "billingContactId">
 ): Promise<{
   spaceFee: number
   addonFees: number
   totalCharges: number
   hours: number
+  discountAmount: number
 }> {
   const supabase = await createClient()
   const organizationId = await resolveOrganizationId()
   if (!organizationId) {
-    return { spaceFee: 0, addonFees: 0, totalCharges: 0, hours: 0 }
+    return {
+      spaceFee: 0,
+      addonFees: 0,
+      totalCharges: 0,
+      hours: 0,
+      discountAmount: 0,
+    }
   }
 
   const venueIds = Array.from(new Set(rental.spaces.map((space) => space.venueId)))
   if (!venueIds.length) {
-    return { spaceFee: 0, addonFees: 0, totalCharges: 0, hours: 0 }
+    return {
+      spaceFee: 0,
+      addonFees: 0,
+      totalCharges: 0,
+      hours: 0,
+      discountAmount: 0,
+    }
   }
 
-  const [venuesResult, dayPricingResult] = await Promise.all([
-    supabase
-      .from("venues")
-      .select("id, hourly_rate, peak_hourly_rate, base_price, peak_flat_price")
-      .eq("organization_id", organizationId)
-      .in("id", venueIds),
-    supabase
-      .from("rental_space_pricing")
-      .select("venue_id, day_of_week, hourly_price, flat_price, is_active")
-      .eq("organization_id", organizationId)
-      .in("venue_id", venueIds)
-      .eq("is_active", true),
-  ])
+  const [venuesResult, dayPricingResult, discountPolicies, tagIdsByContact] =
+    await Promise.all([
+      supabase
+        .from("venues")
+        .select("id, hourly_rate, peak_hourly_rate, base_price, peak_flat_price")
+        .eq("organization_id", organizationId)
+        .in("id", venueIds),
+      supabase
+        .from("rental_space_pricing")
+        .select("venue_id, day_of_week, hourly_price, flat_price, is_active")
+        .eq("organization_id", organizationId)
+        .in("venue_id", venueIds)
+        .eq("is_active", true),
+      getActiveVenueRentalDiscountPolicies(organizationId),
+      loadDiscountTagIdsByContactId(
+        organizationId,
+        rental.billingContactId ? [rental.billingContactId] : []
+      ),
+    ])
 
   const rates = buildVenueRateLookup({
     venues: (venuesResult.data || []) as Array<{
@@ -1197,12 +1588,22 @@ export async function getVenueRentalQuotedCharges(
     }>,
   })
 
-  // Detail Financial: space fee from rates; add-ons left at $0 for now.
   const quote = computeVenueRentalQuotedCharges(rental.spaces, [], rates)
-  return {
+  const contactTagIds = rental.billingContactId
+    ? tagIdsByContact.get(rental.billingContactId) || []
+    : []
+  const discounted = applyVenueRentalDiscountPolicies({
     spaceFee: quote.spaceFee,
+    venueCount: rental.spaces.length,
+    contactTagIds,
+    policies: discountPolicies,
+  })
+
+  return {
+    spaceFee: discounted.spaceFee,
     addonFees: 0,
-    totalCharges: quote.spaceFee,
+    totalCharges: discounted.totalCharges,
     hours: quote.hours,
+    discountAmount: discounted.discountAmount,
   }
 }

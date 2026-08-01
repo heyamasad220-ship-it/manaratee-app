@@ -178,6 +178,76 @@ export function isBookingDepositSatisfied(input: {
   return input.depositPaid
 }
 
+/**
+ * Payment types that do NOT satisfy the booking hold (Approved → Confirmed).
+ * Security deposit is optional and must not confirm on its own.
+ */
+export const VENUE_RENTAL_NON_CONFIRMING_PAYMENT_TYPES = new Set([
+  "discount",
+  "credit",
+  "refund",
+  "security_deposit",
+])
+
+/**
+ * Payment types that satisfy the booking hold (move Approved → Confirmed).
+ * @deprecated Prefer excluding {@link VENUE_RENTAL_NON_CONFIRMING_PAYMENT_TYPES}.
+ */
+export const VENUE_RENTAL_BOOKING_PAYMENT_TYPES = new Set([
+  "deposit",
+  "remaining_balance",
+  "installment",
+])
+
+/**
+ * Decide next rental status after ledger payments change.
+ * Confirms when any completed money payment exists (deposit, final, installment,
+ * add-on, cleaning, etc.) — not only payment_type=deposit. Discounts/credits/
+ * refunds/security deposit alone do not confirm.
+ */
+export function resolveVenueRentalStatusAfterPayments(input: {
+  previousStatus: VenueRentalStatus | null | undefined
+  paidPaymentTypes: Iterable<string>
+}): VenueRentalStatus {
+  const previousStatus = input.previousStatus ?? null
+
+  const terminalOrConfirmed = new Set<string>([
+    VENUE_RENTAL_STATUSES.confirmed,
+    VENUE_RENTAL_STATUSES.depositPaid,
+    VENUE_RENTAL_STATUSES.securityDepositPaid,
+    VENUE_RENTAL_STATUSES.completed,
+    VENUE_RENTAL_STATUSES.closed,
+    VENUE_RENTAL_STATUSES.cancelledAfterPayment,
+    VENUE_RENTAL_STATUSES.cancelledBeforePayment,
+    VENUE_RENTAL_STATUSES.declined,
+    VENUE_RENTAL_STATUSES.holdExpired,
+    VENUE_RENTAL_STATUSES.awaitingSecurityDepositRefundApproval,
+    VENUE_RENTAL_STATUSES.securityDepositRefunded,
+  ])
+
+  if (previousStatus && terminalOrConfirmed.has(previousStatus)) {
+    // Normalize legacy deposit_paid labels to confirmed when payments change.
+    if (
+      previousStatus === VENUE_RENTAL_STATUSES.depositPaid ||
+      previousStatus === VENUE_RENTAL_STATUSES.securityDepositPaid
+    ) {
+      return VENUE_RENTAL_STATUSES.confirmed
+    }
+    return previousStatus
+  }
+
+  const paidTypes = [...input.paidPaymentTypes].filter(Boolean)
+  const bookingPaymentCollected = paidTypes.some(
+    (type) => !VENUE_RENTAL_NON_CONFIRMING_PAYMENT_TYPES.has(type)
+  )
+
+  if (bookingPaymentCollected) {
+    return VENUE_RENTAL_STATUSES.confirmed
+  }
+
+  return VENUE_RENTAL_STATUSES.approvedPendingPayment
+}
+
 /** @deprecated Use `isBookingDepositSatisfied` — security deposit is not required. */
 export function bothRequiredDepositsPaid(input: {
   depositPaid: boolean

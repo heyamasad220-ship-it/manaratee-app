@@ -27,13 +27,18 @@ import {
   canStaffForceBookVenueRental,
   isVenueRentalPaymentReceivedStatus,
   isVenueRentalReviewable,
+  resolveVenueRentalStatusAfterPayments,
   shouldCancelVenueRentalAfterPayment,
   summarizeOutstandingRentalPayments,
+  VENUE_RENTAL_BOOKING_PAYMENT_TYPES,
   VENUE_RENTAL_FORCE_BOOK_STATUSES,
 } from "./venue-rental-status"
 import { expireVenueRentalHoldsForScope } from "./venue-rental-hold-expiry"
 import { completePastConfirmedVenueRentalsForScope } from "./venue-rental-auto-complete"
-import { getBlockingReservationsForVenue } from "./venue-rental-queries"
+import {
+  getBlockingReservationsForVenue,
+  getVenueRentalOrgSettings,
+} from "./venue-rental-queries"
 import {
   assertLegacyVenueBookingAvailableForMigration,
   legacyVenueBookingToSpaceSlot,
@@ -56,13 +61,21 @@ import {
   type RentalPaymentType,
   type RentalSpaceSlotInput,
   type SubmitVenueRentalInput,
+  type UpdateVenueRentalRequestDetailsInput,
   type VenueRentalStatus,
 } from "./venue-rental-types"
+import {
+  mergeVenueRentalCustomerNotes,
+  mergeVenueRentalEventTypeInNotes,
+} from "./venue-rental-format"
 import {
   canEditPendingCharge,
   isCompletedPaymentStatus,
   isPendingPaymentStatus,
+  resolveVenueRentalDiscountDollarAmount,
+  venueRentalChargePaymentTypeForAddon,
 } from "./venue-rental-payment-ledger"
+import { venueRentalOrgRequiresPolicyAgreement } from "./venue-rental-policy-documents"
 
 const CALENDAR_PATHS = [
   "/facilities/availability",
@@ -82,6 +95,65 @@ function revalidateVenueRentalPaths() {
   for (const path of CALENDAR_PATHS) {
     revalidatePath(path)
   }
+}
+
+async function stampPolicyDocumentsOnRental(input: {
+  organizationId: string
+  venueRentalId: string
+  customerUserId?: string | null
+  notifyCustomer?: boolean
+}) {
+  const settings = await getVenueRentalOrgSettings(input.organizationId)
+  if (!venueRentalOrgRequiresPolicyAgreement(settings)) {
+    return { stamped: false as const, settings }
+  }
+
+  const supabase = await createClient()
+  const nowIso = new Date().toISOString()
+  const { error } = await supabase
+    .from("venue_rentals")
+    .update({
+      policies_sent_at: nowIso,
+      policies_document_url_snapshot: settings.policiesDocumentUrl,
+      pricing_guide_url_snapshot: settings.pricingGuideUrl,
+    })
+    .eq("id", input.venueRentalId)
+    .eq("organization_id", input.organizationId)
+
+  if (error) {
+    if (
+      error.code === "42703" ||
+      error.message?.toLowerCase().includes("policies_sent_at")
+    ) {
+      console.error(
+        "Policy document columns missing. Run scripts/221_venue_rental_customer_documents.sql"
+      )
+      return { stamped: false as const, settings }
+    }
+    throw new Error(error.message || "Failed to record policy documents on rental.")
+  }
+
+  if (input.notifyCustomer !== false) {
+    fireModuleNotifications([
+      {
+        organizationId: input.organizationId,
+        moduleKey: "venue_rentals",
+        audience: "customer",
+        eventKey: "policies_documents_sent",
+        subject: "Review venue rental policies",
+        summary:
+          "Please review our policies and pricing guide, then agree in your rental portal to continue.",
+        metadata: {
+          venueRentalId: input.venueRentalId,
+          customerUserId: input.customerUserId ?? null,
+          policiesDocumentUrl: settings.policiesDocumentUrl,
+          pricingGuideUrl: settings.pricingGuideUrl,
+        },
+      },
+    ])
+  }
+
+  return { stamped: true as const, settings }
 }
 
 async function assertCanManageVenueRentals() {
@@ -180,7 +252,8 @@ async function assertVenuesInOrg(
 
 async function checkSpaceConflicts(
   organizationId: string,
-  spaces: RentalSpaceSlotInput[]
+  spaces: RentalSpaceSlotInput[],
+  excludeSourceIds: string[] = []
 ) {
   const existingByVenue = new Map<string, Awaited<ReturnType<typeof getBlockingReservationsForVenue>>>()
 
@@ -199,7 +272,8 @@ async function checkSpaceConflicts(
           organizationId,
           space.venueId,
           new Date(minStart).toISOString(),
-          new Date(maxEnd).toISOString()
+          new Date(maxEnd).toISOString(),
+          excludeSourceIds
         )
       )
     }
@@ -459,6 +533,13 @@ export async function submitVenueRentalRequest(input: SubmitVenueRentalInput) {
     operationalSetup: input.operationalSetup,
   })
 
+  const policyStamp = await stampPolicyDocumentsOnRental({
+    organizationId,
+    venueRentalId: rental.id as string,
+    customerUserId,
+    notifyCustomer: true,
+  })
+
   fireModuleNotifications([
     {
       organizationId,
@@ -475,8 +556,15 @@ export async function submitVenueRentalRequest(input: SubmitVenueRentalInput) {
       audience: "customer",
       eventKey: "request_received",
       subject: "Venue rental request received",
-      summary: "Your venue rental request was received and is awaiting review.",
-      metadata: { venueRentalId: rental.id, customerUserId },
+      summary: policyStamp.stamped
+        ? "Your venue rental request was received. Please review and agree to our policies in your portal."
+        : "Your venue rental request was received and is awaiting review.",
+      metadata: {
+        venueRentalId: rental.id,
+        customerUserId,
+        policiesDocumentUrl: policyStamp.settings.policiesDocumentUrl,
+        pricingGuideUrl: policyStamp.settings.pricingGuideUrl,
+      },
     },
   ])
 
@@ -613,6 +701,13 @@ export async function createStaffVenueRentalRequest(input: CreateStaffVenueRenta
     throw addonError
   }
 
+  const policyStamp = await stampPolicyDocumentsOnRental({
+    organizationId,
+    venueRentalId: rental.id as string,
+    customerUserId,
+    notifyCustomer: Boolean(customerUserId),
+  })
+
   fireModuleNotifications([
     {
       organizationId,
@@ -627,6 +722,26 @@ export async function createStaffVenueRentalRequest(input: CreateStaffVenueRenta
         createdByStaff: true,
       },
     },
+    ...(customerUserId
+      ? [
+          {
+            organizationId,
+            moduleKey: "venue_rentals" as const,
+            audience: "customer" as const,
+            eventKey: "request_received",
+            subject: "Venue rental request received",
+            summary: policyStamp.stamped
+              ? "A venue rental request was created for you. Please review and agree to our policies in your portal."
+              : "A venue rental request was created for you and is awaiting review.",
+            metadata: {
+              venueRentalId: rental.id,
+              customerUserId,
+              policiesDocumentUrl: policyStamp.settings.policiesDocumentUrl,
+              pricingGuideUrl: policyStamp.settings.pricingGuideUrl,
+            },
+          },
+        ]
+      : []),
   ])
 
   await syncContactAffiliations(billingContactId, organizationId, supabase)
@@ -636,12 +751,172 @@ export async function createStaffVenueRentalRequest(input: CreateStaffVenueRenta
   return rental.id as string
 }
 
+function reservationStatusForRentalStatus(
+  status: VenueRentalStatus
+): (typeof RENTAL_RESERVATION_STATUSES)[keyof typeof RENTAL_RESERVATION_STATUSES] {
+  if (
+    status === VENUE_RENTAL_STATUSES.confirmed ||
+    status === VENUE_RENTAL_STATUSES.depositPaid ||
+    status === VENUE_RENTAL_STATUSES.securityDepositPaid ||
+    status === VENUE_RENTAL_STATUSES.completed ||
+    status === VENUE_RENTAL_STATUSES.awaitingSecurityDepositRefundApproval ||
+    status === VENUE_RENTAL_STATUSES.securityDepositRefunded ||
+    status === VENUE_RENTAL_STATUSES.closed
+  ) {
+    return RENTAL_RESERVATION_STATUSES.confirmed
+  }
+
+  if (
+    status === VENUE_RENTAL_STATUSES.cancelledBeforePayment ||
+    status === VENUE_RENTAL_STATUSES.cancelledAfterPayment ||
+    status === VENUE_RENTAL_STATUSES.declined ||
+    status === VENUE_RENTAL_STATUSES.holdExpired
+  ) {
+    return RENTAL_RESERVATION_STATUSES.cancelled
+  }
+
+  return RENTAL_RESERVATION_STATUSES.temporaryHold
+}
+
+/** Staff in-place edit of spaces, notes, and event type on an existing rental. */
+export async function updateVenueRentalRequestDetails(
+  input: UpdateVenueRentalRequestDetailsInput
+) {
+  await assertCanManageVenueRentals()
+
+  const supabase = await createClient()
+  const organizationId = await resolveOrganizationId()
+
+  if (!organizationId) {
+    throw new Error("No organization selected")
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    throw new Error("You must be signed in to update a rental request.")
+  }
+
+  const venueRentalId = input.venueRentalId?.trim()
+  if (!venueRentalId) {
+    throw new Error("Rental id is required.")
+  }
+
+  validateSpaces(input.spaces)
+  await assertVenuesInOrg(
+    organizationId,
+    input.spaces.map((space) => space.venueId)
+  )
+
+  const { data: rental, error: rentalError } = await supabase
+    .from("venue_rentals")
+    .select("id, status, notes, venue_rental_event_type_id")
+    .eq("id", venueRentalId)
+    .eq("organization_id", organizationId)
+    .maybeSingle()
+
+  if (rentalError || !rental) {
+    throw new Error("Rental request not found.")
+  }
+
+  const { data: existingReservations, error: existingReservationsError } =
+    await supabase
+      .from("rental_reservations")
+      .select("id")
+      .eq("venue_rental_id", venueRentalId)
+      .eq("organization_id", organizationId)
+
+  if (existingReservationsError) {
+    throw new Error("Failed to load current reservations.")
+  }
+
+  const excludeSourceIds = (existingReservations || []).map((row) => row.id as string)
+  await checkSpaceConflicts(organizationId, input.spaces, excludeSourceIds)
+
+  const eventTypeId = input.venueRentalEventTypeId?.trim() || null
+  let eventTypeName: string | null = null
+
+  if (eventTypeId) {
+    const { data: eventType, error: eventTypeError } = await supabase
+      .from("venue_rental_event_types")
+      .select("id, name")
+      .eq("organization_id", organizationId)
+      .eq("id", eventTypeId)
+      .maybeSingle()
+
+    if (eventTypeError || !eventType) {
+      throw new Error("The selected event type could not be found.")
+    }
+
+    eventTypeName = (eventType.name as string) || null
+  }
+
+  let nextNotes = mergeVenueRentalCustomerNotes(rental.notes, input.notes)
+  nextNotes = mergeVenueRentalEventTypeInNotes(nextNotes, eventTypeName)
+
+  const { error: updateError } = await supabase
+    .from("venue_rentals")
+    .update({
+      venue_rental_event_type_id: eventTypeId,
+      notes: nextNotes,
+    })
+    .eq("id", venueRentalId)
+    .eq("organization_id", organizationId)
+
+  if (updateError) {
+    throw new Error(updateError.message || "Failed to update rental request.")
+  }
+
+  const reservationStatus = reservationStatusForRentalStatus(
+    rental.status as VenueRentalStatus
+  )
+
+  if (excludeSourceIds.length > 0) {
+    const { error: deleteError } = await supabase
+      .from("rental_reservations")
+      .delete()
+      .eq("venue_rental_id", venueRentalId)
+      .eq("organization_id", organizationId)
+
+    if (deleteError) {
+      throw new Error(deleteError.message || "Failed to replace reservations.")
+    }
+  }
+
+  const reservationRows = input.spaces.map((space) => ({
+    organization_id: organizationId,
+    venue_rental_id: venueRentalId,
+    venue_id: space.venueId,
+    start_at: space.startAt,
+    end_at: space.endAt,
+    status: reservationStatus,
+    created_by: user.id,
+  }))
+
+  const { error: insertError } = await supabase
+    .from("rental_reservations")
+    .insert(reservationRows)
+
+  if (insertError) {
+    throw new Error(insertError.message || "Failed to save updated spaces.")
+  }
+
+  await syncOperationalBriefForVenueRental(venueRentalId, organizationId, user.id)
+
+  revalidateVenueRentalPaths()
+  revalidatePath(`/bookings/rentals/${venueRentalId}`)
+}
+
 export async function approveVenueRentalRequest(input: {
   venueRentalId: string
   depositAmount: number
   /** @deprecated Optional; security deposit is not required for confirmation. */
   securityDepositAmount?: number
   remainingBalanceAmount?: number
+  /** Staff override when customer has not agreed yet (walk-ins / exceptions). */
+  bypassPolicyAgreement?: boolean
 }) {
   await assertCanManageVenueRentals()
 
@@ -658,7 +933,7 @@ export async function approveVenueRentalRequest(input: {
 
   const rental = await supabase
     .from("venue_rentals")
-    .select("id, status")
+    .select("id, status, policies_agreed_at")
     .eq("id", input.venueRentalId)
     .eq("organization_id", organizationId)
     .maybeSingle()
@@ -671,6 +946,36 @@ export async function approveVenueRentalRequest(input: {
     throw new Error("Only submitted or pending requests can be approved.")
   }
 
+  const settings = await getVenueRentalOrgSettings(organizationId)
+  if (
+    venueRentalOrgRequiresPolicyAgreement(settings) &&
+    !rental.data.policies_agreed_at &&
+    !input.bypassPolicyAgreement
+  ) {
+    throw new Error(
+      "Customer must agree to policies and pricing before approval. Ask them to agree in the portal, or use bypass for an exception."
+    )
+  }
+
+  await approveVenueRentalRequestCore({
+    venueRentalId: input.venueRentalId,
+    organizationId,
+    approvedByUserId: user?.id ?? null,
+    depositAmount: input.depositAmount,
+    securityDepositAmount: input.securityDepositAmount,
+    remainingBalanceAmount: input.remainingBalanceAmount,
+  })
+}
+
+async function approveVenueRentalRequestCore(input: {
+  venueRentalId: string
+  organizationId: string
+  approvedByUserId: string | null
+  depositAmount: number
+  securityDepositAmount?: number
+  remainingBalanceAmount?: number
+}) {
+  const supabase = await createClient()
   const nowIso = new Date().toISOString()
   const holdExpiresAt = computeHoldExpiresAt(new Date(nowIso))
 
@@ -678,13 +983,13 @@ export async function approveVenueRentalRequest(input: {
     .from("venue_rentals")
     .update({
       status: VENUE_RENTAL_STATUSES.approvedPendingPayment,
-      supervisor_user_id: user?.id ?? null,
+      supervisor_user_id: input.approvedByUserId,
       approved_at: nowIso,
       payment_notice_sent_at: nowIso,
       hold_expires_at: holdExpiresAt.toISOString(),
     })
     .eq("id", input.venueRentalId)
-    .eq("organization_id", organizationId)
+    .eq("organization_id", input.organizationId)
 
   if (updateError) {
     throw new Error(updateError.message || "Failed to approve rental request")
@@ -694,7 +999,7 @@ export async function approveVenueRentalRequest(input: {
     .from("rental_reservations")
     .update({ hold_expires_at: holdExpiresAt.toISOString() })
     .eq("venue_rental_id", input.venueRentalId)
-    .eq("organization_id", organizationId)
+    .eq("organization_id", input.organizationId)
 
   type PaymentInsertRow = {
     organization_id: string
@@ -707,7 +1012,7 @@ export async function approveVenueRentalRequest(input: {
 
   const paymentRows: PaymentInsertRow[] = [
     {
-      organization_id: organizationId,
+      organization_id: input.organizationId,
       venue_rental_id: input.venueRentalId,
       payment_type: RENTAL_PAYMENT_TYPES.deposit,
       status: RENTAL_PAYMENT_STATUSES.paymentRequested,
@@ -719,7 +1024,7 @@ export async function approveVenueRentalRequest(input: {
   const securityAmount = Math.max(0, Number(input.securityDepositAmount) || 0)
   if (securityAmount > 0) {
     paymentRows.push({
-      organization_id: organizationId,
+      organization_id: input.organizationId,
       venue_rental_id: input.venueRentalId,
       payment_type: RENTAL_PAYMENT_TYPES.securityDeposit,
       status: RENTAL_PAYMENT_STATUSES.paymentRequested,
@@ -730,7 +1035,7 @@ export async function approveVenueRentalRequest(input: {
 
   if (input.remainingBalanceAmount && input.remainingBalanceAmount > 0) {
     paymentRows.push({
-      organization_id: organizationId,
+      organization_id: input.organizationId,
       venue_rental_id: input.venueRentalId,
       payment_type: RENTAL_PAYMENT_TYPES.remainingBalance,
       status: RENTAL_PAYMENT_STATUSES.unpaid,
@@ -742,16 +1047,20 @@ export async function approveVenueRentalRequest(input: {
   await supabase.from("rental_payments").insert(paymentRows)
 
   await supabase.from("rental_contracts").insert({
-    organization_id: organizationId,
+    organization_id: input.organizationId,
     venue_rental_id: input.venueRentalId,
     status: RENTAL_CONTRACT_STATUSES.generated,
   })
 
-  await syncOperationalBriefForVenueRental(input.venueRentalId, organizationId, user?.id)
+  await syncOperationalBriefForVenueRental(
+    input.venueRentalId,
+    input.organizationId,
+    input.approvedByUserId
+  )
 
   fireModuleNotifications([
     {
-      organizationId,
+      organizationId: input.organizationId,
       moduleKey: "venue_rentals",
       audience: "staff",
       eventKey: "request_approved",
@@ -760,7 +1069,7 @@ export async function approveVenueRentalRequest(input: {
       metadata: { venueRentalId: input.venueRentalId },
     },
     {
-      organizationId,
+      organizationId: input.organizationId,
       moduleKey: "venue_rentals",
       audience: "customer",
       eventKey: "request_approved",
@@ -775,6 +1084,116 @@ export async function approveVenueRentalRequest(input: {
   ])
 
   revalidateVenueRentalPaths()
+  revalidatePath(`/bookings/rentals/${input.venueRentalId}`)
+  revalidatePath(`/customer/rentals/${input.venueRentalId}`)
+}
+
+/** Customer agrees to org policies/pricing documents stamped on the rental. */
+export async function agreeVenueRentalPolicies(input: { venueRentalId: string }) {
+  const supabase = await createClient()
+  const organizationId = await resolveOrganizationId()
+
+  if (!organizationId) {
+    throw new Error("No organization selected")
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    throw new Error("You must be signed in to agree to policies.")
+  }
+
+  const portalSession = await resolveCustomerPortalSession()
+  const customerUserId = portalSession?.effectiveUserId ?? user.id
+
+  const { data: rental, error: rentalError } = await supabase
+    .from("venue_rentals")
+    .select(
+      "id, status, customer_user_id, policies_sent_at, policies_agreed_at, policies_document_url_snapshot, pricing_guide_url_snapshot"
+    )
+    .eq("id", input.venueRentalId)
+    .eq("organization_id", organizationId)
+    .maybeSingle()
+
+  if (rentalError || !rental) {
+    throw new Error("Rental request not found.")
+  }
+
+  if (rental.customer_user_id !== customerUserId) {
+    throw new Error("You can only agree to policies for your own rental request.")
+  }
+
+  if (!isVenueRentalReviewable(rental.status as typeof VENUE_RENTAL_STATUSES.submitted)) {
+    throw new Error("This rental is no longer awaiting policy agreement.")
+  }
+
+  const hasDocs = Boolean(
+    rental.policies_document_url_snapshot || rental.pricing_guide_url_snapshot
+  )
+  if (!hasDocs && !rental.policies_sent_at) {
+    throw new Error("No policy documents are attached to this request.")
+  }
+
+  if (rental.policies_agreed_at) {
+    return { agreed: true, autoApproved: false }
+  }
+
+  const nowIso = new Date().toISOString()
+  const { error: agreeError } = await supabase
+    .from("venue_rentals")
+    .update({ policies_agreed_at: nowIso })
+    .eq("id", input.venueRentalId)
+    .eq("organization_id", organizationId)
+
+  if (agreeError) {
+    throw new Error(agreeError.message || "Failed to record policy agreement.")
+  }
+
+  fireModuleNotifications([
+    {
+      organizationId,
+      moduleKey: "venue_rentals",
+      audience: "staff",
+      eventKey: "policies_agreed",
+      subject: "Customer agreed to rental policies",
+      summary: "A customer agreed to venue rental policies and is ready for review.",
+      metadata: { venueRentalId: input.venueRentalId, customerUserId },
+    },
+  ])
+
+  const settings = await getVenueRentalOrgSettings(organizationId)
+  let autoApproved = false
+
+  if (settings.approvalMode === "auto_after_agreement") {
+    const { getVenueRentalDetailRow, getVenueRentalQuotedCharges } = await import(
+      "./venue-rental-queries"
+    )
+    const detail = await getVenueRentalDetailRow(input.venueRentalId)
+    const quoted = detail
+      ? await getVenueRentalQuotedCharges(detail)
+      : { totalCharges: 0 }
+    const depositAmount = Math.max(0, Number(quoted.totalCharges) || 0)
+    const securityDepositAmount =
+      settings.securityDepositEnabled && settings.defaultSecurityDepositAmount != null
+        ? settings.defaultSecurityDepositAmount
+        : 0
+
+    await approveVenueRentalRequestCore({
+      venueRentalId: input.venueRentalId,
+      organizationId,
+      approvedByUserId: null,
+      depositAmount,
+      securityDepositAmount: securityDepositAmount > 0 ? securityDepositAmount : undefined,
+    })
+    autoApproved = true
+  }
+
+  revalidateVenueRentalPaths()
+  revalidatePath(`/bookings/rentals/${input.venueRentalId}`)
+  revalidatePath(`/customer/rentals/${input.venueRentalId}`)
+  return { agreed: true, autoApproved }
 }
 
 export async function markVenueRentalPending(input: {
@@ -1114,7 +1533,7 @@ export async function recordVenueRentalPaymentReceived(input: {
 
   const { data: rental } = await supabase
     .from("venue_rentals")
-    .select("id")
+    .select("id, status")
     .eq("id", input.venueRentalId)
     .eq("organization_id", organizationId)
     .maybeSingle()
@@ -1123,12 +1542,41 @@ export async function recordVenueRentalPaymentReceived(input: {
     throw new Error("Venue rental not found.")
   }
 
+  // While Approved (deposit due), apply money to the deposit hold — even if the
+  // staff picker said Final Payment / Installment (common when no pending
+  // deposit row exists, e.g. imported requests).
+  let effectivePaymentType = paymentType
+  const awaitingDeposit =
+    rental.status === VENUE_RENTAL_STATUSES.approvedPendingPayment
+
+  if (
+    awaitingDeposit &&
+    VENUE_RENTAL_BOOKING_PAYMENT_TYPES.has(paymentType)
+  ) {
+    const { data: depositRows } = await supabase
+      .from("rental_payments")
+      .select("id, status")
+      .eq("organization_id", organizationId)
+      .eq("venue_rental_id", input.venueRentalId)
+      .eq("payment_type", RENTAL_PAYMENT_TYPES.deposit)
+      .order("created_at", { ascending: true })
+
+    const unpaidDeposit = (depositRows || []).find((payment) =>
+      isPendingPaymentStatus(String(payment.status || ""))
+    )
+    const hasAnyDeposit = (depositRows || []).length > 0
+
+    if (unpaidDeposit || !hasAnyDeposit) {
+      effectivePaymentType = RENTAL_PAYMENT_TYPES.deposit
+    }
+  }
+
   const { data: existingPayments, error: listError } = await supabase
     .from("rental_payments")
     .select("id, status, amount")
     .eq("organization_id", organizationId)
     .eq("venue_rental_id", input.venueRentalId)
-    .eq("payment_type", paymentType)
+    .eq("payment_type", effectivePaymentType)
     .order("created_at", { ascending: true })
 
   if (listError) {
@@ -1171,7 +1619,7 @@ export async function recordVenueRentalPaymentReceived(input: {
       .insert({
         organization_id: organizationId,
         venue_rental_id: input.venueRentalId,
-        payment_type: paymentType,
+        payment_type: effectivePaymentType,
         ...paidFields,
       })
       .select("id")
@@ -1196,7 +1644,7 @@ export async function recordVenueRentalPaymentReceived(input: {
       metadata: {
         venueRentalId: input.venueRentalId,
         paymentId,
-        paymentType,
+        paymentType: effectivePaymentType,
         amount,
       },
     },
@@ -1210,7 +1658,7 @@ export async function recordVenueRentalPaymentReceived(input: {
       metadata: {
         venueRentalId: input.venueRentalId,
         paymentId,
-        paymentType,
+        paymentType: effectivePaymentType,
         amount,
       },
     },
@@ -1222,25 +1670,23 @@ export async function recordVenueRentalPaymentReceived(input: {
 /** Add a pending charge line (does not mark received). */
 export async function addVenueRentalCharge(input: {
   venueRentalId: string
-  paymentType:
+  paymentType?:
     | "deposit"
     | "security_deposit"
     | "remaining_balance"
     | "addon_fee"
     | "cleaning_fee"
     | "adjustment"
-    | "discount"
     | "installment"
-  amount: number
+  /** Catalog add-on — preferred for Financial → Add charge. */
+  rentalAddonId?: string | null
+  quantity?: number
+  unitPrice?: number | null
+  amount?: number
   dueAt?: string | null
   notes?: string
 }) {
   await assertCanManageVenueRentals()
-
-  const amount = Number(input.amount)
-  if (!Number.isFinite(amount) || amount <= 0) {
-    throw new Error("Enter a charge amount greater than zero.")
-  }
 
   const supabase = await createClient()
   const organizationId = await resolveOrganizationId()
@@ -1259,14 +1705,62 @@ export async function addVenueRentalCharge(input: {
 
   if (!rental) throw new Error("Venue rental not found.")
 
+  const quantityRaw = Number(input.quantity)
+  const quantity =
+    Number.isFinite(quantityRaw) && quantityRaw > 0 ? Math.floor(quantityRaw) : 1
+
+  let paymentType = input.paymentType || RENTAL_PAYMENT_TYPES.addonFee
+  let amount = Number(input.amount)
+  let autoNote: string | null = null
+
+  const rentalAddonId = input.rentalAddonId?.trim() || null
+  if (rentalAddonId) {
+    const { data: catalogAddon, error: catalogError } = await supabase
+      .from("rental_addons")
+      .select("id, name, slug, default_price, is_active")
+      .eq("organization_id", organizationId)
+      .eq("id", rentalAddonId)
+      .maybeSingle()
+
+    if (catalogError || !catalogAddon || !catalogAddon.is_active) {
+      throw new Error("The selected add-on is invalid or inactive.")
+    }
+
+    paymentType = venueRentalChargePaymentTypeForAddon({
+      slug: catalogAddon.slug as string | null,
+      name: catalogAddon.name as string,
+    })
+
+    const unitPrice =
+      input.unitPrice != null && Number.isFinite(Number(input.unitPrice))
+        ? Number(input.unitPrice)
+        : Number(catalogAddon.default_price || 0)
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      amount = Math.round(unitPrice * quantity * 100) / 100
+    }
+
+    autoNote =
+      quantity > 1
+        ? `${catalogAddon.name} × ${quantity}`
+        : (catalogAddon.name as string)
+  }
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new Error("Enter a charge amount greater than zero.")
+  }
+
+  const staffNotes = input.notes?.trim()
+  const notes = [autoNote, staffNotes].filter(Boolean).join("\n") || null
+
   const { error } = await supabase.from("rental_payments").insert({
     organization_id: organizationId,
     venue_rental_id: input.venueRentalId,
-    payment_type: input.paymentType,
+    payment_type: paymentType,
     status: RENTAL_PAYMENT_STATUSES.paymentRequested,
     amount,
     due_at: input.dueAt || null,
-    notes: input.notes?.trim() || null,
+    notes,
     recorded_by: user?.id ?? null,
   })
 
@@ -1316,6 +1810,90 @@ export async function applyVenueRentalCredit(input: {
     throw new Error(error.message || "Failed to apply credit.")
   }
 
+  revalidateVenueRentalPaths()
+}
+
+/**
+ * Apply a completed discount (fixed $ or % of basis / total charges).
+ * Reduces balance due; shown separately from credits on the Financial panel.
+ */
+export async function applyVenueRentalDiscount(input: {
+  venueRentalId: string
+  discountType: "fixed" | "percent"
+  amount: number
+  /** Total charges basis from the UI when applying a percent discount. */
+  basisAmount?: number
+  notes?: string
+  referenceNumber?: string
+}) {
+  await assertCanManageVenueRentals()
+
+  const discountType = input.discountType
+  if (discountType !== "fixed" && discountType !== "percent") {
+    throw new Error("Choose a fixed amount or percentage discount.")
+  }
+
+  const dollarAmount = resolveVenueRentalDiscountDollarAmount({
+    discountType,
+    amount: input.amount,
+    basisAmount: input.basisAmount,
+  })
+
+  if (dollarAmount <= 0) {
+    throw new Error("Discount must resolve to more than $0.00.")
+  }
+
+  const supabase = await createClient()
+  const organizationId = await resolveOrganizationId()
+  if (!organizationId) throw new Error("No organization selected")
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  const { data: rental } = await supabase
+    .from("venue_rentals")
+    .select("id")
+    .eq("id", input.venueRentalId)
+    .eq("organization_id", organizationId)
+    .maybeSingle()
+
+  if (!rental) throw new Error("Venue rental not found.")
+
+  const formatUsd = (value: number) =>
+    new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+    }).format(value)
+
+  const calcNote =
+    discountType === "percent"
+      ? `Discount: ${Number(input.amount)}% of ${formatUsd(
+          Number(input.basisAmount) || 0
+        )} (${formatUsd(dollarAmount)})`
+      : null
+
+  const staffNotes = input.notes?.trim()
+  const notes = staffNotes || calcNote
+
+  const { error } = await supabase.from("rental_payments").insert({
+    organization_id: organizationId,
+    venue_rental_id: input.venueRentalId,
+    payment_type: RENTAL_PAYMENT_TYPES.discount,
+    status: RENTAL_PAYMENT_STATUSES.completed,
+    amount: dollarAmount,
+    paid_at: new Date().toISOString(),
+    notes,
+    reference_number: input.referenceNumber?.trim() || null,
+    recorded_by: user?.id ?? null,
+    payment_method: RENTAL_PAYMENT_METHODS.other,
+  })
+
+  if (error) {
+    throw new Error(error.message || "Failed to apply discount.")
+  }
+
+  await syncVenueRentalStatusAfterPayment(input.venueRentalId, organizationId)
   revalidateVenueRentalPaths()
 }
 
@@ -1494,6 +2072,143 @@ export async function sendVenueRentalPaymentReminder(input: {
   revalidateVenueRentalPaths()
 }
 
+/**
+ * Edit transaction details (method, reference, notes, date).
+ * Completed payments: metadata only (amount stays — void to correct amount).
+ * Pending charges: amount and due date may also be updated.
+ */
+export async function updateVenueRentalTransactionDetails(input: {
+  paymentId: string
+  paymentMethod?: RentalPaymentMethod | null
+  referenceNumber?: string | null
+  notes?: string | null
+  paymentDate?: string | null
+  receiptUrl?: string | null
+  amount?: number | null
+  dueAt?: string | null
+}) {
+  await assertCanManageVenueRentals()
+
+  const supabase = await createClient()
+  const organizationId = await resolveOrganizationId()
+  if (!organizationId) throw new Error("No organization selected")
+
+  const { data: payment, error: paymentError } = await supabase
+    .from("rental_payments")
+    .select(
+      "id, venue_rental_id, payment_type, status, payment_method, reference_number, notes, paid_at, due_at, receipt_url, amount"
+    )
+    .eq("id", input.paymentId)
+    .eq("organization_id", organizationId)
+    .maybeSingle()
+
+  if (paymentError || !payment) {
+    throw new Error("Transaction not found.")
+  }
+
+  if (payment.payment_type === RENTAL_PAYMENT_TYPES.refund) {
+    throw new Error("Refund rows cannot be edited here.")
+  }
+
+  if (
+    payment.status === RENTAL_PAYMENT_STATUSES.voided ||
+    payment.status === RENTAL_PAYMENT_STATUSES.failed ||
+    payment.status === RENTAL_PAYMENT_STATUSES.refunded
+  ) {
+    throw new Error("Voided, failed, or refunded transactions cannot be edited.")
+  }
+
+  const isPending = canEditPendingCharge(String(payment.status || ""))
+  const isCompleted = isCompletedPaymentStatus(String(payment.status || ""))
+
+  if (!isPending && !isCompleted) {
+    throw new Error("This transaction cannot be edited in its current status.")
+  }
+
+  const updates: Record<string, unknown> = {}
+
+  if (input.paymentMethod !== undefined) {
+    const method = input.paymentMethod?.trim() || null
+    if (
+      method &&
+      !Object.values(RENTAL_PAYMENT_METHODS).includes(method as RentalPaymentMethod)
+    ) {
+      throw new Error("Choose a valid payment method.")
+    }
+    updates.payment_method = method
+  }
+
+  if (input.referenceNumber !== undefined) {
+    updates.reference_number = input.referenceNumber?.trim() || null
+  }
+
+  if (input.notes !== undefined) {
+    updates.notes = input.notes?.trim() || null
+  }
+
+  if (input.receiptUrl !== undefined) {
+    updates.receipt_url = input.receiptUrl?.trim() || null
+  }
+
+  if (input.paymentDate !== undefined) {
+    const dateValue = input.paymentDate?.trim()
+    if (dateValue) {
+      const paidAt = new Date(`${dateValue}T12:00:00`)
+      if (Number.isNaN(paidAt.getTime())) {
+        throw new Error("Enter a valid payment date.")
+      }
+      updates.paid_at = paidAt.toISOString()
+    } else if (isCompleted) {
+      throw new Error("Completed transactions need a payment date.")
+    } else {
+      updates.paid_at = null
+    }
+  }
+
+  if (input.amount !== undefined && input.amount !== null) {
+    if (!isPending) {
+      throw new Error(
+        "Completed payment amounts cannot be edited. Void and record a correction instead."
+      )
+    }
+    const amount = Number(input.amount)
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new Error("Enter an amount greater than zero.")
+    }
+    updates.amount = amount
+  }
+
+  if (input.dueAt !== undefined) {
+    if (!isPending) {
+      throw new Error("Due date can only be edited on pending charges.")
+    }
+    const dueValue = input.dueAt?.trim()
+    updates.due_at = dueValue
+      ? new Date(`${dueValue}T12:00:00`).toISOString()
+      : null
+  }
+
+  if (Object.keys(updates).length === 0) {
+    throw new Error("No changes to save.")
+  }
+
+  const { error } = await supabase
+    .from("rental_payments")
+    .update(updates)
+    .eq("id", input.paymentId)
+    .eq("organization_id", organizationId)
+
+  if (error) {
+    throw new Error(error.message || "Failed to update transaction.")
+  }
+
+  await syncVenueRentalStatusAfterPayment(
+    payment.venue_rental_id as string,
+    organizationId
+  )
+  revalidateVenueRentalPaths()
+}
+
 export async function updateVenueRentalPaymentRecord(input: {
   paymentId: string
   paymentType:
@@ -1647,34 +2362,29 @@ async function syncVenueRentalStatusAfterPayment(
     RENTAL_PAYMENT_STATUSES.completed,
   ])
 
-  const paidTypes = new Set(
-    (payments || [])
-      .filter((payment) => paidStatuses.has(payment.status as string))
-      .map((payment) => payment.payment_type)
-  )
+  const paidTypes = (payments || [])
+    .filter((payment) => paidStatuses.has(payment.status as string))
+    .map((payment) => String(payment.payment_type || ""))
 
-  const depositPaid = paidTypes.has(RENTAL_PAYMENT_TYPES.deposit)
+  // Intended process: collecting a booking payment (deposit / final / installment)
+  // confirms the hold. Security deposit / cleaning / add-ons do not. Do not regress
+  // confirmed / completed / cancelled when editing later balance lines.
+  const nextStatus = resolveVenueRentalStatusAfterPayments({
+    previousStatus,
+    paidPaymentTypes: paidTypes,
+  })
 
-  // Intended process: deposit paid confirms the booking (security deposit not required).
-  // Do not regress confirmed / completed / cancelled statuses when editing remaining balance.
-  const terminalOrConfirmed = new Set<string>([
-    VENUE_RENTAL_STATUSES.confirmed,
-    VENUE_RENTAL_STATUSES.completed,
-    VENUE_RENTAL_STATUSES.closed,
-    VENUE_RENTAL_STATUSES.cancelledAfterPayment,
-    VENUE_RENTAL_STATUSES.cancelledBeforePayment,
-    VENUE_RENTAL_STATUSES.declined,
-    VENUE_RENTAL_STATUSES.holdExpired,
-    VENUE_RENTAL_STATUSES.awaitingSecurityDepositRefundApproval,
-    VENUE_RENTAL_STATUSES.securityDepositRefunded,
-  ])
-
-  let nextStatus: VenueRentalStatus = VENUE_RENTAL_STATUSES.approvedPendingPayment
-
-  if (previousStatus && terminalOrConfirmed.has(previousStatus)) {
-    nextStatus = previousStatus
-  } else if (depositPaid) {
-    nextStatus = VENUE_RENTAL_STATUSES.confirmed
+  if (nextStatus === previousStatus) {
+    if (nextStatus === VENUE_RENTAL_STATUSES.confirmed) {
+      // Still clear hold if somehow still set on an already-confirmed rental.
+      await supabase
+        .from("venue_rentals")
+        .update({ hold_expires_at: null })
+        .eq("id", venueRentalId)
+        .eq("organization_id", organizationId)
+        .not("hold_expires_at", "is", null)
+    }
+    return
   }
 
   const statusUpdate: Record<string, unknown> = { status: nextStatus }
@@ -1682,11 +2392,23 @@ async function syncVenueRentalStatusAfterPayment(
     statusUpdate.hold_expires_at = null
   }
 
-  await supabase
+  const { data: updatedRental, error: statusError } = await supabase
     .from("venue_rentals")
     .update(statusUpdate)
     .eq("id", venueRentalId)
     .eq("organization_id", organizationId)
+    .select("status")
+    .maybeSingle()
+
+  if (statusError) {
+    throw new Error(statusError.message || "Failed to update rental status.")
+  }
+
+  if (!updatedRental || updatedRental.status !== nextStatus) {
+    throw new Error(
+      "Failed to update rental status (no row updated). Check organization access."
+    )
+  }
 
   if (nextStatus === VENUE_RENTAL_STATUSES.confirmed) {
     await supabase
@@ -1712,6 +2434,108 @@ async function syncVenueRentalStatusAfterPayment(
       ])
     }
   }
+}
+
+/**
+ * Repair Approved rentals that already have a booking payment recorded but were
+ * never moved to Confirmed (e.g. payment typed as Final Payment before the fix).
+ */
+export async function reconcileVenueRentalStatusFromPayments(
+  venueRentalId: string
+) {
+  const supabase = await createClient()
+  const organizationId = await resolveOrganizationId()
+  if (!organizationId) return { updated: false }
+
+  const { data: rental } = await supabase
+    .from("venue_rentals")
+    .select("status")
+    .eq("id", venueRentalId)
+    .eq("organization_id", organizationId)
+    .maybeSingle()
+
+  if (!rental) return { updated: false }
+
+  const previousStatus = rental.status as VenueRentalStatus
+  if (previousStatus !== VENUE_RENTAL_STATUSES.approvedPendingPayment) {
+    return { updated: false }
+  }
+
+  await syncVenueRentalStatusAfterPayment(venueRentalId, organizationId)
+
+  const { data: refreshed } = await supabase
+    .from("venue_rentals")
+    .select("status")
+    .eq("id", venueRentalId)
+    .eq("organization_id", organizationId)
+    .maybeSingle()
+
+  const nextStatus = refreshed?.status as VenueRentalStatus | undefined
+  if (nextStatus && nextStatus !== previousStatus) {
+    revalidateVenueRentalPaths()
+    revalidatePath(`/bookings/rentals/${venueRentalId}`)
+    return { updated: true, status: nextStatus }
+  }
+
+  return { updated: false, status: previousStatus }
+}
+
+/**
+ * Batch-repair all Approved rentals in the org that already have confirming
+ * payments on the ledger. Called when staff open Requests (same pattern as
+ * auto-complete) so the queue updates without opening each detail page.
+ */
+export async function reconcileApprovedVenueRentalsWithPayments() {
+  const supabase = await createClient()
+  const organizationId = await resolveOrganizationId()
+  if (!organizationId) return 0
+
+  const { data: rentals, error } = await supabase
+    .from("venue_rentals")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("status", VENUE_RENTAL_STATUSES.approvedPendingPayment)
+
+  if (error) {
+    console.error("Failed to load Approved rentals for payment reconcile:", error)
+    return 0
+  }
+
+  if (!rentals?.length) return 0
+
+  let updatedCount = 0
+  for (const rental of rentals) {
+    try {
+      const before = VENUE_RENTAL_STATUSES.approvedPendingPayment
+      await syncVenueRentalStatusAfterPayment(rental.id as string, organizationId)
+
+      const { data: refreshed } = await supabase
+        .from("venue_rentals")
+        .select("status")
+        .eq("id", rental.id)
+        .eq("organization_id", organizationId)
+        .maybeSingle()
+
+      if (
+        refreshed?.status &&
+        refreshed.status !== before &&
+        refreshed.status === VENUE_RENTAL_STATUSES.confirmed
+      ) {
+        updatedCount += 1
+      }
+    } catch (error) {
+      console.error(
+        `Failed to reconcile venue rental ${rental.id} after payment:`,
+        error
+      )
+    }
+  }
+
+  if (updatedCount > 0) {
+    revalidateVenueRentalPaths()
+  }
+
+  return updatedCount
 }
 
 export async function expireVenueRentalHolds(now = new Date()) {
@@ -1759,6 +2583,61 @@ export async function completePastConfirmedVenueRentals(now = new Date()) {
   return result.completedCount
 }
 
+/** Mark a confirmed rental completed without the security-deposit refund workflow. */
+export async function markVenueRentalCompleted(input: {
+  venueRentalId: string
+  notes?: string
+}) {
+  await assertCanManageVenueRentals()
+
+  const supabase = await createClient()
+  const organizationId = await resolveOrganizationId()
+
+  if (!organizationId) {
+    throw new Error("No organization selected")
+  }
+
+  const { data: rental, error: rentalError } = await supabase
+    .from("venue_rentals")
+    .select("id, status, notes")
+    .eq("id", input.venueRentalId)
+    .eq("organization_id", organizationId)
+    .maybeSingle()
+
+  if (rentalError || !rental) {
+    throw new Error("Rental not found.")
+  }
+
+  if (
+    rental.status !== VENUE_RENTAL_STATUSES.confirmed &&
+    rental.status !== VENUE_RENTAL_STATUSES.depositPaid &&
+    rental.status !== VENUE_RENTAL_STATUSES.securityDepositPaid
+  ) {
+    throw new Error("Only confirmed rentals can be marked completed.")
+  }
+
+  const note = input.notes?.trim()
+  const nextNotes =
+    note && note.length > 0
+      ? [rental.notes?.trim(), note].filter(Boolean).join("\n\n")
+      : rental.notes
+
+  const { error } = await supabase
+    .from("venue_rentals")
+    .update({
+      status: VENUE_RENTAL_STATUSES.completed,
+      notes: nextNotes,
+    })
+    .eq("id", input.venueRentalId)
+    .eq("organization_id", organizationId)
+
+  if (error) {
+    throw new Error(error.message || "Failed to mark rental completed.")
+  }
+
+  revalidateVenueRentalPaths()
+}
+
 export async function markVenueRentalCompletedAndAwaitingRefund(input: {
   venueRentalId: string
   inspectionNotes?: string
@@ -1785,6 +2664,13 @@ export async function markVenueRentalCompletedAndAwaitingRefund(input: {
 
   if (rental.status !== VENUE_RENTAL_STATUSES.confirmed && rental.status !== VENUE_RENTAL_STATUSES.completed) {
     throw new Error("Only confirmed or completed rentals can enter refund review.")
+  }
+
+  const settings = await getVenueRentalOrgSettings(organizationId)
+  if (!settings.securityDepositEnabled) {
+    throw new Error(
+      "Security deposit refunds are turned off for this organization. Enable them under Venue Rentals → Settings → General, or mark the rental completed instead."
+    )
   }
 
   const nowIso = new Date().toISOString()

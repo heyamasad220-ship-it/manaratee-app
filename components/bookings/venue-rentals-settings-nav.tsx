@@ -7,6 +7,11 @@ import { cn } from "@/lib/utils"
 
 const settingsTabs = [
   {
+    label: "General",
+    href: "/bookings/settings/general",
+    matchPrefix: "/bookings/settings/general",
+  },
+  {
     label: "Notifications",
     href: "/bookings/settings/notifications",
     matchPrefix: "/bookings/settings/notifications",
@@ -20,6 +25,11 @@ const settingsTabs = [
     label: "Add-ons",
     href: "/bookings/settings/addons",
     matchPrefix: "/bookings/settings/addons",
+  },
+  {
+    label: "Discounts",
+    href: "/bookings/settings/discounts",
+    matchPrefix: "/bookings/settings/discounts",
   },
 ] as const
 

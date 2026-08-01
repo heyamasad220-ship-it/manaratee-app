@@ -43,6 +43,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { TimeInput } from "@/components/ui/time-input"
 import { cn } from "@/lib/utils"
 
 export type VenueRentalCreateVenueOption = {
@@ -522,22 +523,22 @@ export function VenueRentalCreateDialog({
             </div>
             <div className="space-y-2">
               <Label htmlFor="booking-start">Start</Label>
-              <Input
+              <TimeInput
                 id="booking-start"
-                type="time"
                 value={startTime}
-                onChange={(event) => setStartTime(event.target.value)}
+                onChange={setStartTime}
                 disabled={isPending}
+                minuteStep={5}
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="booking-end">End</Label>
-              <Input
+              <TimeInput
                 id="booking-end"
-                type="time"
                 value={endTime}
-                onChange={(event) => setEndTime(event.target.value)}
+                onChange={setEndTime}
                 disabled={isPending}
+                minuteStep={5}
               />
             </div>
           </div>
