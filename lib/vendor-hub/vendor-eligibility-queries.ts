@@ -95,6 +95,24 @@ export async function getApprovedVendorOrganizationsForAuthUser(
   return approved
 }
 
+export async function isAuthUserApprovedVendorForOrganization(
+  authUserId: string,
+  organizationId: string
+): Promise<boolean> {
+  const supabase = await createClient()
+  const contacts = await getContactIdsForAuthUser(supabase, authUserId)
+  const contact = contacts.find((row) => row.organization_id === organizationId)
+  if (!contact) {
+    return false
+  }
+
+  return isApprovedOrgVendor({
+    supabase,
+    organizationId,
+    contactId: contact.id,
+  })
+}
+
 export async function hasPendingOrgVendorApplication(input: {
   supabase: SupabaseClient
   organizationId: string

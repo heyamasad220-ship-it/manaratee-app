@@ -140,10 +140,10 @@ Customer sidebar and dashboard only show areas enabled for the active organizati
 
 | Customer area | Required module slug |
 |---------------|----------------------|
-| Venue Rentals / Book a Space | `bookings` |
+| Venue Rentals | `bookings` |
 | Donations | `donations` |
 | Programs | `programs` |
-| My Bazaars | `vendor-hub` |
+| My Bazaars (approved vendors only) | `vendor-hub` |
 | Opportunities | `membership` |
 | Dashboard / Profile | always visible |
 

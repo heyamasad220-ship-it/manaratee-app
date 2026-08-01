@@ -26,7 +26,6 @@ export type CustomerPortalNavItemConfig = {
 export const CUSTOMER_PORTAL_NAV_ITEMS: CustomerPortalNavItemConfig[] = [
   { label: "Dashboard", href: "/customer/dashboard", moduleSlug: null },
   { label: "Venue Rentals", href: "/customer/rentals", moduleSlug: "bookings" },
-  { label: "Book a Space", href: "/customer/rentals/new", moduleSlug: "bookings" },
   { label: "Donations", href: "/customer/donation", moduleSlug: "donations" },
   { label: "Programs", href: "/customer/programs", moduleSlug: "programs" },
   { label: "My Bazaars", href: "/customer/bazaars", moduleSlug: "vendor-hub" },

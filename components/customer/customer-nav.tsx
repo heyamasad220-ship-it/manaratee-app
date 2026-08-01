@@ -38,12 +38,13 @@ type CustomerNavProps = {
   portalCapabilities?: UserPortalCapabilities
   enabledModuleSlugs?: string[]
   customerName?: string
+  /** Show My Bazaars only when the user is an approved vendor for this org. */
+  isApprovedVendor?: boolean
 }
 
 const memberNavIcons = {
   "/customer/dashboard": Home,
   "/customer/rentals": CalendarDays,
-  "/customer/rentals/new": CalendarPlus,
   "/customer/donation": Gift,
   "/customer/programs": HeartHandshake,
   "/customer/bazaars": Store,
@@ -71,6 +72,7 @@ export function CustomerNav({
   portalCapabilities,
   enabledModuleSlugs = [],
   customerName = "Customer",
+  isApprovedVendor = false,
 }: CustomerNavProps) {
   const pathname = usePathname()
 
@@ -80,6 +82,7 @@ export function CustomerNav({
     enabledSlugSet
   )
     .filter((item) => item.href !== "/customer/profile")
+    .filter((item) => item.href !== "/customer/bazaars" || isApprovedVendor)
     .map((item) => ({
       ...item,
       icon:

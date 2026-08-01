@@ -70,12 +70,6 @@ export default async function CustomerVenueRentalsPage() {
               Choose a space, pick your date and time, and submit a request for
               supervisor approval.
             </p>
-            <Button className="mt-6" asChild>
-              <Link href="/customer/rentals/new">
-                <Plus className="mr-2 h-4 w-4" />
-                Request Venue Rental
-              </Link>
-            </Button>
           </CardContent>
         </Card>
       ) : (

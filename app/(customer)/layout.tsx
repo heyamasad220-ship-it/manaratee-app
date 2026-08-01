@@ -8,6 +8,7 @@ import { resolveCustomerDisplayName } from "@/lib/customer/customer-display-name
 import { loadCustomerPortalEnabledModuleSlugs } from "@/lib/customer/customer-portal-modules-server"
 import { getActiveOrganization } from "@/lib/organizations/get-active-organization"
 import { linkVendorContactsForCurrentUser } from "@/lib/vendor-hub/link-vendor-contact-auth"
+import { isAuthUserApprovedVendorForOrganization } from "@/lib/vendor-hub/vendor-eligibility-queries"
 import { createClient } from "@/lib/supabase/server"
 
 export default async function CustomerLayout({
@@ -49,6 +50,13 @@ export default async function CustomerLayout({
       )
     : []
 
+  const isApprovedVendor =
+    Boolean(effectiveUserId && activeOrganization?.organization_id) &&
+    (await isAuthUserApprovedVendorForOrganization(
+      effectiveUserId as string,
+      activeOrganization!.organization_id
+    ))
+
   let customerName = user?.email?.split("@")[0] || "Customer"
   if (activeOrganization?.organization_id && portalSession) {
     const { supabase, session } = await getCustomerPortalSupabase()
@@ -73,6 +81,7 @@ export default async function CustomerLayout({
         portalCapabilities={portalCapabilities}
         enabledModuleSlugs={enabledModuleSlugs}
         customerName={customerName}
+        isApprovedVendor={isApprovedVendor}
       />
 
       <main className="min-w-0 flex-1 overflow-x-hidden">
