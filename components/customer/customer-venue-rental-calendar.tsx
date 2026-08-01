@@ -19,6 +19,12 @@ import type {
   RentalAddonCatalogItem,
   RentalSpaceSlotInput,
 } from "@/lib/bookings/venue-rental-types"
+import type { VenuePublicDayHours } from "@/lib/bookings/venue-day-pricing"
+import {
+  getVenueDayHoursForDate,
+  isVenueHourBookable,
+  resolveCalendarHourRange,
+} from "@/lib/bookings/venue-day-pricing"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
@@ -43,8 +49,6 @@ import {
 } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 
-const HOURS_START = 7
-const HOURS_END = 20
 const ROW_HEIGHT = 60
 
 type Venue = {
@@ -53,6 +57,7 @@ type Venue = {
   description?: string | null
   capacity?: number | null
   status?: string | null
+  daySchedule?: VenuePublicDayHours[]
 }
 
 type SelectedSlot = {
@@ -173,15 +178,24 @@ export function CustomerVenueRentalCalendar({
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
   const hours = useMemo(() => {
+    const dayHours = filteredVenues.map((venue) =>
+      getVenueDayHoursForDate(venue.daySchedule, currentDate)
+    )
+    const { startHour, endHourInclusive } = resolveCalendarHourRange(dayHours)
     const result: number[] = []
-    for (let hour = HOURS_START; hour <= HOURS_END; hour += 1) {
+    for (let hour = startHour; hour <= endHourInclusive; hour += 1) {
       result.push(hour)
     }
     return result
-  }, [])
+  }, [currentDate, filteredVenues])
 
   function onOpenBooking(venue: Venue, hour: number, date: Date) {
     if (venue.status === "closed" || venue.status === "inactive") {
+      return
+    }
+
+    const dayHours = getVenueDayHoursForDate(venue.daySchedule, date)
+    if (!isVenueHourBookable(dayHours, hour)) {
       return
     }
 
@@ -237,6 +251,15 @@ export function CustomerVenueRentalCalendar({
     if (blocked) {
       setError("That time is no longer available.")
       return
+    }
+
+    const venue = venues.find((item) => item.id === selectedSlot.venueId)
+    const dayHours = getVenueDayHoursForDate(venue?.daySchedule, selectedSlot.date)
+    for (let hour = selectedSlot.hour; hour < selectedSlot.hour + durationHours; hour += 1) {
+      if (!isVenueHourBookable(dayHours, hour)) {
+        setError("That duration extends past the space’s open hours.")
+        return
+      }
     }
 
     setSpaces((current) => [...current, nextSpace])
@@ -648,6 +671,10 @@ function DayView({
           <div className="col-span-2 border-b border-border px-4 py-8 text-center text-sm text-muted-foreground">
             No bookable spaces are available right now.
           </div>
+        ) : hours.length === 0 ? (
+          <div className="col-span-full border-b border-border px-4 py-8 text-center text-sm text-muted-foreground">
+            No spaces are open on this day.
+          </div>
         ) : (
           hours.map((hour) => (
             <div key={hour} className="contents">
@@ -655,31 +682,40 @@ function DayView({
                 {formatHour(hour)}
               </div>
               {venues.map((venue) => {
-                const isClosed = venue.status === "closed" || venue.status === "inactive"
+                const statusClosed =
+                  venue.status === "closed" || venue.status === "inactive"
+                const dayHours = getVenueDayHoursForDate(venue.daySchedule, currentDate)
+                const outsideHours = !isVenueHourBookable(dayHours, hour)
+                const isClosed = statusClosed || outsideHours
                 const startingBlock = availabilityBlocks.find((block) =>
                   blockStartsAtSlot(block, venue.id, currentDate, hour)
                 )
                 const isBlocked = availabilityBlocks.some((block) =>
                   blockCoversSlot(block, venue.id, currentDate, hour)
                 )
+                const canBook = !isClosed && !isBlocked
 
                 return (
                   <div
                     key={`${hour}-${venue.id}`}
                     className={cn(
                       "relative border-b border-r border-border last:border-r-0",
-                      !isBlocked && !isClosed && "cursor-pointer hover:bg-primary/5"
+                      canBook && "cursor-pointer hover:bg-primary/5"
                     )}
                     style={{ height: ROW_HEIGHT }}
                     onClick={() => {
-                      if (!isBlocked && !isClosed) {
+                      if (canBook) {
                         onOpenBooking(venue, hour, currentDate)
                       }
                     }}
                   >
                     {isClosed ? (
                       <div className="absolute inset-x-1 top-1 rounded-md border border-gray-300 bg-gray-100 px-2 py-1 text-[11px] text-gray-600">
-                        Closed
+                        {statusClosed
+                          ? "Closed"
+                          : dayHours && !dayHours.open
+                            ? "Closed"
+                            : "Outside hours"}
                       </div>
                     ) : startingBlock ? (
                       <div
@@ -698,11 +734,11 @@ function DayView({
                           <span className="truncate">Unavailable</span>
                         </div>
                       </div>
-                    ) : !isBlocked ? (
+                    ) : (
                       <div className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity hover:opacity-100">
                         <Plus className="h-5 w-5 text-primary/50" />
                       </div>
-                    ) : null}
+                    )}
                   </div>
                 )
               })}

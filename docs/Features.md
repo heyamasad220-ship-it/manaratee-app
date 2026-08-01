@@ -170,7 +170,7 @@ Status: Pilot preparation (June 2026)
 
 Statuses updated to match: submit lands on `submitted`; new `pending`; staff label for approved-awaiting-deposit is **Approved**; `deposit_paid` / `security_deposit_paid` treated as confirmed. Run **`scripts/206_venue_rental_status_process.sql`**. Key files: `lib/bookings/venue-rental-status.ts`, `venue-rental-actions.ts`, `venue-rental-auto-complete.ts`, `venue-rental-detail-client.tsx`, `venue-rental-requests-queue.tsx`. Cron: `app/api/cron/venue-rental-auto-complete/route.ts` (hourly in `vercel.json`).
 
-Routes: `/customer/rentals`, `/customer/rentals/new`, `/customer/rentals/[id]`. **Book a Space** (`/customer/rentals/new`) uses a month calendar (same `Calendar` control as staff facilities) to pick a date, then shows that day’s space/time grid — no Day/Week toggle.
+Routes: `/customer/rentals`, `/customer/rentals/new`, `/customer/rentals/[id]`. **Book a Space** (`/customer/rentals/new`) uses a month calendar (same `Calendar` control as staff facilities) to pick a date, then shows that day’s space/time grid — no Day/Week toggle. Grid hours come from each space’s admin day schedule (`rental_space_pricing` / Spaces settings), not a hardcoded 7am–8pm window.
 
 **Phase 1 Deliverable #3 (payment UX honesty):** Customer payment and contract-signing flows clearly state that **staff will email payment instructions** and handle agreement follow-up. Disabled “Pay deposit” / “Sign agreement” buttons removed; informational callouts replace them. Payment architecture unchanged — `rental_payments` ledger and future Stripe checkout (Phase 6) remain the target path.
 

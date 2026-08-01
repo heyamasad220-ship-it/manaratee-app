@@ -20,6 +20,14 @@ export type VenueDayScheduleFormRow = {
   hourlyPrice: string
 }
 
+/** Hours-only schedule row for customer booking calendars (no pricing). */
+export type VenuePublicDayHours = {
+  dayOfWeek: number
+  open: boolean
+  startTime: string
+  endTime: string
+}
+
 export const VENUE_DAY_ORDER: VenueDayOfWeek[] = [0, 1, 2, 3, 4, 5, 6]
 
 export const VENUE_DAY_LABELS: Record<VenueDayOfWeek, string> = {
@@ -132,4 +140,93 @@ export function formatVenueDayHours(row: {
 }) {
   if (!row.open) return "Closed"
   return `${row.startTime} – ${row.endTime}`
+}
+
+/** Parse "HH:MM" / "HH:MM:SS" into hour + fraction (0–24). */
+export function parseVenueTimeToHours(time: string): number {
+  const match = String(time || "")
+    .trim()
+    .match(/^(\d{1,2}):(\d{2})/)
+  if (!match) return 0
+  const hour = Number(match[1])
+  const minute = Number(match[2])
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return 0
+  return hour + minute / 60
+}
+
+/**
+ * Hour rows that can start a booking for an open window.
+ * Example: 08:00–22:00 → 8..21 (last slot ends at close).
+ */
+export function bookableStartHoursForWindow(
+  startTime: string,
+  endTime: string
+): number[] {
+  const start = parseVenueTimeToHours(startTime)
+  const end = parseVenueTimeToHours(endTime)
+  if (!(end > start)) return []
+
+  const firstHour = Math.floor(start)
+  const lastStartHour = Math.ceil(end) - 1
+  const hours: number[] = []
+  for (let hour = firstHour; hour <= lastStartHour; hour += 1) {
+    if (hour >= 0 && hour <= 23) {
+      hours.push(hour)
+    }
+  }
+  return hours
+}
+
+export function getVenueDayHoursForDate(
+  daySchedule: Array<{
+    dayOfWeek: number
+    open: boolean
+    startTime: string
+    endTime: string
+  }> | null | undefined,
+  date: Date
+): { open: boolean; startTime: string; endTime: string } | null {
+  if (!daySchedule?.length) return null
+  const dayOfWeek = date.getDay()
+  const row = daySchedule.find((day) => day.dayOfWeek === dayOfWeek)
+  if (!row) return null
+  return {
+    open: row.open,
+    startTime: row.startTime,
+    endTime: row.endTime,
+  }
+}
+
+/** True when a one-hour slot starting at `hour` fits inside the open window. */
+export function isVenueHourBookable(
+  dayHours: { open: boolean; startTime: string; endTime: string } | null,
+  hour: number
+): boolean {
+  if (!dayHours?.open) return false
+  const start = parseVenueTimeToHours(dayHours.startTime)
+  const end = parseVenueTimeToHours(dayHours.endTime)
+  if (!(end > start)) return false
+  return hour >= Math.floor(start) && hour < end
+}
+
+export function resolveCalendarHourRange(
+  schedules: Array<{ open: boolean; startTime: string; endTime: string } | null>
+): { startHour: number; endHourInclusive: number } {
+  let minStart = Number.POSITIVE_INFINITY
+  let maxEnd = Number.NEGATIVE_INFINITY
+
+  for (const schedule of schedules) {
+    if (!schedule?.open) continue
+    const hours = bookableStartHoursForWindow(schedule.startTime, schedule.endTime)
+    if (!hours.length) continue
+    minStart = Math.min(minStart, hours[0])
+    maxEnd = Math.max(maxEnd, hours[hours.length - 1])
+  }
+
+  if (!Number.isFinite(minStart) || !Number.isFinite(maxEnd)) {
+    // Match admin default day schedule (08:00–22:00).
+    return { startHour: 8, endHourInclusive: 21 }
+  }
+
+  return { startHour: minStart, endHourInclusive: maxEnd }
 }

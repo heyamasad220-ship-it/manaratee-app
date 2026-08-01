@@ -182,6 +182,12 @@ function donationFrequencyLabel(frequency: DonationFrequency): string {
   return DONATION_FREQUENCY_OPTIONS.find((option) => option.value === frequency)?.label ?? frequency
 }
 
+function isImportLedgerMemo(memo?: string | null) {
+  const value = String(memo || "").trim()
+  if (!value) return false
+  return /^MAS(_CAMPAIGN_LEDGER)?(_V\d+)?\|/i.test(value) || /^MAS\|/i.test(value)
+}
+
 function resolvePaymentCampaignLabel(
   payment: {
     campaign_id?: string | null
@@ -209,7 +215,11 @@ function resolvePaymentCampaignLabel(
     if (category?.name) return category.name
   }
 
-  return payment.memo || "General Fund"
+  if (payment.memo && !isImportLedgerMemo(payment.memo)) {
+    return payment.memo
+  }
+
+  return "General Fund"
 }
 
 function resolvePaymentTypeLabel(payment: {
@@ -219,6 +229,21 @@ function resolvePaymentTypeLabel(payment: {
   if (payment.pledge_id) return "Pledge payment"
   if (payment.recurring_donation_plan_id) return "Recurring donation"
   return "One-time donation"
+}
+
+function formatGivingHistoryDate(value?: string | null) {
+  if (!value) return "Date unavailable"
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return value.slice(0, 10)
+  }
+
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  })
 }
 
 function mapPortalPaymentRow(
@@ -1308,11 +1333,9 @@ export default function CustomerDonationsPage() {
                             <CheckCircle2 className="h-5 w-5 text-emerald-600" />
                           </div>
                           <div>
-                            <p className="font-medium text-foreground">{payment.campaign}</p>
+                            <p className="font-medium text-foreground">{payment.paymentType}</p>
                             <p className="text-sm text-muted-foreground">
-                              {payment.date}
-                              <span className="mx-1.5">·</span>
-                              {payment.paymentType}
+                              {formatGivingHistoryDate(payment.date)}
                             </p>
                           </div>
                         </div>

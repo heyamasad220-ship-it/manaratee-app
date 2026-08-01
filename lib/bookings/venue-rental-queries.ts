@@ -297,6 +297,93 @@ export async function getPublicAvailabilityBlocks(
   return [...stored, ...programBlocks]
 }
 
+export type CustomerVenueDayHours = import("@/lib/bookings/venue-day-pricing").VenuePublicDayHours
+
+/**
+ * Public day/hours for bookable venues (customer calendar).
+ * Uses service role because rental_space_pricing is staff-RLS only.
+ */
+export async function getCustomerVenueDaySchedules(
+  organizationId: string,
+  venues: Array<{
+    id: string
+    availability_start?: string | null
+    availability_end?: string | null
+  }>
+): Promise<Record<string, CustomerVenueDayHours[]>> {
+  const { createServiceRoleClient } = await import("@/lib/supabase/service-role")
+  const { dayScheduleFromPricingRows } = await import("@/lib/bookings/venue-day-pricing")
+
+  const venueIds = venues.map((venue) => venue.id)
+  const result: Record<string, CustomerVenueDayHours[]> = {}
+
+  if (venueIds.length === 0) {
+    return result
+  }
+
+  const fallbackByVenue = new Map(
+    venues.map((venue) => [
+      venue.id,
+      {
+        startTime: venue.availability_start,
+        endTime: venue.availability_end,
+      },
+    ])
+  )
+
+  try {
+    const supabase = createServiceRoleClient()
+    const { data, error } = await supabase
+      .from("rental_space_pricing")
+      .select(
+        "venue_id, day_of_week, start_time, end_time, flat_price, hourly_price, is_active"
+      )
+      .eq("organization_id", organizationId)
+      .in("venue_id", venueIds)
+
+    if (error && error.code !== "42P01") {
+      console.error("[getCustomerVenueDaySchedules]", error)
+    }
+
+    const grouped = new Map<string, NonNullable<typeof data>>()
+    for (const row of data || []) {
+      const venueId = row.venue_id as string
+      const list = grouped.get(venueId) || []
+      list.push(row)
+      grouped.set(venueId, list)
+    }
+
+    for (const venueId of venueIds) {
+      const fallback = fallbackByVenue.get(venueId)
+      result[venueId] = dayScheduleFromPricingRows(grouped.get(venueId) || [], {
+        startTime: fallback?.startTime,
+        endTime: fallback?.endTime,
+      }).map((day) => ({
+        dayOfWeek: day.dayOfWeek,
+        open: day.open,
+        startTime: day.startTime,
+        endTime: day.endTime,
+      }))
+    }
+  } catch (error) {
+    console.error("[getCustomerVenueDaySchedules]", error)
+    for (const venueId of venueIds) {
+      const fallback = fallbackByVenue.get(venueId)
+      result[venueId] = dayScheduleFromPricingRows([], {
+        startTime: fallback?.startTime,
+        endTime: fallback?.endTime,
+      }).map((day) => ({
+        dayOfWeek: day.dayOfWeek,
+        open: day.open,
+        startTime: day.startTime,
+        endTime: day.endTime,
+      }))
+    }
+  }
+
+  return result
+}
+
 export async function getActiveRentalAddons(
   organizationId?: string | null
 ): Promise<RentalAddonCatalogItem[]> {
