@@ -20,7 +20,8 @@ export default async function CustomerVenueRentalRequestPage({
   const params = await searchParams
   const initialVenueId = params?.venueId
 
-  const { organizationId } = await requireCustomerPortalPageContext()
+  const { organizationId, activeOrganization } =
+    await requireCustomerPortalPageContext()
   const { supabase } = await getCustomerPortalSupabase()
   const rangeStart = new Date()
   rangeStart.setDate(rangeStart.getDate() - 7)

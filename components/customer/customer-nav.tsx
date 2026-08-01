@@ -13,6 +13,7 @@ import {
   HeartHandshake,
   Home,
   LogOut,
+  Receipt,
   Store,
   User,
 } from "lucide-react"
@@ -46,6 +47,7 @@ const memberNavIcons = {
   "/customer/dashboard": Home,
   "/customer/rentals": CalendarDays,
   "/customer/donation": Gift,
+  "/customer/transactions": Receipt,
   "/customer/programs": HeartHandshake,
   "/customer/bazaars": Store,
   "/customer/opportunities": ClipboardList,
@@ -102,9 +104,6 @@ export function CustomerNav({
           ...filteredMemberNav,
           ...(portalCapabilities?.hasStaffToolsPortal
             ? [{ label: "Staff Tools", href: "/customer/staff", icon: Briefcase }]
-            : []),
-          ...(portalCapabilities?.hasTeachingPortal
-            ? [{ label: "My Classes", href: "/my-classes", icon: GraduationCap }]
             : []),
         ]
 

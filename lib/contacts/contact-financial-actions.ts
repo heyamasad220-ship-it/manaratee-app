@@ -30,6 +30,7 @@ import type {
   ContactFinancialTimelineEvent,
   ContactOpenBalanceRow,
 } from "@/lib/contacts/contact-financial-types"
+import type { ContactProfileModuleFlags } from "@/lib/contacts/contact-profile-module-access"
 import { ensureDonorExtensionForContact } from "@/lib/donations/donor-contact-bridge"
 import { loadMemberContactsByIds } from "@/lib/contacts/group-membership-data"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
@@ -150,6 +151,111 @@ export async function loadContactFinancialSummaryAction(
   }
 
   const supabase = await createClient()
+  return buildContactFinancialSummary(supabase, organizationId, input, "staff")
+}
+
+export async function loadCustomerMyTransactionsSummaryAction(): Promise<
+  | {
+      success: true
+      data: ContactFinancialSummaryPayload
+      contactId: string
+      contactName: string
+      contactEmail: string | null
+      contactPhone: string | null
+      donorId: string | null
+      personId: string | null
+      modules: ContactProfileModuleFlags
+    }
+  | { success: false; error: string }
+> {
+  const { getCustomerPortalSupabase } = await import("@/lib/auth/customer-portal-session")
+  const { getActiveOrganization } = await import("@/lib/organizations/get-active-organization")
+  const { loadCustomerPortalEnabledModuleSlugs } = await import(
+    "@/lib/customer/customer-portal-modules-server"
+  )
+  const {
+    getContactProfileModuleFlags,
+    showContactFinancialSurfaces,
+  } = await import("@/lib/contacts/contact-profile-module-access")
+
+  const { supabase, session } = await getCustomerPortalSupabase()
+  const { activeOrganization } = await getActiveOrganization()
+
+  if (!activeOrganization) {
+    return { success: false, error: "No organization selected." }
+  }
+
+  const organizationId = activeOrganization.organization_id
+  const enabledSlugs = await loadCustomerPortalEnabledModuleSlugs(organizationId, supabase)
+  const modules = getContactProfileModuleFlags(enabledSlugs)
+
+  if (!showContactFinancialSurfaces(modules)) {
+    return { success: false, error: "No financial modules are enabled for this organization." }
+  }
+
+  const { data: contact, error: contactError } = await supabase
+    .from("contacts")
+    .select("id, full_name, email, phone, person_id")
+    .eq("auth_user_id", session.effectiveUserId)
+    .eq("organization_id", organizationId)
+    .maybeSingle()
+
+  if (contactError || !contact) {
+    return { success: false, error: "Contact not found." }
+  }
+
+  const contactId = contact.id as string
+  const personId = (contact.person_id as string | null) ?? null
+
+  let donorId: string | null = null
+  if (modules.donations) {
+    const { data: donorRow } = await supabase
+      .from("donors")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .eq("contact_id", contactId)
+      .maybeSingle()
+    donorId = (donorRow?.id as string | null) ?? null
+  }
+
+  const result = await buildContactFinancialSummary(
+    supabase,
+    organizationId,
+    {
+      contactId,
+      donorId,
+      personId,
+      modules,
+      isGroup: false,
+    },
+    "customer"
+  )
+
+  if (!result.success) {
+    return result
+  }
+
+  return {
+    success: true,
+    data: result.data,
+    contactId,
+    contactName: (contact.full_name as string | null)?.trim() || "You",
+    contactEmail: (contact.email as string | null) ?? null,
+    contactPhone: (contact.phone as string | null) ?? null,
+    donorId,
+    personId,
+    modules,
+  }
+}
+
+async function buildContactFinancialSummary(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  organizationId: string,
+  input: LoadContactFinancialSummaryInput,
+  audience: "staff" | "customer"
+): Promise<
+  { success: true; data: ContactFinancialSummaryPayload } | { success: false; error: string }
+> {
   const { contactId, donorId, personId, modules, isGroup = false } = input
 
   const openBalances: ContactOpenBalanceRow[] = []
@@ -722,26 +828,56 @@ export async function loadContactFinancialSummaryAction(
     "other",
   ]
 
+  const payload: ContactFinancialSummaryPayload = {
+    metrics: {
+      totalPaid,
+      lifetimeContributions,
+      outstandingBalance,
+      lastActivityDate,
+      donationsOnlyTotalPaid: otherPaidTotal <= 0,
+    },
+    openBalances,
+    timeline,
+    availableFilters: filterOrder.filter(
+      (filter) => filter === "all" || availableFilters.has(filter)
+    ),
+    moduleNotes: {
+      programsReady,
+      rentalsReady,
+      membershipReady,
+    },
+  }
+
+  if (audience === "customer") {
+    payload.timeline = payload.timeline.map((event) => ({
+      ...event,
+      href: null,
+      statusAction: null,
+      paymentActionRow: undefined,
+    }))
+    payload.openBalances = payload.openBalances.map((row) => ({
+      ...row,
+      href: customerOpenBalanceHref(row),
+    }))
+  }
+
   return {
     success: true,
-    data: {
-      metrics: {
-        totalPaid,
-        lifetimeContributions,
-        outstandingBalance,
-        lastActivityDate,
-        donationsOnlyTotalPaid: otherPaidTotal <= 0,
-      },
-      openBalances,
-      timeline,
-      availableFilters: filterOrder.filter(
-        (filter) => filter === "all" || availableFilters.has(filter)
-      ),
-      moduleNotes: {
-        programsReady,
-        rentalsReady,
-        membershipReady,
-      },
-    },
+    data: payload,
+  }
+}
+
+function customerOpenBalanceHref(row: ContactOpenBalanceRow): string | null {
+  switch (row.sourceModule) {
+    case "donations":
+      return "/customer/donation?tab=pledges"
+    case "venue_rentals":
+      return "/customer/rentals"
+    case "programs":
+      return "/customer/programs"
+    case "membership":
+      return "/customer/opportunities"
+    default:
+      return null
   }
 }

@@ -169,7 +169,6 @@ function matchesFilters(
     enrollment === "all" ||
     enrollmentLabel === enrollment ||
     (enrollment === "open" && enrollmentLabel === "open") ||
-    (enrollment === "closed" && enrollmentLabel === "closed") ||
     (enrollment === "waitlist" && enrollmentLabel === "waitlist") ||
     (enrollment === "full" && enrollmentLabel === "full")
 
@@ -267,6 +266,13 @@ export default async function CustomerProgramsPage({
         }
         return true
       })
+      // Hide seasons whose enrollment window is closed (or not yet open).
+      programs = programs.filter((program) =>
+        isEnrollmentOpen(
+          program.enrollment_open_date,
+          program.enrollment_close_date
+        )
+      )
     }
   }
 
@@ -377,7 +383,6 @@ export default async function CustomerProgramsPage({
                   <option value="open">Open</option>
                   <option value="waitlist">Waitlist</option>
                   <option value="full">Full</option>
-                  <option value="closed">Closed</option>
                 </select>
 
                 <Button type="submit">Filter</Button>
@@ -389,8 +394,8 @@ export default async function CustomerProgramsPage({
         <div>
           <h2 className="text-lg font-bold">Available Years/Seasons</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Showing active programs only. Draft, paused, and archived programs
-            are hidden from customers.
+            Showing seasons with open enrollment only. Closed, draft, paused,
+            and archived programs are hidden from customers.
           </p>
         </div>
 

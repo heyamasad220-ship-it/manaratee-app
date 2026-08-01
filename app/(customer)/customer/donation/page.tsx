@@ -69,6 +69,7 @@ import {
   resolveDonationPaymentMethodLabel,
   type OrganizationPaymentMethodOption,
 } from "@/components/customer/customer-donation-payment-picker"
+import { CustomerDashboardGivingSection } from "@/components/customer/customer-dashboard-giving-section"
 import type { ContactPaymentMethodRow } from "@/lib/contacts/contact-payment-method-actions"
 
 type Contact = {
@@ -110,6 +111,16 @@ type DonationPledge = {
 type DonationCampaign = {
   id: string
   name: string
+  description: string | null
+}
+
+type DonationTab = "giving" | "pledges" | "payments"
+
+function resolveDonationTab(value: string | null): DonationTab {
+  if (value === "pledges" || value === "payments" || value === "giving") {
+    return value
+  }
+  return "giving"
 }
 
 type DonationPayment = {
@@ -277,6 +288,7 @@ export default function CustomerDonationsPage() {
     OrganizationPaymentMethodOption[]
   >([])
   const [pageLoadError, setPageLoadError] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<DonationTab>("giving")
 
   const [selectedPledge, setSelectedPledge] = useState<DonationPledge | null>(null)
   const [showPaymentDialog, setShowPaymentDialog] = useState(false)
@@ -350,6 +362,7 @@ export default function CustomerDonationsPage() {
           (result.campaigns || []).map((campaign) => ({
             id: campaign.id as string,
             name: campaign.name as string,
+            description: (campaign.description as string | null) ?? null,
           }))
         )
 
@@ -399,8 +412,14 @@ export default function CustomerDonationsPage() {
     const give = params.get("give")
     const campaign = params.get("campaign")?.trim() || ""
     const action = params.get("action")?.trim() || ""
+    const tab = params.get("tab")
+
+    if (tab) {
+      setActiveTab(resolveDonationTab(tab))
+    }
 
     if (action === "pledge" && campaign) {
+      setActiveTab("pledges")
       setNewPledgeForm({ campaign, totalAmount: "" })
       setFormError("")
       setShowNewPledgeDialog(true)
@@ -409,6 +428,7 @@ export default function CustomerDonationsPage() {
     }
 
     if (give === "one-time" || give === "recurring") {
+      setActiveTab("giving")
       setDonationForm({
         amount: "",
         frequency: give === "recurring" ? "monthly" : "one-time",
@@ -1009,7 +1029,7 @@ export default function CustomerDonationsPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-foreground">My Donations</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          View your pledges, payments, and manage your donations.
+          Explore giving opportunities, manage pledges, and review payment history.
         </p>
       </div>
 
@@ -1089,11 +1109,43 @@ export default function CustomerDonationsPage() {
         </Card>
       </div>
 
-      <Tabs defaultValue="pledges" className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-2">
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => setActiveTab(resolveDonationTab(value))}
+        className="w-full"
+      >
+        <TabsList className="grid w-full max-w-xl grid-cols-3">
+          <TabsTrigger value="giving">Giving Opportunities</TabsTrigger>
           <TabsTrigger value="pledges">My Pledges</TabsTrigger>
-          <TabsTrigger value="payments">Payment History</TabsTrigger>
+          <TabsTrigger value="payments">Giving history</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="giving" className="mt-6">
+          {loading ? (
+            <Card className="border shadow-sm">
+              <CardContent className="p-6 text-sm text-muted-foreground">
+                Loading giving opportunities...
+              </CardContent>
+            </Card>
+          ) : (
+            <CustomerDashboardGivingSection
+              campaigns={campaigns.map((campaign) => ({
+                ...campaign,
+                flyerUrl: null,
+              }))}
+              categories={donationCategories.map((category) => ({
+                id: category.id,
+                name: category.name,
+              }))}
+              onPledge={(campaignId) => {
+                setActiveTab("pledges")
+                setNewPledgeForm({ campaign: campaignId, totalAmount: "" })
+                setFormError("")
+                setShowNewPledgeDialog(true)
+              }}
+            />
+          )}
+        </TabsContent>
 
         <TabsContent value="pledges" className="mt-6">
           <div className="flex flex-col gap-4">
@@ -1229,7 +1281,7 @@ export default function CustomerDonationsPage() {
 
         <TabsContent value="payments" className="mt-6">
           <div className="flex flex-col gap-4">
-            <h2 className="text-lg font-semibold text-foreground">Payment History</h2>
+            <h2 className="text-lg font-semibold text-foreground">Giving history</h2>
 
             <Card>
               <CardContent className="p-0">

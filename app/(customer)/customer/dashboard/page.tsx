@@ -14,15 +14,7 @@ import {
   isCustomerPortalModuleEnabled,
 } from "@/lib/customer/customer-portal-modules"
 import { loadCustomerPortalEnabledModuleSlugs } from "@/lib/customer/customer-portal-modules-server"
-import { buildCustomerOpenDonationCategories } from "@/lib/customer/customer-open-donation-categories"
 import { Card, CardContent } from "@/components/ui/card"
-import { CustomerDashboardGivingSection } from "@/components/customer/customer-dashboard-giving-section"
-import type {
-  CustomerDashboardCampaign,
-} from "@/components/customer/customer-dashboard-campaigns"
-import type {
-  CustomerDashboardCategory,
-} from "@/components/customer/customer-dashboard-categories"
 
 function formatDashboardCurrency(amount: number) {
   return new Intl.NumberFormat("en-US", {
@@ -114,52 +106,6 @@ export default async function CustomerDashboardPage() {
     }
   }
 
-  const { data: activeCampaignRows } = donationsModuleEnabled
-    ? await supabase
-        .from("campaigns")
-        .select("id, name, description")
-        .eq("organization_id", organizationId)
-        .eq("status", "active")
-        .order("name", { ascending: true })
-    : { data: [] }
-
-  const activeCampaigns: CustomerDashboardCampaign[] = (activeCampaignRows || []).map((row) => ({
-    id: row.id as string,
-    name: row.name as string,
-    description: (row.description as string | null) ?? null,
-    flyerUrl: null,
-  }))
-
-  let activeCategories: CustomerDashboardCategory[] = []
-
-  if (donationsModuleEnabled) {
-    const [{ data: categoryRows }, { data: subcategoryRows }] = await Promise.all([
-      supabase
-        .from("donation_categories")
-        .select("id, name")
-        .eq("organization_id", organizationId)
-        .order("name", { ascending: true }),
-      supabase
-        .from("donation_subcategories")
-        .select("id, name, category_id, is_active")
-        .eq("organization_id", organizationId)
-        .order("name", { ascending: true }),
-    ])
-
-    activeCategories = buildCustomerOpenDonationCategories(
-      (categoryRows || []) as Array<{ id: string; name: string }>,
-      (subcategoryRows || []) as Array<{
-        id: string
-        name: string
-        category_id: string
-        is_active?: boolean | null
-      }>
-    ).map((category) => ({
-      id: category.id,
-      name: category.name,
-    }))
-  }
-
   type OverviewCardTheme = {
     border: string
     valueClass: string
@@ -235,7 +181,7 @@ export default async function CustomerDashboardPage() {
           title: "Pledges",
           value: openPledgeCount,
           description: `${formatDashboardCurrency(openPledgeBalance)} remaining balance`,
-          href: "/customer/donation",
+          href: "/customer/donation?tab=pledges",
           icon: HandCoins,
         }
       : null,
@@ -294,13 +240,6 @@ export default async function CustomerDashboardPage() {
           )
         })}
       </section>
-
-      {donationsModuleEnabled ? (
-        <CustomerDashboardGivingSection
-          campaigns={activeCampaigns}
-          categories={activeCategories}
-        />
-      ) : null}
     </div>
   )
 }

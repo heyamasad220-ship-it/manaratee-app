@@ -142,16 +142,17 @@ Customer sidebar and dashboard only show areas enabled for the active organizati
 |---------------|----------------------|
 | Venue Rentals | `bookings` |
 | Donations | `donations` |
+| My Transactions | any of `donations` / `programs` / `bookings` / `membership` |
 | Programs | `programs` |
 | My Bazaars (approved vendors only) | `vendor-hub` |
 | Opportunities | `membership` |
 | Dashboard / Profile | always visible |
 
-Key files: `lib/customer/customer-portal-modules.ts` (client-safe), `lib/customer/customer-portal-modules-server.ts` (server loaders/guards), `components/customer/customer-nav.tsx`, `app/(customer)/layout.tsx`. Disabled module routes redirect to `/customer/dashboard`. **Dashboard** (`/customer/dashboard`): KPI cards; two-column giving section — **Active Campaigns** (left, one campaign per row) and **Donation Options** (right, two categories per row each with a **Donate** button that opens the **Make a Donation** dialog in place via `components/customer/customer-donation-dialog.tsx`). Customer sidebar branding uses the active org `logo_url` with **organization name** in bold below the logo (falls back to name-only or Manaratee logo). **Profile** submenu (Family, Notification Preferences, Applications) appears only after the donor opens Profile. **Notification Preferences** (`/customer/profile/notifications`) shows toggles only for org-enabled modules (`lib/customer/customer-notification-preferences.ts`); Donations module includes payment completed, payment charges, failed transactions, pledge reminders, and SMS payment reminders, plus org-wide newsletter.
+Key files: `lib/customer/customer-portal-modules.ts` (client-safe), `lib/customer/customer-portal-modules-server.ts` (server loaders/guards), `components/customer/customer-nav.tsx`, `app/(customer)/layout.tsx`. Disabled module routes redirect to `/customer/dashboard`. **Dashboard** (`/customer/dashboard`): KPI overview cards only (Profile, Venue Rentals, Donations, Pledges, Programs as enabled). **My Transactions** (`/customer/transactions`): customer read-only mirror of contact **Financial** (KPIs, Financial by Module, Recent Transactions, Financial Summary / open balances) via `ContactFinancialPanel` `variant="customer"` + `loadCustomerMyTransactionsSummaryAction`. Visible when donations, programs, bookings, or membership is enabled. Giving UI lives under **Donations → Giving Opportunities**; donations tab **Giving history** lists donation payments. Customer sidebar branding uses the active org `logo_url` with **organization name** in bold below the logo (falls back to name-only or Manaratee logo). **Profile** submenu (Family, Notification Preferences, Applications) appears only after the donor opens Profile. **Notification Preferences** (`/customer/profile/notifications`) shows toggles only for org-enabled modules (`lib/customer/customer-notification-preferences.ts`); Donations module includes payment completed, payment charges, failed transactions, pledge reminders, and SMS payment reminders, plus org-wide newsletter.
 
 For a donations-only org (e.g. MAS Dallas on the **Nonprofit** bundle), ensure only `donations` is enabled in platform admin → organization modules (or assign bundle `nonprofit`).
 
-**Portal switcher (July 2026):** User menu **Switch portal** appears only when the same login has a **personal (customer) portal** and at least one staff-side portal (Admin Dashboard, Staff Tools, or Teaching). Staff-only accounts (e.g. `admin@org` with admin + staff-tools permissions but no personal/customer account) do not see the switcher. Key: `shouldShowPortalSwitcher` in `lib/auth/resolve-portal-permissions.ts`, `components/portal/portal-switcher.tsx`.
+**Portal switcher (July 2026):** User menu **Switch portal** appears only when the same login has a **personal (customer) portal** and at least one staff-side portal (Admin Dashboard, Staff Tools, or Teaching). **My Classes** (teaching) is reached only via Switch portal — not duplicated in the personal-account sidebar. Staff-only accounts (e.g. `admin@org` with admin + staff-tools permissions but no personal/customer account) do not see the switcher. Key: `shouldShowPortalSwitcher` in `lib/auth/resolve-portal-permissions.ts`, `components/portal/portal-switcher.tsx`.
 
 **Donor join deep-link (June 2026):** Settings → Users exposes two links: general customer join and **Donor signup and give**. The donor link is `/join/{org-slug}?next=/customer/donation?give=one-time` (encoded in the URL). After signup or sign-in, the user is routed to `/customer/donation` and the **Donate** dialog opens (one-time by default). Requires donations module + org Stripe Connect (Donations → Settings → Online Payments). Key files: `lib/organizations/join-organization-url.ts`, `lib/auth/sanitize-customer-redirect-path.ts`, `components/customer/organization-join-client.tsx`, `components/settings/organization-join-link-card.tsx`.
 
@@ -169,7 +170,7 @@ Status: Pilot preparation (June 2026)
 
 Statuses updated to match: submit lands on `submitted`; new `pending`; staff label for approved-awaiting-deposit is **Approved**; `deposit_paid` / `security_deposit_paid` treated as confirmed. Run **`scripts/206_venue_rental_status_process.sql`**. Key files: `lib/bookings/venue-rental-status.ts`, `venue-rental-actions.ts`, `venue-rental-auto-complete.ts`, `venue-rental-detail-client.tsx`, `venue-rental-requests-queue.tsx`. Cron: `app/api/cron/venue-rental-auto-complete/route.ts` (hourly in `vercel.json`).
 
-Routes: `/customer/rentals`, `/customer/rentals/new`, `/customer/rentals/[id]`
+Routes: `/customer/rentals`, `/customer/rentals/new`, `/customer/rentals/[id]`. **Book a Space** (`/customer/rentals/new`) uses a month calendar (same `Calendar` control as staff facilities) to pick a date, then shows that day’s space/time grid — no Day/Week toggle.
 
 **Phase 1 Deliverable #3 (payment UX honesty):** Customer payment and contract-signing flows clearly state that **staff will email payment instructions** and handle agreement follow-up. Disabled “Pay deposit” / “Sign agreement” buttons removed; informational callouts replace them. Payment architecture unchanged — `rental_payments` ledger and future Stripe checkout (Phase 6) remain the target path.
 
@@ -405,8 +406,9 @@ Routes:
 
 * Organization filtering
 * Active program filtering
+* Open-enrollment-only list (closed enrollment windows hidden)
 * Program cards
-* Enrollment badges
+* Enrollment badges (Open / Waitlist / Full)
 * Loading states
 * Empty states
 
@@ -1105,8 +1107,10 @@ Stripe-powered recurring billing on top of existing `recurring_donation_plans`. 
 
 ### Customer portal
 
+* `/customer/donation` — tabs: **Giving Opportunities** (default; Active Campaigns + Donation Options via `CustomerDashboardGivingSection` / `customer-donation-dialog.tsx`), **My Pledges**, **Giving history**. Deep links: `?tab=giving|pledges|payments`, `?campaign={id}&action=pledge`, `?campaign={id}&give=one-time|recurring`
+* `/customer/transactions` — **My Transactions** sidebar page: read-only cross-module financial summary (mirrors staff contact Financial overview)
 * `/customer/donation` — **Donate** dialog: amount, frequency (one-time / monthly / quarterly / annually), campaign, category/fund; payment picker shows **cards on file** from `contact_payment_methods` (same as Profile → Payment Methods) plus org offline/online methods, with **Add new card** in-dialog
-* `/customer/donation` — **Payment History** tab lists all payments for the contact: pledge payments, recurring donations, and one-time donations. Dashboard **Active Campaigns** cards link here with `?campaign={id}&action=pledge` or `?campaign={id}&give=one-time|recurring` to pre-select the campaign.
+* `/customer/donation` — **Giving history** tab lists donation payments for the contact: pledge payments, recurring donations, and one-time donations
 * `/customer/donation` — **New Pledge** (My Pledges tab): required **campaign** + **total pledge amount** only; pledge date is set automatically. After creating the pledge, donors use **Pay Now** (pay in full or any amount toward balance) or **Set Up Payment Plan** (monthly/quarterly/annually, number of payments, amount per payment, first payment date). Key files: `lib/customer/customer-pledge-actions.ts`, `lib/donations/pledge-payment-plan.ts`, migrations `158_pledge_payment_plan.sql`, `159_customer_pledge_plan_update.sql`
 * **Admin/customer pledge alignment (July 2026):** Staff can set or edit the same installment **payment plan** on `/donations/campaigns/pledges` and donor **Pledges** tabs via `updatePledgePaymentPlanAction` + `components/donations/pledge-payment-plan-dialog.tsx` (shared validation in `validatePledgePaymentPlanInput`). Main pledges page **Record Payment** now uses `recordPledgePaymentAction` (balance cap, audit log, affiliation sync). Plan summary and suggested pay amount match the customer portal. Admin `Yearly` frequency stores as `annually` for consistency.
 * `createRecurringDonationCheckoutAction` creates `recurring_donation_plans` (`pending_setup`) + `donation_checkout_sessions` (`recurring_setup`) + Stripe Checkout `mode: subscription`

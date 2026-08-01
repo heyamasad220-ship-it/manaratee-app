@@ -53,7 +53,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { loadContactFinancialSummaryAction } from "@/lib/contacts/contact-financial-actions"
+import { loadContactFinancialSummaryAction, loadCustomerMyTransactionsSummaryAction } from "@/lib/contacts/contact-financial-actions"
 import { financialActivityStatusBadgeClass } from "@/lib/donations/donation-status"
 import type {
   ContactFinancialSummaryPayload,
@@ -213,6 +213,8 @@ type ContactFinancialPanelProps = {
   personId?: string | null
   isGroup?: boolean
   modules: ContactProfileModuleFlags
+  /** Customer portal read-only mirror of the staff Financial tab. */
+  variant?: "staff" | "customer"
   paymentMethods?: ContactPaymentMethodRow[]
   paymentMethodsLoading?: boolean
   showPaymentMethods?: boolean
@@ -451,14 +453,15 @@ function ModuleBreakdownChart({
 }
 
 export function ContactFinancialPanel({
-  contactId,
-  contactName,
-  contactEmail,
-  contactPhone,
-  donorId,
-  personId,
+  contactId: contactIdProp,
+  contactName: contactNameProp,
+  contactEmail: contactEmailProp,
+  contactPhone: contactPhoneProp,
+  donorId: donorIdProp,
+  personId: personIdProp,
   isGroup = false,
-  modules,
+  modules: modulesProp,
+  variant = "staff",
   paymentMethods = [],
   paymentMethodsLoading = false,
   showPaymentMethods = false,
@@ -470,9 +473,16 @@ export function ContactFinancialPanel({
   refreshToken = 0,
   stickyTopClass = "top-0",
 }: ContactFinancialPanelProps) {
+  const isCustomer = variant === "customer"
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [data, setData] = useState<ContactFinancialSummaryPayload | null>(null)
+  const [contactId, setContactId] = useState(contactIdProp)
+  const [contactName, setContactName] = useState(contactNameProp)
+  const [contactEmail, setContactEmail] = useState(contactEmailProp)
+  const [contactPhone, setContactPhone] = useState(contactPhoneProp)
+  const [donorId, setDonorId] = useState(donorIdProp)
+  const [modules, setModules] = useState(modulesProp)
   const [openBalancesOpen, setOpenBalancesOpen] = useState(false)
   const [allTransactionsOpen, setAllTransactionsOpen] = useState(false)
   const [detailTab, setDetailTab] = useState<FinancialDetailTab>("payment-plans")
@@ -481,35 +491,78 @@ export function ContactFinancialPanel({
     setLoading(true)
     setError(null)
 
-    const result = await loadContactFinancialSummaryAction({
-      contactId,
-      donorId,
-      personId,
-      modules,
-      isGroup,
-    })
-
-    if (!result.success) {
-      setError(result.error)
-      setData(null)
+    if (isCustomer) {
+      const result = await loadCustomerMyTransactionsSummaryAction()
+      if (!result.success) {
+        setError(result.error)
+        setData(null)
+      } else {
+        setData(result.data)
+        setContactId(result.contactId)
+        setContactName(result.contactName)
+        setContactEmail(result.contactEmail)
+        setContactPhone(result.contactPhone)
+        setDonorId(result.donorId)
+        setModules(result.modules)
+      }
     } else {
-      setData(result.data)
+      const result = await loadContactFinancialSummaryAction({
+        contactId: contactIdProp,
+        donorId: donorIdProp,
+        personId: personIdProp,
+        modules: modulesProp,
+        isGroup,
+      })
+
+      if (!result.success) {
+        setError(result.error)
+        setData(null)
+      } else {
+        setData(result.data)
+      }
     }
 
     setLoading(false)
-  }, [contactId, donorId, isGroup, modules, personId])
+  }, [
+    contactIdProp,
+    donorIdProp,
+    isCustomer,
+    isGroup,
+    modulesProp,
+    personIdProp,
+  ])
 
   useEffect(() => {
     void loadData()
   }, [loadData, refreshToken])
 
-  const showDonationSidebar = Boolean(modules.donations && donorId)
+  useEffect(() => {
+    if (isCustomer) return
+    setContactId(contactIdProp)
+    setContactName(contactNameProp)
+    setContactEmail(contactEmailProp)
+    setContactPhone(contactPhoneProp)
+    setDonorId(donorIdProp)
+    setModules(modulesProp)
+  }, [
+    contactEmailProp,
+    contactIdProp,
+    contactNameProp,
+    contactPhoneProp,
+    donorIdProp,
+    isCustomer,
+    modulesProp,
+  ])
+
+  const showDonationSidebar = Boolean(modules.donations && donorId) && !isCustomer
   const showPaymentPlansTab = showDonationSidebar && !isGroup
-  const showPaymentMethodsTab = showPaymentMethods
+  const showPaymentMethodsTab = showPaymentMethods && !isCustomer
   const showStatementsTab = showDonationSidebar && Boolean(donorId) && !isGroup
-  const showPledgesTab = Boolean(modules.donations) && !isGroup
-  const showRefundsTab = Boolean(modules.donations || modules.bookings) && !isGroup
+  const showPledgesTab = Boolean(modules.donations) && !isGroup && !isCustomer
+  const showRefundsTab =
+    Boolean(modules.donations || modules.bookings) && !isGroup && !isCustomer
   const showDetailTabsCard =
+    !isCustomer &&
     !isGroup &&
     (showPaymentPlansTab ||
       showPledgesTab ||
@@ -517,6 +570,7 @@ export function ContactFinancialPanel({
       showPaymentMethodsTab ||
       Boolean(modules.donations))
   const showFinancialAside = !isGroup
+  const readOnlyTransactions = isCustomer
 
   const hasAnyModule =
     modules.donations || modules.bookings || modules.programs || modules.membership
@@ -710,7 +764,9 @@ export function ContactFinancialPanel({
             <SheetHeader>
               <SheetTitle>Open Balances</SheetTitle>
               <SheetDescription>
-                Amounts {contactName} still owes or has committed but not fully paid.
+                {isCustomer
+                  ? "Amounts you still owe or have committed but not fully paid."
+                  : `Amounts ${contactName} still owes or has committed but not fully paid.`}
               </SheetDescription>
             </SheetHeader>
             <div className="mt-4 min-h-0 flex-1 overflow-y-auto pr-1">
@@ -724,16 +780,25 @@ export function ContactFinancialPanel({
         <SheetContent className="flex w-full flex-col sm:max-w-3xl">
           <SheetHeader>
             <SheetTitle>All Transactions</SheetTitle>
-            <SheetDescription>Full financial timeline for {contactName}.</SheetDescription>
+            <SheetDescription>
+              {isCustomer
+                ? "Your full financial timeline."
+                : `Full financial timeline for ${contactName}.`}
+            </SheetDescription>
           </SheetHeader>
           <div className="mt-4 min-h-0 flex-1 overflow-y-auto pr-1">
             <FinancialTransactionsTable
               rows={transactions}
-              emptyMessage="No transactions recorded for this contact yet."
+              emptyMessage={
+                isCustomer
+                  ? "No transactions recorded yet."
+                  : "No transactions recorded for this contact yet."
+              }
               contactId={contactId}
               contactName={contactName}
               contactEmail={contactEmail}
               onUpdated={() => void loadData()}
+              readOnly={readOnlyTransactions}
             />
           </div>
         </SheetContent>
@@ -759,12 +824,17 @@ export function ContactFinancialPanel({
                 <CardContent className="space-y-3">
                   <FinancialTransactionsTable
                     rows={recentTransactions}
-                    emptyMessage="No transactions recorded for this contact yet."
+                    emptyMessage={
+                      isCustomer
+                        ? "No transactions recorded yet."
+                        : "No transactions recorded for this contact yet."
+                    }
                     contactId={contactId}
                     contactName={contactName}
                     contactEmail={contactEmail}
                     onUpdated={() => void loadData()}
                     compact
+                    readOnly={readOnlyTransactions}
                   />
                   {transactions.length > 0 ? (
                     <Button
@@ -889,7 +959,9 @@ export function ContactFinancialPanel({
 
           <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <Info className="h-3.5 w-3.5 shrink-0" />
-            All financial information is associated with {contactName}.
+            {isCustomer
+              ? "All financial information is associated with your account."
+              : `All financial information is associated with ${contactName}.`}
           </p>
 
           {trailingContent}
@@ -1040,6 +1112,7 @@ function FinancialTransactionsTable({
   contactEmail,
   onUpdated,
   compact = false,
+  readOnly = false,
 }: {
   rows: ContactFinancialTimelineEvent[]
   emptyMessage: string
@@ -1048,6 +1121,7 @@ function FinancialTransactionsTable({
   contactEmail?: string | null
   onUpdated?: () => void
   compact?: boolean
+  readOnly?: boolean
 }) {
   const router = useRouter()
   const [openingPaymentId, setOpeningPaymentId] = useState<string | null>(null)
@@ -1059,6 +1133,7 @@ function FinancialTransactionsTable({
 
   const openPaymentEditor = useCallback(
     async (paymentId: string, initialDialog: "edit" | "allocate" = "edit") => {
+      if (readOnly) return
       setOpeningPaymentId(paymentId)
       try {
         const result = await getPaymentDetailPageDataAction(paymentId)
@@ -1097,11 +1172,12 @@ function FinancialTransactionsTable({
         setOpeningPaymentId(null)
       }
     },
-    []
+    [readOnly]
   )
 
   const handleTimelineDateClick = useCallback(
     (event: ContactFinancialTimelineEvent) => {
+      if (readOnly) return
       const paymentId = getTimelinePaymentId(event)
       if (paymentId) {
         void openPaymentEditor(paymentId)
@@ -1112,12 +1188,14 @@ function FinancialTransactionsTable({
         router.push(event.href)
       }
     },
-    [openPaymentEditor, router]
+    [openPaymentEditor, readOnly, router]
   )
 
   if (rows.length === 0) {
     return <p className="text-sm text-muted-foreground">{emptyMessage}</p>
   }
+
+  const showActions = !compact && !readOnly
 
   return (
     <>
@@ -1130,14 +1208,14 @@ function FinancialTransactionsTable({
               <TableHead>Description</TableHead>
               <TableHead className="text-right">Amount</TableHead>
               <TableHead>Status</TableHead>
-              {!compact ? (
+              {showActions ? (
                 <TableHead className="w-[1%] text-right">Actions</TableHead>
               ) : null}
             </TableRow>
           </TableHeader>
           <TableBody>
             {rows.map((event) => {
-              const editable = isTimelineEventEditable(event)
+              const editable = !readOnly && isTimelineEventEditable(event)
               const paymentId = getTimelinePaymentId(event)
               const isOpening = paymentId != null && openingPaymentId === paymentId
               const actionRow = event.paymentActionRow
@@ -1180,7 +1258,7 @@ function FinancialTransactionsTable({
                       "—"
                     )}
                   </TableCell>
-                  {!compact ? (
+                  {showActions ? (
                     <TableCell className="text-right">
                       <ContactTransactionRowActions
                         event={event}
@@ -1203,7 +1281,7 @@ function FinancialTransactionsTable({
         </Table>
       </div>
 
-      {paymentEdit ? (
+      {!readOnly && paymentEdit ? (
         <ContactFinancialPaymentEditDialog
           donorId={paymentEdit.donorId}
           donation={paymentEdit.row}

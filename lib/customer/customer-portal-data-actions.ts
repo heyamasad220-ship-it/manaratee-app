@@ -159,7 +159,7 @@ export async function loadCustomerDonationPortalData() {
       .order("payment_date", { ascending: false }),
     supabase
       .from("campaigns")
-      .select("id, name")
+      .select("id, name, description")
       .eq("organization_id", organizationId)
       .eq("status", "active")
       .order("name", { ascending: true }),

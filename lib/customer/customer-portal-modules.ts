@@ -27,6 +27,7 @@ export const CUSTOMER_PORTAL_NAV_ITEMS: CustomerPortalNavItemConfig[] = [
   { label: "Dashboard", href: "/customer/dashboard", moduleSlug: null },
   { label: "Venue Rentals", href: "/customer/rentals", moduleSlug: "bookings" },
   { label: "Donations", href: "/customer/donation", moduleSlug: "donations" },
+  { label: "My Transactions", href: "/customer/transactions", moduleSlug: null },
   { label: "Programs", href: "/customer/programs", moduleSlug: "programs" },
   { label: "My Bazaars", href: "/customer/bazaars", moduleSlug: "vendor-hub" },
   { label: "Opportunities", href: "/customer/opportunities", moduleSlug: "membership" },
@@ -41,11 +42,26 @@ export function isCustomerPortalModuleEnabled(
   return enabledSlugs.has(normalizeModuleSlug(moduleSlug))
 }
 
+/** Show My Transactions when any financial module is enabled for the org. */
+export function showCustomerMyTransactionsNav(enabledSlugs: Set<string>): boolean {
+  return (
+    isCustomerPortalModuleEnabled(enabledSlugs, "donations") ||
+    isCustomerPortalModuleEnabled(enabledSlugs, "programs") ||
+    isCustomerPortalModuleEnabled(enabledSlugs, "bookings") ||
+    isCustomerPortalModuleEnabled(enabledSlugs, "membership")
+  )
+}
+
 export function filterCustomerPortalNavItems(
   items: CustomerPortalNavItemConfig[],
   enabledSlugs: Set<string>
 ): CustomerPortalNavItemConfig[] {
-  return items.filter((item) => isCustomerPortalModuleEnabled(enabledSlugs, item.moduleSlug))
+  return items.filter((item) => {
+    if (item.href === "/customer/transactions") {
+      return showCustomerMyTransactionsNav(enabledSlugs)
+    }
+    return isCustomerPortalModuleEnabled(enabledSlugs, item.moduleSlug)
+  })
 }
 
 export function resolveRequiredModuleForCustomerPath(pathname: string): string | null {

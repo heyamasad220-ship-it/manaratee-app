@@ -19,9 +19,11 @@ import {
 export function CustomerDashboardGivingSection({
   campaigns,
   categories,
+  onPledge,
 }: {
   campaigns: CustomerDashboardCampaign[]
   categories: CustomerDashboardCategory[]
+  onPledge?: (campaignId: string) => void
 }) {
   const [donationDialogOpen, setDonationDialogOpen] = useState(false)
   const [donationDialogPreset, setDonationDialogPreset] = useState<
@@ -38,6 +40,7 @@ export function CustomerDashboardGivingSection({
       <div className="grid gap-6 lg:grid-cols-[minmax(0,20rem)_1fr] lg:items-start">
         <CustomerDashboardCampaigns
           campaigns={campaigns}
+          onPledge={onPledge}
           onOpenDonationDialog={(campaignId, frequency) =>
             openDonationDialog({ campaignId, frequency })
           }

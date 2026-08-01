@@ -21,6 +21,7 @@ import type {
 } from "@/lib/bookings/venue-rental-types"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { Calendar } from "@/components/ui/calendar"
 import { Card, CardContent } from "@/components/ui/card"
 import {
   Dialog,
@@ -42,13 +43,9 @@ import {
 } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 
-const viewModes = ["Day", "Week"] as const
-type ViewMode = (typeof viewModes)[number]
-
 const HOURS_START = 7
 const HOURS_END = 20
 const ROW_HEIGHT = 60
-const DAY_LABELS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"]
 
 type Venue = {
   id: string
@@ -81,14 +78,16 @@ function formatDate(date: Date) {
 }
 
 function toDateKey(date: Date) {
-  return date.toISOString().slice(0, 10)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
 }
 
-function getWeekStart(date: Date) {
-  const d = new Date(date)
-  const day = d.getDay()
-  d.setDate(d.getDate() - day)
-  return d
+function startOfLocalDay(date: Date) {
+  const next = new Date(date)
+  next.setHours(0, 0, 0, 0)
+  return next
 }
 
 function slotBounds(date: Date, hour: number, durationHours = 1) {
@@ -127,10 +126,7 @@ function blockStartsAtSlot(
   }
 
   const blockStart = new Date(block.startAt)
-  return (
-    blockStart.toISOString().slice(0, 10) === toDateKey(date) &&
-    blockStart.getHours() === hour
-  )
+  return toDateKey(blockStart) === toDateKey(date) && blockStart.getHours() === hour
 }
 
 export function CustomerVenueRentalCalendar({
@@ -159,8 +155,7 @@ export function CustomerVenueRentalCalendar({
     return match ? [match] : venues
   }, [initialVenueId, venues])
   const [isPending, startTransition] = useTransition()
-  const [activeView, setActiveView] = useState<ViewMode>("Day")
-  const [currentDate, setCurrentDate] = useState(new Date())
+  const [currentDate, setCurrentDate] = useState(() => startOfLocalDay(new Date()))
   const [selectedSlot, setSelectedSlot] = useState<SelectedSlot | null>(null)
   const [isBookingDialogOpen, setIsBookingDialogOpen] = useState(false)
   const [spaces, setSpaces] = useState<RentalSpaceSlotInput[]>([])
@@ -184,15 +179,6 @@ export function CustomerVenueRentalCalendar({
     }
     return result
   }, [])
-
-  const weekDays = useMemo(() => {
-    const start = getWeekStart(currentDate)
-    return Array.from({ length: 7 }, (_, index) => {
-      const day = new Date(start)
-      day.setDate(start.getDate() + index)
-      return day
-    })
-  }, [currentDate])
 
   function onOpenBooking(venue: Venue, hour: number, date: Date) {
     if (venue.status === "closed" || venue.status === "inactive") {
@@ -312,6 +298,14 @@ export function CustomerVenueRentalCalendar({
     })
   }
 
+  function shiftSelectedDate(deltaDays: number) {
+    setCurrentDate((current) => {
+      const next = new Date(current)
+      next.setDate(next.getDate() + deltaDays)
+      return startOfLocalDay(next)
+    })
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -323,18 +317,6 @@ export function CustomerVenueRentalCalendar({
         ) : (
           <p className="text-sm text-muted-foreground">{organizationName}</p>
         )}
-        <div className="flex items-center gap-2">
-          {viewModes.map((mode) => (
-            <Button
-              key={mode}
-              variant={activeView === mode ? "default" : "outline"}
-              size="sm"
-              onClick={() => setActiveView(mode)}
-            >
-              {mode}
-            </Button>
-          ))}
-        </div>
       </div>
 
       {submittedId ? (
@@ -353,40 +335,59 @@ export function CustomerVenueRentalCalendar({
         </Card>
       ) : null}
 
-      <Card>
-        <CardContent className="p-4">
-          <div className="mb-4 flex items-center justify-between">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => {
-                const next = new Date(currentDate)
-                next.setDate(next.getDate() + (activeView === "Week" ? -7 : -1))
-                setCurrentDate(next)
+      <div className="grid gap-4 xl:grid-cols-[auto_minmax(0,1fr)] xl:items-start">
+        <Card className="w-full xl:w-fit">
+          <CardContent className="flex flex-col items-center p-4">
+            <Calendar
+              mode="single"
+              selected={currentDate}
+              onSelect={(date) => {
+                if (date) {
+                  setCurrentDate(startOfLocalDay(date))
+                }
               }}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <div className="text-center">
-              <p className="font-medium">{formatDate(currentDate)}</p>
-              <p className="text-xs text-muted-foreground">
-                Unavailable slots are blocked. No event details are shown.
-              </p>
-            </div>
+              defaultMonth={currentDate}
+              className="rounded-md"
+            />
             <Button
-              variant="outline"
-              size="icon"
-              onClick={() => {
-                const next = new Date(currentDate)
-                next.setDate(next.getDate() + (activeView === "Week" ? 7 : 1))
-                setCurrentDate(next)
-              }}
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="mt-2 w-full"
+              onClick={() => setCurrentDate(startOfLocalDay(new Date()))}
             >
-              <ChevronRight className="h-4 w-4" />
+              Today
             </Button>
-          </div>
+          </CardContent>
+        </Card>
 
-          {activeView === "Day" ? (
+        <Card>
+          <CardContent className="p-4">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => shiftSelectedDate(-1)}
+                aria-label="Previous day"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <div className="min-w-0 text-center">
+                <p className="font-medium">{formatDate(currentDate)}</p>
+                <p className="text-xs text-muted-foreground">
+                  Click an open time slot to request that space.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => shiftSelectedDate(1)}
+                aria-label="Next day"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+
             <DayView
               venues={filteredVenues}
               availabilityBlocks={availabilityBlocks}
@@ -395,17 +396,9 @@ export function CustomerVenueRentalCalendar({
               scrollRef={scrollContainerRef}
               onOpenBooking={onOpenBooking}
             />
-          ) : (
-            <WeekView
-              venues={filteredVenues}
-              availabilityBlocks={availabilityBlocks}
-              weekDays={weekDays}
-              scrollRef={scrollContainerRef}
-              onOpenBooking={onOpenBooking}
-            />
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
 
       <Dialog open={isBookingDialogOpen} onOpenChange={setIsBookingDialogOpen}>
         <DialogContent className="flex max-h-[min(90dvh,900px)] max-w-lg flex-col gap-0 overflow-hidden p-0">
@@ -419,178 +412,181 @@ export function CustomerVenueRentalCalendar({
           <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
             {selectedSlot ? (
               <div className="space-y-4">
-              <div className="rounded-lg border p-3 text-sm">
-                <div className="flex items-center gap-2 font-medium">
-                  <MapPin className="h-4 w-4" />
-                  {selectedSlot.venueName}
+                <div className="rounded-lg border p-3 text-sm">
+                  <div className="flex items-center gap-2 font-medium">
+                    <MapPin className="h-4 w-4" />
+                    {selectedSlot.venueName}
+                  </div>
+                  <div className="mt-1 flex items-center gap-2 text-muted-foreground">
+                    <CalendarDays className="h-4 w-4" />
+                    {formatDate(selectedSlot.date)}
+                  </div>
+                  <div className="mt-1 flex items-center gap-2 text-muted-foreground">
+                    <Clock className="h-4 w-4" />
+                    {formatHour(selectedSlot.hour)} –{" "}
+                    {formatHour(selectedSlot.hour + durationHours)}
+                  </div>
                 </div>
-                <div className="mt-1 flex items-center gap-2 text-muted-foreground">
-                  <CalendarDays className="h-4 w-4" />
-                  {formatDate(selectedSlot.date)}
+
+                <div className="grid gap-2">
+                  <Label htmlFor="duration">Duration (hours)</Label>
+                  <Input
+                    id="duration"
+                    type="number"
+                    min={1}
+                    max={8}
+                    value={durationHours}
+                    onChange={(event) => setDurationHours(Number(event.target.value) || 1)}
+                  />
                 </div>
-                <div className="mt-1 flex items-center gap-2 text-muted-foreground">
-                  <Clock className="h-4 w-4" />
-                  {formatHour(selectedSlot.hour)} – {formatHour(selectedSlot.hour + durationHours)}
-                </div>
-              </div>
 
-              <div className="grid gap-2">
-                <Label htmlFor="duration">Duration (hours)</Label>
-                <Input
-                  id="duration"
-                  type="number"
-                  min={1}
-                  max={8}
-                  value={durationHours}
-                  onChange={(event) => setDurationHours(Number(event.target.value) || 1)}
-                />
-              </div>
+                <Button type="button" variant="outline" onClick={addCurrentSlotToRequest}>
+                  Add this space/time to request
+                </Button>
 
-              <Button type="button" variant="outline" onClick={addCurrentSlotToRequest}>
-                Add this space/time to request
-              </Button>
-
-              {spaces.length ? (
-                <div className="space-y-2">
-                  <Label>Selected spaces</Label>
-                  {spaces.map((space, index) => {
-                    const venue = venues.find((item) => item.id === space.venueId)
-                    return (
-                      <div
-                        key={`${space.venueId}-${space.startAt}-${index}`}
-                        className="flex items-center justify-between rounded border px-3 py-2 text-sm"
-                      >
-                        <span>
-                          {venue?.name || "Space"} · {new Date(space.startAt).toLocaleString()} –{" "}
-                          {new Date(space.endAt).toLocaleTimeString()}
-                        </span>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() =>
-                            setSpaces((current) => current.filter((_, itemIndex) => itemIndex !== index))
-                          }
+                {spaces.length ? (
+                  <div className="space-y-2">
+                    <Label>Selected spaces</Label>
+                    {spaces.map((space, index) => {
+                      const venue = venues.find((item) => item.id === space.venueId)
+                      return (
+                        <div
+                          key={`${space.venueId}-${space.startAt}-${index}`}
+                          className="flex items-center justify-between rounded border px-3 py-2 text-sm"
                         >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    )
-                  })}
-                </div>
-              ) : null}
-
-              <div className="grid gap-2">
-                <Label>Event type</Label>
-                <Select value={eventTypeId} onValueChange={setEventTypeId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select event type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {eventTypes.map((eventType) => (
-                      <SelectItem key={eventType.id} value={eventType.id}>
-                        {eventType.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {addons.length ? (
-                <div className="space-y-2">
-                  <Label>Add-ons</Label>
-                  {addons.map((addon) => (
-                    <label key={addon.id} className="flex items-start gap-2 text-sm">
-                      <Checkbox
-                        checked={selectedAddonIds.has(addon.id)}
-                        onCheckedChange={(checked) => {
-                          setSelectedAddonIds((current) => {
-                            const next = new Set(current)
-                            if (checked) {
-                              next.add(addon.id)
-                            } else {
-                              next.delete(addon.id)
+                          <span>
+                            {venue?.name || "Space"} · {new Date(space.startAt).toLocaleString()} –{" "}
+                            {new Date(space.endAt).toLocaleTimeString()}
+                          </span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() =>
+                              setSpaces((current) =>
+                                current.filter((_, itemIndex) => itemIndex !== index)
+                              )
                             }
-                            return next
-                          })
-                        }}
-                      />
-                      <span>
-                        {addon.name}
-                        {addon.defaultPrice > 0 ? ` · $${addon.defaultPrice.toFixed(2)}` : ""}
-                      </span>
-                    </label>
-                  ))}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : null}
+
+                <div className="grid gap-2">
+                  <Label>Event type</Label>
+                  <Select value={eventTypeId} onValueChange={setEventTypeId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select event type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {eventTypes.map((eventType) => (
+                        <SelectItem key={eventType.id} value={eventType.id}>
+                          {eventType.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-              ) : null}
 
-              <div className="grid gap-2">
-                <Label htmlFor="notes">Notes</Label>
-                <Textarea
-                  id="notes"
-                  value={notes}
-                  onChange={(event) => setNotes(event.target.value)}
-                  placeholder="Tell us about your event..."
-                  rows={3}
-                />
-              </div>
+                {addons.length ? (
+                  <div className="space-y-2">
+                    <Label>Add-ons</Label>
+                    {addons.map((addon) => (
+                      <label key={addon.id} className="flex items-start gap-2 text-sm">
+                        <Checkbox
+                          checked={selectedAddonIds.has(addon.id)}
+                          onCheckedChange={(checked) => {
+                            setSelectedAddonIds((current) => {
+                              const next = new Set(current)
+                              if (checked) {
+                                next.add(addon.id)
+                              } else {
+                                next.delete(addon.id)
+                              }
+                              return next
+                            })
+                          }}
+                        />
+                        <span>
+                          {addon.name}
+                          {addon.defaultPrice > 0 ? ` · $${addon.defaultPrice.toFixed(2)}` : ""}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                ) : null}
 
-              <details className="rounded-lg border px-3 py-2">
-                <summary className="cursor-pointer text-sm font-medium">
-                  Facility setup details (optional)
-                </summary>
-                <div className="mt-4 space-y-4">
-                  <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-2">
+                  <Label htmlFor="notes">Notes</Label>
+                  <Textarea
+                    id="notes"
+                    value={notes}
+                    onChange={(event) => setNotes(event.target.value)}
+                    placeholder="Tell us about your event..."
+                    rows={3}
+                  />
+                </div>
+
+                <details className="rounded-lg border px-3 py-2">
+                  <summary className="cursor-pointer text-sm font-medium">
+                    Facility setup details (optional)
+                  </summary>
+                  <div className="mt-4 space-y-4">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="grid gap-2">
+                        <Label htmlFor="expected_attendance">Expected attendance</Label>
+                        <Input
+                          id="expected_attendance"
+                          type="number"
+                          min={1}
+                          value={expectedAttendance}
+                          onChange={(event) => setExpectedAttendance(event.target.value)}
+                          placeholder="120"
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="setup_style">Setup style</Label>
+                        <Input
+                          id="setup_style"
+                          value={setupStyle}
+                          onChange={(event) => setSetupStyle(event.target.value)}
+                          placeholder="Banquet, theater, classroom..."
+                        />
+                      </div>
+                    </div>
+
                     <div className="grid gap-2">
-                      <Label htmlFor="expected_attendance">Expected attendance</Label>
-                      <Input
-                        id="expected_attendance"
-                        type="number"
-                        min={1}
-                        value={expectedAttendance}
-                        onChange={(event) => setExpectedAttendance(event.target.value)}
-                        placeholder="120"
+                      <Label htmlFor="equipment_notes">Equipment / AV needs</Label>
+                      <Textarea
+                        id="equipment_notes"
+                        value={equipmentNotes}
+                        onChange={(event) => setEquipmentNotes(event.target.value)}
+                        placeholder="Projector, microphones, stage..."
+                        rows={2}
                       />
                     </div>
+
                     <div className="grid gap-2">
-                      <Label htmlFor="setup_style">Setup style</Label>
+                      <Label htmlFor="primary_contact_phone">Contact phone</Label>
                       <Input
-                        id="setup_style"
-                        value={setupStyle}
-                        onChange={(event) => setSetupStyle(event.target.value)}
-                        placeholder="Banquet, theater, classroom..."
+                        id="primary_contact_phone"
+                        value={primaryContactPhone}
+                        onChange={(event) => setPrimaryContactPhone(event.target.value)}
+                        placeholder="Best number for day-of coordination"
                       />
                     </div>
                   </div>
+                </details>
 
-                  <div className="grid gap-2">
-                    <Label htmlFor="equipment_notes">Equipment / AV needs</Label>
-                    <Textarea
-                      id="equipment_notes"
-                      value={equipmentNotes}
-                      onChange={(event) => setEquipmentNotes(event.target.value)}
-                      placeholder="Projector, microphones, stage..."
-                      rows={2}
-                    />
+                {error ? (
+                  <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                    {error}
                   </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="primary_contact_phone">Contact phone</Label>
-                    <Input
-                      id="primary_contact_phone"
-                      value={primaryContactPhone}
-                      onChange={(event) => setPrimaryContactPhone(event.target.value)}
-                      placeholder="Best number for day-of coordination"
-                    />
-                  </div>
-                </div>
-              </details>
-
-              {error ? (
-                <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                  {error}
-                </div>
-              ) : null}
+                ) : null}
               </div>
             ) : null}
           </div>
@@ -628,156 +624,91 @@ function DayView({
     <div ref={scrollRef} className="overflow-x-auto">
       <div
         className="grid min-w-[700px]"
-        style={{ gridTemplateColumns: `70px repeat(${venues.length}, minmax(140px, 1fr))` }}
+        style={{
+          gridTemplateColumns: `70px repeat(${Math.max(venues.length, 1)}, minmax(140px, 1fr))`,
+        }}
       >
         <div className="sticky top-0 z-10 border-b border-r border-border bg-muted/50 p-2" />
-        {venues.map((venue) => (
-          <div
-            key={venue.id}
-            className="sticky top-0 z-10 border-b border-r border-border bg-muted/50 px-2 py-3 text-center text-xs font-semibold last:border-r-0"
-          >
-            {venue.name}
+        {venues.length === 0 ? (
+          <div className="sticky top-0 z-10 border-b border-border bg-muted/50 px-2 py-3 text-center text-xs font-semibold">
+            No spaces
           </div>
-        ))}
-
-        {hours.map((hour) => (
-          <div key={hour} className="contents">
-            <div className="border-b border-r border-border px-2 py-3 text-xs text-muted-foreground">
-              {formatHour(hour)}
+        ) : (
+          venues.map((venue) => (
+            <div
+              key={venue.id}
+              className="sticky top-0 z-10 border-b border-r border-border bg-muted/50 px-2 py-3 text-center text-xs font-semibold last:border-r-0"
+            >
+              {venue.name}
             </div>
-            {venues.map((venue) => {
-              const isClosed = venue.status === "closed" || venue.status === "inactive"
-              const startingBlock = availabilityBlocks.find((block) =>
-                blockStartsAtSlot(block, venue.id, currentDate, hour)
-              )
-              const isBlocked = availabilityBlocks.some((block) =>
-                blockCoversSlot(block, venue.id, currentDate, hour)
-              )
+          ))
+        )}
 
-              return (
-                <div
-                  key={`${hour}-${venue.id}`}
-                  className={cn(
-                    "relative border-b border-r border-border last:border-r-0",
-                    !isBlocked && !isClosed && "cursor-pointer hover:bg-primary/5"
-                  )}
-                  style={{ height: ROW_HEIGHT }}
-                  onClick={() => {
-                    if (!isBlocked && !isClosed) {
-                      onOpenBooking(venue, hour, currentDate)
-                    }
-                  }}
-                >
-                  {isClosed ? (
-                    <div className="absolute inset-x-1 top-1 rounded-md border border-gray-300 bg-gray-100 px-2 py-1 text-[11px] text-gray-600">
-                      Closed
-                    </div>
-                  ) : startingBlock ? (
-                    <div
-                      className="absolute inset-x-1 top-1 z-[5] overflow-hidden rounded-md border border-gray-200 bg-gray-100 px-2 py-1 text-[11px] font-medium text-gray-600 shadow-sm"
-                      style={{
-                        height: `${Math.max(
-                          ((new Date(startingBlock.endAt).getHours() || hour + 1) - hour) *
-                            ROW_HEIGHT -
-                            8,
-                          ROW_HEIGHT - 8
-                        )}px`,
-                      }}
-                    >
-                      <div className="flex items-center gap-1">
-                        <Lock className="h-3 w-3" />
-                        <span className="truncate">Unavailable</span>
-                      </div>
-                    </div>
-                  ) : !isBlocked ? (
-                    <div className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity hover:opacity-100">
-                      <Plus className="h-5 w-5 text-primary/50" />
-                    </div>
-                  ) : null}
-                </div>
-              )
-            })}
+        {venues.length === 0 ? (
+          <div className="col-span-2 border-b border-border px-4 py-8 text-center text-sm text-muted-foreground">
+            No bookable spaces are available right now.
           </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function WeekView({
-  venues,
-  availabilityBlocks,
-  weekDays,
-  scrollRef,
-  onOpenBooking,
-}: {
-  venues: Venue[]
-  availabilityBlocks: PublicAvailabilityBlock[]
-  weekDays: Date[]
-  scrollRef: React.RefObject<HTMLDivElement | null>
-  onOpenBooking: (venue: Venue, hour: number, date: Date) => void
-}) {
-  return (
-    <div ref={scrollRef} className="overflow-x-auto">
-      <div
-        className="grid min-w-[700px]"
-        style={{ gridTemplateColumns: `70px repeat(${venues.length}, minmax(140px, 1fr))` }}
-      >
-        <div className="sticky top-0 z-10 border-b border-r border-border bg-muted/50 p-2" />
-        {venues.map((venue) => (
-          <div
-            key={venue.id}
-            className="sticky top-0 z-10 border-b border-r border-border bg-muted/50 px-2 py-3 text-center text-xs font-semibold last:border-r-0"
-          >
-            {venue.name}
-          </div>
-        ))}
-
-        {weekDays.map((day) => {
-          const dayKey = toDateKey(day)
-          return (
-            <div key={dayKey} className="contents">
-              <div className="border-b border-r border-border px-2 py-3 text-xs">
-                <div className="font-semibold text-primary">{day.getDate()}</div>
-                <div>{DAY_LABELS[day.getDay()]}</div>
+        ) : (
+          hours.map((hour) => (
+            <div key={hour} className="contents">
+              <div className="border-b border-r border-border px-2 py-3 text-xs text-muted-foreground">
+                {formatHour(hour)}
               </div>
               {venues.map((venue) => {
                 const isClosed = venue.status === "closed" || venue.status === "inactive"
-                const hasBlock = availabilityBlocks.some(
-                  (block) =>
-                    block.venueId === venue.id &&
-                    block.startAt.slice(0, 10) <= dayKey &&
-                    block.endAt.slice(0, 10) >= dayKey
+                const startingBlock = availabilityBlocks.find((block) =>
+                  blockStartsAtSlot(block, venue.id, currentDate, hour)
+                )
+                const isBlocked = availabilityBlocks.some((block) =>
+                  blockCoversSlot(block, venue.id, currentDate, hour)
                 )
 
                 return (
                   <div
-                    key={`${dayKey}-${venue.id}`}
+                    key={`${hour}-${venue.id}`}
                     className={cn(
-                      "min-h-[80px] border-b border-r border-border px-2 py-2 last:border-r-0",
-                      !hasBlock && !isClosed && "cursor-pointer hover:bg-primary/5"
+                      "relative border-b border-r border-border last:border-r-0",
+                      !isBlocked && !isClosed && "cursor-pointer hover:bg-primary/5"
                     )}
+                    style={{ height: ROW_HEIGHT }}
                     onClick={() => {
-                      if (!hasBlock && !isClosed) {
-                        onOpenBooking(venue, 9, day)
+                      if (!isBlocked && !isClosed) {
+                        onOpenBooking(venue, hour, currentDate)
                       }
                     }}
                   >
                     {isClosed ? (
-                      <span className="text-xs text-gray-500">Closed</span>
-                    ) : hasBlock ? (
-                      <span className="inline-flex items-center gap-1 text-xs text-gray-600">
-                        <Lock className="h-3 w-3" /> Unavailable
-                      </span>
-                    ) : (
-                      <span className="text-xs text-emerald-700">Available</span>
-                    )}
+                      <div className="absolute inset-x-1 top-1 rounded-md border border-gray-300 bg-gray-100 px-2 py-1 text-[11px] text-gray-600">
+                        Closed
+                      </div>
+                    ) : startingBlock ? (
+                      <div
+                        className="absolute inset-x-1 top-1 z-[5] overflow-hidden rounded-md border border-gray-200 bg-gray-100 px-2 py-1 text-[11px] font-medium text-gray-600 shadow-sm"
+                        style={{
+                          height: `${Math.max(
+                            ((new Date(startingBlock.endAt).getHours() || hour + 1) - hour) *
+                              ROW_HEIGHT -
+                              8,
+                            ROW_HEIGHT - 8
+                          )}px`,
+                        }}
+                      >
+                        <div className="flex items-center gap-1">
+                          <Lock className="h-3 w-3" />
+                          <span className="truncate">Unavailable</span>
+                        </div>
+                      </div>
+                    ) : !isBlocked ? (
+                      <div className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity hover:opacity-100">
+                        <Plus className="h-5 w-5 text-primary/50" />
+                      </div>
+                    ) : null}
                   </div>
                 )
               })}
             </div>
-          )
-        })}
+          ))
+        )}
       </div>
     </div>
   )

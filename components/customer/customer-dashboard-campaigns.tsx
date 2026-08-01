@@ -26,9 +26,11 @@ export type CustomerDashboardCampaign = {
 export function CustomerDashboardCampaigns({
   campaigns,
   onOpenDonationDialog,
+  onPledge,
 }: {
   campaigns: CustomerDashboardCampaign[]
   onOpenDonationDialog?: (campaignId: string, frequency: DonationFrequency) => void
+  onPledge?: (campaignId: string) => void
 }) {
   const router = useRouter()
   const [selectedCampaign, setSelectedCampaign] = useState<CustomerDashboardCampaign | null>(null)
@@ -40,7 +42,11 @@ export function CustomerDashboardCampaigns({
   }
 
   const goToPledge = (campaignId: string) => {
-    router.push(`/customer/donation?campaign=${campaignId}&action=pledge`)
+    if (onPledge) {
+      onPledge(campaignId)
+    } else {
+      router.push(`/customer/donation?campaign=${campaignId}&action=pledge`)
+    }
     setShowDonateOptions(false)
     setSelectedCampaign(null)
   }
