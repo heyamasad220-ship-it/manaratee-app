@@ -134,6 +134,18 @@ export function OperationalBriefPanel({
                 <BriefField label="Schedule" value={scheduleLabel} />
                 <BriefField label="Spaces / rooms" value={brief.spacesLabel} />
                 <BriefField label="Expected attendance" value={brief.expectedAttendance} />
+                <BriefField
+                  label="Chairs per table"
+                  value={brief.chairsPerTable}
+                />
+                <BriefField
+                  label="Tables needed"
+                  value={
+                    brief.expectedAttendance && brief.chairsPerTable
+                      ? Math.ceil(brief.expectedAttendance / brief.chairsPerTable)
+                      : null
+                  }
+                />
                 <BriefField label="Setup style" value={brief.setupStyle} />
                 <BriefField label="Room setup" value={brief.roomSetupNotes} />
                 <BriefField label="Equipment needs" value={brief.equipmentNotes} />

@@ -113,6 +113,7 @@ export function toOperationalBriefView(
     endTime: brief.end_time,
     spacesLabel: options?.spacesLabel ?? null,
     expectedAttendance: brief.expected_attendance,
+    chairsPerTable: brief.chairs_per_table ?? null,
     setupStyle: brief.setup_style,
     roomSetupNotes: brief.room_setup_notes,
     equipmentNotes: brief.equipment_notes,

@@ -24,6 +24,10 @@ export interface VenueRecord {
   status: VenueStatus
   color: string
   flyer_url: string | null
+  /** NULL = inherit org Venue Rentals default setup buffer. */
+  setup_minutes: number | null
+  /** NULL = inherit org Venue Rentals default cleanup buffer. */
+  cleanup_minutes: number | null
   created_at: string
   updated_at: string
 }

@@ -10,6 +10,7 @@ import { VENUE_RENTAL_STATUSES } from "./venue-rental-types"
 import {
   getVenueRentalCalendarColorClasses,
   getVenueRentalStatusLabel,
+  computeRemainingBalanceDueAt,
 } from "./venue-rental-status"
 
 export type CustomerRentalNextAction = {
@@ -41,12 +42,10 @@ export type CustomerVenueRentalDashboardPartition = {
 export type CustomerTimelineStageId =
   | "request_submitted"
   | "request_approved"
-  | "agreement_signed"
   | "deposit_paid"
-  | "security_deposit_paid"
   | "reservation_confirmed"
+  | "full_balance_paid"
   | "event_completed"
-  | "security_deposit_refunded"
 
 export type CustomerTimelineStageState =
   | "complete"
@@ -505,7 +504,7 @@ function stageState(
 
 export function getCustomerRentalTimelineStages(input: TimelineInput): CustomerTimelineStage[] {
   const { rental, approvedAt, context } = input
-  const { payments, contract } = context
+  const { payments } = context
   const cancelled = isCancelledOrDeclined(rental.status)
 
   const submittedComplete = rental.status !== VENUE_RENTAL_STATUSES.draft
@@ -520,15 +519,31 @@ export function getCustomerRentalTimelineStages(input: TimelineInput): CustomerT
     rental.status === VENUE_RENTAL_STATUSES.securityDepositRefunded ||
     rental.status === VENUE_RENTAL_STATUSES.closed
 
-  const agreementSigned = contract?.status === "Signed"
+  // Policies are acknowledged on the request form at submit — no separate agreement step.
+  // Security deposit collect/refund steps are omitted (org does not collect security deposits).
   const depositPaid = payments.deposit?.isPaid ?? false
-  const securityPaid = payments.securityDeposit?.isPaid ?? false
   const confirmed =
     rental.status === VENUE_RENTAL_STATUSES.confirmed ||
     rental.status === VENUE_RENTAL_STATUSES.completed ||
     rental.status === VENUE_RENTAL_STATUSES.awaitingSecurityDepositRefundApproval ||
     rental.status === VENUE_RENTAL_STATUSES.securityDepositRefunded ||
     rental.status === VENUE_RENTAL_STATUSES.closed
+
+  const eventStart = getEarliestStart(rental)
+  const balanceDueAt = eventStart ? computeRemainingBalanceDueAt(eventStart) : null
+  const balanceDueLabel = balanceDueAt
+    ? balanceDueAt.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+    : null
+
+  const remainingPaid = payments.remainingBalance?.isPaid ?? false
+  const remainingDue = payments.remainingBalance?.isDue ?? false
+  const fullBalancePaid =
+    remainingPaid ||
+    (confirmed && !remainingDue && (payments.outstandingBalance ?? 0) <= 0)
 
   const eventEnd = getLatestEnd(rental)
   const eventCompleted =
@@ -537,10 +552,6 @@ export function getCustomerRentalTimelineStages(input: TimelineInput): CustomerT
     rental.status === VENUE_RENTAL_STATUSES.securityDepositRefunded ||
     rental.status === VENUE_RENTAL_STATUSES.closed ||
     (eventEnd !== null && eventEnd.getTime() < Date.now() && confirmed)
-
-  const refundComplete =
-    rental.status === VENUE_RENTAL_STATUSES.securityDepositRefunded ||
-    payments.refundStatus === "refunded"
 
   const milestones: Array<{
     id: CustomerTimelineStageId
@@ -567,34 +578,28 @@ export function getCustomerRentalTimelineStages(input: TimelineInput): CustomerT
         : null,
     },
     {
-      id: "agreement_signed",
-      label: "Agreement signed",
-      complete: agreementSigned,
-      dateLabel: contract?.signedAt
-        ? new Date(contract.signedAt).toLocaleDateString("en-US", {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-          })
-        : null,
-    },
-    {
       id: "deposit_paid",
       label: "Deposit paid",
       complete: depositPaid,
       dateLabel: payments.deposit?.paidDateLabel ?? null,
     },
     {
-      id: "security_deposit_paid",
-      label: "Security deposit paid",
-      complete: securityPaid,
-      dateLabel: payments.securityDeposit?.paidDateLabel ?? null,
-    },
-    {
       id: "reservation_confirmed",
       label: "Reservation confirmed",
       complete: confirmed,
       dateLabel: confirmed ? getPrimaryDateLabel(rental) : null,
+    },
+    {
+      id: "full_balance_paid",
+      label: "Full balance paid",
+      complete: fullBalancePaid && !cancelled,
+      dateLabel: fullBalancePaid
+        ? payments.remainingBalance?.paidDateLabel ?? balanceDueLabel
+        : balanceDueLabel
+          ? `Due by ${balanceDueLabel}`
+          : payments.remainingBalance?.dueDateLabel
+            ? `Due by ${payments.remainingBalance.dueDateLabel}`
+            : null,
     },
     {
       id: "event_completed",
@@ -607,13 +612,6 @@ export function getCustomerRentalTimelineStages(input: TimelineInput): CustomerT
             year: "numeric",
           })
         : null,
-    },
-    {
-      id: "security_deposit_refunded",
-      label: "Security deposit refunded",
-      complete: refundComplete,
-      dateLabel:
-        payments.refundStatus === "refunded" ? payments.refundLabel : null,
     },
   ]
 

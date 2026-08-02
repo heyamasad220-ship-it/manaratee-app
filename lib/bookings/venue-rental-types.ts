@@ -192,6 +192,8 @@ export interface SubmitVenueRentalInput {
   spaces: RentalSpaceSlotInput[]
   addons?: RentalAddonSelectionInput[]
   operationalSetup?: OperationalSetupInput
+  /** Customer confirmed they read org policies / pricing docs on the request form. */
+  policiesAcknowledged?: boolean
 }
 
 /** Staff-created rental on behalf of any contact (Requests → Add). */
@@ -227,8 +229,11 @@ export type PublicAvailabilityBlock = {
 /** 72 hours after supervisor approval / payment notice */
 export const RENTAL_HOLD_DURATION_MS = 72 * 60 * 60 * 1000
 
-/** Remaining balance reminder threshold */
-export const RENTAL_BALANCE_REMINDER_LEAD_MS = 7 * 24 * 60 * 60 * 1000
+/** Remaining balance due / reminder lead time before event start */
+export const RENTAL_BALANCE_DUE_LEAD_MS = 14 * 24 * 60 * 60 * 1000
+
+/** @deprecated Use `RENTAL_BALANCE_DUE_LEAD_MS` (14 days). */
+export const RENTAL_BALANCE_REMINDER_LEAD_MS = RENTAL_BALANCE_DUE_LEAD_MS
 
 export interface VenueRentalSpaceSummary {
   venueId: string
@@ -401,6 +406,10 @@ export interface VenueRentalOrgSettings {
   pricingGuideName: string | null
   /** manual = staff approve after agree; auto_after_agreement = approve on agree. */
   approvalMode: VenueRentalApprovalMode
+  /** Default setup buffer before each slot (minutes). */
+  defaultSetupMinutes: number
+  /** Default cleanup/teardown buffer after each slot (minutes). */
+  defaultCleanupMinutes: number
 }
 
 /** Staff Settings → Discounts catalog row. */

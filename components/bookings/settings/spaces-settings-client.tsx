@@ -52,6 +52,10 @@ import {
   type VenueDayScheduleFormRow,
 } from "@/lib/bookings/venue-day-pricing"
 import {
+  optionalBufferMinutesToHoursInput,
+  parseOptionalBufferHours,
+} from "@/lib/bookings/venue-rental-buffers"
+import {
   normalizeVenueColor,
   parseAmenities,
   VENUE_STATUSES,
@@ -69,6 +73,9 @@ type VenueFormState = {
   amenities: string
   color: string
   flyerUrl: string
+  /** Empty = inherit org default. */
+  setupHours: string
+  cleanupHours: string
   daySchedule: VenueDayScheduleFormRow[]
 }
 
@@ -81,6 +88,8 @@ const emptyForm: VenueFormState = {
   amenities: "",
   color: "#3b82f6",
   flyerUrl: "",
+  setupHours: "",
+  cleanupHours: "",
   daySchedule: buildDefaultVenueDaySchedule(),
 }
 
@@ -103,6 +112,8 @@ function toFormState(venue: VenueWithStats): VenueFormState {
     amenities: venue.amenities.join(", "),
     color: normalizeVenueColor(venue.color),
     flyerUrl: venue.flyer_url || "",
+    setupHours: optionalBufferMinutesToHoursInput(venue.setup_minutes),
+    cleanupHours: optionalBufferMinutesToHoursInput(venue.cleanup_minutes),
     daySchedule:
       venue.daySchedule?.length > 0
         ? venue.daySchedule
@@ -178,12 +189,18 @@ export function SpacesSettingsClient({
         status: selectedVenue?.status ?? VENUE_STATUSES.active,
         color: form.color,
         flyer_url: form.flyerUrl.trim() || null,
+        setup_minutes: parseOptionalBufferHours(form.setupHours),
+        cleanup_minutes: parseOptionalBufferHours(form.cleanupHours),
         daySchedule: form.daySchedule,
       })
 
       setForm(emptyForm)
       closeDialog()
-      const warnings = [result.brandingWarning, result.pricingWarning].filter(Boolean)
+      const warnings = [
+        result.brandingWarning,
+        result.buffersWarning,
+        result.pricingWarning,
+      ].filter(Boolean)
       if (warnings.length > 0) {
         window.alert(warnings.join("\n\n"))
       }
@@ -460,6 +477,25 @@ export function SpacesSettingsClient({
                     </div>
                   </div>
 
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="rounded-lg border p-3 text-center">
+                      <p className="text-sm font-semibold">
+                        {selectedVenue.setup_minutes == null
+                          ? "Org default"
+                          : `${optionalBufferMinutesToHoursInput(selectedVenue.setup_minutes)} hr`}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Setup buffer</p>
+                    </div>
+                    <div className="rounded-lg border p-3 text-center">
+                      <p className="text-sm font-semibold">
+                        {selectedVenue.cleanup_minutes == null
+                          ? "Org default"
+                          : `${optionalBufferMinutesToHoursInput(selectedVenue.cleanup_minutes)} hr`}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Cleanup buffer</p>
+                    </div>
+                  </div>
+
                   <div>
                     <h4 className="mb-2 text-sm font-medium text-muted-foreground">
                       Hours & rates by day
@@ -665,6 +701,51 @@ export function SpacesSettingsClient({
                       }
                       placeholder="100"
                     />
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="venue-setup-hours">Setup buffer (hours)</Label>
+                      <Input
+                        id="venue-setup-hours"
+                        type="number"
+                        min={0}
+                        max={24}
+                        step="0.25"
+                        value={form.setupHours}
+                        onChange={(event) =>
+                          setForm((current) => ({
+                            ...current,
+                            setupHours: event.target.value,
+                          }))
+                        }
+                        placeholder="Org default"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Leave blank to use Venue Rentals → Settings → General.
+                      </p>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="venue-cleanup-hours">Cleanup buffer (hours)</Label>
+                      <Input
+                        id="venue-cleanup-hours"
+                        type="number"
+                        min={0}
+                        max={24}
+                        step="0.25"
+                        value={form.cleanupHours}
+                        onChange={(event) =>
+                          setForm((current) => ({
+                            ...current,
+                            cleanupHours: event.target.value,
+                          }))
+                        }
+                        placeholder="Org default"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Leave blank to inherit the organization default.
+                      </p>
+                    </div>
                   </div>
 
                   <div className="space-y-2">

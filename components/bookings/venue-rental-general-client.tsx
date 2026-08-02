@@ -6,6 +6,10 @@ import { FileText, Loader2, Trash2, Upload } from "lucide-react"
 
 import { uploadVenueRentalOrgDocument } from "@/lib/bookings/venue-rental-document-actions"
 import { updateVenueRentalOrgSettings } from "@/lib/bookings/venue-rental-settings-actions"
+import {
+  bufferMinutesToHours,
+  hoursToBufferMinutes,
+} from "@/lib/bookings/venue-rental-buffers"
 import type {
   VenueRentalApprovalMode,
   VenueRentalOrgSettings,
@@ -69,6 +73,12 @@ export function VenueRentalGeneralClient({
   const [approvalMode, setApprovalMode] = useState<VenueRentalApprovalMode>(
     settings.approvalMode
   )
+  const [setupHours, setSetupHours] = useState(
+    String(bufferMinutesToHours(settings.defaultSetupMinutes || 0))
+  )
+  const [cleanupHours, setCleanupHours] = useState(
+    String(bufferMinutesToHours(settings.defaultCleanupMinutes || 0))
+  )
 
   const policiesInputRef = useRef<HTMLInputElement>(null)
   const pricingInputRef = useRef<HTMLInputElement>(null)
@@ -122,6 +132,8 @@ export function VenueRentalGeneralClient({
           pricingGuideUrl: pricingDoc.url || null,
           pricingGuideName: pricingDoc.name || null,
           approvalMode,
+          defaultSetupMinutes: hoursToBufferMinutes(setupHours),
+          defaultCleanupMinutes: hoursToBufferMinutes(cleanupHours),
         })
         setSecurityDepositEnabled(next.securityDepositEnabled)
         setDefaultAmount(
@@ -138,6 +150,8 @@ export function VenueRentalGeneralClient({
           name: next.pricingGuideName || "",
         })
         setApprovalMode(next.approvalMode)
+        setSetupHours(String(bufferMinutesToHours(next.defaultSetupMinutes || 0)))
+        setCleanupHours(String(bufferMinutesToHours(next.defaultCleanupMinutes || 0)))
         setSaved(true)
         router.refresh()
       } catch (saveError) {
@@ -248,6 +262,54 @@ export function VenueRentalGeneralClient({
           Settings saved.
         </div>
       ) : null}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Setup & cleanup buffers</CardTitle>
+          <CardDescription>
+            Automatically block time before and after each booking so the space
+            is not double-booked during setup or teardown. For example, 4 hours
+            of setup before a 6:00 PM event blocks the space from 2:00 PM.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-2">
+            <Label htmlFor="default-setup-hours">Setup buffer (hours)</Label>
+            <Input
+              id="default-setup-hours"
+              type="number"
+              min={0}
+              max={24}
+              step="0.25"
+              value={setupHours}
+              disabled={!canManage || isPending}
+              onChange={(event) => setSetupHours(event.target.value)}
+              placeholder="0"
+            />
+            <p className="text-xs text-muted-foreground">
+              Applied before the event start on new bookings. Spaces can override
+              this in Facilities → Spaces.
+            </p>
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="default-cleanup-hours">Cleanup buffer (hours)</Label>
+            <Input
+              id="default-cleanup-hours"
+              type="number"
+              min={0}
+              max={24}
+              step="0.25"
+              value={cleanupHours}
+              disabled={!canManage || isPending}
+              onChange={(event) => setCleanupHours(event.target.value)}
+              placeholder="0"
+            />
+            <p className="text-xs text-muted-foreground">
+              Applied after the event end on new bookings.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

@@ -34,6 +34,8 @@ type VenueRow = {
   status: string | null
   color?: string | null
   flyer_url?: string | null
+  setup_minutes?: number | string | null
+  cleanup_minutes?: number | string | null
   created_at: string
   updated_at: string
 }
@@ -76,6 +78,14 @@ function mapVenueRow(row: VenueRow): VenueRecord {
     status: normalizeVenueStatus(row.status),
     color: normalizeVenueColor(row.color),
     flyer_url: row.flyer_url?.trim() || null,
+    setup_minutes:
+      row.setup_minutes == null || row.setup_minutes === ""
+        ? null
+        : Math.max(0, Math.floor(Number(row.setup_minutes) || 0)),
+    cleanup_minutes:
+      row.cleanup_minutes == null || row.cleanup_minutes === ""
+        ? null
+        : Math.max(0, Math.floor(Number(row.cleanup_minutes) || 0)),
     created_at: row.created_at,
     updated_at: row.updated_at,
   }
@@ -101,6 +111,8 @@ const venueSelectColumns = `
   status,
   color,
   flyer_url,
+  setup_minutes,
+  cleanup_minutes,
   created_at,
   updated_at
 `
@@ -133,6 +145,8 @@ function isMissingVenueColumnError(error: { message?: string } | null) {
     message.includes("flyer_url") ||
     message.includes("venues.color") ||
     message.includes("column \"color\"") ||
+    message.includes("setup_minutes") ||
+    message.includes("cleanup_minutes") ||
     message.includes("does not exist")
   )
 }

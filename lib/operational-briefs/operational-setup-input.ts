@@ -1,5 +1,6 @@
 export type OperationalSetupInput = {
   expectedAttendance?: number | null
+  chairsPerTable?: number | null
   setupStyle?: string | null
   roomSetupNotes?: string | null
   equipmentNotes?: string | null
@@ -20,6 +21,9 @@ export function mergeOperationalSetupIntoUpsert<
     ...target,
     ...(setup.expectedAttendance !== undefined
       ? { expected_attendance: setup.expectedAttendance }
+      : {}),
+    ...(setup.chairsPerTable !== undefined
+      ? { chairs_per_table: setup.chairsPerTable }
       : {}),
     ...(setup.setupStyle !== undefined ? { setup_style: setup.setupStyle } : {}),
     ...(setup.roomSetupNotes !== undefined

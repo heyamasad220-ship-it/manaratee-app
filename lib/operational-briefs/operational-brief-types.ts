@@ -52,6 +52,7 @@ export interface OperationalBriefRecord {
   internal_coordinator_phone: string | null
   internal_coordinator_email: string | null
   expected_attendance: number | null
+  chairs_per_table: number | null
   setup_style: string | null
   room_setup_notes: string | null
   equipment_notes: string | null
@@ -87,6 +88,7 @@ export type OperationalBriefUpsertInput = {
   internal_coordinator_phone?: string | null
   internal_coordinator_email?: string | null
   expected_attendance?: number | null
+  chairs_per_table?: number | null
   setup_style?: string | null
   room_setup_notes?: string | null
   equipment_notes?: string | null
@@ -112,6 +114,7 @@ export type OperationalBriefView = {
   endTime: string | null
   spacesLabel: string | null
   expectedAttendance: number | null
+  chairsPerTable: number | null
   setupStyle: string | null
   roomSetupNotes: string | null
   equipmentNotes: string | null

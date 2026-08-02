@@ -147,7 +147,9 @@ export function venueRentalChargePaymentTypeForAddon(input: {
   if (
     slug === "extra-cleaning" ||
     slug === "cleaning-fee" ||
-    name === "extra cleaning"
+    slug === "cleanup-fee" ||
+    name === "extra cleaning" ||
+    name === "cleanup fee"
   ) {
     return "cleaning_fee"
   }
@@ -162,6 +164,14 @@ export function venueRentalChargePaymentTypeForAddon(input: {
   }
 
   return "addon_fee"
+}
+
+/** Post-inspection fees — staff Financial only, never customer self-serve. */
+export function isVenueRentalPostEventStaffAddon(input: {
+  slug?: string | null
+  name?: string | null
+}): boolean {
+  return venueRentalChargePaymentTypeForAddon(input) !== "addon_fee"
 }
 
 /** Resolve a staff-entered fixed/$ or % discount into a positive dollar amount. */

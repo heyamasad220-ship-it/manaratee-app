@@ -77,7 +77,7 @@ describe("customer venue rental experience", () => {
     )
     assert.equal(
       getCustomerFriendlyStatusLabel(VENUE_RENTAL_STATUSES.approvedPendingPayment),
-      "Approved — payment required"
+      "Approved — pay deposit to confirm"
     )
     assert.equal(
       getCustomerFriendlyStatusLabel(VENUE_RENTAL_STATUSES.securityDepositRefunded),
@@ -250,14 +250,84 @@ describe("customer venue rental experience", () => {
       }),
     })
 
+    assert.deepEqual(
+      stages.map((stage) => stage.id),
+      [
+        "request_submitted",
+        "request_approved",
+        "deposit_paid",
+        "reservation_confirmed",
+        "full_balance_paid",
+        "event_completed",
+      ]
+    )
+
     const submitted = stages.find((stage) => stage.id === "request_submitted")
     const approved = stages.find((stage) => stage.id === "request_approved")
-    const agreement = stages.find((stage) => stage.id === "agreement_signed")
     const deposit = stages.find((stage) => stage.id === "deposit_paid")
+    const fullBalance = stages.find((stage) => stage.id === "full_balance_paid")
 
     assert.equal(submitted?.state, "complete")
     assert.equal(approved?.state, "complete")
-    assert.equal(agreement?.state, "complete")
     assert.equal(deposit?.state, "complete")
+    assert.equal(fullBalance?.state, "upcoming")
+    assert.match(fullBalance?.dateLabel || "", /^Due by /)
+  })
+
+  it("marks full balance paid when remaining balance is paid", () => {
+    const stages = getCustomerRentalTimelineStages({
+      rental: baseRental({
+        status: VENUE_RENTAL_STATUSES.confirmed,
+        spaces: [
+          {
+            venueId: "venue-1",
+            venueName: "Hall A",
+            startAt: "2026-08-20T18:00:00.000Z",
+            endAt: "2026-08-20T22:00:00.000Z",
+          },
+        ],
+      }),
+      approvedAt: "2026-05-02T12:00:00.000Z",
+      context: financialContext({
+        payments: {
+          deposit: {
+            id: "pay-1",
+            paymentType: "deposit",
+            label: "Deposit",
+            amount: 500,
+            currency: "USD",
+            dueDate: null,
+            dueDateLabel: null,
+            status: "Paid",
+            paidDate: "2026-05-04T12:00:00.000Z",
+            paidDateLabel: "May 4, 2026",
+            isPaid: true,
+            isDue: false,
+          },
+          securityDeposit: null,
+          remainingBalance: {
+            id: "pay-2",
+            paymentType: "remaining_balance",
+            label: "Remaining Balance",
+            amount: 1500,
+            currency: "USD",
+            dueDate: "2026-08-06T18:00:00.000Z",
+            dueDateLabel: "Aug 6, 2026",
+            status: "Paid",
+            paidDate: "2026-08-01T12:00:00.000Z",
+            paidDateLabel: "Aug 1, 2026",
+            isPaid: true,
+            isDue: false,
+          },
+          outstandingBalance: 0,
+          refundStatus: "none",
+          refundLabel: null,
+        },
+      }),
+    })
+
+    const fullBalance = stages.find((stage) => stage.id === "full_balance_paid")
+    assert.equal(fullBalance?.state, "complete")
+    assert.equal(fullBalance?.dateLabel, "Aug 1, 2026")
   })
 })

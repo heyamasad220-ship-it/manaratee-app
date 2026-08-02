@@ -10,6 +10,7 @@ import type {
   VenueRentalOrgSettings,
 } from "@/lib/bookings/venue-rental-types"
 import { getVenueRentalOrgSettings } from "@/lib/bookings/venue-rental-queries"
+import { clampBufferMinutes } from "@/lib/bookings/venue-rental-buffers"
 
 async function assertCanManageVenueRentalSettings() {
   const canManage = await hasAnyPermission(
@@ -48,6 +49,8 @@ export async function updateVenueRentalOrgSettings(input: {
   pricingGuideUrl?: string | null
   pricingGuideName?: string | null
   approvalMode?: VenueRentalApprovalMode
+  defaultSetupMinutes?: number | null
+  defaultCleanupMinutes?: number | null
 }): Promise<VenueRentalOrgSettings> {
   await assertCanManageVenueRentalSettings()
 
@@ -89,6 +92,9 @@ export async function updateVenueRentalOrgSettings(input: {
     )
   }
 
+  const defaultSetupMinutes = clampBufferMinutes(input.defaultSetupMinutes)
+  const defaultCleanupMinutes = clampBufferMinutes(input.defaultCleanupMinutes)
+
   const { error } = await supabase.from("venue_rental_settings").upsert(
     {
       organization_id: organizationId,
@@ -103,6 +109,8 @@ export async function updateVenueRentalOrgSettings(input: {
         ? normalizeOptionalName(input.pricingGuideName) || "Pricing guide"
         : null,
       approval_mode: approvalMode,
+      default_setup_minutes: defaultSetupMinutes,
+      default_cleanup_minutes: defaultCleanupMinutes,
     },
     { onConflict: "organization_id" }
   )
@@ -123,6 +131,15 @@ export async function updateVenueRentalOrgSettings(input: {
     ) {
       throw new Error(
         "Customer document settings columns are missing. Run scripts/221_venue_rental_customer_documents.sql in Supabase."
+      )
+    }
+    if (
+      error.code === "42703" ||
+      error.message?.toLowerCase().includes("default_setup_minutes") ||
+      error.message?.toLowerCase().includes("default_cleanup_minutes")
+    ) {
+      throw new Error(
+        "Setup/cleanup buffer columns are missing. Run scripts/222_venue_rental_setup_cleanup_buffers.sql in Supabase."
       )
     }
     throw new Error(error.message || "Failed to save settings.")

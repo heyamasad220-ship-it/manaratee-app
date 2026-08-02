@@ -240,13 +240,60 @@ export async function upsertOperationalBrief(
         primary_contact_person_id: input.primary_contact_person_id ?? null,
         primary_contact_name: input.primary_contact_name ?? null,
         primary_contact_phone: input.primary_contact_phone ?? null,
+        expected_attendance: input.expected_attendance ?? null,
+        chairs_per_table: input.chairs_per_table ?? null,
+        setup_style: input.setup_style ?? null,
+        room_setup_notes: input.room_setup_notes ?? null,
+        equipment_notes: input.equipment_notes ?? null,
+        food_beverage_notes: input.food_beverage_notes ?? null,
+        table_linen_notes: input.table_linen_notes ?? null,
+        cleanup_notes: input.cleanup_notes ?? null,
+        accessibility_notes: input.accessibility_notes ?? null,
+        facility_notes: input.facility_notes ?? null,
         special_requests: input.special_requests ?? null,
         source_status: input.source_status ?? null,
         updated_by: input.updated_by ?? null,
       })
       .eq("id", existing.data.id)
 
-    if (error) throw error
+    if (error) {
+      if (
+        error.message?.toLowerCase().includes("chairs_per_table") ||
+        error.code === "42703" ||
+        error.code === "PGRST204"
+      ) {
+        const { chairs_per_table: _chairs, ...withoutChairs } = {
+          title: input.title,
+          event_date: input.event_date ?? null,
+          start_time: input.start_time ?? null,
+          end_time: input.end_time ?? null,
+          reservation_id: input.reservation_id ?? null,
+          primary_contact_person_id: input.primary_contact_person_id ?? null,
+          primary_contact_name: input.primary_contact_name ?? null,
+          primary_contact_phone: input.primary_contact_phone ?? null,
+          expected_attendance: input.expected_attendance ?? null,
+          setup_style: input.setup_style ?? null,
+          room_setup_notes: input.room_setup_notes ?? null,
+          equipment_notes: input.equipment_notes ?? null,
+          food_beverage_notes: input.food_beverage_notes ?? null,
+          table_linen_notes: input.table_linen_notes ?? null,
+          cleanup_notes: input.cleanup_notes ?? null,
+          accessibility_notes: input.accessibility_notes ?? null,
+          facility_notes: input.facility_notes ?? null,
+          special_requests: input.special_requests ?? null,
+          source_status: input.source_status ?? null,
+          updated_by: input.updated_by ?? null,
+        }
+        void _chairs
+        const retry = await supabase
+          .from("operational_briefs")
+          .update(withoutChairs)
+          .eq("id", existing.data.id)
+        if (retry.error) throw retry.error
+        return existing.data.id as string
+      }
+      throw error
+    }
     return existing.data.id as string
   }
 
@@ -259,6 +306,26 @@ export async function upsertOperationalBrief(
     .select("id")
     .single()
 
-  if (error) throw error
+  if (error) {
+    if (
+      error.message?.toLowerCase().includes("chairs_per_table") ||
+      error.code === "42703" ||
+      error.code === "PGRST204"
+    ) {
+      const { chairs_per_table: _chairs, ...withoutChairs } = input
+      void _chairs
+      const retry = await supabase
+        .from("operational_briefs")
+        .insert({
+          ...withoutChairs,
+          setup_status: input.setup_status ?? OPERATIONAL_BRIEF_SETUP_STATUSES.notStarted,
+        })
+        .select("id")
+        .single()
+      if (retry.error) throw retry.error
+      return retry.data.id as string
+    }
+    throw error
+  }
   return data.id as string
 }

@@ -18,9 +18,15 @@ import {
 import {
   deriveVenueRentalPaymentLedgerStatus,
   deriveVenueRentalStaffNextAction,
+  isVenueRentalPostEventStaffAddon,
   rentalHasFinancialActivity,
   summarizeVenueRentalPaymentLedger,
 } from "./venue-rental-payment-ledger"
+import {
+  dedupeCustomerRentalAddons,
+  sortRentalAddonsAlphabetically,
+} from "./venue-rental-addon-display"
+
 import {
   formatVenueRentalDateTime,
   formatVenueRentalSpaceLine,
@@ -363,6 +369,8 @@ export async function getCustomerVenueDaySchedules(
         open: day.open,
         startTime: day.startTime,
         endTime: day.endTime,
+        flatPrice: Number(day.flatPrice || 0),
+        hourlyPrice: Number(day.hourlyPrice || 0),
       }))
     }
   } catch (error) {
@@ -377,6 +385,8 @@ export async function getCustomerVenueDaySchedules(
         open: day.open,
         startTime: day.startTime,
         endTime: day.endTime,
+        flatPrice: Number(day.flatPrice || 0),
+        hourlyPrice: Number(day.hourlyPrice || 0),
       }))
     }
   }
@@ -385,7 +395,8 @@ export async function getCustomerVenueDaySchedules(
 }
 
 export async function getActiveRentalAddons(
-  organizationId?: string | null
+  organizationId?: string | null,
+  options?: { customerFacing?: boolean }
 ): Promise<RentalAddonCatalogItem[]> {
   const supabase = await createClient()
   const orgId = organizationId ?? (await resolveOrganizationId())
@@ -417,25 +428,39 @@ export async function getActiveRentalAddons(
         console.error(fallback.error)
         throw new Error("Failed to load rental add-ons")
       }
-      return (fallback.data || []).map((row) => ({
+      const rows = (fallback.data || []).map((row) => ({
         id: row.id as string,
         name: row.name as string,
         slug: "",
         description: (row.description as string | null) ?? null,
         defaultPrice: Number(row.default_price || 0),
       }))
+      if (options?.customerFacing) {
+        return sortRentalAddonsAlphabetically(
+          dedupeCustomerRentalAddons(rows.filter((row) => !isVenueRentalPostEventStaffAddon(row)))
+        )
+      }
+      return rows
     }
     console.error(error)
     throw new Error("Failed to load rental add-ons")
   }
 
-  return (data || []).map((row) => ({
+  const rows = (data || []).map((row) => ({
     id: row.id as string,
     name: row.name as string,
     slug: (row.slug as string | null) || "",
     description: (row.description as string | null) ?? null,
     defaultPrice: Number(row.default_price || 0),
   }))
+
+  if (options?.customerFacing) {
+    return sortRentalAddonsAlphabetically(
+      dedupeCustomerRentalAddons(rows.filter((row) => !isVenueRentalPostEventStaffAddon(row)))
+    )
+  }
+
+  return rows
 }
 
 const DEFAULT_VENUE_RENTAL_ORG_SETTINGS: VenueRentalOrgSettings = {
@@ -446,6 +471,8 @@ const DEFAULT_VENUE_RENTAL_ORG_SETTINGS: VenueRentalOrgSettings = {
   pricingGuideUrl: null,
   pricingGuideName: null,
   approvalMode: "manual",
+  defaultSetupMinutes: 0,
+  defaultCleanupMinutes: 0,
 }
 
 /** Per-org Venue Rentals settings (Settings → General). Missing row = defaults. */
@@ -462,7 +489,7 @@ export async function getVenueRentalOrgSettings(
   const { data, error } = await supabase
     .from("venue_rental_settings")
     .select(
-      "security_deposit_enabled, default_security_deposit_amount, policies_document_url, policies_document_name, pricing_guide_url, pricing_guide_name, approval_mode"
+      "security_deposit_enabled, default_security_deposit_amount, policies_document_url, policies_document_name, pricing_guide_url, pricing_guide_name, approval_mode, default_setup_minutes, default_cleanup_minutes"
     )
     .eq("organization_id", orgId)
     .maybeSingle()
@@ -471,26 +498,63 @@ export async function getVenueRentalOrgSettings(
     if (error.code === "42P01") {
       return { ...DEFAULT_VENUE_RENTAL_ORG_SETTINGS }
     }
-    // Pre-migration 221: fall back to security-deposit columns only.
+    // Pre-migration columns: fall back progressively.
     if (
       error.code === "42703" ||
       error.code === "PGRST204" ||
       error.message?.toLowerCase().includes("does not exist")
     ) {
-      const legacy = await supabase
+      const mid = await supabase
         .from("venue_rental_settings")
-        .select("security_deposit_enabled, default_security_deposit_amount")
+        .select(
+          "security_deposit_enabled, default_security_deposit_amount, policies_document_url, policies_document_name, pricing_guide_url, pricing_guide_name, approval_mode"
+        )
         .eq("organization_id", orgId)
         .maybeSingle()
-      if (legacy.error || !legacy.data) {
+
+      if (
+        mid.error &&
+        (mid.error.code === "42703" ||
+          mid.error.code === "PGRST204" ||
+          mid.error.message?.toLowerCase().includes("does not exist"))
+      ) {
+        const legacy = await supabase
+          .from("venue_rental_settings")
+          .select("security_deposit_enabled, default_security_deposit_amount")
+          .eq("organization_id", orgId)
+          .maybeSingle()
+        if (legacy.error || !legacy.data) {
+          return { ...DEFAULT_VENUE_RENTAL_ORG_SETTINGS }
+        }
+        const defaultAmount = legacy.data.default_security_deposit_amount
+        return {
+          ...DEFAULT_VENUE_RENTAL_ORG_SETTINGS,
+          securityDepositEnabled: Boolean(legacy.data.security_deposit_enabled),
+          defaultSecurityDepositAmount:
+            defaultAmount == null ? null : Number(defaultAmount) || 0,
+        }
+      }
+
+      if (mid.error || !mid.data) {
         return { ...DEFAULT_VENUE_RENTAL_ORG_SETTINGS }
       }
-      const defaultAmount = legacy.data.default_security_deposit_amount
+
+      const defaultAmount = mid.data.default_security_deposit_amount
+      const approvalMode =
+        mid.data.approval_mode === "auto_after_agreement"
+          ? "auto_after_agreement"
+          : "manual"
+
       return {
         ...DEFAULT_VENUE_RENTAL_ORG_SETTINGS,
-        securityDepositEnabled: Boolean(legacy.data.security_deposit_enabled),
+        securityDepositEnabled: Boolean(mid.data.security_deposit_enabled),
         defaultSecurityDepositAmount:
           defaultAmount == null ? null : Number(defaultAmount) || 0,
+        policiesDocumentUrl: (mid.data.policies_document_url as string | null) || null,
+        policiesDocumentName: (mid.data.policies_document_name as string | null) || null,
+        pricingGuideUrl: (mid.data.pricing_guide_url as string | null) || null,
+        pricingGuideName: (mid.data.pricing_guide_name as string | null) || null,
+        approvalMode,
       }
     }
     console.error(error)
@@ -516,6 +580,8 @@ export async function getVenueRentalOrgSettings(
     pricingGuideUrl: (data.pricing_guide_url as string | null) || null,
     pricingGuideName: (data.pricing_guide_name as string | null) || null,
     approvalMode,
+    defaultSetupMinutes: Math.max(0, Number(data.default_setup_minutes) || 0),
+    defaultCleanupMinutes: Math.max(0, Number(data.default_cleanup_minutes) || 0),
   }
 }
 

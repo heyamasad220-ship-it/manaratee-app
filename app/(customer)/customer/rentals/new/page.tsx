@@ -9,8 +9,10 @@ import {
   getActiveRentalAddons,
   getCustomerVenueDaySchedules,
   getPublicAvailabilityBlocks,
+  getVenueRentalOrgSettings,
 } from "@/lib/bookings/venue-rental-queries"
 import { getCustomerPortalSupabase } from "@/lib/auth/customer-portal-session"
+import { getRoomSetupStyles } from "@/lib/setup-styles/setup-style-queries"
 
 export default async function CustomerVenueRentalRequestPage({
   searchParams,
@@ -28,27 +30,30 @@ export default async function CustomerVenueRentalRequestPage({
   const rangeEnd = new Date()
   rangeEnd.setDate(rangeEnd.getDate() + 60)
 
-  const [venuesResult, availabilityBlocks, eventTypes, addons] = await Promise.all([
-    supabase
-      .from("venues")
-      .select(
-        "id, name, description, capacity, status, available_for_bookings, usage_tag, availability_start, availability_end"
-      )
-      .eq("organization_id", organizationId)
-      .eq("available_for_bookings", true)
-      .in("status", ["active", "closed", "inactive"])
-      .order("name", { ascending: true }),
-    getPublicAvailabilityBlocks(
-      organizationId,
-      rangeStart.toISOString(),
-      rangeEnd.toISOString()
-    ),
-    getVenueRentalEventTypes({
-      organizationId,
-      activeOnly: true,
-    }),
-    getActiveRentalAddons(organizationId),
-  ])
+  const [venuesResult, availabilityBlocks, eventTypes, addons, setupStyles, orgSettings] =
+    await Promise.all([
+      supabase
+        .from("venues")
+        .select(
+          "id, name, description, capacity, status, available_for_bookings, usage_tag, availability_start, availability_end"
+        )
+        .eq("organization_id", organizationId)
+        .eq("available_for_bookings", true)
+        .in("status", ["active", "closed", "inactive"])
+        .order("name", { ascending: true }),
+      getPublicAvailabilityBlocks(
+        organizationId,
+        rangeStart.toISOString(),
+        rangeEnd.toISOString()
+      ),
+      getVenueRentalEventTypes({
+        organizationId,
+        activeOnly: true,
+      }),
+      getActiveRentalAddons(organizationId, { customerFacing: true }),
+      getRoomSetupStyles({ activeOnly: true }),
+      getVenueRentalOrgSettings(organizationId),
+    ])
 
   const venueRows = venuesResult.data || []
   const daySchedulesByVenueId = await getCustomerVenueDaySchedules(
@@ -96,6 +101,11 @@ export default async function CustomerVenueRentalRequestPage({
           name: eventType.name,
         }))}
         addons={addons}
+        setupStyles={setupStyles}
+        policiesDocumentUrl={orgSettings.policiesDocumentUrl}
+        policiesDocumentName={orgSettings.policiesDocumentName}
+        pricingGuideUrl={orgSettings.pricingGuideUrl}
+        pricingGuideName={orgSettings.pricingGuideName}
         initialVenueId={initialVenueId}
         dashboardHref="/customer/rentals"
       />

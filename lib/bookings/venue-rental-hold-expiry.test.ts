@@ -4,39 +4,52 @@ import { describe, it } from "node:test"
 import {
   groupVenueRentalIdsByOrganization,
   selectExpiredHoldRentals,
+  VENUE_RENTAL_EXPIRABLE_HOLD_STATUSES,
   VENUE_RENTAL_HOLD_PAYMENT_STATUSES,
 } from "./venue-rental-hold-expiry"
 import { VENUE_RENTAL_STATUSES } from "./venue-rental-types"
 
 describe("venue rental hold expiry", () => {
-  it("only targets hold-payment workflow statuses", () => {
+  it("includes request and payment hold statuses", () => {
     assert.deepEqual(VENUE_RENTAL_HOLD_PAYMENT_STATUSES, [
       VENUE_RENTAL_STATUSES.approvedPendingPayment,
       VENUE_RENTAL_STATUSES.depositPaid,
       VENUE_RENTAL_STATUSES.securityDepositPaid,
     ])
+    assert.ok(
+      VENUE_RENTAL_EXPIRABLE_HOLD_STATUSES.includes(VENUE_RENTAL_STATUSES.submitted)
+    )
+    assert.ok(
+      VENUE_RENTAL_EXPIRABLE_HOLD_STATUSES.includes(VENUE_RENTAL_STATUSES.pending)
+    )
     assert.equal(
-      VENUE_RENTAL_HOLD_PAYMENT_STATUSES.includes(VENUE_RENTAL_STATUSES.confirmed),
+      VENUE_RENTAL_EXPIRABLE_HOLD_STATUSES.includes(VENUE_RENTAL_STATUSES.confirmed),
       false
     )
   })
 
-  it("selects only elapsed holds in hold-payment statuses", () => {
+  it("selects elapsed holds for submitted requests and payment holds", () => {
     const now = new Date("2026-06-15T12:00:00.000Z")
 
     const selected = selectExpiredHoldRentals(
       [
         {
-          id: "expired",
+          id: "expired-request",
           organization_id: "org-1",
-          status: VENUE_RENTAL_STATUSES.approvedPendingPayment,
+          status: VENUE_RENTAL_STATUSES.submitted,
           hold_expires_at: "2026-06-15T11:00:00.000Z",
         },
         {
-          id: "active-hold",
+          id: "active-request",
+          organization_id: "org-1",
+          status: VENUE_RENTAL_STATUSES.pending,
+          hold_expires_at: "2026-06-15T13:00:00.000Z",
+        },
+        {
+          id: "expired-payment",
           organization_id: "org-1",
           status: VENUE_RENTAL_STATUSES.approvedPendingPayment,
-          hold_expires_at: "2026-06-15T13:00:00.000Z",
+          hold_expires_at: "2026-06-15T11:00:00.000Z",
         },
         {
           id: "confirmed",
@@ -48,8 +61,10 @@ describe("venue rental hold expiry", () => {
       now
     )
 
-    assert.equal(selected.length, 1)
-    assert.equal(selected[0]?.id, "expired")
+    assert.deepEqual(
+      selected.map((row) => row.id).sort(),
+      ["expired-payment", "expired-request"]
+    )
   })
 
   it("groups expired rentals by organization for isolated updates", () => {

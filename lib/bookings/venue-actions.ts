@@ -19,6 +19,7 @@ import {
   VENUE_STATUSES,
   type VenueStatus,
 } from "./venue-types"
+import { clampBufferMinutes } from "./venue-rental-buffers"
 
 type UpsertVenueInput = {
   id?: string
@@ -37,6 +38,9 @@ type UpsertVenueInput = {
   status?: VenueStatus
   color?: string | null
   flyer_url?: string | null
+  /** null = inherit org default; omit to leave unchanged is not supported — always pass. */
+  setup_minutes?: number | null
+  cleanup_minutes?: number | null
   daySchedule?: VenueDayScheduleFormRow[] | VenueDayScheduleInput[]
 }
 
@@ -50,6 +54,13 @@ async function assertCanManageVenues() {
   if (!canManage) {
     throw new Error("You do not have permission to manage spaces.")
   }
+}
+
+function normalizeOptionalBufferMinutes(
+  value: number | null | undefined
+): number | null {
+  if (value == null) return null
+  return clampBufferMinutes(value)
 }
 
 function validateVenueInput(input: UpsertVenueInput) {
@@ -83,6 +94,8 @@ function validateVenueInput(input: UpsertVenueInput) {
     status,
     color: normalizeVenueColor(input.color),
     flyer_url: input.flyer_url?.trim() || null,
+    setup_minutes: normalizeOptionalBufferMinutes(input.setup_minutes),
+    cleanup_minutes: normalizeOptionalBufferMinutes(input.cleanup_minutes),
   }
 }
 
@@ -95,6 +108,8 @@ function toLegacyVenuePayload(payload: ReturnType<typeof validateVenueInput>) {
     availability_end: _availabilityEnd,
     color: _color,
     flyer_url: _flyerUrl,
+    setup_minutes: _setupMinutes,
+    cleanup_minutes: _cleanupMinutes,
     ...legacy
   } = payload
 
@@ -104,6 +119,12 @@ function toLegacyVenuePayload(payload: ReturnType<typeof validateVenueInput>) {
 /** Drop color/flyer when migration 204 has not been applied yet. */
 function toPayloadWithoutBranding(payload: ReturnType<typeof validateVenueInput>) {
   const { color: _color, flyer_url: _flyerUrl, ...rest } = payload
+  return rest
+}
+
+/** Drop buffer columns when migration 222 has not been applied yet. */
+function toPayloadWithoutBuffers(payload: ReturnType<typeof validateVenueInput>) {
+  const { setup_minutes: _setup, cleanup_minutes: _cleanup, ...rest } = payload
   return rest
 }
 
@@ -121,6 +142,8 @@ function isMissingVenueColumnError(error: { message?: string } | null) {
     message.includes('"color"') ||
     message.includes("venues.color") ||
     message.includes("column \"color\"") ||
+    message.includes("setup_minutes") ||
+    message.includes("cleanup_minutes") ||
     message.includes("schema cache") ||
     message.includes("does not exist")
   )
@@ -134,6 +157,14 @@ function isMissingBrandingColumnError(error: { message?: string } | null) {
     message.includes('"color"') ||
     message.includes("venues.color") ||
     (message.includes("color") && message.includes("venues"))
+  )
+}
+
+function isMissingBufferColumnError(error: { message?: string } | null) {
+  const message = error?.message?.toLowerCase() ?? ""
+  return (
+    message.includes("setup_minutes") ||
+    message.includes("cleanup_minutes")
   )
 }
 
@@ -227,6 +258,7 @@ export async function upsertVenue(input: UpsertVenueInput) {
 
   let venueId = input.id || null
   let brandingSkipped = false
+  let buffersSkipped = false
 
   if (input.id) {
     let { error } = await supabase
@@ -234,6 +266,16 @@ export async function upsertVenue(input: UpsertVenueInput) {
       .update(payload)
       .eq("id", input.id)
       .eq("organization_id", organizationId)
+
+    if (error && isMissingBufferColumnError(error)) {
+      buffersSkipped = true
+      const withoutBuffers = await supabase
+        .from("venues")
+        .update(toPayloadWithoutBuffers(payload))
+        .eq("id", input.id)
+        .eq("organization_id", organizationId)
+      error = withoutBuffers.error
+    }
 
     if (error && isMissingBrandingColumnError(error)) {
       brandingSkipped = true
@@ -243,10 +285,21 @@ export async function upsertVenue(input: UpsertVenueInput) {
         .eq("id", input.id)
         .eq("organization_id", organizationId)
       error = withoutBranding.error
+
+      if (error && isMissingBufferColumnError(error)) {
+        buffersSkipped = true
+        const withoutBoth = await supabase
+          .from("venues")
+          .update(toPayloadWithoutBuffers(toPayloadWithoutBranding(payload)))
+          .eq("id", input.id)
+          .eq("organization_id", organizationId)
+        error = withoutBoth.error
+      }
     }
 
     if (error && isMissingVenueColumnError(error)) {
       brandingSkipped = true
+      buffersSkipped = true
       const legacyResult = await supabase
         .from("venues")
         .update(toLegacyVenuePayload(payload))
@@ -269,6 +322,20 @@ export async function upsertVenue(input: UpsertVenueInput) {
       .select("id")
       .single()
 
+    if (error && isMissingBufferColumnError(error)) {
+      buffersSkipped = true
+      const withoutBuffers = await supabase
+        .from("venues")
+        .insert({
+          organization_id: organizationId,
+          ...toPayloadWithoutBuffers(payload),
+        })
+        .select("id")
+        .single()
+      data = withoutBuffers.data
+      error = withoutBuffers.error
+    }
+
     if (error && isMissingBrandingColumnError(error)) {
       brandingSkipped = true
       const withoutBranding = await supabase
@@ -281,10 +348,25 @@ export async function upsertVenue(input: UpsertVenueInput) {
         .single()
       data = withoutBranding.data
       error = withoutBranding.error
+
+      if (error && isMissingBufferColumnError(error)) {
+        buffersSkipped = true
+        const withoutBoth = await supabase
+          .from("venues")
+          .insert({
+            organization_id: organizationId,
+            ...toPayloadWithoutBuffers(toPayloadWithoutBranding(payload)),
+          })
+          .select("id")
+          .single()
+        data = withoutBoth.data
+        error = withoutBoth.error
+      }
     }
 
     if (error && isMissingVenueColumnError(error)) {
       brandingSkipped = true
+      buffersSkipped = true
       const legacyResult = await supabase
         .from("venues")
         .insert({
@@ -309,6 +391,10 @@ export async function upsertVenue(input: UpsertVenueInput) {
     ? "Venue saved, but color/flyer could not be stored. Run scripts/204_venue_color_flyer.sql in the Supabase SQL Editor, then save again."
     : undefined
 
+  const buffersWarning = buffersSkipped
+    ? "Venue saved, but setup/cleanup buffers could not be stored. Run scripts/222_venue_rental_setup_cleanup_buffers.sql in the Supabase SQL Editor, then save again."
+    : undefined
+
   if (venueId && daySchedule) {
     try {
       await replaceVenueDayPricing(supabase, organizationId, venueId, daySchedule)
@@ -318,6 +404,7 @@ export async function upsertVenue(input: UpsertVenueInput) {
       return {
         id: venueId as string,
         brandingWarning,
+        buffersWarning,
         pricingWarning:
           pricingError instanceof Error
             ? pricingError.message
@@ -327,7 +414,7 @@ export async function upsertVenue(input: UpsertVenueInput) {
   }
 
   revalidateVenuePaths()
-  return { id: venueId as string, brandingWarning }
+  return { id: venueId as string, brandingWarning, buffersWarning }
 }
 
 async function replaceVenueDayPricing(

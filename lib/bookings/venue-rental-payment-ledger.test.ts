@@ -4,6 +4,7 @@ import { describe, it } from "node:test"
 import {
   deriveVenueRentalPaymentLedgerStatus,
   deriveVenueRentalStaffNextAction,
+  isVenueRentalPostEventStaffAddon,
   matchesVenueRentalPaymentLedgerView,
   rentalHasFinancialActivity,
   resolveVenueRentalDiscountDollarAmount,
@@ -383,6 +384,10 @@ describe("venueRentalChargePaymentTypeForAddon", () => {
       "cleaning_fee"
     )
     assert.equal(
+      venueRentalChargePaymentTypeForAddon({ slug: "cleanup-fee", name: "Cleanup Fee" }),
+      "cleaning_fee"
+    )
+    assert.equal(
       venueRentalChargePaymentTypeForAddon({ slug: "damage-charge" }),
       "adjustment"
     )
@@ -393,5 +398,12 @@ describe("venueRentalChargePaymentTypeForAddon", () => {
       }),
       "addon_fee"
     )
+  })
+
+  it("marks post-event fees as staff-only", () => {
+    assert.equal(isVenueRentalPostEventStaffAddon({ slug: "extra-cleaning" }), true)
+    assert.equal(isVenueRentalPostEventStaffAddon({ slug: "cleanup-fee" }), true)
+    assert.equal(isVenueRentalPostEventStaffAddon({ slug: "damage-charge" }), true)
+    assert.equal(isVenueRentalPostEventStaffAddon({ slug: "table-covers" }), false)
   })
 })

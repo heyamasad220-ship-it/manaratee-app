@@ -1,5 +1,9 @@
 import type { VenueRentalCalendarColor, VenueRentalStatus } from "./venue-rental-types"
-import { RENTAL_PAYMENT_STATUSES, VENUE_RENTAL_STATUSES } from "./venue-rental-types"
+import {
+  RENTAL_BALANCE_DUE_LEAD_MS,
+  RENTAL_PAYMENT_STATUSES,
+  VENUE_RENTAL_STATUSES,
+} from "./venue-rental-types"
 
 const STATUS_LABELS: Record<VenueRentalStatus, string> = {
   draft: "Draft",
@@ -260,6 +264,13 @@ export function computeHoldExpiresAt(from: Date = new Date()): Date {
   return new Date(from.getTime() + 72 * 60 * 60 * 1000)
 }
 
+/** Full remaining balance is due 14 days before the event start. */
+export function computeRemainingBalanceDueAt(eventStartAt: Date | string): Date {
+  const eventStart =
+    typeof eventStartAt === "string" ? new Date(eventStartAt) : eventStartAt
+  return new Date(eventStart.getTime() - RENTAL_BALANCE_DUE_LEAD_MS)
+}
+
 export function isHoldExpired(holdExpiresAt: string | null | undefined, now = new Date()): boolean {
   if (!holdExpiresAt) {
     return false
@@ -380,9 +391,8 @@ export function shouldSendBalanceReminder(input: {
 
   const now = input.now ?? new Date()
   const eventStart = new Date(input.eventStartAt)
-  const leadMs = 14 * 24 * 60 * 60 * 1000
   const msUntilEvent = eventStart.getTime() - now.getTime()
 
   // Send when we are within 14 days of the event (and event is still in the future).
-  return msUntilEvent > 0 && msUntilEvent <= leadMs
+  return msUntilEvent > 0 && msUntilEvent <= RENTAL_BALANCE_DUE_LEAD_MS
 }

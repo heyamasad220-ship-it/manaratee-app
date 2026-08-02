@@ -20,12 +20,14 @@ export type VenueDayScheduleFormRow = {
   hourlyPrice: string
 }
 
-/** Hours-only schedule row for customer booking calendars (no pricing). */
+/** Hours (+ optional rates) for customer booking calendars. */
 export type VenuePublicDayHours = {
   dayOfWeek: number
   open: boolean
   startTime: string
   endTime: string
+  flatPrice?: number
+  hourlyPrice?: number
 }
 
 export const VENUE_DAY_ORDER: VenueDayOfWeek[] = [0, 1, 2, 3, 4, 5, 6]

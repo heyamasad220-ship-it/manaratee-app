@@ -22,6 +22,7 @@ import { assertNoReservationConflicts } from "@/lib/reservations/reservation-con
 
 import {
   computeHoldExpiresAt,
+  computeRemainingBalanceDueAt,
   canStaffCancelVenueRental,
   canStaffDeleteVenueRental,
   canStaffForceBookVenueRental,
@@ -39,6 +40,11 @@ import {
   getBlockingReservationsForVenue,
   getVenueRentalOrgSettings,
 } from "./venue-rental-queries"
+import {
+  clampBufferMinutes,
+  shiftIsoByMinutes,
+} from "./venue-rental-buffers"
+import { resolveVenueRentalBuffersForVenues } from "./venue-rental-buffers-server"
 import {
   assertLegacyVenueBookingAvailableForMigration,
   legacyVenueBookingToSpaceSlot,
@@ -68,10 +74,12 @@ import {
   mergeVenueRentalCustomerNotes,
   mergeVenueRentalEventTypeInNotes,
 } from "./venue-rental-format"
+import { resolveVenueRentalAddonQuantity } from "./venue-rental-addon-quantity"
 import {
   canEditPendingCharge,
   isCompletedPaymentStatus,
   isPendingPaymentStatus,
+  isVenueRentalPostEventStaffAddon,
   resolveVenueRentalDiscountDollarAmount,
   venueRentalChargePaymentTypeForAddon,
 } from "./venue-rental-payment-ledger"
@@ -102,10 +110,12 @@ async function stampPolicyDocumentsOnRental(input: {
   venueRentalId: string
   customerUserId?: string | null
   notifyCustomer?: boolean
+  /** Customer already checked acknowledgment on the booking form. */
+  alreadyAgreed?: boolean
 }) {
   const settings = await getVenueRentalOrgSettings(input.organizationId)
   if (!venueRentalOrgRequiresPolicyAgreement(settings)) {
-    return { stamped: false as const, settings }
+    return { stamped: false as const, settings, agreed: false as const }
   }
 
   const supabase = await createClient()
@@ -116,6 +126,7 @@ async function stampPolicyDocumentsOnRental(input: {
       policies_sent_at: nowIso,
       policies_document_url_snapshot: settings.policiesDocumentUrl,
       pricing_guide_url_snapshot: settings.pricingGuideUrl,
+      ...(input.alreadyAgreed ? { policies_agreed_at: nowIso } : {}),
     })
     .eq("id", input.venueRentalId)
     .eq("organization_id", input.organizationId)
@@ -128,12 +139,12 @@ async function stampPolicyDocumentsOnRental(input: {
       console.error(
         "Policy document columns missing. Run scripts/221_venue_rental_customer_documents.sql"
       )
-      return { stamped: false as const, settings }
+      return { stamped: false as const, settings, agreed: false as const }
     }
     throw new Error(error.message || "Failed to record policy documents on rental.")
   }
 
-  if (input.notifyCustomer !== false) {
+  if (input.notifyCustomer !== false && !input.alreadyAgreed) {
     fireModuleNotifications([
       {
         organizationId: input.organizationId,
@@ -153,7 +164,29 @@ async function stampPolicyDocumentsOnRental(input: {
     ])
   }
 
-  return { stamped: true as const, settings }
+  if (input.alreadyAgreed) {
+    fireModuleNotifications([
+      {
+        organizationId: input.organizationId,
+        moduleKey: "venue_rentals",
+        audience: "staff",
+        eventKey: "policies_agreed",
+        subject: "Customer agreed to rental policies",
+        summary:
+          "A customer agreed to venue rental policies when submitting their request.",
+        metadata: {
+          venueRentalId: input.venueRentalId,
+          customerUserId: input.customerUserId ?? null,
+        },
+      },
+    ])
+  }
+
+  return {
+    stamped: true as const,
+    settings,
+    agreed: Boolean(input.alreadyAgreed),
+  }
 }
 
 async function assertCanManageVenueRentals() {
@@ -255,16 +288,36 @@ async function checkSpaceConflicts(
   spaces: RentalSpaceSlotInput[],
   excludeSourceIds: string[] = []
 ) {
-  const existingByVenue = new Map<string, Awaited<ReturnType<typeof getBlockingReservationsForVenue>>>()
+  const buffersByVenue = await resolveVenueRentalBuffersForVenues(
+    organizationId,
+    spaces.map((space) => space.venueId)
+  )
+
+  const existingByVenue = new Map<
+    string,
+    Awaited<ReturnType<typeof getBlockingReservationsForVenue>>
+  >()
 
   for (const space of spaces) {
     if (!existingByVenue.has(space.venueId)) {
-      const minStart = spaces
-        .filter((item) => item.venueId === space.venueId)
-        .reduce((min, item) => Math.min(min, new Date(item.startAt).getTime()), Infinity)
-      const maxEnd = spaces
-        .filter((item) => item.venueId === space.venueId)
-        .reduce((max, item) => Math.max(max, new Date(item.endAt).getTime()), 0)
+      const venueSpaces = spaces.filter((item) => item.venueId === space.venueId)
+      let minStart = Infinity
+      let maxEnd = 0
+
+      for (const item of venueSpaces) {
+        const buffers = buffersByVenue.get(item.venueId) || {
+          setupMinutes: 0,
+          cleanupMinutes: 0,
+        }
+        const occupiedStart = new Date(
+          shiftIsoByMinutes(item.startAt, -buffers.setupMinutes)
+        ).getTime()
+        const occupiedEnd = new Date(
+          shiftIsoByMinutes(item.endAt, buffers.cleanupMinutes)
+        ).getTime()
+        minStart = Math.min(minStart, occupiedStart)
+        maxEnd = Math.max(maxEnd, occupiedEnd)
+      }
 
       existingByVenue.set(
         space.venueId,
@@ -279,33 +332,79 @@ async function checkSpaceConflicts(
     }
   }
 
-  const candidates = spaces.map((space, index) => ({
-    id: `candidate-${index}`,
-    venueId: space.venueId,
-    startAt: space.startAt,
-    endAt: space.endAt,
-    status: RENTAL_RESERVATION_STATUSES.temporaryHold,
-  }))
+  const candidates = spaces.map((space, index) => {
+    const buffers = buffersByVenue.get(space.venueId) || {
+      setupMinutes: 0,
+      cleanupMinutes: 0,
+    }
+    return {
+      id: `candidate-${index}`,
+      venueId: space.venueId,
+      startAt: shiftIsoByMinutes(space.startAt, -buffers.setupMinutes),
+      endAt: shiftIsoByMinutes(space.endAt, buffers.cleanupMinutes),
+      status: RENTAL_RESERVATION_STATUSES.temporaryHold,
+    }
+  })
 
   const existing = Array.from(existingByVenue.values()).flat()
   assertNoReservationConflicts(candidates, existing)
 }
 
+async function buildReservationRowsWithBuffers(input: {
+  organizationId: string
+  venueRentalId: string
+  spaces: RentalSpaceSlotInput[]
+  status: string
+  createdBy: string
+  holdExpiresAt?: string | null
+}) {
+  const buffersByVenue = await resolveVenueRentalBuffersForVenues(
+    input.organizationId,
+    input.spaces.map((space) => space.venueId)
+  )
+
+  return input.spaces.map((space) => {
+    const buffers = buffersByVenue.get(space.venueId) || {
+      setupMinutes: 0,
+      cleanupMinutes: 0,
+    }
+    return {
+      organization_id: input.organizationId,
+      venue_rental_id: input.venueRentalId,
+      venue_id: space.venueId,
+      start_at: space.startAt,
+      end_at: space.endAt,
+      setup_minutes: buffers.setupMinutes,
+      cleanup_minutes: buffers.cleanupMinutes,
+      status: input.status,
+      hold_expires_at: input.holdExpiresAt ?? null,
+      created_by: input.createdBy,
+    }
+  })
+}
+
 async function insertSelectedAddons(
   organizationId: string,
   venueRentalId: string,
-  addons: RentalAddonSelectionInput[] | undefined
+  addons: RentalAddonSelectionInput[] | undefined,
+  options?: {
+    rejectPostEventFees?: boolean
+    expectedAttendance?: number | null
+    chairsPerTable?: number | null
+  }
 ) {
   if (!addons?.length) {
     return
   }
 
   const supabase = await createClient()
+  const attendance = options?.expectedAttendance ?? null
+  const chairsPerTable = options?.chairsPerTable ?? null
 
   for (const addon of addons) {
     const { data: catalogAddon, error: catalogError } = await supabase
       .from("rental_addons")
-      .select("id, default_price, is_active")
+      .select("id, name, slug, default_price, is_active")
       .eq("organization_id", organizationId)
       .eq("id", addon.rentalAddonId)
       .maybeSingle()
@@ -314,12 +413,41 @@ async function insertSelectedAddons(
       throw new Error("One or more selected add-ons are invalid.")
     }
 
+    if (
+      options?.rejectPostEventFees !== false &&
+      isVenueRentalPostEventStaffAddon({
+        slug: catalogAddon.slug as string | null,
+        name: catalogAddon.name as string | null,
+      })
+    ) {
+      throw new Error(
+        "Extra cleaning and damage charges are added by staff after the event, not during booking."
+      )
+    }
+
+    const unitPrice = addon.unitPrice ?? Number(catalogAddon.default_price || 0)
+    let quantity = Math.max(1, addon.quantity || 1)
+
+    if (
+      attendance != null &&
+      attendance > 0 &&
+      chairsPerTable != null &&
+      chairsPerTable > 0
+    ) {
+      quantity = resolveVenueRentalAddonQuantity({
+        slug: catalogAddon.slug as string | null,
+        name: catalogAddon.name as string | null,
+        expectedAttendance: attendance,
+        chairsPerTable,
+      })
+    }
+
     const { error } = await supabase.from("rental_selected_addons").insert({
       organization_id: organizationId,
       venue_rental_id: venueRentalId,
       rental_addon_id: addon.rentalAddonId,
-      quantity: Math.max(1, addon.quantity || 1),
-      unit_price: addon.unitPrice ?? Number(catalogAddon.default_price || 0),
+      quantity,
+      unit_price: unitPrice,
     })
 
     if (error) {
@@ -387,6 +515,34 @@ async function resolveBillingContactId(
     .maybeSingle()
 
   return (linkedContact?.id as string | undefined) ?? null
+}
+
+async function resolveContactPhoneForCustomer(
+  organizationId: string,
+  userId: string,
+  billingContactId?: string | null
+): Promise<string | null> {
+  const supabase = await createClient()
+
+  if (billingContactId) {
+    const { data } = await supabase
+      .from("contacts")
+      .select("phone")
+      .eq("organization_id", organizationId)
+      .eq("id", billingContactId)
+      .maybeSingle()
+    const phone = (data?.phone as string | null)?.trim()
+    if (phone) return phone
+  }
+
+  const { data: linkedContact } = await supabase
+    .from("contacts")
+    .select("phone")
+    .eq("organization_id", organizationId)
+    .eq("auth_user_id", userId)
+    .maybeSingle()
+
+  return (linkedContact?.phone as string | null)?.trim() || null
 }
 
 export async function updateVenueRentalBillingContact(input: {
@@ -465,6 +621,45 @@ export async function submitVenueRentalRequest(input: SubmitVenueRentalInput) {
   )
   await checkSpaceConflicts(organizationId, input.spaces)
 
+  const expectedAttendance =
+    typeof input.operationalSetup?.expectedAttendance === "number" &&
+    Number.isFinite(input.operationalSetup.expectedAttendance) &&
+    input.operationalSetup.expectedAttendance > 0
+      ? Math.floor(input.operationalSetup.expectedAttendance)
+      : null
+  const chairsPerTable =
+    typeof input.operationalSetup?.chairsPerTable === "number" &&
+    Number.isFinite(input.operationalSetup.chairsPerTable) &&
+    input.operationalSetup.chairsPerTable >= 1
+      ? Math.floor(input.operationalSetup.chairsPerTable)
+      : null
+  const setupStyle = input.operationalSetup?.setupStyle?.trim() || null
+
+  if (!expectedAttendance) {
+    throw new Error("Expected attendance is required.")
+  }
+  if (!chairsPerTable) {
+    throw new Error("Enter how many chairs per table.")
+  }
+  if (!setupStyle) {
+    throw new Error("Please select a facility setup style.")
+  }
+
+  const eventTypeId = input.venueRentalEventTypeId?.trim() || null
+  if (!eventTypeId) {
+    throw new Error("Please select an event type.")
+  }
+
+  const orgSettings = await getVenueRentalOrgSettings(organizationId)
+  if (
+    venueRentalOrgRequiresPolicyAgreement(orgSettings) &&
+    !input.policiesAcknowledged
+  ) {
+    throw new Error(
+      "Please confirm you have read the policies and procedures and pricing guide before submitting."
+    )
+  }
+
   const billingContactId = await resolveBillingContactId(
     organizationId,
     customerUserId,
@@ -474,10 +669,11 @@ export async function submitVenueRentalRequest(input: SubmitVenueRentalInput) {
   const rentalInsertBase = {
     organization_id: organizationId,
     customer_user_id: customerUserId,
-    venue_rental_event_type_id: input.venueRentalEventTypeId || null,
+    venue_rental_event_type_id: eventTypeId,
     status: VENUE_RENTAL_STATUSES.submitted,
     notes: input.notes?.trim() || null,
-    expected_attendance: input.operationalSetup?.expectedAttendance ?? null,
+    expected_attendance: expectedAttendance,
+    hold_expires_at: computeHoldExpiresAt().toISOString(),
     created_by: customerUserId,
   }
 
@@ -487,7 +683,7 @@ export async function submitVenueRentalRequest(input: SubmitVenueRentalInput) {
       ...rentalInsertBase,
       billing_contact_id: billingContactId,
     })
-    .select("id")
+    .select("id, hold_expires_at")
     .single()
 
   if (
@@ -497,7 +693,7 @@ export async function submitVenueRentalRequest(input: SubmitVenueRentalInput) {
     rentalResult = await supabase
       .from("venue_rentals")
       .insert(rentalInsertBase)
-      .select("id")
+      .select("id, hold_expires_at")
       .single()
   }
 
@@ -508,15 +704,18 @@ export async function submitVenueRentalRequest(input: SubmitVenueRentalInput) {
     throw new Error(rentalError?.message || "Failed to create rental request")
   }
 
-  const reservationRows = input.spaces.map((space) => ({
-    organization_id: organizationId,
-    venue_rental_id: rental.id,
-    venue_id: space.venueId,
-    start_at: space.startAt,
-    end_at: space.endAt,
+  const holdExpiresAt =
+    (rental.hold_expires_at as string | null) ||
+    computeHoldExpiresAt().toISOString()
+
+  const reservationRows = await buildReservationRowsWithBuffers({
+    organizationId,
+    venueRentalId: rental.id as string,
+    spaces: input.spaces,
     status: RENTAL_RESERVATION_STATUSES.temporaryHold,
-    created_by: customerUserId,
-  }))
+    holdExpiresAt,
+    createdBy: customerUserId,
+  })
 
   const { error: reservationError } = await supabase
     .from("rental_reservations")
@@ -527,10 +726,26 @@ export async function submitVenueRentalRequest(input: SubmitVenueRentalInput) {
     throw new Error(reservationError.message || "Failed to create temporary hold")
   }
 
-  await insertSelectedAddons(organizationId, rental.id as string, input.addons)
+  await insertSelectedAddons(organizationId, rental.id as string, input.addons, {
+    expectedAttendance,
+    chairsPerTable,
+  })
+
+  const primaryContactPhone =
+    input.operationalSetup?.primaryContactPhone?.trim() ||
+    (await resolveContactPhoneForCustomer(
+      organizationId,
+      customerUserId,
+      billingContactId
+    ))
 
   await syncOperationalBriefForVenueRental(rental.id as string, organizationId, customerUserId, {
-    operationalSetup: input.operationalSetup,
+    operationalSetup: {
+      expectedAttendance,
+      chairsPerTable,
+      setupStyle,
+      primaryContactPhone,
+    },
   })
 
   const policyStamp = await stampPolicyDocumentsOnRental({
@@ -538,6 +753,7 @@ export async function submitVenueRentalRequest(input: SubmitVenueRentalInput) {
     venueRentalId: rental.id as string,
     customerUserId,
     notifyCustomer: true,
+    alreadyAgreed: Boolean(input.policiesAcknowledged),
   })
 
   fireModuleNotifications([
@@ -557,7 +773,9 @@ export async function submitVenueRentalRequest(input: SubmitVenueRentalInput) {
       eventKey: "request_received",
       subject: "Venue rental request received",
       summary: policyStamp.stamped
-        ? "Your venue rental request was received. Please review and agree to our policies in your portal."
+        ? policyStamp.agreed
+          ? "Your venue rental request was received. Thank you for reviewing our policies."
+          : "Your venue rental request was received. Please review and agree to our policies in your portal."
         : "Your venue rental request was received and is awaiting review.",
       metadata: {
         venueRentalId: rental.id,
@@ -636,6 +854,7 @@ export async function createStaffVenueRentalRequest(input: CreateStaffVenueRenta
     status: VENUE_RENTAL_STATUSES.submitted,
     notes: input.notes?.trim() || null,
     expected_attendance: expectedAttendance,
+    hold_expires_at: computeHoldExpiresAt().toISOString(),
     created_by: user.id,
   }
 
@@ -645,7 +864,7 @@ export async function createStaffVenueRentalRequest(input: CreateStaffVenueRenta
       ...rentalInsertBase,
       billing_contact_id: billingContactId,
     })
-    .select("id")
+    .select("id, hold_expires_at")
     .single()
 
   if (
@@ -655,7 +874,7 @@ export async function createStaffVenueRentalRequest(input: CreateStaffVenueRenta
     rentalResult = await supabase
       .from("venue_rentals")
       .insert(rentalInsertBase)
-      .select("id")
+      .select("id, hold_expires_at")
       .single()
   }
 
@@ -666,15 +885,18 @@ export async function createStaffVenueRentalRequest(input: CreateStaffVenueRenta
     throw new Error(rentalError?.message || "Failed to create rental request")
   }
 
-  const reservationRows = input.spaces.map((space) => ({
-    organization_id: organizationId,
-    venue_rental_id: rental.id,
-    venue_id: space.venueId,
-    start_at: space.startAt,
-    end_at: space.endAt,
+  const holdExpiresAt =
+    (rental.hold_expires_at as string | null) ||
+    computeHoldExpiresAt().toISOString()
+
+  const reservationRows = await buildReservationRowsWithBuffers({
+    organizationId,
+    venueRentalId: rental.id as string,
+    spaces: input.spaces,
     status: RENTAL_RESERVATION_STATUSES.temporaryHold,
-    created_by: user.id,
-  }))
+    holdExpiresAt,
+    createdBy: user.id,
+  })
 
   const { error: reservationError } = await supabase
     .from("rental_reservations")
@@ -812,7 +1034,7 @@ export async function updateVenueRentalRequestDetails(
 
   const { data: rental, error: rentalError } = await supabase
     .from("venue_rentals")
-    .select("id, status, notes, venue_rental_event_type_id")
+    .select("id, status, notes, venue_rental_event_type_id, hold_expires_at")
     .eq("id", venueRentalId)
     .eq("organization_id", organizationId)
     .maybeSingle()
@@ -885,15 +1107,14 @@ export async function updateVenueRentalRequestDetails(
     }
   }
 
-  const reservationRows = input.spaces.map((space) => ({
-    organization_id: organizationId,
-    venue_rental_id: venueRentalId,
-    venue_id: space.venueId,
-    start_at: space.startAt,
-    end_at: space.endAt,
+  const reservationRows = await buildReservationRowsWithBuffers({
+    organizationId,
+    venueRentalId,
+    spaces: input.spaces,
     status: reservationStatus,
-    created_by: user.id,
-  }))
+    holdExpiresAt: (rental.hold_expires_at as string | null) ?? null,
+    createdBy: user.id,
+  })
 
   const { error: insertError } = await supabase
     .from("rental_reservations")
@@ -1034,13 +1255,26 @@ async function approveVenueRentalRequestCore(input: {
   }
 
   if (input.remainingBalanceAmount && input.remainingBalanceAmount > 0) {
+    const { data: reservationStarts } = await supabase
+      .from("rental_reservations")
+      .select("start_at")
+      .eq("venue_rental_id", input.venueRentalId)
+      .eq("organization_id", input.organizationId)
+      .order("start_at", { ascending: true })
+      .limit(1)
+
+    const earliestStart = reservationStarts?.[0]?.start_at as string | undefined
+    const remainingDueAt = earliestStart
+      ? computeRemainingBalanceDueAt(earliestStart).toISOString()
+      : null
+
     paymentRows.push({
       organization_id: input.organizationId,
       venue_rental_id: input.venueRentalId,
       payment_type: RENTAL_PAYMENT_TYPES.remainingBalance,
       status: RENTAL_PAYMENT_STATUSES.unpaid,
       amount: input.remainingBalanceAmount,
-      due_at: null,
+      due_at: remainingDueAt,
     })
   }
 
@@ -2849,7 +3083,7 @@ export async function forceBookVenueRentalWithOverride(input: {
 
   const { data: reservations, error: reservationsError } = await supabase
     .from("rental_reservations")
-    .select("id, venue_id, start_at, end_at")
+    .select("id, venue_id, start_at, end_at, setup_minutes, cleanup_minutes")
     .eq("venue_rental_id", input.venueRentalId)
     .eq("organization_id", organizationId)
 
@@ -2859,11 +3093,13 @@ export async function forceBookVenueRentalWithOverride(input: {
 
   let hasConflict = false
   for (const reservation of reservations || []) {
+    const setupMinutes = clampBufferMinutes(reservation.setup_minutes)
+    const cleanupMinutes = clampBufferMinutes(reservation.cleanup_minutes)
     const blocking = await getBlockingReservationsForVenue(
       organizationId,
       reservation.venue_id as string,
-      reservation.start_at as string,
-      reservation.end_at as string,
+      shiftIsoByMinutes(reservation.start_at as string, -setupMinutes),
+      shiftIsoByMinutes(reservation.end_at as string, cleanupMinutes),
       reservation.id as string
     )
 
@@ -3290,6 +3526,8 @@ export async function importLegacyVenueBookingAsVenueRental(input: {
 
   await checkSpaceConflicts(organizationId, [space])
 
+  const holdExpiresAt = computeHoldExpiresAt().toISOString()
+
   const { data: rental, error: rentalError } = await supabase
     .from("venue_rentals")
     .insert({
@@ -3298,6 +3536,7 @@ export async function importLegacyVenueBookingAsVenueRental(input: {
       status: VENUE_RENTAL_STATUSES.submitted,
       notes: input.notes?.trim() || (legacyBooking.notes as string | null) || null,
       legacy_venue_booking_id: input.legacyVenueBookingId,
+      hold_expires_at: holdExpiresAt,
       created_by: user.id,
     })
     .select("id")
@@ -3309,15 +3548,18 @@ export async function importLegacyVenueBookingAsVenueRental(input: {
     )
   }
 
-  const { error: reservationError } = await supabase.from("rental_reservations").insert({
-    organization_id: organizationId,
-    venue_rental_id: rental.id,
-    venue_id: space.venueId,
-    start_at: space.startAt,
-    end_at: space.endAt,
+  const reservationRows = await buildReservationRowsWithBuffers({
+    organizationId,
+    venueRentalId: rental.id as string,
+    spaces: [space],
     status: RENTAL_RESERVATION_STATUSES.temporaryHold,
-    created_by: user.id,
+    holdExpiresAt,
+    createdBy: user.id,
   })
+
+  const { error: reservationError } = await supabase
+    .from("rental_reservations")
+    .insert(reservationRows[0])
 
   if (reservationError) {
     await supabase.from("venue_rentals").delete().eq("id", rental.id)
