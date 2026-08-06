@@ -39,144 +39,50 @@ import {
 import { InternalEventStatusBadge, type InternalEventStatus } from "@/lib/status-badges"
 import { cn } from "@/lib/utils"
 
-// Mock data for KPI cards
 const kpiData = {
-  pendingRequests: 8,
-  approvedEvents: 24,
-  childcareRequired: 5,
-  volunteersRequired: 12,
-  vendorsRequired: 3,
-  ticketedEvents: 7,
+  pendingRequests: 0,
+  approvedEvents: 0,
+  childcareRequired: 0,
+  volunteersRequired: 0,
+  vendorsRequired: 0,
+  ticketedEvents: 0,
 }
 
-// Mock data for recent event requests
-const recentRequests = [
-  {
-    id: "REQ-2024-001",
-    eventName: "Youth Basketball Tournament",
-    requestedBy: "Ahmed Hassan",
-    requestedDate: "Mar 25, 2024",
-    eventDate: "Apr 15, 2024",
-    space: "Gymnasium",
-    status: "Pending Review" as InternalEventStatus,
-  },
-  {
-    id: "REQ-2024-002",
-    eventName: "Sisters Halaqa",
-    requestedBy: "Fatima Ali",
-    requestedDate: "Mar 24, 2024",
-    eventDate: "Apr 3, 2024",
-    space: "Multi-Purpose Room",
-    status: "Submitted" as InternalEventStatus,
-  },
-  {
-    id: "REQ-2024-003",
-    eventName: "Fundraising Gala",
-    requestedBy: "Omar Sheikh",
-    requestedDate: "Mar 23, 2024",
-    eventDate: "May 10, 2024",
-    space: "Main Hall",
-    status: "Needs Changes" as InternalEventStatus,
-  },
-  {
-    id: "REQ-2024-004",
-    eventName: "Quran Competition",
-    requestedBy: "Ibrahim Khan",
-    requestedDate: "Mar 22, 2024",
-    eventDate: "Apr 20, 2024",
-    space: "Main Hall",
-    status: "Approved" as InternalEventStatus,
-  },
-]
+const recentRequests: {
+  id: string
+  eventName: string
+  requestedBy: string
+  requestedDate: string
+  eventDate: string
+  space: string
+  status: InternalEventStatus
+}[] = []
 
-// Mock data for today's schedule
-const todaysSchedule = [
-  {
-    id: "1",
-    eventName: "Jummah Prayer",
-    time: "1:00 PM - 2:30 PM",
-    space: "Main Hall",
-    status: "Scheduled" as InternalEventStatus,
-    attendees: 450,
-  },
-  {
-    id: "2",
-    eventName: "Arabic Class - Beginners",
-    time: "3:00 PM - 4:30 PM",
-    space: "Classroom A",
-    status: "Scheduled" as InternalEventStatus,
-    attendees: 25,
-  },
-  {
-    id: "3",
-    eventName: "Youth Study Circle",
-    time: "5:00 PM - 6:30 PM",
-    space: "Multi-Purpose Room",
-    status: "Scheduled" as InternalEventStatus,
-    attendees: 35,
-  },
-  {
-    id: "4",
-    eventName: "Board Meeting",
-    time: "7:00 PM - 9:00 PM",
-    space: "Conference Room",
-    status: "Scheduled" as InternalEventStatus,
-    attendees: 12,
-  },
-]
+const todaysSchedule: {
+  id: string
+  eventName: string
+  time: string
+  space: string
+  status: InternalEventStatus
+  attendees: number
+}[] = []
 
-// Mock data for operational alerts
-const operationalAlerts = [
-  {
-    id: "1",
-    type: "warning",
-    message: "Youth Basketball Tournament needs 6 more volunteers",
-    eventDate: "Apr 15, 2024",
-    action: "Assign Volunteers",
-  },
-  {
-    id: "2",
-    type: "warning",
-    message: "Fundraising Gala awaiting vendor confirmation for catering",
-    eventDate: "May 10, 2024",
-    action: "Contact Vendor",
-  },
-  {
-    id: "3",
-    type: "info",
-    message: "Sisters Retreat childcare request pending assignment",
-    eventDate: "Apr 8, 2024",
-    action: "Assign Childcare",
-  },
-]
+const operationalAlerts: {
+  id: string
+  type: string
+  message: string
+  eventDate: string
+  action: string
+}[] = []
 
-// Mock data for events needing action
-const eventsNeedingAction = [
-  {
-    id: "1",
-    eventName: "Community Iftar",
-    eventDate: "Apr 5, 2024",
-    actionRequired: "Confirm venue setup",
-    daysUntil: 10,
-    priority: "high",
-  },
-  {
-    id: "2",
-    eventName: "Youth Basketball Tournament",
-    eventDate: "Apr 15, 2024",
-    actionRequired: "Finalize volunteer schedule",
-    daysUntil: 20,
-    priority: "medium",
-  },
-  {
-    id: "3",
-    eventName: "Fundraising Gala",
-    eventDate: "May 10, 2024",
-    actionRequired: "Review vendor contracts",
-    daysUntil: 45,
-    priority: "low",
-  },
-]
+const eventsNeedingAction: {
+  id: string
+  eventName: string
+  eventDate: string
+  actionRequired: string
+  daysUntil: number
+  priority: string
+}[] = []
 
 export default function OverviewPage() {
   const [timePeriod, setTimePeriod] = useState("this-week")
@@ -352,21 +258,29 @@ export default function OverviewPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {recentRequests.map((request) => (
-                      <TableRow key={request.id} className="group">
-                        <TableCell className="py-2.5">
-                          <div>
-                            <p className="font-medium text-sm">{request.eventName}</p>
-                            <p className="text-xs text-muted-foreground">{request.requestedBy}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell className="py-2.5 text-sm">{request.space}</TableCell>
-                        <TableCell className="py-2.5 text-sm">{request.eventDate}</TableCell>
-                        <TableCell className="py-2.5">
-                          <InternalEventStatusBadge status={request.status} />
+                    {recentRequests.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={4} className="py-6 text-center text-sm text-muted-foreground">
+                          No data yet.
                         </TableCell>
                       </TableRow>
-                    ))}
+                    ) : (
+                      recentRequests.map((request) => (
+                        <TableRow key={request.id} className="group">
+                          <TableCell className="py-2.5">
+                            <div>
+                              <p className="font-medium text-sm">{request.eventName}</p>
+                              <p className="text-xs text-muted-foreground">{request.requestedBy}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-2.5 text-sm">{request.space}</TableCell>
+                          <TableCell className="py-2.5 text-sm">{request.eventDate}</TableCell>
+                          <TableCell className="py-2.5">
+                            <InternalEventStatusBadge status={request.status} />
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
                   </TableBody>
                 </Table>
               </div>
@@ -398,21 +312,29 @@ export default function OverviewPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {todaysSchedule.map((event) => (
-                      <TableRow key={event.id} className="group">
-                        <TableCell className="py-2.5">
-                          <p className="font-medium text-sm">{event.eventName}</p>
+                    {todaysSchedule.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={4} className="py-6 text-center text-sm text-muted-foreground">
+                          No data yet.
                         </TableCell>
-                        <TableCell className="py-2.5">
-                          <div className="flex items-center gap-1.5 text-sm">
-                            <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                            {event.time}
-                          </div>
-                        </TableCell>
-                        <TableCell className="py-2.5 text-sm">{event.space}</TableCell>
-                        <TableCell className="py-2.5 text-sm text-right">{event.attendees}</TableCell>
                       </TableRow>
-                    ))}
+                    ) : (
+                      todaysSchedule.map((event) => (
+                        <TableRow key={event.id} className="group">
+                          <TableCell className="py-2.5">
+                            <p className="font-medium text-sm">{event.eventName}</p>
+                          </TableCell>
+                          <TableCell className="py-2.5">
+                            <div className="flex items-center gap-1.5 text-sm">
+                              <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                              {event.time}
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-2.5 text-sm">{event.space}</TableCell>
+                          <TableCell className="py-2.5 text-sm text-right">{event.attendees}</TableCell>
+                        </TableRow>
+                      ))
+                    )}
                   </TableBody>
                 </Table>
               </div>
@@ -431,23 +353,27 @@ export default function OverviewPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {operationalAlerts.map((alert) => (
-                <div
-                  key={alert.id}
-                  className={cn(
-                    "flex items-start justify-between gap-3 rounded-lg border p-3",
-                    alert.type === "warning" ? "border-amber-200 bg-amber-50" : "border-blue-200 bg-blue-50"
-                  )}
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium">{alert.message}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">Event: {alert.eventDate}</p>
+              {operationalAlerts.length === 0 ? (
+                <p className="py-4 text-center text-sm text-muted-foreground">No data yet.</p>
+              ) : (
+                operationalAlerts.map((alert) => (
+                  <div
+                    key={alert.id}
+                    className={cn(
+                      "flex items-start justify-between gap-3 rounded-lg border p-3",
+                      alert.type === "warning" ? "border-amber-200 bg-amber-50" : "border-blue-200 bg-blue-50"
+                    )}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium">{alert.message}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Event: {alert.eventDate}</p>
+                    </div>
+                    <Button size="sm" variant="outline" className="shrink-0 h-8 text-xs">
+                      {alert.action}
+                    </Button>
                   </div>
-                  <Button size="sm" variant="outline" className="shrink-0 h-8 text-xs">
-                    {alert.action}
-                  </Button>
-                </div>
-              ))}
+                ))
+              )}
             </CardContent>
           </Card>
 
@@ -457,33 +383,37 @@ export default function OverviewPage() {
               <CardTitle className="text-base font-semibold">Events Needing Action</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {eventsNeedingAction.map((event) => (
-                <div
-                  key={event.id}
-                  className="flex items-center justify-between gap-3 rounded-lg border p-3"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium truncate">{event.eventName}</p>
-                      <Badge
-                        variant="outline"
-                        className={cn(
-                          "text-[10px] shrink-0",
-                          event.priority === "high" && "border-red-200 bg-red-50 text-red-700",
-                          event.priority === "medium" && "border-amber-200 bg-amber-50 text-amber-700",
-                          event.priority === "low" && "border-gray-200 bg-gray-50 text-gray-600"
-                        )}
-                      >
-                        {event.daysUntil}d
-                      </Badge>
+              {eventsNeedingAction.length === 0 ? (
+                <p className="py-4 text-center text-sm text-muted-foreground">No data yet.</p>
+              ) : (
+                eventsNeedingAction.map((event) => (
+                  <div
+                    key={event.id}
+                    className="flex items-center justify-between gap-3 rounded-lg border p-3"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium truncate">{event.eventName}</p>
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "text-[10px] shrink-0",
+                            event.priority === "high" && "border-red-200 bg-red-50 text-red-700",
+                            event.priority === "medium" && "border-amber-200 bg-amber-50 text-amber-700",
+                            event.priority === "low" && "border-gray-200 bg-gray-50 text-gray-600"
+                          )}
+                        >
+                          {event.daysUntil}d
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">{event.actionRequired}</p>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5">{event.actionRequired}</p>
+                    <Button size="sm" variant="ghost" className="shrink-0 h-8">
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
                   </div>
-                  <Button size="sm" variant="ghost" className="shrink-0 h-8">
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
+                ))
+              )}
             </CardContent>
           </Card>
         </div>

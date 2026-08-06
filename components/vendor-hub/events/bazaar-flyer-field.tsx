@@ -2,10 +2,11 @@
 
 import * as React from "react"
 import { Loader2, Plus, X } from "lucide-react"
+import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { uploadBazaarFlyer } from "@/lib/vendor-hub/bazaar-flyer-actions"
+import { saveBazaarEventFlyer, uploadBazaarFlyer } from "@/lib/vendor-hub/bazaar-flyer-actions"
 import { cn } from "@/lib/utils"
 
 export function BazaarFlyerField({
@@ -14,12 +15,19 @@ export function BazaarFlyerField({
   value,
   onValueChange,
   disabled = false,
+  autoSave = false,
+  compact = false,
+  showHint = true,
 }: {
   eventId: string
   initialFlyerUrl?: string | null
   value?: string
   onValueChange?: (url: string) => void
   disabled?: boolean
+  /** Persist flyer_url on the event after upload or remove. */
+  autoSave?: boolean
+  compact?: boolean
+  showHint?: boolean
 }) {
   const isControlled = value !== undefined
   const [internalFlyerUrl, setInternalFlyerUrl] = React.useState(initialFlyerUrl || "")
@@ -41,6 +49,11 @@ export function BazaarFlyerField({
     } else {
       setInternalFlyerUrl(url)
     }
+  }
+
+  async function persistFlyer(url: string | null) {
+    if (!autoSave || !eventId || eventId === "draft") return
+    await saveBazaarEventFlyer(eventId, url)
   }
 
   async function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
@@ -66,6 +79,10 @@ export function BazaarFlyerField({
       }
 
       updateFlyerUrl(result.url)
+      if (autoSave) {
+        await persistFlyer(result.url)
+        toast.success("Flyer saved")
+      }
     } catch (uploadError: unknown) {
       setError(uploadError instanceof Error ? uploadError.message : "Could not upload flyer.")
     } finally {
@@ -76,8 +93,24 @@ export function BazaarFlyerField({
     }
   }
 
+  async function handleRemove() {
+    setError(null)
+    setUploading(true)
+    try {
+      updateFlyerUrl("")
+      if (autoSave) {
+        await persistFlyer(null)
+        toast.success("Flyer removed")
+      }
+    } catch (removeError: unknown) {
+      setError(removeError instanceof Error ? removeError.message : "Could not remove flyer.")
+    } finally {
+      setUploading(false)
+    }
+  }
+
   return (
-    <div className="space-y-2">
+    <div className={cn("space-y-2", compact && "max-w-[200px]")}>
       <Label>Event flyer</Label>
       <input
         ref={inputRef}
@@ -95,7 +128,7 @@ export function BazaarFlyerField({
         className={cn(
           "group relative flex w-full items-center justify-center overflow-hidden rounded-lg border-2 border-dashed border-border bg-muted/40 transition-colors",
           "hover:border-primary/50 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-          "h-48",
+          compact ? "h-36" : "h-48",
           (uploading || disabled) && "cursor-not-allowed opacity-70"
         )}
       >
@@ -120,7 +153,7 @@ export function BazaarFlyerField({
           variant="ghost"
           size="sm"
           className="h-8 px-2"
-          onClick={() => updateFlyerUrl("")}
+          onClick={() => void handleRemove()}
           disabled={uploading || disabled}
         >
           <X className="mr-1.5 h-4 w-4" />
@@ -128,9 +161,11 @@ export function BazaarFlyerField({
         </Button>
       ) : null}
 
-      <p className="text-xs text-muted-foreground">
-        PNG, JPG, or WebP up to 10 MB. Shown on the public share page.
-      </p>
+      {showHint ? (
+        <p className="text-xs text-muted-foreground">
+          PNG, JPG, or WebP up to 10 MB. Shown on the public share page.
+        </p>
+      ) : null}
       {error ? <p className="text-xs text-red-600">{error}</p> : null}
     </div>
   )

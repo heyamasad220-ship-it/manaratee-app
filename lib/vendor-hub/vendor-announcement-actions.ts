@@ -15,6 +15,34 @@ import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-orga
 import { requireVendorHubManage } from "@/lib/vendor-hub/vendor-hub-permissions"
 import { VENDOR_HUB_ROUTES } from "@/lib/vendor-hub/vendor-hub-routes"
 
+function isSoftAnnouncementQueryError(error: {
+  code?: string
+  message?: string
+} | null) {
+  if (!error) return false
+  const code = error.code || ""
+  const message = (error.message || "").toLowerCase()
+  return (
+    code === "42P01" ||
+    code === "PGRST205" ||
+    code === "42P17" ||
+    message.includes("does not exist") ||
+    message.includes("infinite recursion detected in policy")
+  )
+}
+
+function logAnnouncementQueryError(
+  context: string,
+  error: { message?: string; code?: string; details?: string; hint?: string }
+) {
+  console.error(context, {
+    message: error.message ?? null,
+    code: error.code ?? null,
+    details: error.details ?? null,
+    hint: error.hint ?? null,
+  })
+}
+
 export async function fetchEventVendorAnnouncements(eventId: string) {
   await requireVendorHubManage()
   const organizationId = await getSelectedOrganizationId()
@@ -83,10 +111,10 @@ export async function getEventVendorAnnouncements(
     .limit(100)
 
   if (error) {
-    if (error.code === "42P01") {
+    if (isSoftAnnouncementQueryError(error)) {
       return []
     }
-    console.error("getEventVendorAnnouncements:", error)
+    logAnnouncementQueryError("getEventVendorAnnouncements:", error)
     return []
   }
 
@@ -153,10 +181,10 @@ export async function getVendorInboxMessages(): Promise<VendorInboxMessage[]> {
     .limit(100)
 
   if (error) {
-    if (error.code === "42P01") {
+    if (isSoftAnnouncementQueryError(error)) {
       return []
     }
-    console.error("getVendorInboxMessages:", error)
+    logAnnouncementQueryError("getVendorInboxMessages:", error)
     return []
   }
 

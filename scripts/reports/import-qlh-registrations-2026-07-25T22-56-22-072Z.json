@@ -1,0 +1,54 @@
+{
+  "mode": "execute",
+  "xlsxPath": "C:/Users/danan/Downloads/QLH_Registrations.xlsx",
+  "sheetName": "QLH2526",
+  "rawRows": 201,
+  "department": {
+    "id": "fdebdb8b-520c-4c0c-a1c9-9e780966eb73",
+    "name": "Education"
+  },
+  "byYear": {
+    "QLH 2025-2026": {
+      "rows": 117,
+      "enrolled": 3,
+      "skipped": 114
+    },
+    "QLH 2024-2025": {
+      "rows": 84,
+      "enrolled": 0,
+      "skipped": 84
+    }
+  },
+  "createdContacts": 0,
+  "reusedContacts": 0,
+  "createdPeople": 198,
+  "createdEnrollments": 3,
+  "skippedExisting": 195,
+  "skippedNoProgram": [],
+  "skippedNoParent": [],
+  "errors": [],
+  "samples": [
+    {
+      "year": "QLH 2025-2026",
+      "member": "Ayla Charef",
+      "enrollmentId": "ebb74e6d-52f6-4695-89c6-71eabac4dbaf",
+      "parent": "Ramessharef",
+      "parentEmail": "ramessharef@gmail.com"
+    },
+    {
+      "year": "QLH 2025-2026",
+      "member": "Jeneen Harb",
+      "enrollmentId": "9bf8bd2e-d2b8-44d0-87c1-7f1006e35d12",
+      "parent": "Harb Parent",
+      "parentEmail": null
+    },
+    {
+      "year": "QLH 2025-2026",
+      "member": "alaa almaqaleh",
+      "enrollmentId": "efcc61f8-7f1c-4730-b9d8-67e6218e8929",
+      "parent": "Man Sharif",
+      "parentEmail": "man_sharif@yahoo.com"
+    }
+  ],
+  "uniqueParents": 94
+}

@@ -48,40 +48,14 @@ import {
   ORGANIZATION_DISCOUNT_CODES,
 } from "@/lib/tickets/ticketing-checkout-ui-types"
 
-const checkInUsers = [
-  {
-    id: "u1",
-    name: "Ahmed Hassan",
-    email: "ahmed@example.com",
-    role: "Admin",
-    lastActive: "Feb 25, 2026",
-    status: "Active",
-  },
-  {
-    id: "u2",
-    name: "Sarah Johnson",
-    email: "sarah@example.com",
-    role: "Staff",
-    lastActive: "Feb 24, 2026",
-    status: "Active",
-  },
-  {
-    id: "u3",
-    name: "Michael Chen",
-    email: "michael@example.com",
-    role: "Staff",
-    lastActive: "Feb 20, 2026",
-    status: "Active",
-  },
-  {
-    id: "u4",
-    name: "Fatima Al-Rashid",
-    email: "fatima@example.com",
-    role: "Volunteer",
-    lastActive: "Feb 15, 2026",
-    status: "Inactive",
-  },
-]
+const checkInUsers: {
+  id: string
+  name: string
+  email: string
+  role: string
+  lastActive: string
+  status: string
+}[] = []
 
 export function TicketingSettingsClient() {
   const [activeTab, setActiveTab] = useState("checkout-form")
@@ -217,37 +191,45 @@ export function TicketingSettingsClient() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {checkInUsers.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell>
-                        <div className="flex flex-col">
-                          <span className="font-medium">{user.name}</span>
-                          <span className="text-xs text-muted-foreground">{user.email}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{user.role}</Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">{user.lastActive}</TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="secondary"
-                          className={
-                            user.status === "Active"
-                              ? "bg-emerald-100 text-emerald-700"
-                              : "bg-muted text-muted-foreground"
-                          }
-                        >
-                          {user.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
+                  {checkInUsers.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                        No check-in app users yet.
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ) : (
+                    checkInUsers.map((user) => (
+                      <TableRow key={user.id}>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{user.name}</span>
+                            <span className="text-xs text-muted-foreground">{user.email}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{user.role}</Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{user.lastActive}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="secondary"
+                            className={
+                              user.status === "Active"
+                                ? "bg-emerald-100 text-emerald-700"
+                                : "bg-muted text-muted-foreground"
+                            }
+                          >
+                            {user.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </CardContent>

@@ -1,0 +1,867 @@
+{
+  "source": "C:/Users/danan/Downloads/BazaarVendors.csv",
+  "generated_at": "2026-08-05T01:04:16.540Z",
+  "dry_run": true,
+  "summary": {
+    "csv_rows": 593,
+    "unique_events": 21,
+    "unique_vendor_contacts": 319,
+    "participation_rows": 593,
+    "payments_with_amount": 592,
+    "notes": [
+      "Repeated question columns are collapsed (first non-empty wins).",
+      "Description column is treated as booth/ticket category (Food vendors vs Bazaar Vendors).",
+      "No booth numbers in this CSV — assignments can be created later or as category-only notes.",
+      "Import will NOT use legacy vendors table; CRM contacts are the identity."
+    ]
+  },
+  "column_normalization": {
+    "business_name_from": [
+      "What is the name of your business?",
+      "What is your business name?",
+      "what is your business name?"
+    ],
+    "selling_from": [
+      "What Are you selling?",
+      "What are you selling?",
+      "What products are you selling?(details please)"
+    ],
+    "social_from": [
+      "Do you have a website or/and social media for your business? please listed below?",
+      "Do you have a website or social media for your business?",
+      "Please share your social media addresses, e.g. Facebook, Instagram, etc.",
+      "What is the link to your business if applicable?",
+      "Do you have a website or social media account?"
+    ]
+  },
+  "events_preview": [
+    {
+      "name": "Open House",
+      "event_date": "2026-08-08",
+      "start_time": "14:00:00",
+      "end_time": "17:00:00",
+      "source_start_label": "Sat Aug 8, 2026 2:00 PM",
+      "source_end_label": "Sat Aug 8, 2026 5:00 PM",
+      "vendor_row_count": 5
+    },
+    {
+      "name": "Islamic Games 2026",
+      "event_date": "2026-06-14",
+      "start_time": "09:00:00",
+      "end_time": "19:00:00",
+      "source_start_label": "Sun Jun 14, 2026 9:00 AM",
+      "source_end_label": "Sun Jun 14, 2026 7:00 PM",
+      "vendor_row_count": 4
+    },
+    {
+      "name": "Islamic Games 2026",
+      "event_date": "2026-06-13",
+      "start_time": "10:00:00",
+      "end_time": "20:00:00",
+      "source_start_label": "Sat Jun 13, 2026 10:00 AM",
+      "source_end_label": "Sat Jun 13, 2026 8:00 PM",
+      "vendor_row_count": 10
+    },
+    {
+      "name": "Hajj Simulation",
+      "event_date": "2026-05-22",
+      "start_time": "13:00:00",
+      "end_time": "20:00:00",
+      "source_start_label": "Fri May 22, 2026 1:00 PM",
+      "source_end_label": "Fri May 22, 2026 8:00 PM",
+      "vendor_row_count": 1
+    },
+    {
+      "name": "MAS Bazaar",
+      "event_date": "2026-02-14",
+      "start_time": "11:00:00",
+      "end_time": "17:00:00",
+      "source_start_label": "Sat Feb 14, 2026 11:00 AM",
+      "source_end_label": "Sat Feb 14, 2026 5:00 PM",
+      "vendor_row_count": 34
+    },
+    {
+      "name": "MAS Fall Bazaar",
+      "event_date": "2025-11-08",
+      "start_time": "12:00:00",
+      "end_time": "20:00:00",
+      "source_start_label": "Sat Nov 8, 2025 12:00 PM",
+      "source_end_label": "Sat Nov 8, 2025 8:00 PM",
+      "vendor_row_count": 42
+    },
+    {
+      "name": "MAS Eid Al-adha Bazaar-",
+      "event_date": "2025-05-17",
+      "start_time": "11:00:00",
+      "end_time": "20:00:00",
+      "source_start_label": "Sat May 17, 2025 11:00 AM",
+      "source_end_label": "Sat May 17, 2025 8:00 PM",
+      "vendor_row_count": 40
+    },
+    {
+      "name": "I Pray Party - Sponsors",
+      "event_date": "2025-05-03",
+      "start_time": "17:00:00",
+      "end_time": "21:00:00",
+      "source_start_label": "Sat May 3, 2025 5:00 PM",
+      "source_end_label": "Sat May 3, 2025 9:00 PM",
+      "vendor_row_count": 3
+    },
+    {
+      "name": "Islamic Games (2025)",
+      "event_date": "2025-04-19",
+      "start_time": "09:00:00",
+      "end_time": "17:00:00",
+      "source_start_label": "Sat Apr 19, 2025 9:00 AM",
+      "source_end_label": "Fri Apr 25, 2025 5:00 PM",
+      "vendor_row_count": 17
+    },
+    {
+      "name": "Pre Ramadan Bazaar",
+      "event_date": "2025-02-08",
+      "start_time": "11:00:00",
+      "end_time": "19:00:00",
+      "source_start_label": "Sat Feb 8, 2025 11:00 AM",
+      "source_end_label": "Sat Feb 8, 2025 7:00 PM",
+      "vendor_row_count": 41
+    },
+    {
+      "name": "MAS Fall Bazaar",
+      "event_date": "2024-10-13",
+      "start_time": "12:00:00",
+      "end_time": "20:00:00",
+      "source_start_label": "Sun Oct 13, 2024 12:00 PM",
+      "source_end_label": "Sun Oct 13, 2024 8:00 PM",
+      "vendor_row_count": 38
+    },
+    {
+      "name": "Eid Uladha Bazaar",
+      "event_date": "2024-06-08",
+      "start_time": "12:00:00",
+      "end_time": "20:00:00",
+      "source_start_label": "Sat Jun 8, 2024 12:00 PM",
+      "source_end_label": "Sat Jun 8, 2024 8:00 PM",
+      "vendor_row_count": 36
+    },
+    {
+      "name": "Islamic Games 2024",
+      "event_date": "2024-04-27",
+      "start_time": "09:00:00",
+      "end_time": "22:00:00",
+      "source_start_label": "Sat Apr 27, 2024 9:00 AM",
+      "source_end_label": "Sat Apr 27, 2024 10:00 PM",
+      "vendor_row_count": 35
+    },
+    {
+      "name": "Ramadan Bazaar",
+      "event_date": "2024-02-24",
+      "start_time": "12:00:00",
+      "end_time": "18:00:00",
+      "source_start_label": "Sat Feb 24, 2024 12:00 PM",
+      "source_end_label": "Sat Feb 24, 2024 6:00 PM",
+      "vendor_row_count": 51
+    },
+    {
+      "name": "Eid Al Adha Bazaar",
+      "event_date": "2023-06-17",
+      "start_time": "12:00:00",
+      "end_time": "20:00:00",
+      "source_start_label": "Sat Jun 17, 2023 12:00 PM",
+      "source_end_label": "Sat Jun 17, 2023 8:00 PM",
+      "vendor_row_count": 46
+    },
+    {
+      "name": "I pray party mini Bazaar",
+      "event_date": "2023-05-06",
+      "start_time": "14:00:00",
+      "end_time": "19:00:00",
+      "source_start_label": "Sat May 6, 2023 2:00 PM",
+      "source_end_label": "Sat May 6, 2023 7:00 PM",
+      "vendor_row_count": 14
+    },
+    {
+      "name": "Ramadan Ready Bazar",
+      "event_date": "2023-03-04",
+      "start_time": "12:00:00",
+      "end_time": "18:00:00",
+      "source_start_label": "Sat Mar 4, 2023 12:00 PM",
+      "source_end_label": "Sat Mar 4, 2023 6:00 PM",
+      "vendor_row_count": 44
+    },
+    {
+      "name": "MAS Sohba Bazar",
+      "event_date": "2022-12-31",
+      "start_time": "11:00:00",
+      "end_time": "18:00:00",
+      "source_start_label": "Sat Dec 31, 2022 11:00 AM",
+      "source_end_label": "Sat Dec 31, 2022 6:00 PM",
+      "vendor_row_count": 49
+    },
+    {
+      "name": "Pre- Ramadan Bazaar",
+      "event_date": "2022-03-19",
+      "start_time": "12:00:00",
+      "end_time": "19:00:00",
+      "source_start_label": "Sat Mar 19, 2022 12:00 PM",
+      "source_end_label": "Sat Mar 19, 2022 7:00 PM",
+      "vendor_row_count": 54
+    },
+    {
+      "name": "\"Welcome to Dallas\" Bazaar",
+      "event_date": "2021-10-24",
+      "start_time": "15:30:00",
+      "end_time": "20:30:00",
+      "source_start_label": "Sun Oct 24, 2021 3:30 PM",
+      "source_end_label": "Sun Oct 24, 2021 8:30 PM",
+      "vendor_row_count": 25
+    },
+    {
+      "name": "Eid bazaar booths sale",
+      "event_date": "2019-06-08",
+      "start_time": "15:00:00",
+      "end_time": "20:00:00",
+      "source_start_label": "Sat Jun 8, 2019 3:00 PM",
+      "source_end_label": "Sat Jun 8, 2019 8:00 PM",
+      "vendor_row_count": 4
+    }
+  ],
+  "contacts_preview_sample": [
+    {
+      "email": "0123456789salam9358@gmail.com",
+      "first_name": "Zinab Al",
+      "last_name": "zarie",
+      "full_name": "Zinab Al zarie",
+      "phone": "+1 269-237-8868",
+      "company_name": "Damascus Sweet",
+      "address_line1": null,
+      "city": null,
+      "state": null,
+      "postal_code": null,
+      "event_count": 1
+    },
+    {
+      "email": "aanjumaazhar@gmail.com",
+      "first_name": "anjum",
+      "last_name": "azhar",
+      "full_name": "anjum azhar",
+      "phone": "+1 945-209-6154",
+      "company_name": "Kid’s toys",
+      "address_line1": null,
+      "city": null,
+      "state": null,
+      "postal_code": null,
+      "event_count": 5
+    },
+    {
+      "email": "abdallahg87@gmail.com",
+      "first_name": "Abdallah",
+      "last_name": "Ghanayem",
+      "full_name": "Abdallah Ghanayem",
+      "phone": "+1 708-527-7354",
+      "company_name": "Modesty Box",
+      "address_line1": null,
+      "city": null,
+      "state": null,
+      "postal_code": null,
+      "event_count": 2
+    },
+    {
+      "email": "abdulrahmanmarouf17@gmail.com",
+      "first_name": "Abdulrahman",
+      "last_name": "marouf",
+      "full_name": "Abdulrahman marouf",
+      "phone": "+1 469-992-7224",
+      "company_name": "Khatmarouf",
+      "address_line1": null,
+      "city": null,
+      "state": null,
+      "postal_code": null,
+      "event_count": 3
+    },
+    {
+      "email": "abdulwahabaltailouni@gmail.com",
+      "first_name": "59 Shawarma &",
+      "last_name": "Juice",
+      "full_name": "59 Shawarma & Juice",
+      "phone": "+1 469-422-9208",
+      "company_name": "59 Shawarma & Juice",
+      "address_line1": null,
+      "city": null,
+      "state": null,
+      "postal_code": null,
+      "event_count": 3
+    },
+    {
+      "email": "abeer1980_17@yahoo.com",
+      "first_name": "Abeer",
+      "last_name": "Hamed",
+      "full_name": "Abeer Hamed",
+      "phone": "+1 214-609-6866",
+      "company_name": "Resin_4fans",
+      "address_line1": null,
+      "city": null,
+      "state": null,
+      "postal_code": null,
+      "event_count": 2
+    },
+    {
+      "email": "abeeraber452@gmail.com",
+      "first_name": "Abeer",
+      "last_name": "Almaarawi",
+      "full_name": "Abeer Almaarawi",
+      "phone": "520585091",
+      "company_name": "Alzarrad Syrian Eatery",
+      "address_line1": null,
+      "city": null,
+      "state": null,
+      "postal_code": null,
+      "event_count": 1
+    },
+    {
+      "email": "abokewana@yahoo.com",
+      "first_name": "Abeer Abu",
+      "last_name": "Kawan",
+      "full_name": "Abeer Abu Kawan",
+      "phone": "+1 806-252-8483",
+      "company_name": null,
+      "address_line1": null,
+      "city": null,
+      "state": null,
+      "postal_code": null,
+      "event_count": 2
+    },
+    {
+      "email": "abonormasre20@gmail.com",
+      "first_name": "Ahmad",
+      "last_name": "Almasri",
+      "full_name": "Ahmad Almasri",
+      "phone": "+1 773-630-3419",
+      "company_name": "Orient palace",
+      "address_line1": null,
+      "city": null,
+      "state": null,
+      "postal_code": null,
+      "event_count": 8
+    },
+    {
+      "email": "aboodhindiyeh@gmail.com",
+      "first_name": "Abdulraheem",
+      "last_name": "Hindieh",
+      "full_name": "Abdulraheem Hindieh",
+      "phone": "+1 945-257-1388",
+      "company_name": "Saru",
+      "address_line1": null,
+      "city": null,
+      "state": null,
+      "postal_code": null,
+      "event_count": 1
+    },
+    {
+      "email": "abraraeltilib@gmail.com",
+      "first_name": "Abrar",
+      "last_name": "Eltilib",
+      "full_name": "Abrar Eltilib",
+      "phone": "+1 512-694-3256",
+      "company_name": null,
+      "address_line1": null,
+      "city": null,
+      "state": null,
+      "postal_code": null,
+      "event_count": 1
+    },
+    {
+      "email": "abusaadenas74@gmail.com",
+      "first_name": "Enas",
+      "last_name": "abusaad",
+      "full_name": "Enas abusaad",
+      "phone": "+1 214-228-0666",
+      "company_name": "Rezinas art",
+      "address_line1": null,
+      "city": null,
+      "state": null,
+      "postal_code": null,
+      "event_count": 7
+    },
+    {
+      "email": "admin@darulhedayah.org",
+      "first_name": "Habiba",
+      "last_name": "Sultana",
+      "full_name": "Habiba Sultana",
+      "phone": "+1 917-703-5919",
+      "company_name": "DarulHedayah masjid in Princeton",
+      "address_line1": null,
+      "city": null,
+      "state": null,
+      "postal_code": null,
+      "event_count": 1
+    },
+    {
+      "email": "admin@sham-foods.com",
+      "first_name": "Sham Catering Bassam",
+      "last_name": "Tarabishi",
+      "full_name": "Sham Catering Bassam Tarabishi",
+      "phone": "+1 972-878-7964",
+      "company_name": "Sham Restaurant Food Supply *SHAM Catering*",
+      "address_line1": null,
+      "city": null,
+      "state": null,
+      "postal_code": null,
+      "event_count": 1
+    },
+    {
+      "email": "ahmad.a.khdeer@gmail.com",
+      "first_name": "Ahmad",
+      "last_name": "Khdeir",
+      "full_name": "Ahmad Khdeir",
+      "phone": "+1 682-375-7302",
+      "company_name": null,
+      "address_line1": null,
+      "city": null,
+      "state": null,
+      "postal_code": null,
+      "event_count": 1
+    }
+  ],
+  "participations_preview_sample": [
+    {
+      "event_key": "Eid bazaar booths sale::2019-06-08",
+      "event_name": "Eid bazaar booths sale",
+      "event_date": "2019-06-08",
+      "contact_email": "sabuazab@hotmail.com",
+      "contact_name": "Samah Azab",
+      "company_name": null,
+      "booth_category": "Bazaar Vendors",
+      "selling": null,
+      "social": null,
+      "fee_amount": 100,
+      "payment_method": "PAYPAL",
+      "paid_at": "6/2/2019 16:36",
+      "proposed_lifecycle": "paid",
+      "maps_to": {
+        "contacts": "upsert by email",
+        "applications": "one approved org vendor application",
+        "vendor_hub_events": "upsert by name + date",
+        "vendor_hub_participant_status": "one row per event+contact",
+        "vendor_hub_payments": "payment row"
+      }
+    },
+    {
+      "event_key": "Eid bazaar booths sale::2019-06-08",
+      "event_name": "Eid bazaar booths sale",
+      "event_date": "2019-06-08",
+      "contact_email": "ubaig@halalmt.com",
+      "contact_name": "Umar Baig",
+      "company_name": null,
+      "booth_category": "Food vendors",
+      "selling": null,
+      "social": null,
+      "fee_amount": 200,
+      "payment_method": "PAYPAL",
+      "paid_at": "6/2/2019 17:22",
+      "proposed_lifecycle": "paid",
+      "maps_to": {
+        "contacts": "upsert by email",
+        "applications": "one approved org vendor application",
+        "vendor_hub_events": "upsert by name + date",
+        "vendor_hub_participant_status": "one row per event+contact",
+        "vendor_hub_payments": "payment row"
+      }
+    },
+    {
+      "event_key": "Eid bazaar booths sale::2019-06-08",
+      "event_name": "Eid bazaar booths sale",
+      "event_date": "2019-06-08",
+      "contact_email": "abokewana@yahoo.com",
+      "contact_name": "Abeer Abukawan",
+      "company_name": null,
+      "booth_category": "Bazaar Vendors",
+      "selling": null,
+      "social": null,
+      "fee_amount": 100,
+      "payment_method": "PAYPAL",
+      "paid_at": "6/4/2019 23:38",
+      "proposed_lifecycle": "paid",
+      "maps_to": {
+        "contacts": "upsert by email",
+        "applications": "one approved org vendor application",
+        "vendor_hub_events": "upsert by name + date",
+        "vendor_hub_participant_status": "one row per event+contact",
+        "vendor_hub_payments": "payment row"
+      }
+    },
+    {
+      "event_key": "Eid bazaar booths sale::2019-06-08",
+      "event_name": "Eid bazaar booths sale",
+      "event_date": "2019-06-08",
+      "contact_email": "bhussain67@gmail.com",
+      "contact_name": "Bandas Hussain",
+      "company_name": null,
+      "booth_category": "Bazaar Vendors",
+      "selling": null,
+      "social": null,
+      "fee_amount": 100,
+      "payment_method": "PAYPAL",
+      "paid_at": "6/6/2019 12:39",
+      "proposed_lifecycle": "paid",
+      "maps_to": {
+        "contacts": "upsert by email",
+        "applications": "one approved org vendor application",
+        "vendor_hub_events": "upsert by name + date",
+        "vendor_hub_participant_status": "one row per event+contact",
+        "vendor_hub_payments": "payment row"
+      }
+    },
+    {
+      "event_key": "\"Welcome to Dallas\" Bazaar::2021-10-24",
+      "event_name": "\"Welcome to Dallas\" Bazaar",
+      "event_date": "2021-10-24",
+      "contact_email": "amerzina@hotmail.com",
+      "contact_name": "Manal Muradi",
+      "company_name": null,
+      "booth_category": "Table (inside the Hall)",
+      "selling": null,
+      "social": null,
+      "fee_amount": 75,
+      "payment_method": "PAYPAL",
+      "paid_at": "10/14/2021 12:10",
+      "proposed_lifecycle": "paid",
+      "maps_to": {
+        "contacts": "upsert by email",
+        "applications": "one approved org vendor application",
+        "vendor_hub_events": "upsert by name + date",
+        "vendor_hub_participant_status": "one row per event+contact",
+        "vendor_hub_payments": "payment row"
+      }
+    },
+    {
+      "event_key": "\"Welcome to Dallas\" Bazaar::2021-10-24",
+      "event_name": "\"Welcome to Dallas\" Bazaar",
+      "event_date": "2021-10-24",
+      "contact_email": "nowarahak@gmail.com",
+      "contact_name": "Nour Atef",
+      "company_name": null,
+      "booth_category": "Table (inside the Hall)",
+      "selling": null,
+      "social": null,
+      "fee_amount": 75,
+      "payment_method": "PAYPAL",
+      "paid_at": "10/14/2021 12:11",
+      "proposed_lifecycle": "paid",
+      "maps_to": {
+        "contacts": "upsert by email",
+        "applications": "one approved org vendor application",
+        "vendor_hub_events": "upsert by name + date",
+        "vendor_hub_participant_status": "one row per event+contact",
+        "vendor_hub_payments": "payment row"
+      }
+    },
+    {
+      "event_key": "\"Welcome to Dallas\" Bazaar::2021-10-24",
+      "event_name": "\"Welcome to Dallas\" Bazaar",
+      "event_date": "2021-10-24",
+      "contact_email": "tawadenike@gmail.com",
+      "contact_name": "Nadrah Accessories",
+      "company_name": null,
+      "booth_category": "Table (outside)",
+      "selling": null,
+      "social": null,
+      "fee_amount": 75,
+      "payment_method": "PAYPAL",
+      "paid_at": "10/14/2021 12:19",
+      "proposed_lifecycle": "paid",
+      "maps_to": {
+        "contacts": "upsert by email",
+        "applications": "one approved org vendor application",
+        "vendor_hub_events": "upsert by name + date",
+        "vendor_hub_participant_status": "one row per event+contact",
+        "vendor_hub_payments": "payment row"
+      }
+    },
+    {
+      "event_key": "\"Welcome to Dallas\" Bazaar::2021-10-24",
+      "event_name": "\"Welcome to Dallas\" Bazaar",
+      "event_date": "2021-10-24",
+      "contact_email": "abdulrahmanmarouf17@gmail.com",
+      "contact_name": "Hamanni Marouf",
+      "company_name": null,
+      "booth_category": "Table (inside the Hall)",
+      "selling": null,
+      "social": null,
+      "fee_amount": 75,
+      "payment_method": "PAYPAL",
+      "paid_at": "10/14/2021 12:22",
+      "proposed_lifecycle": "paid",
+      "maps_to": {
+        "contacts": "upsert by email",
+        "applications": "one approved org vendor application",
+        "vendor_hub_events": "upsert by name + date",
+        "vendor_hub_participant_status": "one row per event+contact",
+        "vendor_hub_payments": "payment row"
+      }
+    },
+    {
+      "event_key": "\"Welcome to Dallas\" Bazaar::2021-10-24",
+      "event_name": "\"Welcome to Dallas\" Bazaar",
+      "event_date": "2021-10-24",
+      "contact_email": "f_imtairah90@yahoo.com",
+      "contact_name": "Fatima Imtairah",
+      "company_name": null,
+      "booth_category": "Table (outside)",
+      "selling": null,
+      "social": null,
+      "fee_amount": 75,
+      "payment_method": "PAYPAL",
+      "paid_at": "10/14/2021 13:36",
+      "proposed_lifecycle": "paid",
+      "maps_to": {
+        "contacts": "upsert by email",
+        "applications": "one approved org vendor application",
+        "vendor_hub_events": "upsert by name + date",
+        "vendor_hub_participant_status": "one row per event+contact",
+        "vendor_hub_payments": "payment row"
+      }
+    },
+    {
+      "event_key": "\"Welcome to Dallas\" Bazaar::2021-10-24",
+      "event_name": "\"Welcome to Dallas\" Bazaar",
+      "event_date": "2021-10-24",
+      "contact_email": "raad@biznesus.com",
+      "contact_name": "BIZNES GROUP LLC / HIBA ALGHANDOR",
+      "company_name": null,
+      "booth_category": "Table (inside the Hall)",
+      "selling": null,
+      "social": null,
+      "fee_amount": 75,
+      "payment_method": "PAYPAL",
+      "paid_at": "10/14/2021 17:22",
+      "proposed_lifecycle": "paid",
+      "maps_to": {
+        "contacts": "upsert by email",
+        "applications": "one approved org vendor application",
+        "vendor_hub_events": "upsert by name + date",
+        "vendor_hub_participant_status": "one row per event+contact",
+        "vendor_hub_payments": "payment row"
+      }
+    },
+    {
+      "event_key": "\"Welcome to Dallas\" Bazaar::2021-10-24",
+      "event_name": "\"Welcome to Dallas\" Bazaar",
+      "event_date": "2021-10-24",
+      "contact_email": "rabinasarwer@yahoo.com",
+      "contact_name": "Rabina sarwer",
+      "company_name": null,
+      "booth_category": "Table (outside)",
+      "selling": null,
+      "social": null,
+      "fee_amount": 75,
+      "payment_method": "PAYPAL",
+      "paid_at": "10/14/2021 18:42",
+      "proposed_lifecycle": "paid",
+      "maps_to": {
+        "contacts": "upsert by email",
+        "applications": "one approved org vendor application",
+        "vendor_hub_events": "upsert by name + date",
+        "vendor_hub_participant_status": "one row per event+contact",
+        "vendor_hub_payments": "payment row"
+      }
+    },
+    {
+      "event_key": "\"Welcome to Dallas\" Bazaar::2021-10-24",
+      "event_name": "\"Welcome to Dallas\" Bazaar",
+      "event_date": "2021-10-24",
+      "contact_email": "robocopdeelo@hotmail.com",
+      "contact_name": "Hadeel Salman",
+      "company_name": null,
+      "booth_category": "Table (inside the Hall)",
+      "selling": null,
+      "social": null,
+      "fee_amount": 75,
+      "payment_method": "PAYPAL",
+      "paid_at": "10/14/2021 21:01",
+      "proposed_lifecycle": "paid",
+      "maps_to": {
+        "contacts": "upsert by email",
+        "applications": "one approved org vendor application",
+        "vendor_hub_events": "upsert by name + date",
+        "vendor_hub_participant_status": "one row per event+contact",
+        "vendor_hub_payments": "payment row"
+      }
+    },
+    {
+      "event_key": "\"Welcome to Dallas\" Bazaar::2021-10-24",
+      "event_name": "\"Welcome to Dallas\" Bazaar",
+      "event_date": "2021-10-24",
+      "contact_email": "bhussain67@gmail.com",
+      "contact_name": "Baydaa Hussain ( Baraka)",
+      "company_name": null,
+      "booth_category": "Table (outside)",
+      "selling": null,
+      "social": null,
+      "fee_amount": 75,
+      "payment_method": "PAYPAL",
+      "paid_at": "10/14/2021 22:35",
+      "proposed_lifecycle": "paid",
+      "maps_to": {
+        "contacts": "upsert by email",
+        "applications": "one approved org vendor application",
+        "vendor_hub_events": "upsert by name + date",
+        "vendor_hub_participant_status": "one row per event+contact",
+        "vendor_hub_payments": "payment row"
+      }
+    },
+    {
+      "event_key": "\"Welcome to Dallas\" Bazaar::2021-10-24",
+      "event_name": "\"Welcome to Dallas\" Bazaar",
+      "event_date": "2021-10-24",
+      "contact_email": "abokewana@yahoo.com",
+      "contact_name": "Abeer Abu Kawan",
+      "company_name": null,
+      "booth_category": "Table (outside)",
+      "selling": null,
+      "social": null,
+      "fee_amount": 75,
+      "payment_method": "PAYPAL",
+      "paid_at": "10/14/2021 22:38",
+      "proposed_lifecycle": "paid",
+      "maps_to": {
+        "contacts": "upsert by email",
+        "applications": "one approved org vendor application",
+        "vendor_hub_events": "upsert by name + date",
+        "vendor_hub_participant_status": "one row per event+contact",
+        "vendor_hub_payments": "payment row"
+      }
+    },
+    {
+      "event_key": "\"Welcome to Dallas\" Bazaar::2021-10-24",
+      "event_name": "\"Welcome to Dallas\" Bazaar",
+      "event_date": "2021-10-24",
+      "contact_email": "samir@myislamicgift.com",
+      "contact_name": "My Islamic Gift",
+      "company_name": null,
+      "booth_category": "Table (inside the Hall)",
+      "selling": null,
+      "social": null,
+      "fee_amount": 75,
+      "payment_method": "PAYPAL",
+      "paid_at": "10/15/2021 13:44",
+      "proposed_lifecycle": "paid",
+      "maps_to": {
+        "contacts": "upsert by email",
+        "applications": "one approved org vendor application",
+        "vendor_hub_events": "upsert by name + date",
+        "vendor_hub_participant_status": "one row per event+contact",
+        "vendor_hub_payments": "payment row"
+      }
+    },
+    {
+      "event_key": "\"Welcome to Dallas\" Bazaar::2021-10-24",
+      "event_name": "\"Welcome to Dallas\" Bazaar",
+      "event_date": "2021-10-24",
+      "contact_email": "emdadun.choudhury@gmail.com",
+      "contact_name": "Emdadun Nahar Choudhury",
+      "company_name": null,
+      "booth_category": "Table (inside the Hall)",
+      "selling": null,
+      "social": null,
+      "fee_amount": 75,
+      "payment_method": "PAYPAL",
+      "paid_at": "10/15/2021 16:02",
+      "proposed_lifecycle": "paid",
+      "maps_to": {
+        "contacts": "upsert by email",
+        "applications": "one approved org vendor application",
+        "vendor_hub_events": "upsert by name + date",
+        "vendor_hub_participant_status": "one row per event+contact",
+        "vendor_hub_payments": "payment row"
+      }
+    },
+    {
+      "event_key": "\"Welcome to Dallas\" Bazaar::2021-10-24",
+      "event_name": "\"Welcome to Dallas\" Bazaar",
+      "event_date": "2021-10-24",
+      "contact_email": "aleez2016@icloud.com",
+      "contact_name": "Salwan alrefaay",
+      "company_name": null,
+      "booth_category": "Table (outside)",
+      "selling": null,
+      "social": null,
+      "fee_amount": 75,
+      "payment_method": "PAYPAL",
+      "paid_at": "10/15/2021 16:25",
+      "proposed_lifecycle": "paid",
+      "maps_to": {
+        "contacts": "upsert by email",
+        "applications": "one approved org vendor application",
+        "vendor_hub_events": "upsert by name + date",
+        "vendor_hub_participant_status": "one row per event+contact",
+        "vendor_hub_payments": "payment row"
+      }
+    },
+    {
+      "event_key": "\"Welcome to Dallas\" Bazaar::2021-10-24",
+      "event_name": "\"Welcome to Dallas\" Bazaar",
+      "event_date": "2021-10-24",
+      "contact_email": "hebadruz80@gmail.com",
+      "contact_name": "Heba Abu Ghaith",
+      "company_name": null,
+      "booth_category": "Table (outside)",
+      "selling": null,
+      "social": null,
+      "fee_amount": 75,
+      "payment_method": "PAYPAL",
+      "paid_at": "10/16/2021 17:21",
+      "proposed_lifecycle": "paid",
+      "maps_to": {
+        "contacts": "upsert by email",
+        "applications": "one approved org vendor application",
+        "vendor_hub_events": "upsert by name + date",
+        "vendor_hub_participant_status": "one row per event+contact",
+        "vendor_hub_payments": "payment row"
+      }
+    },
+    {
+      "event_key": "\"Welcome to Dallas\" Bazaar::2021-10-24",
+      "event_name": "\"Welcome to Dallas\" Bazaar",
+      "event_date": "2021-10-24",
+      "contact_email": "kmrumana@yahoo.com",
+      "contact_name": "Rumana Faroque",
+      "company_name": null,
+      "booth_category": "Table (outside)",
+      "selling": null,
+      "social": null,
+      "fee_amount": 75,
+      "payment_method": "PAYPAL",
+      "paid_at": "10/17/2021 19:36",
+      "proposed_lifecycle": "paid",
+      "maps_to": {
+        "contacts": "upsert by email",
+        "applications": "one approved org vendor application",
+        "vendor_hub_events": "upsert by name + date",
+        "vendor_hub_participant_status": "one row per event+contact",
+        "vendor_hub_payments": "payment row"
+      }
+    },
+    {
+      "event_key": "\"Welcome to Dallas\" Bazaar::2021-10-24",
+      "event_name": "\"Welcome to Dallas\" Bazaar",
+      "event_date": "2021-10-24",
+      "contact_email": "paulnaeem@hotmail.com",
+      "contact_name": "Sheikh Naeem",
+      "company_name": null,
+      "booth_category": "Table (outside)",
+      "selling": null,
+      "social": null,
+      "fee_amount": 75,
+      "payment_method": "PAYPAL",
+      "paid_at": "10/18/2021 12:29",
+      "proposed_lifecycle": "paid",
+      "maps_to": {
+        "contacts": "upsert by email",
+        "applications": "one approved org vendor application",
+        "vendor_hub_events": "upsert by name + date",
+        "vendor_hub_participant_status": "one row per event+contact",
+        "vendor_hub_payments": "payment row"
+      }
+    }
+  ]
+}

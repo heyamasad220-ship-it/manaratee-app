@@ -42,21 +42,21 @@ type MainSettingsTab = (typeof mainSettingsTabs)[number]
 const eventsSubTabs = ["Event Types", "Notifications"] as const
 type EventsSubTab = (typeof eventsSubTabs)[number]
 
-// Mock event types
-const defaultEventTypes = [
-  { id: "et-1", name: "Community Event", color: "#10B981", description: "General community gatherings" },
-  { id: "et-2", name: "Religious Service", color: "#6366F1", description: "Regular prayer services" },
-  { id: "et-3", name: "Educational", color: "#F59E0B", description: "Classes and workshops" },
-  { id: "et-4", name: "Youth Program", color: "#EC4899", description: "Youth-focused activities" },
-  { id: "et-5", name: "Fundraiser", color: "#8B5CF6", description: "Fundraising events" },
-]
+interface EventType {
+  id: string
+  name: string
+  color: string
+  description: string
+}
+
+const defaultEventTypes: EventType[] = []
 
 export default function SettingsPage() {
   const [mainTab, setMainTab] = useState<MainSettingsTab>("Events Settings")
   const [eventsSubTab, setEventsSubTab] = useState<EventsSubTab>("Event Types")
   const [eventTypes, setEventTypes] = useState(defaultEventTypes)
   const [showAddTypeDialog, setShowAddTypeDialog] = useState(false)
-  const [editingType, setEditingType] = useState<typeof defaultEventTypes[0] | null>(null)
+  const [editingType, setEditingType] = useState<EventType | null>(null)
 
   return (
     <>
@@ -128,7 +128,14 @@ export default function SettingsPage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {eventTypes.map((type) => (
+                        {eventTypes.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
+                              No data yet.
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          eventTypes.map((type) => (
                           <TableRow key={type.id}>
                             <TableCell>
                               <div className="h-4 w-4 rounded-full" style={{ backgroundColor: type.color }} />
@@ -146,7 +153,8 @@ export default function SettingsPage() {
                               </div>
                             </TableCell>
                           </TableRow>
-                        ))}
+                          ))
+                        )}
                       </TableBody>
                     </Table>
                   </CardContent>

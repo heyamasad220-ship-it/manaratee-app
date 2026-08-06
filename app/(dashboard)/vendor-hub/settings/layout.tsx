@@ -11,7 +11,7 @@ export default async function VendorHubSettingsLayout({
   return (
     <VendorHubSectionShell
       title="Settings"
-      description="Configure vendor hub defaults, booth types, applications, and publishing."
+      description="Configure vendor hub defaults, booths, applications, payments, and public page."
       showEventSelector={false}
     >
       {children}

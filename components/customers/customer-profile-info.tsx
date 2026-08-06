@@ -34,18 +34,18 @@ interface CustomerData {
 }
 
 const initialCustomer: CustomerData = {
-  firstName: "Sarah",
-  lastName: "Johnson",
-  dateOfBirth: "1990-04-15",
-  gender: "Female",
-  phone: "+1 (555) 234-5678",
-  email: "sarah.johnson@email.com",
-  addressLine1: "1234 Ocean Drive",
-  addressLine2: "Apt 12B",
-  city: "Miami",
-  state: "FL",
-  zipCode: "33139",
-  country: "United States",
+  firstName: "",
+  lastName: "",
+  dateOfBirth: "",
+  gender: "",
+  phone: "",
+  email: "",
+  addressLine1: "",
+  addressLine2: "",
+  city: "",
+  state: "",
+  zipCode: "",
+  country: "",
   status: "Active",
 }
 

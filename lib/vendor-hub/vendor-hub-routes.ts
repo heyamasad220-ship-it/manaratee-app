@@ -5,6 +5,7 @@ export const VENDOR_HUB_ROUTES = {
   network: {
     root: `${VENDOR_HUB_BASE}/network`,
     vendors: `${VENDOR_HUB_BASE}/network/vendors`,
+    vendor: (contactId: string) => `${VENDOR_HUB_BASE}/network/vendors/${contactId}`,
     onboarding: `${VENDOR_HUB_BASE}/network/onboarding`,
     history: `${VENDOR_HUB_BASE}/network/history`,
     documents: `${VENDOR_HUB_BASE}/network/documents`,

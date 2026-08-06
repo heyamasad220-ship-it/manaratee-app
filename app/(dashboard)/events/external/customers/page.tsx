@@ -48,133 +48,31 @@ import {
 const tabs = ["Individuals", "Organizations"] as const
 type Tab = (typeof tabs)[number]
 
-// Mock individual customers
-const individuals = [
-  {
-    id: "ind-1",
-    name: "Sarah Johnson",
-    email: "sarah.johnson@email.com",
-    phone: "+1 (555) 123-4567",
-    address: "123 Oak Street, Springfield, IL 62701",
-    totalBookings: 5,
-    totalSpent: 4250,
-    lastBooking: "2024-01-15",
-    status: "Active",
-  },
-  {
-    id: "ind-2",
-    name: "Michael Chen",
-    email: "michael.chen@email.com",
-    phone: "+1 (555) 234-5678",
-    address: "456 Maple Ave, Chicago, IL 60601",
-    totalBookings: 3,
-    totalSpent: 2800,
-    lastBooking: "2024-01-08",
-    status: "Active",
-  },
-  {
-    id: "ind-3",
-    name: "Emily Rodriguez",
-    email: "emily.r@email.com",
-    phone: "+1 (555) 345-6789",
-    address: "789 Pine Road, Naperville, IL 60540",
-    totalBookings: 8,
-    totalSpent: 7500,
-    lastBooking: "2024-01-20",
-    status: "VIP",
-  },
-  {
-    id: "ind-4",
-    name: "David Kim",
-    email: "david.kim@email.com",
-    phone: "+1 (555) 456-7890",
-    address: "321 Elm Street, Evanston, IL 60201",
-    totalBookings: 2,
-    totalSpent: 1200,
-    lastBooking: "2023-12-10",
-    status: "Active",
-  },
-  {
-    id: "ind-5",
-    name: "Jessica Thompson",
-    email: "j.thompson@email.com",
-    phone: "+1 (555) 567-8901",
-    address: "654 Cedar Lane, Oak Park, IL 60302",
-    totalBookings: 1,
-    totalSpent: 450,
-    lastBooking: "2023-11-25",
-    status: "Inactive",
-  },
-]
+const individuals: {
+  id: string
+  name: string
+  email: string
+  phone: string
+  address: string
+  totalBookings: number
+  totalSpent: number
+  lastBooking: string
+  status: string
+}[] = []
 
-// Mock organization customers
-const organizations = [
-  {
-    id: "org-1",
-    name: "Springfield Community Center",
-    type: "Non-Profit",
-    contact: "Robert Williams",
-    email: "rwilliams@springfieldcc.org",
-    phone: "+1 (555) 111-2222",
-    address: "100 Community Drive, Springfield, IL 62702",
-    totalBookings: 12,
-    totalSpent: 18500,
-    lastBooking: "2024-01-18",
-    status: "Active",
-  },
-  {
-    id: "org-2",
-    name: "Tech Innovators Inc.",
-    type: "Corporate",
-    contact: "Amanda Foster",
-    email: "afoster@techinnovators.com",
-    phone: "+1 (555) 222-3333",
-    address: "500 Innovation Blvd, Chicago, IL 60606",
-    totalBookings: 8,
-    totalSpent: 24000,
-    lastBooking: "2024-01-12",
-    status: "VIP",
-  },
-  {
-    id: "org-3",
-    name: "Lincoln High School",
-    type: "Educational",
-    contact: "Patricia Moore",
-    email: "pmoore@lincolnhs.edu",
-    phone: "+1 (555) 333-4444",
-    address: "200 School Street, Lincoln, IL 62656",
-    totalBookings: 6,
-    totalSpent: 5400,
-    lastBooking: "2024-01-05",
-    status: "Active",
-  },
-  {
-    id: "org-4",
-    name: "Harmony Wedding Planners",
-    type: "Corporate",
-    contact: "Lisa Chang",
-    email: "lisa@harmonyweddings.com",
-    phone: "+1 (555) 444-5555",
-    address: "75 Bridal Way, Naperville, IL 60563",
-    totalBookings: 15,
-    totalSpent: 32000,
-    lastBooking: "2024-01-22",
-    status: "VIP",
-  },
-  {
-    id: "org-5",
-    name: "First Baptist Church",
-    type: "Religious",
-    contact: "Pastor James Brown",
-    email: "jbrown@firstbaptist.org",
-    phone: "+1 (555) 555-6666",
-    address: "300 Faith Avenue, Springfield, IL 62704",
-    totalBookings: 4,
-    totalSpent: 3200,
-    lastBooking: "2023-12-20",
-    status: "Active",
-  },
-]
+const organizations: {
+  id: string
+  name: string
+  type: string
+  contact: string
+  email: string
+  phone: string
+  address: string
+  totalBookings: number
+  totalSpent: number
+  lastBooking: string
+  status: string
+}[] = []
 
 export default function CustomersPage() {
   const [activeTab, setActiveTab] = useState<Tab>("Individuals")
@@ -330,7 +228,14 @@ export default function CustomersPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredIndividuals.map((ind) => (
+                  {filteredIndividuals.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                        No data yet.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredIndividuals.map((ind) => (
                     <TableRow key={ind.id}>
                       <TableCell>
                         <Link
@@ -383,7 +288,8 @@ export default function CustomersPage() {
                         </Badge>
                       </TableCell>
                     </TableRow>
-                  ))}
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
@@ -406,7 +312,14 @@ export default function CustomersPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredOrganizations.map((org) => (
+                  {filteredOrganizations.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                        No data yet.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredOrganizations.map((org) => (
                     <TableRow key={org.id}>
                       <TableCell>
                         <Link
@@ -452,7 +365,8 @@ export default function CustomersPage() {
                         </Badge>
                       </TableCell>
                     </TableRow>
-                  ))}
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </CardContent>

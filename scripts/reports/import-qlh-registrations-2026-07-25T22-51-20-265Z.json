@@ -1,0 +1,141 @@
+{
+  "mode": "dry-run",
+  "xlsxPath": "C:/Users/danan/Downloads/QLH_Registrations.xlsx",
+  "sheetName": "QLH2526",
+  "rawRows": 201,
+  "department": {
+    "id": "fdebdb8b-520c-4c0c-a1c9-9e780966eb73",
+    "name": "Education"
+  },
+  "byYear": {
+    "QLH 2025-2026": {
+      "rows": 117,
+      "enrolled": 115,
+      "skipped": 2
+    },
+    "QLH 2024-2025": {
+      "rows": 84,
+      "enrolled": 83,
+      "skipped": 1
+    }
+  },
+  "createdContacts": 0,
+  "reusedContacts": 0,
+  "createdPeople": 0,
+  "createdEnrollments": 198,
+  "skippedExisting": 0,
+  "skippedNoProgram": [],
+  "skippedNoParent": [],
+  "errors": [],
+  "samples": [
+    {
+      "year": "QLH 2025-2026",
+      "member": "Sharef Zuhair Hamed",
+      "parent": "Zuhair Hamed",
+      "parentEmail": "zuhair.hamed88@yahoo.com",
+      "dob": "2018-08-29",
+      "gender": "Male",
+      "enrollmentDate": "2025-05-22"
+    },
+    {
+      "year": "QLH 2025-2026",
+      "member": "Shahed Zuhair Hamed",
+      "parent": "Zuhair Hamed",
+      "parentEmail": "zuhair.hamed88@yahoo.com",
+      "dob": "2020-03-09",
+      "gender": "Female",
+      "enrollmentDate": "2025-05-22"
+    },
+    {
+      "year": "QLH 2025-2026",
+      "member": "Mohamed Amine Soulaimani",
+      "parent": "Rosemary",
+      "parentEmail": "rga203@nyu.edu",
+      "dob": "2017-07-07",
+      "gender": "Male",
+      "enrollmentDate": "2025-05-25"
+    },
+    {
+      "year": "QLH 2025-2026",
+      "member": "Rasmi Hijazi",
+      "parent": "Malak Jbara",
+      "parentEmail": "jbaramalak@yahoo.com",
+      "dob": "2022-10-21",
+      "gender": "Male",
+      "enrollmentDate": "2025-05-29"
+    },
+    {
+      "year": "QLH 2025-2026",
+      "member": "Zuhra Hijazi",
+      "parent": "Malak Jbara",
+      "parentEmail": "jbaramalak@yahoo.com",
+      "dob": "2020-07-01",
+      "gender": "Female",
+      "enrollmentDate": "2025-05-29"
+    },
+    {
+      "year": "QLH 2025-2026",
+      "member": "Saleh Sweiki",
+      "parent": "Samah Nasir",
+      "parentEmail": "samahnasir23@gmail.com",
+      "dob": "2019-07-14",
+      "gender": "Male",
+      "enrollmentDate": "2025-06-18"
+    },
+    {
+      "year": "QLH 2025-2026",
+      "member": "Laila Fetiha",
+      "parent": "Fetiha Parent",
+      "parentEmail": null,
+      "dob": "2019-01-22",
+      "gender": "Female",
+      "enrollmentDate": "2025-07-15"
+    },
+    {
+      "year": "QLH 2025-2026",
+      "member": "Habiba Fetiha",
+      "parent": "Fetiha Parent",
+      "parentEmail": null,
+      "dob": "2014-10-16",
+      "gender": "Female",
+      "enrollmentDate": "2025-07-15"
+    },
+    {
+      "year": "QLH 2025-2026",
+      "member": "Farida Fetiha",
+      "parent": "Fetiha Parent",
+      "parentEmail": null,
+      "dob": "2013-03-13",
+      "gender": "Female",
+      "enrollmentDate": "2025-07-15"
+    },
+    {
+      "year": "QLH 2025-2026",
+      "member": "Jameel Ghrir",
+      "parent": "Malik Ghrir",
+      "parentEmail": "jameelmalik2012@hotmail.com",
+      "dob": "2012-01-01",
+      "gender": "Male",
+      "enrollmentDate": "2025-07-23"
+    },
+    {
+      "year": "QLH 2025-2026",
+      "member": "ALI Qaderi",
+      "parent": "ALI Qaderi",
+      "parentEmail": "telhaebtsam@gmail.com",
+      "dob": "2015-12-31",
+      "gender": "Male",
+      "enrollmentDate": "2025-07-23"
+    },
+    {
+      "year": "QLH 2025-2026",
+      "member": "Yousef Qaderi",
+      "parent": "ALI Qaderi",
+      "parentEmail": "telhaebtsam@gmail.com",
+      "dob": "2020-01-01",
+      "gender": "Male",
+      "enrollmentDate": "2025-07-23"
+    }
+  ],
+  "uniqueParents": 94
+}

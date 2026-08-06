@@ -43,8 +43,18 @@ export type VendorHubEventRecord = {
   public_share_token: string | null
   organization_id: string | null
   internal_event_id: string | null
+  organizer_contact_id: string | null
+  organizer_name: string | null
+  venue_id: string | null
   created_at: string | null
   updated_at: string | null
+}
+
+export type VendorHubOrganizerContact = {
+  id: string
+  full_name: string | null
+  email: string | null
+  phone: string | null
 }
 
 export type VendorHubEventWithInternal = VendorHubEventRecord & {
@@ -56,6 +66,8 @@ export type VendorHubEventWithInternal = VendorHubEventRecord & {
     location_label: string | null
     status: string
   } | null
+  organizer_contact?: VendorHubOrganizerContact | null
+  venue_name?: string | null
 }
 
 export type VendorHubDashboardMetrics = {

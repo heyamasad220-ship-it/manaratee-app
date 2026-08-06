@@ -42,9 +42,9 @@ export function GenerateReportModal({ open, onOpenChange }: GenerateReportModalP
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Events</SelectItem>
-                <SelectItem value="spring-gala">Spring Gala</SelectItem>
-                <SelectItem value="tech-expo">Tech Expo 2026</SelectItem>
-                <SelectItem value="member-meetup">Member Meetup</SelectItem>
+                <SelectItem value="none" disabled>
+                  No events
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>

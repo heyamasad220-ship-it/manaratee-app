@@ -28,6 +28,9 @@ export type UpsertBazaarEventInput = {
   calendar_visibility: BazaarCalendarVisibility
   internal_event_id?: string | null
   flyer_url?: string | null
+  organizer_contact_id?: string | null
+  organizer_name?: string | null
+  venue_id?: string | null
 }
 
 export type InternalEventLinkOption = {
@@ -35,6 +38,11 @@ export type InternalEventLinkOption = {
   name: string
   start_at: string | null
   status: string | null
+}
+
+export type BazaarVenueOption = {
+  id: string
+  name: string
 }
 
 function revalidateVendorHubEventPaths(eventId?: string) {
@@ -69,6 +77,33 @@ export async function fetchInternalEventsForLinking(): Promise<InternalEventLink
   }
 
   return (data ?? []) as InternalEventLinkOption[]
+}
+
+export async function fetchVenuesForBazaarPicker(): Promise<BazaarVenueOption[]> {
+  await requireVendorHubManage()
+
+  const supabase = await createClient()
+  const organizationId = await getSelectedOrganizationId()
+
+  if (!organizationId) {
+    return []
+  }
+
+  const { data, error } = await supabase
+    .from("venues")
+    .select("id, name")
+    .eq("organization_id", organizationId)
+    .order("name", { ascending: true })
+
+  if (error) {
+    console.error("fetchVenuesForBazaarPicker error:", error)
+    return []
+  }
+
+  return (data ?? []).map((row) => ({
+    id: row.id as string,
+    name: (row.name as string) || "Untitled space",
+  }))
 }
 
 export async function upsertBazaarEvent(input: UpsertBazaarEventInput) {
@@ -108,6 +143,42 @@ export async function upsertBazaarEvent(input: UpsertBazaarEventInput) {
     }
   }
 
+  const organizerContactId = input.organizer_contact_id?.trim() || null
+  if (organizerContactId) {
+    const { data: contact, error: contactError } = await supabase
+      .from("contacts")
+      .select("id")
+      .eq("id", organizerContactId)
+      .eq("organization_id", organizationId)
+      .maybeSingle()
+
+    if (contactError) {
+      throw new Error(contactError.message)
+    }
+
+    if (!contact) {
+      throw new Error("Selected primary contact was not found")
+    }
+  }
+
+  const venueId = input.venue_id?.trim() || null
+  if (venueId) {
+    const { data: venue, error: venueError } = await supabase
+      .from("venues")
+      .select("id")
+      .eq("id", venueId)
+      .eq("organization_id", organizationId)
+      .maybeSingle()
+
+    if (venueError) {
+      throw new Error(venueError.message)
+    }
+
+    if (!venue) {
+      throw new Error("Selected space was not found")
+    }
+  }
+
   const payload = {
     name,
     event_type: input.event_type?.trim() || null,
@@ -123,6 +194,9 @@ export async function upsertBazaarEvent(input: UpsertBazaarEventInput) {
     organization_id: organizationId,
     internal_event_id: internalEventId,
     flyer_url: input.flyer_url?.trim() || null,
+    organizer_contact_id: organizerContactId,
+    organizer_name: input.organizer_name?.trim() || null,
+    venue_id: venueId,
   }
 
   if (input.id) {
@@ -199,4 +273,104 @@ export async function upsertBazaarEvent(input: UpsertBazaarEventInput) {
   }
 
   return { id: data.id }
+}
+
+export async function getBazaarEventDeleteBlockers(eventId: string): Promise<string | null> {
+  await requireVendorHubManage()
+
+  const supabase = await createClient()
+  const organizationId = await getSelectedOrganizationId()
+  if (!organizationId) {
+    return "No organization selected."
+  }
+
+  const trimmedId = eventId.trim()
+  if (!trimmedId) return "Event id is required."
+
+  const { data: existing, error: fetchError } = await supabase
+    .from("vendor_hub_events")
+    .select("id, organization_id")
+    .eq("id", trimmedId)
+    .maybeSingle()
+
+  if (fetchError) return fetchError.message
+  if (!existing || existing.organization_id !== organizationId) {
+    return "Bazaar event not found."
+  }
+
+  const [assignmentsResult, paymentsResult] = await Promise.all([
+    supabase
+      .from("vendor_hub_booth_assignments")
+      .select("id, status")
+      .eq("event_id", trimmedId)
+      .in("status", ["reserved", "assigned", "confirmed"]),
+    supabase.from("vendor_hub_payments").select("id").eq("event_id", trimmedId).limit(1),
+  ])
+
+  if (assignmentsResult.error) return assignmentsResult.error.message
+  if (paymentsResult.error) return paymentsResult.error.message
+
+  const reservationCount = assignmentsResult.data?.length ?? 0
+  const hasFinancialActivity = (paymentsResult.data?.length ?? 0) > 0
+
+  if (reservationCount > 0 && hasFinancialActivity) {
+    return "This event has booth reservations and payment activity. Remove those first before deleting."
+  }
+  if (reservationCount > 0) {
+    return "This event has booth reservations. Remove them before deleting."
+  }
+  if (hasFinancialActivity) {
+    return "This event has payment activity. Remove or refund payments before deleting."
+  }
+
+  return null
+}
+
+export async function deleteBazaarEvent(eventId: string) {
+  await requireVendorHubManage()
+
+  const supabase = await createClient()
+  const organizationId = await getSelectedOrganizationId()
+
+  if (!organizationId) {
+    throw new Error("No organization selected")
+  }
+
+  const trimmedId = eventId.trim()
+  if (!trimmedId) {
+    throw new Error("Event id is required")
+  }
+
+  const blocker = await getBazaarEventDeleteBlockers(trimmedId)
+  if (blocker) {
+    throw new Error(blocker)
+  }
+
+  const { data: existing, error: fetchError } = await supabase
+    .from("vendor_hub_events")
+    .select("id, organization_id")
+    .eq("id", trimmedId)
+    .maybeSingle()
+
+  if (fetchError) {
+    throw new Error(fetchError.message)
+  }
+
+  if (!existing || existing.organization_id !== organizationId) {
+    throw new Error("Bazaar event not found")
+  }
+
+  const { error } = await supabase
+    .from("vendor_hub_events")
+    .delete()
+    .eq("id", trimmedId)
+    .eq("organization_id", organizationId)
+
+  if (error) {
+    console.error("deleteBazaarEvent error:", error)
+    throw new Error(error.message || "Failed to delete bazaar event")
+  }
+
+  revalidateVendorHubEventPaths(trimmedId)
+  return { ok: true as const }
 }

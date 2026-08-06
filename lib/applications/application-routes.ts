@@ -21,13 +21,15 @@ export const HR_CHILDCARE_APPLICATIONS_PATH = HR_CHILDCARE_PATH
 /** @deprecated Use MEMBERSHIP_APPLICATIONS_PATH — committee apps live under Membership. */
 export const HR_COMMITTEE_APPLICATIONS_PATH = "/workforce/settings/committee-applications"
 export const MEMBERSHIP_APPLICATIONS_PATH = "/membership/applications"
-export const VENDOR_HUB_APPLICATIONS_PATH = "/vendor-hub/events"
+export const VENDOR_HUB_APPLICATIONS_PATH = "/vendor-hub/network/onboarding"
 export const PROGRAMS_FINANCIAL_ASSISTANCE_PATH = "/programs/financial-assistance"
 
 /** Customer portal childcare provider application intake. */
 export const CUSTOMER_CHILDCARE_APPLY_PATH = "/customer/apply/childcare"
 /** Customer portal volunteer application intake. */
 export const CUSTOMER_VOLUNTEER_APPLY_PATH = "/customer/apply/volunteer"
+/** Customer portal vendor (org) application intake. */
+export const CUSTOMER_VENDOR_APPLY_PATH = "/customer/apply/vendor"
 
 /** @deprecated Sign-Ups applications moved back under People Management */
 export const SIGN_UPS_APPLICATIONS_PATH = "/people-management/applications"

@@ -128,7 +128,7 @@ export function VendorHubDashboardClient({
           id: "payments",
           title: `$${metrics.outstandingBalance.toFixed(2)} outstanding balance`,
           href: selectedEventId
-            ? VENDOR_HUB_ROUTES.events.payments(selectedEventId)
+            ? VENDOR_HUB_ROUTES.events.booths(selectedEventId)
             : VENDOR_HUB_ROUTES.events.list,
         }
       : null,
@@ -358,37 +358,13 @@ export function VendorHubDashboardClient({
               <Link
                 href={
                   selectedEventId
-                    ? VENDOR_HUB_ROUTES.events.applications(selectedEventId)
-                    : VENDOR_HUB_ROUTES.events.list
-                }
-              >
-                <Button variant="outline" className="gap-2">
-                  <Store className="h-4 w-4" />
-                  View reservations
-                </Button>
-              </Link>
-              <Link
-                href={
-                  selectedEventId
                     ? VENDOR_HUB_ROUTES.events.booths(selectedEventId)
                     : VENDOR_HUB_ROUTES.events.list
                 }
               >
                 <Button variant="outline" className="gap-2">
                   <Store className="h-4 w-4" />
-                  Assign Booths
-                </Button>
-              </Link>
-              <Link
-                href={
-                  selectedEventId
-                    ? VENDOR_HUB_ROUTES.events.payments(selectedEventId)
-                    : VENDOR_HUB_ROUTES.events.list
-                }
-              >
-                <Button variant="outline" className="gap-2">
-                  <DollarSign className="h-4 w-4" />
-                  Record Payment
+                  View vendors
                 </Button>
               </Link>
               <Link

@@ -1,4 +1,4 @@
-import { getAppBaseUrl } from "@/lib/app/get-app-base-url"
+import { getShareableAppBaseUrl } from "@/lib/app/get-app-base-url"
 import {
   CUSTOMER_DONATION_POST_JOIN_PATH,
   sanitizeCustomerPortalRedirectPath,
@@ -8,7 +8,7 @@ export function buildOrganizationJoinUrl(
   orgSlug: string,
   options?: { next?: string | null; baseUrl?: string }
 ) {
-  const base = options?.baseUrl ?? getAppBaseUrl()
+  const base = options?.baseUrl ?? getShareableAppBaseUrl()
   const slug = orgSlug.trim().toLowerCase()
   const url = new URL(`${base}/join/${encodeURIComponent(slug)}`)
 

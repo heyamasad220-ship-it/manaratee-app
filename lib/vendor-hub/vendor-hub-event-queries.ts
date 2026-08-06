@@ -5,6 +5,7 @@ import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-orga
 import type {
   VendorHubDashboardMetrics,
   VendorHubEventWithInternal,
+  VendorHubOrganizerContact,
 } from "./vendor-hub-types"
 
 function logSupabaseError(
@@ -19,15 +20,107 @@ function logSupabaseError(
   })
 }
 
+async function enrichEventsWithVenues(
+  events: VendorHubEventWithInternal[]
+): Promise<VendorHubEventWithInternal[]> {
+  const venueIds = [
+    ...new Set(
+      events
+        .map((event) => event.venue_id)
+        .filter((id): id is string => Boolean(id))
+    ),
+  ]
+
+  if (venueIds.length === 0) {
+    return events.map((event) => ({ ...event, venue_name: null }))
+  }
+
+  const supabase = await createClient()
+  const organizationId = await getSelectedOrganizationId()
+
+  let query = supabase.from("venues").select("id, name").in("id", venueIds)
+  if (organizationId) {
+    query = query.eq("organization_id", organizationId)
+  }
+
+  const { data, error } = await query
+  if (error) {
+    logSupabaseError("enrichEventsWithVenues error:", error)
+    return events.map((event) => ({ ...event, venue_name: null }))
+  }
+
+  const nameById = new Map(
+    (data || []).map((row) => [row.id as string, (row.name as string) || null])
+  )
+
+  return events.map((event) => ({
+    ...event,
+    venue_name: event.venue_id ? nameById.get(event.venue_id) ?? null : null,
+  }))
+}
+
+async function enrichEventsWithOrganizerContacts(
+  events: VendorHubEventWithInternal[]
+): Promise<VendorHubEventWithInternal[]> {
+  const contactIds = events
+    .map((event) => event.organizer_contact_id)
+    .filter((id): id is string => Boolean(id))
+
+  if (contactIds.length === 0) {
+    return events.map((event) => ({ ...event, organizer_contact: null }))
+  }
+
+  const supabase = await createClient()
+  const organizationId = await getSelectedOrganizationId()
+
+  let query = supabase
+    .from("contacts")
+    .select("id, full_name, email, phone")
+    .in("id", contactIds)
+
+  if (organizationId) {
+    query = query.eq("organization_id", organizationId)
+  }
+
+  const { data, error } = await query
+
+  if (error) {
+    logSupabaseError("enrichEventsWithOrganizerContacts error:", error)
+    return events.map((event) => ({ ...event, organizer_contact: null }))
+  }
+
+  const contactsById = new Map(
+    (data || []).map((row) => [
+      row.id as string,
+      {
+        id: row.id as string,
+        full_name: (row.full_name as string | null) ?? null,
+        email: (row.email as string | null) ?? null,
+        phone: (row.phone as string | null) ?? null,
+      } satisfies VendorHubOrganizerContact,
+    ])
+  )
+
+  return events.map((event) => ({
+    ...event,
+    organizer_contact: event.organizer_contact_id
+      ? contactsById.get(event.organizer_contact_id) ?? null
+      : null,
+  }))
+}
+
 async function enrichEventsWithInternal(
   events: VendorHubEventWithInternal[]
 ): Promise<VendorHubEventWithInternal[]> {
-  const internalEventIds = events
+  const withVenues = await enrichEventsWithVenues(events)
+  const withContacts = await enrichEventsWithOrganizerContacts(withVenues)
+
+  const internalEventIds = withContacts
     .map((event) => event.internal_event_id)
     .filter((id): id is string => Boolean(id))
 
   if (internalEventIds.length === 0) {
-    return events
+    return withContacts
   }
 
   const supabase = await createClient()
@@ -46,12 +139,12 @@ async function enrichEventsWithInternal(
 
   if (error) {
     logSupabaseError("enrichEventsWithInternal error:", error)
-    return events
+    return withContacts
   }
 
   const internalById = new Map((data || []).map((row) => [row.id, row]))
 
-  return events.map((event) => ({
+  return withContacts.map((event) => ({
     ...event,
     internal_event: event.internal_event_id
       ? internalById.get(event.internal_event_id) ?? null

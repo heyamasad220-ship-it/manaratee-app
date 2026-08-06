@@ -1,0 +1,631 @@
+﻿{
+  "columns": 28,
+  "dataRows": 593,
+  "uniqueEmails": 319,
+  "missingEmail": 0,
+  "emailsOnMultipleRows": 113,
+  "withBusinessName": 477,
+  "withSelling": 532,
+  "withSocial": 418,
+  "events": [
+    {
+      "count": 54,
+      "key": "Pre- Ramadan Bazaar || Sat Mar 19, 2022 12:00 PM"
+    },
+    {
+      "count": 51,
+      "key": "Ramadan Bazaar || Sat Feb 24, 2024 12:00 PM"
+    },
+    {
+      "count": 49,
+      "key": "MAS Sohba Bazar || Sat Dec 31, 2022 11:00 AM"
+    },
+    {
+      "count": 46,
+      "key": "Eid Al Adha Bazaar || Sat Jun 17, 2023 12:00 PM"
+    },
+    {
+      "count": 44,
+      "key": "Ramadan Ready Bazar || Sat Mar 4, 2023 12:00 PM"
+    },
+    {
+      "count": 42,
+      "key": "MAS Fall Bazaar || Sat Nov 8, 2025 12:00 PM"
+    },
+    {
+      "count": 41,
+      "key": "Pre Ramadan Bazaar || Sat Feb 8, 2025 11:00 AM"
+    },
+    {
+      "count": 40,
+      "key": "MAS Eid Al-adha Bazaar- || Sat May 17, 2025 11:00 AM"
+    },
+    {
+      "count": 38,
+      "key": "MAS Fall Bazaar || Sun Oct 13, 2024 12:00 PM"
+    },
+    {
+      "count": 36,
+      "key": "Eid Uladha Bazaar || Sat Jun 8, 2024 12:00 PM"
+    },
+    {
+      "count": 35,
+      "key": "Islamic Games 2024 || Sat Apr 27, 2024 9:00 AM"
+    },
+    {
+      "count": 34,
+      "key": "MAS Bazaar || Sat Feb 14, 2026 11:00 AM"
+    },
+    {
+      "count": 25,
+      "key": "\"Welcome to Dallas\" Bazaar || Sun Oct 24, 2021 3:30 PM"
+    },
+    {
+      "count": 17,
+      "key": "Islamic Games (2025) || Sat Apr 19, 2025 9:00 AM"
+    },
+    {
+      "count": 14,
+      "key": "I pray party mini Bazaar || Sat May 6, 2023 2:00 PM"
+    },
+    {
+      "count": 10,
+      "key": "Islamic Games 2026 || Sat Jun 13, 2026 10:00 AM"
+    },
+    {
+      "count": 5,
+      "key": "Open House || Sat Aug 8, 2026 2:00 PM"
+    },
+    {
+      "count": 4,
+      "key": "Eid bazaar booths sale || Sat Jun 8, 2019 3:00 PM"
+    },
+    {
+      "count": 4,
+      "key": "Islamic Games 2026 || Sun Jun 14, 2026 9:00 AM"
+    },
+    {
+      "count": 3,
+      "key": "I Pray Party - Sponsors || Sat May 3, 2025 5:00 PM"
+    },
+    {
+      "count": 1,
+      "key": "Hajj Simulation || Fri May 22, 2026 1:00 PM"
+    }
+  ],
+  "paymentAmounts": [
+    {
+      "amount": "150",
+      "count": 152
+    },
+    {
+      "amount": "175",
+      "count": 125
+    },
+    {
+      "amount": "100",
+      "count": 96
+    },
+    {
+      "amount": "300",
+      "count": 80
+    },
+    {
+      "amount": "200",
+      "count": 64
+    },
+    {
+      "amount": "75",
+      "count": 25
+    },
+    {
+      "amount": "70",
+      "count": 22
+    },
+    {
+      "amount": "225",
+      "count": 8
+    },
+    {
+      "amount": "275",
+      "count": 7
+    },
+    {
+      "amount": "50",
+      "count": 5
+    },
+    {
+      "amount": "160",
+      "count": 3
+    },
+    {
+      "amount": "130",
+      "count": 2
+    },
+    {
+      "amount": "750",
+      "count": 1
+    },
+    {
+      "amount": "0",
+      "count": 1
+    },
+    {
+      "amount": "250",
+      "count": 1
+    },
+    {
+      "amount": "112.5",
+      "count": 1
+    }
+  ],
+  "descriptions": [
+    {
+      "label": "Bazaar Vendors",
+      "count": 3
+    },
+    {
+      "label": "Food vendors",
+      "count": 1
+    },
+    {
+      "label": "Table (inside the Hall)",
+      "count": 7
+    },
+    {
+      "label": "Table (outside)",
+      "count": 18
+    },
+    {
+      "label": "Banquet Table",
+      "count": 22
+    },
+    {
+      "label": "Main Hall Table",
+      "count": 8
+    },
+    {
+      "label": "Main Hall Table (No food items)",
+      "count": 16
+    },
+    {
+      "label": "Lobby Table",
+      "count": 7
+    },
+    {
+      "label": "sponsor",
+      "count": 1
+    },
+    {
+      "label": "Table (Lobby Area)",
+      "count": 9
+    },
+    {
+      "label": "Table in the Main Hall (Musalla)",
+      "count": 5
+    },
+    {
+      "label": "Table in the Banquet Hall",
+      "count": 23
+    },
+    {
+      "label": "Food Truck (Outside)",
+      "count": 1
+    },
+    {
+      "label": "Table in the Main Hall (Musalla, NO FOOD VENDORS}",
+      "count": 37
+    },
+    {
+      "label": "Table between the two building outside",
+      "count": 18
+    },
+    {
+      "label": "booth inside the main hall (no food)",
+      "count": 12
+    },
+    {
+      "label": "lobby (food, Coffee, sweets)",
+      "count": 2
+    },
+    {
+      "label": "Booth in the main Hall (No Food)",
+      "count": 92
+    },
+    {
+      "label": "between the Two Building (weather permitting)",
+      "count": 4
+    },
+    {
+      "label": "Booth in the Lobbey",
+      "count": 3
+    },
+    {
+      "label": "Food Truck",
+      "count": 2
+    },
+    {
+      "label": "Booth in the Banquet Hall",
+      "count": 16
+    },
+    {
+      "label": "Booth in the Lobby",
+      "count": 6
+    },
+    {
+      "label": "Between the two buildings (Non Food Items)",
+      "count": 13
+    },
+    {
+      "label": "Between the two buildings (Food ONLY)",
+      "count": 5
+    },
+    {
+      "label": "Food Vendors & Food Trucks",
+      "count": 1
+    },
+    {
+      "label": "Bazaar Vendor",
+      "count": 28
+    },
+    {
+      "label": "Coffee Vendors",
+      "count": 3
+    },
+    {
+      "label": "Food Vendor (provide 20 free meals for the volunteers)",
+      "count": 1
+    },
+    {
+      "label": "Food Vendors",
+      "count": 4
+    },
+    {
+      "label": "Food Vendors (Expected to provide 20 meals for staff and volunteers)",
+      "count": 2
+    },
+    {
+      "label": "Shawarma",
+      "count": 1
+    },
+    {
+      "label": "Falafel",
+      "count": 1
+    },
+    {
+      "label": "Coffee",
+      "count": 5
+    },
+    {
+      "label": "Between the two buildings non food items",
+      "count": 9
+    },
+    {
+      "label": "Booth in the Lobby (No Clothes)",
+      "count": 18
+    },
+    {
+      "label": "Food Vendors between the two buildings",
+      "count": 10
+    },
+    {
+      "label": "FoodTruck",
+      "count": 9
+    },
+    {
+      "label": "Henna Booth",
+      "count": 1
+    },
+    {
+      "label": "Booth in the main Hall",
+      "count": 43
+    },
+    {
+      "label": "Booth on the stage",
+      "count": 9
+    },
+    {
+      "label": "Food Vendors between the two buildings (Hot Meal)",
+      "count": 6
+    },
+    {
+      "label": "Booth in the entrance  (No Clothes)",
+      "count": 1
+    },
+    {
+      "label": "Booth in the banquet Hall",
+      "count": 2
+    },
+    {
+      "label": "Coffee (Saturday)",
+      "count": 2
+    },
+    {
+      "label": "Juice / Smoothies/ Mocktails (Saturday)",
+      "count": 1
+    },
+    {
+      "label": "Burgers - Saturday (20 free meals for staff and volunteers)",
+      "count": 1
+    },
+    {
+      "label": "Shawarma - Sunday (20 free meals for staff and volunteers)",
+      "count": 2
+    },
+    {
+      "label": "Coffee (Sunday) (inc. Free)",
+      "count": 1
+    },
+    {
+      "label": "Shawarma - Saturday (20 free meals for staff and volunteers)",
+      "count": 2
+    },
+    {
+      "label": "Other food vendor - Saturday (non Shawerma, non Feied cheicken, non Burger, non Indo-Pak)",
+      "count": 2
+    },
+    {
+      "label": "Other food vendor - Sunday (non Shawerma, non Feied cheicken, non Burger, non Indo-Pak)",
+      "count": 2
+    },
+    {
+      "label": "Fried Chicken - Saturday (20 free meals for staff and volunteers)",
+      "count": 1
+    },
+    {
+      "label": "Fried Chicken - Sunday (20 free meals for staff and volunteers)",
+      "count": 1
+    },
+    {
+      "label": "Ice Cream (Saturday)",
+      "count": 1
+    },
+    {
+      "label": "Ice Cream (Sunday)",
+      "count": 1
+    },
+    {
+      "label": "Dessert",
+      "count": 1
+    },
+    {
+      "label": "Shawerma",
+      "count": 1
+    },
+    {
+      "label": "Shawrma",
+      "count": 1
+    },
+    {
+      "label": "Juice/ Mockatails",
+      "count": 2
+    },
+    {
+      "label": "FACE PAINTING & HENNA",
+      "count": 2
+    },
+    {
+      "label": "Booth in the Main Prayer Hall",
+      "count": 21
+    },
+    {
+      "label": "Ice Cream Truck",
+      "count": 1
+    },
+    {
+      "label": "Add Logo on Flyer",
+      "count": 1
+    },
+    {
+      "label": "Coffee (Outside)",
+      "count": 1
+    },
+    {
+      "label": "Coffee (Lobby)",
+      "count": 1
+    },
+    {
+      "label": "Booth in the entrance (Lobby)",
+      "count": 6
+    },
+    {
+      "label": "Mocktail/ Smoothie (outside)",
+      "count": 3
+    },
+    {
+      "label": "Outside Table",
+      "count": 4
+    },
+    {
+      "label": "Henna & Facepainting",
+      "count": 2
+    },
+    {
+      "label": "Regular Booth - Main Prayer Hall",
+      "count": 14
+    },
+    {
+      "label": "Regular Booth - Banquet Hall",
+      "count": 6
+    },
+    {
+      "label": "Henna",
+      "count": 1
+    },
+    {
+      "label": "Corner Booth - Main Prayer Hall",
+      "count": 3
+    },
+    {
+      "label": "Booth on the stage (inc. Members Discount)",
+      "count": 1
+    },
+    {
+      "label": "Coffee (Lobby) (inc. 50% Off)",
+      "count": 1
+    },
+    {
+      "label": "Non-Food Vendor Booth",
+      "count": 11
+    },
+    {
+      "label": "Juice / Smoothies/ Mocktails",
+      "count": 1
+    },
+    {
+      "label": "Other food vendor (non Shawerma, non Fried chicken, non Burger, non Indo-Pak)",
+      "count": 1
+    },
+    {
+      "label": "Shawarma (10 free meals for staff and volunteers)",
+      "count": 1
+    },
+    {
+      "label": "General Merchandise (Non-Food)",
+      "count": 4
+    }
+  ],
+  "paymentMethods": [
+    {
+      "method": "PAYPAL",
+      "count": 97
+    },
+    {
+      "method": "STRIPE",
+      "count": 496
+    }
+  ],
+  "repeatedQuestionGroups": {
+    "businessName": [
+      "What is the name of your business?",
+      "What is your business name?",
+      "what is your business name?"
+    ],
+    "selling": [
+      "What Are you selling?",
+      "What are you selling?",
+      "What products are you selling?(details please)"
+    ],
+    "social": [
+      "Do you have a website or/and social media for your business? please listed below?",
+      "Do you have a website or social media for your business?",
+      "Please share your social media addresses, e.g. Facebook, Instagram, etc.",
+      "What is the link to your business if applicable?",
+      "Do you have a website or social media account?"
+    ]
+  },
+  "samplePreview": [
+    {
+      "event": "Eid bazaar booths sale",
+      "start": "Sat Jun 8, 2019 3:00 PM",
+      "description": "Bazaar Vendors",
+      "amount": "100",
+      "method": "PAYPAL",
+      "name": "Samah Azab",
+      "email": "sabuazab@hotmail.com",
+      "phone": "+1 469-969-8299",
+      "business": null,
+      "selling": null,
+      "city": "Forney",
+      "state": "TX"
+    },
+    {
+      "event": "Eid bazaar booths sale",
+      "start": "Sat Jun 8, 2019 3:00 PM",
+      "description": "Food vendors",
+      "amount": "200",
+      "method": "PAYPAL",
+      "name": "Umar Baig",
+      "email": "ubaig@halalmt.com",
+      "phone": "+1 903-738-3283",
+      "business": null,
+      "selling": null,
+      "city": "Dallas",
+      "state": "TX"
+    },
+    {
+      "event": "Eid bazaar booths sale",
+      "start": "Sat Jun 8, 2019 3:00 PM",
+      "description": "Bazaar Vendors",
+      "amount": "100",
+      "method": "PAYPAL",
+      "name": "Abeer Abukawan",
+      "email": "abokewana@yahoo.com",
+      "phone": "+1 806-252-8483",
+      "business": null,
+      "selling": null,
+      "city": "McKinney",
+      "state": "Tx"
+    },
+    {
+      "event": "Eid bazaar booths sale",
+      "start": "Sat Jun 8, 2019 3:00 PM",
+      "description": "Bazaar Vendors",
+      "amount": "100",
+      "method": "PAYPAL",
+      "name": "Bandas Hussain",
+      "email": "bhussain67@gmail.com",
+      "phone": "+1 214-604-5561",
+      "business": null,
+      "selling": null,
+      "city": "Plano",
+      "state": "TX"
+    },
+    {
+      "event": "\"Welcome to Dallas\" Bazaar",
+      "start": "Sun Oct 24, 2021 3:30 PM",
+      "description": "Table (inside the Hall)",
+      "amount": "75",
+      "method": "PAYPAL",
+      "name": "Manal Muradi",
+      "email": "amerzina@hotmail.com",
+      "phone": "+1 206-548-6584",
+      "business": null,
+      "selling": null,
+      "city": "",
+      "state": ""
+    },
+    {
+      "event": "\"Welcome to Dallas\" Bazaar",
+      "start": "Sun Oct 24, 2021 3:30 PM",
+      "description": "Table (inside the Hall)",
+      "amount": "75",
+      "method": "PAYPAL",
+      "name": "Nour Atef",
+      "email": "nowarahak@gmail.com",
+      "phone": "+1 469-744-9555",
+      "business": null,
+      "selling": null,
+      "city": "",
+      "state": ""
+    },
+    {
+      "event": "\"Welcome to Dallas\" Bazaar",
+      "start": "Sun Oct 24, 2021 3:30 PM",
+      "description": "Table (outside)",
+      "amount": "75",
+      "method": "PAYPAL",
+      "name": "Nadrah Accessories",
+      "email": "tawadenike@gmail.com",
+      "phone": "+1 973-932-4445",
+      "business": null,
+      "selling": null,
+      "city": "",
+      "state": ""
+    },
+    {
+      "event": "\"Welcome to Dallas\" Bazaar",
+      "start": "Sun Oct 24, 2021 3:30 PM",
+      "description": "Table (inside the Hall)",
+      "amount": "75",
+      "method": "PAYPAL",
+      "name": "Hamanni Marouf",
+      "email": "abdulrahmanmarouf17@gmail.com",
+      "phone": "+1 469-992-7224",
+      "business": null,
+      "selling": null,
+      "city": "",
+      "state": ""
+    }
+  ]
+}

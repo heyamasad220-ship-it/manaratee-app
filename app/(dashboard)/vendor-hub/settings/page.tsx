@@ -1,7 +1,7 @@
 "use client"
 
-import Link from "next/link"
 import { useEffect, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -39,7 +39,6 @@ import {
   FileText,
   DollarSign,
   Settings,
-  Bell,
   Tags,
   Plus,
   Pencil,
@@ -48,6 +47,7 @@ import {
 import { VendorTypesSettings } from "@/components/vendor-hub/vendor-types-settings"
 import { BoothAttributesSettings } from "@/components/vendor-hub/booth-attributes-settings"
 import { BoothTemplateLibrarySettings } from "@/components/vendor-hub/booth-template-library-settings"
+import { VendorHubNotificationsSettingsPanel } from "@/components/vendor-hub/vendor-hub-notifications-settings-panel"
 import {
   fetchBoothTypeAttributeIds,
   fetchVendorHubBoothAttributes,
@@ -100,6 +100,17 @@ const emptyBoothTypeForm: BoothTypeForm = {
 
 export default function VendorHubSettingsPage() {
   const supabase = createClient()
+  const searchParams = useSearchParams()
+  const requestedTab = searchParams.get("tab")
+  const defaultTab =
+    requestedTab === "notifications" ||
+    requestedTab === "booths" ||
+    requestedTab === "applications" ||
+    requestedTab === "email" ||
+    requestedTab === "vendor-types" ||
+    requestedTab === "general"
+      ? requestedTab
+      : "general"
 
   const [emailNotifications, setEmailNotifications] = useState(false)
   const [autoApproveVendors, setAutoApproveVendors] = useState(false)
@@ -306,52 +317,134 @@ location: type.location ?? "",
     <>
       <div>
         <div className="mx-auto flex max-w-6xl flex-col gap-6">
-          <Tabs defaultValue="general" className="w-full">
+          <Tabs defaultValue={defaultTab} className="w-full">
             <TabsList className="flex h-auto flex-wrap justify-start gap-2">
               <TabsTrigger value="general">General</TabsTrigger>
               <TabsTrigger value="booths">Booths</TabsTrigger>
               <TabsTrigger value="applications">Applications</TabsTrigger>
-              <TabsTrigger value="payments">Payments</TabsTrigger>
               <TabsTrigger value="notifications">Notifications</TabsTrigger>
               <TabsTrigger value="email">Email Templates</TabsTrigger>
-              <TabsTrigger value="public">Public Page</TabsTrigger>
               <TabsTrigger value="vendor-types">Vendor Types</TabsTrigger>
             </TabsList>
 
             <TabsContent value="general" className="mt-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Settings className="h-5 w-5" />
-                    General Settings
-                  </CardTitle>
-                  <CardDescription>Configure basic Vendor Hub defaults.</CardDescription>
-                </CardHeader>
+              <div className="flex flex-col gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Settings className="h-5 w-5" />
+                      General Settings
+                    </CardTitle>
+                    <CardDescription>Configure basic Vendor Hub defaults.</CardDescription>
+                  </CardHeader>
 
-                <CardContent className="flex flex-col gap-4">
-                  <div className="flex flex-col gap-2">
-                    <Label htmlFor="default-name">Default Vendor Event Name</Label>
-                    <Input id="default-name" placeholder="Enter default event name" />
-                  </div>
-
-                  <div className="grid gap-4 sm:grid-cols-2">
+                  <CardContent className="flex flex-col gap-4">
                     <div className="flex flex-col gap-2">
-                      <Label htmlFor="default-start">Default Start Time</Label>
-                      <TimeInput id="default-start" />
+                      <Label htmlFor="default-name">Default Vendor Event Name</Label>
+                      <Input id="default-name" placeholder="Enter default event name" />
+                    </div>
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="flex flex-col gap-2">
+                        <Label htmlFor="default-start">Default Start Time</Label>
+                        <TimeInput id="default-start" />
+                      </div>
+
+                      <div className="flex flex-col gap-2">
+                        <Label htmlFor="default-end">Default End Time</Label>
+                        <TimeInput id="default-end" />
+                      </div>
                     </div>
 
                     <div className="flex flex-col gap-2">
-                      <Label htmlFor="default-end">Default End Time</Label>
-                      <TimeInput id="default-end" />
+                      <Label htmlFor="default-location">Default Location</Label>
+                      <Input id="default-location" placeholder="Enter default location" />
                     </div>
-                  </div>
+                  </CardContent>
+                </Card>
 
-                  <div className="flex flex-col gap-2">
-                    <Label htmlFor="default-location">Default Location</Label>
-                    <Input id="default-location" placeholder="Enter default location" />
-                  </div>
-                </CardContent>
-              </Card>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <DollarSign className="h-5 w-5" />
+                      Payment Settings
+                    </CardTitle>
+                    <CardDescription>Configure payment options and policies.</CardDescription>
+                  </CardHeader>
+
+                  <CardContent className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="payment-methods">Accepted Payment Methods</Label>
+                      <Select>
+                        <SelectTrigger id="payment-methods">
+                          <SelectValue placeholder="Select payment methods" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Payment Methods</SelectItem>
+                          <SelectItem value="card">Credit Card Only</SelectItem>
+                          <SelectItem value="card-cash">Credit Card & Cash</SelectItem>
+                          <SelectItem value="cash-check">Cash & Check</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="refund-policy">Refund Policy</Label>
+                      <Select>
+                        <SelectTrigger id="refund-policy">
+                          <SelectValue placeholder="Select refund policy" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="7">Full refund up to 7 days before</SelectItem>
+                          <SelectItem value="14">Full refund up to 14 days before</SelectItem>
+                          <SelectItem value="30">Full refund up to 30 days before</SelectItem>
+                          <SelectItem value="none">No refunds</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="cancellation-fee">Late Cancellation Fee</Label>
+                      <Input id="cancellation-fee" type="number" placeholder="Enter cancellation fee" />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Globe className="h-5 w-5" />
+                      Public Page
+                    </CardTitle>
+                    <CardDescription>Configure the public-facing Vendor Hub page.</CardDescription>
+                  </CardHeader>
+
+                  <CardContent className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="public-description">Public Description</Label>
+                      <Textarea
+                        id="public-description"
+                        placeholder="Enter public-facing description"
+                        rows={3}
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="contact-email">Public Contact Email</Label>
+                      <Input
+                        id="contact-email"
+                        type="email"
+                        placeholder="Enter public contact email"
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="contact-phone">Public Contact Phone</Label>
+                      <Input id="contact-phone" placeholder="Enter public contact phone" />
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             </TabsContent>
 
             <TabsContent value="booths" className="mt-6">
@@ -568,76 +661,8 @@ location: type.location ?? "",
               </Card>
             </TabsContent>
 
-            <TabsContent value="payments" className="mt-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <DollarSign className="h-5 w-5" />
-                    Payment Settings
-                  </CardTitle>
-                  <CardDescription>Configure payment options and policies.</CardDescription>
-                </CardHeader>
-
-                <CardContent className="flex flex-col gap-4">
-                  <div className="flex flex-col gap-2">
-                    <Label htmlFor="payment-methods">Accepted Payment Methods</Label>
-                    <Select>
-                      <SelectTrigger id="payment-methods">
-                        <SelectValue placeholder="Select payment methods" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Payment Methods</SelectItem>
-                        <SelectItem value="card">Credit Card Only</SelectItem>
-                        <SelectItem value="card-cash">Credit Card & Cash</SelectItem>
-                        <SelectItem value="cash-check">Cash & Check</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="flex flex-col gap-2">
-                    <Label htmlFor="refund-policy">Refund Policy</Label>
-                    <Select>
-                      <SelectTrigger id="refund-policy">
-                        <SelectValue placeholder="Select refund policy" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="7">Full refund up to 7 days before</SelectItem>
-                        <SelectItem value="14">Full refund up to 14 days before</SelectItem>
-                        <SelectItem value="30">Full refund up to 30 days before</SelectItem>
-                        <SelectItem value="none">No refunds</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="flex flex-col gap-2">
-                    <Label htmlFor="cancellation-fee">Late Cancellation Fee</Label>
-                    <Input id="cancellation-fee" type="number" placeholder="Enter cancellation fee" />
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
             <TabsContent value="notifications" className="mt-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Bell className="h-5 w-5" />
-                    Notifications
-                  </CardTitle>
-                  <CardDescription>
-                    Configure when vendors receive email about bazaar publishing, updates,
-                    reminders, and cancellations.
-                  </CardDescription>
-                </CardHeader>
-
-                <CardContent>
-                  <Button asChild variant="outline">
-                    <Link href="/vendor-hub/settings/notifications">
-                      Open vendor notification settings
-                    </Link>
-                  </Button>
-                </CardContent>
-              </Card>
+              <VendorHubNotificationsSettingsPanel />
             </TabsContent>
 
             <TabsContent value="email" className="mt-6">
@@ -664,35 +689,6 @@ location: type.location ?? "",
                   <Button variant="outline" className="w-fit">
                     Edit More Templates
                   </Button>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="public" className="mt-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Globe className="h-5 w-5" />
-                    Public Page
-                  </CardTitle>
-                  <CardDescription>Configure the public-facing Vendor Hub page.</CardDescription>
-                </CardHeader>
-
-                <CardContent className="flex flex-col gap-4">
-                  <div className="flex flex-col gap-2">
-                    <Label htmlFor="public-description">Public Description</Label>
-                    <Textarea id="public-description" placeholder="Enter public-facing description" rows={3} />
-                  </div>
-
-                  <div className="flex flex-col gap-2">
-                    <Label htmlFor="contact-email">Public Contact Email</Label>
-                    <Input id="contact-email" type="email" placeholder="Enter public contact email" />
-                  </div>
-
-                  <div className="flex flex-col gap-2">
-                    <Label htmlFor="contact-phone">Public Contact Phone</Label>
-                    <Input id="contact-phone" placeholder="Enter public contact phone" />
-                  </div>
                 </CardContent>
               </Card>
             </TabsContent>

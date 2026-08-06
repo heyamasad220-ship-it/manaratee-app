@@ -472,12 +472,13 @@ Tables:
 * application_type_definitions (global registry of application types)
 * applications (tenant submissions)
 * application_history (audit trail)
-* application_documents (uploaded files)
+* application_documents (uploaded files; optional `document_kind` for vendor profile categories — migration **`230_vendor_profile_documents.sql`**; storage bucket `application-documents`)
 
 Migrations:
 
 * `scripts/012_applications.sql` — core Applications engine
 * `scripts/013_rename_hr_module.sql` — renames HR module display name to People Management
+* `scripts/230_vendor_profile_documents.sql` — `application_documents.document_kind` + `application-documents` storage bucket
 
 Key relationships:
 
@@ -571,12 +572,14 @@ rental_payments.venue_rental_id → venue_rentals.id
 
 * vendors
 * vendor_categories
-* vendor_hub_events
+* vendor_hub_events — includes `organizer_contact_id`, `organizer_name`, `venue_id` (`scripts/227_vendor_hub_event_organizer_venue.sql`)
 * vendor_hub_vendors
 * vendor_hub_booths
 * vendor_hub_booth_types
 * vendor_hub_booth_assignments
 * vendor_hub_payments
+* vendor_hub_announcements / vendor_hub_announcement_recipients — RLS helpers in `scripts/228_vendor_hub_announcements_rls_fix.sql` (avoids 42P17 recursion)
+* vendor_hub_events vendor SELECT — `scripts/229_vendor_hub_events_rls_perf.sql` (avoids statement timeouts after large imports)
 
 No foreign key relationships were included in the current relationship export for these tables.
 

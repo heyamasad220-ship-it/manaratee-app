@@ -1,0 +1,191 @@
+{
+  "importTag": "BAZAAR_VENDORS_CSV_V1",
+  "mode": "dry-run",
+  "orgId": "e057e00a-e4e3-4adf-9af5-f465db1894be",
+  "csv": "C:/Users/danan/Downloads/BazaarVendors.csv",
+  "summary": {
+    "csv_rows": 593,
+    "skipped_no_email": 0,
+    "unique_events": 21,
+    "unique_contacts": 319,
+    "participation_rows": 593,
+    "payments_with_amount": 592
+  },
+  "counters": {
+    "contactsMatched": 0,
+    "contactsCreated": 0,
+    "applicationsCreated": 0,
+    "applicationsApproved": 0,
+    "applicationsExisting": 0,
+    "eventsCreated": 0,
+    "eventsExisting": 0,
+    "participantsCreated": 0,
+    "participantsUpdated": 0,
+    "participantsExisting": 0,
+    "paymentsCreated": 0,
+    "paymentsExisting": 0,
+    "paymentsSkippedZero": 0,
+    "affiliationsSynced": 0
+  },
+  "sample_events": [
+    {
+      "name": "Open House",
+      "date": "2026-08-08",
+      "vendors": 5,
+      "status": "draft"
+    },
+    {
+      "name": "Islamic Games 2026",
+      "date": "2026-06-14",
+      "vendors": 4,
+      "status": "completed"
+    },
+    {
+      "name": "Islamic Games 2026",
+      "date": "2026-06-13",
+      "vendors": 10,
+      "status": "completed"
+    },
+    {
+      "name": "Hajj Simulation",
+      "date": "2026-05-22",
+      "vendors": 1,
+      "status": "completed"
+    },
+    {
+      "name": "MAS Bazaar",
+      "date": "2026-02-14",
+      "vendors": 34,
+      "status": "completed"
+    },
+    {
+      "name": "MAS Fall Bazaar",
+      "date": "2025-11-08",
+      "vendors": 42,
+      "status": "completed"
+    },
+    {
+      "name": "MAS Eid Al-adha Bazaar-",
+      "date": "2025-05-17",
+      "vendors": 40,
+      "status": "completed"
+    },
+    {
+      "name": "I Pray Party - Sponsors",
+      "date": "2025-05-03",
+      "vendors": 3,
+      "status": "completed"
+    }
+  ],
+  "sample_participations": [
+    {
+      "event": "Eid bazaar booths sale",
+      "date": "2019-06-08",
+      "email": "sabuazab@hotmail.com",
+      "business": null,
+      "fee": 100,
+      "lifecycle": "paid",
+      "importKey": "1f9e0289185983ea81b34ecd"
+    },
+    {
+      "event": "Eid bazaar booths sale",
+      "date": "2019-06-08",
+      "email": "ubaig@halalmt.com",
+      "business": null,
+      "fee": 200,
+      "lifecycle": "paid",
+      "importKey": "0433617606eaa3387671f12b"
+    },
+    {
+      "event": "Eid bazaar booths sale",
+      "date": "2019-06-08",
+      "email": "abokewana@yahoo.com",
+      "business": null,
+      "fee": 100,
+      "lifecycle": "paid",
+      "importKey": "f121e4728fee89c7d86fec30"
+    },
+    {
+      "event": "Eid bazaar booths sale",
+      "date": "2019-06-08",
+      "email": "bhussain67@gmail.com",
+      "business": null,
+      "fee": 100,
+      "lifecycle": "paid",
+      "importKey": "94aa3506e74be8b9bd7cd66f"
+    },
+    {
+      "event": "\"Welcome to Dallas\" Bazaar",
+      "date": "2021-10-24",
+      "email": "amerzina@hotmail.com",
+      "business": null,
+      "fee": 75,
+      "lifecycle": "paid",
+      "importKey": "499395cd1da01b42002b21f0"
+    },
+    {
+      "event": "\"Welcome to Dallas\" Bazaar",
+      "date": "2021-10-24",
+      "email": "nowarahak@gmail.com",
+      "business": null,
+      "fee": 75,
+      "lifecycle": "paid",
+      "importKey": "2de236980b164d5be32b25aa"
+    },
+    {
+      "event": "\"Welcome to Dallas\" Bazaar",
+      "date": "2021-10-24",
+      "email": "tawadenike@gmail.com",
+      "business": null,
+      "fee": 75,
+      "lifecycle": "paid",
+      "importKey": "f88eefef38d26682f14f33a3"
+    },
+    {
+      "event": "\"Welcome to Dallas\" Bazaar",
+      "date": "2021-10-24",
+      "email": "abdulrahmanmarouf17@gmail.com",
+      "business": null,
+      "fee": 75,
+      "lifecycle": "paid",
+      "importKey": "4672acf6cb941c6518b491cf"
+    },
+    {
+      "event": "\"Welcome to Dallas\" Bazaar",
+      "date": "2021-10-24",
+      "email": "f_imtairah90@yahoo.com",
+      "business": null,
+      "fee": 75,
+      "lifecycle": "paid",
+      "importKey": "14cd52a64f249988165579d3"
+    },
+    {
+      "event": "\"Welcome to Dallas\" Bazaar",
+      "date": "2021-10-24",
+      "email": "raad@biznesus.com",
+      "business": null,
+      "fee": 75,
+      "lifecycle": "paid",
+      "importKey": "0fa99f7e24db34798076b4bd"
+    },
+    {
+      "event": "\"Welcome to Dallas\" Bazaar",
+      "date": "2021-10-24",
+      "email": "rabinasarwer@yahoo.com",
+      "business": null,
+      "fee": 75,
+      "lifecycle": "paid",
+      "importKey": "99099572320b0f222dad366f"
+    },
+    {
+      "event": "\"Welcome to Dallas\" Bazaar",
+      "date": "2021-10-24",
+      "email": "robocopdeelo@hotmail.com",
+      "business": null,
+      "fee": 75,
+      "lifecycle": "paid",
+      "importKey": "55b707416bebf399242315a5"
+    }
+  ],
+  "errors": []
+}

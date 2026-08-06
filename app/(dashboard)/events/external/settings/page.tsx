@@ -32,20 +32,13 @@ import { cn } from "@/lib/utils"
 const settingsTabs = ["Event Types", "Deposit Policy", "General"] as const
 type SettingsTab = (typeof settingsTabs)[number]
 
-const defaultEventTypes = [
-  { id: "et-1", name: "Wedding", active: true },
-  { id: "et-2", name: "Engagement", active: true },
-  { id: "et-3", name: "Graduation", active: true },
-  { id: "et-4", name: "Baby Shower", active: true },
-  { id: "et-5", name: "Birthday Party", active: true },
-  { id: "et-6", name: "Corporate Event", active: true },
-  { id: "et-7", name: "Dinner Banquet", active: true },
-  { id: "et-8", name: "Meeting", active: true },
-  { id: "et-9", name: "Memorial Service", active: true },
-  { id: "et-10", name: "Fundraiser", active: true },
-  { id: "et-11", name: "Workshop", active: true },
-  { id: "et-12", name: "Conference", active: true },
-]
+interface EventType {
+  id: string
+  name: string
+  active: boolean
+}
+
+const defaultEventTypes: EventType[] = []
 
 
 
@@ -175,7 +168,14 @@ export default function VenueRentalSettingsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {eventTypes.map((eventType, index) => (
+                  {eventTypes.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
+                        No data yet.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    eventTypes.map((eventType, index) => (
                     <TableRow key={eventType.id}>
                       <TableCell className="text-sm text-muted-foreground">
                         {index + 1}
@@ -237,7 +237,8 @@ export default function VenueRentalSettingsPage() {
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))}
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </div>

@@ -45,6 +45,7 @@ export function ContactProfileHeader({
   city,
   state,
   address,
+  onNameClick,
   actions,
 }: {
   contactName: string
@@ -56,6 +57,8 @@ export function ContactProfileHeader({
   city?: string | null
   state?: string | null
   address?: string | null
+  /** When set, the contact name is a blue clickable control. */
+  onNameClick?: () => void
   actions?: ReactNode
 }) {
   const isOrganization = recordType === "organization"
@@ -81,7 +84,17 @@ export function ContactProfileHeader({
 
         <div className="min-w-0 space-y-2">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-            <h1 className="text-xl font-semibold tracking-tight">{displayName}</h1>
+            {onNameClick ? (
+              <button
+                type="button"
+                onClick={onNameClick}
+                className="text-left text-xl font-semibold tracking-tight text-primary hover:underline"
+              >
+                {displayName}
+              </button>
+            ) : (
+              <h1 className="text-xl font-semibold tracking-tight">{displayName}</h1>
+            )}
             <Badge
               variant="secondary"
               className={cn("font-normal", STATUS_COLORS[mappedStatus])}

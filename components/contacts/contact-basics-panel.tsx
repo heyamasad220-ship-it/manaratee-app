@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useTransition, type ReactNode } from "react"
+import { useEffect, useRef, useState, useTransition, type ReactNode } from "react"
 import { Loader2, MapPin, Pencil } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -65,7 +65,17 @@ type ContactBasicsPanelProps = {
   onSaved: () => Promise<void>
   layout?: "default" | "overview-general"
   showEditButton?: boolean
+  /** Hide the inline Cancel / Save bar (e.g. when parent dialog owns the footer). */
+  hideSaveBar?: boolean
+  onEditActionsChange?: (actions: ContactBasicsEditActions | null) => void
   onHeaderMetaChange?: (meta: ContactBasicsHeaderMeta) => void
+}
+
+export type ContactBasicsEditActions = {
+  save: () => void
+  cancel: () => void
+  isPending: boolean
+  isEditing: boolean
 }
 
 function formatDate(value: string | null | undefined) {
@@ -97,6 +107,8 @@ export function ContactBasicsPanel({
   onSaved,
   layout = "default",
   showEditButton = true,
+  hideSaveBar = false,
+  onEditActionsChange,
   onHeaderMetaChange,
 }: ContactBasicsPanelProps) {
   const [isEditing, setIsEditing] = useState(defaultEditing)
@@ -228,8 +240,10 @@ export function ContactBasicsPanel({
           })
         }
 
-        setEditing(false)
-        onEditingChange?.(false)
+        if (!hideSaveBar) {
+          setEditing(false)
+          onEditingChange?.(false)
+        }
         await onSaved()
       } catch (saveError) {
         setError(
@@ -238,6 +252,22 @@ export function ContactBasicsPanel({
       }
     })
   }
+
+  const saveRef = useRef(handleSave)
+  const cancelRef = useRef(handleCancel)
+  saveRef.current = handleSave
+  cancelRef.current = handleCancel
+
+  useEffect(() => {
+    if (!onEditActionsChange) return
+    onEditActionsChange({
+      save: () => saveRef.current(),
+      cancel: () => cancelRef.current(),
+      isPending,
+      isEditing,
+    })
+    return () => onEditActionsChange(null)
+  }, [isEditing, isPending, onEditActionsChange])
 
   const addressEditor = (
     <div className="grid gap-2 sm:grid-cols-6">
@@ -275,7 +305,8 @@ export function ContactBasicsPanel({
     </div>
   )
 
-  const overviewSaveBar = isEditing ? (
+  const overviewSaveBar =
+    isEditing && !hideSaveBar ? (
     <div className="flex justify-end gap-2 pt-1">
       <Button variant="outline" onClick={handleCancel} disabled={isPending}>
         Cancel

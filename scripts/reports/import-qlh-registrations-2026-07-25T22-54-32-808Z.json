@@ -1,0 +1,138 @@
+{
+  "mode": "execute",
+  "xlsxPath": "C:/Users/danan/Downloads/QLH_Registrations.xlsx",
+  "sheetName": "QLH2526",
+  "rawRows": 201,
+  "department": {
+    "id": "fdebdb8b-520c-4c0c-a1c9-9e780966eb73",
+    "name": "Education"
+  },
+  "byYear": {
+    "QLH 2025-2026": {
+      "rows": 117,
+      "enrolled": 111,
+      "skipped": 6
+    },
+    "QLH 2024-2025": {
+      "rows": 84,
+      "enrolled": 83,
+      "skipped": 1
+    }
+  },
+  "createdContacts": 0,
+  "reusedContacts": 0,
+  "createdPeople": 195,
+  "createdEnrollments": 194,
+  "skippedExisting": 0,
+  "skippedNoProgram": [],
+  "skippedNoParent": [],
+  "errors": [
+    {
+      "member": "Ayla Charef",
+      "year": "QLH 2025-2026",
+      "error": "child person: date/time field value out of range: \"2021-22-02\""
+    },
+    {
+      "member": "Jeneen Harb",
+      "year": "QLH 2025-2026",
+      "error": "child person: date/time field value out of range: \"2019-91-04\""
+    },
+    {
+      "member": "alaa almaqaleh",
+      "year": "QLH 2025-2026",
+      "error": "child person: date/time field value out of range: \"2017-05-00\""
+    },
+    {
+      "member": "Abraham Aref",
+      "year": "QLH 2025-2026",
+      "error": "duplicate key value violates unique constraint \"program_enrollments_active_child_person_offering_uidx\""
+    }
+  ],
+  "samples": [
+    {
+      "year": "QLH 2025-2026",
+      "member": "Sharef Zuhair Hamed",
+      "enrollmentId": "437e6af9-f9c2-4321-a0a3-9d52ad61195c",
+      "parent": "Zuhair Hamed",
+      "parentEmail": "zuhair.hamed88@yahoo.com"
+    },
+    {
+      "year": "QLH 2025-2026",
+      "member": "Shahed Zuhair Hamed",
+      "enrollmentId": "bc8c747b-1c82-4770-86ea-923ee8673a5d",
+      "parent": "Zuhair Hamed",
+      "parentEmail": "zuhair.hamed88@yahoo.com"
+    },
+    {
+      "year": "QLH 2025-2026",
+      "member": "Mohamed Amine Soulaimani",
+      "enrollmentId": "dd695cf7-6b60-46d2-b577-7d78ce6c8744",
+      "parent": "Rosemary",
+      "parentEmail": "rga203@nyu.edu"
+    },
+    {
+      "year": "QLH 2025-2026",
+      "member": "Rasmi Hijazi",
+      "enrollmentId": "6cd6d4ab-9b43-4966-b257-2e925f37a3f3",
+      "parent": "Malak Jbara",
+      "parentEmail": "jbaramalak@yahoo.com"
+    },
+    {
+      "year": "QLH 2025-2026",
+      "member": "Zuhra Hijazi",
+      "enrollmentId": "1625815f-3ab7-4f83-a455-182ca396afc9",
+      "parent": "Malak Jbara",
+      "parentEmail": "jbaramalak@yahoo.com"
+    },
+    {
+      "year": "QLH 2025-2026",
+      "member": "Saleh Sweiki",
+      "enrollmentId": "3625df2c-74c3-4a18-9a58-d3256a963a45",
+      "parent": "Samah Nasir",
+      "parentEmail": "samahnasir23@gmail.com"
+    },
+    {
+      "year": "QLH 2025-2026",
+      "member": "Laila Fetiha",
+      "enrollmentId": "abef5899-a9e6-445f-b7e2-99041214123d",
+      "parent": "Fetiha Parent",
+      "parentEmail": null
+    },
+    {
+      "year": "QLH 2025-2026",
+      "member": "Habiba Fetiha",
+      "enrollmentId": "8f519576-045d-4235-912d-e624bb8c4b34",
+      "parent": "Fetiha Parent",
+      "parentEmail": null
+    },
+    {
+      "year": "QLH 2025-2026",
+      "member": "Farida Fetiha",
+      "enrollmentId": "4ca43fac-ea50-4be1-a7c3-e0b33de97c00",
+      "parent": "Fetiha Parent",
+      "parentEmail": null
+    },
+    {
+      "year": "QLH 2025-2026",
+      "member": "Jameel Ghrir",
+      "enrollmentId": "71e9d6fd-f0f5-4313-aae3-e91fd36821c4",
+      "parent": "Malik Ghrir",
+      "parentEmail": "jameelmalik2012@hotmail.com"
+    },
+    {
+      "year": "QLH 2025-2026",
+      "member": "ALI Qaderi",
+      "enrollmentId": "a88852a4-5180-45be-8da1-0acc8e81cb78",
+      "parent": "ALI Qaderi",
+      "parentEmail": "telhaebtsam@gmail.com"
+    },
+    {
+      "year": "QLH 2025-2026",
+      "member": "Yousef Qaderi",
+      "enrollmentId": "f02902ea-376b-48cb-9357-5a6671f2da42",
+      "parent": "ALI Qaderi",
+      "parentEmail": "telhaebtsam@gmail.com"
+    }
+  ],
+  "uniqueParents": 94
+}

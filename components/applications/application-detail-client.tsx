@@ -34,6 +34,7 @@ import {
   type ApplicationTypeDefinition,
 } from "@/lib/applications/application-types"
 import { ApplicationStatusBadge } from "@/components/applications/application-status-badge"
+import { formatVendorApplicationFormDataForReview } from "@/lib/vendor-hub/vendor-application-fields"
 
 export function ApplicationDetailClient({ applicationId }: { applicationId: string }) {
   const router = useRouter()
@@ -137,6 +138,15 @@ export function ApplicationDetailClient({ applicationId }: { applicationId: stri
     )
   }
 
+  const vendorFormRows =
+    application.application_type === "vendor"
+      ? formatVendorApplicationFormDataForReview(
+          application.form_data && typeof application.form_data === "object"
+            ? (application.form_data as Record<string, unknown>)
+            : null
+        )
+      : []
+
   const formSummary =
     typeof application.form_data.summary === "string"
       ? application.form_data.summary
@@ -233,9 +243,20 @@ export function ApplicationDetailClient({ applicationId }: { applicationId: stri
             </div>
             <div className="sm:col-span-2">
               <Label className="text-muted-foreground">Submission Details</Label>
-              <pre className="mt-2 max-h-64 overflow-auto rounded-lg bg-muted p-3 text-xs whitespace-pre-wrap">
-                {formSummary}
-              </pre>
+              {vendorFormRows.length > 0 ? (
+                <dl className="mt-2 space-y-3 rounded-lg border bg-muted/30 p-3">
+                  {vendorFormRows.map((row) => (
+                    <div key={row.key}>
+                      <dt className="text-xs font-medium text-muted-foreground">{row.label}</dt>
+                      <dd className="mt-0.5 whitespace-pre-wrap text-sm">{row.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              ) : (
+                <pre className="mt-2 max-h-64 overflow-auto rounded-lg bg-muted p-3 text-xs whitespace-pre-wrap">
+                  {formSummary}
+                </pre>
+              )}
             </div>
           </CardContent>
         </Card>

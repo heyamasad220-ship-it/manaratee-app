@@ -12,9 +12,7 @@ export const VENDOR_NETWORK_TABS: ModuleTabNavItem[] = [
 export function bazaarEventTabs(eventId: string): ModuleTabNavItem[] {
   return [
     { label: "Overview", href: VENDOR_HUB_ROUTES.events.detail(eventId), exact: true },
-    { label: "Reservations", href: VENDOR_HUB_ROUTES.events.applications(eventId) },
-    { label: "Booths", href: VENDOR_HUB_ROUTES.events.booths(eventId) },
-    { label: "Payments", href: VENDOR_HUB_ROUTES.events.payments(eventId) },
+    { label: "Vendors", href: VENDOR_HUB_ROUTES.events.booths(eventId) },
     { label: "Evaluations", href: VENDOR_HUB_ROUTES.events.evaluations(eventId) },
     { label: "Messages", href: VENDOR_HUB_ROUTES.events.messages(eventId) },
   ]

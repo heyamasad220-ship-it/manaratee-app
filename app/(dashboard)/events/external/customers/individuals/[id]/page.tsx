@@ -39,122 +39,38 @@ import {
   X,
 } from "lucide-react"
 
-// Mock individual data
-const individuals: Record<string, {
-  id: string
-  name: string
-  email: string
-  phone: string
-  address: string
-  city: string
-  state: string
-  zip: string
-  totalBookings: number
-  totalSpent: number
-  status: string
-  notes: string
-  createdAt: string
-}> = {
-  "ind-1": {
-    id: "ind-1",
-    name: "Sarah Johnson",
-    email: "sarah.johnson@email.com",
-    phone: "+1 (555) 123-4567",
-    address: "123 Oak Street",
-    city: "Springfield",
-    state: "IL",
-    zip: "62701",
-    totalBookings: 5,
-    totalSpent: 4250,
-    status: "Active",
-    notes: "Prefers evening time slots. Regular customer for birthday parties.",
-    createdAt: "2023-06-15",
-  },
-  "ind-2": {
-    id: "ind-2",
-    name: "Michael Chen",
-    email: "michael.chen@email.com",
-    phone: "+1 (555) 234-5678",
-    address: "456 Maple Ave",
-    city: "Chicago",
-    state: "IL",
-    zip: "60601",
-    totalBookings: 3,
-    totalSpent: 2800,
-    status: "Active",
-    notes: "Corporate events coordinator. Usually books on weekdays.",
-    createdAt: "2023-08-20",
-  },
-  "ind-3": {
-    id: "ind-3",
-    name: "Emily Rodriguez",
-    email: "emily.r@email.com",
-    phone: "+1 (555) 345-6789",
-    address: "789 Pine Road",
-    city: "Naperville",
-    state: "IL",
-    zip: "60540",
-    totalBookings: 8,
-    totalSpent: 7500,
-    status: "VIP",
-    notes: "VIP customer. Event planner who brings multiple bookings. Offer 10% discount.",
-    createdAt: "2023-03-10",
-  },
+const emptyIndividual = {
+  id: "",
+  name: "",
+  email: "",
+  phone: "",
+  address: "",
+  city: "",
+  state: "",
+  zip: "",
+  totalBookings: 0,
+  totalSpent: 0,
+  status: "",
+  notes: "",
+  createdAt: "",
 }
 
-// Mock booking history
-const bookingHistory = [
-  {
-    id: "bk-1",
-    date: "2024-01-15",
-    space: "Main Hall",
-    eventType: "Birthday Party",
-    duration: "4 hours",
-    amount: 850,
-    status: "Completed",
-  },
-  {
-    id: "bk-2",
-    date: "2023-12-20",
-    space: "Conference Room A",
-    eventType: "Meeting",
-    duration: "2 hours",
-    amount: 300,
-    status: "Completed",
-  },
-  {
-    id: "bk-3",
-    date: "2023-11-05",
-    space: "Main Hall",
-    eventType: "Anniversary",
-    duration: "6 hours",
-    amount: 1200,
-    status: "Completed",
-  },
-  {
-    id: "bk-4",
-    date: "2024-02-14",
-    space: "Garden Area",
-    eventType: "Engagement Party",
-    duration: "5 hours",
-    amount: 1100,
-    status: "Upcoming",
-  },
-  {
-    id: "bk-5",
-    date: "2023-09-15",
-    space: "Classroom B",
-    eventType: "Workshop",
-    duration: "3 hours",
-    amount: 450,
-    status: "Completed",
-  },
-]
+const individuals: Record<string, typeof emptyIndividual> = {}
+
+const bookingHistory: {
+  id: string
+  date: string
+  space: string
+  eventType: string
+  duration: string
+  amount: number
+  status: string
+}[] = []
 
 export default function IndividualDetailPage() {
   const params = useParams()
   const customerId = params.id as string
-  const customer = individuals[customerId] || individuals["ind-1"]
+  const customer = individuals[customerId] ?? emptyIndividual
 
   const [isEditing, setIsEditing] = useState(false)
   const [activeTab, setActiveTab] = useState("overview")
@@ -251,7 +167,7 @@ export default function IndividualDetailPage() {
                 <div>
                   <p className="text-sm text-muted-foreground">Avg. per Booking</p>
                   <p className="text-2xl font-semibold">
-                    ${Math.round(customer.totalSpent / customer.totalBookings).toLocaleString()}
+                    ${customer.totalBookings ? Math.round(customer.totalSpent / customer.totalBookings).toLocaleString() : "0"}
                   </p>
                 </div>
               </div>
@@ -391,7 +307,14 @@ export default function IndividualDetailPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {bookingHistory.map((booking) => (
+                    {bookingHistory.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                          No data yet.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      bookingHistory.map((booking) => (
                       <TableRow key={booking.id}>
                         <TableCell>{new Date(booking.date).toLocaleDateString()}</TableCell>
                         <TableCell className="font-medium">{booking.space}</TableCell>
@@ -408,7 +331,8 @@ export default function IndividualDetailPage() {
                           </Badge>
                         </TableCell>
                       </TableRow>
-                    ))}
+                      ))
+                    )}
                   </TableBody>
                 </Table>
               </CardContent>

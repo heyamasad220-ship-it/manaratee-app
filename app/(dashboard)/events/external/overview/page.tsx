@@ -44,38 +44,46 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 
-// Mock data
 const stats = {
-  pendingRequests: 8,
-  approvedBookings: 24,
-  depositPending: 5,
-  upcomingEvents: 12,
-  overdueBalances: 3,
-  overdueAmount: 4850,
+  pendingRequests: 0,
+  approvedBookings: 0,
+  depositPending: 0,
+  upcomingEvents: 0,
+  overdueBalances: 0,
+  overdueAmount: 0,
 }
 
-const recentRequests = [
-  { id: "REQ-015", customer: "Emily Chen", email: "emily@example.com", venue: "Grand Hall", eventType: "Wedding", requestDate: "Mar 22, 2026", eventDate: "Jun 15, 2026", guestCount: 200, status: "Pending Review" },
-  { id: "REQ-014", customer: "Corporate Plus LLC", email: "events@corpplus.com", venue: "Conference Room A", eventType: "Workshop", requestDate: "Mar 21, 2026", eventDate: "Apr 10, 2026", guestCount: 50, status: "Pending Review" },
-  { id: "REQ-013", customer: "Fatima Ali", email: "fatima@email.com", venue: "Garden Pavilion", eventType: "Baby Shower", requestDate: "Mar 20, 2026", eventDate: "May 5, 2026", guestCount: 35, status: "Pending Review" },
-  { id: "REQ-012", customer: "Tech Solutions Inc", email: "bookings@techsol.com", venue: "Grand Hall", eventType: "Conference", requestDate: "Mar 19, 2026", eventDate: "Apr 18, 2026", guestCount: 150, status: "Approved" },
-  { id: "REQ-011", customer: "John Smith", email: "john.smith@email.com", venue: "Banquet Room", eventType: "Birthday Party", requestDate: "Mar 18, 2026", eventDate: "Apr 2, 2026", guestCount: 75, status: "Deposit Paid" },
-]
+const recentRequests: {
+  id: string
+  customer: string
+  email: string
+  venue: string
+  eventType: string
+  requestDate: string
+  eventDate: string
+  guestCount: number
+  status: string
+}[] = []
 
-const todaySchedule = [
-  { id: "EVT-001", time: "9:00 AM - 12:00 PM", venue: "Conference Room A", customer: "Acme Corp", eventType: "Team Meeting", status: "In Progress" },
-  { id: "EVT-002", time: "2:00 PM - 6:00 PM", venue: "Grand Hall", customer: "Sarah Johnson", eventType: "Wedding Reception", status: "Upcoming" },
-  { id: "EVT-003", time: "3:00 PM - 5:00 PM", venue: "Garden Pavilion", customer: "Local Non-Profit", eventType: "Fundraiser", status: "Upcoming" },
-  { id: "EVT-004", time: "6:00 PM - 10:00 PM", venue: "Banquet Room", customer: "Martinez Family", eventType: "Anniversary Dinner", status: "Upcoming" },
-]
+const todaySchedule: {
+  id: string
+  time: string
+  venue: string
+  customer: string
+  eventType: string
+  status: string
+}[] = []
 
-const paymentAlerts = [
-  { id: "PAY-001", customer: "Tech Solutions Inc", venue: "Grand Hall", eventDate: "Apr 18, 2026", type: "Deposit Due", amount: 2250, dueDate: "Mar 25, 2026", daysOverdue: 0 },
-  { id: "PAY-002", customer: "Wedding Dreams LLC", venue: "Grand Hall", eventDate: "Apr 5, 2026", type: "Balance Overdue", amount: 2800, dueDate: "Mar 20, 2026", daysOverdue: 4 },
-  { id: "PAY-003", customer: "Community Center", venue: "Banquet Room", eventDate: "Mar 28, 2026", type: "Balance Overdue", amount: 1200, dueDate: "Mar 14, 2026", daysOverdue: 10 },
-  { id: "PAY-004", customer: "Ahmed Hassan", venue: "Conference Room A", eventDate: "Apr 2, 2026", type: "Deposit Due", amount: 400, dueDate: "Mar 26, 2026", daysOverdue: 0 },
-  { id: "PAY-005", customer: "Johnson Family", venue: "Garden Pavilion", eventDate: "Mar 30, 2026", type: "Balance Overdue", amount: 850, dueDate: "Mar 16, 2026", daysOverdue: 8 },
-]
+const paymentAlerts: {
+  id: string
+  customer: string
+  venue: string
+  eventDate: string
+  type: string
+  amount: number
+  dueDate: string
+  daysOverdue: number
+}[] = []
 
 type BookingStatus = "Pending Review" | "Approved" | "Rejected" | "Deposit Pending" | "Deposit Paid" | "Fully Paid" | "Cancelled"
 
@@ -255,32 +263,40 @@ export default function VenueRentalDashboardPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {recentRequests.map((request) => (
-                    <TableRow key={request.id}>
-                      <TableCell>
-                        <div>
-                          <p className="font-medium text-sm">{request.customer}</p>
-                          <p className="text-xs text-muted-foreground">{request.eventType}</p>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm">{request.venue}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{request.eventDate}</TableCell>
-                      <TableCell className="text-sm">{request.guestCount}</TableCell>
-                      <TableCell>{getStatusBadge(request.status)}</TableCell>
-                      <TableCell>
-                        {request.status === "Pending Review" && (
-                          <div className="flex gap-1">
-                            <Button size="sm" variant="ghost" className="h-7 px-2 text-red-600 hover:text-red-700 hover:bg-red-50">
-                              <XCircle className="h-4 w-4" />
-                            </Button>
-                            <Button size="sm" variant="ghost" className="h-7 px-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50">
-                              <CheckCircle2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        )}
+                  {recentRequests.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="py-6 text-center text-sm text-muted-foreground">
+                        No data yet.
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ) : (
+                    recentRequests.map((request) => (
+                      <TableRow key={request.id}>
+                        <TableCell>
+                          <div>
+                            <p className="font-medium text-sm">{request.customer}</p>
+                            <p className="text-xs text-muted-foreground">{request.eventType}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-sm">{request.venue}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{request.eventDate}</TableCell>
+                        <TableCell className="text-sm">{request.guestCount}</TableCell>
+                        <TableCell>{getStatusBadge(request.status)}</TableCell>
+                        <TableCell>
+                          {request.status === "Pending Review" && (
+                            <div className="flex gap-1">
+                              <Button size="sm" variant="ghost" className="h-7 px-2 text-red-600 hover:text-red-700 hover:bg-red-50">
+                                <XCircle className="h-4 w-4" />
+                              </Button>
+                              <Button size="sm" variant="ghost" className="h-7 px-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50">
+                                <CheckCircle2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
@@ -303,23 +319,27 @@ export default function VenueRentalDashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="flex flex-col gap-3">
-                {todaySchedule.map((event) => (
-                  <div key={event.id} className="flex flex-col gap-1.5 rounded-lg border p-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-primary">{event.time}</span>
-                      <Badge variant="secondary" className={scheduleStatusStyles[event.status]}>
-                        {event.status}
-                      </Badge>
+                {todaySchedule.length === 0 ? (
+                  <p className="py-4 text-center text-sm text-muted-foreground">No data yet.</p>
+                ) : (
+                  todaySchedule.map((event) => (
+                    <div key={event.id} className="flex flex-col gap-1.5 rounded-lg border p-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-primary">{event.time}</span>
+                        <Badge variant="secondary" className={scheduleStatusStyles[event.status]}>
+                          {event.status}
+                        </Badge>
+                      </div>
+                      <p className="font-medium text-sm">{event.customer}</p>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Building2 className="h-3 w-3" />
+                        <span>{event.venue}</span>
+                        <span className="text-muted-foreground/50">•</span>
+                        <span>{event.eventType}</span>
+                      </div>
                     </div>
-                    <p className="font-medium text-sm">{event.customer}</p>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Building2 className="h-3 w-3" />
-                      <span>{event.venue}</span>
-                      <span className="text-muted-foreground/50">•</span>
-                      <span>{event.eventType}</span>
-                    </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>
@@ -352,42 +372,50 @@ export default function VenueRentalDashboardPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paymentAlerts.map((alert) => (
-                  <TableRow key={alert.id}>
-                    <TableCell className="font-medium text-sm">{alert.customer}</TableCell>
-                    <TableCell className="text-sm">{alert.venue}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{alert.eventDate}</TableCell>
-                    <TableCell>
-                      <Badge 
-                        variant="secondary" 
-                        className={alert.type === "Balance Overdue" ? "bg-red-100 text-red-700" : "bg-orange-100 text-orange-700"}
-                      >
-                        {alert.type === "Balance Overdue" && <AlertTriangle className="mr-1 h-3 w-3" />}
-                        {alert.type === "Deposit Due" && <Clock className="mr-1 h-3 w-3" />}
-                        {alert.type}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="font-medium text-sm">{formatCurrency(alert.amount)}</TableCell>
-                    <TableCell>
-                      <div className="flex flex-col">
-                        <span className="text-sm">{alert.dueDate}</span>
-                        {alert.daysOverdue > 0 && (
-                          <span className="text-xs text-red-600">{alert.daysOverdue} days overdue</span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        <Button size="sm" variant="outline" className="h-7 text-xs">
-                          Send Reminder
-                        </Button>
-                        <Button size="sm" className="h-7 text-xs" onClick={() => setShowPaymentDialog(true)}>
-                          Record
-                        </Button>
-                      </div>
+                {paymentAlerts.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="py-6 text-center text-sm text-muted-foreground">
+                      No data yet.
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  paymentAlerts.map((alert) => (
+                    <TableRow key={alert.id}>
+                      <TableCell className="font-medium text-sm">{alert.customer}</TableCell>
+                      <TableCell className="text-sm">{alert.venue}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{alert.eventDate}</TableCell>
+                      <TableCell>
+                        <Badge 
+                          variant="secondary" 
+                          className={alert.type === "Balance Overdue" ? "bg-red-100 text-red-700" : "bg-orange-100 text-orange-700"}
+                        >
+                          {alert.type === "Balance Overdue" && <AlertTriangle className="mr-1 h-3 w-3" />}
+                          {alert.type === "Deposit Due" && <Clock className="mr-1 h-3 w-3" />}
+                          {alert.type}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="font-medium text-sm">{formatCurrency(alert.amount)}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="text-sm">{alert.dueDate}</span>
+                          {alert.daysOverdue > 0 && (
+                            <span className="text-xs text-red-600">{alert.daysOverdue} days overdue</span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          <Button size="sm" variant="outline" className="h-7 text-xs">
+                            Send Reminder
+                          </Button>
+                          <Button size="sm" className="h-7 text-xs" onClick={() => setShowPaymentDialog(true)}>
+                            Record
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </CardContent>
@@ -463,10 +491,9 @@ export default function VenueRentalDashboardPage() {
                   <SelectValue placeholder="Select booking" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="bk-001">Tech Solutions Inc - Grand Hall (Apr 18)</SelectItem>
-                  <SelectItem value="bk-002">Wedding Dreams LLC - Grand Hall (Apr 5)</SelectItem>
-                  <SelectItem value="bk-003">Community Center - Banquet Room (Mar 28)</SelectItem>
-                  <SelectItem value="bk-004">Ahmed Hassan - Conference Room A (Apr 2)</SelectItem>
+                  <SelectItem value="none" disabled>
+                    No bookings
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>

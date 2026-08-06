@@ -11,17 +11,19 @@ export function CopyBazaarEventButton({
   eventName,
   variant = "outline",
   size = "default",
+  className,
 }: {
   eventId: string
   eventName: string
   variant?: "outline" | "ghost" | "default"
   size?: "default" | "sm"
+  className?: string
 }) {
   const [open, setOpen] = useState(false)
 
   return (
     <>
-      <Button variant={variant} size={size} onClick={() => setOpen(true)}>
+      <Button variant={variant} size={size} className={className} onClick={() => setOpen(true)}>
         <Copy className="mr-2 h-4 w-4" />
         Copy event
       </Button>

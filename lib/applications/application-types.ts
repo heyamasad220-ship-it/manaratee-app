@@ -161,6 +161,7 @@ export type ApplicationDocumentRecord = {
   file_name: string
   file_url: string
   file_type: string | null
+  document_kind?: string | null
   uploaded_by: string | null
   created_at: string
 }

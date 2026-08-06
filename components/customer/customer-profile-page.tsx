@@ -51,7 +51,7 @@ import {
   APPLICATION_STATUS_LABELS,
   type ApplicationStatus as DbApplicationStatus,
 } from "@/lib/applications/application-types"
-import { CUSTOMER_CHILDCARE_APPLY_PATH, CUSTOMER_VOLUNTEER_APPLY_PATH } from "@/lib/applications/application-routes"
+import { CUSTOMER_CHILDCARE_APPLY_PATH, CUSTOMER_VENDOR_APPLY_PATH, CUSTOMER_VOLUNTEER_APPLY_PATH } from "@/lib/applications/application-routes"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -162,6 +162,20 @@ type UserApplication = {
 }
 
 const applicationTypes: ApplicationType[] = [
+  {
+    id: "vendor",
+    name: "Vendor",
+    description:
+      "Apply to join the Vendor Network and sell at bazaars, markets, and community events.",
+    icon: "Store",
+    isActive: true,
+    requirements: [
+      "Business name and type",
+      "Products or services description",
+      "Contact and social links",
+    ],
+    href: CUSTOMER_VENDOR_APPLY_PATH,
+  },
   {
     id: "volunteer",
     name: "Volunteer",
@@ -807,6 +821,10 @@ export function CustomerProfilePage({ section }: CustomerProfilePageProps) {
             <p className="text-sm text-muted-foreground">
               You already have active applications on file. Open an application type above to
               check status, or visit{" "}
+              <Link href={CUSTOMER_VENDOR_APPLY_PATH} className="underline">
+                Vendor
+              </Link>{" "}
+              /{" "}
               <Link href={CUSTOMER_VOLUNTEER_APPLY_PATH} className="underline">
                 Volunteer
               </Link>{" "}

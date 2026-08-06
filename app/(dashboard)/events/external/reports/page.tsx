@@ -63,50 +63,27 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-// Mock data
-const bookingsByMonth = [
-  { month: "Jan", bookings: 18, approved: 15, cancelled: 3 },
-  { month: "Feb", bookings: 24, approved: 21, cancelled: 3 },
-  { month: "Mar", bookings: 32, approved: 28, cancelled: 4 },
-  { month: "Apr", bookings: 28, approved: 25, cancelled: 3 },
-  { month: "May", bookings: 35, approved: 31, cancelled: 4 },
-  { month: "Jun", bookings: 42, approved: 38, cancelled: 4 },
-]
+// Chart / table stubs (empty until wired to API)
+const bookingsByMonth: { month: string; bookings: number; approved: number; cancelled: number }[] = []
 
-const revenueByMonth = [
-  { month: "Jan", revenue: 12500, collected: 10800, outstanding: 1700 },
-  { month: "Feb", revenue: 18200, collected: 16500, outstanding: 1700 },
-  { month: "Mar", revenue: 24800, collected: 21200, outstanding: 3600 },
-  { month: "Apr", revenue: 21500, collected: 19800, outstanding: 1700 },
-  { month: "May", revenue: 28900, collected: 25400, outstanding: 3500 },
-  { month: "Jun", revenue: 35600, collected: 31200, outstanding: 4400 },
-]
+const revenueByMonth: { month: string; revenue: number; collected: number; outstanding: number }[] = []
 
-const bookingsByVenue = [
-  { name: "Grand Hall", value: 45, color: "#0ea5e9" },
-  { name: "Garden Pavilion", value: 38, color: "#22c55e" },
-  { name: "Conference Center", value: 32, color: "#f59e0b" },
-  { name: "Rooftop Terrace", value: 24, color: "#8b5cf6" },
-]
+const bookingsByVenue: { name: string; value: number; color: string }[] = []
 
-const bookingsByEventType = [
-  { name: "Wedding", value: 35, color: "#ec4899" },
-  { name: "Corporate", value: 42, color: "#3b82f6" },
-  { name: "Birthday", value: 28, color: "#f97316" },
-  { name: "Conference", value: 22, color: "#06b6d4" },
-  { name: "Other", value: 12, color: "#6b7280" },
-]
+const bookingsByEventType: { name: string; value: number; color: string }[] = []
 
-const detailedReportData = [
-  { id: "BK-001", customer: "Sarah Johnson", venue: "Grand Hall", eventDate: "2026-03-15", eventType: "Wedding", guests: 150, total: 5500, paid: 5500, status: "Approved", paymentStatus: "Fully Paid" },
-  { id: "BK-002", customer: "Tech Corp Inc.", venue: "Conference Center", eventDate: "2026-03-18", eventType: "Corporate", guests: 80, total: 3200, paid: 1600, status: "Approved", paymentStatus: "Deposit Paid" },
-  { id: "BK-003", customer: "Michael Chen", venue: "Garden Pavilion", eventDate: "2026-03-20", eventType: "Birthday", guests: 60, total: 2800, paid: 840, status: "Pending", paymentStatus: "Deposit Pending" },
-  { id: "BK-004", customer: "Emily Davis", venue: "Rooftop Terrace", eventDate: "2026-03-22", eventType: "Corporate", guests: 45, total: 2200, paid: 2200, status: "Approved", paymentStatus: "Fully Paid" },
-  { id: "BK-005", customer: "James Wilson", venue: "Grand Hall", eventDate: "2026-03-25", eventType: "Wedding", guests: 200, total: 6800, paid: 0, status: "Cancelled", paymentStatus: "Refunded" },
-  { id: "BK-006", customer: "Local Nonprofit", venue: "Conference Center", eventDate: "2026-03-28", eventType: "Conference", guests: 100, total: 1800, paid: 540, status: "Approved", paymentStatus: "Deposit Paid" },
-  { id: "BK-007", customer: "Amanda Brown", venue: "Garden Pavilion", eventDate: "2026-04-01", eventType: "Birthday", guests: 40, total: 1900, paid: 1900, status: "Approved", paymentStatus: "Fully Paid" },
-  { id: "BK-008", customer: "StartUp Labs", venue: "Rooftop Terrace", eventDate: "2026-04-05", eventType: "Corporate", guests: 30, total: 1500, paid: 450, status: "Pending", paymentStatus: "Deposit Pending" },
-]
+const detailedReportData: {
+  id: string
+  customer: string
+  venue: string
+  eventDate: string
+  eventType: string
+  guests: number
+  total: number
+  paid: number
+  status: string
+  paymentStatus: string
+}[] = []
 
 const venues = ["All Venues", "Grand Hall", "Garden Pavilion", "Conference Center", "Rooftop Terrace"]
 const bookingStatuses = ["All Statuses", "Pending", "Approved", "Cancelled"]
@@ -158,12 +135,12 @@ export default function VenueRentalsReportsPage() {
   }
 
   // Summary calculations
-  const totalBookings = 179
-  const approvedBookings = 158
-  const cancelledBookings = 21
-  const revenueCollected = 124900
-  const outstandingBalances = 16600
-  const venueUtilization = 72
+  const totalBookings = 0
+  const approvedBookings = 0
+  const cancelledBookings = 0
+  const revenueCollected = 0
+  const outstandingBalances = 0
+  const venueUtilization = 0
 
   return (
     <>
@@ -563,27 +540,35 @@ export default function VenueRentalsReportsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {detailedReportData.map((booking) => (
-                    <TableRow key={booking.id}>
-                      <TableCell className="font-medium text-primary">{booking.id}</TableCell>
-                      <TableCell>{booking.customer}</TableCell>
-                      <TableCell>{booking.venue}</TableCell>
-                      <TableCell>{formatDate(booking.eventDate)}</TableCell>
-                      <TableCell>{booking.eventType}</TableCell>
-                      <TableCell>{booking.guests}</TableCell>
-                      <TableCell className="font-medium">{formatCurrency(booking.total)}</TableCell>
-                      <TableCell className={cn("font-medium", booking.paid === booking.total ? "text-emerald-600" : "")}>
-                        {formatCurrency(booking.paid)}
-                      </TableCell>
-                      <TableCell>{getStatusBadge(booking.status)}</TableCell>
-                      <TableCell>{getPaymentStatusBadge(booking.paymentStatus)}</TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <ExternalLink className="h-4 w-4" />
-                        </Button>
+                  {detailedReportData.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={10} className="py-6 text-center text-sm text-muted-foreground">
+                        No data yet.
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ) : (
+                    detailedReportData.map((booking) => (
+                      <TableRow key={booking.id}>
+                        <TableCell className="font-medium text-primary">{booking.id}</TableCell>
+                        <TableCell>{booking.customer}</TableCell>
+                        <TableCell>{booking.venue}</TableCell>
+                        <TableCell>{formatDate(booking.eventDate)}</TableCell>
+                        <TableCell>{booking.eventType}</TableCell>
+                        <TableCell>{booking.guests}</TableCell>
+                        <TableCell className="font-medium">{formatCurrency(booking.total)}</TableCell>
+                        <TableCell className={cn("font-medium", booking.paid === booking.total ? "text-emerald-600" : "")}>
+                          {formatCurrency(booking.paid)}
+                        </TableCell>
+                        <TableCell>{getStatusBadge(booking.status)}</TableCell>
+                        <TableCell>{getPaymentStatusBadge(booking.paymentStatus)}</TableCell>
+                        <TableCell>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <ExternalLink className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </div>

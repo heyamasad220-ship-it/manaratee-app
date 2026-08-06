@@ -13,6 +13,7 @@ function revalidateModuleSettingsPaths(moduleKey: ModuleNotificationKey) {
     revalidatePath("/event-management/settings/notifications")
   } else if (moduleKey === "vendor_hub") {
     revalidatePath("/vendor-hub/settings/notifications")
+    revalidatePath("/vendor-hub/settings")
   } else {
     revalidatePath("/bookings/settings/notifications")
   }

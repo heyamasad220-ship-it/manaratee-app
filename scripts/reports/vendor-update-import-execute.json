@@ -1,0 +1,85 @@
+{
+  "mode": "execute",
+  "importTag": "VENDOR_UPDATE_CSV_V1",
+  "orgId": "e057e00a-e4e3-4adf-9af5-f465db1894be",
+  "csvPath": "C:\\Users\\danan\\Downloads\\vendorUpdate.csv",
+  "csvRows": 96,
+  "skippedNoEmail": 0,
+  "duplicateEmailRows": 9,
+  "uniqueContacts": 87,
+  "sample": [
+    {
+      "email": "aanjumaazhar@gmail.com",
+      "full_name": "anjum AZHAR",
+      "business_name": "Kids toys",
+      "phone": "9452096154",
+      "selling": "Kids toys",
+      "social": "N/A"
+    },
+    {
+      "email": "aasmi@outlook.com",
+      "full_name": "Asmi ja",
+      "business_name": "Qishta& krumb",
+      "phone": "9452687397",
+      "selling": "We craft freshly made, handcrafted bundt cakes in unique and exciting flavors, including our limited-edition Dubai chocolate and classic red velvet, all topped with rich, creamy cream cheese frosting. Each cake is individually boxed, making it a perfectly portioned snack that combines rich flavor with a Elegant aesthetic . We make sure it stands out and delights anyone looking for high-quality, memorable treats. We also use only plant-based colors instead of synthetic dyes, reflecting our commitment to thoughtful, natural ingredients.",
+      "social": "None"
+    },
+    {
+      "email": "abir@yastore.com",
+      "full_name": "Abir Aljabi",
+      "business_name": "Yastore",
+      "phone": "4696688994",
+      "selling": "Books and toys",
+      "social": "Yastore.com"
+    },
+    {
+      "email": "abusaadenas74@gmail.com",
+      "full_name": "Enas abusaad",
+      "business_name": "Rezinas art",
+      "phone": "2142280666",
+      "selling": "Hand made resin Islamic wall art and home decor",
+      "social": "https://www.instagram.com/rezinas_art?igsh=eDdwZTdrNzJhcTZ0&utm_source=qr"
+    },
+    {
+      "email": "admin@sham-foods.com",
+      "full_name": "Bassam Alatarabishi",
+      "business_name": "Sham Catering",
+      "phone": "9728787964",
+      "selling": "Live station Shawarma",
+      "social": "instagram: Sham_RFS"
+    },
+    {
+      "email": "ahaleim@gmail.com",
+      "full_name": "Ahmed Badri",
+      "business_name": "Barakah Mortgage",
+      "phone": "4696551333",
+      "selling": "Islamic Home Finance",
+      "social": "https://www.facebook.com/share/16uCSEbH14/?mibextid=wwXIfr"
+    },
+    {
+      "email": "ahmedskr@gmail.com",
+      "full_name": "Ahmed Khalil",
+      "business_name": "Voxa Embroidery",
+      "phone": "2146032088",
+      "selling": "Art, decorations and fragrances",
+      "social": "https://www.instagram.com/maxdivoxa"
+    },
+    {
+      "email": "alifpost20@gmail.com",
+      "full_name": "Farah Hye",
+      "business_name": "Alif Post LLC",
+      "phone": "6785248300",
+      "selling": "Ramadan Calendar Boxes, Ramadan treat boxes",
+      "social": "Alif.post"
+    }
+  ],
+  "counters": {
+    "contactsMatched": 87,
+    "contactsCreated": 0,
+    "contactsUpdated": 87,
+    "applicationsCreated": 40,
+    "applicationsUpdated": 47,
+    "applicationsApproved": 0,
+    "errors": []
+  }
+}

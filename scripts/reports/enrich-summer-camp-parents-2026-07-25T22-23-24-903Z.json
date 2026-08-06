@@ -1,0 +1,147 @@
+{
+  "mode": "dry-run",
+  "csvPath": "C:/Users/danan/Downloads/Summer Camp 2026.csv",
+  "parentsInRoster": 107,
+  "matchedParents": 102,
+  "unmatchedParents": [
+    {
+      "email": "hasfoor@yahoo.com",
+      "name": "Husam Asfoor"
+    },
+    {
+      "email": "haamir9@gmail.com",
+      "name": "Hira aamir"
+    },
+    {
+      "email": "mhamideh291290@gmail.com",
+      "name": "Mohammad Hamideh"
+    },
+    {
+      "email": "ujoo@hotmail.com",
+      "name": "Uzma Ahmed"
+    },
+    {
+      "email": "mabrookamal100@yahoo.com",
+      "name": "Amal Aldurra"
+    }
+  ],
+  "contactPatches": 70,
+  "contactsUpdated": 0,
+  "notesAdded": 102,
+  "spousesLinked": 0,
+  "householdsSynced": 0,
+  "samples": [
+    {
+      "contact": "Sameen Sayyed",
+      "email": "sameen2u@gmail.com",
+      "patch": {
+        "address": "4821 mulholland dr, plano"
+      },
+      "willAddNote": true
+    },
+    {
+      "contact": "Mohamed El-Madhoun",
+      "email": "moeelmad@gamil.com",
+      "patch": {
+        "address": "1815 Morning Mist Way Wylie",
+        "city": "1815 Morning Mist Way Wylie",
+        "state": "TX",
+        "zip": "75098"
+      },
+      "willAddNote": true
+    },
+    {
+      "contact": "Sanaa Jomaa",
+      "email": "sanaamjoumaa@gmail.com",
+      "patch": {
+        "address": "1510 Haybale Ln"
+      },
+      "willAddNote": true
+    },
+    {
+      "contact": "Hoda Shaalan",
+      "email": "hoda.shaalan92@gmail.com",
+      "patch": {
+        "address": "181 Meadowcreek"
+      },
+      "willAddNote": true
+    },
+    {
+      "contact": "Emma Soliman",
+      "email": "esolim2@gmail.com",
+      "patch": {
+        "address": "214930654, 5139 Quail Lake Dr Dallas, TX 75287",
+        "zip": "75287"
+      },
+      "willAddNote": true
+    },
+    {
+      "contact": "Rabeeya Hussain",
+      "email": "rabeeyahussain0@gmail.com",
+      "patch": {
+        "address": "4412 Evenstar Way"
+      },
+      "willAddNote": true
+    },
+    {
+      "contact": "Dr. Maheeb Jaouni",
+      "email": "maheebjaouni@yahoo.com",
+      "patch": {
+        "address": "7202 Persimmon",
+        "city": "7202 Persimmon",
+        "state": "CT"
+      },
+      "willAddNote": true
+    },
+    {
+      "contact": "Khitam Al-Hajj",
+      "email": "khitamalhaj@gmail.com",
+      "patch": {
+        "address": "325 Hawthorne Dr"
+      },
+      "willAddNote": true
+    },
+    {
+      "contact": "Haneen Alhasan",
+      "email": "hsalous@gmail.com",
+      "patch": {
+        "address": "6709 Cheswick",
+        "city": "6709 Cheswick",
+        "state": "CT",
+        "zip": "75002"
+      },
+      "willAddNote": true
+    },
+    {
+      "contact": "Saeed Steitieh",
+      "email": "saeed2004@hotmail.com",
+      "patch": {
+        "address": "4141 Horizon North Pkwy apt 234 Dallas"
+      },
+      "willAddNote": true
+    },
+    {
+      "contact": "Susan Almasri",
+      "email": "susan.almasri@gmail.com",
+      "patch": {
+        "address": "1406 Broadmoor lane"
+      },
+      "willAddNote": true
+    },
+    {
+      "contact": "Alexis puente",
+      "email": "a.renepuente@gmail.com",
+      "patch": {
+        "address": "836 dartford drive"
+      },
+      "willAddNote": true
+    }
+  ],
+  "fieldFills": {
+    "phone": 0,
+    "address": 70,
+    "city": 16,
+    "state": 16,
+    "zip": 26
+  }
+}

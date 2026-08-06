@@ -1,0 +1,65 @@
+{
+  "mode": "execute",
+  "generatedAt": "2026-07-25T17:25:00.251Z",
+  "orgId": "e057e00a-e4e3-4adf-9af5-f465db1894be",
+  "actions": [
+    "Rename survivor → \"Summer Camp\", dates 2026-06-01..2026-07-23",
+    "Rename survivor sessions to Week 1–8; move camp2 sessions to Week 9–8",
+    "Configure fee plan: tiers {\"1\":135,\"2\":270,\"3\":360,\"4\":450,\"5\":585,\"6\":720,\"7\":810,\"8\":900}, registration $0, sibling 5% tuition-only",
+    "Archive offering \"Summer Camp Two\" after remapping"
+  ],
+  "warnings": [],
+  "counts": {
+    "survivorSessionsBefore": 8,
+    "camp2Sessions": 0,
+    "camp2Enrollments": 247,
+    "dualCampParticipants": 116,
+    "enrollmentsToRetarget": 131,
+    "finalSessionCount": 8
+  },
+  "survivorOfferingId": "6700239e-bbf5-49ae-90e6-0412b88a22c3",
+  "feePlanId": "a802bba1-421c-44cb-b588-40d1280fbb19",
+  "finalSessions": [
+    {
+      "name": "Week 1",
+      "start": "2026-06-01",
+      "end": "2026-06-04"
+    },
+    {
+      "name": "Week 2",
+      "start": "2026-06-08",
+      "end": "2026-06-11"
+    },
+    {
+      "name": "Week 3",
+      "start": "2026-06-15",
+      "end": "2026-06-18"
+    },
+    {
+      "name": "Week 4",
+      "start": "2026-06-22",
+      "end": "2026-06-25"
+    },
+    {
+      "name": "Week 5",
+      "start": "2026-06-29",
+      "end": "2026-07-02"
+    },
+    {
+      "name": "Week 6",
+      "start": "2026-07-06",
+      "end": "2026-07-09"
+    },
+    {
+      "name": "Week 7",
+      "start": "2026-07-13",
+      "end": "2026-07-16"
+    },
+    {
+      "name": "Week 8",
+      "start": "2026-07-20",
+      "end": "2026-07-23"
+    }
+  ],
+  "sqlRequired": "scripts/190_session_count_tuition_tiers.sql"
+}

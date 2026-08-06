@@ -39,5 +39,48 @@ export function getContactProfileModuleFlags(
 
 /** Overview right-rail Financial Summary + Financial tab visibility. */
 export function showContactFinancialSurfaces(modules: ContactProfileModuleFlags) {
-  return modules.donations || modules.bookings || modules.programs || modules.membership
+  return (
+    modules.donations ||
+    modules.bookings ||
+    modules.programs ||
+    modules.membership ||
+    modules.vendorHub
+  )
+}
+
+/** Core CRM timeline labels that stay visible regardless of subscribed modules. */
+const CORE_TIMELINE_MODULES = new Set(["Contacts", "Roles", "Notes"])
+
+/**
+ * Map display timeline `module` labels to tenant module flags.
+ * Unknown / unsubscribed modules are hidden.
+ */
+export function isContactTimelineModuleEnabled(
+  moduleLabel: string,
+  modules: ContactProfileModuleFlags
+): boolean {
+  if (CORE_TIMELINE_MODULES.has(moduleLabel)) return true
+
+  switch (moduleLabel) {
+    case "Donations":
+      return modules.donations
+    case "Programs":
+      return modules.programs
+    case "Rentals":
+    case "Spaces":
+      return modules.bookings
+    case "Vendor Hub":
+      return modules.vendorHub
+    case "Teams":
+      return modules.membership
+    default:
+      return false
+  }
+}
+
+export function filterContactTimelineByModules<T extends { module: string }>(
+  items: T[],
+  modules: ContactProfileModuleFlags
+): T[] {
+  return items.filter((item) => isContactTimelineModuleEnabled(item.module, modules))
 }

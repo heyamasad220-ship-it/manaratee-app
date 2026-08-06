@@ -490,6 +490,8 @@ export async function submitApplication(input: SubmitApplicationInput) {
   revalidatePath("/customer/profile/applications")
   revalidatePath("/customer/apply/childcare")
   revalidatePath("/customer/apply/volunteer")
+  revalidatePath("/customer/apply/vendor")
+  revalidatePath(VENDOR_HUB_ROUTES.network.onboarding)
 
   if (
     (AFFILIATION_APPLICATION_TYPES as readonly string[]).includes(input.applicationType)

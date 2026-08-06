@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 
-import { createClient } from "@/lib/supabase/server"
+import { createServiceRoleClient } from "@/lib/supabase/service-role"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import {
   buildBazaarShareUrl,
@@ -12,12 +12,15 @@ import { requireVendorHubManage } from "@/lib/vendor-hub/vendor-hub-permissions"
 import { VENDOR_HUB_ROUTES } from "@/lib/vendor-hub/vendor-hub-routes"
 
 async function getEventForOrg(eventId: string) {
-  const supabase = await createClient()
   const organizationId = await getSelectedOrganizationId()
 
   if (!organizationId) {
     throw new Error("No organization selected")
   }
+
+  // Service role after requireVendorHubManage — avoids slow vendor_hub_events RLS
+  // (permissive vendor SELECT policy scanning large participation/payment tables).
+  const supabase = createServiceRoleClient()
 
   const { data, error } = await supabase
     .from("vendor_hub_events")
@@ -26,7 +29,11 @@ async function getEventForOrg(eventId: string) {
     .eq("organization_id", organizationId)
     .maybeSingle()
 
-  if (error || !data) {
+  if (error) {
+    throw new Error(error.message || "Bazaar event not found")
+  }
+
+  if (!data) {
     throw new Error("Bazaar event not found")
   }
 
@@ -43,7 +50,7 @@ function revalidateSharePaths(eventId: string, shareToken?: string | null) {
 export async function ensureBazaarShareToken(eventId: string) {
   await requireVendorHubManage()
 
-  const { supabase, event } = await getEventForOrg(eventId)
+  const { supabase, organizationId, event } = await getEventForOrg(eventId)
 
   if (event.public_share_token) {
     return {
@@ -58,6 +65,7 @@ export async function ensureBazaarShareToken(eventId: string) {
     .from("vendor_hub_events")
     .update({ public_share_token: shareToken })
     .eq("id", eventId)
+    .eq("organization_id", organizationId)
 
   if (error) {
     if (error.code === "42703") {
@@ -79,7 +87,7 @@ export async function ensureBazaarShareToken(eventId: string) {
 export async function regenerateBazaarShareToken(eventId: string) {
   await requireVendorHubManage()
 
-  const { supabase, event } = await getEventForOrg(eventId)
+  const { supabase, organizationId, event } = await getEventForOrg(eventId)
   const previousToken = event.public_share_token as string | null
   const shareToken = createBazaarShareToken()
 
@@ -87,6 +95,7 @@ export async function regenerateBazaarShareToken(eventId: string) {
     .from("vendor_hub_events")
     .update({ public_share_token: shareToken })
     .eq("id", eventId)
+    .eq("organization_id", organizationId)
 
   if (error) {
     throw new Error(error.message)

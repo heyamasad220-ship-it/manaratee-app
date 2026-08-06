@@ -1,0 +1,64 @@
+{
+  "mode": "execute",
+  "orgId": "e057e00a-e4e3-4adf-9af5-f465db1894be",
+  "venueName": "MAS Dallas Islamic Center",
+  "venueId": "c79409cd-207e-4141-a8e9-42d6cfeb120d",
+  "venueCreated": true,
+  "eventsTotal": 22,
+  "eventsUpdated": 22,
+  "sample": [
+    {
+      "id": "3e9e6dbe-0800-485c-ae11-b2182df6a5ec",
+      "name": "Back to School Bazaar",
+      "venue_id": null,
+      "location": "1515 Blake Dr. Richardson TX 75081"
+    },
+    {
+      "id": "9b7fc2cc-0a04-4787-925d-38d5d331d496",
+      "name": "Open House",
+      "venue_id": null,
+      "location": null
+    },
+    {
+      "id": "b2b4909d-168d-4e2d-8cff-2ac109ec4c7b",
+      "name": "Islamic Games 2026",
+      "venue_id": null,
+      "location": null
+    },
+    {
+      "id": "34c5656b-4e17-4f29-833e-fca55b39b425",
+      "name": "Islamic Games 2026",
+      "venue_id": null,
+      "location": null
+    },
+    {
+      "id": "6a2b0e00-4e15-4df9-961c-d396c9064faa",
+      "name": "Hajj Simulation",
+      "venue_id": null,
+      "location": null
+    },
+    {
+      "id": "3c868a18-d377-424c-b471-397e73bfd6d1",
+      "name": "MAS Bazaar",
+      "venue_id": null,
+      "location": null
+    },
+    {
+      "id": "2fe99a4e-d7bf-41af-859b-cae1893597d2",
+      "name": "MAS Fall Bazaar",
+      "venue_id": null,
+      "location": null
+    },
+    {
+      "id": "e5fa223f-2790-41f1-8206-36942a416cd7",
+      "name": "MAS Eid Al-adha Bazaar-",
+      "venue_id": null,
+      "location": null
+    }
+  ],
+  "availableVenues": [
+    "Banquet Hall",
+    "Main Prayer Hall (MPH)",
+    "Youth Lounge"
+  ]
+}

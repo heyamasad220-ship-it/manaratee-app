@@ -1,0 +1,1220 @@
+{
+  "importTag": "SUMMER_CAMPS_2026_V1",
+  "mode": "execute",
+  "generatedAt": "2026-07-25T13:40:11.171Z",
+  "phase": 1,
+  "phaseNote": "Payments CSV only. Master roster / staff payroll / expenses come in later phases.",
+  "calendars": [
+    {
+      "offeringName": "Summer Camp One (June)",
+      "start": "2026-06-01",
+      "end": "2026-06-25",
+      "schedule": "Mon–Thu 11:00–16:00",
+      "weeks": [
+        {
+          "name": "Week 1",
+          "start": "2026-06-01",
+          "end": "2026-06-04"
+        },
+        {
+          "name": "Week 2",
+          "start": "2026-06-08",
+          "end": "2026-06-11"
+        },
+        {
+          "name": "Week 3",
+          "start": "2026-06-15",
+          "end": "2026-06-18"
+        },
+        {
+          "name": "Week 4",
+          "start": "2026-06-22",
+          "end": "2026-06-25"
+        }
+      ]
+    },
+    {
+      "offeringName": "Summer Camp Two (6/29 - 7/23)",
+      "start": "2026-06-29",
+      "end": "2026-07-23",
+      "schedule": "Mon–Thu 11:00–16:00",
+      "weeks": [
+        {
+          "name": "Week 1",
+          "start": "2026-06-29",
+          "end": "2026-07-02"
+        },
+        {
+          "name": "Week 2",
+          "start": "2026-07-06",
+          "end": "2026-07-09"
+        },
+        {
+          "name": "Week 3",
+          "start": "2026-07-13",
+          "end": "2026-07-16"
+        },
+        {
+          "name": "Week 4",
+          "start": "2026-07-20",
+          "end": "2026-07-23"
+        }
+      ]
+    }
+  ],
+  "totals": {
+    "csvRows": 421,
+    "unknownPrograms": 0,
+    "registrationGroups": 366,
+    "enrolmentsPlanned": 612,
+    "cancelledGroups": 15,
+    "faGroups": 23,
+    "staffCreditGroups": 13,
+    "childcareGroups": 20,
+    "skippedNoMembers": 0,
+    "tuitionCollected": 208415,
+    "childcareCollected": 4255
+  },
+  "couponBreakdown": {
+    "STAFF-CAMP1-CREDIT": 6,
+    "CAMP2-ONEWEEK": 4,
+    "TWOWEEKSOFF": 1,
+    "(none)": 281,
+    "CREDITS-CAMP2-100": 1,
+    "CAMP2-CUSTOM-200": 1,
+    "CAMP2-ONEDAYPASS": 1,
+    "CAMP2-TWOWEEKS": 8,
+    "FA-CAMP2-100": 8,
+    "CAMP2-THREEWEEKS": 6,
+    "STAFF-CAMP2-50": 4,
+    "FA-CUSTOM-750": 1,
+    "MEMBER-SC2-10": 3,
+    "CAMP1-ONEWEEK": 5,
+    "FA-CAMP2-50%": 1,
+    "CAMP1-TWOWEEKS": 11,
+    "FA-SC2-1100": 1,
+    "ONEDAYPASS-70": 1,
+    "FA-CAMP1-100": 7,
+    "MEMBER-SC1-10": 4,
+    "PP-CAMP2-40": 1,
+    "SD-SC1-50": 1,
+    "FA-CAMP1-50": 2,
+    "STAFF-CAMP1-50": 2,
+    "FA-CAMP1-100%": 1,
+    "MASSTAFF": 1,
+    "FA-CAMP1-50%": 2,
+    "MEMMAS": 1
+  },
+  "skippedNoMembers": [],
+  "sampleRegistrations": [
+    {
+      "customerName": "Israt Jahan",
+      "email": "israt16_jahan@yahoo.com",
+      "campKey": "camp2",
+      "members": [
+        "Nusaiba M Rawa"
+      ],
+      "couponCode": "STAFF-CAMP1-CREDIT",
+      "couponType": "staff_credit",
+      "sessionPlan": {
+        "weekCount": 4,
+        "dayPass": false,
+        "kind": "full",
+        "reason": "STAFF-CAMP1-CREDIT"
+      },
+      "subscriptionFees": 450,
+      "addOnsAmount": 0,
+      "netTuition": 0,
+      "netChildcare": 0,
+      "cancelled": false,
+      "children": [
+        {
+          "childName": "Nusaiba M Rawa",
+          "originalFee": 450,
+          "discountAmount": 450,
+          "assistedFee": 0,
+          "amountPaid": 0,
+          "isPrimaryForChildcare": true
+        }
+      ]
+    },
+    {
+      "customerName": "Yaser Radwan",
+      "email": "yas.radwan@gmail.com",
+      "campKey": "camp2",
+      "members": [
+        "Zayn Radwan",
+        "Adam Radwan"
+      ],
+      "couponCode": "CAMP2-ONEWEEK",
+      "couponType": "session_length",
+      "sessionPlan": {
+        "weekCount": 1,
+        "dayPass": false,
+        "kind": "weeks",
+        "reason": "CAMP2-ONEWEEK"
+      },
+      "subscriptionFees": 850,
+      "addOnsAmount": 90,
+      "netTuition": 255,
+      "netChildcare": 90,
+      "cancelled": false,
+      "children": [
+        {
+          "childName": "Zayn Radwan",
+          "originalFee": 425,
+          "discountAmount": 297.5,
+          "assistedFee": 127.5,
+          "amountPaid": 127.5,
+          "isPrimaryForChildcare": true
+        },
+        {
+          "childName": "Adam Radwan",
+          "originalFee": 425,
+          "discountAmount": 297.5,
+          "assistedFee": 127.5,
+          "amountPaid": 127.5,
+          "isPrimaryForChildcare": false
+        }
+      ]
+    },
+    {
+      "customerName": "Kinza Muzaffar",
+      "email": "kinzamuzaffar14@gmail.com",
+      "campKey": "camp1",
+      "members": [
+        "Musa Hasan",
+        "Nuh Hasan"
+      ],
+      "couponCode": "TWOWEEKSOFF",
+      "couponType": "session_length",
+      "sessionPlan": {
+        "weekCount": 2,
+        "dayPass": false,
+        "kind": "weeks",
+        "reason": "TWOWEEKSOFF"
+      },
+      "subscriptionFees": 850,
+      "addOnsAmount": 180,
+      "netTuition": 165,
+      "netChildcare": 180,
+      "cancelled": false,
+      "children": [
+        {
+          "childName": "Musa Hasan",
+          "originalFee": 425,
+          "discountAmount": 170,
+          "assistedFee": 82.5,
+          "amountPaid": 82.5,
+          "isPrimaryForChildcare": true
+        },
+        {
+          "childName": "Nuh Hasan",
+          "originalFee": 425,
+          "discountAmount": 170,
+          "assistedFee": 82.5,
+          "amountPaid": 82.5,
+          "isPrimaryForChildcare": false
+        }
+      ]
+    },
+    {
+      "customerName": "Kinza Muzaffar",
+      "email": "kinzamuzaffar14@gmail.com",
+      "campKey": "camp2",
+      "members": [
+        "Musa Hasan",
+        "Nuh Hasan"
+      ],
+      "couponCode": "",
+      "couponType": "none",
+      "sessionPlan": {
+        "weekCount": 4,
+        "dayPass": false,
+        "kind": "full",
+        "reason": "no_coupon"
+      },
+      "subscriptionFees": 850,
+      "addOnsAmount": 300,
+      "netTuition": -300,
+      "netChildcare": 300,
+      "cancelled": false,
+      "children": [
+        {
+          "childName": "Musa Hasan",
+          "originalFee": 425,
+          "discountAmount": 0,
+          "assistedFee": 425,
+          "amountPaid": 0,
+          "isPrimaryForChildcare": true
+        },
+        {
+          "childName": "Nuh Hasan",
+          "originalFee": 425,
+          "discountAmount": 0,
+          "assistedFee": 425,
+          "amountPaid": 0,
+          "isPrimaryForChildcare": false
+        }
+      ]
+    },
+    {
+      "customerName": "Eman Hashem",
+      "email": "eman@drhashem.com",
+      "campKey": "camp2",
+      "members": [
+        "Leila Hashem",
+        "Lana Hashem"
+      ],
+      "couponCode": "CREDITS-CAMP2-100",
+      "couponType": "staff_credit",
+      "sessionPlan": {
+        "weekCount": 4,
+        "dayPass": false,
+        "kind": "full",
+        "reason": "CREDITS-CAMP2-100"
+      },
+      "subscriptionFees": 850,
+      "addOnsAmount": 0,
+      "netTuition": 0,
+      "netChildcare": 0,
+      "cancelled": false,
+      "children": [
+        {
+          "childName": "Leila Hashem",
+          "originalFee": 425,
+          "discountAmount": 425,
+          "assistedFee": 0,
+          "amountPaid": 0,
+          "isPrimaryForChildcare": true
+        },
+        {
+          "childName": "Lana Hashem",
+          "originalFee": 425,
+          "discountAmount": 425,
+          "assistedFee": 0,
+          "amountPaid": 0,
+          "isPrimaryForChildcare": false
+        }
+      ]
+    },
+    {
+      "customerName": "fatima khan",
+      "email": "fa_khan01@hotmail.com",
+      "campKey": "camp2",
+      "members": [
+        "USMAN JABBAR",
+        "Mikael Khan",
+        "yusuf jabbar",
+        "sami jabbar",
+        "noah khan"
+      ],
+      "couponCode": "",
+      "couponType": "none",
+      "sessionPlan": {
+        "weekCount": 4,
+        "dayPass": false,
+        "kind": "full",
+        "reason": "no_coupon"
+      },
+      "subscriptionFees": 2062.5,
+      "addOnsAmount": 0,
+      "netTuition": 1662.5,
+      "netChildcare": 0,
+      "cancelled": false,
+      "children": [
+        {
+          "childName": "USMAN JABBAR",
+          "originalFee": 412.5,
+          "discountAmount": 0,
+          "assistedFee": 332.5,
+          "amountPaid": 332.5,
+          "isPrimaryForChildcare": true
+        },
+        {
+          "childName": "Mikael Khan",
+          "originalFee": 412.5,
+          "discountAmount": 0,
+          "assistedFee": 332.5,
+          "amountPaid": 332.5,
+          "isPrimaryForChildcare": false
+        },
+        {
+          "childName": "yusuf jabbar",
+          "originalFee": 412.5,
+          "discountAmount": 0,
+          "assistedFee": 332.5,
+          "amountPaid": 332.5,
+          "isPrimaryForChildcare": false
+        },
+        {
+          "childName": "sami jabbar",
+          "originalFee": 412.5,
+          "discountAmount": 0,
+          "assistedFee": 332.5,
+          "amountPaid": 332.5,
+          "isPrimaryForChildcare": false
+        },
+        {
+          "childName": "noah khan",
+          "originalFee": 412.5,
+          "discountAmount": 0,
+          "assistedFee": 332.5,
+          "amountPaid": 332.5,
+          "isPrimaryForChildcare": false
+        }
+      ]
+    },
+    {
+      "customerName": "Parvin Ranjbar",
+      "email": "parvin.ranjbar@gmail.com",
+      "campKey": "camp2",
+      "members": [
+        "Ryan Naderi"
+      ],
+      "couponCode": "CAMP2-CUSTOM-200",
+      "couponType": "other_discount",
+      "sessionPlan": {
+        "weekCount": 4,
+        "dayPass": false,
+        "kind": "full",
+        "reason": "CAMP2-CUSTOM-200"
+      },
+      "subscriptionFees": 450,
+      "addOnsAmount": 0,
+      "netTuition": 200,
+      "netChildcare": 0,
+      "cancelled": false,
+      "children": [
+        {
+          "childName": "Ryan Naderi",
+          "originalFee": 450,
+          "discountAmount": 250,
+          "assistedFee": 200,
+          "amountPaid": 200,
+          "isPrimaryForChildcare": true
+        }
+      ]
+    },
+    {
+      "customerName": "Rahila Iftikhar",
+      "email": "fizamaz08@gmail.com",
+      "campKey": "camp2",
+      "members": [
+        "Anniyah Mazhar"
+      ],
+      "couponCode": "",
+      "couponType": "none",
+      "sessionPlan": {
+        "weekCount": 4,
+        "dayPass": false,
+        "kind": "full",
+        "reason": "no_coupon"
+      },
+      "subscriptionFees": 450,
+      "addOnsAmount": 0,
+      "netTuition": 80,
+      "netChildcare": 0,
+      "cancelled": false,
+      "children": [
+        {
+          "childName": "Anniyah Mazhar",
+          "originalFee": 450,
+          "discountAmount": 0,
+          "assistedFee": 80,
+          "amountPaid": 80,
+          "isPrimaryForChildcare": true
+        }
+      ]
+    },
+    {
+      "customerName": "Mariya Kawish",
+      "email": "rabi0012003@yahoo.com",
+      "campKey": "camp2",
+      "members": [
+        "Rehmeen Ijaz"
+      ],
+      "couponCode": "",
+      "couponType": "none",
+      "sessionPlan": {
+        "weekCount": 4,
+        "dayPass": false,
+        "kind": "full",
+        "reason": "no_coupon"
+      },
+      "subscriptionFees": 450,
+      "addOnsAmount": 0,
+      "netTuition": 450,
+      "netChildcare": 0,
+      "cancelled": false,
+      "children": [
+        {
+          "childName": "Rehmeen Ijaz",
+          "originalFee": 450,
+          "discountAmount": 0,
+          "assistedFee": 450,
+          "amountPaid": 450,
+          "isPrimaryForChildcare": true
+        }
+      ]
+    },
+    {
+      "customerName": "Anam K Bakali",
+      "email": "anambakali08@yahoo.com",
+      "campKey": "camp2",
+      "members": [
+        "Idris Arrick"
+      ],
+      "couponCode": "",
+      "couponType": "none",
+      "sessionPlan": {
+        "weekCount": 4,
+        "dayPass": false,
+        "kind": "full",
+        "reason": "no_coupon"
+      },
+      "subscriptionFees": 450,
+      "addOnsAmount": 0,
+      "netTuition": 135,
+      "netChildcare": 0,
+      "cancelled": false,
+      "children": [
+        {
+          "childName": "Idris Arrick",
+          "originalFee": 450,
+          "discountAmount": 0,
+          "assistedFee": 135,
+          "amountPaid": 135,
+          "isPrimaryForChildcare": true
+        }
+      ]
+    },
+    {
+      "customerName": "Raghd Almasri",
+      "email": "almasriraghd@gmail.com",
+      "campKey": "camp2",
+      "members": [
+        "Hamza Ahmad Almasri"
+      ],
+      "couponCode": "",
+      "couponType": "none",
+      "sessionPlan": {
+        "weekCount": 4,
+        "dayPass": false,
+        "kind": "full",
+        "reason": "no_coupon"
+      },
+      "subscriptionFees": 450,
+      "addOnsAmount": 0,
+      "netTuition": 0,
+      "netChildcare": 0,
+      "cancelled": true,
+      "children": [
+        {
+          "childName": "Hamza Ahmad Almasri",
+          "originalFee": 450,
+          "discountAmount": 0,
+          "assistedFee": 0,
+          "amountPaid": 0,
+          "isPrimaryForChildcare": true
+        }
+      ]
+    },
+    {
+      "customerName": "Mariya Kawish",
+      "email": "rabi0012003@yahoo.com",
+      "campKey": "camp2",
+      "members": [
+        "Hafsa Waqas"
+      ],
+      "couponCode": "CAMP2-ONEDAYPASS",
+      "couponType": "session_length",
+      "sessionPlan": {
+        "weekCount": 1,
+        "dayPass": true,
+        "kind": "day_pass",
+        "reason": "CAMP2-ONEDAYPASS"
+      },
+      "subscriptionFees": 450,
+      "addOnsAmount": 0,
+      "netTuition": 35,
+      "netChildcare": 0,
+      "cancelled": false,
+      "children": [
+        {
+          "childName": "Hafsa Waqas",
+          "originalFee": 450,
+          "discountAmount": 415,
+          "assistedFee": 35,
+          "amountPaid": 35,
+          "isPrimaryForChildcare": true
+        }
+      ]
+    },
+    {
+      "customerName": "Abdel jawad Odeh",
+      "email": "ajodeh@gmail.com",
+      "campKey": "camp2",
+      "members": [
+        "Sileen Odeh",
+        "Saber Odeh"
+      ],
+      "couponCode": "CAMP2-TWOWEEKS",
+      "couponType": "session_length",
+      "sessionPlan": {
+        "weekCount": 2,
+        "dayPass": false,
+        "kind": "weeks",
+        "reason": "CAMP2-TWOWEEKS"
+      },
+      "subscriptionFees": 850,
+      "addOnsAmount": 0,
+      "netTuition": 510,
+      "netChildcare": 0,
+      "cancelled": false,
+      "children": [
+        {
+          "childName": "Sileen Odeh",
+          "originalFee": 425,
+          "discountAmount": 170,
+          "assistedFee": 255,
+          "amountPaid": 255,
+          "isPrimaryForChildcare": true
+        },
+        {
+          "childName": "Saber Odeh",
+          "originalFee": 425,
+          "discountAmount": 170,
+          "assistedFee": 255,
+          "amountPaid": 255,
+          "isPrimaryForChildcare": false
+        }
+      ]
+    },
+    {
+      "customerName": "Chereen Shu",
+      "email": "chereenalshurafa@gmail.com",
+      "campKey": "camp2",
+      "members": [
+        "Abdullah Housiny",
+        "Abdel Malek Housing",
+        "Abdel Kareem Housiny"
+      ],
+      "couponCode": "CAMP2-TWOWEEKS",
+      "couponType": "session_length",
+      "sessionPlan": {
+        "weekCount": 2,
+        "dayPass": false,
+        "kind": "weeks",
+        "reason": "CAMP2-TWOWEEKS"
+      },
+      "subscriptionFees": 1250,
+      "addOnsAmount": 0,
+      "netTuition": 750,
+      "netChildcare": 0,
+      "cancelled": false,
+      "children": [
+        {
+          "childName": "Abdullah Housiny",
+          "originalFee": 416.67,
+          "discountAmount": 166.67,
+          "assistedFee": 250,
+          "amountPaid": 250,
+          "isPrimaryForChildcare": true
+        },
+        {
+          "childName": "Abdel Malek Housing",
+          "originalFee": 416.67,
+          "discountAmount": 166.67,
+          "assistedFee": 250,
+          "amountPaid": 250,
+          "isPrimaryForChildcare": false
+        },
+        {
+          "childName": "Abdel Kareem Housiny",
+          "originalFee": 416.66,
+          "discountAmount": 166.66,
+          "assistedFee": 250,
+          "amountPaid": 250,
+          "isPrimaryForChildcare": false
+        }
+      ]
+    },
+    {
+      "customerName": "Unsa K Bakali",
+      "email": "ustaadha.unsa@gmail.com",
+      "campKey": "camp2",
+      "members": [
+        "Habiba S Khan"
+      ],
+      "couponCode": "CAMP2-TWOWEEKS",
+      "couponType": "session_length",
+      "sessionPlan": {
+        "weekCount": 2,
+        "dayPass": false,
+        "kind": "weeks",
+        "reason": "CAMP2-TWOWEEKS"
+      },
+      "subscriptionFees": 450,
+      "addOnsAmount": 0,
+      "netTuition": 270,
+      "netChildcare": 0,
+      "cancelled": false,
+      "children": [
+        {
+          "childName": "Habiba S Khan",
+          "originalFee": 450,
+          "discountAmount": 180,
+          "assistedFee": 270,
+          "amountPaid": 270,
+          "isPrimaryForChildcare": true
+        }
+      ]
+    },
+    {
+      "customerName": "Marwa Awny Awad",
+      "email": "awadmarwa89@gmail.com",
+      "campKey": "camp2",
+      "members": [
+        "Raha Adnan Alrowwad"
+      ],
+      "couponCode": "CAMP2-TWOWEEKS",
+      "couponType": "session_length",
+      "sessionPlan": {
+        "weekCount": 2,
+        "dayPass": false,
+        "kind": "weeks",
+        "reason": "CAMP2-TWOWEEKS"
+      },
+      "subscriptionFees": 450,
+      "addOnsAmount": 0,
+      "netTuition": 270,
+      "netChildcare": 0,
+      "cancelled": false,
+      "children": [
+        {
+          "childName": "Raha Adnan Alrowwad",
+          "originalFee": 450,
+          "discountAmount": 180,
+          "assistedFee": 270,
+          "amountPaid": 270,
+          "isPrimaryForChildcare": true
+        }
+      ]
+    },
+    {
+      "customerName": "Anna Shanks",
+      "email": "agshanks391@gmail.com",
+      "campKey": "camp2",
+      "members": [
+        "Yahya Shanks Villarreal"
+      ],
+      "couponCode": "CAMP2-TWOWEEKS",
+      "couponType": "session_length",
+      "sessionPlan": {
+        "weekCount": 2,
+        "dayPass": false,
+        "kind": "weeks",
+        "reason": "CAMP2-TWOWEEKS"
+      },
+      "subscriptionFees": 450,
+      "addOnsAmount": 0,
+      "netTuition": 270,
+      "netChildcare": 0,
+      "cancelled": false,
+      "children": [
+        {
+          "childName": "Yahya Shanks Villarreal",
+          "originalFee": 450,
+          "discountAmount": 180,
+          "assistedFee": 270,
+          "amountPaid": 270,
+          "isPrimaryForChildcare": true
+        }
+      ]
+    },
+    {
+      "customerName": "Shaima Abdalla",
+      "email": "ssabdalla@gmail.com",
+      "campKey": "camp2",
+      "members": [
+        "Noora Ramadan",
+        "Asya Ramadan"
+      ],
+      "couponCode": "CAMP2-ONEWEEK",
+      "couponType": "session_length",
+      "sessionPlan": {
+        "weekCount": 1,
+        "dayPass": false,
+        "kind": "weeks",
+        "reason": "CAMP2-ONEWEEK"
+      },
+      "subscriptionFees": 850,
+      "addOnsAmount": 0,
+      "netTuition": 255,
+      "netChildcare": 0,
+      "cancelled": false,
+      "children": [
+        {
+          "childName": "Noora Ramadan",
+          "originalFee": 425,
+          "discountAmount": 297.5,
+          "assistedFee": 127.5,
+          "amountPaid": 127.5,
+          "isPrimaryForChildcare": true
+        },
+        {
+          "childName": "Asya Ramadan",
+          "originalFee": 425,
+          "discountAmount": 297.5,
+          "assistedFee": 127.5,
+          "amountPaid": 127.5,
+          "isPrimaryForChildcare": false
+        }
+      ]
+    },
+    {
+      "customerName": "Hira aamir",
+      "email": "haamir9@gmail.com",
+      "campKey": "camp2",
+      "members": [
+        "Inaaya Mohammed",
+        "Maryam Mohammed"
+      ],
+      "couponCode": "CAMP2-TWOWEEKS",
+      "couponType": "session_length",
+      "sessionPlan": {
+        "weekCount": 2,
+        "dayPass": false,
+        "kind": "weeks",
+        "reason": "CAMP2-TWOWEEKS"
+      },
+      "subscriptionFees": 850,
+      "addOnsAmount": 0,
+      "netTuition": 510,
+      "netChildcare": 0,
+      "cancelled": false,
+      "children": [
+        {
+          "childName": "Inaaya Mohammed",
+          "originalFee": 425,
+          "discountAmount": 170,
+          "assistedFee": 255,
+          "amountPaid": 255,
+          "isPrimaryForChildcare": true
+        },
+        {
+          "childName": "Maryam Mohammed",
+          "originalFee": 425,
+          "discountAmount": 170,
+          "assistedFee": 255,
+          "amountPaid": 255,
+          "isPrimaryForChildcare": false
+        }
+      ]
+    },
+    {
+      "customerName": "Omer Sheikh",
+      "email": "osheikh6@gmail.com",
+      "campKey": "camp2",
+      "members": [
+        "Layla Sheikh"
+      ],
+      "couponCode": "",
+      "couponType": "none",
+      "sessionPlan": {
+        "weekCount": 4,
+        "dayPass": false,
+        "kind": "full",
+        "reason": "no_coupon"
+      },
+      "subscriptionFees": 450,
+      "addOnsAmount": 0,
+      "netTuition": 450,
+      "netChildcare": 0,
+      "cancelled": false,
+      "children": [
+        {
+          "childName": "Layla Sheikh",
+          "originalFee": 450,
+          "discountAmount": 0,
+          "assistedFee": 450,
+          "amountPaid": 450,
+          "isPrimaryForChildcare": true
+        }
+      ]
+    },
+    {
+      "customerName": "Reda Farghaly",
+      "email": "reda.afm@gmail.com",
+      "campKey": "camp2",
+      "members": [
+        "Yousuf Moharram",
+        "Sarah Moharram",
+        "Malik Moharram"
+      ],
+      "couponCode": "FA-CAMP2-100",
+      "couponType": "financial_assistance",
+      "sessionPlan": {
+        "weekCount": 4,
+        "dayPass": false,
+        "kind": "full",
+        "reason": "FA-CAMP2-100"
+      },
+      "subscriptionFees": 1250,
+      "addOnsAmount": 0,
+      "netTuition": 0,
+      "netChildcare": 0,
+      "cancelled": false,
+      "children": [
+        {
+          "childName": "Yousuf Moharram",
+          "originalFee": 416.67,
+          "discountAmount": 416.67,
+          "assistedFee": 0,
+          "amountPaid": 0,
+          "isPrimaryForChildcare": true
+        },
+        {
+          "childName": "Sarah Moharram",
+          "originalFee": 416.67,
+          "discountAmount": 416.67,
+          "assistedFee": 0,
+          "amountPaid": 0,
+          "isPrimaryForChildcare": false
+        },
+        {
+          "childName": "Malik Moharram",
+          "originalFee": 416.66,
+          "discountAmount": 416.66,
+          "assistedFee": 0,
+          "amountPaid": 0,
+          "isPrimaryForChildcare": false
+        }
+      ]
+    },
+    {
+      "customerName": "Madeeha Zaki",
+      "email": "macleeha@gmail.com",
+      "campKey": "camp2",
+      "members": [
+        "Emaan Zaki"
+      ],
+      "couponCode": "CAMP2-TWOWEEKS",
+      "couponType": "session_length",
+      "sessionPlan": {
+        "weekCount": 2,
+        "dayPass": false,
+        "kind": "weeks",
+        "reason": "CAMP2-TWOWEEKS"
+      },
+      "subscriptionFees": 450,
+      "addOnsAmount": 0,
+      "netTuition": 0,
+      "netChildcare": 0,
+      "cancelled": true,
+      "children": [
+        {
+          "childName": "Emaan Zaki",
+          "originalFee": 450,
+          "discountAmount": 180,
+          "assistedFee": 0,
+          "amountPaid": 0,
+          "isPrimaryForChildcare": true
+        }
+      ]
+    },
+    {
+      "customerName": "Humera Jabbar",
+      "email": "hirainc@gmail.com",
+      "campKey": "camp2",
+      "members": [
+        "Owais Jabbar"
+      ],
+      "couponCode": "CAMP2-THREEWEEKS",
+      "couponType": "session_length",
+      "sessionPlan": {
+        "weekCount": 3,
+        "dayPass": false,
+        "kind": "weeks",
+        "reason": "CAMP2-THREEWEEKS"
+      },
+      "subscriptionFees": 450,
+      "addOnsAmount": 0,
+      "netTuition": 360,
+      "netChildcare": 0,
+      "cancelled": false,
+      "children": [
+        {
+          "childName": "Owais Jabbar",
+          "originalFee": 450,
+          "discountAmount": 90,
+          "assistedFee": 360,
+          "amountPaid": 360,
+          "isPrimaryForChildcare": true
+        }
+      ]
+    },
+    {
+      "customerName": "Esraa Osama Osama",
+      "email": "esra.habbash.90@gmail.com",
+      "campKey": "camp2",
+      "members": [
+        "Nada Hani Mhanna",
+        "Heba Hani Mhanna",
+        "Ahmad Hani Mhanna"
+      ],
+      "couponCode": "FA-CAMP2-100",
+      "couponType": "financial_assistance",
+      "sessionPlan": {
+        "weekCount": 4,
+        "dayPass": false,
+        "kind": "full",
+        "reason": "FA-CAMP2-100"
+      },
+      "subscriptionFees": 1250,
+      "addOnsAmount": 0,
+      "netTuition": 0,
+      "netChildcare": 0,
+      "cancelled": false,
+      "children": [
+        {
+          "childName": "Nada Hani Mhanna",
+          "originalFee": 416.67,
+          "discountAmount": 416.67,
+          "assistedFee": 0,
+          "amountPaid": 0,
+          "isPrimaryForChildcare": true
+        },
+        {
+          "childName": "Heba Hani Mhanna",
+          "originalFee": 416.67,
+          "discountAmount": 416.67,
+          "assistedFee": 0,
+          "amountPaid": 0,
+          "isPrimaryForChildcare": false
+        },
+        {
+          "childName": "Ahmad Hani Mhanna",
+          "originalFee": 416.66,
+          "discountAmount": 416.66,
+          "assistedFee": 0,
+          "amountPaid": 0,
+          "isPrimaryForChildcare": false
+        }
+      ]
+    },
+    {
+      "customerName": "Esraa Osama Osama",
+      "email": "esra.habbash.90@gmail.com",
+      "campKey": "camp2",
+      "members": [
+        "Esraa Osama Osama"
+      ],
+      "couponCode": "FA-CAMP2-100",
+      "couponType": "financial_assistance",
+      "sessionPlan": {
+        "weekCount": 4,
+        "dayPass": false,
+        "kind": "full",
+        "reason": "FA-CAMP2-100"
+      },
+      "subscriptionFees": 450,
+      "addOnsAmount": 0,
+      "netTuition": 0,
+      "netChildcare": 0,
+      "cancelled": false,
+      "children": [
+        {
+          "childName": "Esraa Osama Osama",
+          "originalFee": 450,
+          "discountAmount": 450,
+          "assistedFee": 0,
+          "amountPaid": 0,
+          "isPrimaryForChildcare": true
+        }
+      ]
+    }
+  ],
+  "staffCreditQueue": [
+    {
+      "customerName": "Israt Jahan",
+      "email": "israt16_jahan@yahoo.com",
+      "campKey": "camp2",
+      "members": [
+        "Nusaiba M Rawa"
+      ],
+      "couponCode": "STAFF-CAMP1-CREDIT",
+      "couponValue": 450,
+      "subscriptionFees": 450,
+      "netTuition": 0
+    },
+    {
+      "customerName": "Eman Hashem",
+      "email": "eman@drhashem.com",
+      "campKey": "camp2",
+      "members": [
+        "Leila Hashem",
+        "Lana Hashem"
+      ],
+      "couponCode": "CREDITS-CAMP2-100",
+      "couponValue": 850,
+      "subscriptionFees": 850,
+      "netTuition": 0
+    },
+    {
+      "customerName": "Marwa Taissir Elgamal",
+      "email": "marwataissir@gmail.com",
+      "campKey": "camp2",
+      "members": [
+        "Sofian Ahmed Gadelkarim"
+      ],
+      "couponCode": "STAFF-CAMP2-50",
+      "couponValue": 225,
+      "subscriptionFees": 450,
+      "netTuition": 225
+    },
+    {
+      "customerName": "Mariam yasin",
+      "email": "lakiyou13@gmail.com",
+      "campKey": "camp2",
+      "members": [
+        "Reem Hjaz",
+        "Sham Hjaz"
+      ],
+      "couponCode": "STAFF-CAMP1-CREDIT",
+      "couponValue": 850,
+      "subscriptionFees": 850,
+      "netTuition": 0
+    },
+    {
+      "customerName": "Heba Turk",
+      "email": "hhtanas@yahoo.com",
+      "campKey": "camp2",
+      "members": [
+        "Anna Khanshour",
+        "Zain Khanshour Khanshour"
+      ],
+      "couponCode": "STAFF-CAMP1-CREDIT",
+      "couponValue": 850,
+      "subscriptionFees": 850,
+      "netTuition": 0
+    },
+    {
+      "customerName": "Dahlia Qutteineh",
+      "email": "dahlia-92@live.com",
+      "campKey": "camp2",
+      "members": [
+        "Ali Al Kokhon",
+        "Omar Al Kokhon"
+      ],
+      "couponCode": "STAFF-CAMP1-CREDIT",
+      "couponValue": 850,
+      "subscriptionFees": 850,
+      "netTuition": 0
+    },
+    {
+      "customerName": "Lena Alkhateeb",
+      "email": "lena0809@gmail.com",
+      "campKey": "camp2",
+      "members": [
+        "Mohib Adnan"
+      ],
+      "couponCode": "STAFF-CAMP2-50",
+      "couponValue": 225,
+      "subscriptionFees": 450,
+      "netTuition": 225
+    },
+    {
+      "customerName": "Lena Alkhateeb",
+      "email": "lena0809@gmail.com",
+      "campKey": "camp2",
+      "members": [
+        "Musa Uzman",
+        "Husna Uzman",
+        "Ayah El Ghali",
+        "Yusuf El Ghali"
+      ],
+      "couponCode": "STAFF-CAMP2-50",
+      "couponValue": 825,
+      "subscriptionFees": 1650,
+      "netTuition": 825
+    },
+    {
+      "customerName": "ALI Qaderi",
+      "email": "telhaebtsam@gmail.com",
+      "campKey": "camp2",
+      "members": [
+        "ALI Qaderi",
+        "Yousef Qaderi"
+      ],
+      "couponCode": "STAFF-CAMP2-50",
+      "couponValue": 425,
+      "subscriptionFees": 850,
+      "netTuition": 425
+    },
+    {
+      "customerName": "Heba Turk",
+      "email": "hhtanas@yahoo.com",
+      "campKey": "camp1",
+      "members": [
+        "Zain Khanshour Khanshour",
+        "Anna Khanshour"
+      ],
+      "couponCode": "STAFF-CAMP1-CREDIT",
+      "couponValue": 850,
+      "subscriptionFees": 850,
+      "netTuition": 0
+    },
+    {
+      "customerName": "Yasmine Ali",
+      "email": "yasmine.hisham.ali@gmail.com",
+      "campKey": "camp1",
+      "members": [
+        "Jolie Hussein",
+        "Malek Hussein"
+      ],
+      "couponCode": "STAFF-CAMP1-CREDIT",
+      "couponValue": 850,
+      "subscriptionFees": 850,
+      "netTuition": 0
+    },
+    {
+      "customerName": "Lena Alkhateeb",
+      "email": "lena0809@gmail.com",
+      "campKey": "camp1",
+      "members": [
+        "Ayah El Ghali",
+        "Yusuf El Ghali"
+      ],
+      "couponCode": "STAFF-CAMP1-50",
+      "couponValue": 425,
+      "subscriptionFees": 850,
+      "netTuition": 425
+    },
+    {
+      "customerName": "ALI Qaderi",
+      "email": "telhaebtsam@gmail.com",
+      "campKey": "camp1",
+      "members": [
+        "ALI Qaderi",
+        "Yousef Qaderi"
+      ],
+      "couponCode": "STAFF-CAMP1-50",
+      "couponValue": 425,
+      "subscriptionFees": 850,
+      "netTuition": 425
+    }
+  ],
+  "created": {
+    "departmentId": "d0c78557-1574-487d-8278-e17009fc7ecf",
+    "programId": "e6436c28-666c-4327-b3c1-4234d2379a42",
+    "offerings": 2,
+    "sessions": 8,
+    "contacts": 978,
+    "enrollments": 612,
+    "faAwards": 48,
+    "cancelled": 22,
+    "affiliationsSynced": 0
+  }
+}

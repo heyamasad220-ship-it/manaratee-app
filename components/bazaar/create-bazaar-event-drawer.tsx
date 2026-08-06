@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react"
 import {
   fetchInternalEventsForLinking,
+  fetchVenuesForBazaarPicker,
   upsertBazaarEvent,
+  type BazaarVenueOption,
   type InternalEventLinkOption,
 } from "@/lib/vendor-hub/vendor-hub-event-actions"
 import {
@@ -43,6 +45,11 @@ import {
 } from "@/components/ui/collapsible"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
+import { HrContactPicker, type HrContactOption } from "@/components/hr/hr-contact-picker"
+import { QuickAddContactDialog } from "@/components/contacts/quick-add-contact-dialog"
+import { FacilityVenueSelect } from "@/components/reservations/facility-venue-select"
+import { TimeInput } from "@/components/ui/time-input"
+import { parseTime24, toTime24 } from "@/components/ui/time-picker"
 import {
   ChevronDown,
   ChevronRight,
@@ -73,46 +80,37 @@ interface CreateBazaarEventDrawerProps {
     description?: string | null
     calendar_status?: string | null
     internal_event_id?: string | null
+    organizer_contact_id?: string | null
+    organizer_name?: string | null
+    venue_id?: string | null
+    organizer_contact?: {
+      id: string
+      full_name: string | null
+      email: string | null
+      phone: string | null
+    } | null
   }
 }
 
-function parseSupabaseTime(time: string | null | undefined) {
-  if (!time) {
-    return { hour: "", minute: "", period: "AM" as const }
+function toTimeInputValue(time: string | null | undefined, minuteStep = 30): string {
+  if (!time) return ""
+  const { hours24, minutes } = parseTime24(time.slice(0, 5))
+  const step = Math.max(1, Math.min(30, minuteStep))
+  let snapped = Math.round(minutes / step) * step
+  let hour = hours24
+  if (snapped >= 60) {
+    snapped = 0
+    hour = (hour + 1) % 24
   }
-
-  const [hourPart, minutePart] = time.split(":")
-  let hourNumber = Number(hourPart)
-  const minute = minutePart?.slice(0, 2) ?? "00"
-  const period = hourNumber >= 12 ? "PM" : "AM"
-
-  if (hourNumber === 0) {
-    hourNumber = 12
-  } else if (hourNumber > 12) {
-    hourNumber -= 12
-  }
-
-  return {
-    hour: String(hourNumber).padStart(2, "0"),
-    minute,
-    period: period as "AM" | "PM",
-  }
+  return toTime24(hour, snapped)
 }
 
-// Mock data for dropdowns
-const mockSpaces = [
-  { id: "s-1", name: "Main Hall" },
-  { id: "s-2", name: "Outdoor Courtyard" },
-  { id: "s-3", name: "Conference Room A" },
-  { id: "s-4", name: "Full Campus" },
-]
+function toSupabaseTime(time24: string): string | null {
+  if (!time24.trim()) return null
+  return `${time24.slice(0, 5)}:00`
+}
 
-const mockContacts = [
-  { id: "c-1", name: "Ahmed Hassan", email: "ahmed@example.com", phone: "(555) 123-4567" },
-  { id: "c-2", name: "Fatima Ali", email: "fatima@example.com", phone: "(555) 234-5678" },
-  { id: "c-3", name: "Omar Khalid", email: "omar@example.com", phone: "(555) 345-6789" },
-]
-
+// Mock data removed — contacts and spaces load from CRM / Facilities.
 const vendorCategories = ["Food", "Retail", "Crafts", "Services", "Other"]
 const paymentMethods = ["Cash", "Zelle", "Stripe", "Check", "Other"]
 
@@ -132,9 +130,12 @@ export function CreateBazaarEventDrawer({
   const [saveError, setSaveError] = useState<string | null>(null)
   const [internalEvents, setInternalEvents] = useState<InternalEventLinkOption[]>([])
   const [loadingInternalEvents, setLoadingInternalEvents] = useState(false)
+  const [venues, setVenues] = useState<BazaarVenueOption[]>([])
+  const [loadingVenues, setLoadingVenues] = useState(false)
   const [boothTemplates, setBoothTemplates] = useState<VendorHubBoothSetupTemplate[]>([])
   const [selectedBoothTemplateId, setSelectedBoothTemplateId] = useState("none")
   const [loadingBoothTemplates, setLoadingBoothTemplates] = useState(false)
+  const [quickAddContactOpen, setQuickAddContactOpen] = useState(false)
   // Section collapse states
   const [vendorAppSection, setVendorAppSection] = useState(false)
   const [boothSetupSection, setBoothSetupSection] = useState(false)
@@ -165,16 +166,10 @@ export function CreateBazaarEventDrawer({
   const [endDate, setEndDate] = useState("")
   const [startTime, setStartTime] = useState("")
   const [endTime, setEndTime] = useState("")
-  const [startHour, setStartHour] = useState("")
-  const [startMinute, setStartMinute] = useState("")
-  const [startPeriod, setStartPeriod] = useState("AM")
-
-  const [endHour, setEndHour] = useState("")
-  const [endMinute, setEndMinute] = useState("")
-  const [endPeriod, setEndPeriod] = useState("PM")
   const [linkedSpace, setLinkedSpace] = useState("")
   const [organizerName, setOrganizerName] = useState("")
-  const [primaryContact, setPrimaryContact] = useState("")
+  const [primaryContactId, setPrimaryContactId] = useState<string | null>(null)
+  const [primaryContactLabel, setPrimaryContactLabel] = useState("")
   const [contactEmail, setContactEmail] = useState("")
   const [contactPhone, setContactPhone] = useState("")
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
@@ -182,6 +177,25 @@ export function CreateBazaarEventDrawer({
   const [boothTypes, setBoothTypes] = useState<BoothType[]>([
     { id: "bt-1", name: "10x10 Tent", price: "100", quantity: "20" },
   ])
+
+  function applyOrganizerContact(contact: {
+    contactId: string
+    full_name: string | null
+    email: string | null
+    phone: string | null
+  }) {
+    setPrimaryContactId(contact.contactId)
+    setPrimaryContactLabel(contact.full_name?.trim() || "Selected contact")
+    setContactEmail(contact.email ?? "")
+    setContactPhone(contact.phone ?? "")
+  }
+
+  function clearOrganizerContact() {
+    setPrimaryContactId(null)
+    setPrimaryContactLabel("")
+    setContactEmail("")
+    setContactPhone("")
+  }
 
   useEffect(() => {
     if (!open) {
@@ -191,6 +205,7 @@ export function CreateBazaarEventDrawer({
     setSaveError(null)
     setLoadingInternalEvents(true)
     setLoadingBoothTemplates(true)
+    setLoadingVenues(true)
     void fetchInternalEventsForLinking()
       .then(setInternalEvents)
       .finally(() => setLoadingInternalEvents(false))
@@ -198,6 +213,9 @@ export function CreateBazaarEventDrawer({
       .then(setBoothTemplates)
       .catch(() => setBoothTemplates([]))
       .finally(() => setLoadingBoothTemplates(false))
+    void fetchVenuesForBazaarPicker()
+      .then(setVenues)
+      .finally(() => setLoadingVenues(false))
   }, [open])
 
   useEffect(() => {
@@ -213,16 +231,27 @@ export function CreateBazaarEventDrawer({
       setDescription(eventData.description ?? "")
       setCalendarVisibility(visibilityFromCalendarStatus(eventData.calendar_status))
       setInternalEventId(eventData.internal_event_id ?? "none")
+      setOrganizerName(eventData.organizer_name ?? "")
+      setLinkedSpace(eventData.venue_id ?? "")
 
-      const start = parseSupabaseTime(eventData.start_time)
-      setStartHour(start.hour)
-      setStartMinute(start.minute)
-      setStartPeriod(start.period)
+      if (eventData.organizer_contact) {
+        applyOrganizerContact({
+          contactId: eventData.organizer_contact.id,
+          full_name: eventData.organizer_contact.full_name,
+          email: eventData.organizer_contact.email,
+          phone: eventData.organizer_contact.phone,
+        })
+      } else if (eventData.organizer_contact_id) {
+        setPrimaryContactId(eventData.organizer_contact_id)
+        setPrimaryContactLabel("Selected contact")
+        setContactEmail("")
+        setContactPhone("")
+      } else {
+        clearOrganizerContact()
+      }
 
-      const end = parseSupabaseTime(eventData.end_time)
-      setEndHour(end.hour)
-      setEndMinute(end.minute)
-      setEndPeriod(end.period)
+      setStartTime(toTimeInputValue(eventData.start_time))
+      setEndTime(toTimeInputValue(eventData.end_time))
       return
     }
 
@@ -233,22 +262,16 @@ export function CreateBazaarEventDrawer({
     setDescription("")
     setCalendarVisibility("private")
     setInternalEventId("none")
-    setStartHour("")
-    setStartMinute("")
-    setStartPeriod("AM")
-    setEndHour("")
-    setEndMinute("")
-    setEndPeriod("PM")
+    setStartTime("")
+    setEndTime("")
     setSelectedBoothTemplateId("none")
+    setLinkedSpace("")
+    setOrganizerName("")
+    clearOrganizerContact()
   }, [open, eventData])
 
-  const handleContactSelect = (contactId: string) => {
-    const contact = mockContacts.find((c) => c.id === contactId)
-    if (contact) {
-      setPrimaryContact(contactId)
-      setContactEmail(contact.email)
-      setContactPhone(contact.phone)
-    }
+  const handleContactSelect = (contact: HrContactOption) => {
+    applyOrganizerContact(contact)
   }
 
   const addBoothType = () => {
@@ -274,21 +297,7 @@ export function CreateBazaarEventDrawer({
       prev.includes(method) ? prev.filter((m) => m !== method) : [...prev, method]
     )
   }
-function formatTimeForSupabase(hour: string, minute: string, period: string) {
-  if (!hour || !minute) return null
 
-  let hourNumber = Number(hour)
-
-  if (period === "PM" && hourNumber !== 12) {
-    hourNumber += 12
-  }
-
-  if (period === "AM" && hourNumber === 12) {
-    hourNumber = 0
-  }
-
-  return `${String(hourNumber).padStart(2, "0")}:${minute}:00`
-}
   const handleSave = async () => {
     if (!eventName.trim()) {
       setSaveError("Please enter an event name.")
@@ -307,8 +316,8 @@ function formatTimeForSupabase(hour: string, minute: string, period: string) {
         name: eventName.trim(),
         event_type: eventType || null,
         event_date: startDate || null,
-        start_time: formatTimeForSupabase(startHour, startMinute, startPeriod),
-        end_time: formatTimeForSupabase(endHour, endMinute, endPeriod),
+        start_time: toSupabaseTime(startTime),
+        end_time: toSupabaseTime(endTime),
         location: location || null,
         description: description || null,
         expected_attendees: 0,
@@ -317,6 +326,9 @@ function formatTimeForSupabase(hour: string, minute: string, period: string) {
           : boothTypes.reduce((total, booth) => total + Number(booth.quantity || 0), 0),
         calendar_visibility: calendarVisibility,
         internal_event_id: internalEventId,
+        organizer_contact_id: primaryContactId,
+        organizer_name: organizerName.trim() || null,
+        venue_id: linkedSpace || null,
       })
 
       if (useTemplate) {
@@ -407,98 +419,27 @@ function formatTimeForSupabase(hour: string, minute: string, period: string) {
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-  <Label>Start Time</Label>
-  <div className="mt-1.5 grid grid-cols-3 gap-2">
-    <Select value={startHour} onValueChange={setStartHour}>
-      <SelectTrigger>
-        <SelectValue placeholder="Hour" />
-      </SelectTrigger>
-      <SelectContent>
-        {["01","02","03","04","05","06","07","08","09","10","11","12"].map((hour) => (
-          <SelectItem key={hour} value={hour}>{hour}</SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-
-    <Select value={startMinute} onValueChange={setStartMinute}>
-      <SelectTrigger>
-        <SelectValue placeholder="Min" />
-      </SelectTrigger>
-      <SelectContent>
-        {["00","15","30","45"].map((minute) => (
-          <SelectItem key={minute} value={minute}>{minute}</SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-
-    <Select value={startPeriod} onValueChange={setStartPeriod}>
-      <SelectTrigger>
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="AM">AM</SelectItem>
-        <SelectItem value="PM">PM</SelectItem>
-      </SelectContent>
-    </Select>
-  </div>
-</div>
+                    <Label htmlFor="bazaar-start-time">Start Time</Label>
+                    <TimeInput
+                      id="bazaar-start-time"
+                      value={startTime}
+                      onChange={setStartTime}
+                      minuteStep={30}
+                      className="mt-1.5"
+                      placeholder="Select start time"
+                    />
+                  </div>
                   <div>
-  <Label>End Time</Label>
-
-  <div className="mt-1.5 grid grid-cols-3 gap-2">
-    <Select value={endHour} onValueChange={setEndHour}>
-      <SelectTrigger>
-        <SelectValue placeholder="Hour" />
-      </SelectTrigger>
-
-      <SelectContent>
-        {[
-          "01",
-          "02",
-          "03",
-          "04",
-          "05",
-          "06",
-          "07",
-          "08",
-          "09",
-          "10",
-          "11",
-          "12",
-        ].map((hour) => (
-          <SelectItem key={hour} value={hour}>
-            {hour}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-
-    <Select value={endMinute} onValueChange={setEndMinute}>
-      <SelectTrigger>
-        <SelectValue placeholder="Min" />
-      </SelectTrigger>
-
-      <SelectContent>
-        {["00", "15", "30", "45"].map((minute) => (
-          <SelectItem key={minute} value={minute}>
-            {minute}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-
-    <Select value={endPeriod} onValueChange={setEndPeriod}>
-      <SelectTrigger>
-        <SelectValue />
-      </SelectTrigger>
-
-      <SelectContent>
-        <SelectItem value="AM">AM</SelectItem>
-        <SelectItem value="PM">PM</SelectItem>
-      </SelectContent>
-    </Select>
-  </div>
-</div>
+                    <Label htmlFor="bazaar-end-time">End Time</Label>
+                    <TimeInput
+                      id="bazaar-end-time"
+                      value={endTime}
+                      onChange={setEndTime}
+                      minuteStep={30}
+                      className="mt-1.5"
+                      placeholder="Select end time"
+                    />
+                  </div>
                 </div>
                 <div>
                   <Label htmlFor="location">Location</Label>
@@ -522,19 +463,21 @@ function formatTimeForSupabase(hour: string, minute: string, period: string) {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="linkedSpace">Link to Space (optional)</Label>
-                  <Select value={linkedSpace} onValueChange={setLinkedSpace}>
-                    <SelectTrigger className="mt-1.5">
-                      <SelectValue placeholder="Select a space" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {mockSpaces.map((space) => (
-                        <SelectItem key={space.id} value={space.id}>
-                          {space.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <FacilityVenueSelect
+                    id="linkedSpace"
+                    label="Link to Space (optional)"
+                    value={linkedSpace}
+                    venues={venues}
+                    disabled={loadingVenues}
+                    allowNone
+                    noneLabel="No facility linked"
+                    onChange={(venueId, venueName) => {
+                      setLinkedSpace(venueId)
+                      if (venueName && !location.trim()) {
+                        setLocation(venueName)
+                      }
+                    }}
+                  />
                 </div>
               </div>
             </section>
@@ -556,21 +499,24 @@ function formatTimeForSupabase(hour: string, minute: string, period: string) {
                     className="mt-1.5"
                   />
                 </div>
-                <div>
-                  <Label htmlFor="primaryContact">Primary Contact</Label>
-                  <Select value={primaryContact} onValueChange={handleContactSelect}>
-                    <SelectTrigger className="mt-1.5">
-                      <SelectValue placeholder="Select or create new" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {mockContacts.map((contact) => (
-                        <SelectItem key={contact.id} value={contact.id}>
-                          {contact.name}
-                        </SelectItem>
-                      ))}
-                      <SelectItem value="new">+ Create New Contact</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="space-y-2">
+                  <HrContactPicker
+                    label="Primary Contact"
+                    selectedContactId={primaryContactId}
+                    selectedLabel={primaryContactLabel}
+                    onChange={handleContactSelect}
+                    onClear={clearOrganizerContact}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full sm:w-auto"
+                    onClick={() => setQuickAddContactOpen(true)}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Create new contact
+                  </Button>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
@@ -578,10 +524,10 @@ function formatTimeForSupabase(hour: string, minute: string, period: string) {
                     <Input
                       id="contactEmail"
                       type="email"
-                      placeholder="email@example.com"
+                      placeholder="From selected contact"
                       value={contactEmail}
-                      onChange={(e) => setContactEmail(e.target.value)}
-                      className="mt-1.5"
+                      readOnly
+                      className="mt-1.5 bg-muted/40"
                     />
                   </div>
                   <div>
@@ -589,10 +535,10 @@ function formatTimeForSupabase(hour: string, minute: string, period: string) {
                     <Input
                       id="contactPhone"
                       type="tel"
-                      placeholder="(555) 123-4567"
+                      placeholder="From selected contact"
                       value={contactPhone}
-                      onChange={(e) => setContactPhone(e.target.value)}
-                      className="mt-1.5"
+                      readOnly
+                      className="mt-1.5 bg-muted/40"
                     />
                   </div>
                 </div>
@@ -1216,6 +1162,19 @@ function formatTimeForSupabase(hour: string, minute: string, period: string) {
           </div>
         </SheetFooter>
       </SheetContent>
+
+      <QuickAddContactDialog
+        open={quickAddContactOpen}
+        onOpenChange={setQuickAddContactOpen}
+        onCreated={(contact) => {
+          applyOrganizerContact({
+            contactId: contact.contactId,
+            full_name: contact.full_name,
+            email: contact.email,
+            phone: contact.phone,
+          })
+        }}
+      />
     </Sheet>
   )
 }

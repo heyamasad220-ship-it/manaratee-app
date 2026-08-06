@@ -1,0 +1,84 @@
+{
+  "mode": "execute",
+  "organizationId": "e057e00a-e4e3-4adf-9af5-f465db1894be",
+  "target": {
+    "id": "44201eab-866b-49c6-a9e6-793a01669c4c",
+    "organization_id": "e057e00a-e4e3-4adf-9af5-f465db1894be",
+    "full_name": "Ahmad Khatib",
+    "email": "hukhatib56@gmail.com",
+    "phone": "13102653045",
+    "contact_type": "individual",
+    "primary_contact_name": null,
+    "status": "active",
+    "notes": null
+  },
+  "merges": [
+    {
+      "target": {
+        "id": "44201eab-866b-49c6-a9e6-793a01669c4c",
+        "full_name": "Ahmad Khatib",
+        "email": "hukhatib56@gmail.com",
+        "phone": "13102653045",
+        "donor_id": "e86d6e80-ade3-4694-9298-2dba9bbcd10f"
+      },
+      "source": {
+        "id": "a2cff47b-426a-4d3c-830f-6473fde9ef23",
+        "full_name": "Ahmad",
+        "email": "thetacoking65@gmail.com",
+        "phone": "310-265-3045",
+        "donor_id": null
+      },
+      "contactInventory": {
+        "payments.contact_id": 0,
+        "pledges.contact_id": 0,
+        "recurring_donation_plans.contact_id": 0,
+        "donation_checkout_sessions.contact_id": 0,
+        "donation_receipts.contact_id": 0,
+        "pledge_reminders.contact_id": 0,
+        "contact_notes.contact_id": 0,
+        "contact_roles.contact_id": 2,
+        "volunteers.contact_id": 0,
+        "staff.contact_id": 0,
+        "applications.contact_id": 1,
+        "ticket_orders.contact_id": 0,
+        "memberships.contact_id": 0,
+        "program_enrollments.participant_contact_id": 0,
+        "program_enrollments.registrant_contact_id": 0,
+        "program_enrollments.payer_contact_id": 0
+      },
+      "donorInventory": {},
+      "contactPatch": {},
+      "steps": [
+        {
+          "table": "contact_roles",
+          "rows": 2
+        },
+        {
+          "table": "vendor_hub_participant_status",
+          "rows": 1
+        },
+        {
+          "table": "applications",
+          "column": "contact_id",
+          "rows": 1
+        },
+        {
+          "table": "donors",
+          "patched": {
+            "full_name": "Ahmad Khatib",
+            "contact_id": "44201eab-866b-49c6-a9e6-793a01669c4c"
+          }
+        },
+        {
+          "table": "contacts",
+          "deletedSource": "a2cff47b-426a-4d3c-830f-6473fde9ef23"
+        },
+        {
+          "table": "sync_contact_affiliations",
+          "contactId": "44201eab-866b-49c6-a9e6-793a01669c4c"
+        }
+      ]
+    }
+  ],
+  "errors": []
+}

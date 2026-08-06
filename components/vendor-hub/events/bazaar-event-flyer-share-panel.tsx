@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { saveBazaarEventFlyer } from "@/lib/vendor-hub/bazaar-flyer-actions"
 import {
   getBazaarShareLink,
   regenerateBazaarShareToken,
@@ -47,18 +46,6 @@ export function BazaarEventFlyerSharePanel({ event }: { event: VendorHubEventWit
     }
   }, [event.id, shareUrl])
 
-  function handleSaveFlyer() {
-    setError(null)
-    startTransition(async () => {
-      try {
-        await saveBazaarEventFlyer(event.id, flyerUrl || null)
-        toast.success("Flyer saved")
-      } catch (saveError) {
-        setError(saveError instanceof Error ? saveError.message : "Could not save flyer.")
-      }
-    })
-  }
-
   async function handleCopyLink() {
     if (!shareUrl) return
 
@@ -91,7 +78,7 @@ export function BazaarEventFlyerSharePanel({ event }: { event: VendorHubEventWit
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <Link2 className="h-4 w-4" />
           Flyer & share link
@@ -100,18 +87,16 @@ export function BazaarEventFlyerSharePanel({ event }: { event: VendorHubEventWit
           Upload a promotional flyer and share a public page with vendors and the community.
         </CardDescription>
       </CardHeader>
-      <CardContent className="grid gap-6 lg:grid-cols-2">
-        <div className="flex flex-col gap-3">
-          <BazaarFlyerField
-            eventId={event.id}
-            value={flyerUrl}
-            onValueChange={setFlyerUrl}
-            disabled={isPending}
-          />
-          <Button onClick={handleSaveFlyer} disabled={isPending}>
-            Save flyer
-          </Button>
-        </div>
+      <CardContent className="flex flex-col gap-5">
+        <BazaarFlyerField
+          eventId={event.id}
+          value={flyerUrl}
+          onValueChange={setFlyerUrl}
+          disabled={isPending}
+          autoSave
+          compact
+          showHint={false}
+        />
 
         <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-2">
@@ -142,14 +127,15 @@ export function BazaarEventFlyerSharePanel({ event }: { event: VendorHubEventWit
               ) : null}
             </div>
             <p className="text-xs text-muted-foreground">
-              Anyone with this link can view the bazaar details and flyer. Booth reservations still
-              require a vendor account.
+              Anyone with this link can view the bazaar details and flyer.
             </p>
           </div>
 
           <Button
             type="button"
             variant="outline"
+            size="sm"
+            className="w-fit"
             onClick={handleRegenerateLink}
             disabled={isPending}
           >
@@ -157,8 +143,9 @@ export function BazaarEventFlyerSharePanel({ event }: { event: VendorHubEventWit
             Regenerate link
           </Button>
         </div>
+
+        {error ? <p className="text-sm text-red-600">{error}</p> : null}
       </CardContent>
-      {error ? <p className="px-6 pb-4 text-sm text-red-600">{error}</p> : null}
     </Card>
   )
 }

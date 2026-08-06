@@ -56,125 +56,34 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-// Mock vendor applications
-const mockVendors = [
-  {
-    id: "v-1",
-    businessName: "Islamic Arts & Crafts",
-    contactName: "Ahmed Hassan",
-    email: "ahmed@islamicarts.com",
-    phone: "+1 (555) 123-4567",
-    type: "Retail",
-    boothType: "Standard",
-    status: "approved",
-    appliedDate: "Feb 15, 2026",
-    products: "Handmade Islamic calligraphy, prayer beads, decorative items",
-    booth: "A-01",
-  },
-  {
-    id: "v-2",
-    businessName: "Modest Fashion Hub",
-    contactName: "Fatima Ali",
-    email: "fatima@modestfashion.com",
-    phone: "+1 (555) 234-5678",
-    type: "Clothing",
-    boothType: "Premium",
-    status: "approved",
-    appliedDate: "Feb 14, 2026",
-    products: "Hijabs, abayas, modest dresses, accessories",
-    booth: "A-02",
-  },
-  {
-    id: "v-3",
-    businessName: "Halal Eats Co.",
-    contactName: "Omar Khan",
-    email: "omar@halaleats.com",
-    phone: "+1 (555) 345-6789",
-    type: "Food",
-    boothType: "Food Booth",
-    status: "pending",
-    appliedDate: "Feb 20, 2026",
-    products: "Mediterranean cuisine, shawarma, falafel, fresh juices",
-    booth: null,
-  },
-  {
-    id: "v-4",
-    businessName: "Kids Fun Zone",
-    contactName: "Sarah Johnson",
-    email: "sarah@kidsfunzone.com",
-    phone: "+1 (555) 456-7890",
-    type: "Activity",
-    boothType: "Activity Space",
-    status: "approved",
-    appliedDate: "Feb 12, 2026",
-    products: "Bounce house, face painting, balloon animals, games",
-    booth: "C-01",
-  },
-  {
-    id: "v-5",
-    businessName: "Baklava Paradise",
-    contactName: "Yusuf Demir",
-    email: "yusuf@baklavaparadise.com",
-    phone: "+1 (555) 567-8901",
-    type: "Food",
-    boothType: "Food Booth",
-    status: "rejected",
-    appliedDate: "Feb 18, 2026",
-    products: "Turkish baklava, kunafa, Turkish delight",
-    booth: null,
-    rejectionReason: "Similar vendor already approved",
-  },
-  {
-    id: "v-6",
-    businessName: "Halal Cosmetics Co.",
-    contactName: "Aisha Rahman",
-    email: "aisha@halalcosmetics.com",
-    phone: "+1 (555) 678-9012",
-    type: "Beauty",
-    boothType: "Premium",
-    status: "pending",
-    appliedDate: "Feb 22, 2026",
-    products: "Halal-certified cosmetics, skincare, fragrances",
-    booth: null,
-  },
-  {
-    id: "v-7",
-    businessName: "Books & Beyond",
-    contactName: "Ibrahim Patel",
-    email: "ibrahim@booksandbeyond.com",
-    phone: "+1 (555) 789-0123",
-    type: "Retail",
-    boothType: "Corner",
-    status: "pending",
-    appliedDate: "Feb 24, 2026",
-    products: "Islamic books, children books, educational materials",
-    booth: null,
-  },
-  {
-    id: "v-8",
-    businessName: "Henna Artists",
-    contactName: "Zainab Mohammed",
-    email: "zainab@hennaartists.com",
-    phone: "+1 (555) 890-1234",
-    type: "Service",
-    boothType: "Activity Space",
-    status: "approved",
-    appliedDate: "Feb 10, 2026",
-    products: "Henna designs, bridal henna, kids henna",
-    booth: "C-02",
-  },
-]
+type VendorApplication = {
+  id: string
+  businessName: string
+  contactName: string
+  email: string
+  phone: string
+  type: string
+  boothType: string
+  status: "approved" | "pending" | "rejected"
+  appliedDate: string
+  products: string
+  booth: string | null
+  rejectionReason?: string
+}
+
+/** Legacy stub page — no sample rows; use Vendor Hub for real applications. */
+const vendors: VendorApplication[] = []
 
 export default function BazaarVendorsPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [typeFilter, setTypeFilter] = useState<string>("all")
-  const [selectedVendor, setSelectedVendor] = useState<typeof mockVendors[0] | null>(null)
+  const [selectedVendor, setSelectedVendor] = useState<VendorApplication | null>(null)
   const [showDetailsDialog, setShowDetailsDialog] = useState(false)
   const [showApprovalDialog, setShowApprovalDialog] = useState(false)
   const [approvalAction, setApprovalAction] = useState<"approve" | "reject">("approve")
 
-  const filteredVendors = mockVendors.filter((vendor) => {
+  const filteredVendors = vendors.filter((vendor) => {
     const matchesSearch =
       vendor.businessName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       vendor.contactName.toLowerCase().includes(searchQuery.toLowerCase())
@@ -184,13 +93,13 @@ export default function BazaarVendorsPage() {
   })
 
   const stats = {
-    total: mockVendors.length,
-    approved: mockVendors.filter((v) => v.status === "approved").length,
-    pending: mockVendors.filter((v) => v.status === "pending").length,
-    rejected: mockVendors.filter((v) => v.status === "rejected").length,
+    total: vendors.length,
+    approved: vendors.filter((v) => v.status === "approved").length,
+    pending: vendors.filter((v) => v.status === "pending").length,
+    rejected: vendors.filter((v) => v.status === "rejected").length,
   }
 
-  const vendorTypes = [...new Set(mockVendors.map((v) => v.type))]
+  const vendorTypes = [...new Set(vendors.map((v) => v.type))]
 
   return (
     <>
@@ -311,7 +220,14 @@ export default function BazaarVendorsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredVendors.map((vendor) => (
+                  {filteredVendors.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
+                        No vendor applications yet. Use Vendor Hub for live applications.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredVendors.map((vendor) => (
                     <TableRow key={vendor.id}>
                       <TableCell className="font-medium">
                         <Link
@@ -406,7 +322,8 @@ export default function BazaarVendorsPage() {
                         </DropdownMenu>
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ))
+                  )}
                 </TableBody>
               </Table>
             </CardContent>

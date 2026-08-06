@@ -1,0 +1,58 @@
+{
+  "mode": "execute",
+  "vendorContacts": 290,
+  "withActivityDate": 290,
+  "updated": 290,
+  "skippedNoDate": 0,
+  "sample": [
+    {
+      "contactId": "400fdf02-d4ed-45a0-a4cc-e6c0c05eb328",
+      "last_activity_at": "2025-05-17"
+    },
+    {
+      "contactId": "2565fc11-65cc-4769-951d-99680d60f461",
+      "last_activity_at": "2024-06-08"
+    },
+    {
+      "contactId": "018114e3-506b-47f5-bc0c-043846668cc2",
+      "last_activity_at": "2024-02-24"
+    },
+    {
+      "contactId": "33a0dd5b-bf6b-4995-9929-3bdbf4320421",
+      "last_activity_at": "2025-05-17"
+    },
+    {
+      "contactId": "2788091d-3bca-470b-b8b7-351f3266acac",
+      "last_activity_at": "2025-05-17"
+    },
+    {
+      "contactId": "6d7f2df6-4eea-4cfa-a0dc-4e658db128cb",
+      "last_activity_at": "2023-03-04"
+    },
+    {
+      "contactId": "eeb3c0fb-e240-45d3-a101-0472be3e366b",
+      "last_activity_at": "2024-02-24"
+    },
+    {
+      "contactId": "f973a9c8-aaa2-420d-9cb1-2ee06807b136",
+      "last_activity_at": "2021-10-24"
+    },
+    {
+      "contactId": "f4c56389-5c69-45ec-9406-9d5cb991d8d1",
+      "last_activity_at": "2025-05-17"
+    },
+    {
+      "contactId": "b63dc383-345a-49c5-9cdd-f2a775e228c4",
+      "last_activity_at": "2024-02-24"
+    },
+    {
+      "contactId": "d9b259f5-2859-4dd8-95e1-22ea08f3ef91",
+      "last_activity_at": "2022-03-19"
+    },
+    {
+      "contactId": "f0aae80d-2dc1-421f-ab19-b793eac49517",
+      "last_activity_at": "2026-02-14"
+    }
+  ],
+  "errors": []
+}

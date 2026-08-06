@@ -95,40 +95,7 @@ const emptyMember: Omit<FamilyMember, "id"> = {
   country: "",
 }
 
-const initialFamily: FamilyMember[] = [
-  {
-    id: "1",
-    firstName: "Michael",
-    lastName: "Johnson",
-    dateOfBirth: "1988-08-22",
-    gender: "Male",
-    relationship: "Spouse",
-    phone: "+1 (555) 345-6789",
-    email: "michael.johnson@email.com",
-    addressLine1: "1234 Ocean Drive",
-    addressLine2: "Apt 12B",
-    city: "Miami",
-    state: "FL",
-    zipCode: "33139",
-    country: "United States",
-  },
-  {
-    id: "2",
-    firstName: "Emma",
-    lastName: "Johnson",
-    dateOfBirth: "2015-02-10",
-    gender: "Female",
-    relationship: "Daughter",
-    phone: "",
-    email: "",
-    addressLine1: "",
-    addressLine2: "",
-    city: "",
-    state: "",
-    zipCode: "",
-    country: "",
-  },
-]
+const initialFamily: FamilyMember[] = []
 
 function FormField({
   label,

@@ -58,29 +58,38 @@ const timeSlots = [
   "7:00 PM", "8:00 PM", "9:00 PM", "10:00 PM"
 ]
 
-// Mock events data for the calendar
-const mockCalendarEvents = [
-  { id: "1", title: "Ramadan Iftar", space: "Main Hall", startHour: 18, durationHours: 3, status: "Approved" as BookingStatus, booker: "Community" },
-  { id: "2", title: "Youth Group Meeting", space: "Room A", startHour: 15, durationHours: 2, status: "Fully Paid" as BookingStatus, booker: "Youth Committee" },
-  { id: "3", title: "Board Meeting", space: "Conference Room", startHour: 10, durationHours: 2, status: "Pending Review" as BookingStatus, booker: "Board" },
-  { id: "4", title: "Community Breakfast", space: "Main Hall", startHour: 9, durationHours: 2, status: "Deposit Paid" as BookingStatus, booker: "Volunteers" },
-  { id: "5", title: "Maintenance Block", space: "Library", startHour: 8, durationHours: 10, status: "Blocked" as BookingStatus, booker: "Admin", isBlocked: true, blockReason: "Scheduled maintenance" },
-]
+const mockCalendarEvents: Array<{
+  id: string
+  title: string
+  space: string
+  startHour: number
+  durationHours: number
+  status: BookingStatus
+  booker: string
+  isBlocked?: boolean
+  blockReason?: string
+}> = []
 
-const mockWeekEvents = [
-  { id: "w1", title: "Friday Prayer", time: "1:00 PM", space: "Main Hall", dayIndex: 5, status: "Fully Paid" as BookingStatus },
-  { id: "w2", title: "Youth Group", time: "4:00 PM", space: "Room A", dayIndex: 6, status: "Approved" as BookingStatus },
-  { id: "w3", title: "Sunday School", time: "10:00 AM", space: "Classrooms", dayIndex: 0, status: "Fully Paid" as BookingStatus },
-  { id: "w4", title: "Women's Circle", time: "11:00 AM", space: "Room B", dayIndex: 2, status: "Pending Review" as BookingStatus },
-  { id: "w5", title: "Quran Study", time: "7:00 PM", space: "Library", dayIndex: 3, status: "Deposit Paid" as BookingStatus },
-]
+const mockWeekEvents: Array<{
+  id: string
+  title: string
+  time: string
+  space: string
+  dayIndex: number
+  status: BookingStatus
+}> = []
 
-const mockListEvents = [
-  { id: "l1", dateLabel: "FRIDAY, MARCH 6, 2026", startTime: "1:00 PM", endTime: "2:30 PM", duration: "1.5 hrs", space: "Main Hall", title: "Friday Prayer", recurring: true, status: "Fully Paid" as BookingStatus },
-  { id: "l2", dateLabel: "FRIDAY, MARCH 6, 2026", startTime: "6:30 PM", endTime: "9:00 PM", duration: "2.5 hrs", space: "Main Hall", title: "Ramadan Iftar", recurring: false, status: "Approved" as BookingStatus },
-  { id: "l3", dateLabel: "SATURDAY, MARCH 7, 2026", startTime: "4:00 PM", endTime: "6:00 PM", duration: "2 hrs", space: "Room A", title: "Youth Group Meeting", recurring: true, status: "Deposit Paid" as BookingStatus },
-  { id: "l4", dateLabel: "SUNDAY, MARCH 8, 2026", startTime: "10:00 AM", endTime: "12:00 PM", duration: "2 hrs", space: "Classrooms", title: "Sunday School", recurring: true, status: "Fully Paid" as BookingStatus },
-]
+const mockListEvents: Array<{
+  id: string
+  dateLabel: string
+  startTime: string
+  endTime: string
+  duration: string
+  space: string
+  title: string
+  recurring: boolean
+  status: BookingStatus
+}> = []
 
 function formatHour(hour: number) {
   const ampm = hour >= 12 ? "PM" : "AM"
@@ -926,17 +935,7 @@ function MonthView({ currentDate, onSlotClick, spaceFilter }: MonthViewProps) {
     return days
   }, [currentDate])
 
-  // Mock events for the month with status colors
-  const monthEvents: Record<number, { title: string; status: BookingStatus }[]> = {
-    6: [{ title: "Ramadan Iftar", status: "Approved" }],
-    7: [{ title: "Youth Group", status: "Fully Paid" }],
-    8: [{ title: "Sunday School", status: "Fully Paid" }],
-    13: [{ title: "Friday Prayer", status: "Fully Paid" }, { title: "Community Dinner", status: "Pending Review" }],
-    15: [{ title: "Board Meeting", status: "Deposit Paid" }],
-    20: [{ title: "Friday Prayer", status: "Fully Paid" }],
-    22: [{ title: "Fundraiser Gala", status: "Approved" }],
-    27: [{ title: "Maintenance", status: "Blocked" }],
-  }
+  const monthEvents: Record<number, { title: string; status: BookingStatus }[]> = {}
 
   return (
     <Card>

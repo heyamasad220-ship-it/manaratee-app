@@ -8,11 +8,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { contactProfilePath } from "@/lib/vendor-hub/contact-centric-model"
 import type { ParticipationHistoryRow } from "@/lib/vendor-hub/participation-history-queries"
 import { VENDOR_HUB_ROUTES } from "@/lib/vendor-hub/vendor-hub-routes"
+
+function formatDate(value?: string | null) {
+  if (!value) return "—"
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return "—"
+  return date.toLocaleDateString()
+}
 
 export function ParticipationHistoryClient({
   rows,
@@ -27,7 +33,7 @@ export function ParticipationHistoryClient({
         <CardContent className="p-6 text-sm text-muted-foreground">
           {contactIdFilter
             ? "No vendor participation history for this contact yet."
-            : "No vendor participation history yet. Approved applications and booth assignments will appear here."}
+            : "No vendor participation history yet. Booth payments across bazaars will appear here."}
         </CardContent>
       </Card>
     )
@@ -44,12 +50,11 @@ export function ParticipationHistoryClient({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Vendor</TableHead>
+                <TableHead>Business Name</TableHead>
                 <TableHead>Event</TableHead>
-                <TableHead>Activity</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>Event Date</TableHead>
+                <TableHead>Booth Type</TableHead>
                 <TableHead>Amount</TableHead>
-                <TableHead>Date</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -59,12 +64,12 @@ export function ParticipationHistoryClient({
                     {row.contactId ? (
                       <Link
                         href={contactProfilePath(row.contactId)}
-                        className="font-medium hover:text-primary hover:underline"
+                        className="font-medium text-primary hover:underline"
                       >
-                        {row.contactName}
+                        {row.businessName}
                       </Link>
                     ) : (
-                      row.contactName
+                      row.businessName
                     )}
                   </TableCell>
                   <TableCell>
@@ -79,39 +84,12 @@ export function ParticipationHistoryClient({
                       row.eventName
                     )}
                   </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{row.activityType.replace(/_/g, " ")}</Badge>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {formatDate(row.eventDate)}
                   </TableCell>
+                  <TableCell className="text-sm">{row.boothType || "—"}</TableCell>
                   <TableCell>
-                    {row.activityType === "evaluation" ? (
-                      <div className="flex flex-col gap-1">
-                        <span className="capitalize">{row.rating ?? row.status}</span>
-                        {row.wouldInviteAgain === false ? (
-                          <span className="text-xs text-red-600">Would not invite again</span>
-                        ) : row.wouldInviteAgain === true ? (
-                          <span className="text-xs text-emerald-600">Would invite again</span>
-                        ) : null}
-                        {row.evaluationNotes ? (
-                          <span className="line-clamp-2 text-xs text-muted-foreground">
-                            {row.evaluationNotes}
-                          </span>
-                        ) : null}
-                      </div>
-                    ) : (
-                      (row.status ?? "—")
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {row.activityType === "evaluation"
-                      ? "—"
-                      : row.amount != null
-                        ? `$${row.amount.toFixed(2)}`
-                        : "—"}
-                  </TableCell>
-                  <TableCell>
-                    {row.occurredAt
-                      ? new Date(row.occurredAt).toLocaleDateString()
-                      : "—"}
+                    {row.amount != null ? `$${row.amount.toFixed(2)}` : "—"}
                   </TableCell>
                 </TableRow>
               ))}

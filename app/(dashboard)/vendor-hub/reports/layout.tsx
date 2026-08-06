@@ -11,7 +11,7 @@ export default async function VendorHubReportsLayout({
   return (
     <VendorHubSectionShell
       title="Reports"
-      description="Vendor sales, booth performance, and activity summaries."
+      description="Live booth fees, payments, and utilization from Vendor Hub events."
       showEventSelector={false}
     >
       {children}

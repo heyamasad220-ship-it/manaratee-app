@@ -55,22 +55,7 @@ interface Booking {
   blockReason?: string
 }
 
-const mockBookings: Booking[] = [
-  { id: "BK-001", customer: "Sarah Johnson", venue: "Grand Hall", eventType: "Wedding", date: "2026-03-28", startTime: "4:00 PM", endTime: "11:00 PM", guests: 300, status: "Fully Paid", amount: 3500 },
-  { id: "BK-002", customer: "Ahmed Hassan", venue: "Conference Center", eventType: "Corporate Meeting", date: "2026-03-25", startTime: "9:00 AM", endTime: "5:00 PM", guests: 40, status: "Pending Review", amount: 800 },
-  { id: "BK-003", customer: "Maria Garcia", venue: "Garden Pavilion", eventType: "Birthday Party", date: "2026-03-30", startTime: "2:00 PM", endTime: "6:00 PM", guests: 50, status: "Approved", amount: 1200 },
-  { id: "BK-004", customer: "Tech Solutions Inc", venue: "Grand Hall", eventType: "Conference", date: "2026-04-05", startTime: "8:00 AM", endTime: "6:00 PM", guests: 400, status: "Deposit Paid", amount: 4500 },
-  { id: "BK-005", customer: "John Smith", venue: "Banquet Room", eventType: "Graduation", date: "2026-04-08", startTime: "6:00 PM", endTime: "10:00 PM", guests: 150, status: "Deposit Pending", amount: 2800 },
-  { id: "BK-006", customer: "Emily Chen", venue: "Grand Hall", eventType: "Wedding", date: "2026-04-15", startTime: "3:00 PM", endTime: "11:00 PM", guests: 250, status: "Approved", amount: 4200 },
-  { id: "BK-007", customer: "Corporate Plus LLC", venue: "Conference Center", eventType: "Workshop", date: "2026-04-10", startTime: "9:00 AM", endTime: "1:00 PM", guests: 35, status: "Fully Paid", amount: 500 },
-  { id: "BK-008", customer: "Fatima Ali", venue: "Garden Pavilion", eventType: "Baby Shower", date: "2026-04-12", startTime: "2:00 PM", endTime: "6:00 PM", guests: 45, status: "Deposit Paid", amount: 1100 },
-  { id: "BK-009", customer: "Michael Brown", venue: "Conference Center", eventType: "Meeting", date: "2026-03-26", startTime: "10:00 AM", endTime: "12:00 PM", guests: 15, status: "Cancelled", amount: 200 },
-  { id: "BK-010", customer: "Lisa Thompson", venue: "Banquet Room", eventType: "Anniversary", date: "2026-04-20", startTime: "5:00 PM", endTime: "10:00 PM", guests: 100, status: "Pending Review", amount: 2400 },
-  { id: "BK-011", customer: "Admin Block", venue: "Grand Hall", eventType: "Maintenance", date: "2026-03-27", startTime: "8:00 AM", endTime: "6:00 PM", guests: 0, status: "Blocked", amount: 0, isBlocked: true, blockReason: "Scheduled maintenance" },
-  { id: "BK-012", customer: "Admin Block", venue: "Garden Pavilion", eventType: "Private Event", date: "2026-04-01", startTime: "12:00 PM", endTime: "8:00 PM", guests: 0, status: "Blocked", amount: 0, isBlocked: true, blockReason: "super_admin's private event" },
-  { id: "BK-013", customer: "David Lee", venue: "Banquet Room", eventType: "Retirement Party", date: "2026-03-24", startTime: "5:00 PM", endTime: "9:00 PM", guests: 75, status: "Fully Paid", amount: 1800 },
-  { id: "BK-014", customer: "Jennifer White", venue: "Grand Hall", eventType: "Gala", date: "2026-04-18", startTime: "6:00 PM", endTime: "11:00 PM", guests: 350, status: "Deposit Pending", amount: 5200 },
-]
+const mockBookings: Booking[] = []
 
 const venues = ["All Venues", "Grand Hall", "Conference Center", "Garden Pavilion", "Banquet Room"]
 

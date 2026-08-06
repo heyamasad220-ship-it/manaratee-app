@@ -11,6 +11,10 @@ function urlFromRequestHeaders(headers: Headers) {
   return normalizeBaseUrl(origin.startsWith("http") ? origin : `https://${origin}`)
 }
 
+function isLocalDevHost(url: string) {
+  return /localhost|127\.0\.0\.1/i.test(url)
+}
+
 /**
  * Base URL for auth redirects and invite emails.
  * Production defaults to app.manaratee.com so invites never point at *.vercel.app.
@@ -35,6 +39,25 @@ export function getAppBaseUrl(request?: { headers: Headers }) {
 
   if (process.env.VERCEL_URL) {
     return normalizeBaseUrl(`https://${process.env.VERCEL_URL}`)
+  }
+
+  return CANONICAL_APP_URL
+}
+
+/**
+ * Public links meant to be copied and shared with customers (join links, etc.).
+ * Never returns localhost — always a real app host, defaulting to app.manaratee.com.
+ */
+export function getShareableAppBaseUrl() {
+  const fromEnv =
+    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+    process.env.NEXT_PUBLIC_SITE_URL?.trim()
+
+  if (fromEnv) {
+    const normalized = normalizeBaseUrl(fromEnv)
+    if (!isLocalDevHost(normalized)) {
+      return normalized
+    }
   }
 
   return CANONICAL_APP_URL

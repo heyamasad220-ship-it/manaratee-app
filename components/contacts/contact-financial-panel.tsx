@@ -9,7 +9,6 @@ import {
   CreditCard,
   DollarSign,
   FileText,
-  Heart,
   Info,
   Loader2,
   Mail,
@@ -83,6 +82,7 @@ const MODULE_CHART_COLORS: Record<ContactFinancialSourceModule, string> = {
   donations: "#10b981",
   programs: "#8b5cf6",
   venue_rentals: "#f59e0b",
+  vendor_hub: "#ea580c",
   membership: "#06b6d4",
   other: "#94a3b8",
 }
@@ -91,6 +91,7 @@ const MODULE_LABELS: Record<ContactFinancialSourceModule, string> = {
   donations: "Donations",
   programs: "Programs",
   venue_rentals: "Venue Rentals",
+  vendor_hub: "Vendor Hub",
   membership: "Membership",
   other: "Other",
 }
@@ -232,6 +233,12 @@ type ContactFinancialPanelProps = {
   refreshToken?: number
   /** Rendered after Statements (e.g. Notes & Activity). */
   trailingContent?: ReactNode
+  /**
+   * staff-overview: KPI + by-module chart + recent transactions (Contact Overview).
+   * staff-details: detail tabs + payment methods / statements (Financial tab).
+   * full: customer / legacy complete layout.
+   */
+  surface?: "full" | "staff-overview" | "staff-details"
 }
 
 function ContactFinancialIdentity({
@@ -287,6 +294,7 @@ function buildModuleBreakdown(
   if (modules.donations) order.push("donations")
   if (modules.programs) order.push("programs")
   if (modules.bookings) order.push("venue_rentals")
+  if (modules.vendorHub) order.push("vendor_hub")
   if (modules.membership) order.push("membership")
   if ((totals.other ?? 0) > 0) order.push("other")
 
@@ -313,35 +321,20 @@ function buildModuleBreakdown(
 
 function ContactFinancialMetricsGrid({
   metrics,
-  donationCount,
   lastPaymentLabel,
   lastPaymentDate,
   onOpenBalances,
 }: {
   metrics: ContactFinancialSummaryPayload["metrics"]
-  donationCount: number
   lastPaymentLabel: string | null
   lastPaymentDate?: string | null
   onOpenBalances: () => void
 }) {
   return (
-    <DonationMetricCardGrid columns={4} colorful compact className="w-full min-w-0">
+    <DonationMetricCardGrid columns={3} colorful compact className="w-full min-w-0">
       <DonationMetricCard
-        title="Lifetime Giving"
-        value={formatCurrency(metrics.lifetimeContributions)}
-        description={
-          donationCount === 1 ? "1 donation" : `${donationCount} donations`
-        }
-        icon={Heart}
-        accent="emerald"
-        compact
-      />
-      <DonationMetricCard
-        title="Total Paid"
+        title="Total payments received"
         value={formatCurrency(metrics.totalPaid)}
-        description={
-          metrics.donationsOnlyTotalPaid ? "Donations only" : "Across all modules"
-        }
         icon={DollarSign}
         accent="rose"
         compact
@@ -423,7 +416,7 @@ function ModuleBreakdownChart({
             </ChartContainer>
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
               <p className="text-lg font-semibold tabular-nums">{formatCurrency(totalPaid)}</p>
-              <p className="text-[11px] text-muted-foreground">Total Paid</p>
+              <p className="text-[11px] text-muted-foreground">Payments received</p>
             </div>
           </div>
 
@@ -472,6 +465,7 @@ export function ContactFinancialPanel({
   trailingContent,
   refreshToken = 0,
   stickyTopClass = "top-0",
+  surface = "full",
 }: ContactFinancialPanelProps) {
   const isCustomer = variant === "customer"
   const [loading, setLoading] = useState(true)
@@ -561,7 +555,12 @@ export function ContactFinancialPanel({
   const showPledgesTab = Boolean(modules.donations) && !isGroup && !isCustomer
   const showRefundsTab =
     Boolean(modules.donations || modules.bookings) && !isGroup && !isCustomer
+  const showHomepage =
+    surface === "full" || surface === "staff-overview"
+  const showDetails =
+    surface === "full" || surface === "staff-details"
   const showDetailTabsCard =
+    showDetails &&
     !isCustomer &&
     !isGroup &&
     (showPaymentPlansTab ||
@@ -569,11 +568,17 @@ export function ContactFinancialPanel({
       showRefundsTab ||
       showPaymentMethodsTab ||
       Boolean(modules.donations))
-  const showFinancialAside = !isGroup
+  const showFinancialAside =
+    showDetails && !isGroup && surface !== "staff-overview"
+  const showFinancialSummaryAside = showFinancialAside && surface === "full"
   const readOnlyTransactions = isCustomer
 
   const hasAnyModule =
-    modules.donations || modules.bookings || modules.programs || modules.membership
+    modules.donations ||
+    modules.bookings ||
+    modules.programs ||
+    modules.membership ||
+    modules.vendorHub
 
   const contactIdentity = hideIdentity ? null : (
     <ContactFinancialIdentity
@@ -699,12 +704,6 @@ export function ContactFinancialPanel({
   const { metrics, openBalances, timeline } = data
   const transactions = timeline.filter(isPaidTransaction)
   const refunds = timeline.filter(isRefundEvent)
-  const donationCount = timeline.filter(
-    (event) =>
-      event.sourceModule === "donations" &&
-      event.filterCategory !== "pledges" &&
-      !isRefundEvent(event)
-  ).length
   const lastPayment = transactions[0] ?? null
   const moduleBreakdown = buildModuleBreakdown(timeline, modules)
   const recentTransactions = transactions.slice(0, RECENT_TRANSACTION_LIMIT)
@@ -712,53 +711,50 @@ export function ContactFinancialPanel({
   const donationsPaid = moduleBreakdown.slices.find((s) => s.key === "donations")?.value ?? 0
   const programsPaid = moduleBreakdown.slices.find((s) => s.key === "programs")?.value ?? 0
   const rentalsPaid = moduleBreakdown.slices.find((s) => s.key === "venue_rentals")?.value ?? 0
+  const vendorHubPaid = moduleBreakdown.slices.find((s) => s.key === "vendor_hub")?.value ?? 0
   const refundTotal = refunds.reduce((sum, event) => sum + Math.abs(event.amount ?? 0), 0)
 
-  const metricsBlock = !isGroup ? (
-    <div className="space-y-3">
-      <div className="flex justify-end">
-        <Select value="all-time" disabled>
-          <SelectTrigger className="h-8 w-[140px] text-xs">
-            <Calendar className="mr-1.5 h-3.5 w-3.5" />
-            <SelectValue placeholder="All Time" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all-time">All Time</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      <ContactFinancialMetricsGrid
-        metrics={metrics}
-        donationCount={donationCount}
-        lastPaymentLabel={lastPayment?.eventType ?? null}
-        lastPaymentDate={lastPayment?.date ?? null}
-        onOpenBalances={() => setOpenBalancesOpen(true)}
-      />
-    </div>
-  ) : contactIdentity ? (
-    contactIdentity
+  const metricsGrid = !isGroup ? (
+    <ContactFinancialMetricsGrid
+      metrics={metrics}
+      lastPaymentLabel={lastPayment?.eventType ?? null}
+      lastPaymentDate={lastPayment?.date ?? null}
+      onOpenBalances={() => setOpenBalancesOpen(true)}
+    />
   ) : null
+
+  const metricsBlock =
+    showHomepage && !isGroup ? (
+      <div className="space-y-3">
+        <div className="flex justify-end">
+          <Select value="all-time" disabled>
+            <SelectTrigger className="h-8 w-[140px] text-xs">
+              <Calendar className="mr-1.5 h-3.5 w-3.5" />
+              <SelectValue placeholder="All Time" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all-time">All Time</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {metricsGrid}
+      </div>
+    ) : showHomepage && contactIdentity ? (
+      contactIdentity
+    ) : null
 
   return (
     <div className="space-y-6">
-      {hideIdentity && stickyHeader
-        ? renderCombinedSticky(
-            !isGroup ? (
-              <ContactFinancialMetricsGrid
-                metrics={metrics}
-                donationCount={donationCount}
-                lastPaymentLabel={lastPayment?.eventType ?? null}
-                lastPaymentDate={lastPayment?.date ?? null}
-                onOpenBalances={() => setOpenBalancesOpen(true)}
-              />
-            ) : null
-          )
-        : metricsBlock}
+      {showHomepage && hideIdentity && stickyHeader
+        ? renderCombinedSticky(metricsGrid)
+        : showHomepage
+          ? metricsBlock
+          : null}
 
       {belowSticky}
       {leadingContent}
 
-      {!isGroup ? (
+      {!isGroup && showHomepage ? (
         <Sheet open={openBalancesOpen} onOpenChange={setOpenBalancesOpen}>
           <SheetContent className="flex w-full flex-col sm:max-w-xl">
             <SheetHeader>
@@ -776,33 +772,35 @@ export function ContactFinancialPanel({
         </Sheet>
       ) : null}
 
-      <Sheet open={allTransactionsOpen} onOpenChange={setAllTransactionsOpen}>
-        <SheetContent className="flex w-full flex-col sm:max-w-3xl">
-          <SheetHeader>
-            <SheetTitle>All Transactions</SheetTitle>
-            <SheetDescription>
-              {isCustomer
-                ? "Your full financial timeline."
-                : `Full financial timeline for ${contactName}.`}
-            </SheetDescription>
-          </SheetHeader>
-          <div className="mt-4 min-h-0 flex-1 overflow-y-auto pr-1">
-            <FinancialTransactionsTable
-              rows={transactions}
-              emptyMessage={
-                isCustomer
-                  ? "No transactions recorded yet."
-                  : "No transactions recorded for this contact yet."
-              }
-              contactId={contactId}
-              contactName={contactName}
-              contactEmail={contactEmail}
-              onUpdated={() => void loadData()}
-              readOnly={readOnlyTransactions}
-            />
-          </div>
-        </SheetContent>
-      </Sheet>
+      {showHomepage ? (
+        <Sheet open={allTransactionsOpen} onOpenChange={setAllTransactionsOpen}>
+          <SheetContent className="flex w-full flex-col sm:max-w-3xl">
+            <SheetHeader>
+              <SheetTitle>All Transactions</SheetTitle>
+              <SheetDescription>
+                {isCustomer
+                  ? "Your full financial timeline."
+                  : `Full financial timeline for ${contactName}.`}
+              </SheetDescription>
+            </SheetHeader>
+            <div className="mt-4 min-h-0 flex-1 overflow-y-auto pr-1">
+              <FinancialTransactionsTable
+                rows={transactions}
+                emptyMessage={
+                  isCustomer
+                    ? "No transactions recorded yet."
+                    : "No transactions recorded for this contact yet."
+                }
+                contactId={contactId}
+                contactName={contactName}
+                contactEmail={contactEmail}
+                onUpdated={() => void loadData()}
+                readOnly={readOnlyTransactions}
+              />
+            </div>
+          </SheetContent>
+        </Sheet>
+      ) : null}
 
       <div
         className={cn(
@@ -811,7 +809,7 @@ export function ContactFinancialPanel({
         )}
       >
         <div className="space-y-6">
-          {!isGroup ? (
+          {showHomepage && !isGroup ? (
             <div className="grid gap-6 lg:grid-cols-2">
               <ModuleBreakdownChart
                 slices={moduleBreakdown.slices}
@@ -848,7 +846,9 @@ export function ContactFinancialPanel({
                 </CardContent>
               </Card>
             </div>
-          ) : (
+          ) : null}
+
+          {showHomepage && isGroup ? (
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">Transactions</CardTitle>
@@ -864,7 +864,7 @@ export function ContactFinancialPanel({
                 />
               </CardContent>
             </Card>
-          )}
+          ) : null}
 
           {showDetailTabsCard ? (
             <Card>
@@ -957,18 +957,21 @@ export function ContactFinancialPanel({
             </Card>
           ) : null}
 
-          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Info className="h-3.5 w-3.5 shrink-0" />
-            {isCustomer
-              ? "All financial information is associated with your account."
-              : `All financial information is associated with ${contactName}.`}
-          </p>
+          {showDetails ? (
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Info className="h-3.5 w-3.5 shrink-0" />
+              {isCustomer
+                ? "All financial information is associated with your account."
+                : `All financial information is associated with ${contactName}.`}
+            </p>
+          ) : null}
 
           {trailingContent}
         </div>
 
         {showFinancialAside ? (
           <aside className="space-y-4">
+            {showFinancialSummaryAside ? (
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">Financial Summary</CardTitle>
@@ -982,6 +985,9 @@ export function ContactFinancialPanel({
                 ) : null}
                 {modules.bookings ? (
                   <SummaryRow label="Venue Rentals" value={formatCurrency(rentalsPaid)} />
+                ) : null}
+                {modules.vendorHub ? (
+                  <SummaryRow label="Vendor Hub" value={formatCurrency(vendorHubPaid)} />
                 ) : null}
                 <SummaryRow
                   label="Total Paid"
@@ -1011,6 +1017,7 @@ export function ContactFinancialPanel({
                 </Button>
               </CardContent>
             </Card>
+            ) : null}
 
             {showPaymentMethodsTab ? (
               <Card>

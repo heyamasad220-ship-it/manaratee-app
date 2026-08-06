@@ -44,72 +44,7 @@ interface Employee {
   status: EmployeeStatus
 }
 
-const mockEmployees: Employee[] = [
-  {
-    id: "emp-001",
-    name: "Sarah Mitchell",
-    title: "Program Director",
-    department: "Administration",
-    type: "Full-Time",
-    status: "Active",
-  },
-  {
-    id: "emp-002",
-    name: "James Okafor",
-    title: "Lead Instructor",
-    department: "Education",
-    type: "Full-Time",
-    status: "Active",
-  },
-  {
-    id: "emp-003",
-    name: "Maria Gonzalez",
-    title: "Office Manager",
-    department: "Operations",
-    type: "Full-Time",
-    status: "Active",
-  },
-  {
-    id: "emp-004",
-    name: "Kevin Park",
-    title: "IT Support Specialist",
-    department: "Technology",
-    type: "Contract",
-    status: "Active",
-  },
-  {
-    id: "emp-005",
-    name: "Aisha Rahman",
-    title: "Event Coordinator",
-    department: "Events",
-    type: "Part-Time",
-    status: "Active",
-  },
-  {
-    id: "emp-006",
-    name: "David Chen",
-    title: "Facilities Manager",
-    department: "Operations",
-    type: "Full-Time",
-    status: "On Leave",
-  },
-  {
-    id: "emp-007",
-    name: "Jessica Taylor",
-    title: "Marketing Associate",
-    department: "Marketing",
-    type: "Intern",
-    status: "Active",
-  },
-  {
-    id: "emp-008",
-    name: "Robert Kim",
-    title: "Finance Officer",
-    department: "Finance",
-    type: "Full-Time",
-    status: "Inactive",
-  },
-]
+const mockEmployees: Employee[] = []
 
 type SortField = "name" | "title" | "department" | "type" | "status"
 type SortDirection = "asc" | "desc"

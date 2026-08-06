@@ -6,6 +6,7 @@ export type ContactFinancialFilter =
   | "pledges"
   | "programs"
   | "venue_rentals"
+  | "vendor_hub"
   | "membership"
   | "other"
 
@@ -13,6 +14,7 @@ export type ContactFinancialSourceModule =
   | "donations"
   | "programs"
   | "venue_rentals"
+  | "vendor_hub"
   | "membership"
   | "other"
 

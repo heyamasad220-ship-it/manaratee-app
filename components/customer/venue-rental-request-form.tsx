@@ -31,13 +31,13 @@ import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { bookingSpaces } from "@/lib/mock-data"
 
-// Mock current user - in production this would come from auth context
+// Anonymous stub until auth context wires the signed-in user
 // User types: "employee" | "member" | "guest" | "volunteer" | "donor"
 const mockCurrentUser = {
-  id: "user-1",
-  name: "John Doe",
-  email: "john@example.com",
-  type: "member" as const, // Change to "employee" to test employee access
+  id: "",
+  name: "",
+  email: "",
+  type: "guest" as const,
 }
 
 // Filter spaces based on user type

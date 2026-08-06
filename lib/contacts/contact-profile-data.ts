@@ -15,6 +15,10 @@ import {
 import { getVenueRentalStatusLabel } from "@/lib/bookings/venue-rental-status"
 import type { VenueRentalStatus } from "@/lib/bookings/venue-rental-types"
 import { getActiveFaAwardsByEnrollmentIds } from "@/lib/programs/fa-awards"
+import {
+  VENDOR_ORG_APPLICATION_MODULE,
+  VENDOR_ORG_APPLICATION_TYPE,
+} from "@/lib/vendor-hub/vendor-participation-model"
 
 export type ContactRelationshipSummary = {
   affiliationsCount: number
@@ -92,6 +96,15 @@ export type ContactEnrollmentRecord = {
   faNote: string | null
 }
 
+export type ContactVendorStats = {
+  applicationCount: number
+  participationCount: number
+  paymentCount: number
+  paymentTotal: number
+  /** Sum of application + participation + payment + legacy vendor rows used in the timeline. */
+  activityCount: number
+}
+
 export type ContactProfileData = {
   summary: ContactRelationshipSummary
   activity: ContactActivitySummary
@@ -102,6 +115,7 @@ export type ContactProfileData = {
   rentalStats: ContactRentalStats
   rentalRecords: ContactRentalRecord[]
   enrollmentRecords: ContactEnrollmentRecord[]
+  vendorStats: ContactVendorStats
   activeTeamsCount: number
   notes: ContactNoteRecord[]
 }
@@ -600,14 +614,178 @@ export async function fetchContactProfileData(
     }
   }
 
-  const { data: vendors } = await supabase
+  // Vendor Hub is contact-centric (role + applications / participation / payments).
+  // Legacy `vendors` rows are included only when still linked.
+  let vendorApplicationCount = 0
+  let vendorParticipationCount = 0
+  let vendorPaymentCount = 0
+  let vendorPaymentTotal = 0
+
+  const { data: vendorApplications } = await supabase
+    .from("applications")
+    .select("id, status, submitted_at, created_at, form_data, module_owner")
+    .eq("organization_id", orgId)
+    .eq("contact_id", contactId)
+    .eq("application_type", VENDOR_ORG_APPLICATION_TYPE)
+    .order("created_at", { ascending: false })
+    .limit(20)
+
+  for (const application of vendorApplications || []) {
+    const moduleOwner = (application.module_owner as string | null) || null
+    if (
+      moduleOwner &&
+      moduleOwner !== VENDOR_ORG_APPLICATION_MODULE &&
+      moduleOwner !== "bazaar"
+    ) {
+      continue
+    }
+    vendorApplicationCount += 1
+    const formData =
+      application.form_data && typeof application.form_data === "object"
+        ? (application.form_data as Record<string, unknown>)
+        : {}
+    const businessName =
+      typeof formData.business_name === "string" ? formData.business_name.trim() : ""
+    const occurredAt =
+      (application.submitted_at as string | null) ||
+      (application.created_at as string | null) ||
+      new Date().toISOString()
+    activity.vendorHub.push({
+      id: application.id,
+      module: "vendorHub",
+      activityType: "vendor_application",
+      title: businessName || "Vendor application",
+      date: occurredAt,
+      status: application.status,
+    })
+    pushTimeline({
+      id: `vendor-app-${application.id}`,
+      date: occurredAt,
+      title: businessName
+        ? `Vendor application: ${businessName}`
+        : "Vendor application submitted",
+      module: "Vendor Hub",
+      status: application.status,
+    })
+  }
+
+  const { data: vendorParticipations } = await supabase
+    .from("vendor_hub_participant_status")
+    .select("id, lifecycle_status, created_at, updated_at, vendor_hub_event_id")
+    .eq("organization_id", orgId)
+    .eq("contact_id", contactId)
+    .order("updated_at", { ascending: false })
+    .limit(50)
+
+  const participationEventIds = Array.from(
+    new Set(
+      (vendorParticipations || [])
+        .map((row) => row.vendor_hub_event_id as string | null)
+        .filter((id): id is string => Boolean(id))
+    )
+  )
+  const participationEventNameById = new Map<string, string>()
+  if (participationEventIds.length > 0) {
+    const { data: participationEvents } = await supabase
+      .from("vendor_hub_events")
+      .select("id, name")
+      .in("id", participationEventIds)
+    for (const event of participationEvents || []) {
+      participationEventNameById.set(event.id as string, (event.name as string) || "Bazaar event")
+    }
+  }
+
+  for (const participation of vendorParticipations || []) {
+    vendorParticipationCount += 1
+    const eventId = participation.vendor_hub_event_id as string | null
+    const eventName = eventId
+      ? participationEventNameById.get(eventId) || "Bazaar event"
+      : "Vendor Hub event"
+    const occurredAt =
+      (participation.updated_at as string | null) ||
+      (participation.created_at as string | null) ||
+      new Date().toISOString()
+    activity.vendorHub.push({
+      id: participation.id,
+      module: "vendorHub",
+      activityType: "vendor_participation",
+      title: `Vendor participation: ${eventName}`,
+      date: occurredAt,
+      status: participation.lifecycle_status,
+    })
+    pushTimeline({
+      id: `vendor-participation-${participation.id}`,
+      date: occurredAt,
+      title: `Vendor participation: ${eventName}`,
+      module: "Vendor Hub",
+      status: participation.lifecycle_status,
+    })
+  }
+
+  const { data: vendorPayments } = await supabase
+    .from("vendor_hub_payments")
+    .select("id, amount, payment_date, payment_type, event_id, created_at")
+    .eq("contact_id", contactId)
+    .order("payment_date", { ascending: false })
+    .limit(50)
+
+  const paymentEventIds = Array.from(
+    new Set(
+      (vendorPayments || [])
+        .map((row) => row.event_id as string | null)
+        .filter((id): id is string => Boolean(id))
+    )
+  )
+  const paymentEventNameById = new Map<string, string>()
+  if (paymentEventIds.length > 0) {
+    const { data: paymentEvents } = await supabase
+      .from("vendor_hub_events")
+      .select("id, name")
+      .in("id", paymentEventIds)
+    for (const event of paymentEvents || []) {
+      paymentEventNameById.set(event.id as string, (event.name as string) || "Bazaar event")
+    }
+  }
+
+  for (const payment of vendorPayments || []) {
+    const amount = Number(payment.amount || 0)
+    vendorPaymentCount += 1
+    if (Number.isFinite(amount)) vendorPaymentTotal += amount
+    const eventId = payment.event_id as string | null
+    const eventName = eventId
+      ? paymentEventNameById.get(eventId) || "Bazaar event"
+      : "Vendor Hub"
+    const occurredAt =
+      (payment.payment_date as string | null) ||
+      (payment.created_at as string | null) ||
+      new Date().toISOString()
+    activity.vendorHub.push({
+      id: payment.id,
+      module: "vendorHub",
+      activityType: "vendor_participation",
+      title: `${eventName} booth payment`,
+      date: occurredAt,
+      amount: Number.isFinite(amount) ? amount : null,
+      status: "Paid",
+    })
+    pushTimeline({
+      id: `vendor-payment-${payment.id}`,
+      date: occurredAt,
+      title: `${eventName} booth payment`,
+      module: "Vendor Hub",
+      amount: Number.isFinite(amount) ? amount : null,
+      status: "Paid",
+    })
+  }
+
+  const { data: legacyVendors } = await supabase
     .from("vendors")
     .select("id, business_name, status, created_at")
     .eq("organization_id", orgId)
     .eq("contact_id", contactId)
     .limit(20)
 
-  for (const vendor of vendors || []) {
+  for (const vendor of legacyVendors || []) {
     activity.vendorHub.push({
       id: vendor.id,
       module: "vendorHub",
@@ -617,7 +795,7 @@ export async function fetchContactProfileData(
       status: vendor.status,
     })
     pushTimeline({
-      id: `vendor-${vendor.id}`,
+      id: `vendor-legacy-${vendor.id}`,
       date: vendor.created_at,
       title: vendor.business_name
         ? `Vendor application: ${vendor.business_name}`
@@ -625,6 +803,14 @@ export async function fetchContactProfileData(
       module: "Vendor Hub",
       status: vendor.status,
     })
+  }
+
+  const vendorStats: ContactVendorStats = {
+    applicationCount: vendorApplicationCount,
+    participationCount: vendorParticipationCount,
+    paymentCount: vendorPaymentCount,
+    paymentTotal: vendorPaymentTotal,
+    activityCount: activity.vendorHub.length,
   }
 
   const notesSelect = await supabase
@@ -682,7 +868,7 @@ export async function fetchContactProfileData(
     bookingsCount: activity.spaces.length,
     donationsTotal: donorStats.totalDonated,
     donationsCount: donorStats.donationCount,
-    vendorActivityCount: activity.vendorHub.length,
+    vendorActivityCount: vendorStats.activityCount,
     lastActivityDate: latestDate(allDates),
   }
 
@@ -702,6 +888,7 @@ export async function fetchContactProfileData(
     rentalStats,
     rentalRecords,
     enrollmentRecords: uniqueEnrollmentRecords,
+    vendorStats,
     activeTeamsCount,
     notes,
   }

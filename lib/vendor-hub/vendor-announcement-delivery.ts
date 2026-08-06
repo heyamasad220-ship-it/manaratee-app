@@ -103,6 +103,14 @@ export async function deliverVendorEventAnnouncement(input: {
         "Vendor announcements require migration 083_vendor_hub_announcements.sql in Supabase."
       )
     }
+    if (
+      announcementError?.code === "42P17" ||
+      announcementError?.message?.toLowerCase().includes("infinite recursion")
+    ) {
+      throw new Error(
+        "Vendor announcements RLS recursion — run scripts/228_vendor_hub_announcements_rls_fix.sql in Supabase."
+      )
+    }
     throw new Error(announcementError?.message || "Failed to create announcement.")
   }
 

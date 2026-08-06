@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation"
 
-import { contactProfilePath } from "@/lib/vendor-hub/contact-centric-model"
+import { VENDOR_HUB_ROUTES } from "@/lib/vendor-hub/vendor-hub-routes"
 
 /**
- * Vendor detail lives in CRM. This route preserves old links to /vendor-hub/vendors/[id].
+ * Legacy /vendor-hub/vendors/[id] links → Vendor Network vendor profile.
  */
 export default async function VendorHubVendorDetailRedirect({
   params,
@@ -11,5 +11,5 @@ export default async function VendorHubVendorDetailRedirect({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  redirect(contactProfilePath(id))
+  redirect(VENDOR_HUB_ROUTES.network.vendor(id))
 }

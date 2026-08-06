@@ -1,0 +1,341 @@
+{
+  "mode": "execute",
+  "csvPath": "C:/Users/danan/Downloads/Summer Camp 2026.csv",
+  "hasGradeColumn": false,
+  "rosterRows": 615,
+  "enrollments": 476,
+  "matched": 573,
+  "unmatched": [
+    {
+      "child": "Omar Abu Awad",
+      "parentEmail": "3asem888@gmail.com"
+    },
+    {
+      "child": "julaan shalabi",
+      "parentEmail": null
+    },
+    {
+      "child": "Syed Ahad Qadri",
+      "parentEmail": null
+    },
+    {
+      "child": "Tali Abusaad",
+      "parentEmail": null
+    },
+    {
+      "child": "Sila Aziz",
+      "parentEmail": null
+    },
+    {
+      "child": "Maria Irksoussi",
+      "parentEmail": null
+    },
+    {
+      "child": "Fatimah Al zahraa Abousaad",
+      "parentEmail": null
+    },
+    {
+      "child": "Aisha Bilal Musavvir",
+      "parentEmail": null
+    },
+    {
+      "child": "Anabiya Ahsen",
+      "parentEmail": null
+    },
+    {
+      "child": "Sila Ahsen",
+      "parentEmail": null
+    },
+    {
+      "child": "Mariam Hamideh",
+      "parentEmail": "jeninegharbieh@gmail.com"
+    },
+    {
+      "child": "Noah Hamideh",
+      "parentEmail": "jeninegharbieh@gmail.com"
+    },
+    {
+      "child": "Elias Taha",
+      "parentEmail": null
+    },
+    {
+      "child": "Mikhael Taha",
+      "parentEmail": null
+    },
+    {
+      "child": "ALI Qaderi",
+      "parentEmail": "telhaebtsam@gmail.com"
+    },
+    {
+      "child": "Rasmi Hijazi",
+      "parentEmail": null
+    },
+    {
+      "child": "Mohammad Hamideh",
+      "parentEmail": "mhamideh291290@gmail.com"
+    },
+    {
+      "child": "Noura S Nabolsi",
+      "parentEmail": null
+    },
+    {
+      "child": "Fatima Choudhry",
+      "parentEmail": null
+    },
+    {
+      "child": "Yamen Adel Rabah",
+      "parentEmail": null
+    },
+    {
+      "child": "Kareem Elarja",
+      "parentEmail": "abeer_qandil@yahoo.com"
+    },
+    {
+      "child": "Essa Elarja",
+      "parentEmail": "abeer_qandil@yahoo.com"
+    },
+    {
+      "child": "USMAN JABBAR",
+      "parentEmail": null
+    },
+    {
+      "child": "Mikael Khan",
+      "parentEmail": null
+    },
+    {
+      "child": "Taim Khalil",
+      "parentEmail": null
+    },
+    {
+      "child": "Omar Abukhaled",
+      "parentEmail": null
+    },
+    {
+      "child": "Mohammad Hamayel",
+      "parentEmail": "tahaniawad88@yahoo.com"
+    },
+    {
+      "child": "Sila Aziz",
+      "parentEmail": null
+    },
+    {
+      "child": "julaan shalabi",
+      "parentEmail": null
+    },
+    {
+      "child": "Yamen Adel Rabah",
+      "parentEmail": null
+    },
+    {
+      "child": "USMAN JABBAR",
+      "parentEmail": null
+    },
+    {
+      "child": "Mikael Khan",
+      "parentEmail": null
+    },
+    {
+      "child": "Maya Tabbara",
+      "parentEmail": "ftabbara@gmail.com"
+    },
+    {
+      "child": "Kareem Elarja",
+      "parentEmail": "abeer_qandil@yahoo.com"
+    },
+    {
+      "child": "Essa Elarja",
+      "parentEmail": "abeer_qandil@yahoo.com"
+    },
+    {
+      "child": "Minnah Shaheen",
+      "parentEmail": null
+    },
+    {
+      "child": "Omar Abu Awad",
+      "parentEmail": "3asem888@gmail.com"
+    },
+    {
+      "child": "ALI Qaderi",
+      "parentEmail": "telhaebtsam@gmail.com"
+    },
+    {
+      "child": "Sarah Tamony",
+      "parentEmail": null
+    },
+    {
+      "child": "Sofia Adel Zaq",
+      "parentEmail": null
+    },
+    {
+      "child": "Emaan Zaki",
+      "parentEmail": "macleeha@gmail.com"
+    },
+    {
+      "child": "Esraa Osama Osama",
+      "parentEmail": null
+    }
+  ],
+  "ambiguous": [],
+  "wouldUpdatePeople": 460,
+  "updatedPeople": 460,
+  "wouldUpdateEnrollments": 460,
+  "updatedEnrollments": 460,
+  "fieldFills": {
+    "dob": 460,
+    "gender": 460,
+    "grade": 0,
+    "child_age": 460
+  },
+  "samples": [
+    {
+      "child": "Khadija Sayyed",
+      "personId": "86df034d-3232-48f5-938f-358fe8656791",
+      "personPatch": {
+        "date_of_birth": "2016-01-01",
+        "gender": "Female"
+      },
+      "setChildAge": 10,
+      "enrollmentCount": 1
+    },
+    {
+      "child": "Mohammed Sayyed",
+      "personId": "2cde8249-3cd9-4775-aa63-41bcbb8f9a7d",
+      "personPatch": {
+        "date_of_birth": "2020-01-01",
+        "gender": "Male"
+      },
+      "setChildAge": 6,
+      "enrollmentCount": 1
+    },
+    {
+      "child": "Ibrahim Ullah",
+      "personId": "2248d27e-bf2d-4c84-87da-2059b3d24284",
+      "personPatch": {
+        "date_of_birth": "2021-01-01",
+        "gender": "Male"
+      },
+      "setChildAge": 5,
+      "enrollmentCount": 1
+    },
+    {
+      "child": "Zain Elmadhoun",
+      "personId": "1f6ed05f-4596-40fb-9072-ee61ad5d130c",
+      "personPatch": {
+        "date_of_birth": "2017-01-01",
+        "gender": "Male"
+      },
+      "setChildAge": 9,
+      "enrollmentCount": 1
+    },
+    {
+      "child": "Raha Adnan Alrowwad",
+      "personId": "fb0afb29-da98-4916-b73a-c7ed2007bc19",
+      "personPatch": {
+        "date_of_birth": "2021-01-01",
+        "gender": "Female"
+      },
+      "setChildAge": 5,
+      "enrollmentCount": 1
+    },
+    {
+      "child": "Ayah Abu Awad",
+      "personId": "5a595983-953d-4670-ad23-9178b35a1d93",
+      "personPatch": {
+        "date_of_birth": "2021-01-01",
+        "gender": "Female"
+      },
+      "setChildAge": 5,
+      "enrollmentCount": 1
+    },
+    {
+      "child": "Amar Amiri",
+      "personId": "a8eaae2c-990e-4b82-b815-fb0e38cda359",
+      "personPatch": {
+        "date_of_birth": "2018-01-01",
+        "gender": "Female"
+      },
+      "setChildAge": 8,
+      "enrollmentCount": 1
+    },
+    {
+      "child": "Luna Amiri",
+      "personId": "b52ffd99-1db8-4c0d-9a79-1d75e4b4ede4",
+      "personPatch": {
+        "date_of_birth": "2020-01-01",
+        "gender": "Female"
+      },
+      "setChildAge": 6,
+      "enrollmentCount": 1
+    },
+    {
+      "child": "Malek Amiri",
+      "personId": "8df6ff43-9772-4d8d-ab7d-a00963f7b428",
+      "personPatch": {
+        "date_of_birth": "2022-01-01",
+        "gender": "Male"
+      },
+      "setChildAge": 4,
+      "enrollmentCount": 1
+    },
+    {
+      "child": "Omar Hassan",
+      "personId": "af28addb-7c23-4d41-b77d-9856ae90bfe9",
+      "personPatch": {
+        "date_of_birth": "2019-01-01",
+        "gender": "Male"
+      },
+      "setChildAge": 7,
+      "enrollmentCount": 1
+    },
+    {
+      "child": "Leila Hassanein",
+      "personId": "fcef288a-4a26-48db-aa47-379b3fe52c95",
+      "personPatch": {
+        "date_of_birth": "2013-05-22",
+        "gender": "Female"
+      },
+      "setChildAge": 13,
+      "enrollmentCount": 1
+    },
+    {
+      "child": "Yasmeen Hassanein",
+      "personId": "91f66941-66cf-4949-9c15-994302d78235",
+      "personPatch": {
+        "date_of_birth": "2014-12-12",
+        "gender": "Female"
+      },
+      "setChildAge": 11,
+      "enrollmentCount": 1
+    },
+    {
+      "child": "Youssef Shaalan",
+      "personId": "391ea162-3007-41dd-99b0-f72dc68371d0",
+      "personPatch": {
+        "date_of_birth": "2021-01-01",
+        "gender": "Male"
+      },
+      "setChildAge": 5,
+      "enrollmentCount": 1
+    },
+    {
+      "child": "Tamer Zaben",
+      "personId": "6f801b14-7158-4c61-9228-260dba6b1bdb",
+      "personPatch": {
+        "date_of_birth": "2021-01-01",
+        "gender": "Male"
+      },
+      "setChildAge": 5,
+      "enrollmentCount": 1
+    },
+    {
+      "child": "Elia Zaben",
+      "personId": "67e43d1a-8028-45d7-b85c-afdfd89fb590",
+      "personPatch": {
+        "date_of_birth": "2019-01-01",
+        "gender": "Female"
+      },
+      "setChildAge": 7,
+      "enrollmentCount": 1
+    }
+  ]
+}

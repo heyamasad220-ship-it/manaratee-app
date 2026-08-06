@@ -88,150 +88,9 @@ interface PaymentHistoryItem {
   status: "Completed" | "Pending" | "Failed"
 }
 
-const mockBookingPayments: BookingPayment[] = [
-  {
-    id: "BP-001",
-    bookingId: "BK-2024-001",
-    customer: "Sarah Johnson",
-    customerEmail: "sarah@example.com",
-    venue: "Grand Hall",
-    eventDate: "2026-04-15",
-    totalAmount: 5500,
-    depositAmount: 1650,
-    paidToDate: 1650,
-    balanceDue: 3850,
-    depositStatus: "Paid",
-    balanceStatus: "Pending",
-    paymentMethod: "Credit Card",
-    depositDueDate: "2026-03-20",
-    balanceDueDate: "2026-04-10",
-  },
-  {
-    id: "BP-002",
-    bookingId: "BK-2024-002",
-    customer: "Ahmed Hassan",
-    customerEmail: "ahmed@company.com",
-    venue: "Conference Room A",
-    eventDate: "2026-04-08",
-    totalAmount: 1200,
-    depositAmount: 360,
-    paidToDate: 1200,
-    balanceDue: 0,
-    depositStatus: "Paid",
-    balanceStatus: "Paid",
-    paymentMethod: "Bank Transfer",
-    depositDueDate: "2026-03-15",
-    balanceDueDate: "2026-04-01",
-  },
-  {
-    id: "BP-003",
-    bookingId: "BK-2024-003",
-    customer: "Maria Garcia",
-    customerEmail: "maria@email.com",
-    venue: "Garden Pavilion",
-    eventDate: "2026-04-22",
-    totalAmount: 3200,
-    depositAmount: 960,
-    paidToDate: 0,
-    balanceDue: 3200,
-    depositStatus: "Overdue",
-    balanceStatus: "Pending",
-    paymentMethod: "Credit Card",
-    depositDueDate: "2026-03-18",
-    balanceDueDate: "2026-04-15",
-  },
-  {
-    id: "BP-004",
-    bookingId: "BK-2024-004",
-    customer: "Tech Solutions Inc",
-    customerEmail: "events@techsolutions.com",
-    venue: "Grand Hall",
-    eventDate: "2026-05-10",
-    totalAmount: 7500,
-    depositAmount: 2250,
-    paidToDate: 2250,
-    balanceDue: 5250,
-    depositStatus: "Paid",
-    balanceStatus: "Pending",
-    paymentMethod: "Bank Transfer",
-    depositDueDate: "2026-04-01",
-    balanceDueDate: "2026-05-03",
-  },
-  {
-    id: "BP-005",
-    bookingId: "BK-2024-005",
-    customer: "John Smith",
-    customerEmail: "john.smith@gmail.com",
-    venue: "Banquet Room",
-    eventDate: "2026-04-05",
-    totalAmount: 2800,
-    depositAmount: 840,
-    paidToDate: 840,
-    balanceDue: 1960,
-    depositStatus: "Paid",
-    balanceStatus: "Overdue",
-    paymentMethod: "Check",
-    depositDueDate: "2026-03-10",
-    balanceDueDate: "2026-03-28",
-  },
-  {
-    id: "BP-006",
-    bookingId: "BK-2024-006",
-    customer: "Emily Chen",
-    customerEmail: "emily.chen@email.com",
-    venue: "Conference Room B",
-    eventDate: "2026-04-12",
-    totalAmount: 800,
-    depositAmount: 240,
-    paidToDate: 500,
-    balanceDue: 300,
-    depositStatus: "Paid",
-    balanceStatus: "Partial",
-    paymentMethod: "Multiple",
-    depositDueDate: "2026-03-25",
-    balanceDueDate: "2026-04-05",
-  },
-  {
-    id: "BP-007",
-    bookingId: "BK-2024-007",
-    customer: "Corporate Plus LLC",
-    customerEmail: "bookings@corpplus.com",
-    venue: "Grand Hall",
-    eventDate: "2026-05-20",
-    totalAmount: 9000,
-    depositAmount: 2700,
-    paidToDate: 0,
-    balanceDue: 9000,
-    depositStatus: "Pending",
-    balanceStatus: "N/A",
-    paymentMethod: "Credit Card",
-    depositDueDate: "2026-04-15",
-    balanceDueDate: "2026-05-13",
-  },
-  {
-    id: "BP-008",
-    bookingId: "BK-2024-008",
-    customer: "Lisa Wong",
-    customerEmail: "lisa.wong@email.com",
-    venue: "Garden Pavilion",
-    eventDate: "2026-04-28",
-    totalAmount: 4200,
-    depositAmount: 1260,
-    paidToDate: 4200,
-    balanceDue: 0,
-    depositStatus: "Paid",
-    balanceStatus: "Paid",
-    paymentMethod: "Credit Card",
-    depositDueDate: "2026-03-22",
-    balanceDueDate: "2026-04-21",
-  },
-]
+const mockBookingPayments: BookingPayment[] = []
 
-const mockPaymentHistory: PaymentHistoryItem[] = [
-  { id: "PH-001", date: "2026-03-20", type: "Deposit", amount: 1650, method: "Credit Card", reference: "ch_3Nxxxxx1", status: "Completed" },
-  { id: "PH-002", date: "2026-03-15", type: "Deposit", amount: 360, method: "Bank Transfer", reference: "TRF-789456", status: "Completed" },
-  { id: "PH-003", date: "2026-03-16", type: "Balance", amount: 840, method: "Bank Transfer", reference: "TRF-789457", status: "Completed" },
-]
+const mockPaymentHistory: PaymentHistoryItem[] = []
 
 const venues = ["All Venues", "Grand Hall", "Garden Pavilion", "Conference Room A", "Conference Room B", "Banquet Room"]
 
@@ -687,23 +546,27 @@ const [recordPaymentForm, setRecordPaymentForm] = useState({
               <div className="flex flex-col gap-2">
                 <h4 className="text-sm font-semibold">Transactions</h4>
                 <div className="flex flex-col gap-2">
-                  {mockPaymentHistory.map((item) => (
-                    <div key={item.id} className="flex items-center justify-between rounded-lg border p-3">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-100">
-                          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  {mockPaymentHistory.length === 0 ? (
+                    <p className="py-4 text-center text-sm text-muted-foreground">No data yet.</p>
+                  ) : (
+                    mockPaymentHistory.map((item) => (
+                      <div key={item.id} className="flex items-center justify-between rounded-lg border p-3">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-100">
+                            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">{item.type} Payment</p>
+                            <p className="text-xs text-muted-foreground">{item.date} - {item.method}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-sm font-medium">{item.type} Payment</p>
-                          <p className="text-xs text-muted-foreground">{item.date} - {item.method}</p>
+                        <div className="text-right">
+                          <p className="font-semibold text-emerald-600">{formatCurrency(item.amount)}</p>
+                          <p className="text-xs text-muted-foreground font-mono">{item.reference}</p>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <p className="font-semibold text-emerald-600">{formatCurrency(item.amount)}</p>
-                        <p className="text-xs text-muted-foreground font-mono">{item.reference}</p>
-                      </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                   {selectedPayment.balanceDue > 0 && (
                     <div className="flex items-center justify-between rounded-lg border border-dashed p-3 bg-muted/30">
                       <div className="flex items-center gap-3">

@@ -1,10 +1,9 @@
 "use client"
 
-import { useEffect, useState, useTransition } from "react"
-import { Loader2, Pencil, Plus, Trash2 } from "lucide-react"
+import { useEffect, useMemo, useState, useTransition } from "react"
+import { ArrowDown, ArrowUp, Loader2, Pencil, Plus, Trash2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -48,6 +47,8 @@ type VendorTypeFormState = {
   sort_order: number
 }
 
+type NameSortDirection = "asc" | "desc"
+
 const emptyForm: VendorTypeFormState = {
   name: "",
   description: "",
@@ -65,6 +66,7 @@ export function VendorTypesSettings() {
   const [form, setForm] = useState<VendorTypeFormState>(emptyForm)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const [nameSort, setNameSort] = useState<NameSortDirection>("asc")
 
   useEffect(() => {
     let cancelled = false
@@ -95,6 +97,17 @@ export function VendorTypesSettings() {
       cancelled = true
     }
   }, [])
+
+  const sortedVendorTypes = useMemo(() => {
+    return [...vendorTypes].sort((a, b) => {
+      const comparison = a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+      return nameSort === "asc" ? comparison : -comparison
+    })
+  }, [nameSort, vendorTypes])
+
+  function toggleNameSort() {
+    setNameSort((current) => (current === "asc" ? "desc" : "asc"))
+  }
 
   function refreshVendorTypes() {
     startTransition(async () => {
@@ -188,6 +201,8 @@ export function VendorTypesSettings() {
     )
   }
 
+  const NameSortIcon = nameSort === "asc" ? ArrowUp : ArrowDown
+
   return (
     <>
       <Card>
@@ -208,22 +223,30 @@ export function VendorTypesSettings() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={toggleNameSort}
+                    className="inline-flex items-center gap-1.5 font-medium hover:text-foreground"
+                    aria-label={`Sort by name ${nameSort === "asc" ? "descending" : "ascending"}`}
+                  >
+                    Name
+                    <NameSortIcon className="h-3.5 w-3.5" />
+                  </button>
+                </TableHead>
                 <TableHead>Default fee</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Sort</TableHead>
                 <TableHead className="w-[120px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {vendorTypes.length === 0 ? (
+              {sortedVendorTypes.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
+                  <TableCell colSpan={3} className="py-8 text-center text-muted-foreground">
                     No vendor types yet. Add coffee, dessert, juice, and other categories.
                   </TableCell>
                 </TableRow>
               ) : (
-                vendorTypes.map((vendorType) => (
+                sortedVendorTypes.map((vendorType) => (
                   <TableRow key={vendorType.id}>
                     <TableCell>
                       <p className="font-medium">{vendorType.name}</p>
@@ -238,12 +261,6 @@ export function VendorTypesSettings() {
                         ? `$${Number(vendorType.default_fee).toFixed(2)}`
                         : "—"}
                     </TableCell>
-                    <TableCell>
-                      <Badge variant={vendorType.is_active ? "default" : "secondary"}>
-                        {vendorType.is_active ? "Active" : "Inactive"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{vendorType.sort_order}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
                         <Button

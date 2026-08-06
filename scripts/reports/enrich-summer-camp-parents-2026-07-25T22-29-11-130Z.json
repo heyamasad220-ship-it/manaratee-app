@@ -1,0 +1,124 @@
+{
+  "mode": "execute",
+  "csvPath": "C:/Users/danan/Downloads/Summer Camp 2026.csv",
+  "parentsInRoster": 107,
+  "matchedParents": 102,
+  "unmatchedParents": [
+    {
+      "email": "hasfoor@yahoo.com",
+      "name": "Husam Asfoor"
+    },
+    {
+      "email": "haamir9@gmail.com",
+      "name": "Hira aamir"
+    },
+    {
+      "email": "mhamideh291290@gmail.com",
+      "name": "Mohammad Hamideh"
+    },
+    {
+      "email": "ujoo@hotmail.com",
+      "name": "Uzma Ahmed"
+    },
+    {
+      "email": "mabrookamal100@yahoo.com",
+      "name": "Amal Aldurra"
+    }
+  ],
+  "contactPatches": 9,
+  "contactsUpdated": 9,
+  "notesAdded": 102,
+  "spousesLinked": 1,
+  "householdsSynced": 0,
+  "samples": [
+    {
+      "contact": "Emma Soliman",
+      "email": "esolim2@gmail.com",
+      "patch": {
+        "city": "5139 Quail Lake Dr Dallas",
+        "state": "TX"
+      },
+      "willAddNote": true
+    },
+    {
+      "contact": "Maha Diab",
+      "email": "maha.jebara@gmail.com",
+      "patch": {
+        "city": "4605 Clearlake Dr Rowlett",
+        "state": "TX"
+      },
+      "willAddNote": true
+    },
+    {
+      "contact": "Maysaa Ghanim",
+      "email": "mayghanim@gmail.com",
+      "patch": {
+        "city": "2204 18 Th St Plano",
+        "state": "TX"
+      },
+      "willAddNote": true
+    },
+    {
+      "contact": "Amer Doko",
+      "email": "amerdoko@gmail.com",
+      "patch": {
+        "city": "Garland",
+        "state": "TX"
+      },
+      "willAddNote": true
+    },
+    {
+      "contact": "Razan Jlaghi",
+      "email": "razanjlaghi91@gmail.com",
+      "patch": {
+        "city": "3315 meadow wood dr Richardson",
+        "state": "TX"
+      },
+      "willAddNote": true
+    },
+    {
+      "contact": "Hassan Mushtaq",
+      "email": "hmushtaq@gmail.com",
+      "patch": {
+        "city": "916 Blue Jay Dr. Murphy",
+        "state": "TX"
+      },
+      "willAddNote": true
+    },
+    {
+      "contact": "Saja Koran",
+      "email": "koransaja@gmail.com",
+      "patch": {
+        "city": "7000 huckleberry Dr. McKinney",
+        "state": "TX"
+      },
+      "willAddNote": true
+    },
+    {
+      "contact": "Mary Yerrou",
+      "email": "yerroumary@gmail.com",
+      "patch": {
+        "city": "1818 Breeds Hill Rd. Garland",
+        "state": "TX"
+      },
+      "willAddNote": true
+    },
+    {
+      "contact": "Ammar Elmezayen",
+      "email": "amezyn81@gmail.com",
+      "patch": {
+        "city": "2222 Medical District Dr. Dallas",
+        "state": "TX"
+      },
+      "willAddNote": true
+    }
+  ],
+  "fieldFills": {
+    "phone": 0,
+    "address": 0,
+    "city": 9,
+    "state": 9,
+    "zip": 0
+  },
+  "householdSyncHint": "Run: node scripts/sync-summer-camp-households.mjs --execute (and repair-household-spouse-dependents for linked spouses)"
+}

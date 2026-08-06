@@ -31,7 +31,7 @@ export function BirthDateInput({
   value,
   onChange,
   className,
-  placeholder = "Select date of birth",
+  placeholder = "Date of birth",
   disabled,
 }: {
   id?: string

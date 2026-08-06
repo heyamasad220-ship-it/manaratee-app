@@ -40,147 +40,42 @@ import {
   X,
 } from "lucide-react"
 
-// Mock organization data
-const organizations: Record<string, {
-  id: string
-  name: string
-  type: string
-  contact: string
-  email: string
-  phone: string
-  address: string
-  city: string
-  state: string
-  zip: string
-  totalBookings: number
-  totalSpent: number
-  status: string
-  notes: string
-  createdAt: string
-  taxExempt: boolean
-  taxId: string
-}> = {
-  "org-1": {
-    id: "org-1",
-    name: "Springfield Community Center",
-    type: "Non-Profit",
-    contact: "Robert Williams",
-    email: "rwilliams@springfieldcc.org",
-    phone: "+1 (555) 111-2222",
-    address: "100 Community Drive",
-    city: "Springfield",
-    state: "IL",
-    zip: "62702",
-    totalBookings: 12,
-    totalSpent: 18500,
-    status: "Active",
-    notes: "Long-term partner. Hosts monthly community events. 15% discount applied.",
-    createdAt: "2022-03-15",
-    taxExempt: true,
-    taxId: "XX-XXXXXXX",
-  },
-  "org-2": {
-    id: "org-2",
-    name: "Tech Innovators Inc.",
-    type: "Corporate",
-    contact: "Amanda Foster",
-    email: "afoster@techinnovators.com",
-    phone: "+1 (555) 222-3333",
-    address: "500 Innovation Blvd",
-    city: "Chicago",
-    state: "IL",
-    zip: "60606",
-    totalBookings: 8,
-    totalSpent: 24000,
-    status: "VIP",
-    notes: "Premium corporate client. Quarterly team events and annual conference.",
-    createdAt: "2023-01-20",
-    taxExempt: false,
-    taxId: "",
-  },
-  "org-4": {
-    id: "org-4",
-    name: "Harmony Wedding Planners",
-    type: "Corporate",
-    contact: "Lisa Chang",
-    email: "lisa@harmonyweddings.com",
-    phone: "+1 (555) 444-5555",
-    address: "75 Bridal Way",
-    city: "Naperville",
-    state: "IL",
-    zip: "60563",
-    totalBookings: 15,
-    totalSpent: 32000,
-    status: "VIP",
-    notes: "Top referring partner. Brings multiple wedding bookings monthly. VIP pricing.",
-    createdAt: "2022-08-10",
-    taxExempt: false,
-    taxId: "",
-  },
+const emptyOrganization = {
+  id: "",
+  name: "",
+  type: "",
+  contact: "",
+  email: "",
+  phone: "",
+  address: "",
+  city: "",
+  state: "",
+  zip: "",
+  totalBookings: 0,
+  totalSpent: 0,
+  status: "",
+  notes: "",
+  createdAt: "",
+  taxExempt: false,
+  taxId: "",
 }
 
-// Mock booking history
-const bookingHistory = [
-  {
-    id: "bk-1",
-    date: "2024-01-18",
-    space: "Main Hall",
-    eventType: "Corporate Meeting",
-    duration: "8 hours",
-    amount: 2400,
-    status: "Completed",
-  },
-  {
-    id: "bk-2",
-    date: "2024-01-05",
-    space: "Main Hall + Garden",
-    eventType: "Annual Gala",
-    duration: "Full Day",
-    amount: 4500,
-    status: "Completed",
-  },
-  {
-    id: "bk-3",
-    date: "2023-12-15",
-    space: "Conference Room A",
-    eventType: "Board Meeting",
-    duration: "4 hours",
-    amount: 600,
-    status: "Completed",
-  },
-  {
-    id: "bk-4",
-    date: "2024-02-20",
-    space: "Main Hall",
-    eventType: "Team Building",
-    duration: "6 hours",
-    amount: 1800,
-    status: "Upcoming",
-  },
-  {
-    id: "bk-5",
-    date: "2024-03-15",
-    space: "Full Venue",
-    eventType: "Conference",
-    duration: "Full Day",
-    amount: 5500,
-    status: "Upcoming",
-  },
-  {
-    id: "bk-6",
-    date: "2023-11-10",
-    space: "Classroom B",
-    eventType: "Training Session",
-    duration: "3 hours",
-    amount: 450,
-    status: "Completed",
-  },
-]
+const organizations: Record<string, typeof emptyOrganization> = {}
+
+const bookingHistory: {
+  id: string
+  date: string
+  space: string
+  eventType: string
+  duration: string
+  amount: number
+  status: string
+}[] = []
 
 export default function OrganizationDetailPage() {
   const params = useParams()
   const customerId = params.id as string
-  const customer = organizations[customerId] || organizations["org-1"]
+  const customer = organizations[customerId] ?? emptyOrganization
 
   const [isEditing, setIsEditing] = useState(false)
   const [activeTab, setActiveTab] = useState("overview")
@@ -275,7 +170,7 @@ export default function OrganizationDetailPage() {
                 <div>
                   <p className="text-sm text-muted-foreground">Avg. per Booking</p>
                   <p className="text-2xl font-semibold">
-                    ${Math.round(customer.totalSpent / customer.totalBookings).toLocaleString()}
+                    ${customer.totalBookings ? Math.round(customer.totalSpent / customer.totalBookings).toLocaleString() : "0"}
                   </p>
                 </div>
               </div>
@@ -497,7 +392,14 @@ export default function OrganizationDetailPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {bookingHistory.map((booking) => (
+                    {bookingHistory.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                          No data yet.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      bookingHistory.map((booking) => (
                       <TableRow key={booking.id}>
                         <TableCell>{new Date(booking.date).toLocaleDateString()}</TableCell>
                         <TableCell className="font-medium">{booking.space}</TableCell>
@@ -514,7 +416,8 @@ export default function OrganizationDetailPage() {
                           </Badge>
                         </TableCell>
                       </TableRow>
-                    ))}
+                      ))
+                    )}
                   </TableBody>
                 </Table>
               </CardContent>

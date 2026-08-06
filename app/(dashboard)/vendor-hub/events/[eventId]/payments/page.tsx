@@ -1,27 +1,15 @@
-import { notFound } from "next/navigation"
+import { redirect } from "next/navigation"
 
-import { BazaarEventWorkspaceShell } from "@/components/vendor-hub/bazaar-event-workspace-shell"
-import BazaarPaymentsPanel from "@/components/vendor-hub/events/bazaar-payments-panel"
-import { getVendorHubEventById } from "@/lib/vendor-hub/vendor-hub-event-queries"
+import { VENDOR_HUB_ROUTES } from "@/lib/vendor-hub/vendor-hub-routes"
 import { requireVendorHubManage } from "@/lib/vendor-hub/vendor-hub-permissions"
 
-export default async function BazaarEventPaymentsPage({
+/** Payments tab removed — payment totals appear on the Vendors tab. */
+export default async function BazaarEventPaymentsRedirectPage({
   params,
 }: {
   params: Promise<{ eventId: string }>
 }) {
   await requireVendorHubManage()
-
   const { eventId } = await params
-  const event = await getVendorHubEventById(eventId)
-
-  if (!event) {
-    notFound()
-  }
-
-  return (
-    <BazaarEventWorkspaceShell event={event}>
-      <BazaarPaymentsPanel eventId={eventId} />
-    </BazaarEventWorkspaceShell>
-  )
+  redirect(VENDOR_HUB_ROUTES.events.booths(eventId))
 }

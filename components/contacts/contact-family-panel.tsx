@@ -325,7 +325,7 @@ export function ContactFamilyPanel({
             }}
           >
             <UserPlus className="mr-2 h-4 w-4" />
-            Add member
+            Add Family Member
           </Button>
         </CardHeader>
         <CardContent className={embedded ? "pt-0" : undefined}>
@@ -386,18 +386,6 @@ export function ContactFamilyPanel({
                 Link an existing contact who already has a profile, or create a new person for this
                 household without opening a separate contact page.
               </p>
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-3"
-                onClick={() => {
-                  resetDialogState()
-                  setIsAddDialogOpen(true)
-                }}
-              >
-                <UserPlus className="mr-2 h-4 w-4" />
-                Add family member
-              </Button>
             </div>
           ) : (
             <div className="flex flex-col gap-2">

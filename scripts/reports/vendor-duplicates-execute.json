@@ -1,0 +1,95 @@
+{
+  "mode": "execute",
+  "orgId": "e057e00a-e4e3-4adf-9af5-f465db1894be",
+  "vendorCount": 290,
+  "duplicateGroups": 2,
+  "plannedMerges": 2,
+  "merges": [
+    {
+      "reason": "phone",
+      "key": "2145972892",
+      "target": {
+        "id": "7b9c410b-98b2-4111-a3cd-d43a56beb3c6",
+        "full_name": "Ahmad Gharbia",
+        "email": "ahmadgharbieh94@gmail.com",
+        "phone": "(214) 597-2892",
+        "business_name": "Alchemyst perfumes",
+        "score": 16
+      },
+      "source": {
+        "id": "9e22b7fa-2d67-41cf-acb4-718311e59b31",
+        "full_name": "Ahmad Gharbieh",
+        "email": "alchemist.luxury.usa@gmail.com",
+        "phone": "12145972892",
+        "business_name": "Alchemyst Luxury Fragrances",
+        "score": 13
+      }
+    },
+    {
+      "reason": "phone",
+      "key": "3102653045",
+      "target": {
+        "id": "44201eab-866b-49c6-a9e6-793a01669c4c",
+        "full_name": "Ahmad Khatib",
+        "email": "hukhatib56@gmail.com",
+        "phone": "13102653045",
+        "business_name": "Taco King",
+        "score": 12
+      },
+      "source": {
+        "id": "a2cff47b-426a-4d3c-830f-6473fde9ef23",
+        "full_name": "Ahmad",
+        "email": "thetacoking65@gmail.com",
+        "phone": "310-265-3045",
+        "business_name": "Taco king",
+        "score": 11
+      }
+    }
+  ],
+  "results": [
+    {
+      "reason": "phone",
+      "key": "2145972892",
+      "target": {
+        "id": "7b9c410b-98b2-4111-a3cd-d43a56beb3c6",
+        "full_name": "Ahmad Gharbia",
+        "email": "ahmadgharbieh94@gmail.com",
+        "phone": "(214) 597-2892",
+        "business_name": "Alchemyst perfumes",
+        "score": 16
+      },
+      "source": {
+        "id": "9e22b7fa-2d67-41cf-acb4-718311e59b31",
+        "full_name": "Ahmad Gharbieh",
+        "email": "alchemist.luxury.usa@gmail.com",
+        "phone": "12145972892",
+        "business_name": "Alchemyst Luxury Fragrances",
+        "score": 13
+      },
+      "mergeStatus": 0,
+      "stderr": "countRows failed for pledges.contact_id: \n"
+    },
+    {
+      "reason": "phone",
+      "key": "3102653045",
+      "target": {
+        "id": "44201eab-866b-49c6-a9e6-793a01669c4c",
+        "full_name": "Ahmad Khatib",
+        "email": "hukhatib56@gmail.com",
+        "phone": "13102653045",
+        "business_name": "Taco King",
+        "score": 12
+      },
+      "source": {
+        "id": "a2cff47b-426a-4d3c-830f-6473fde9ef23",
+        "full_name": "Ahmad",
+        "email": "thetacoking65@gmail.com",
+        "phone": "310-265-3045",
+        "business_name": "Taco king",
+        "score": 11
+      },
+      "mergeStatus": 0,
+      "stderr": "countRows failed for pledges.contact_id: \n"
+    }
+  ]
+}

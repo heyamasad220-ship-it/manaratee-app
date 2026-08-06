@@ -1,0 +1,150 @@
+{
+  "importTag": "VENUE_RENTAL_GOOGLE_FORM_V1",
+  "mode": "execute",
+  "orgId": "e057e00a-e4e3-4adf-9af5-f465db1894be",
+  "keepYear": 2026,
+  "keepMonth": 7,
+  "timeZone": "America/Chicago",
+  "contactsDeleted": 0,
+  "importedRentalsFound": 148,
+  "keepCount": 6,
+  "deleteCount": 142,
+  "deletedRentals": 142,
+  "deletedBriefs": 0,
+  "deletedOverrideLogs": 0,
+  "keepNoReservation": 0,
+  "errors": [
+    "operational_briefs: column operational_briefs.venue_rental_id does not exist",
+    "operational_briefs: column operational_briefs.venue_rental_id does not exist"
+  ],
+  "sampleKeep": [
+    {
+      "id": "e3b8f378-cb20-4f53-aa2f-1424bc6485e2",
+      "status": "completed",
+      "startAt": "2026-07-12T21:30:00+00:00",
+      "billingContactId": "f332c629-2d48-4452-b54b-66a3f23fa7fd"
+    },
+    {
+      "id": "bb9c21d0-8ca4-4770-95be-f817552ba2ad",
+      "status": "cancelled_before_payment",
+      "startAt": "2026-07-25T23:00:00+00:00",
+      "billingContactId": "9a827e57-285e-4ed5-9cab-9fdc06c25d3f"
+    },
+    {
+      "id": "7232efb1-f4fe-439e-ae5b-b700acf943af",
+      "status": "cancelled_before_payment",
+      "startAt": "2026-07-26T18:00:00+00:00",
+      "billingContactId": "a86224cd-6d42-40de-a2f6-52966380d052"
+    },
+    {
+      "id": "63f57a90-e7c6-4a48-b0ae-808f61b9f04f",
+      "status": "completed",
+      "startAt": "2026-07-18T00:00:00+00:00",
+      "billingContactId": "c85588e7-a5d1-4589-b4c3-7f230c97d9ce"
+    },
+    {
+      "id": "0d3f7804-b5cc-4705-ad9c-e61db7934071",
+      "status": "submitted",
+      "startAt": "2026-07-30T23:00:00+00:00",
+      "billingContactId": "05cc0c32-293c-4c38-af4f-6ebcb853046b"
+    },
+    {
+      "id": "e069db91-d357-4944-a8e8-5b03a4e3b7af",
+      "status": "completed",
+      "startAt": "2026-07-26T20:00:00+00:00",
+      "billingContactId": "cb6a3b19-fdc1-4c97-9899-af9e20a191e8"
+    }
+  ],
+  "sampleDelete": [
+    {
+      "id": "bfd132be-29d1-4424-8b91-a219f45ff44a",
+      "status": "completed",
+      "startAt": "2025-01-04T21:00:00+00:00",
+      "billingContactId": "935d1eed-d363-4221-bf85-129823766972"
+    },
+    {
+      "id": "737663d8-4db8-418c-8f9e-4dad213a4ef3",
+      "status": "completed",
+      "startAt": "2025-03-24T00:00:00+00:00",
+      "billingContactId": "a3998f95-bb2d-4aff-a042-6d642ac0cf7a"
+    },
+    {
+      "id": "2dac884c-0d09-4009-ac42-ff07c5d1b0c7",
+      "status": "completed",
+      "startAt": "2025-03-25T00:00:00+00:00",
+      "billingContactId": "e6c9ff48-16c1-41fe-bfcd-9043a16e9d0c"
+    },
+    {
+      "id": "117ca5cf-281f-4b47-96a1-1df8addf538d",
+      "status": "completed",
+      "startAt": "2025-04-05T21:00:00+00:00",
+      "billingContactId": "05e02b18-0259-4227-83ba-cbcfa272892e"
+    },
+    {
+      "id": "bcb05e7e-245d-4c76-ab7e-f7a5d49955f1",
+      "status": "completed",
+      "startAt": "2025-04-06T00:00:00+00:00",
+      "billingContactId": "c56cbaa3-19e1-4eca-95ba-217f97d15b5b"
+    },
+    {
+      "id": "e66ca354-3447-4102-8dcb-44cfb345960f",
+      "status": "completed",
+      "startAt": "2025-04-13T18:30:00+00:00",
+      "billingContactId": "970be4e4-e76c-4810-97eb-b042002b1b2a"
+    },
+    {
+      "id": "da88eacd-5554-4cc2-b6ce-c4aa4f5c2c74",
+      "status": "completed",
+      "startAt": "2025-04-19T19:00:00+00:00",
+      "billingContactId": "1c880ef6-d511-4655-bab3-fe263f29d9a3"
+    },
+    {
+      "id": "105c3138-de47-4081-aaac-36a7080ab24b",
+      "status": "completed",
+      "startAt": "2025-04-26T23:00:00+00:00",
+      "billingContactId": "3e34ca1f-fa79-4f43-a946-a2f014e91f2d"
+    },
+    {
+      "id": "59737d02-4148-4be1-acb4-4d87f954b6c8",
+      "status": "completed",
+      "startAt": "2025-04-26T23:00:00+00:00",
+      "billingContactId": "a3034ab3-efde-47d6-b79c-52eba9063c9e"
+    },
+    {
+      "id": "09ee6c99-d619-46ce-84d5-f86d624f9655",
+      "status": "completed",
+      "startAt": "2025-05-18T20:00:00+00:00",
+      "billingContactId": "64e83421-6eab-47dc-99c3-7287380252e0"
+    },
+    {
+      "id": "fd111b2f-d82a-4e9f-80de-11dc634f5c78",
+      "status": "completed",
+      "startAt": "2025-07-12T22:00:00+00:00",
+      "billingContactId": "1d5dc074-35c5-42f6-96b8-309628ea5d8c"
+    },
+    {
+      "id": "31357ad3-fe4a-49ed-9bab-6ce4b150f6cc",
+      "status": "completed",
+      "startAt": "2025-10-17T11:00:00+00:00",
+      "billingContactId": "fd2a9f85-e20b-4769-ad06-9a97cb5c6ff9"
+    },
+    {
+      "id": "760929f1-e597-4126-8b9b-c31fe898d9d3",
+      "status": "completed",
+      "startAt": "2025-11-09T00:00:00+00:00",
+      "billingContactId": "0dd5c70c-e0b1-421d-af63-03957cf28377"
+    },
+    {
+      "id": "eb2bc4a1-0894-43fe-82a6-b42ca8f1301a",
+      "status": "completed",
+      "startAt": "2025-12-20T23:00:00+00:00",
+      "billingContactId": "d7acdca0-68dc-4c28-b63c-8dd4c9b3de88"
+    },
+    {
+      "id": "cab52c10-977a-49b5-b438-b8d3bfd40de2",
+      "status": "completed",
+      "startAt": "2026-01-17T19:00:00+00:00",
+      "billingContactId": "43735ea3-73e2-431b-945c-9db870d6165f"
+    }
+  ]
+}

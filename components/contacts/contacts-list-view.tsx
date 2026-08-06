@@ -14,6 +14,7 @@ import { createClient } from "@/lib/supabase/client"
 import { getCurrentOrganizationId } from "@/lib/current-organization"
 import { addContactWithRoles } from "@/lib/contacts/contact-actions"
 import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
+import { VENDOR_HUB_ROUTES } from "@/lib/vendor-hub/vendor-hub-routes"
 import {
   fetchAllTeamMembershipsForFilter,
   fetchHrTeamPositions,
@@ -34,6 +35,7 @@ import {
   filterContactRoles,
   mapRoleValue,
   mapStatus,
+  statusToDbValue,
   MEMBERSHIP_DERIVED_ROLE,
   normalizeContactRecordType,
 } from "@/lib/contacts/contact-constants"
@@ -73,6 +75,8 @@ import {
 } from "@/components/ui/popover"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { ListPagination } from "@/components/ui/list-pagination"
+import { DEFAULT_LIST_PAGE_SIZE } from "@/lib/ui/list-pagination"
 import { cn } from "@/lib/utils"
 import {
   Search,
@@ -98,6 +102,8 @@ export interface ContactListItem {
   status: ContactStatus
   createdAt: string
   lastActivity?: string
+  businessName?: string | null
+  vendorType?: string | null
 }
 
 export type ContactsListViewProps = {
@@ -113,6 +119,8 @@ export type ContactsListViewProps = {
   hideRoleFilter?: boolean
   /** Hide record type filter when locked. */
   hideRecordTypeFilter?: boolean
+  /** Vendor Network columns: contact+phone, business name, vendor type; no roles/record type/actions. */
+  vendorNetworkLayout?: boolean
   /** Optional content beside the Add Contact button. */
   headerAction?: ReactNode
   emptyMessage?: string
@@ -122,6 +130,146 @@ export type ContactsListViewProps = {
   embedded?: boolean
   /** Only fetch contacts when the user searches (avoids loading the full list on open). */
   searchToLoad?: boolean
+}
+
+function parseVendorCategoryFromNotes(notes: string | null | undefined) {
+  if (!notes) return null
+  const match = String(notes).match(/(?:^|\n)category=([^\n]*)/i)
+  const value = match?.[1]?.trim()
+  return value || null
+}
+
+async function loadVendorTypesByContact(
+  supabase: ReturnType<typeof createClient>,
+  contactIds: string[]
+) {
+  const typeByContact = new Map<string, string>()
+  if (contactIds.length === 0) return typeByContact
+
+  const chunkSize = 200
+  for (let i = 0; i < contactIds.length; i += chunkSize) {
+    const chunk = contactIds.slice(i, i + chunkSize)
+    const { data, error } = await supabase
+      .from("vendor_hub_payments")
+      .select("contact_id, payment_date, notes")
+      .in("contact_id", chunk)
+      .order("payment_date", { ascending: false })
+
+    if (error) {
+      console.error(
+        "loadVendorTypesByContact payments:",
+        error.message || error.code || error
+      )
+    } else {
+      for (const row of data || []) {
+        const contactId = row.contact_id as string | null
+        if (!contactId || typeByContact.has(contactId)) continue
+        const category = parseVendorCategoryFromNotes(row.notes as string | null)
+        if (category) typeByContact.set(contactId, category)
+      }
+    }
+
+    const missing = chunk.filter((id) => !typeByContact.has(id))
+    if (missing.length === 0) continue
+
+    const { data: participants, error: participantError } = await supabase
+      .from("vendor_hub_participant_status")
+      .select("contact_id, updated_at, notes")
+      .in("contact_id", missing)
+      .order("updated_at", { ascending: false })
+
+    if (participantError) {
+      console.error(
+        "loadVendorTypesByContact participants:",
+        participantError.message || participantError.code || participantError
+      )
+      continue
+    }
+
+    for (const row of participants || []) {
+      const contactId = row.contact_id as string | null
+      if (!contactId || typeByContact.has(contactId)) continue
+      const category = parseVendorCategoryFromNotes(row.notes as string | null)
+      if (category) typeByContact.set(contactId, category)
+    }
+  }
+
+  return typeByContact
+}
+
+function businessNameFromFormData(formData: unknown) {
+  if (!formData || typeof formData !== "object") return null
+  const value = (formData as Record<string, unknown>).business_name
+  if (typeof value !== "string") return null
+  const trimmed = value.trim()
+  return trimmed || null
+}
+
+async function loadVendorBusinessNamesByContact(
+  supabase: ReturnType<typeof createClient>,
+  orgId: string,
+  contactIds: string[]
+) {
+  const nameByContact = new Map<string, string>()
+  const vendorTypeIdByContact = new Map<string, string>()
+  if (contactIds.length === 0) {
+    return { nameByContact, vendorTypeIdByContact }
+  }
+
+  const chunkSize = 200
+  for (let i = 0; i < contactIds.length; i += chunkSize) {
+    const chunk = contactIds.slice(i, i + chunkSize)
+    const { data, error } = await supabase
+      .from("applications")
+      .select("contact_id, form_data, created_at")
+      .eq("organization_id", orgId)
+      .eq("application_type", "vendor")
+      .in("contact_id", chunk)
+      .order("created_at", { ascending: false })
+
+    if (error) {
+      console.error(
+        "loadVendorBusinessNamesByContact:",
+        error.message || error.code || error
+      )
+      continue
+    }
+
+    for (const row of data || []) {
+      const contactId = row.contact_id as string | null
+      if (!contactId) continue
+      if (!nameByContact.has(contactId)) {
+        const businessName = businessNameFromFormData(row.form_data)
+        if (businessName) nameByContact.set(contactId, businessName)
+      }
+      if (!vendorTypeIdByContact.has(contactId)) {
+        const formData =
+          row.form_data && typeof row.form_data === "object"
+            ? (row.form_data as Record<string, unknown>)
+            : null
+        const typeId =
+          typeof formData?.vendor_type_id === "string"
+            ? formData.vendor_type_id.trim()
+            : ""
+        if (typeId) vendorTypeIdByContact.set(contactId, typeId)
+      }
+    }
+
+    const missing = chunk.filter((id) => !nameByContact.has(id))
+    if (missing.length === 0) continue
+
+    const { data: contacts } = await supabase
+      .from("contacts")
+      .select("id, full_name, email")
+      .in("id", missing)
+
+    for (const contact of contacts || []) {
+      const fallback = (contact.full_name || contact.email || "").trim()
+      if (fallback) nameByContact.set(contact.id, fallback)
+    }
+  }
+
+  return { nameByContact, vendorTypeIdByContact }
 }
 
 function getInitials(name: string) {
@@ -185,6 +333,7 @@ export function ContactsListView({
   showStats = true,
   hideRoleFilter = false,
   hideRecordTypeFilter = false,
+  vendorNetworkLayout = false,
   headerAction,
   emptyMessage,
   showTeamFilters = false,
@@ -215,6 +364,9 @@ export function ContactsListView({
   const [teamFilter, setTeamFilter] = useState("all")
   const [teamPositionFilter, setTeamPositionFilter] = useState("all")
   const [membershipStatusFilter, setMembershipStatusFilter] = useState<"all" | "active" | "inactive">("all")
+  const [listPage, setListPage] = useState(1)
+  const [listPageSize, setListPageSize] = useState(DEFAULT_LIST_PAGE_SIZE)
+  const [listTotal, setListTotal] = useState(0)
 
   const [teamOptions, setTeamOptions] = useState<{ id: string; name: string }[]>([])
   const [teamPositionOptions, setTeamPositionOptions] = useState<{ id: string; name: string }[]>([])
@@ -261,7 +413,9 @@ export function ContactsListView({
           roles,
           status: mapStatus(c.status),
           createdAt: c.created_at,
-          lastActivity: c.created_at,
+          lastActivity: c.last_activity_at || c.updated_at || c.created_at,
+          businessName: null,
+          vendorType: null,
         }
       })
     },
@@ -301,10 +455,113 @@ export function ContactsListView({
     })
   }, [searchToLoad, showStats, supabase])
 
+  const loadVendorNetworkPage = useCallback(async () => {
+    const role = requiredRole || "vendor"
+    const contactFields =
+      "id, full_name, email, phone, contact_type, status, created_at, updated_at, last_activity_at, contact_roles!inner(role)"
+
+    setLoading(true)
+    setErrorMessage("")
+
+    const orgId = await getCurrentOrganizationId()
+    if (!orgId) {
+      setContacts([])
+      setListTotal(0)
+      setLoading(false)
+      return
+    }
+
+    const from = (Math.max(1, listPage) - 1) * Math.max(1, listPageSize)
+    const to = from + Math.max(1, listPageSize) - 1
+    const trimmedSearch = searchQuery.trim()
+
+    let query = supabase
+      .from("contacts")
+      .select(contactFields, { count: "exact" })
+      .eq("organization_id", orgId)
+      .eq("contact_roles.role", role)
+      .order("full_name", { ascending: true })
+      .range(from, to)
+
+    if (statusFilter !== "all") {
+      query = query.eq("status", statusToDbValue(statusFilter))
+    }
+
+    if (trimmedSearch) {
+      const escapedSearch = trimmedSearch.replace(/[%_\\,]/g, "\\$&")
+      const pattern = `%${escapedSearch}%`
+      query = query.or(
+        `full_name.ilike.${pattern},email.ilike.${pattern},phone.ilike.${pattern}`
+      )
+    }
+
+    const { data, error, count } = await query
+
+    if (error) {
+      console.error(
+        "Error loading vendor network contacts:",
+        error.message || error.code || error
+      )
+      setContacts([])
+      setListTotal(0)
+      setErrorMessage(error.message || "Could not load vendors.")
+      setLoading(false)
+      return
+    }
+
+    setListTotal(count ?? 0)
+
+    const mapped = mapContactRows(data || [])
+    const contactIds = mapped.map((c) => c.id)
+    const [boothTypeByContact, businessMeta] = await Promise.all([
+      loadVendorTypesByContact(supabase, contactIds),
+      loadVendorBusinessNamesByContact(supabase, orgId, contactIds),
+    ])
+
+    const catalogTypeIds = [...businessMeta.vendorTypeIdByContact.values()]
+    const catalogNameById = new Map<string, string>()
+    if (catalogTypeIds.length > 0) {
+      const { data: catalogTypes } = await supabase
+        .from("vendor_hub_vendor_types")
+        .select("id, name")
+        .in("id", catalogTypeIds)
+      for (const type of catalogTypes || []) {
+        catalogNameById.set(type.id as string, type.name as string)
+      }
+    }
+
+    setContacts(
+      mapped.map((c) => {
+        const catalogTypeId = businessMeta.vendorTypeIdByContact.get(c.id)
+        const catalogTypeName = catalogTypeId
+          ? catalogNameById.get(catalogTypeId) || null
+          : null
+        return {
+          ...c,
+          vendorType: catalogTypeName || boothTypeByContact.get(c.id) || null,
+          businessName: businessMeta.nameByContact.get(c.id) || c.name || null,
+        }
+      })
+    )
+    setLoading(false)
+  }, [
+    listPage,
+    listPageSize,
+    mapContactRows,
+    requiredRole,
+    searchQuery,
+    statusFilter,
+    supabase,
+  ])
+
   const loadContacts = useCallback(
     async (search?: string) => {
+      if (vendorNetworkLayout) {
+        return
+      }
+
       const contactFields =
-        "id, full_name, email, phone, contact_type, status, created_at, contact_roles(role)"
+        "id, full_name, email, phone, contact_type, status, created_at, updated_at, last_activity_at, contact_roles(role)"
 
       const trimmedSearch = search?.trim() || ""
 
@@ -324,6 +581,10 @@ export function ContactsListView({
         return
       }
 
+      const finalizeContacts = async (rows: any[]) => {
+        setContacts(mapContactRows(rows))
+      }
+
       if (searchToLoad) {
         const escapedSearch = trimmedSearch.replace(/[%_\\,]/g, "\\$&")
         const pattern = `%${escapedSearch}%`
@@ -337,14 +598,17 @@ export function ContactsListView({
           .limit(100)
 
         if (error) {
-          console.error("Error searching contacts:", error)
+          console.error(
+            "Error searching contacts:",
+            error.message || error.code || error
+          )
           setContacts([])
           setErrorMessage(error.message || "Could not search contacts.")
           setLoading(false)
           return
         }
 
-        setContacts(mapContactRows(data || []))
+        await finalizeContacts(data || [])
         setLoading(false)
         return
       }
@@ -362,7 +626,10 @@ export function ContactsListView({
           .range(from, from + pageSize - 1)
 
         if (error) {
-          console.error("Error loading contacts:", error)
+          console.error(
+            "Error loading contacts:",
+            error.message || error.code || error
+          )
           setContacts([])
           setErrorMessage(error.message || "Could not load contacts.")
           setLoading(false)
@@ -374,23 +641,47 @@ export function ContactsListView({
         from += pageSize
       }
 
-      setContacts(mapContactRows(allRows))
+      await finalizeContacts(allRows)
       setLoading(false)
     },
-    [mapContactRows, searchToLoad, supabase]
+    [mapContactRows, searchToLoad, supabase, vendorNetworkLayout]
   )
 
   useEffect(() => {
+    if (vendorNetworkLayout) return
     if (searchToLoad) {
       void loadSummaryStats()
       return
     }
 
     void loadContacts()
-  }, [loadContacts, loadSummaryStats, searchToLoad])
+  }, [loadContacts, loadSummaryStats, searchToLoad, vendorNetworkLayout])
 
   useEffect(() => {
-    if (!searchToLoad) return
+    if (!vendorNetworkLayout) return
+    setListPage(1)
+  }, [searchQuery, statusFilter, vendorNetworkLayout])
+
+  useEffect(() => {
+    if (!vendorNetworkLayout) return
+
+    const delay = searchQuery.trim() ? 350 : 0
+    const timer = window.setTimeout(() => {
+      void loadVendorNetworkPage()
+    }, delay)
+
+    return () => window.clearTimeout(timer)
+  }, [
+    vendorNetworkLayout,
+    loadVendorNetworkPage,
+    searchQuery,
+    listPage,
+    listPageSize,
+    statusFilter,
+  ])
+
+  useEffect(() => {
+    if (vendorNetworkLayout || !searchToLoad) return
 
     const trimmedSearch = searchQuery.trim()
     if (!trimmedSearch) {
@@ -405,7 +696,7 @@ export function ContactsListView({
     }, 350)
 
     return () => window.clearTimeout(timer)
-  }, [loadContacts, searchQuery, searchToLoad])
+  }, [loadContacts, searchQuery, searchToLoad, vendorNetworkLayout])
 
   useEffect(() => {
     if (!showTeamFilters) return
@@ -442,6 +733,10 @@ export function ContactsListView({
   }, [teamMemberships])
 
   const filteredContacts = useMemo(() => {
+    if (vendorNetworkLayout) {
+      return contacts
+    }
+
     const search = searchQuery.trim().toLowerCase()
 
     return contacts.filter((contact) => {
@@ -494,6 +789,7 @@ export function ContactsListView({
     teamPositionFilter,
     membershipStatusFilter,
     membershipsByContact,
+    vendorNetworkLayout,
   ])
 
   const stats = useMemo(() => {
@@ -540,7 +836,9 @@ export function ContactsListView({
       resetAddForm()
       setShowAddDialog(false)
 
-      if (searchToLoad) {
+      if (vendorNetworkLayout) {
+        await loadVendorNetworkPage()
+      } else if (searchToLoad) {
         if (searchQuery.trim()) {
           await loadContacts(searchQuery.trim())
         }
@@ -709,7 +1007,10 @@ export function ContactsListView({
 
           <Select
             value={statusFilter}
-            onValueChange={(v) => setStatusFilter(v as ContactStatus | "all")}
+            onValueChange={(v) => {
+              setStatusFilter(v as ContactStatus | "all")
+              if (vendorNetworkLayout) setListPage(1)
+            }}
           >
             <SelectTrigger className="h-9 shrink-0 sm:w-[150px]">
               <SelectValue placeholder="Status" />
@@ -799,19 +1100,33 @@ export function ContactsListView({
             <TableHeader>
               <TableRow>
                 <TableHead>Contact</TableHead>
-                <TableHead>Roles</TableHead>
-                <TableHead className="hidden md:table-cell">Phone</TableHead>
-                <TableHead className="hidden lg:table-cell">Record Type</TableHead>
+                {vendorNetworkLayout ? (
+                  <>
+                    <TableHead>Business Name</TableHead>
+                    <TableHead>Vendor Type</TableHead>
+                  </>
+                ) : (
+                  <>
+                    <TableHead>Roles</TableHead>
+                    <TableHead className="hidden md:table-cell">Phone</TableHead>
+                    <TableHead className="hidden lg:table-cell">Record Type</TableHead>
+                  </>
+                )}
                 <TableHead>Status</TableHead>
                 <TableHead className="hidden sm:table-cell">Last Activity</TableHead>
-                <TableHead className="w-[80px] text-right">Actions</TableHead>
+                {!vendorNetworkLayout && (
+                  <TableHead className="w-[80px] text-right">Actions</TableHead>
+                )}
               </TableRow>
             </TableHeader>
 
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                  <TableCell
+                    colSpan={vendorNetworkLayout ? 5 : 7}
+                    className="h-24 text-center text-muted-foreground"
+                  >
                     <div className="flex items-center justify-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Loading contacts...
@@ -820,7 +1135,10 @@ export function ContactsListView({
                 </TableRow>
               ) : filteredContacts.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                  <TableCell
+                    colSpan={vendorNetworkLayout ? 5 : 7}
+                    className="h-24 text-center text-muted-foreground"
+                  >
                     {searchToLoad && !searchQuery.trim()
                       ? "Start typing to search for contacts."
                       : emptyMessage ||
@@ -833,7 +1151,13 @@ export function ContactsListView({
                 filteredContacts.map((contact) => (
                   <TableRow
                     key={contact.id}
-                    onClick={() => router.push(contactProfileHref(contact.id))}
+                    onClick={() =>
+                      router.push(
+                        vendorNetworkLayout
+                          ? VENDOR_HUB_ROUTES.network.vendor(contact.id)
+                          : contactProfileHref(contact.id)
+                      )
+                    }
                     className="cursor-pointer hover:bg-muted/50"
                   >
                     <TableCell>
@@ -843,49 +1167,80 @@ export function ContactsListView({
                             {getInitials(contact.name)}
                           </AvatarFallback>
                         </Avatar>
-                        <div className="flex flex-col">
-                          <span className="font-medium">{contact.name}</span>
+                        <div className="flex flex-col gap-0.5">
+                          {vendorNetworkLayout ? (
+                            <span className="font-semibold text-foreground">
+                              {contact.name}
+                            </span>
+                          ) : (
+                            <Link
+                              href={contactProfileHref(contact.id)}
+                              className="font-medium text-primary hover:underline"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {contact.name}
+                            </Link>
+                          )}
                           <span className="text-sm text-muted-foreground">
                             {contact.email || "-"}
                           </span>
+                          {vendorNetworkLayout && (
+                            <span className="flex items-center gap-1 text-sm text-muted-foreground">
+                              <Phone className="h-3 w-3" />
+                              {contact.phone || "-"}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </TableCell>
 
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {contact.roles.length === 0 ? (
-                          <span className="text-sm text-muted-foreground">—</span>
-                        ) : (
-                          contact.roles.map((role) => {
-                            const RoleIcon = ROLE_ICONS[role]
-                            return (
-                              <Badge
-                                key={role}
-                                variant="secondary"
-                                className={cn("gap-1", ROLE_COLORS[role])}
-                              >
-                                <RoleIcon className="h-3 w-3" />
-                                {role}
-                              </Badge>
-                            )
-                          })
-                        )}
-                      </div>
-                    </TableCell>
+                    {vendorNetworkLayout ? (
+                      <>
+                        <TableCell className="text-sm">
+                          {contact.businessName || "—"}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {contact.vendorType || "—"}
+                        </TableCell>
+                      </>
+                    ) : (
+                      <>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {contact.roles.length === 0 ? (
+                              <span className="text-sm text-muted-foreground">—</span>
+                            ) : (
+                              contact.roles.map((role) => {
+                                const RoleIcon = ROLE_ICONS[role]
+                                return (
+                                  <Badge
+                                    key={role}
+                                    variant="secondary"
+                                    className={cn("gap-1", ROLE_COLORS[role])}
+                                  >
+                                    <RoleIcon className="h-3 w-3" />
+                                    {role}
+                                  </Badge>
+                                )
+                              })
+                            )}
+                          </div>
+                        </TableCell>
 
-                    <TableCell className="hidden md:table-cell">
-                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                        <Phone className="h-3 w-3" />
-                        {contact.phone || "-"}
-                      </div>
-                    </TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                            <Phone className="h-3 w-3" />
+                            {contact.phone || "-"}
+                          </div>
+                        </TableCell>
 
-                    <TableCell className="hidden lg:table-cell">
-                      <Badge variant="outline">
-                        {contact.recordType === "organization" ? "Organization" : "Person"}
-                      </Badge>
-                    </TableCell>
+                        <TableCell className="hidden lg:table-cell">
+                          <Badge variant="outline">
+                            {contact.recordType === "organization" ? "Organization" : "Person"}
+                          </Badge>
+                        </TableCell>
+                      </>
+                    )}
 
                     <TableCell>
                       <Badge variant="secondary" className={STATUS_COLORS[contact.status]}>
@@ -897,30 +1252,32 @@ export function ContactsListView({
                       {formatDate(contact.lastActivity || contact.createdAt)}
                     </TableCell>
 
-                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem asChild>
-                            <Link href={contactProfileHref(contact.id, { edit: true })}>
-                              <Pencil className="mr-2 h-4 w-4" />
-                              Edit profile
-                            </Link>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => openDeleteDialog(contact)}
-                            className="text-red-600 focus:text-red-600"
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
+                    {!vendorNetworkLayout && (
+                      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem asChild>
+                              <Link href={contactProfileHref(contact.id, { edit: true })}>
+                                <Pencil className="mr-2 h-4 w-4" />
+                                Edit profile
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => openDeleteDialog(contact)}
+                              className="text-red-600 focus:text-red-600"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))
               )}
@@ -928,6 +1285,20 @@ export function ContactsListView({
           </Table>
         </CardContent>
       </Card>
+
+      {vendorNetworkLayout && listTotal > 0 ? (
+        <ListPagination
+          page={listPage}
+          pageSize={listPageSize}
+          total={listTotal}
+          entryLabel="vendors"
+          onPageChange={setListPage}
+          onPageSizeChange={(next) => {
+            setListPageSize(next)
+            setListPage(1)
+          }}
+        />
+      ) : null}
 
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
         <DialogContent className="max-w-lg">

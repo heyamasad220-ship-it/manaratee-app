@@ -92,6 +92,7 @@ const ACTIVITY_TYPE_LABELS = {
   pledge: "Pledge",
   programs: "Programs",
   venue_rentals: "Venue Rental",
+  vendor_hub: "Vendor Hub",
   membership: "Membership",
   other: "Other",
 } as const
@@ -811,6 +812,65 @@ async function buildContactFinancialSummary(
     availableFilters.add("membership")
   }
 
+  if (modules.vendorHub) {
+    const { data: vendorPayments, error: vendorPaymentsError } = await supabase
+      .from("vendor_hub_payments")
+      .select("id, amount, payment_date, payment_type, notes, event_id, created_at")
+      .eq("contact_id", contactId)
+      .order("payment_date", { ascending: false })
+
+    if (vendorPaymentsError) {
+      console.error("vendor hub payments financial:", vendorPaymentsError.message)
+    } else if ((vendorPayments || []).length > 0) {
+      availableFilters.add("vendor_hub")
+
+      const eventIds = Array.from(
+        new Set(
+          (vendorPayments || [])
+            .map((payment) => payment.event_id as string | null)
+            .filter((id): id is string => Boolean(id))
+        )
+      )
+      const eventNameById = new Map<string, string>()
+      if (eventIds.length > 0) {
+        const { data: events } = await supabase
+          .from("vendor_hub_events")
+          .select("id, name")
+          .in("id", eventIds)
+        for (const event of events || []) {
+          eventNameById.set(event.id as string, (event.name as string) || "Bazaar event")
+        }
+      }
+
+      for (const payment of vendorPayments || []) {
+        const amount = Number(payment.amount || 0)
+        if (!Number.isFinite(amount) || amount === 0) continue
+        otherPaidTotal += amount
+        const eventId = payment.event_id as string | null
+        const eventName = eventId
+          ? eventNameById.get(eventId) || "Bazaar event"
+          : "Vendor Hub"
+        const occurredAt =
+          (payment.payment_date as string | null) ||
+          (payment.created_at as string | null) ||
+          new Date().toISOString()
+        activityDates.push(occurredAt)
+        timeline.push({
+          id: `vendor-payment-${payment.id}`,
+          date: occurredAt,
+          eventType: activityTypeLabel("vendor_hub"),
+          description: `${eventName} booth payment`,
+          amount,
+          method: (payment.payment_type as string | null) || null,
+          status: "Paid",
+          sourceModule: "vendor_hub",
+          filterCategory: "vendor_hub",
+          href: eventId ? `/vendor-hub/events/${eventId}/payments` : null,
+        })
+      }
+    }
+  }
+
   timeline.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 
   const totalPaid = donationPaidTotal + otherPaidTotal
@@ -824,6 +884,7 @@ async function buildContactFinancialSummary(
     "pledges",
     "programs",
     "venue_rentals",
+    "vendor_hub",
     "membership",
     "other",
   ]
@@ -875,6 +936,8 @@ function customerOpenBalanceHref(row: ContactOpenBalanceRow): string | null {
       return "/customer/rentals"
     case "programs":
       return "/customer/programs"
+    case "vendor_hub":
+      return "/customer/bazaars"
     case "membership":
       return "/customer/opportunities"
     default:

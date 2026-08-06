@@ -261,6 +261,83 @@ async function reassignContactColumn(orgId, table, column, sourceContactId, targ
   return rowCount
 }
 
+async function reassignContactRoles(orgId, sourceContactId, targetContactId) {
+  const sourceRoles = await fetchAll("contact_roles", (query) =>
+    query.eq("organization_id", orgId).eq("contact_id", sourceContactId)
+  )
+  if (!sourceRoles.length) return 0
+
+  const targetRoles = await fetchAll("contact_roles", (query) =>
+    query.eq("organization_id", orgId).eq("contact_id", targetContactId)
+  )
+  const targetRoleSet = new Set(targetRoles.map((row) => row.role))
+
+  let handled = 0
+  for (const row of sourceRoles) {
+    handled += 1
+    if (targetRoleSet.has(row.role)) {
+      if (execute) {
+        const { error } = await sb.from("contact_roles").delete().eq("id", row.id)
+        if (error) throw new Error(`contact_roles dedupe: ${error.message}`)
+      }
+      continue
+    }
+
+    if (execute) {
+      const { error } = await sb
+        .from("contact_roles")
+        .update({ contact_id: targetContactId })
+        .eq("id", row.id)
+      if (error) throw new Error(`contact_roles reassign: ${error.message}`)
+    }
+    targetRoleSet.add(row.role)
+  }
+
+  return handled
+}
+
+async function reassignVendorHubParticipantStatus(orgId, sourceContactId, targetContactId) {
+  const sourceRows = await fetchAll("vendor_hub_participant_status", (query) =>
+    query.eq("organization_id", orgId).eq("contact_id", sourceContactId)
+  )
+  if (!sourceRows.length) return 0
+
+  const targetRows = await fetchAll("vendor_hub_participant_status", (query) =>
+    query.eq("organization_id", orgId).eq("contact_id", targetContactId)
+  )
+  const targetEventIds = new Set(targetRows.map((row) => row.event_id))
+
+  let handled = 0
+  for (const row of sourceRows) {
+    handled += 1
+    if (targetEventIds.has(row.event_id)) {
+      if (execute) {
+        const { error } = await sb
+          .from("vendor_hub_participant_status")
+          .delete()
+          .eq("id", row.id)
+        if (error && error.code !== "42P01") {
+          throw new Error(`vendor_hub_participant_status dedupe: ${error.message}`)
+        }
+      }
+      continue
+    }
+
+    if (execute) {
+      const { error } = await sb
+        .from("vendor_hub_participant_status")
+        .update({ contact_id: targetContactId })
+        .eq("id", row.id)
+      if (error && error.code !== "42P01") {
+        throw new Error(`vendor_hub_participant_status reassign: ${error.message}`)
+      }
+    }
+    targetEventIds.add(row.event_id)
+  }
+
+  return handled
+}
+
 async function reassignGroupMembers(orgId, sourceGroupId, targetGroupId) {
   const sourceRows = await fetchAll("contact_group_members", (query) =>
     query.eq("organization_id", orgId).eq("group_contact_id", sourceGroupId)
@@ -432,7 +509,6 @@ async function mergeSourceIntoTarget(orgId, target, source, renameTarget = null)
     ["donation_receipts", "contact_id"],
     ["pledge_reminders", "contact_id"],
     ["contact_notes", "contact_id"],
-    ["contact_roles", "contact_id"],
     ["volunteers", "contact_id"],
     ["staff", "contact_id"],
     ["applications", "contact_id"],
@@ -441,7 +517,22 @@ async function mergeSourceIntoTarget(orgId, target, source, renameTarget = null)
     ["program_enrollments", "participant_contact_id"],
     ["program_enrollments", "registrant_contact_id"],
     ["program_enrollments", "payer_contact_id"],
+    ["vendor_hub_payments", "contact_id"],
+    ["vendor_hub_booth_assignments", "contact_id"],
+    ["vendor_hub_participation_evaluations", "contact_id"],
   ]
+
+  const roleRows = await reassignContactRoles(orgId, source.id, target.id)
+  if (roleRows > 0) report.steps.push({ table: "contact_roles", rows: roleRows })
+
+  const participantRows = await reassignVendorHubParticipantStatus(
+    orgId,
+    source.id,
+    target.id
+  )
+  if (participantRows > 0) {
+    report.steps.push({ table: "vendor_hub_participant_status", rows: participantRows })
+  }
 
   for (const [table, column] of contactColumns) {
     const rows = await reassignContactColumn(orgId, table, column, source.id, target.id)

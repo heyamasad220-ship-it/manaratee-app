@@ -43,72 +43,7 @@ interface Organization {
   status: OrgStatus
 }
 
-const mockOrganizations: Organization[] = [
-  {
-    id: "org-001",
-    name: "Green Valley Community Center",
-    contact: "Maria Gonzalez",
-    phone: "+1 (555) 234-5678",
-    dateAdded: "2023-06-15",
-    status: "Active",
-  },
-  {
-    id: "org-002",
-    name: "Sunrise Foundation",
-    contact: "Robert Kim",
-    phone: "+1 (555) 345-6789",
-    dateAdded: "2023-08-22",
-    status: "Active",
-  },
-  {
-    id: "org-003",
-    name: "Helping Hands Charity",
-    contact: "Linda Patel",
-    phone: "+1 (555) 456-7890",
-    dateAdded: "2023-11-01",
-    status: "Pending",
-  },
-  {
-    id: "org-004",
-    name: "Tech for Good Inc.",
-    contact: "David Nguyen",
-    phone: "+1 (555) 567-8901",
-    dateAdded: "2024-01-10",
-    status: "Active",
-  },
-  {
-    id: "org-005",
-    name: "City Youth Alliance",
-    contact: "Sarah Thompson",
-    phone: "+1 (555) 678-9012",
-    dateAdded: "2024-02-28",
-    status: "Inactive",
-  },
-  {
-    id: "org-006",
-    name: "Bright Futures Academy",
-    contact: "James Okafor",
-    phone: "+1 (555) 789-0123",
-    dateAdded: "2024-04-14",
-    status: "Active",
-  },
-  {
-    id: "org-007",
-    name: "Harbor Health Services",
-    contact: "Emily Walsh",
-    phone: "+1 (555) 890-1234",
-    dateAdded: "2024-05-30",
-    status: "Active",
-  },
-  {
-    id: "org-008",
-    name: "Mountain View Partners",
-    contact: "Carlos Rivera",
-    phone: "+1 (555) 901-2345",
-    dateAdded: "2024-07-19",
-    status: "Pending",
-  },
-]
+const mockOrganizations: Organization[] = []
 
 type SortField = "name" | "contact" | "phone" | "dateAdded" | "status"
 type SortDirection = "asc" | "desc"
