@@ -5,7 +5,10 @@ import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { getDefaultOfferingForProgram } from "@/lib/programs/program-offering-queries"
-import type { ProgramSessionStatus } from "@/lib/programs/program-session-types"
+import type {
+  ProgramSession,
+  ProgramSessionStatus,
+} from "@/lib/programs/program-session-types"
 
 type ProgramSessionFieldsInput = {
   name: string
@@ -39,7 +42,7 @@ function revalidateProgramSessionPaths(programId: string) {
 
 export async function createProgramSession(
   input: CreateProgramSessionInput
-) {
+): Promise<ProgramSession> {
   const supabase = await createClient()
 
   const organizationId = await getSelectedOrganizationId()
@@ -65,7 +68,7 @@ export async function createProgramSession(
     }
   }
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("program_sessions")
     .insert({
       organization_id: organizationId,
@@ -97,8 +100,10 @@ export async function createProgramSession(
       waitlist_capacity:
         input.waitlist_capacity ?? null,
 
-      status: "active",
+      status: input.status ?? "active",
     })
+    .select("*")
+    .single()
 
   if (error) {
     console.error(error)
@@ -106,9 +111,12 @@ export async function createProgramSession(
   }
 
   revalidateProgramSessionPaths(input.program_id)
+  return data
 }
 
-export async function updateProgramSession(input: UpdateProgramSessionInput) {
+export async function updateProgramSession(
+  input: UpdateProgramSessionInput
+): Promise<ProgramSession> {
   const supabase = await createClient()
   const organizationId = await getSelectedOrganizationId()
 
@@ -121,7 +129,7 @@ export async function updateProgramSession(input: UpdateProgramSessionInput) {
     throw new Error("Session name is required.")
   }
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("program_sessions")
     .update({
       name,
@@ -140,6 +148,8 @@ export async function updateProgramSession(input: UpdateProgramSessionInput) {
     .eq("id", input.session_id)
     .eq("program_id", input.program_id)
     .eq("organization_id", organizationId)
+    .select("*")
+    .single()
 
   if (error) {
     console.error(error)
@@ -147,4 +157,5 @@ export async function updateProgramSession(input: UpdateProgramSessionInput) {
   }
 
   revalidateProgramSessionPaths(input.program_id)
+  return data
 }

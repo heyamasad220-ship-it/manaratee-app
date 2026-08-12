@@ -26,12 +26,14 @@ export function ProgramBrandingColors({
   programId,
   initialBackgroundColor,
   onBackgroundColorChange,
+  flyerFit = "cover",
 }: {
   flyerUrl?: string
   onFlyerUrlChange?: (url: string) => void
   programId?: string
   initialBackgroundColor?: string | null
   onBackgroundColorChange?: (color: string) => void
+  flyerFit?: "cover" | "contain"
 }) {
   const [committedFlyerUrl, setCommittedFlyerUrl] = React.useState(flyerUrl || "")
   const [committedBackgroundColor, setCommittedBackgroundColor] = React.useState(
@@ -56,16 +58,21 @@ export function ProgramBrandingColors({
   }
 
   return (
-    <div className="space-y-3">
+    <div
+      className={
+        flyerFit === "contain" ? "w-fit max-w-full space-y-3" : "space-y-3"
+      }
+    >
       <input type="hidden" name="flyer_url" value={committedFlyerUrl} />
       <input type="hidden" name="background_color" value={committedBackgroundColor} />
 
-      <div className="grid gap-4 sm:grid-cols-1">
+      <div className="space-y-4">
         <ProgramFlyerField
           programId={programId}
           value={committedFlyerUrl}
           onValueChange={handleFlyerChange}
           hideHiddenInput
+          fit={flyerFit}
         />
 
         <div className="flex items-center gap-3">

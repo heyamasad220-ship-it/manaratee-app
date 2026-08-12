@@ -1,7 +1,7 @@
 "use server"
 
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
-import { loadDepartmentOpenPrograms } from "@/lib/departments/department-active-programs"
+import { loadDepartmentWorkspacePrograms } from "@/lib/departments/department-active-programs"
 import { createProgram } from "@/lib/programs/program-actions"
 import { createProgramOffering } from "@/lib/programs/program-offering-actions"
 import type {
@@ -35,7 +35,7 @@ async function loadDepartmentPrograms(
   organizationId: string,
   departmentId: string
 ): Promise<DepartmentProgramOption[]> {
-  const programs = await loadDepartmentOpenPrograms(organizationId, departmentId)
+  const programs = await loadDepartmentWorkspacePrograms(organizationId, departmentId)
   return programs.map((row) => ({
     id: row.id,
     name: row.name,

@@ -1,4 +1,4 @@
-import { Suspense } from "react"
+import { Suspense, type ReactNode } from "react"
 
 import { ReservationCalendar } from "@/components/reservations/reservation-calendar"
 import type { FacilityEventFormOptions } from "@/components/reservations/reservation-calendar"
@@ -101,11 +101,15 @@ async function AudienceCalendarPageContent({
   searchParams,
   permissions,
   headerTitle,
+  defaultSourceTypes,
+  sectionNav,
 }: {
   audience: CalendarAudience
   searchParams?: Promise<Record<string, string | string[] | undefined>>
   permissions: PermissionKey[]
   headerTitle?: string
+  defaultSourceTypes?: ReservationSourceType[] | null
+  sectionNav?: ReactNode
 }) {
   await requireAnyPermission(...permissions)
 
@@ -115,7 +119,10 @@ async function AudienceCalendarPageContent({
   const viewParam = getSearchParam(resolved, "view")
   const view: CalendarViewMode =
     viewParam === "grid" || viewParam === "week" ? "grid" : "day"
-  const sourceTypes = parseSourceTypesParam(getSearchParam(resolved, "sources"))
+  const sourceTypes =
+    parseSourceTypesParam(getSearchParam(resolved, "sources")) ??
+    defaultSourceTypes ??
+    null
 
   const [data, canManageBlocks, canPlanEvents] = await Promise.all([
     getCalendarData(audience, anchorDate, view, { sourceTypes }),
@@ -155,6 +162,7 @@ async function AudienceCalendarPageContent({
           ? "Filtered view of the shared facility schedule — same data as Facilities Calendar."
           : CALENDAR_AUDIENCE_DESCRIPTIONS[audience]
       }
+      sectionNav={sectionNav}
     />
   )
 }
@@ -162,7 +170,11 @@ async function AudienceCalendarPageContent({
 export function createAudienceCalendarPage(
   audience: CalendarAudience,
   permissions: PermissionKey[],
-  headerTitle?: string
+  headerTitle?: string,
+  options?: {
+    defaultSourceTypes?: ReservationSourceType[] | null
+    sectionNav?: ReactNode
+  }
 ) {
   return function AudienceCalendarPage({
     searchParams,
@@ -176,6 +188,8 @@ export function createAudienceCalendarPage(
           searchParams={searchParams}
           permissions={permissions}
           headerTitle={headerTitle}
+          defaultSourceTypes={options?.defaultSourceTypes}
+          sectionNav={options?.sectionNav}
         />
       </Suspense>
     )

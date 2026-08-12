@@ -15,7 +15,8 @@ export function OfferingSettingsAccordionItem({
   className,
 }: {
   value: string
-  step: number
+  /** Optional numbered badge; omit to show title only. */
+  step?: number
   title: string
   children: ReactNode
   className?: string
@@ -30,10 +31,12 @@ export function OfferingSettingsAccordionItem({
     >
       <AccordionTrigger className="px-5 py-4 hover:no-underline data-[state=open]:border-b [&>svg]:ml-auto">
         <span className="flex items-center gap-3 text-left">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-semibold text-white">
-            {step}
-          </span>
-          <span className="text-base font-semibold text-foreground">{title}</span>
+          {step != null ? (
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-semibold text-white">
+              {step}
+            </span>
+          ) : null}
+          <span className="text-base font-semibold text-blue-600">{title}</span>
         </span>
       </AccordionTrigger>
       <AccordionContent className="px-5 pt-5 pb-6">{children}</AccordionContent>

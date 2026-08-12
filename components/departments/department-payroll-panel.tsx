@@ -148,11 +148,17 @@ export function DepartmentPayrollPanel({
   departmentName,
   staff,
   onStaffChanged,
+  openYearsOnly = true,
+  programId = null,
+  readOnly = false,
 }: {
   departmentId: string
   departmentName: string
   staff: DepartmentStaffMember[]
   onStaffChanged: () => Promise<void> | void
+  openYearsOnly?: boolean
+  programId?: string | null
+  readOnly?: boolean
 }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -185,7 +191,10 @@ export function DepartmentPayrollPanel({
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
-    const result = await fetchDepartmentPayrollListAction(departmentId)
+    const result = await fetchDepartmentPayrollListAction(departmentId, {
+      openYearsOnly,
+      programId,
+    })
     if (!result.success) {
       setError(result.error)
       setRows([])
@@ -193,11 +202,11 @@ export function DepartmentPayrollPanel({
       return
     }
     setRows(result.rows)
-    setCanApprove(result.canApprove)
+    setCanApprove(readOnly ? false : result.canApprove)
     setSelfStaffId(result.selfStaffId)
     setMigrationRequired(result.migrationRequired)
     setLoading(false)
-  }, [departmentId])
+  }, [departmentId, openYearsOnly, programId, readOnly])
 
   useEffect(() => {
     void load()
@@ -487,10 +496,12 @@ export function DepartmentPayrollPanel({
               Employees & Payroll
             </CardTitle>
             <CardDescription>
-              Department employees and pay periods for {departmentName}. Email and phone live on
-              the contact page.
+              {readOnly
+                ? `Historical pay periods for ${departmentName}. Switch program above to compare.`
+                : `Open program pay periods for ${departmentName}. Closed-program history is under Reports.`}
             </CardDescription>
           </div>
+          {!readOnly ? (
           <div className="flex flex-wrap gap-2">
             {canApprove ? (
               <Button type="button" size="sm" variant="outline" onClick={openAddEmployee}>
@@ -513,6 +524,7 @@ export function DepartmentPayrollPanel({
               </Button>
             ) : null}
           </div>
+          ) : null}
         </CardHeader>
         <CardContent>
           {loading ? (

@@ -1,9 +1,8 @@
 import { VendorHubDashboardClient } from "@/components/vendor-hub/vendor-hub-dashboard-client"
-import { getVendorHubDashboardMetrics } from "@/lib/vendor-hub/vendor-hub-event-queries"
+import { getVendorHubOrgDashboard } from "@/lib/vendor-hub/vendor-hub-event-queries"
 
 export default async function VendorHubDashboardPage() {
-  const events = await getVendorHubDashboardMetrics(null)
-  const initialMetrics = events
+  const { metrics, upcomingEvents } = await getVendorHubOrgDashboard()
 
-  return <VendorHubDashboardClient initialMetrics={initialMetrics} />
+  return <VendorHubDashboardClient metrics={metrics} upcomingEvents={upcomingEvents} />
 }

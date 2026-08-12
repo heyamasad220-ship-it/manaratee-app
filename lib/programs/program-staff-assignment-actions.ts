@@ -7,6 +7,7 @@ import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-orga
 import {
   getStaffAssignmentsForContact,
   getStaffAssignmentsForOffering,
+  searchDepartmentEmployeeContacts,
   searchStaffEligibleContacts,
 } from "@/lib/programs/program-staff-assignment-queries"
 import type { ProgramStaffAssignmentRole } from "@/lib/programs/program-staff-assignment-types"
@@ -238,11 +239,23 @@ export async function removeProgramStaffAssignment(input: {
   return getStaffAssignmentsForOffering(existing.offering_id as string, organizationId)
 }
 
-export async function searchProgramStaffContactsAction(search?: string) {
+export async function searchProgramStaffContactsAction(
+  search?: string,
+  options?: { departmentId?: string | null }
+) {
   const organizationId = await getSelectedOrganizationId()
 
   if (!organizationId) {
     throw new Error("No organization selected")
+  }
+
+  const departmentId = options?.departmentId?.trim() || null
+  if (departmentId) {
+    return searchDepartmentEmployeeContacts(
+      organizationId,
+      departmentId,
+      search
+    )
   }
 
   return searchStaffEligibleContacts(organizationId, search)

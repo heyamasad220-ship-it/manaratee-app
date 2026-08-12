@@ -1,14 +1,8 @@
 import Link from "next/link"
 import { Suspense } from "react"
 import {
-  CheckCircle,
-  Clock,
-  DollarSign,
   Download,
-  Printer,
-  Search,
   Users,
-  UserPlus,
 } from "lucide-react"
 
 import { Header } from "@/components/layout/header"
@@ -16,28 +10,29 @@ import { ProgramsRegistrationsTable } from "@/components/programs/programs-regis
 import { ProgramsReportsNav } from "@/components/programs/programs-reports-nav"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
 
-import { getDepartments } from "@/lib/departments/department-queries"
 import { createClient } from "@/lib/supabase/server"
+import { getDepartments } from "@/lib/departments/department-queries"
 import { getOpenPrograms } from "@/lib/programs/program-queries"
 import {
   PROGRAM_LABEL,
-  PROGRAM_LABEL_PLURAL,
   YEAR_SEASON_LABEL,
 } from "@/lib/programs/program-display-labels"
+import { isOfferingCurrentlyActive } from "@/lib/programs/program-offering-display"
+import {
+  buildEnrollmentFeeBreakdown,
+  type AdditionalFeeItem,
+  type RegistrationChargeInput,
+  type RegistrationFeeLineInput,
+} from "@/lib/programs/registration-report-helpers"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import {
   contactLabel,
   isTerminalEnrollmentStatus,
   loadContactsByIds,
-  shouldShowEnrollmentPaymentStatus,
 } from "@/lib/programs/registration-display-helpers"
 
 type PageSearchParams = {
-  q?: string
-  department?: string
-  offering?: string
   status?: string
   type?: string
 }
@@ -50,6 +45,7 @@ type EnrollmentRow = {
   department_id: string | null
   child_name: string
   child_age: number | null
+  child_person_id: string | null
   parent_name: string | null
   parent_email: string | null
   parent_phone: string | null
@@ -65,6 +61,8 @@ type EnrollmentRow = {
   total_amount: number | null
   notes: string | null
   created_at: string | null
+  cancelled_at: string | null
+  withdrawn_at: string | null
 }
 
 type WaitlistRow = {
@@ -91,6 +89,7 @@ type RegistrationRow = {
   department_id: string | null
   program_name: string
   offering_name: string
+  offering_activity: "active" | "closed"
   participant_name: string
   participant_contact_id: string | null
   contact_name: string
@@ -105,6 +104,24 @@ type RegistrationRow = {
   total_amount: number | null
   waitlist_position: number | null
   notes: string | null
+  registration_fee: number | null
+  additional_fees: AdditionalFeeItem[]
+  cancellation_date: string | null
+  cancelled_by: string | null
+}
+
+async function fetchByIdChunks<T>(
+  ids: string[],
+  fetchChunk: (chunk: string[]) => Promise<T[]>
+): Promise<T[]> {
+  if (ids.length === 0) return []
+  const rows: T[] = []
+  const chunkSize = 150
+  for (let i = 0; i < ids.length; i += chunkSize) {
+    const chunk = ids.slice(i, i + chunkSize)
+    rows.push(...(await fetchChunk(chunk)))
+  }
+  return rows
 }
 
 function getValue(value: string | string[] | undefined) {
@@ -163,32 +180,6 @@ function resolveBalanceStatus(
   return "open"
 }
 
-function formatBalanceStatus(status: "paid" | "open" | "refunded") {
-  if (status === "paid") return "Paid"
-  if (status === "open") return "Open"
-  return "Refunded"
-}
-
-function getBalanceStatusBadgeVariant(status: "paid" | "open" | "refunded") {
-  if (status === "paid") return "default"
-  if (status === "open") return "outline"
-  return "secondary"
-}
-
-function isThisMonth(value: string | null) {
-  if (!value) return false
-
-  const date = value.includes("T")
-    ? new Date(value)
-    : new Date(`${value}T00:00:00`)
-  const now = new Date()
-
-  return (
-    date.getFullYear() === now.getFullYear() &&
-    date.getMonth() === now.getMonth()
-  )
-}
-
 function isAdultEnrollment(row: EnrollmentRow) {
   const participantType = (row.participant_type || "").toLowerCase()
   const registrantType = (row.registrant_type || "").toLowerCase()
@@ -201,36 +192,157 @@ function isAdultEnrollment(row: EnrollmentRow) {
 
 function hasActiveFilters(filters: PageSearchParams) {
   return Boolean(
-    (filters.q || "").trim() ||
-      (filters.department && filters.department !== "all") ||
-      (filters.offering && filters.offering !== "all") ||
-      (filters.status && filters.status !== "all") ||
+    (filters.status && filters.status !== "all") ||
       (filters.type && filters.type !== "all")
   )
 }
 
+function mergeAdditionalFees(fees: AdditionalFeeItem[]): AdditionalFeeItem[] {
+  const map = new Map<string, number>()
+  for (const fee of fees) {
+    const key = fee.label.trim() || "Additional fee"
+    map.set(key, (map.get(key) || 0) + Number(fee.amount || 0))
+  }
+  return [...map.entries()].map(([label, amount]) => ({ label, amount }))
+}
+
+function aggregateFamilyRegistrationRows(
+  rows: RegistrationRow[],
+  departmentNameById: Map<string, string>
+) {
+  const groups = new Map<string, RegistrationRow[]>()
+
+  for (const row of rows) {
+    const contactKey =
+      row.contact_profile_id ||
+      (row.contact_email ? `email:${row.contact_email.toLowerCase()}` : null) ||
+      (row.contact_phone ? `phone:${row.contact_phone}` : null) ||
+      `name:${row.contact_name}` ||
+      row.id
+    const key = `${row.type}|${row.program_id || "none"}|${contactKey}`
+    const list = groups.get(key) || []
+    list.push(row)
+    groups.set(key, list)
+  }
+
+  return [...groups.entries()]
+    .map(([groupKey, members]) => {
+      const sorted = [...members].sort((a, b) => {
+        const aDate = a.registered_date
+          ? new Date(a.registered_date).getTime()
+          : 0
+        const bDate = b.registered_date
+          ? new Date(b.registered_date).getTime()
+          : 0
+        return aDate - bDate
+      })
+      const primary = sorted[0]
+      const participantNames = [
+        ...new Set(
+          sorted
+            .map((row) => row.participant_name?.trim())
+            .filter((name): name is string => Boolean(name))
+        ),
+      ]
+      const offeringPairs = sorted
+        .filter((row) => row.offering_id)
+        .map((row) => ({
+          id: row.offering_id as string,
+          name: row.offering_name,
+        }))
+      const offeringIds: string[] = []
+      const offeringNames: string[] = []
+      for (const pair of offeringPairs) {
+        if (offeringIds.includes(pair.id)) continue
+        offeringIds.push(pair.id)
+        offeringNames.push(pair.name)
+      }
+
+      const hasActiveMember = sorted.some(
+        (row) =>
+          row.type === "waitlist" ||
+          !isTerminalEnrollmentStatus(row.status)
+      )
+      const offeringActivity = sorted.some(
+        (row) => row.offering_activity === "active"
+      )
+        ? ("active" as const)
+        : ("closed" as const)
+
+      const totalAmount = sorted.reduce(
+        (sum, row) => sum + Number(row.total_amount || 0),
+        0
+      )
+      const amountPaid = sorted.reduce(
+        (sum, row) => sum + Number(row.amount_paid || 0),
+        0
+      )
+      const additionalFees = mergeAdditionalFees(
+        sorted.flatMap((row) => row.additional_fees)
+      )
+      const registrationFeeTotal = sorted.reduce(
+        (sum, row) => sum + Number(row.registration_fee || 0),
+        0
+      )
+
+      const primaryActive =
+        sorted.find(
+          (row) =>
+            row.type === "enrollment" &&
+            !isTerminalEnrollmentStatus(row.status)
+        ) || primary
+
+      const departmentId = primary.department_id
+      const departmentName = departmentId
+        ? departmentNameById.get(departmentId) || "Unknown department"
+        : "No department"
+
+      return {
+        id: groupKey,
+        type: primary.type,
+        contactName: primary.contact_name,
+        contactProfileId: primary.contact_profile_id,
+        contactEmail: primary.contact_email,
+        contactPhone: primary.contact_phone,
+        participantCount: participantNames.length,
+        participantNames,
+        departmentId,
+        departmentName,
+        programId: primary.program_id,
+        programName: primary.program_name,
+        offeringIds,
+        offeringNames,
+        offeringActivity,
+        registeredDateLabel: formatDate(primary.registered_date),
+        sortDate: primary.registered_date,
+        registrationFeeLabel:
+          primary.type === "waitlist"
+            ? "—"
+            : formatCurrency(registrationFeeTotal),
+        registrationPaidLabel:
+          primary.type === "waitlist" ? "—" : formatCurrency(amountPaid),
+        additionalFees,
+        registrationStatus: hasActiveMember
+          ? ("active" as const)
+          : ("cancelled" as const),
+        primaryRegistrationId: primaryActive.id,
+        enrollmentStatus: primaryActive.status,
+        totalAmount,
+        amountPaid,
+        notes: primaryActive.notes,
+      }
+    })
+    .sort((a, b) => {
+      const aDate = a.sortDate ? new Date(a.sortDate).getTime() : 0
+      const bDate = b.sortDate ? new Date(b.sortDate).getTime() : 0
+      return bDate - aDate
+    })
+    .map(({ sortDate: _sortDate, ...row }) => row)
+}
+
 function matchesFilters(row: RegistrationRow, filters: PageSearchParams) {
-  const query = (filters.q || "").trim().toLowerCase()
-  const departmentFilter = (filters.department || "all").toLowerCase()
-  const offeringFilter = filters.offering || "all"
   const statusFilter = (filters.status || "all").toLowerCase()
   const typeFilter = filters.type || "all"
-
-  const matchesSearch =
-    !query ||
-    row.participant_name.toLowerCase().includes(query) ||
-    row.contact_name.toLowerCase().includes(query) ||
-    (row.contact_email || "").toLowerCase().includes(query) ||
-    (row.contact_phone || "").toLowerCase().includes(query) ||
-    row.offering_name.toLowerCase().includes(query) ||
-    row.program_name.toLowerCase().includes(query)
-
-  const matchesDepartment =
-    departmentFilter === "all" ||
-    (row.department_id || "").toLowerCase() === departmentFilter
-
-  const matchesOffering =
-    offeringFilter === "all" || row.offering_id === offeringFilter
 
   const balanceStatus = resolveBalanceStatus(
     row.payment_status,
@@ -247,13 +359,7 @@ function matchesFilters(row: RegistrationRow, filters: PageSearchParams) {
 
   const matchesType = typeFilter === "all" || row.type === typeFilter
 
-  return (
-    matchesSearch &&
-    matchesDepartment &&
-    matchesOffering &&
-    matchesStatus &&
-    matchesType
-  )
+  return matchesStatus && matchesType
 }
 
 export default async function ProgramsRegistrationsPage({
@@ -264,9 +370,6 @@ export default async function ProgramsRegistrationsPage({
   const resolvedSearchParams = await searchParams
 
   const filters: PageSearchParams = {
-    q: getValue(resolvedSearchParams?.q),
-    department: getValue(resolvedSearchParams?.department) || "all",
-    offering: getValue(resolvedSearchParams?.offering) || "all",
     status: getValue(resolvedSearchParams?.status) || "all",
     type: getValue(resolvedSearchParams?.type) || "all",
   }
@@ -288,18 +391,20 @@ export default async function ProgramsRegistrationsPage({
       (program.department_id as string | null) || null,
     ])
   )
+  const departmentNameById = new Map(
+    departments.map((department) => [department.id, department.name])
+  )
 
   let enrollments: EnrollmentRow[] = []
   let waitlist: WaitlistRow[] = []
   let loadError: string | null = null
   const offeringNameById = new Map<string, string>()
-  const offeringMeta: Array<{
-    id: string
-    name: string
-    programId: string
-    departmentId: string | null
-    status: string
-  }> = []
+  const activeOfferingIds = new Set<string>()
+  const feesByEnrollmentId = new Map<
+    string,
+    { registrationFee: number | null; additionalFees: AdditionalFeeItem[] }
+  >()
+  const cancelledByEnrollmentId = new Map<string, string>()
 
   if (programIds.length > 0 && organizationId) {
     const [enrollmentsResult, waitlistResult, offeringsResult] =
@@ -315,6 +420,7 @@ export default async function ProgramsRegistrationsPage({
           department_id,
           child_name,
           child_age,
+          child_person_id,
           parent_name,
           parent_email,
           parent_phone,
@@ -329,7 +435,9 @@ export default async function ProgramsRegistrationsPage({
           amount_paid,
           total_amount,
           notes,
-          created_at
+          created_at,
+          cancelled_at,
+          withdrawn_at
         `
           )
           .eq("organization_id", organizationId)
@@ -359,7 +467,9 @@ export default async function ProgramsRegistrationsPage({
           .order("created_at", { ascending: false }),
         supabase
           .from("program_offerings")
-          .select("id, name, program_id, status")
+          .select(
+            "id, name, program_id, status, start_date, end_date, enrollment_open_date, enrollment_close_date, inherit_dates"
+          )
           .eq("organization_id", organizationId)
           .in("program_id", programIds)
           .neq("status", "archived")
@@ -378,18 +488,182 @@ export default async function ProgramsRegistrationsPage({
       waitlist = (waitlistResult.data || []) as WaitlistRow[]
     }
 
+    const programById = new Map(programs.map((program) => [program.id, program]))
+
     for (const offering of offeringsResult.data || []) {
       const id = offering.id as string
-      const programId = offering.program_id as string
       const name = (offering.name as string) || PROGRAM_LABEL
       offeringNameById.set(id, name)
-      offeringMeta.push({
-        id,
-        name,
-        programId,
-        departmentId: programDepartmentById.get(programId) || null,
-        status: (offering.status as string) || "active",
+
+      const programId = offering.program_id as string | null
+      const program = programId ? programById.get(programId) : null
+
+      if (
+        isOfferingCurrentlyActive(
+          {
+            status: (offering.status as string) || "draft",
+            start_date: (offering.start_date as string | null) ?? null,
+            end_date: (offering.end_date as string | null) ?? null,
+            enrollment_open_date:
+              (offering.enrollment_open_date as string | null) ?? null,
+            enrollment_close_date:
+              (offering.enrollment_close_date as string | null) ?? null,
+            inherit_dates: Boolean(offering.inherit_dates),
+          },
+          program ?? null
+        )
+      ) {
+        activeOfferingIds.add(id)
+      }
+    }
+
+    const enrollmentIds = enrollments.map((row) => row.id)
+    if (enrollmentIds.length > 0) {
+      const charges = await fetchByIdChunks(enrollmentIds, async (chunk) => {
+        const { data, error } = await supabase
+          .from("program_charges")
+          .select(
+            "id, enrollment_id, charge_type, total, subtotal, discount_total, metadata, quote_snapshot"
+          )
+          .eq("organization_id", organizationId)
+          .in("enrollment_id", chunk)
+        if (error) {
+          console.error("registrations charges:", error.message)
+          return []
+        }
+        return (data || []) as RegistrationChargeInput[]
       })
+
+      const chargeIds = charges.map((charge) => charge.id)
+      const lines = await fetchByIdChunks(chargeIds, async (chunk) => {
+        const { data, error } = await supabase
+          .from("program_charge_lines")
+          .select("charge_id, line_type, label, amount, metadata")
+          .eq("organization_id", organizationId)
+          .in("charge_id", chunk)
+        if (error) {
+          console.error("registrations charge lines:", error.message)
+          return []
+        }
+        return (data || []) as Array<
+          RegistrationFeeLineInput & { charge_id: string }
+        >
+      })
+
+      const linesByChargeId = new Map<string, RegistrationFeeLineInput[]>()
+      for (const line of lines) {
+        const list = linesByChargeId.get(line.charge_id) || []
+        list.push(line)
+        linesByChargeId.set(line.charge_id, list)
+      }
+
+      const chargesByEnrollmentId = new Map<string, RegistrationChargeInput[]>()
+      for (const charge of charges) {
+        const enrollmentId = charge.enrollment_id
+        if (!enrollmentId) continue
+        const list = chargesByEnrollmentId.get(enrollmentId) || []
+        list.push(charge)
+        chargesByEnrollmentId.set(enrollmentId, list)
+      }
+
+      for (const enrollmentId of enrollmentIds) {
+        feesByEnrollmentId.set(
+          enrollmentId,
+          buildEnrollmentFeeBreakdown(
+            chargesByEnrollmentId.get(enrollmentId) || [],
+            linesByChargeId
+          )
+        )
+      }
+
+      const cancelledEnrollmentIds = enrollments
+        .filter((row) => {
+          const status = (row.status || "").toLowerCase()
+          return (
+            status === "cancelled" ||
+            status === "canceled" ||
+            status === "withdrawn" ||
+            Boolean(row.cancelled_at) ||
+            Boolean(row.withdrawn_at)
+          )
+        })
+        .map((row) => row.id)
+
+      if (cancelledEnrollmentIds.length > 0) {
+        const history = await fetchByIdChunks(
+          cancelledEnrollmentIds,
+          async (chunk) => {
+            const { data, error } = await supabase
+              .from("program_enrollment_status_history")
+              .select(
+                "enrollment_id, to_status, actor_type, actor_user_id, created_at"
+              )
+              .eq("organization_id", organizationId)
+              .in("enrollment_id", chunk)
+              .in("to_status", ["cancelled", "canceled", "withdrawn"])
+              .order("created_at", { ascending: false })
+            if (error) {
+              console.error("registrations cancel history:", error.message)
+              return []
+            }
+            return data || []
+          }
+        )
+
+        const latestByEnrollment = new Map<
+          string,
+          {
+            actor_type: string | null
+            actor_user_id: string | null
+          }
+        >()
+        for (const row of history) {
+          const enrollmentId = row.enrollment_id as string
+          if (latestByEnrollment.has(enrollmentId)) continue
+          latestByEnrollment.set(enrollmentId, {
+            actor_type: (row.actor_type as string | null) || null,
+            actor_user_id: (row.actor_user_id as string | null) || null,
+          })
+        }
+
+        const actorIds = [
+          ...new Set(
+            [...latestByEnrollment.values()]
+              .map((row) => row.actor_user_id)
+              .filter((id): id is string => Boolean(id))
+          ),
+        ]
+        const profileNameById = new Map<string, string>()
+        if (actorIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from("profiles")
+            .select("id, full_name, email")
+            .in("id", actorIds)
+          for (const profile of profiles || []) {
+            const name =
+              (profile.full_name as string | null)?.trim() ||
+              (profile.email as string | null)?.trim() ||
+              null
+            if (name) profileNameById.set(profile.id as string, name)
+          }
+        }
+
+        for (const [enrollmentId, actor] of latestByEnrollment) {
+          if (actor.actor_user_id && profileNameById.has(actor.actor_user_id)) {
+            cancelledByEnrollmentId.set(
+              enrollmentId,
+              profileNameById.get(actor.actor_user_id)!
+            )
+          } else if (actor.actor_type === "system") {
+            cancelledByEnrollmentId.set(enrollmentId, "System")
+          } else if (actor.actor_type) {
+            cancelledByEnrollmentId.set(
+              enrollmentId,
+              actor.actor_type.replace(/_/g, " ")
+            )
+          }
+        }
+      }
     }
   }
 
@@ -446,6 +720,21 @@ export default async function ProgramsRegistrationsPage({
         : (row.program_id ? programNameById.get(row.program_id) : null) ||
           "Unknown offering"
 
+      const fees = feesByEnrollmentId.get(row.id)
+      const registrationFee =
+        fees?.registrationFee ??
+        (row.total_amount != null ? Number(row.total_amount) : null)
+      const statusLower = (row.status || "").toLowerCase()
+      const isCancelled =
+        statusLower === "cancelled" ||
+        statusLower === "canceled" ||
+        statusLower === "withdrawn" ||
+        Boolean(row.cancelled_at) ||
+        Boolean(row.withdrawn_at)
+      const cancellationDate = isCancelled
+        ? row.cancelled_at || row.withdrawn_at || null
+        : null
+
       return {
         id: row.id,
         type: "enrollment" as const,
@@ -456,6 +745,10 @@ export default async function ProgramsRegistrationsPage({
           (row.program_id ? programNameById.get(row.program_id) : null) ||
           `Unknown ${YEAR_SEASON_LABEL}`,
         offering_name: offeringName,
+        offering_activity:
+          row.offering_id && activeOfferingIds.has(row.offering_id)
+            ? ("active" as const)
+            : ("closed" as const),
         participant_name: participantName,
         participant_contact_id: row.participant_contact_id,
         contact_name: contactName,
@@ -472,6 +765,12 @@ export default async function ProgramsRegistrationsPage({
         total_amount: row.total_amount,
         waitlist_position: null,
         notes: row.notes,
+        registration_fee: registrationFee,
+        additional_fees: fees?.additionalFees || [],
+        cancellation_date: cancellationDate,
+        cancelled_by: isCancelled
+          ? cancelledByEnrollmentId.get(row.id) || null
+          : null,
       }
     }),
     ...waitlist.map((row) => ({
@@ -488,6 +787,7 @@ export default async function ProgramsRegistrationsPage({
       offering_name:
         (row.program_id ? programNameById.get(row.program_id) : null) ||
         `Unknown ${PROGRAM_LABEL.toLowerCase()}`,
+      offering_activity: "closed" as const,
       participant_name: row.child_name,
       participant_contact_id: null,
       contact_name: row.parent_name || "Contact not set",
@@ -502,6 +802,10 @@ export default async function ProgramsRegistrationsPage({
       total_amount: null,
       waitlist_position: row.position,
       notes: null,
+      registration_fee: null,
+      additional_fees: [] as AdditionalFeeItem[],
+      cancellation_date: null,
+      cancelled_by: null,
     })),
   ].sort((a, b) => {
     const aDate = a.registered_date ? new Date(a.registered_date).getTime() : 0
@@ -513,83 +817,16 @@ export default async function ProgramsRegistrationsPage({
     matchesFilters(row, filters)
   )
 
-  const activeEnrollmentCount = enrollments.filter(
-    (row) => !isTerminalEnrollmentStatus(row.status)
-  ).length
-  const totalWaitlist = waitlist.length
-  const thisMonthRegistrations = registrationRows.filter((row) =>
-    isThisMonth(row.registered_date)
-  ).length
-
-  const openBalanceCount = enrollments.filter(
-    (row) =>
-      !isTerminalEnrollmentStatus(row.status) &&
-      resolveBalanceStatus(row.payment_status, row.amount_paid, row.total_amount) ===
-        "open"
-  ).length
-
-  const revenue = enrollments.reduce(
-    (total, row) => total + Number(row.amount_paid || 0),
-    0
+  const familyRows = aggregateFamilyRegistrationRows(
+    filteredRows,
+    departmentNameById
   )
-
-  const statuses = ["open", "paid", "refunded"] as const
-
-  const departmentFilter = filters.department || "all"
-  const offeringsForSelect =
-    departmentFilter === "all"
-      ? offeringMeta.filter(
-          (o) =>
-            o.status === "active" ||
-            o.status === "draft" ||
-            o.status === "closed"
-        )
-      : offeringMeta.filter((o) => (o.departmentId || "") === departmentFilter)
-
-  const stats = [
-    {
-      label: "Active Enrollment",
-      value: String(activeEnrollmentCount),
-      icon: Users,
-      color: "text-blue-600",
-      href: null as string | null,
-    },
-    {
-      label: "Waitlist",
-      value: String(totalWaitlist),
-      icon: UserPlus,
-      color: "text-orange-600",
-      href: "/programs/registrations?type=waitlist",
-    },
-    {
-      label: "This Month",
-      value: String(thisMonthRegistrations),
-      icon: CheckCircle,
-      color: "text-green-600",
-      href: null as string | null,
-    },
-    {
-      label: "Open Balances",
-      value: String(openBalanceCount),
-      icon: Clock,
-      color: "text-amber-600",
-      // Clear search/other filters so the table matches this KPI.
-      href: "/programs/registrations?status=open",
-    },
-    {
-      label: "Revenue Collected",
-      value: formatCurrency(revenue),
-      icon: DollarSign,
-      color: "text-purple-600",
-      href: null as string | null,
-    },
-  ]
 
   const filtersActive = hasActiveFilters(filters)
 
   return (
     <>
-      <Header title="Programs" />
+      <Header title="Reports" />
 
       <Suspense fallback={null}>
         <ProgramsReportsNav />
@@ -601,25 +838,9 @@ export default async function ProgramsRegistrationsPage({
             <h2 className="text-xl font-semibold text-foreground">
               Registrations
             </h2>
-            <p className="text-sm text-muted-foreground">
-              View program enrollment fees, payments received, and balances.
-            </p>
           </div>
 
           <div className="flex flex-wrap gap-2">
-            {filters.offering && filters.offering !== "all" ? (
-              <Button variant="outline" asChild>
-                <Link
-                  href={`/programs/${
-                    offeringMeta.find((o) => o.id === filters.offering)?.programId ||
-                    ""
-                  }/car-tags`}
-                >
-                  <Printer className="mr-2 h-4 w-4" />
-                  Print Car Tags
-                </Link>
-              </Button>
-            ) : null}
             <Button variant="outline" disabled>
               <Download className="mr-2 h-4 w-4" />
               Export Coming Soon
@@ -627,124 +848,17 @@ export default async function ProgramsRegistrationsPage({
           </div>
         </div>
 
-        <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-          {stats.map((stat) => {
-            const content = (
-              <CardContent className="flex h-full items-center gap-4 p-4">
-                <div className={`rounded-full bg-muted p-3 ${stat.color}`}>
-                  <stat.icon className="h-5 w-5" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm text-muted-foreground">{stat.label}</p>
-                  <p className="text-2xl font-bold text-foreground">
-                    {stat.value}
-                  </p>
-                </div>
-              </CardContent>
-            )
-            return (
-              <Card key={stat.label} className="h-full">
-                {stat.href ? (
-                  <Link
-                    href={stat.href}
-                    className="block h-full rounded-lg transition-colors hover:bg-muted/40"
-                    title={`Show ${stat.label.toLowerCase()}`}
-                  >
-                    {content}
-                  </Link>
-                ) : (
-                  content
-                )}
-              </Card>
-            )
-          })}
-        </div>
-
-        <Card className="mb-6">
-          <CardContent className="p-4">
-            <form method="get" className="grid gap-4 lg:grid-cols-6">
-              <div className="relative lg:col-span-2">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  name="q"
-                  defaultValue={filters.q}
-                  placeholder="Search by participant, contact, email, phone, or offering..."
-                  className="pl-9"
-                />
-              </div>
-
-              <select
-                name="department"
-                defaultValue={filters.department}
-                className="h-10 rounded-md border bg-background px-3 text-sm"
-              >
-                <option value="all">All Departments</option>
-                {departments.map((department) => (
-                  <option key={department.id} value={department.id}>
-                    {department.name}
-                  </option>
-                ))}
-              </select>
-
-              <select
-                name="offering"
-                defaultValue={filters.offering}
-                className="h-10 rounded-md border bg-background px-3 text-sm"
-              >
-                <option value="all">All {PROGRAM_LABEL_PLURAL}</option>
-                {offeringsForSelect.map((offering) => (
-                  <option key={offering.id} value={offering.id}>
-                    {offering.name}
-                    {programNameById.get(offering.programId)
-                      ? ` · ${programNameById.get(offering.programId)}`
-                      : ""}
-                  </option>
-                ))}
-              </select>
-
-              <select
-                name="type"
-                defaultValue={filters.type}
-                className="h-10 rounded-md border bg-background px-3 text-sm"
-              >
-                <option value="all">All Types</option>
-                <option value="enrollment">Enrollments</option>
-                <option value="waitlist">Waitlist</option>
-              </select>
-
-              <div className="flex gap-4">
-                <select
-                  name="status"
-                  defaultValue={(filters.status || "all").toLowerCase()}
-                  className="h-10 flex-1 rounded-md border bg-background px-3 text-sm"
-                >
-                  <option value="all">All Statuses</option>
-                  {statuses.map((status) => (
-                    <option key={status} value={status}>
-                      {formatBalanceStatus(status)}
-                    </option>
-                  ))}
-                </select>
-                <Button type="submit">Apply</Button>
-              </div>
-            </form>
-            {filtersActive ? (
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
-                <p>
-                  Showing {filteredRows.length}{" "}
-                  {filteredRows.length === 1 ? "result" : "results"}
-                  {(filters.status || "").toLowerCase() === "open" &&
-                  openBalanceCount > filteredRows.length
-                    ? ` (${openBalanceCount} open balances total)`
-                    : null}
-                </p>
-                <Button variant="ghost" size="sm" asChild>
-                  <Link href="/programs/registrations">Clear filters</Link>
-                </Button>
-              </div>
-            ) : null}
-          </CardContent>
-        </Card>
+        {filtersActive ? (
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
+            <p>
+              Showing {filteredRows.length}{" "}
+              {filteredRows.length === 1 ? "result" : "results"}
+            </p>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/programs/registrations">Clear filters</Link>
+            </Button>
+          </div>
+        ) : null}
 
         {loadError ? (
           <Card>
@@ -766,58 +880,7 @@ export default async function ProgramsRegistrationsPage({
                     ? "Try clearing filters, or registrations will appear here after enrollment."
                     : "Registrations for open years will appear here after enrollment."
                 }
-                rows={filteredRows.map((row) => {
-                  const balance =
-                    row.type === "waitlist"
-                      ? null
-                      : outstandingBalance(row.total_amount, row.amount_paid)
-                  const balanceStatus =
-                    row.type === "waitlist" ||
-                    !shouldShowEnrollmentPaymentStatus(row.status)
-                      ? null
-                      : resolveBalanceStatus(
-                          row.payment_status,
-                          row.amount_paid,
-                          row.total_amount
-                        )
-
-                  return {
-                    id: row.id,
-                    type: row.type,
-                    participantName: row.participant_name,
-                    participantContactId: row.participant_contact_id,
-                    contactName: row.contact_name,
-                    contactProfileId: row.contact_profile_id,
-                    contactEmail: row.contact_email,
-                    contactPhone: row.contact_phone,
-                    childAge: row.child_age,
-                    waitlistPosition: row.waitlist_position,
-                    offeringName: row.offering_name,
-                    registeredDateLabel: formatDate(row.registered_date),
-                    feeLabel:
-                      row.type === "waitlist"
-                        ? "N/A"
-                        : formatCurrency(row.total_amount),
-                    receivedLabel:
-                      row.type === "waitlist"
-                        ? "N/A"
-                        : formatCurrency(row.amount_paid),
-                    balanceLabel:
-                      row.type === "waitlist"
-                        ? "N/A"
-                        : formatCurrency(balance),
-                    statusLabel: balanceStatus
-                      ? formatBalanceStatus(balanceStatus)
-                      : null,
-                    statusVariant: balanceStatus
-                      ? getBalanceStatusBadgeVariant(balanceStatus)
-                      : "secondary",
-                    enrollmentStatus: row.status,
-                    totalAmount: row.total_amount ?? 0,
-                    amountPaid: row.amount_paid ?? 0,
-                    notes: row.notes,
-                  }
-                })}
+                rows={familyRows}
               />
             </CardContent>
           </Card>

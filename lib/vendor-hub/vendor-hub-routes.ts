@@ -19,6 +19,7 @@ export const VENDOR_HUB_ROUTES = {
     payments: (eventId: string) => `${VENDOR_HUB_BASE}/events/${eventId}/payments`,
     evaluations: (eventId: string) => `${VENDOR_HUB_BASE}/events/${eventId}/evaluations`,
     messages: (eventId: string) => `${VENDOR_HUB_BASE}/events/${eventId}/messages`,
+    settings: (eventId: string) => `${VENDOR_HUB_BASE}/events/${eventId}/settings`,
   },
   communityCalendar: `${VENDOR_HUB_BASE}/community-calendar`,
   reports: `${VENDOR_HUB_BASE}/reports`,

@@ -227,9 +227,11 @@ Monthly tuition uses the **offering billing calendar** (Sep–May), not “N mon
 
 Example: offering runs Sep–May at $150/month. Participant joins in November → charges for Nov, Dec, Jan, Feb, Mar, Apr, May only (7 months), not 9 months starting in November.
 
+**Exception months (August 2026):** Staff uncheck months on Billing Schedule (e.g. Ramadan). Those periods use `period_status = skipped` and are excluded for all enrollments. Billing day is the day-of-month from the offering start date. Run **`scripts/238_offering_billing_calendar_summary.sql`**.
+
 Implemented via:
 
-- `count_offering_billing_months_from_date(start, end, join_date)`
+- `count_offering_billing_months_from_date(start, end, join_date)` / `count_active_offering_billing_periods` (238)
 - `program_offering_billing_periods` — canonical month rows per offering
 - Quote engine uses `participant_month_count` for `per_month` tuition quantity
 - `build_monthly_quote_schedule()` labels rows by period (e.g. “November 2025 tuition”)

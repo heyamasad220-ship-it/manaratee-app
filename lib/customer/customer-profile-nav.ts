@@ -3,11 +3,14 @@ export type CustomerProfileSection =
   | "family"
   | "notifications"
   | "applications"
+  | "vendor"
 
 export type CustomerProfileNavItem = {
   label: string
   href: string
   section: CustomerProfileSection
+  /** When true, only show for approved org vendors. */
+  requiresApprovedVendor?: boolean
 }
 
 export const CUSTOMER_PROFILE_NAV_ITEMS: CustomerProfileNavItem[] = [
@@ -26,6 +29,12 @@ export const CUSTOMER_PROFILE_NAV_ITEMS: CustomerProfileNavItem[] = [
     href: "/customer/profile/applications",
     section: "applications",
   },
+  {
+    label: "Vendor profile",
+    href: "/customer/profile/vendor",
+    section: "vendor",
+    requiresApprovedVendor: true,
+  },
 ]
 
 export function isCustomerProfilePath(pathname: string): boolean {
@@ -40,6 +49,7 @@ export function resolveCustomerProfileSection(
   if (sectionParam === "family") return "family"
   if (sectionParam === "notifications") return "notifications"
   if (sectionParam === "applications") return "applications"
+  if (sectionParam === "vendor") return "vendor"
   return "personal"
 }
 
@@ -58,7 +68,16 @@ export function customerProfileSectionTitle(section: CustomerProfileSection): st
       return "Notification Preferences"
     case "applications":
       return "Applications"
+    case "vendor":
+      return "Vendor profile"
     default:
       return "Profile"
   }
+}
+
+export function filterCustomerProfileNavItems(
+  items: CustomerProfileNavItem[],
+  isApprovedVendor: boolean
+) {
+  return items.filter((item) => !item.requiresApprovedVendor || isApprovedVendor)
 }

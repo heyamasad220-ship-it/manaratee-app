@@ -1,11 +1,6 @@
-import { EventManagementReportsClient } from "@/components/events/event-management-reports-client"
-import {
-  PERMISSIONS,
-  requireAnyPermission,
-} from "@/lib/permissions/permissions"
+import { redirect } from "next/navigation"
 
-export default async function EventManagementReportsPage() {
-  await requireAnyPermission(PERMISSIONS.EVENTS_VIEW, PERMISSIONS.PROGRAMS_VIEW)
-
-  return <EventManagementReportsClient />
+/** Event Management Reports removed — childcare lives under Programs/ Events → Reports. */
+export default function EventManagementReportsRedirectPage() {
+  redirect("/programs/reports/childcare")
 }

@@ -12,7 +12,6 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Switch } from "@/components/ui/switch"
 import {
   buildFeePlanStateFromSimplePricing,
   countOfferingBillingMonths,
@@ -22,21 +21,28 @@ import {
   summarizeRequiredCharges,
 } from "@/lib/programs/offering-pricing-mapper"
 import {
+  createDefaultDiscount,
+  DISCOUNT_STATUS_LABELS,
+  DISCOUNT_VALUE_TYPE_LABELS,
   FEE_BILLING_SCOPE_LABELS,
   FEE_RECURRENCE_LABELS,
   FEE_TYPE_LABELS,
+  OFFERING_DISCOUNT_NAME_LABELS,
   PAYMENT_STRUCTURE_LABELS,
   defaultFeeName,
   type ChargeType,
   type FeeBillingScope,
   type FeeRecurrence,
+  type OfferingDiscount,
+  type OfferingDiscountName,
   type OfferingFee,
   type PaymentStructure,
+  type SimpleDiscountStatus,
+  type SimpleDiscountValueType,
   type SimpleOfferingPricing,
-  type SimplePricingDiscountLine,
-  type SimplePricingDiscounts,
 } from "@/lib/programs/offering-pricing-simple-types"
 import { BILLING_MIGRATION_MESSAGE } from "@/lib/programs/program-billing-schema"
+import { billingDayFromStartDate } from "@/lib/programs/program-billing-utils"
 import { saveOfferingPricing } from "@/lib/programs/offering-workspace-actions"
 import type { OfferingWorkspaceData } from "@/lib/programs/offering-workspace-types"
 import type { ProgramOffering } from "@/lib/programs/program-offering-types"
@@ -150,10 +156,10 @@ function FeeRow({
   onRemove: () => void
 }) {
   return (
-    <div className="space-y-3 rounded-lg border p-3">
-      <div className="grid gap-3 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,0.7fr)] sm:items-end">
+    <div className="space-y-2">
+      <div className="grid grid-cols-1 items-end gap-2 sm:grid-cols-[minmax(0,1.1fr)_minmax(0,0.7fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_auto_auto]">
         <div className="space-y-1.5">
-          <Label className="text-xs">Type</Label>
+          <Label className="text-xs">Name</Label>
           <select
             value={fee.feeType}
             onChange={(event) => {
@@ -162,11 +168,7 @@ function FeeRow({
                 ...fee,
                 feeType,
                 name:
-                  feeType === "custom"
-                    ? fee.name
-                    : defaultFeeName(feeType),
-                recurrence:
-                  feeType === "tuition" ? fee.recurrence : fee.recurrence,
+                  feeType === "custom" ? fee.name : defaultFeeName(feeType),
               })
             }}
             className="h-9 w-full rounded-md border bg-background px-3 text-sm"
@@ -184,28 +186,32 @@ function FeeRow({
             type="number"
             min="0"
             step="0.01"
+            className="h-9"
             value={fee.amount}
             onChange={(event) =>
               onChange({ ...fee, amount: Number(event.target.value || 0) })
             }
           />
         </div>
-      </div>
-
-      {fee.feeType === "custom" ? (
         <div className="space-y-1.5">
-          <Label className="text-xs">Name</Label>
-          <Input
-            value={fee.name}
+          <Label className="text-xs">Type</Label>
+          <select
+            value={fee.billingScope}
             onChange={(event) =>
-              onChange({ ...fee, name: event.target.value })
+              onChange({
+                ...fee,
+                billingScope: event.target.value as FeeBillingScope,
+              })
             }
-            placeholder="Before Care, Lunch, Books…"
-          />
+            className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+          >
+            {Object.entries(FEE_BILLING_SCOPE_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
         </div>
-      ) : null}
-
-      <div className="grid gap-3 sm:grid-cols-3 sm:items-end">
         <div className="space-y-1.5">
           <Label className="text-xs">Recurrence</Label>
           <select
@@ -225,80 +231,182 @@ function FeeRow({
             ))}
           </select>
         </div>
+        <label className="flex h-9 items-center gap-2 text-sm">
+          <Checkbox
+            checked={fee.required}
+            onCheckedChange={(checked) =>
+              onChange({ ...fee, required: checked === true })
+            }
+          />
+          Required
+        </label>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-9 w-9 shrink-0 text-destructive hover:text-destructive"
+          onClick={onRemove}
+          aria-label={`Remove ${fee.name || "fee"}`}
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </div>
+
+      {fee.feeType === "custom" ? (
+        <div className="space-y-1.5 sm:max-w-sm">
+          <Label className="text-xs">Name</Label>
+          <Input
+            className="h-9"
+            value={fee.name}
+            onChange={(event) =>
+              onChange({ ...fee, name: event.target.value })
+            }
+            placeholder="Before Care, Lunch, Books…"
+          />
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function DiscountRow({
+  discount,
+  onChange,
+  onRemove,
+}: {
+  discount: OfferingDiscount
+  onChange: (next: OfferingDiscount) => void
+  onRemove: () => void
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="grid grid-cols-1 items-end gap-2 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,0.7fr)_minmax(0,0.9fr)_auto]">
         <div className="space-y-1.5">
-          <Label className="text-xs">Billed to</Label>
+          <Label className="text-xs">Name</Label>
           <select
-            value={fee.billingScope}
+            value={discount.name}
+            onChange={(event) => {
+              const name = event.target.value as OfferingDiscountName
+              onChange({
+                ...discount,
+                name,
+                customLabel:
+                  name === "custom" ? discount.customLabel || "" : undefined,
+                value:
+                  discount.value ||
+                  (name === "full_payment"
+                    ? 5
+                    : name === "sibling" || name === "early_bird"
+                      ? 10
+                      : 0),
+              })
+            }}
+            className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+          >
+            {Object.entries(OFFERING_DISCOUNT_NAME_LABELS).map(
+              ([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              )
+            )}
+          </select>
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs">Type</Label>
+          <select
+            value={discount.valueType}
             onChange={(event) =>
               onChange({
-                ...fee,
-                billingScope: event.target.value as FeeBillingScope,
+                ...discount,
+                valueType: event.target.value as SimpleDiscountValueType,
               })
             }
             className="h-9 w-full rounded-md border bg-background px-3 text-sm"
           >
-            {Object.entries(FEE_BILLING_SCOPE_LABELS).map(([value, label]) => (
+            {Object.entries(DISCOUNT_VALUE_TYPE_LABELS).map(([value, label]) => (
               <option key={value} value={value}>
                 {label}
               </option>
             ))}
           </select>
         </div>
-        <div className="flex items-center justify-between gap-2 pb-1">
-          <label className="flex items-center gap-2 text-sm">
-            <Checkbox
-              checked={fee.required}
-              onCheckedChange={(checked) =>
-                onChange({ ...fee, required: checked === true })
-              }
-            />
-            Required
-          </label>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="shrink-0 text-destructive hover:text-destructive"
-            onClick={onRemove}
-            aria-label={`Remove ${fee.name || "fee"}`}
+        <div className="space-y-1.5">
+          <Label className="text-xs">
+            {discount.valueType === "percent" ? "Percent" : "Amount"}
+          </Label>
+          <Input
+            type="number"
+            min="0"
+            step="0.01"
+            max={discount.valueType === "percent" ? 100 : undefined}
+            className="h-9"
+            value={discount.value}
+            onChange={(event) =>
+              onChange({
+                ...discount,
+                value: Number(event.target.value || 0),
+              })
+            }
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs">Status</Label>
+          <select
+            value={discount.status}
+            onChange={(event) =>
+              onChange({
+                ...discount,
+                status: event.target.value as SimpleDiscountStatus,
+              })
+            }
+            className="h-9 w-full rounded-md border bg-background px-3 text-sm"
           >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+            {Object.entries(DISCOUNT_STATUS_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
         </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-9 w-9 shrink-0 text-destructive hover:text-destructive"
+          onClick={onRemove}
+          aria-label="Remove discount"
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
       </div>
-    </div>
-  )
-}
 
-function DiscountToggleRow({
-  title,
-  description,
-  line,
-  onChange,
-  children,
-}: {
-  title: string
-  description: string
-  line: SimplePricingDiscountLine
-  onChange: (next: SimplePricingDiscountLine) => void
-  children?: React.ReactNode
-}) {
-  return (
-    <div className="space-y-3 rounded-lg border p-3">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-sm font-medium">{title}</p>
-          <p className="text-xs text-muted-foreground">{description}</p>
+      {discount.name === "custom" ? (
+        <div className="space-y-1.5 sm:max-w-sm">
+          <Label className="text-xs">Custom name</Label>
+          <Input
+            className="h-9"
+            value={discount.customLabel || ""}
+            onChange={(event) =>
+              onChange({ ...discount, customLabel: event.target.value })
+            }
+            placeholder="Summer promo, Referral…"
+          />
         </div>
-        <Switch
-          checked={line.enabled}
-          onCheckedChange={(checked) =>
-            onChange({ ...line, enabled: checked })
-          }
-        />
-      </div>
-      {line.enabled ? (
-        <div className="grid gap-3 sm:grid-cols-2">{children}</div>
+      ) : null}
+
+      {discount.name === "early_bird" ? (
+        <div className="space-y-1.5 sm:max-w-xs">
+          <Label className="text-xs">Pay by</Label>
+          <Input
+            type="date"
+            className="h-9"
+            value={discount.endsBefore || ""}
+            onChange={(event) =>
+              onChange({ ...discount, endsBefore: event.target.value })
+            }
+          />
+        </div>
       ) : null}
     </div>
   )
@@ -384,12 +492,19 @@ export function OfferingPricingEditorProvider({
   }, [offering.id, workspacePricingSignature])
 
   const requiredTotal = summarizeRequiredCharges(pricing.fees)
-  const billingMonths = countOfferingBillingMonths(
-    offering.start_date,
-    offering.end_date
-  )
   const billingBundle = workspaceData.billingSchedule.bundle
   const billingMigrationRequired = workspaceData.billingSchedule.migrationRequired
+  const billingMonths = React.useMemo(() => {
+    const periods = billingBundle?.billing_periods
+    if (periods && periods.length > 0) {
+      return periods.filter((period) => period.period_status === "active").length
+    }
+    return countOfferingBillingMonths(offering.start_date, offering.end_date)
+  }, [
+    billingBundle?.billing_periods,
+    offering.start_date,
+    offering.end_date,
+  ])
   const showBillingSchedule =
     pricing.paymentStructure === "monthly" ||
     pricing.paymentStructure === "installments" ||
@@ -410,7 +525,9 @@ export function OfferingPricingEditorProvider({
               ? "monthly"
               : "one_time",
         paymentDueDay: hasMonthly
-          ? next.paymentDueDay ?? 1
+          ? billingDayFromStartDate(offering.start_date) ??
+            next.paymentDueDay ??
+            1
           : next.paymentDueDay,
       }
       feePlanStateRef.current = buildFeePlanStateFromSimplePricing(
@@ -505,50 +622,7 @@ export function OfferingPricingEditorProvider({
 }
 
 export function OfferingPricingBillingSetupSection() {
-  const { pricing, updatePricing, billingMonths, offering } =
-    useOfferingPricingEditor()
-  const hasMonthly = pricing.fees.some((fee) => fee.recurrence === "monthly")
-
-  return (
-    <EditSectionCard title="Billing" plain>
-      <div className="space-y-3">
-        <div className="space-y-1.5">
-          <Label>Duration</Label>
-          <div className="flex min-h-9 items-center rounded-md border bg-muted/40 px-3 text-sm text-muted-foreground">
-            {offering.start_date && offering.end_date
-              ? `${billingMonths} month${billingMonths === 1 ? "" : "s"} (from start/end dates)`
-              : "Set start and end dates in General to compute duration"}
-          </div>
-        </div>
-        {hasMonthly ? (
-          <div className="space-y-1.5">
-            <Label htmlFor="payment-due-day">Billing day (1–28)</Label>
-            <Input
-              id="payment-due-day"
-              type="number"
-              min="1"
-              max="28"
-              className="max-w-[140px]"
-              value={pricing.paymentDueDay ?? 1}
-              onChange={(event) =>
-                updatePricing((current) => ({
-                  ...current,
-                  paymentDueDay: Math.min(
-                    28,
-                    Math.max(1, Number(event.target.value || 1))
-                  ),
-                }))
-              }
-            />
-          </div>
-        ) : (
-          <p className="text-xs text-muted-foreground">
-            Billing day appears when any fee is set to Monthly.
-          </p>
-        )}
-      </div>
-    </EditSectionCard>
-  )
+  return null
 }
 
 /** Unified fees list (replaces Charges + Optional Add-Ons). */
@@ -556,7 +630,7 @@ export function OfferingPricingChargesSection() {
   const { pricing, updatePricing } = useOfferingPricingEditor()
 
   return (
-    <EditSectionCard plain>
+    <EditSectionCard title="Fees" plain>
       <div className="space-y-3">
         {pricing.fees.map((fee) => (
           <FeeRow
@@ -605,202 +679,47 @@ export function OfferingPricingAddonsSection() {
 }
 
 export function OfferingPricingDiscountsSection() {
-  const { pricing, updatePricing, discountTags } = useOfferingPricingEditor()
-
-  function updateDiscount<K extends keyof SimplePricingDiscounts>(
-    key: K,
-    next: SimplePricingDiscountLine
-  ) {
-    updatePricing((current) => ({
-      ...current,
-      discounts: { ...current.discounts, [key]: next },
-    }))
-  }
+  const { pricing, updatePricing } = useOfferingPricingEditor()
 
   return (
     <EditSectionCard title="Discounts" plain>
       <div className="space-y-3">
-        <DiscountToggleRow
-          title="Early bird"
-          description="Percent off tuition when paid by the date below."
-          line={pricing.discounts.earlyBird}
-          onChange={(next) => updateDiscount("earlyBird", next)}
+        {pricing.discounts.map((discount) => (
+          <DiscountRow
+            key={discount.clientId}
+            discount={discount}
+            onChange={(next) =>
+              updatePricing((current) => ({
+                ...current,
+                discounts: current.discounts.map((item) =>
+                  item.clientId === discount.clientId ? next : item
+                ),
+              }))
+            }
+            onRemove={() =>
+              updatePricing((current) => ({
+                ...current,
+                discounts: current.discounts.filter(
+                  (item) => item.clientId !== discount.clientId
+                ),
+              }))
+            }
+          />
+        ))}
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() =>
+            updatePricing((current) => ({
+              ...current,
+              discounts: [...current.discounts, createDefaultDiscount()],
+            }))
+          }
         >
-          <div className="space-y-1.5">
-            <Label className="text-xs">Pay by</Label>
-            <Input
-              type="date"
-              value={pricing.discounts.earlyBird.endsBefore || ""}
-              onChange={(event) =>
-                updateDiscount("earlyBird", {
-                  ...pricing.discounts.earlyBird,
-                  endsBefore: event.target.value,
-                })
-              }
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs">Percent off tuition</Label>
-            <Input
-              type="number"
-              min="0"
-              max="100"
-              step="0.01"
-              value={pricing.discounts.earlyBird.percent}
-              onChange={(event) =>
-                updateDiscount("earlyBird", {
-                  ...pricing.discounts.earlyBird,
-                  percent: Number(event.target.value || 0),
-                })
-              }
-            />
-          </div>
-        </DiscountToggleRow>
-
-        <DiscountToggleRow
-          title="Pay in full"
-          description="Percent off when the balance is paid up front."
-          line={pricing.discounts.fullPayment}
-          onChange={(next) => updateDiscount("fullPayment", next)}
-        >
-          <div className="space-y-1.5 sm:col-span-2">
-            <Label className="text-xs">Percent off</Label>
-            <Input
-              type="number"
-              min="0"
-              max="100"
-              step="0.01"
-              className="max-w-[140px]"
-              value={pricing.discounts.fullPayment.percent}
-              onChange={(event) =>
-                updateDiscount("fullPayment", {
-                  ...pricing.discounts.fullPayment,
-                  percent: Number(event.target.value || 0),
-                })
-              }
-            />
-          </div>
-        </DiscountToggleRow>
-
-        <DiscountToggleRow
-          title="Sibling"
-          description="When another sibling is already enrolled in this program."
-          line={pricing.discounts.sibling}
-          onChange={(next) => updateDiscount("sibling", next)}
-        >
-          <div className="space-y-1.5 sm:col-span-2">
-            <Label className="text-xs">Percent off</Label>
-            <Input
-              type="number"
-              min="0"
-              max="100"
-              step="0.01"
-              className="max-w-[140px]"
-              value={pricing.discounts.sibling.percent}
-              onChange={(event) =>
-                updateDiscount("sibling", {
-                  ...pricing.discounts.sibling,
-                  percent: Number(event.target.value || 0),
-                })
-              }
-            />
-          </div>
-        </DiscountToggleRow>
-
-        <DiscountToggleRow
-          title="Member"
-          description="Contacts with the selected member discount tag."
-          line={pricing.discounts.member}
-          onChange={(next) => updateDiscount("member", next)}
-        >
-          <div className="space-y-1.5">
-            <Label className="text-xs">Discount tag</Label>
-            <select
-              value={pricing.discounts.member.discountTagId || ""}
-              onChange={(event) =>
-                updateDiscount("member", {
-                  ...pricing.discounts.member,
-                  discountTagId: event.target.value || null,
-                })
-              }
-              className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-            >
-              <option value="">Select tag…</option>
-              {discountTags.map((tag) => (
-                <option key={tag.id} value={tag.id}>
-                  {tag.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs">Percent off</Label>
-            <Input
-              type="number"
-              min="0"
-              max="100"
-              step="0.01"
-              value={pricing.discounts.member.percent}
-              onChange={(event) =>
-                updateDiscount("member", {
-                  ...pricing.discounts.member,
-                  percent: Number(event.target.value || 0),
-                })
-              }
-            />
-          </div>
-        </DiscountToggleRow>
-
-        <DiscountToggleRow
-          title="Staff"
-          description="Contacts with the selected staff discount tag."
-          line={pricing.discounts.staff}
-          onChange={(next) => updateDiscount("staff", next)}
-        >
-          <div className="space-y-1.5">
-            <Label className="text-xs">Discount tag</Label>
-            <select
-              value={pricing.discounts.staff.discountTagId || ""}
-              onChange={(event) =>
-                updateDiscount("staff", {
-                  ...pricing.discounts.staff,
-                  discountTagId: event.target.value || null,
-                })
-              }
-              className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-            >
-              <option value="">Select tag…</option>
-              {discountTags.map((tag) => (
-                <option key={tag.id} value={tag.id}>
-                  {tag.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs">Percent off</Label>
-            <Input
-              type="number"
-              min="0"
-              max="100"
-              step="0.01"
-              value={pricing.discounts.staff.percent}
-              onChange={(event) =>
-                updateDiscount("staff", {
-                  ...pricing.discounts.staff,
-                  percent: Number(event.target.value || 0),
-                })
-              }
-            />
-          </div>
-        </DiscountToggleRow>
-
-        {discountTags.length === 0 ? (
-          <p className="text-xs text-muted-foreground">
-            Create Member / Staff tags under Workforce → Settings → Discount
-            tags, then assign them on contacts.
-          </p>
-        ) : null}
+          <Plus className="mr-1 h-4 w-4" />
+          Add discount
+        </Button>
       </div>
     </EditSectionCard>
   )
@@ -823,8 +742,6 @@ export function OfferingPaymentStructureFields({
             paymentStructure: value as PaymentStructure,
             installmentCount:
               value === "installments" ? current.installmentCount ?? 2 : null,
-            paymentDueDay:
-              value === "monthly" ? current.paymentDueDay ?? 1 : null,
           }))
         }
         className={cn(
@@ -859,28 +776,6 @@ export function OfferingPaymentStructureFields({
               updatePricing((current) => ({
                 ...current,
                 installmentCount: Math.max(2, Number(event.target.value || 2)),
-              }))
-            }
-          />
-        </div>
-      ) : null}
-
-      {pricing.paymentStructure === "monthly" ? (
-        <div className="max-w-xs space-y-1.5">
-          <Label htmlFor="payment-due-day-legacy">Payment due day (1–28)</Label>
-          <Input
-            id="payment-due-day-legacy"
-            type="number"
-            min="1"
-            max="28"
-            value={pricing.paymentDueDay ?? 1}
-            onChange={(event) =>
-              updatePricing((current) => ({
-                ...current,
-                paymentDueDay: Math.min(
-                  28,
-                  Math.max(1, Number(event.target.value || 1))
-                ),
               }))
             }
           />
@@ -988,7 +883,7 @@ export function OfferingPricingEditorSections({
   showPaymentStructure = false,
   showBillingSchedule = true,
   showDiscounts = true,
-  showBillingSetup = true,
+  showBillingSetup: _showBillingSetup = false,
   showTitle = true,
   showSaveButton = true,
   paymentStructureLayout = "vertical",
@@ -998,6 +893,7 @@ export function OfferingPricingEditorSections({
   showPaymentStructure?: boolean
   showBillingSchedule?: boolean
   showDiscounts?: boolean
+  /** @deprecated Duration / billing day live under Billing Schedule. */
   showBillingSetup?: boolean
   showTitle?: boolean
   showSaveButton?: boolean
@@ -1018,13 +914,12 @@ export function OfferingPricingEditorSections({
         </div>
       ) : null}
 
-      {showBillingSetup ? <OfferingPricingBillingSetupSection /> : null}
       {showCharges ? <OfferingPricingChargesSection /> : null}
+      {showBillingSchedule ? <OfferingPricingBillingScheduleSection /> : null}
       {showDiscounts ? <OfferingPricingDiscountsSection /> : null}
       {showPaymentStructure ? (
         <OfferingPaymentStructureSection layout={paymentStructureLayout} />
       ) : null}
-      {showBillingSchedule ? <OfferingPricingBillingScheduleSection /> : null}
       <OfferingPricingSaveFooter showSaveButton={showSaveButton} />
     </div>
   )

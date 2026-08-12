@@ -4,9 +4,18 @@ import * as React from "react"
 import { useRouter } from "next/navigation"
 import { ClipboardCheck, Loader2 } from "lucide-react"
 
+import { DepartmentApplicationDetailDialog } from "@/components/departments/department-application-detail-sheet"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   Table,
   TableBody,
@@ -15,17 +24,24 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { TableColumnHeaderFilter } from "@/components/ui/table-column-header-filter"
+import { ListPagination } from "@/components/ui/list-pagination"
 import {
-  evaluateProgramApplication,
   evaluateProgramApplicationsBatch,
   fetchDepartmentApplicationsAction,
 } from "@/lib/programs/program-application-actions"
 import type {
   DepartmentApplicationListFilter,
+  ProgramApplicantType,
   ProgramApplicationWithDetails,
 } from "@/lib/programs/program-application-types"
 import { PROGRAM_APPLICANT_TYPE_LABELS } from "@/lib/programs/program-application-types"
+import { PROGRAM_LABEL, PROGRAM_LABEL_PLURAL } from "@/lib/programs/program-display-labels"
 import { createClient } from "@/lib/supabase/client"
+import {
+  DEFAULT_LIST_PAGE_SIZE,
+  slicePageItems,
+} from "@/lib/ui/list-pagination"
 
 function formatDate(value: string | null) {
   if (!value) return "—"
@@ -36,12 +52,55 @@ function formatDate(value: string | null) {
   })
 }
 
+function formatLastUpdated(application: ProgramApplicationWithDetails) {
+  // Prefer approval actor/time; otherwise last staff save. Never show applicant submit alone.
+  const approvedBy = application.evaluated_by_name?.trim()
+  const approvedAt = application.evaluated_at
+  if (application.evaluated_by_user_id && approvedAt) {
+    const stamp = new Date(approvedAt).toLocaleString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    })
+    return approvedBy ? `${approvedBy} · ${stamp}` : stamp
+  }
+
+  const updatedBy = application.updated_by_name?.trim()
+  const updatedAt = application.updated_by_user_id
+    ? application.updated_at
+    : null
+  if (!updatedAt) return "—"
+  const stamp = new Date(updatedAt).toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  })
+  return updatedBy ? `${updatedBy} · ${stamp}` : stamp
+}
+
+function applicationProgramName(application: ProgramApplicationWithDetails) {
+  const primary =
+    application.approved_offering_name ||
+    application.offering_name ||
+    PROGRAM_LABEL
+  const extra =
+    (application.application_answers?.requested_offering_ids?.length || 0) - 1
+  if (extra > 0) {
+    return `${primary} (+${extra} more)`
+  }
+  return primary
+}
+
 type DepartmentApplicationsPanelProps = {
   departmentId: string
   departmentName: string
   /** Needs review vs approved but not yet registered. */
   filter?: DepartmentApplicationListFilter
-  /** Hide outer title when embedded in Participants tab. */
+  /** Hide outer title when embedded in Registrations tab. */
   embedded?: boolean
   onCountsMayHaveChanged?: () => void
 }
@@ -62,8 +121,16 @@ export function DepartmentApplicationsPanel({
     ProgramApplicationWithDetails[]
   >([])
   const [selectedIds, setSelectedIds] = React.useState<string[]>([])
-  const [busyId, setBusyId] = React.useState<string | null>(null)
   const [batchBusy, setBatchBusy] = React.useState(false)
+  const [participantFilter, setParticipantFilter] = React.useState("")
+  const [programFilter, setProgramFilter] = React.useState("all")
+  const [applicantTypeFilter, setApplicantTypeFilter] = React.useState<
+    "all" | ProgramApplicantType
+  >("all")
+  const [detailApplication, setDetailApplication] =
+    React.useState<ProgramApplicationWithDetails | null>(null)
+  const [page, setPage] = React.useState(1)
+  const [pageSize, setPageSize] = React.useState(DEFAULT_LIST_PAGE_SIZE)
 
   const isReview = filter === "submitted"
 
@@ -75,28 +142,92 @@ export function DepartmentApplicationsPanel({
       setError(result.error)
       setApplications([])
       setSelectedIds([])
-    } else {
-      setApplications(result.applications)
-      setSelectedIds((current) =>
-        current.filter((id) =>
-          result.applications.some((application) => application.id === id)
-        )
-      )
+      setLoading(false)
+      return [] as ProgramApplicationWithDetails[]
     }
+    setApplications(result.applications)
+    setSelectedIds((current) =>
+      current.filter((id) =>
+        result.applications.some((application) => application.id === id)
+      )
+    )
     setLoading(false)
+    return result.applications
   }, [departmentId, filter])
 
   React.useEffect(() => {
     void load()
   }, [load])
 
+  const programOptions = React.useMemo(() => {
+    const names = new Set(
+      applications.map((application) => applicationProgramName(application))
+    )
+    return [...names].sort((a, b) => a.localeCompare(b))
+  }, [applications])
+
+  const filteredApplications = React.useMemo(() => {
+    const nameQuery = participantFilter.trim().toLowerCase()
+    return applications.filter((application) => {
+      if (
+        nameQuery &&
+        !application.participant_name.toLowerCase().includes(nameQuery)
+      ) {
+        return false
+      }
+      if (
+        programFilter !== "all" &&
+        applicationProgramName(application) !== programFilter
+      ) {
+        return false
+      }
+      if (
+        applicantTypeFilter !== "all" &&
+        application.applicant_type !== applicantTypeFilter
+      ) {
+        return false
+      }
+      return true
+    })
+  }, [applications, participantFilter, programFilter, applicantTypeFilter])
+
+  React.useEffect(() => {
+    setPage(1)
+  }, [participantFilter, programFilter, applicantTypeFilter, filter])
+
+  const pagedApplications = React.useMemo(
+    () => slicePageItems(filteredApplications, page, pageSize),
+    [filteredApplications, page, pageSize]
+  )
+
+  const filtersActive =
+    Boolean(participantFilter.trim()) ||
+    programFilter !== "all" ||
+    applicantTypeFilter !== "all"
+
   const allSelected =
-    applications.length > 0 &&
-    applications.every((application) => selectedIds.includes(application.id))
+    pagedApplications.length > 0 &&
+    pagedApplications.every((application) =>
+      selectedIds.includes(application.id)
+    )
   const hasSelection = selectedIds.length > 0
 
   function toggleAll(checked: boolean) {
-    setSelectedIds(checked ? applications.map((application) => application.id) : [])
+    if (!checked) {
+      setSelectedIds((current) =>
+        current.filter(
+          (id) => !pagedApplications.some((application) => application.id === id)
+        )
+      )
+      return
+    }
+    setSelectedIds((current) => {
+      const next = new Set(current)
+      for (const application of pagedApplications) {
+        next.add(application.id)
+      }
+      return [...next]
+    })
   }
 
   function toggleOne(applicationId: string, checked: boolean) {
@@ -107,52 +238,22 @@ export function DepartmentApplicationsPanel({
     )
   }
 
-  async function requireUserId() {
+  async function handleBatchDecision(decision: "approved" | "not_approved") {
+    if (!hasSelection) return
     const {
       data: { user },
     } = await supabase.auth.getUser()
     if (!user?.id) {
       setError("You must be signed in to evaluate applications.")
-      return null
-    }
-    return user.id
-  }
-
-  async function handleDecision(
-    applicationId: string,
-    decision: "approved" | "not_approved"
-  ) {
-    const userId = await requireUserId()
-    if (!userId) return
-
-    setBusyId(applicationId)
-    const result = await evaluateProgramApplication({
-      applicationId,
-      decision,
-      evaluatedByUserId: userId,
-    })
-    setBusyId(null)
-    if (!result.success) {
-      setError(result.error)
       return
     }
-    setSelectedIds((current) => current.filter((id) => id !== applicationId))
-    await load()
-    onCountsMayHaveChanged?.()
-    router.refresh()
-  }
-
-  async function handleBatchDecision(decision: "approved" | "not_approved") {
-    if (!hasSelection) return
-    const userId = await requireUserId()
-    if (!userId) return
 
     setBatchBusy(true)
     setError(null)
     const result = await evaluateProgramApplicationsBatch({
       applicationIds: selectedIds,
       decision,
-      evaluatedByUserId: userId,
+      evaluatedByUserId: user.id,
     })
     setBatchBusy(false)
 
@@ -177,19 +278,21 @@ export function DepartmentApplicationsPanel({
 
   const title = isReview
     ? embedded
-      ? "Needs review"
+      ? "Applications"
       : `Applications · ${departmentName}`
     : embedded
-      ? "Approved — not registered"
-      : `Approved — not registered · ${departmentName}`
+      ? "Approved"
+      : `Approved · ${departmentName}`
 
   const description = isReview
-    ? "Everyone applies. Review new and returning participants, then approve so they can register for a program."
-    : "Approved participants who have not registered yet. They appear on the roster after registration."
+    ? "Everyone applies. Select rows to batch approve, or open a row to review and approve inside the form."
+    : "Approved participants who have not registered yet. Open a row to edit or un-approve."
 
   const emptyMessage = isReview
     ? "No pending applications."
     : "No approved participants waiting to register."
+
+  const columnCount = isReview ? 6 : 5
 
   return (
     <div className="space-y-4">
@@ -216,7 +319,7 @@ export function DepartmentApplicationsPanel({
             <Button
               type="button"
               size="sm"
-              disabled={!hasSelection || batchBusy || busyId !== null}
+              disabled={!hasSelection || batchBusy}
               onClick={() => void handleBatchDecision("approved")}
             >
               {batchBusy ? "Working…" : "Approve selected"}
@@ -225,7 +328,7 @@ export function DepartmentApplicationsPanel({
               type="button"
               size="sm"
               variant="outline"
-              disabled={!hasSelection || batchBusy || busyId !== null}
+              disabled={!hasSelection || batchBusy}
               onClick={() => void handleBatchDecision("not_approved")}
             >
               Not approve selected
@@ -258,120 +361,215 @@ export function DepartmentApplicationsPanel({
                       checked={allSelected}
                       onCheckedChange={(checked) => toggleAll(checked === true)}
                       aria-label="Select all applications"
+                      disabled={batchBusy}
                     />
                   </TableHead>
                 ) : null}
-                <TableHead>Participant</TableHead>
-                <TableHead>Year/Season / Program</TableHead>
-                <TableHead>New / Returning</TableHead>
+                <TableHead>
+                  <TableColumnHeaderFilter
+                    label="Participant"
+                    active={Boolean(participantFilter.trim())}
+                  >
+                    {({ close }) => (
+                      <Input
+                        placeholder="Search by name"
+                        value={participantFilter}
+                        onChange={(event) =>
+                          setParticipantFilter(event.target.value)
+                        }
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") close()
+                        }}
+                      />
+                    )}
+                  </TableColumnHeaderFilter>
+                </TableHead>
+                <TableHead>
+                  <TableColumnHeaderFilter
+                    label={PROGRAM_LABEL}
+                    active={programFilter !== "all"}
+                  >
+                    {({ close }) => (
+                      <Select
+                        value={programFilter}
+                        onValueChange={(value) => {
+                          setProgramFilter(value)
+                          close()
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue
+                            placeholder={`All ${PROGRAM_LABEL_PLURAL.toLowerCase()}`}
+                          />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">
+                            All {PROGRAM_LABEL_PLURAL.toLowerCase()}
+                          </SelectItem>
+                          {programOptions.map((name) => (
+                            <SelectItem key={name} value={name}>
+                              {name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </TableColumnHeaderFilter>
+                </TableHead>
+                <TableHead>
+                  <TableColumnHeaderFilter
+                    label="New / Returning"
+                    active={applicantTypeFilter !== "all"}
+                  >
+                    {({ close }) => (
+                      <Select
+                        value={applicantTypeFilter}
+                        onValueChange={(value) => {
+                          setApplicantTypeFilter(
+                            value as "all" | ProgramApplicantType
+                          )
+                          close()
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="All" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All</SelectItem>
+                          <SelectItem value="new">New</SelectItem>
+                          <SelectItem value="returning">Returning</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </TableColumnHeaderFilter>
+                </TableHead>
                 <TableHead>{isReview ? "Submitted" : "Approved"}</TableHead>
-                {isReview ? (
-                  <TableHead className="text-right">Actions</TableHead>
-                ) : null}
+                <TableHead>Last Updated</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {applications.map((application) => {
-                const selected = selectedIds.includes(application.id)
-                const rowBusy = busyId === application.id || batchBusy
-                return (
-                  <TableRow
-                    key={application.id}
-                    data-state={selected ? "selected" : undefined}
+              {filteredApplications.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={columnCount}
+                    className="py-8 text-center text-sm text-muted-foreground"
                   >
-                    {isReview ? (
+                    {filtersActive
+                      ? "No applications match these filters."
+                      : emptyMessage}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                pagedApplications.map((application) => {
+                  const selected = selectedIds.includes(application.id)
+                  return (
+                    <TableRow
+                      key={application.id}
+                      data-state={selected ? "selected" : undefined}
+                      className="cursor-pointer hover:bg-muted/40"
+                      tabIndex={0}
+                      role="button"
+                      aria-label={`View application for ${application.participant_name}`}
+                      onClick={() => setDetailApplication(application)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault()
+                          setDetailApplication(application)
+                        }
+                      }}
+                    >
+                      {isReview ? (
+                        <TableCell
+                          onClick={(event) => event.stopPropagation()}
+                          onKeyDown={(event) => event.stopPropagation()}
+                        >
+                          <Checkbox
+                            checked={selected}
+                            onCheckedChange={(checked) =>
+                              toggleOne(application.id, checked === true)
+                            }
+                            aria-label={`Select ${application.participant_name}`}
+                            disabled={batchBusy}
+                          />
+                        </TableCell>
+                      ) : null}
+                      <TableCell className="font-medium text-sky-700">
+                        {application.participant_name}
+                      </TableCell>
+                      <TableCell>{applicationProgramName(application)}</TableCell>
                       <TableCell>
-                        <Checkbox
-                          checked={selected}
-                          onCheckedChange={(checked) =>
-                            toggleOne(application.id, checked === true)
+                        <Badge
+                          variant="secondary"
+                          className={
+                            application.applicant_type === "new"
+                              ? "bg-sky-50 text-sky-800"
+                              : undefined
                           }
-                          aria-label={`Select ${application.participant_name}`}
-                          disabled={rowBusy}
-                        />
+                        >
+                          {
+                            PROGRAM_APPLICANT_TYPE_LABELS[
+                              application.applicant_type
+                            ]
+                          }
+                        </Badge>
                       </TableCell>
-                    ) : null}
-                    <TableCell className="font-medium">
-                      {application.participant_name}
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm">
-                        {application.program_name || "Year/Season"}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {application.approved_offering_name ||
-                          application.offering_name ||
-                          "Program"}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant="secondary"
-                        className={
-                          application.applicant_type === "new"
-                            ? "bg-sky-50 text-sky-800"
-                            : undefined
-                        }
-                      >
-                        {
-                          PROGRAM_APPLICANT_TYPE_LABELS[
-                            application.applicant_type
-                          ]
-                        }
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {formatDate(
-                        isReview
-                          ? application.created_at
-                          : application.evaluated_at
-                      )}
-                    </TableCell>
-                    {isReview ? (
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            type="button"
-                            size="sm"
-                            disabled={rowBusy}
-                            onClick={() =>
-                              void handleDecision(application.id, "approved")
-                            }
-                          >
-                            Approve
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            disabled={rowBusy}
-                            onClick={() =>
-                              void handleDecision(
-                                application.id,
-                                "not_approved"
-                              )
-                            }
-                          >
-                            Not approve
-                          </Button>
-                        </div>
+                      <TableCell>
+                        {formatDate(
+                          isReview
+                            ? application.created_at
+                            : application.evaluated_at
+                        )}
                       </TableCell>
-                    ) : null}
-                  </TableRow>
-                )
-              })}
+                      <TableCell className="text-sm text-muted-foreground">
+                        {formatLastUpdated(application)}
+                      </TableCell>
+                    </TableRow>
+                  )
+                })
+              )}
             </TableBody>
           </Table>
         </div>
       )}
 
+      {!loading && !error && filteredApplications.length > 0 ? (
+        <ListPagination
+          page={page}
+          pageSize={pageSize}
+          total={filteredApplications.length}
+          entryLabel="applications"
+          onPageChange={setPage}
+          onPageSizeChange={(next) => {
+            setPageSize(next)
+            setPage(1)
+          }}
+        />
+      ) : null}
+
       {isReview ? (
         <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
           <ClipboardCheck className="mr-1 inline h-3.5 w-3.5" />
-          After approval, participants can register for the program. Approve into a
-          different program and waitlist-on-full come next.
+          Use checkboxes for batch approve. Open a row to review, edit, and
+          approve one application at a time.
         </div>
       ) : null}
+
+      <DepartmentApplicationDetailDialog
+        application={detailApplication}
+        open={detailApplication != null}
+        onOpenChange={(open) => {
+          if (!open) setDetailApplication(null)
+        }}
+        onChanged={async () => {
+          const rows = await load()
+          onCountsMayHaveChanged?.()
+          router.refresh()
+          setDetailApplication((current) => {
+            if (!current) return null
+            return rows.find((row) => row.id === current.id) || null
+          })
+        }}
+      />
     </div>
   )
 }

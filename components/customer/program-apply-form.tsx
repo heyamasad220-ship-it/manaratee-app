@@ -4,11 +4,15 @@ import * as React from "react"
 import { useRouter } from "next/navigation"
 import { Loader2 } from "lucide-react"
 
+import {
+  ProgramApplicationFormFields,
+  type ProgramApplicationFormValues,
+} from "@/components/programs/program-application-form-fields"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { submitProgramApplication } from "@/lib/programs/program-application-actions"
 import type { ProgramApplicantType } from "@/lib/programs/program-application-types"
+import { EMPTY_PROGRAM_APPLICATION_ANSWERS } from "@/lib/programs/program-application-types"
 import type { ProgramOffering } from "@/lib/programs/program-offering-types"
 
 export function ProgramApplyForm({
@@ -29,17 +33,23 @@ export function ProgramApplyForm({
   familyMembers: Array<{ contactId: string; name: string }>
 }) {
   const router = useRouter()
-  const [offeringId, setOfferingId] = React.useState(
-    initialOfferingId || offerings[0]?.id || ""
-  )
-  const [applicantType, setApplicantType] =
-    React.useState<ProgramApplicantType>("returning")
+  const initialIds = initialOfferingId
+    ? [initialOfferingId]
+    : offerings[0]?.id
+      ? [offerings[0].id]
+      : []
   const [participantContactId, setParticipantContactId] = React.useState(
     familyMembers[0]?.contactId || ""
   )
-  const [participantName, setParticipantName] = React.useState(
-    familyMembers[0]?.name || ""
-  )
+  const [values, setValues] = React.useState<ProgramApplicationFormValues>({
+    participantName: familyMembers[0]?.name || "",
+    applicantType: "returning" as ProgramApplicantType,
+    offeringIds: initialIds,
+    answers: {
+      ...EMPTY_PROGRAM_APPLICATION_ANSWERS,
+      requested_offering_ids: initialIds.length > 0 ? initialIds : null,
+    },
+  })
   const [isSaving, setIsSaving] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [successMessage, setSuccessMessage] = React.useState<string | null>(
@@ -47,18 +57,25 @@ export function ProgramApplyForm({
   )
 
   React.useEffect(() => {
-    const member = familyMembers.find((row) => row.contactId === participantContactId)
-    if (member) setParticipantName(member.name)
+    const member = familyMembers.find(
+      (row) => row.contactId === participantContactId
+    )
+    if (member) {
+      setValues((current) => ({
+        ...current,
+        participantName: member.name,
+      }))
+    }
   }, [participantContactId, familyMembers])
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
-    if (!offeringId) {
-      setError("Select a program.")
+    if (values.offeringIds.length === 0) {
+      setError("Select at least one course.")
       return
     }
-    if (!participantName.trim()) {
-      setError("Participant name is required.")
+    if (!values.participantName.trim()) {
+      setError("Full name is required.")
       return
     }
 
@@ -69,11 +86,15 @@ export function ProgramApplyForm({
     const result = await submitProgramApplication({
       organizationId,
       programId,
-      offeringId,
+      offeringId: values.offeringIds[0],
       registrantContactId,
       participantContactId: participantContactId || null,
-      participantName,
-      applicantType,
+      participantName: values.participantName,
+      applicantType: values.applicantType,
+      answers: {
+        ...values.answers,
+        requested_offering_ids: values.offeringIds,
+      },
       source: "customer",
       createdByUserId: userId,
     })
@@ -101,61 +122,6 @@ export function ProgramApplyForm({
 
   return (
     <form onSubmit={(event) => void handleSubmit(event)} className="space-y-4">
-      <div className="space-y-1.5">
-        <Label htmlFor="apply-offering">Program</Label>
-        <select
-          id="apply-offering"
-          value={offeringId}
-          onChange={(event) => setOfferingId(event.target.value)}
-          className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-          disabled={isSaving}
-        >
-          {offerings.map((offering) => (
-            <option key={offering.id} value={offering.id}>
-              {offering.name}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="space-y-1.5">
-        <Label>Student type</Label>
-        <div className="space-y-2 rounded-md border p-3">
-          <label className="flex cursor-pointer items-start gap-2 text-sm">
-            <input
-              type="radio"
-              name="applicantType"
-              className="mt-1"
-              checked={applicantType === "returning"}
-              onChange={() => setApplicantType("returning")}
-              disabled={isSaving}
-            />
-            <span>
-              <span className="font-medium">Returning student</span>
-              <span className="block text-xs text-muted-foreground">
-                Reviewed by the department before registration.
-              </span>
-            </span>
-          </label>
-          <label className="flex cursor-pointer items-start gap-2 text-sm">
-            <input
-              type="radio"
-              name="applicantType"
-              className="mt-1"
-              checked={applicantType === "new"}
-              onChange={() => setApplicantType("new")}
-              disabled={isSaving}
-            />
-            <span>
-              <span className="font-medium">New student</span>
-              <span className="block text-xs text-muted-foreground">
-                Reviewed by the department before registration.
-              </span>
-            </span>
-          </label>
-        </div>
-      </div>
-
       {familyMembers.length > 0 ? (
         <div className="space-y-1.5">
           <Label htmlFor="apply-participant">Participant</Label>
@@ -173,18 +139,19 @@ export function ProgramApplyForm({
             ))}
           </select>
         </div>
-      ) : (
-        <div className="space-y-1.5">
-          <Label htmlFor="apply-name">Participant name</Label>
-          <Input
-            id="apply-name"
-            value={participantName}
-            onChange={(event) => setParticipantName(event.target.value)}
-            disabled={isSaving}
-            placeholder="Student full name"
-          />
-        </div>
-      )}
+      ) : null}
+
+      <ProgramApplicationFormFields
+        values={values}
+        onChange={setValues}
+        offerings={offerings.map((offering) => ({
+          id: offering.id,
+          name: offering.name,
+        }))}
+        disabled={isSaving}
+        showParticipantName={familyMembers.length === 0}
+        idPrefix="customer-apply"
+      />
 
       {error ? (
         <p className="text-sm text-destructive">{error}</p>

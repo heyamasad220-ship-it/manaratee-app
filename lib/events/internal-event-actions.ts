@@ -419,10 +419,8 @@ async function assertInternalEventSpacesAvailable(input: {
 
 function revalidateInternalEventPaths(eventId?: string) {
   revalidatePath("/event-management")
-  revalidatePath("/event-management/calendar")
+  revalidatePath("/workforce/departments/calendar")
   revalidatePath("/facilities/availability")
-  revalidatePath("/event-management/overview")
-  revalidatePath("/event-management/overview")
   revalidatePath("/facilities/calendar")
   revalidatePath("/facilities/reservation-center")
   revalidatePath("/facilities/overview")

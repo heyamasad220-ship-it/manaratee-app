@@ -161,16 +161,33 @@ BEGIN
 
   v_has_tiers := COALESCE(v_plan.metadata->'session_count_tiers', '{}'::jsonb) <> '{}'::jsonb;
 
-  v_offering_month_count := public.count_offering_billing_months(
-    COALESCE(v_offering.start_date, v_today),
-    COALESCE(v_offering.end_date, v_today)
-  );
+  IF to_regprocedure(
+    'public.resolve_offering_billing_month_counts(uuid,uuid,date,integer,numeric)'
+  ) IS NOT NULL THEN
+    SELECT c.offering_month_count, c.participant_month_count
+    INTO v_offering_month_count, v_participant_month_count
+    FROM public.resolve_offering_billing_month_counts(
+      p_organization_id,
+      p_offering_id,
+      v_today,
+      COALESCE(
+        v_plan.payment_due_day,
+        LEAST(EXTRACT(DAY FROM COALESCE(v_offering.start_date, v_today))::integer, 28)
+      ),
+      NULL
+    ) AS c;
+  ELSE
+    v_offering_month_count := public.count_offering_billing_months(
+      COALESCE(v_offering.start_date, v_today),
+      COALESCE(v_offering.end_date, v_today)
+    );
 
-  v_participant_month_count := public.count_offering_billing_months_from_date(
-    COALESCE(v_offering.start_date, v_today),
-    COALESCE(v_offering.end_date, v_today),
-    v_today
-  );
+    v_participant_month_count := public.count_offering_billing_months_from_date(
+      COALESCE(v_offering.start_date, v_today),
+      COALESCE(v_offering.end_date, v_today),
+      v_today
+    );
+  END IF;
 
   FOR v_comp IN
     SELECT *

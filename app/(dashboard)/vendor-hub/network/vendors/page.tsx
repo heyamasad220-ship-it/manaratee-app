@@ -1,6 +1,17 @@
 import { ContactsListView } from "@/components/contacts/contacts-list-view"
+import {
+  ensureVendorInactiveStatusForCurrentOrg,
+  ensureVendorNetworkRolesForCurrentOrg,
+} from "@/lib/vendor-hub/vendor-network-sync-actions"
+import { requireVendorHubManage } from "@/lib/vendor-hub/vendor-hub-permissions"
 
-export default function VendorNetworkVendorsPage() {
+export default async function VendorNetworkVendorsPage() {
+  await requireVendorHubManage()
+  // Keep Vendor Network in sync with approved applications (imports / merges).
+  await ensureVendorNetworkRolesForCurrentOrg()
+  // Mark vendors inactive when last activity is older than 2 years.
+  await ensureVendorInactiveStatusForCurrentOrg()
+
   return (
     <ContactsListView
       requiredRole="vendor"

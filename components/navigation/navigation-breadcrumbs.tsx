@@ -36,7 +36,8 @@ export function NavigationBreadcrumbs({
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const router = useRouter()
-  const { navItems, loading, ensureSubExpanded } = useSidebarContext()
+  const { navItems, loading, ensureSubExpanded, openModuleDrawer } =
+    useSidebarContext()
 
   if (loading || (pathname === "/dashboard" && extras.length === 0)) {
     return null
@@ -50,13 +51,47 @@ export function NavigationBreadcrumbs({
   }
 
   function handleSegmentClick(segment: (typeof trail)[number]) {
+    // Open the module drawer (previous menu) when leaving a nested page.
+    if (segment.module) {
+      openModuleDrawer(segment.module)
+    }
     if (segment.expandKeys?.length) {
       ensureSubExpanded(segment.expandKeys)
     }
 
-    if (segment.href) {
+    if (!segment.href) return
+
+    const targetPath = segment.href.split("?")[0] || segment.href
+    const hrefQuery = segment.href.includes("?")
+      ? segment.href.slice(segment.href.indexOf("?") + 1)
+      : ""
+    const currentQuery = searchParams.toString()
+    // Folder groups often share the first child's href (e.g. Programs → Catalog).
+    // Stay put and only reveal the menu instead of a no-op navigation — unless the
+    // query differs (e.g. department year workspace → department overview).
+    if (targetPath === pathname) {
+      if (hrefQuery === currentQuery) {
+        return
+      }
       router.push(segment.href)
+      return
     }
+
+    // Module root while already inside that module — open the menu only.
+    if (segment.module && !segment.expandKeys?.length) {
+      const prefixes = [
+        segment.module.matchPrefix,
+        ...(segment.module.alsoMatchPrefixes ?? []),
+      ]
+      const alreadyInside = prefixes.some(
+        (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+      )
+      if (alreadyInside) {
+        return
+      }
+    }
+
+    router.push(segment.href)
   }
 
   return (

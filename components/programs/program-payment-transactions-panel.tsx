@@ -51,7 +51,7 @@ function statusClass(status: ProgramPaymentTransactionRow["status"]) {
     case "Refunded":
       return "border-amber-200 bg-amber-50 text-amber-900"
     case "Voided":
-      return "border-red-200 bg-red-50 text-red-800"
+      return "border-zinc-200 bg-zinc-100 text-zinc-700"
     default:
       return "border-red-200 bg-red-50 text-red-800"
   }

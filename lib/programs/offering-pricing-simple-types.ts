@@ -57,8 +57,12 @@ export type SimplePricingDiscountLine = {
   endsBefore?: string
   /** Member/staff: org discount tag that unlocks this percent. */
   discountTagId?: string | null
+  valueType?: SimpleDiscountValueType
+  /** Used when valueType is fixed_amount. */
+  amount?: number
 }
 
+/** @deprecated Prefer OfferingDiscount rows. Kept for member/staff preserve. */
 export type SimplePricingDiscounts = {
   earlyBird: SimplePricingDiscountLine
   fullPayment: SimplePricingDiscountLine
@@ -67,10 +71,35 @@ export type SimplePricingDiscounts = {
   staff: SimplePricingDiscountLine
 }
 
+export type OfferingDiscountName =
+  | "early_bird"
+  | "full_payment"
+  | "sibling"
+  | "custom"
+
+export type SimpleDiscountValueType = "percent" | "fixed_amount"
+
+export type SimpleDiscountStatus = "active" | "closed"
+
+export type OfferingDiscount = {
+  clientId: string
+  ruleId?: string
+  name: OfferingDiscountName
+  /** Required when name is custom. */
+  customLabel?: string
+  valueType: SimpleDiscountValueType
+  value: number
+  status: SimpleDiscountStatus
+  /** Early bird: last day to receive the discount (YYYY-MM-DD). */
+  endsBefore?: string
+}
+
 export type SimpleOfferingPricing = {
   fees: OfferingFee[]
   paymentDueDay: number | null
-  discounts: SimplePricingDiscounts
+  discounts: OfferingDiscount[]
+  /** @deprecated Member/staff tags — not edited on offering; preserved on save. */
+  legacyTagDiscounts?: Pick<SimplePricingDiscounts, "member" | "staff">
   /** Derived for billing calendar / legacy payment structure. */
   paymentStructure: PaymentStructure
   installmentCount: number | null
@@ -117,6 +146,43 @@ export const PAYMENT_STRUCTURE_LABELS: Record<PaymentStructure, string> = {
   installments: "Installments",
 }
 
+export const OFFERING_DISCOUNT_NAME_LABELS: Record<OfferingDiscountName, string> =
+  {
+    early_bird: "Early Bird",
+    full_payment: "Full Payment",
+    sibling: "Sibling",
+    custom: "Custom",
+  }
+
+export const DISCOUNT_VALUE_TYPE_LABELS: Record<SimpleDiscountValueType, string> =
+  {
+    percent: "Percent",
+    fixed_amount: "Fixed amount",
+  }
+
+export const DISCOUNT_STATUS_LABELS: Record<SimpleDiscountStatus, string> = {
+  active: "Active",
+  closed: "Closed",
+}
+
 export function defaultFeeName(feeType: ChargeType) {
   return FEE_TYPE_LABELS[feeType]
+}
+
+export function createDefaultDiscount(
+  name: OfferingDiscountName = "early_bird"
+): OfferingDiscount {
+  return {
+    clientId:
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `discount-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    name,
+    customLabel: name === "custom" ? "" : undefined,
+    valueType: "percent",
+    value:
+      name === "full_payment" ? 5 : name === "sibling" || name === "early_bird" ? 10 : 0,
+    status: "active",
+    endsBefore: "",
+  }
 }

@@ -90,7 +90,7 @@ export async function upsertEventType(input: UpsertEventTypeInput) {
   revalidatePath("/event-management/settings/event-types")
   revalidatePath("/facilities/settings/event-types")
   revalidatePath("/bookings/settings/event-types")
-  revalidatePath("/event-management/overview")
+  revalidatePath("/event-management")
 }
 
 export async function deleteEventType(id: string) {
@@ -127,5 +127,5 @@ export async function deleteEventType(id: string) {
   revalidatePath("/event-management/settings/event-types")
   revalidatePath("/facilities/settings/event-types")
   revalidatePath("/bookings/settings/event-types")
-  revalidatePath("/event-management/overview")
+  revalidatePath("/event-management")
 }

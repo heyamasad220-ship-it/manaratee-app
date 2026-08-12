@@ -6,6 +6,7 @@ import {
   loadDepartmentOpenPrograms,
   type DepartmentYearProgramRow,
 } from "@/lib/departments/department-active-programs"
+import { autoCloseExpiredYearPrograms } from "@/lib/departments/department-year-auto-close"
 import {
   canManageDepartment,
   canViewDepartment,
@@ -195,6 +196,12 @@ export async function fetchDepartmentYearProgramsAction(
       }
     }
 
+    try {
+      await autoCloseExpiredYearPrograms({ organizationId, departmentId })
+    } catch (error) {
+      console.error("autoCloseExpiredYearPrograms:", error)
+    }
+
     const supabase = await createClient()
     const { data, error } = await supabase
       .from("programs")
@@ -238,7 +245,7 @@ export async function fetchDepartmentYearProgramsAction(
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Could not load year programs.",
+      error: error instanceof Error ? error.message : "Could not load programs.",
     }
   }
 }
@@ -273,7 +280,7 @@ export async function fetchDepartmentYearBasicsAction(
     ])
 
     if (!program || program.department_id !== departmentId) {
-      return { success: false, error: "Year/season not found for this department." }
+      return { success: false, error: "Program not found for this department." }
     }
 
     const visibility =
@@ -293,7 +300,7 @@ export async function fetchDepartmentYearBasicsAction(
       error:
         error instanceof Error
           ? error.message
-          : "Could not load year/season details.",
+          : "Could not load program details.",
     }
   }
 }
@@ -618,7 +625,7 @@ export async function closeDepartmentYearProgramAction(input: {
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Could not close year program.",
+      error: error instanceof Error ? error.message : "Could not close program.",
     }
   }
 }
@@ -640,7 +647,7 @@ export async function restoreClosedDepartmentYearProgramAction(input: {
     if (!(await canArchiveDepartmentYears())) {
       return {
         success: false,
-        error: "Only a Super Admin can restore a closed or archived year.",
+        error: "Only a Super Admin can restore a closed or archived program.",
       }
     }
 
@@ -660,7 +667,7 @@ export async function restoreClosedDepartmentYearProgramAction(input: {
     }
 
     if (program.status !== "archived" && program.status !== "closed") {
-      return { success: false, error: "Only closed or archived years can be restored this way." }
+      return { success: false, error: "Only closed or archived programs can be restored this way." }
     }
 
     const { error: programError } = await supabase

@@ -23,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { departmentsMasterCalendarHref } from "@/lib/departments/departments-section-path"
 import { getInternalEventStatusLabel } from "@/lib/events/internal-event-status"
 import {
   formatInternalEventLocation,
@@ -49,6 +50,8 @@ type InternalEventsCalendarClientProps = {
   initialDepartmentId: string | null
   canBookSpace: boolean
   returnTo?: string | null
+  /** When true, page already rendered Header + Departments tabs. */
+  hideHeader?: boolean
 }
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
@@ -117,6 +120,7 @@ export function InternalEventsCalendarClient({
   initialDepartmentId,
   canBookSpace,
   returnTo = null,
+  hideHeader = false,
 }: InternalEventsCalendarClientProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -168,18 +172,16 @@ export function InternalEventsCalendarClient({
   const selectedEvents = eventsByDay.get(selectedDateKey) || []
 
   function pushQuery(next: { month?: string; department?: string | null }) {
-    const params = new URLSearchParams()
-    params.set("month", next.month ?? toMonthParam(monthAnchor))
     const department =
       next.department === undefined ? initialDepartmentId : next.department
-    if (department) {
-      params.set("department", department)
-    }
-    if (returnTo) {
-      params.set("returnTo", returnTo)
-    }
     startTransition(() => {
-      router.push(`/event-management/calendar?${params.toString()}`)
+      router.push(
+        departmentsMasterCalendarHref({
+          month: next.month ?? toMonthParam(monthAnchor),
+          departmentId: department,
+          returnTo,
+        })
+      )
     })
   }
 
@@ -193,9 +195,9 @@ export function InternalEventsCalendarClient({
       departmentId: initialDepartmentId,
       returnTo:
         returnTo ||
-        `/event-management/calendar${
-          initialDepartmentId ? `?department=${initialDepartmentId}` : ""
-        }`,
+        departmentsMasterCalendarHref({
+          departmentId: initialDepartmentId,
+        }),
       openNew: true,
       date: dateKey || undefined,
     })
@@ -213,7 +215,7 @@ export function InternalEventsCalendarClient({
 
   return (
     <>
-      <Header title="Event Management" />
+      {hideHeader ? null : <Header title="Departments" />}
 
       <div className="flex flex-col gap-6 p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">

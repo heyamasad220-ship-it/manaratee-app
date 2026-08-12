@@ -202,6 +202,86 @@ export async function searchStaffEligibleContacts(
   return Array.from(byId.values())
 }
 
+/**
+ * Employees assigned to a department (staff.department_id), as contact options
+ * for program instructor assignment. Skips staff rows without a linked contact.
+ */
+export async function searchDepartmentEmployeeContacts(
+  organizationId: string,
+  departmentId: string,
+  search?: string,
+  limit = 100
+): Promise<StaffEligibleContact[]> {
+  const supabase = await createClient()
+
+  let query = supabase
+    .from("staff")
+    .select(
+      `
+      contact_id,
+      first_name,
+      last_name,
+      email,
+      status,
+      contact:contact_id ( id, full_name, email )
+    `
+    )
+    .eq("organization_id", organizationId)
+    .eq("department_id", departmentId)
+    .not("contact_id", "is", null)
+    .neq("status", "inactive")
+    .order("last_name", { ascending: true })
+    .limit(limit)
+
+  const trimmedSearch = search?.trim()
+  if (trimmedSearch) {
+    const escaped = trimmedSearch.replace(/[%_\\,]/g, "\\$&")
+    query = query.or(
+      `first_name.ilike.%${escaped}%,last_name.ilike.%${escaped}%,email.ilike.%${escaped}%`
+    )
+  }
+
+  const { data, error } = await query
+
+  if (error) {
+    console.error("searchDepartmentEmployeeContacts:", error.message)
+    throw new Error("Failed to load department employees")
+  }
+
+  const byId = new Map<string, StaffEligibleContact>()
+
+  for (const row of data || []) {
+    const contactId = row.contact_id as string | null
+    if (!contactId) continue
+
+    const contact = row.contact as
+      | { id?: string; full_name?: string | null; email?: string | null }
+      | null
+    const staffName =
+      `${(row.first_name as string | null)?.trim() || ""} ${(row.last_name as string | null)?.trim() || ""}`.trim()
+    const fullName =
+      (contact?.full_name as string | null)?.trim() ||
+      staffName ||
+      "Unnamed employee"
+    const email =
+      (contact?.email as string | null) ??
+      ((row.email as string | null) ?? null)
+
+    if (byId.has(contactId)) continue
+
+    byId.set(contactId, {
+      id: contactId,
+      full_name: fullName,
+      email,
+      roles: ["employee"],
+    })
+  }
+
+  return Array.from(byId.values()).sort((a, b) =>
+    a.full_name.localeCompare(b.full_name)
+  )
+}
+
 export async function getOfferingEnrollmentCount(
   offeringId: string,
   organizationId: string

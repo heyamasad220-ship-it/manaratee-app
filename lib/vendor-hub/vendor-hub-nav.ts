@@ -15,5 +15,6 @@ export function bazaarEventTabs(eventId: string): ModuleTabNavItem[] {
     { label: "Vendors", href: VENDOR_HUB_ROUTES.events.booths(eventId) },
     { label: "Evaluations", href: VENDOR_HUB_ROUTES.events.evaluations(eventId) },
     { label: "Messages", href: VENDOR_HUB_ROUTES.events.messages(eventId) },
+    { label: "Settings", href: VENDOR_HUB_ROUTES.events.settings(eventId) },
   ]
 }

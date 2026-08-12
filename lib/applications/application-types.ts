@@ -177,6 +177,8 @@ export type ApplicationListFilters = {
   reviewerId?: string
   page?: number
   pageSize?: number
+  /** When true, oldest submitted_at first (useful for vendor onboarding first-activity order). */
+  sortSubmittedAscending?: boolean
 }
 
 export type ApplicationDashboardStats = {

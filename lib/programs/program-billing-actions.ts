@@ -178,6 +178,71 @@ export async function createBillingOverrideAction(formData: FormData) {
   return { ok: true }
 }
 
+export async function setOfferingBillingPeriodStatusesAction(input: {
+  offeringId: string
+  programId: string
+  periodIds: string[]
+  periodStatus: "active" | "skipped"
+}) {
+  const organizationId = await requireOrganizationId()
+  const periodIds = input.periodIds.filter(Boolean)
+
+  if (!input.offeringId || periodIds.length === 0) {
+    return { ok: false as const, error: "Missing offering or periods" }
+  }
+
+  if (input.periodStatus !== "active" && input.periodStatus !== "skipped") {
+    return { ok: false as const, error: "Invalid period status" }
+  }
+
+  const supabase = await createClient()
+  const { error } = await supabase.rpc("set_offering_billing_period_statuses", {
+    p_organization_id: organizationId,
+    p_offering_id: input.offeringId,
+    p_period_ids: periodIds,
+    p_period_status: input.periodStatus,
+  })
+
+  if (error) {
+    if (isBillingSchemaMissingError(error.message)) {
+      return {
+        ok: false as const,
+        error:
+          "Billing migrations are not applied yet. Run 021 and 238 in Supabase.",
+      }
+    }
+
+    const rpcMissing =
+      error.message.includes("set_offering_billing_period_statuses") ||
+      error.message.includes("Could not find the function") ||
+      error.code === "PGRST202"
+
+    if (!rpcMissing) {
+      return { ok: false as const, error: error.message }
+    }
+
+    const { error: updateError } = await supabase
+      .from("program_offering_billing_periods")
+      .update({
+        period_status: input.periodStatus,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("organization_id", organizationId)
+      .eq("offering_id", input.offeringId)
+      .in("id", periodIds)
+
+    if (updateError) {
+      return { ok: false as const, error: updateError.message }
+    }
+  }
+
+  if (input.programId) {
+    revalidateBilling(input.programId)
+  }
+
+  return { ok: true as const }
+}
+
 export async function syncBillingPeriodsAction(formData: FormData) {
   const organizationId = await requireOrganizationId()
   const offeringId = String(formData.get("offering_id") || "")

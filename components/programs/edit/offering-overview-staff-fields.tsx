@@ -38,6 +38,9 @@ const ADDITIONAL_ROLES = OFFERING_STAFF_ROLE_OPTIONS.filter(
 /**
  * Compact staff controls for Offering Overview (view + edit).
  * Primary instructor is a core overview field; extra staff can be added while editing.
+ *
+ * `variant="additionalInline"`: Advanced Settings — no primary instructor, inline
+ * name + role dropdowns (no assign dialog).
  */
 export function OfferingOverviewStaffFields({
   programId,
@@ -46,6 +49,10 @@ export function OfferingOverviewStaffFields({
   sessions,
   editing,
   onAssignmentsChange,
+  departmentId = null,
+  variant = "full",
+  saveHandlerRef,
+  disabled = false,
 }: {
   programId: string
   offering: ProgramOffering
@@ -55,6 +62,10 @@ export function OfferingOverviewStaffFields({
   onAssignmentsChange?: (
     assignments: ProgramStaffAssignmentWithDetails[]
   ) => void
+  departmentId?: string | null
+  variant?: "full" | "additionalInline"
+  saveHandlerRef?: React.MutableRefObject<(() => Promise<boolean>) | null>
+  disabled?: boolean
 }) {
   const router = useRouter()
   const [assignments, setAssignments] = React.useState(initialAssignments)
@@ -65,15 +76,32 @@ export function OfferingOverviewStaffFields({
   const [contactResults, setContactResults] = React.useState<
     StaffEligibleContact[]
   >([])
+  const [staffOptions, setStaffOptions] = React.useState<StaffEligibleContact[]>(
+    []
+  )
   const [isSearching, setIsSearching] = React.useState(false)
   const [selectedContactId, setSelectedContactId] = React.useState("")
   const [assignmentRole, setAssignmentRole] =
-    React.useState<ProgramStaffAssignmentRole>("primary_instructor")
+    React.useState<ProgramStaffAssignmentRole>("assistant_instructor")
   const [sessionId, setSessionId] = React.useState("")
 
   React.useEffect(() => {
     setAssignments(initialAssignments)
   }, [initialAssignments])
+
+  React.useEffect(() => {
+    if (!editing || variant !== "additionalInline") return
+    void (async () => {
+      try {
+        const rows = await searchProgramStaffContactsAction("", {
+          departmentId,
+        })
+        setStaffOptions(rows || [])
+      } catch {
+        setStaffOptions([])
+      }
+    })()
+  }, [editing, variant, departmentId, offering.id])
 
   React.useEffect(() => {
     if (!isDialogOpen) return
@@ -86,7 +114,9 @@ export function OfferingOverviewStaffFields({
   async function loadContacts(search: string) {
     setIsSearching(true)
     try {
-      setContactResults(await searchProgramStaffContactsAction(search))
+      setContactResults(
+        await searchProgramStaffContactsAction(search, { departmentId })
+      )
     } catch (searchError) {
       setError(
         searchError instanceof Error
@@ -112,9 +142,14 @@ export function OfferingOverviewStaffFields({
     setError(null)
   }
 
-  async function handleAssign() {
-    if (!selectedContactId) {
-      setError("Select a contact.")
+  async function handleAssign(input?: {
+    contactId?: string
+    role?: ProgramStaffAssignmentRole
+  }) {
+    const contactId = input?.contactId ?? selectedContactId
+    const role = input?.role ?? assignmentRole
+    if (!contactId) {
+      setError("Select a name.")
       return
     }
 
@@ -124,12 +159,14 @@ export function OfferingOverviewStaffFields({
       const nextAssignments = await createProgramStaffAssignment({
         programId,
         offeringId: offering.id,
-        contactId: selectedContactId,
-        assignmentRole,
+        contactId,
+        assignmentRole: role,
         sessionId: sessionId || null,
       })
       setAssignments(nextAssignments)
       onAssignmentsChange?.(nextAssignments)
+      setSelectedContactId("")
+      setAssignmentRole("assistant_instructor")
       closeDialog()
       router.refresh()
     } catch (assignError) {
@@ -174,17 +211,54 @@ export function OfferingOverviewStaffFields({
       !(item.assignment_role === "primary_instructor" && !item.session_id)
   )
 
+  async function handlePendingAdditionalSave(): Promise<boolean> {
+    if (variant !== "additionalInline") return true
+    if (!selectedContactId) return true
+    setError(null)
+    try {
+      const nextAssignments = await createProgramStaffAssignment({
+        programId,
+        offeringId: offering.id,
+        contactId: selectedContactId,
+        assignmentRole,
+        sessionId: null,
+      })
+      setAssignments(nextAssignments)
+      onAssignmentsChange?.(nextAssignments)
+      setSelectedContactId("")
+      setAssignmentRole("assistant_instructor")
+      return true
+    } catch (assignError) {
+      setError(
+        assignError instanceof Error
+          ? assignError.message
+          : "Failed to assign staff."
+      )
+      return false
+    }
+  }
+
+  React.useEffect(() => {
+    if (!saveHandlerRef || variant !== "additionalInline") return
+    saveHandlerRef.current = () => handlePendingAdditionalSave()
+    return () => {
+      saveHandlerRef.current = null
+    }
+  })
+
   if (!editing) {
     return (
       <>
-        <div className="space-y-1">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Primary instructor
-          </p>
-          <p className="text-sm font-medium">
-            {primaryInstructor?.contact_name || "Not assigned"}
-          </p>
-        </div>
+        {variant === "full" ? (
+          <div className="space-y-1">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Primary instructor
+            </p>
+            <p className="text-sm font-medium">
+              {primaryInstructor?.contact_name || "Not assigned"}
+            </p>
+          </div>
+        ) : null}
         {additionalStaff.length > 0 ? (
           <div className="space-y-1 sm:col-span-2">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -201,6 +275,100 @@ export function OfferingOverviewStaffFields({
           </div>
         ) : null}
       </>
+    )
+  }
+
+  if (variant === "additionalInline") {
+    return (
+      <div className="space-y-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="additional-staff-name">Name</Label>
+            <select
+              id="additional-staff-name"
+              value={selectedContactId}
+              onChange={(event) => setSelectedContactId(event.target.value)}
+              disabled={disabled || isSaving}
+              className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+            >
+              <option value="">
+                {departmentId && staffOptions.length === 0
+                  ? "No employees in this department"
+                  : "Select name"}
+              </option>
+              {staffOptions.map((staff) => (
+                <option key={staff.id} value={staff.id}>
+                  {staff.full_name || staff.email || "Unnamed"}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="additional-staff-role">Role</Label>
+            <select
+              id="additional-staff-role"
+              value={assignmentRole}
+              onChange={(event) =>
+                setAssignmentRole(
+                  event.target.value as ProgramStaffAssignmentRole
+                )
+              }
+              disabled={disabled || isSaving}
+              className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+            >
+              {ADDITIONAL_ROLES.map((role) => (
+                <option key={role} value={role}>
+                  {PROGRAM_STAFF_ASSIGNMENT_ROLE_LABELS[role]}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {additionalStaff.length > 0 ? (
+          <ul className="divide-y rounded-md border">
+            {additionalStaff.map((assignment) => (
+              <li
+                key={assignment.id}
+                className="flex items-center justify-between gap-3 px-3 py-2"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">
+                    {assignment.contact_name}
+                  </p>
+                  <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                    <Badge variant="secondary" className="font-normal">
+                      {
+                        PROGRAM_STAFF_ASSIGNMENT_ROLE_LABELS[
+                          assignment.assignment_role
+                        ]
+                      }
+                    </Badge>
+                    {assignment.session_name ? (
+                      <span className="text-xs text-muted-foreground">
+                        {assignment.session_name}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0 text-destructive hover:text-destructive"
+                  disabled={disabled || isSaving}
+                  aria-label={`Remove ${assignment.contact_name}`}
+                  onClick={() => void handleRemove(assignment.id)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+
+        {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      </div>
     )
   }
 

@@ -7,7 +7,6 @@ export const HR_VOLUNTEERS_PATH = "/workforce/volunteers"
 export const HR_CHILDCARE_PATH = "/workforce/childcare"
 
 export type HrOverviewTab =
-  | "overview"
   | "departments"
   | "employees"
   | "volunteers"
@@ -19,25 +18,22 @@ export const HR_OVERVIEW_TABS: ReadonlyArray<{
   id: HrOverviewTab
   label: string
 }> = [
-  { id: "overview", label: "Overview" },
-  { id: "departments", label: "Departments" },
   { id: "employees", label: "Employees" },
   { id: "volunteers", label: "Volunteers" },
   { id: "childcare", label: "Childcare Providers" },
 ]
 
-export function hrOverviewTabPath(tab: HrOverviewTab = "overview"): string {
+export function hrOverviewTabPath(tab: HrOverviewTab = "employees"): string {
   switch (tab) {
     case "departments":
       return HR_DEPARTMENTS_PATH
-    case "employees":
-      return HR_EMPLOYEES_PATH
     case "volunteers":
       return HR_VOLUNTEERS_PATH
     case "childcare":
       return HR_CHILDCARE_PATH
+    case "employees":
     default:
-      return HR_OVERVIEW_PATH
+      return HR_EMPLOYEES_PATH
   }
 }
 
@@ -45,18 +41,12 @@ export function hrOverviewTabPath(tab: HrOverviewTab = "overview"): string {
 export function hrOverviewTabFromPathname(
   pathname: string | null | undefined
 ): HrOverviewTab {
-  if (!pathname) return "overview"
+  if (!pathname) return "employees"
   if (
     pathname === HR_DEPARTMENTS_PATH ||
     pathname.startsWith(`${HR_DEPARTMENTS_PATH}/`)
   ) {
     return "departments"
-  }
-  if (
-    pathname === HR_EMPLOYEES_PATH ||
-    pathname.startsWith(`${HR_EMPLOYEES_PATH}/`)
-  ) {
-    return "employees"
   }
   if (
     pathname === HR_VOLUNTEERS_PATH ||
@@ -70,7 +60,7 @@ export function hrOverviewTabFromPathname(
   ) {
     return "childcare"
   }
-  return "overview"
+  return "employees"
 }
 
 /** Canonical URL for employee job-title management. */
@@ -92,7 +82,8 @@ export function parseHrOverviewTab(tab: string | null | undefined): HrOverviewTa
   ) {
     return tab
   }
-  return "overview"
+  // Legacy `overview` (and unknown) → Employees.
+  return "employees"
 }
 
 export function parseHrDirectoryView(
@@ -125,7 +116,7 @@ export function hrOverviewHref(options?: {
   status?: string | null
 }): string {
   const params = new URLSearchParams()
-  const tab = options?.tab ?? "overview"
+  const tab = options?.tab ?? "employees"
   const path = hrOverviewTabPath(tab)
   if (options?.view === "applications" || options?.view === "positions") {
     params.set("view", options.view)

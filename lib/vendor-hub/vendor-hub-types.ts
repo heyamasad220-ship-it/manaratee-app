@@ -75,12 +75,27 @@ export type VendorHubDashboardMetrics = {
   approvedVendors: number
   boothsTotal: number
   boothsAssigned: number
+  /** Distinct vendors registered for this event (participants / assignments). */
+  boothRegistrations: number
   revenueCollected: number
   outstandingBalance: number
   vendorsMissingDocuments: number
   vendorsMissingPayment: number
   vendorsPendingEvaluation: number
   vendorsParticipated: number
+}
+
+/** Org-level Vendor Hub home metrics (not event-scoped). */
+export type VendorHubOrgDashboardMetrics = {
+  onboardingPending: number
+  activeVendors: number
+  revenueCollected: number
+  outstandingBalance: number
+}
+
+export type VendorHubOrgDashboardData = {
+  metrics: VendorHubOrgDashboardMetrics
+  upcomingEvents: VendorHubEventWithInternal[]
 }
 
 /** Booth reservation for a single bazaar event (approved org vendor, no re-application). */

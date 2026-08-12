@@ -346,6 +346,7 @@ export async function getUpcomingOperationalBriefs(
 }
 
 export type TemporaryHoldRow = {
+  id: string
   venueRentalId: string
   shortLabel: string
   venueName: string
@@ -362,7 +363,7 @@ export async function getActiveTemporaryHolds(limit = 10): Promise<TemporaryHold
   const { data, error } = await supabase
     .from("rental_reservations")
     .select(
-      "venue_rental_id, start_at, end_at, hold_expires_at, venues(name), venue_rentals(id, status, hold_expires_at)"
+      "id, venue_rental_id, start_at, end_at, hold_expires_at, venues(name), venue_rentals(id, status, hold_expires_at)"
     )
     .eq("organization_id", orgId)
     .eq("status", "temporary_hold")
@@ -381,6 +382,7 @@ export async function getActiveTemporaryHolds(limit = 10): Promise<TemporaryHold
     const rental = Array.isArray(rentalRel) ? rentalRel[0] : rentalRel
 
     return {
+      id: row.id as string,
       venueRentalId: row.venue_rental_id as string,
       shortLabel: (row.venue_rental_id as string).slice(0, 8),
       venueName: venueName ?? "Space",

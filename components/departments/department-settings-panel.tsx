@@ -376,7 +376,7 @@ export function DepartmentSettingsPanel({
           </TabsTrigger>
           <TabsTrigger value="year-defaults" className="gap-2">
             <CalendarRange className="size-4" />
-            Year defaults
+            Program defaults
           </TabsTrigger>
           <TabsTrigger value="registration" className="gap-2">
             <ShieldCheck className="size-4" />

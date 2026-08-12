@@ -16,6 +16,11 @@ export function ProgramFlyerField({
   onFlyerUrlChange,
   uploadOnly = false,
   hideHiddenInput = false,
+  hideLabel = false,
+  emptyLabel,
+  frameClassName,
+  /** `contain` shows the full flyer (no crop); `cover` fills a fixed frame. */
+  fit = "cover",
 }: {
   programId?: string
   initialFlyerUrl?: string | null
@@ -24,6 +29,13 @@ export function ProgramFlyerField({
   onFlyerUrlChange?: (url: string) => void
   uploadOnly?: boolean
   hideHiddenInput?: boolean
+  /** Hide the default "Flyer" label above the dropzone. */
+  hideLabel?: boolean
+  /** Optional text shown under the + when empty (e.g. "Add Flyer"). */
+  emptyLabel?: string
+  /** Extra classes for the dropzone button (height, layout). */
+  frameClassName?: string
+  fit?: "cover" | "contain"
 }) {
   const isControlled = value !== undefined
   const [internalFlyerUrl, setInternalFlyerUrl] = React.useState(
@@ -104,8 +116,13 @@ export function ProgramFlyerField({
   }
 
   return (
-    <div className="space-y-2">
-      <Label>Flyer</Label>
+    <div
+      className={cn(
+        "flex flex-col space-y-2",
+        fit === "contain" ? "w-fit max-w-full items-start" : "h-full w-full"
+      )}
+    >
+      {hideLabel ? null : <Label>Flyer</Label>}
       {!hideHiddenInput ? (
         <input type="hidden" name="flyer_url" value={flyerUrl} />
       ) : null}
@@ -124,20 +141,31 @@ export function ProgramFlyerField({
         onClick={openFilePicker}
         disabled={uploading}
         className={cn(
-          "group relative flex w-full items-center justify-center overflow-hidden rounded-lg border-2 border-dashed border-border bg-muted/40 transition-colors",
+          "group relative flex items-center justify-center overflow-hidden rounded-lg border-2 border-dashed border-border bg-muted/40 transition-colors",
           "hover:border-primary/50 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-          uploadOnly ? "h-20" : "h-36",
-          uploading && "cursor-wait opacity-70"
+          fit === "contain" && !uploadOnly
+            ? flyerUrl
+              ? "h-auto w-fit max-w-full p-0"
+              : "h-48 w-36"
+            : cn("w-full", uploadOnly ? "h-20" : "h-36"),
+          emptyLabel && !flyerUrl && "flex-col gap-2",
+          uploading && "cursor-wait opacity-70",
+          frameClassName
         )}
-        aria-label={flyerUrl ? "Replace program flyer" : "Upload program flyer"}
+        data-flyer-frame=""
+        aria-label={flyerUrl ? "Replace flyer" : emptyLabel || "Upload flyer"}
       >
         {flyerUrl && !uploadOnly ? (
           <>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={flyerUrl}
-              alt="Program flyer preview"
-              className="h-full w-full object-cover"
+              alt="Flyer preview"
+              className={
+                fit === "contain"
+                  ? "block h-auto max-h-[36rem] w-auto max-w-full"
+                  : "h-full w-full object-cover"
+              }
             />
             <div className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition-opacity group-hover:bg-black/40 group-hover:opacity-100">
               <Plus className="h-8 w-8 text-white" />
@@ -150,7 +178,14 @@ export function ProgramFlyerField({
         ) : uploading ? (
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         ) : (
-          <Plus className="h-8 w-8 text-muted-foreground" />
+          <>
+            <Plus className="h-8 w-8 text-muted-foreground" />
+            {emptyLabel ? (
+              <span className="text-sm font-medium text-muted-foreground">
+                {emptyLabel}
+              </span>
+            ) : null}
+          </>
         )}
       </button>
 

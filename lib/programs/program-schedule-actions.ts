@@ -358,6 +358,93 @@ export async function createRecurringScheduleItems(
   revalidateSchedulePaths(input.program_id, input.offering_id)
 }
 
+/**
+ * Replace all weekly meeting times for an offering with one recurring pattern
+ * (same start/end time across selected days). Used by the simple schedule editor.
+ */
+export async function replaceOfferingWeeklySchedule(input: {
+  program_id: string
+  offering_id: string
+  title?: string
+  days_of_week: string[]
+  start_time: string
+  end_time: string
+  location?: string
+  venue_id?: string | null
+  instructor_name?: string
+}) {
+  const supabase = await createClient()
+  const organizationId = await getSelectedOrganizationId()
+
+  if (!organizationId) {
+    throw new Error("No organization selected")
+  }
+
+  if (!input.offering_id) {
+    throw new Error("Offering is required for schedule items")
+  }
+
+  if (!input.days_of_week.length) {
+    throw new Error("Select at least one day.")
+  }
+
+  if (!input.start_time || !input.end_time) {
+    throw new Error("Start and end time are required.")
+  }
+
+  const { error: deleteError } = await supabase
+    .from("program_schedule_items")
+    .delete()
+    .eq("organization_id", organizationId)
+    .eq("program_id", input.program_id)
+    .eq("offering_id", input.offering_id)
+
+  if (deleteError) {
+    console.error(deleteError)
+    throw new Error("Failed to clear existing schedule times.")
+  }
+
+  await createRecurringScheduleItems({
+    program_id: input.program_id,
+    offering_id: input.offering_id,
+    title: input.title?.trim() || "Weekly time",
+    days_of_week: input.days_of_week,
+    start_time: input.start_time,
+    end_time: input.end_time,
+    location: input.location,
+    venue_id: input.venue_id ?? null,
+    instructor_name: input.instructor_name,
+  })
+}
+
+/** Clear all schedule items for an offering (simple editor with no days selected). */
+export async function clearOfferingWeeklySchedule(input: {
+  program_id: string
+  offering_id: string
+}) {
+  const supabase = await createClient()
+  const organizationId = await getSelectedOrganizationId()
+
+  if (!organizationId) {
+    throw new Error("No organization selected")
+  }
+
+  const { error } = await supabase
+    .from("program_schedule_items")
+    .delete()
+    .eq("organization_id", organizationId)
+    .eq("program_id", input.program_id)
+    .eq("offering_id", input.offering_id)
+
+  if (error) {
+    console.error(error)
+    throw new Error("Failed to clear schedule times.")
+  }
+
+  await syncOperationalBriefForProgram(input.program_id, organizationId)
+  revalidateSchedulePaths(input.program_id, input.offering_id)
+}
+
 export async function updateScheduleItem(
   itemId: string,
   input: ScheduleItemInput

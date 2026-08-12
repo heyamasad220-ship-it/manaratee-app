@@ -423,7 +423,7 @@ export function ProgramOfferingsSection({
   async function handleDelete(offeringId: string) {
     const offering = offerings.find((item) => item.id === offeringId)
 
-    if (!offering || offering.is_default) {
+    if (!offering) {
       return
     }
 

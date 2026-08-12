@@ -2,16 +2,15 @@
 
 import * as React from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { CreditCard, FileBarChart } from "lucide-react"
+import { FileBarChart } from "lucide-react"
 import { ModuleApplicationsClient } from "@/components/applications/module-applications-client"
 import { FinancialAssistanceOverviewPanel } from "@/components/programs/financial-assistance-overview-panel"
-import {
-  FinancialAssistanceReportPanel,
-  PaymentPlansReportPanel,
-} from "@/components/programs/programs-fa-report-panels"
+import { FinancialAssistanceReportPanel } from "@/components/programs/programs-fa-report-panels"
 import { PROGRAMS_FINANCIAL_ASSISTANCE_PATH } from "@/lib/applications/application-routes"
 import { FINANCE_FINANCIAL_ASSISTANCE_PATH } from "@/lib/finance/finance-paths"
 import type { ProgramFinancialAssistanceSettings } from "@/lib/programs/program-financial-assistance-actions"
+
+const TUITION_PLANS_PATH = "/programs/reports/tuition-plans"
 
 export function ProgramsFinancialAssistanceClient({
   initialPrograms,
@@ -31,7 +30,12 @@ export function ProgramsFinancialAssistanceClient({
     PROGRAMS_FINANCIAL_ASSISTANCE_PATH
 
   React.useEffect(() => {
-    if (searchParams.get("tab") === "financial-assistance") {
+    const tab = searchParams.get("tab")
+    if (tab === "payment-plans") {
+      router.replace(TUITION_PLANS_PATH)
+      return
+    }
+    if (tab === "financial-assistance") {
       const next = new URLSearchParams(searchParams.toString())
       next.set("tab", "reports")
       router.replace(`${resolvedBasePath}?${next.toString()}`)
@@ -57,12 +61,6 @@ export function ProgramsFinancialAssistanceClient({
           label: "Reports",
           icon: FileBarChart,
           content: <FinancialAssistanceReportPanel />,
-        },
-        {
-          value: "payment-plans",
-          label: "Payment Plans",
-          icon: CreditCard,
-          content: <PaymentPlansReportPanel />,
         },
       ]}
     />

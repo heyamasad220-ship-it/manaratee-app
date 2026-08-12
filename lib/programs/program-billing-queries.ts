@@ -11,6 +11,7 @@ import {
 } from "@/lib/programs/program-billing-schema"
 import { getDefaultOfferingForProgram } from "@/lib/programs/program-offering-queries"
 import { contactLabel, loadContactsByIds } from "@/lib/programs/registration-display-helpers"
+import { billingDayFromStartDate } from "@/lib/programs/program-billing-utils"
 
 export type OfferingBillingScheduleResult = {
   migrationRequired: boolean
@@ -172,11 +173,15 @@ export async function getOfferingBillingScheduleBundle(
     offering.end_date
   ) {
     try {
+      const billingDay =
+        billingDayFromStartDate(offering.start_date) ??
+        monthlyPlan.data?.payment_due_day ??
+        null
       await syncOfferingBillingPeriods(
         organizationId,
         offering.id,
         monthlyTuition,
-        monthlyPlan.data?.payment_due_day ?? null
+        billingDay
       )
     } catch (error) {
       console.error("syncOfferingBillingPeriods:", error)

@@ -77,6 +77,10 @@ export async function saveRegistrationQuestionsForOffering(input: {
       is_required: question.required,
       sort_order: index * 10,
       is_active: true,
+      options:
+        question.questionType === "select"
+          ? question.options.map((option) => option.trim()).filter(Boolean)
+          : [],
     }))
     .filter((row) => row.prompt.length > 0)
 
@@ -89,6 +93,14 @@ export async function saveRegistrationQuestionsForOffering(input: {
     .insert(rows)
 
   if (insertError) {
+    if (
+      insertError.message?.includes("options") ||
+      insertError.message?.includes("select")
+    ) {
+      throw new Error(
+        "Registration question options are missing. Run scripts/239_registration_question_select_options.sql."
+      )
+    }
     throw new Error(insertError.message)
   }
 }

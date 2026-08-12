@@ -18,6 +18,7 @@ import {
   CREATE_EVENT_CTA_LABEL,
   VIEW_MASTER_CALENDAR_CTA_LABEL,
 } from "@/lib/events/facility-event-request-href"
+import { departmentsMasterCalendarHref } from "@/lib/departments/departments-section-path"
 import { getInternalEventDeleteBlockersMap } from "@/lib/events/internal-event-actions"
 import { getInternalEventStatusLabel } from "@/lib/events/internal-event-status"
 
@@ -65,11 +66,10 @@ function bookSpaceHref(departmentId: string) {
 }
 
 function collaborationCalendarHref(departmentId: string) {
-  const params = new URLSearchParams({
-    department: departmentId,
+  return departmentsMasterCalendarHref({
+    departmentId,
     returnTo: departmentEventsReturnTo(departmentId),
   })
-  return `/event-management/calendar?${params.toString()}`
 }
 
 function eventIdFromItem(item: GroupActivityItem) {

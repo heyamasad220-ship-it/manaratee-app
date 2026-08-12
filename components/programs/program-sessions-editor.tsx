@@ -112,6 +112,91 @@ function draftToPayload(draft: SessionDraft) {
   }
 }
 
+function SessionBasicFormFields({
+  draft,
+  idPrefix,
+  onChange,
+  disabled = false,
+}: {
+  draft: SessionDraft
+  idPrefix: string
+  onChange: (field: keyof SessionDraft, value: string | boolean) => void
+  disabled?: boolean
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="space-y-1.5">
+          <Label htmlFor={`${idPrefix}-name`}>Name</Label>
+          <Input
+            id={`${idPrefix}-name`}
+            value={draft.name}
+            disabled={disabled}
+            onChange={(event) => onChange("name", event.target.value)}
+            placeholder="Week 1, Session A"
+            className="h-9"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor={`${idPrefix}-status`}>Status</Label>
+          <select
+            id={`${idPrefix}-status`}
+            value={draft.status}
+            disabled={disabled}
+            onChange={(event) =>
+              onChange("status", event.target.value as ProgramSessionStatus)
+            }
+            className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+          >
+            {SESSION_STATUS_OPTIONS.map((status) => (
+              <option key={status} value={status}>
+                {status.charAt(0).toUpperCase() + status.slice(1)}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor={`${idPrefix}-fee`}>Fee</Label>
+          <Input
+            id={`${idPrefix}-fee`}
+            type="number"
+            min="0"
+            step="0.01"
+            value={draft.price}
+            disabled={disabled}
+            onChange={(event) => onChange("price", event.target.value)}
+            className="h-9"
+          />
+        </div>
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="space-y-1.5">
+          <Label htmlFor={`${idPrefix}-start-date`}>Start date</Label>
+          <Input
+            id={`${idPrefix}-start-date`}
+            type="date"
+            value={draft.start_date}
+            disabled={disabled}
+            onChange={(event) => onChange("start_date", event.target.value)}
+            className="h-9"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor={`${idPrefix}-end-date`}>End date</Label>
+          <Input
+            id={`${idPrefix}-end-date`}
+            type="date"
+            value={draft.end_date}
+            disabled={disabled}
+            onChange={(event) => onChange("end_date", event.target.value)}
+            className="h-9"
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function SessionFormFields({
   draft,
   idPrefix,
@@ -244,6 +329,10 @@ export function ProgramSessionsEditor({
   sessions: initialSessions,
   sessionRegistrationEnabled = true,
   plain = false,
+  /** Compact Name/Status/Fee + dates form for Enrollment Advanced Settings. */
+  variant = "full",
+  disabled = false,
+  onSessionsChange,
 }: {
   programId: string
   offeringId: string
@@ -252,14 +341,18 @@ export function ProgramSessionsEditor({
   sessionRegistrationEnabled?: boolean
   /** Hide nested card chrome when inside offering manage accordion. */
   plain?: boolean
+  variant?: "full" | "basic"
+  disabled?: boolean
+  onSessionsChange?: (sessions: ProgramSession[]) => void
 }) {
   const router = useRouter()
+  const isBasic = variant === "basic"
   const [sessions, setSessions] = React.useState(() =>
     sortProgramSessions(initialSessions)
   )
   const [draft, setDraft] = React.useState<SessionDraft>(emptyDraft)
   const [panelMode, setPanelMode] = React.useState<"closed" | "add" | "edit">(
-    "closed"
+    isBasic ? "add" : "closed"
   )
   const [editingSessionId, setEditingSessionId] = React.useState<string | null>(
     null
@@ -271,12 +364,18 @@ export function ProgramSessionsEditor({
     setSessions(sortProgramSessions(initialSessions))
   }, [initialSessions])
 
+  function commitSessions(next: ProgramSession[]) {
+    const sorted = sortProgramSessions(next)
+    setSessions(sorted)
+    onSessionsChange?.(sorted)
+  }
+
   function updateDraft(field: keyof SessionDraft, value: string | boolean) {
     setDraft((current) => ({ ...current, [field]: value }))
   }
 
   function closeForm() {
-    setPanelMode("closed")
+    setPanelMode(isBasic ? "add" : "closed")
     setEditingSessionId(null)
     setDraft(emptyDraft)
     setError(null)
@@ -309,17 +408,21 @@ export function ProgramSessionsEditor({
 
     try {
       if (panelMode === "edit" && editingSessionId) {
-        await updateProgramSession({
+        const updated = await updateProgramSession({
           session_id: editingSessionId,
           program_id: programId,
           ...payload,
         })
+        commitSessions(
+          sessions.map((row) => (row.id === updated.id ? updated : row))
+        )
       } else {
-        await createProgramSession({
+        const created = await createProgramSession({
           program_id: programId,
           offering_id: offeringId,
           ...payload,
         })
+        commitSessions([...sessions, created])
       }
 
       closeForm()
@@ -338,9 +441,21 @@ export function ProgramSessionsEditor({
   }
 
   const isFormOpen = panelMode !== "closed"
+  const formLocked = disabled || isSaving
 
   const addSessionButton = !isFormOpen ? (
-    <Button type="button" onClick={openAddForm} disabled={isSaving}>
+    <Button type="button" onClick={openAddForm} disabled={formLocked}>
+      <Plus className="mr-2 h-4 w-4" />
+      Add Session
+    </Button>
+  ) : isBasic && panelMode === "edit" ? (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      onClick={openAddForm}
+      disabled={formLocked}
+    >
       <Plus className="mr-2 h-4 w-4" />
       Add Session
     </Button>
@@ -350,7 +465,9 @@ export function ProgramSessionsEditor({
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 space-y-1">
-          {!plain ? (
+          {isBasic ? (
+            <p className="text-sm font-medium text-foreground">Sessions</p>
+          ) : !plain ? (
             <>
               <p className="text-base font-semibold leading-none">Sessions</p>
               <p className="text-sm text-muted-foreground">
@@ -363,7 +480,7 @@ export function ProgramSessionsEditor({
               save immediately.
             </p>
           )}
-          {!sessionRegistrationEnabled ? (
+          {!isBasic && !sessionRegistrationEnabled ? (
             <p className="text-sm text-muted-foreground">
               Tip: enable Selected Sessions or Day Pass under Enrollment so
               customers can register for these sessions.
@@ -386,7 +503,9 @@ export function ProgramSessionsEditor({
               <TableRow>
                 <TableHead>Session</TableHead>
                 <TableHead>Dates</TableHead>
-                <TableHead className="text-right">Price</TableHead>
+                <TableHead className="text-right">
+                  {isBasic ? "Fee" : "Price"}
+                </TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="w-[80px] text-right">Actions</TableHead>
               </TableRow>
@@ -424,7 +543,7 @@ export function ProgramSessionsEditor({
                       variant="ghost"
                       size="sm"
                       onClick={() => openEditForm(session)}
-                      disabled={isSaving}
+                      disabled={formLocked}
                     >
                       <Pencil className="mr-1 h-3.5 w-3.5" />
                       Edit
@@ -439,18 +558,35 @@ export function ProgramSessionsEditor({
 
       {isFormOpen ? (
         <div
-          className="space-y-4 rounded-lg border bg-muted/20 p-4"
+          className={
+            isBasic
+              ? "space-y-3 border-t pt-3"
+              : "space-y-4 rounded-lg border bg-muted/20 p-4"
+          }
           onKeyDown={preventFormSubmitOnEnter}
         >
-          <p className="text-sm font-medium">
-            {panelMode === "edit" ? "Edit session" : "Add session"}
-          </p>
+          {!isBasic ? (
+            <p className="text-sm font-medium">
+              {panelMode === "edit" ? "Edit session" : "Add session"}
+            </p>
+          ) : panelMode === "edit" ? (
+            <p className="text-sm font-medium">Edit session</p>
+          ) : null}
 
-          <SessionFormFields
-            draft={draft}
-            idPrefix={panelMode === "edit" ? "edit-session" : "add-session"}
-            onChange={updateDraft}
-          />
+          {isBasic ? (
+            <SessionBasicFormFields
+              draft={draft}
+              idPrefix={panelMode === "edit" ? "edit-session" : "add-session"}
+              onChange={updateDraft}
+              disabled={formLocked}
+            />
+          ) : (
+            <SessionFormFields
+              draft={draft}
+              idPrefix={panelMode === "edit" ? "edit-session" : "add-session"}
+              onChange={updateDraft}
+            />
+          )}
 
           {error ? (
             <p className="text-sm text-destructive">{error}</p>
@@ -460,7 +596,7 @@ export function ProgramSessionsEditor({
             <Button
               type="button"
               onClick={() => void handleSaveSession()}
-              disabled={isSaving}
+              disabled={formLocked}
             >
               {isSaving
                 ? panelMode === "edit"
@@ -470,19 +606,21 @@ export function ProgramSessionsEditor({
                   ? "Save changes"
                   : "Add Session"}
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={closeForm}
-              disabled={isSaving}
-            >
-              Cancel
-            </Button>
+            {panelMode === "edit" || !isBasic ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={closeForm}
+                disabled={formLocked}
+              >
+                Cancel
+              </Button>
+            ) : null}
           </div>
         </div>
       ) : null}
 
-      {sessions.length > 0 && !plain ? (
+      {sessions.length > 0 && !plain && !isBasic ? (
         <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
           <div className="flex items-center gap-2">
             <CalendarDays className="h-4 w-4" />
@@ -491,7 +629,7 @@ export function ProgramSessionsEditor({
         </div>
       ) : null}
 
-      {!plain ? (
+      {!plain && !isBasic ? (
         <p className="text-xs text-muted-foreground">
           Sessions save immediately. You do not need to click Save on the
           program form.
@@ -500,7 +638,7 @@ export function ProgramSessionsEditor({
     </div>
   )
 
-  if (plain) {
+  if (plain || isBasic) {
     return body
   }
 

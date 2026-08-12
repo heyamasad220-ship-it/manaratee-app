@@ -143,7 +143,8 @@ function payEntryMonthKey(entry: { periodKey: string; periodStart: string }) {
  * Expense: approved payroll whose pay period overlaps the range
  */
 export async function fetchDepartmentBudgetSummary(
-  departmentId: string
+  departmentId: string,
+  options?: { programId?: string | null }
 ): Promise<DepartmentBudgetSummary> {
   const allowed = await canViewDepartment(departmentId)
   if (!allowed) {
@@ -163,17 +164,59 @@ export async function fetchDepartmentBudgetSummary(
     }
   }
 
+  const programId = options?.programId?.trim() || null
   const supabase = await createClient()
-  const [tuition, payroll, periodsResult, openPrograms] = await Promise.all([
-    fetchDepartmentStudentPaymentsMatrix(departmentId),
-    fetchDepartmentPayrollList(departmentId, { scope: "all-approved-for-budget" }),
+
+  let yearPrograms = await loadDepartmentOpenPrograms(
+    organizationId,
+    departmentId
+  )
+  if (programId) {
+    const { data: program } = await supabase
+      .from("programs")
+      .select("id, name, status, start_date, end_date, department_id")
+      .eq("id", programId)
+      .eq("organization_id", organizationId)
+      .maybeSingle()
+    if (
+      !program ||
+      (program.department_id as string | null) !== departmentId
+    ) {
+      return {
+        periods: [],
+        byMonth: [],
+        monthly: [],
+        totals: { ...emptyTotals },
+        canManage,
+        migrationRequired: false,
+      }
+    }
+    yearPrograms = [
+      {
+        id: program.id as string,
+        name: (program.name as string) || "Year",
+        status: (program.status as string) || "closed",
+        startDate: (program.start_date as string | null) ?? null,
+        endDate: (program.end_date as string | null) ?? null,
+      },
+    ]
+  }
+
+  const [tuition, payroll, periodsResult] = await Promise.all([
+    fetchDepartmentStudentPaymentsMatrix(departmentId, {
+      openYearsOnly: !programId,
+    }),
+    fetchDepartmentPayrollList(departmentId, {
+      scope: "all-approved-for-budget",
+      openYearsOnly: !programId,
+      programId,
+    }),
     supabase
       .from("department_budget_periods")
       .select("id, period_start, period_end")
       .eq("organization_id", organizationId)
       .eq("department_id", departmentId)
       .order("period_start", { ascending: true }),
-    loadDepartmentOpenPrograms(organizationId, departmentId),
   ])
 
   if (periodsResult.error) {
@@ -198,12 +241,16 @@ export async function fetchDepartmentBudgetSummary(
     periodOverlapsOpenPrograms(
       row.period_start as string,
       row.period_end as string,
-      openPrograms
+      yearPrograms
     )
   )
 
+  const tuitionRows = programId
+    ? tuition.rows.filter((row) => row.programId === programId)
+    : tuition.rows
+
   const tuitionByMonth = new Map<string, number>()
-  for (const enrollment of tuition.rows) {
+  for (const enrollment of tuitionRows) {
     for (const [monthKey, cell] of Object.entries(enrollment.months)) {
       if (!/^\d{4}-\d{2}$/.test(monthKey)) continue
       tuitionByMonth.set(
@@ -236,7 +283,7 @@ export async function fetchDepartmentBudgetSummary(
       const periodEnd = row.period_end as string
 
       const studentTuition = roundMoney(
-        tuition.rows.reduce((sum, enrollment) => {
+        tuitionRows.reduce((sum, enrollment) => {
           let rowSum = 0
           for (const [monthKey, cell] of Object.entries(enrollment.months)) {
             if (monthOverlapsRange(monthKey, periodStart, periodEnd)) {
@@ -335,9 +382,12 @@ export async function fetchDepartmentBudgetSummary(
   }
 }
 
-export async function fetchDepartmentBudgetAction(departmentId: string) {
+export async function fetchDepartmentBudgetAction(
+  departmentId: string,
+  options?: { programId?: string | null }
+) {
   try {
-    const summary = await fetchDepartmentBudgetSummary(departmentId)
+    const summary = await fetchDepartmentBudgetSummary(departmentId, options)
     return { success: true as const, summary }
   } catch (error) {
     return {

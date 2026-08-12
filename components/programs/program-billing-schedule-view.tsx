@@ -8,16 +8,22 @@ import {
   adjustChargeScheduleAction,
   addEnrollmentFeeAction,
   createBillingOverrideAction,
+  setOfferingBillingPeriodStatusesAction,
   waiveChargeScheduleAction,
 } from "@/lib/programs/program-billing-actions"
 import type {
   OfferingBillingScheduleBundle,
   ProgramChargeScheduleItemExtended,
+  ProgramOfferingBillingPeriod,
 } from "@/lib/programs/program-billing-types"
 import {
   BILLING_OVERRIDE_TYPE_LABELS,
   CHARGE_SCHEDULE_STATUS_LABELS,
 } from "@/lib/programs/program-billing-types"
+import {
+  formatBillingDayLabel,
+  getBillingScheduleSummary,
+} from "@/lib/programs/program-billing-utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -91,6 +97,13 @@ export function ProgramBillingScheduleView({
   const router = useRouter()
   const [pending, setPending] = React.useState(false)
   const [message, setMessage] = React.useState<string | null>(null)
+  const [periods, setPeriods] = React.useState(bundle.billing_periods)
+
+  React.useEffect(() => {
+    setPeriods(bundle.billing_periods)
+  }, [bundle.billing_periods])
+
+  const summary = getBillingScheduleSummary(periods, bundle.offering.start_date)
 
   const [overrideType, setOverrideType] = React.useState("waive")
   const [overridePeriodId, setOverridePeriodId] = React.useState("")
@@ -188,6 +201,35 @@ export function ProgramBillingScheduleView({
     })
   }
 
+  async function handlePeriodToggle(
+    period: ProgramOfferingBillingPeriod,
+    checked: boolean
+  ) {
+    const nextStatus = checked ? "active" : "skipped"
+    const previous = periods
+    setPeriods((current) =>
+      current.map((row) =>
+        row.id === period.id ? { ...row, period_status: nextStatus } : row
+      )
+    )
+    setPending(true)
+    setMessage(null)
+    const result = await setOfferingBillingPeriodStatusesAction({
+      offeringId: bundle.offering.id,
+      programId,
+      periodIds: [period.id],
+      periodStatus: nextStatus,
+    })
+    setPending(false)
+    if (!result.ok) {
+      setPeriods(previous)
+      setMessage(result.error || "Failed to update billing month")
+      return
+    }
+    setMessage(checked ? "Month included" : "Month skipped")
+    router.refresh()
+  }
+
   return (
     <div className="flex flex-col gap-6">
       {message ? (
@@ -200,47 +242,90 @@ export function ProgramBillingScheduleView({
         <CardHeader>
           <CardTitle>Billing Periods</CardTitle>
           <CardDescription>
-            Canonical monthly calendar for {bundle.offering.name}. Late
-            enrollments only receive charges from their join month through the
-            program end date.
+            Monthly calendar for {bundle.offering.name}. Billing day follows the
+            program start date. Uncheck a month to skip it for everyone
+            (including late enrollments). No charges after the last billing date.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          {bundle.billing_periods.length === 0 ? (
+        <CardContent className="space-y-5">
+          {periods.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               {readOnly
                 ? "Billing periods will appear after migration 021 is applied and the program has start/end dates."
                 : "No billing periods yet. Set program start and end dates, then refresh this page."}
             </p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Period</TableHead>
-                  <TableHead>Due Date</TableHead>
-                  <TableHead>Default Tuition</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {bundle.billing_periods.map((period) => (
-                  <TableRow key={period.id}>
-                    <TableCell className="font-medium">
-                      {period.period_label}
-                    </TableCell>
-                    <TableCell>{formatDate(period.due_date)}</TableCell>
-                    <TableCell>
-                      {period.default_tuition_amount !== null
-                        ? formatCurrency(period.default_tuition_amount)
-                        : "—"}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{period.period_status}</Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Billing day
+                  </p>
+                  <p className="text-sm font-medium">
+                    {formatBillingDayLabel(summary.billingDay)}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    First billing date
+                  </p>
+                  <p className="text-sm font-medium">
+                    {formatDate(summary.firstBillingDate)}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Last billing date
+                  </p>
+                  <p className="text-sm font-medium">
+                    {formatDate(summary.lastBillingDate)}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Duration
+                  </p>
+                  <p className="text-sm font-medium">
+                    {summary.durationMonths} month
+                    {summary.durationMonths === 1 ? "" : "s"}
+                    {summary.skippedMonths > 0
+                      ? ` (${summary.skippedMonths} skipped)`
+                      : ""}
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Months</p>
+                <p className="text-xs text-muted-foreground">
+                  Checked months are billed. Uncheck to skip (e.g. Ramadan).
+                </p>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {periods.map((period) => {
+                    const checked = period.period_status === "active"
+                    return (
+                      <label
+                        key={period.id}
+                        className="flex cursor-pointer items-center gap-2 rounded-md border bg-background px-2.5 py-2 text-sm"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          disabled={readOnly || pending}
+                          onChange={(event) =>
+                            void handlePeriodToggle(period, event.target.checked)
+                          }
+                          className="size-3.5 rounded border"
+                        />
+                        <span className={checked ? undefined : "text-muted-foreground line-through"}>
+                          {period.period_label}
+                        </span>
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

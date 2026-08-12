@@ -306,7 +306,7 @@ export default async function CustomerProgramsPage({
           <Card className="border-l-4 border-l-blue-600 shadow-sm">
             <CardContent className="flex items-center justify-between p-6">
               <div>
-                <p className="text-sm text-muted-foreground">Active Years/Seasons</p>
+                <p className="text-sm text-muted-foreground">Active Programs</p>
                 <p className="text-3xl font-bold">{programs.length}</p>
               </div>
               <div className="rounded-lg bg-blue-100 p-3 text-blue-600">
@@ -333,7 +333,7 @@ export default async function CustomerProgramsPage({
             <CardContent className="flex items-center justify-between p-6">
               <div>
                 <p className="text-sm text-muted-foreground">
-                  Upcoming Years/Seasons
+                  Upcoming Programs
                 </p>
                 <p className="text-3xl font-bold text-orange-600">
                   {upcomingPrograms}
@@ -392,7 +392,7 @@ export default async function CustomerProgramsPage({
         </Card>
 
         <div>
-          <h2 className="text-lg font-bold">Available Years/Seasons</h2>
+          <h2 className="text-lg font-bold">Available Programs</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Showing seasons with open enrollment only. Closed, draft, paused,
             and archived programs are hidden from customers.
@@ -479,8 +479,8 @@ export default async function CustomerProgramsPage({
                               remainingSeats === 1 ? "" : "s"
                             } remaining`
                           : program.waitlist > 0
-                            ? "Year/Season is full. Waitlist may be available."
-                            : "Year/Season is full."}
+                            ? "Program is full. Waitlist may be available."
+                            : "Program is full."}
                       </p>
                     </div>
 
@@ -526,7 +526,7 @@ export default async function CustomerProgramsPage({
 
                     <Button asChild className="w-full">
                       <Link href={`/customer/programs/${program.id}`}>
-                        View Year/Season
+                        View Program
                         <ArrowRight className="ml-2 h-4 w-4" />
                       </Link>
                     </Button>

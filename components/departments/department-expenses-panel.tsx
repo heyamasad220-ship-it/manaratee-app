@@ -69,9 +69,16 @@ function dateWithinOpenPrograms(
 export function DepartmentExpensesPanel({
   departmentId,
   departmentName,
+  openYearsOnly = true,
+  programId = null,
+  readOnly = false,
 }: {
   departmentId: string
   departmentName: string
+  /** Operating Financial: open years only. Reports: set false + programId. */
+  openYearsOnly?: boolean
+  programId?: string | null
+  readOnly?: boolean
 }) {
   const supabase = createClient()
   const [loading, setLoading] = useState(true)
@@ -82,13 +89,17 @@ export function DepartmentExpensesPanel({
     setLoading(true)
     setError(null)
 
-    const [{ data: openPrograms, error: programsError }, { data, error: queryError }] =
+    const statusFilter = openYearsOnly
+      ? ["draft", "active", "paused"]
+      : ["draft", "active", "paused", "closed"]
+
+    const [{ data: yearPrograms, error: programsError }, { data, error: queryError }] =
       await Promise.all([
         supabase
           .from("programs")
-          .select("id, start_date, end_date")
+          .select("id, start_date, end_date, status")
           .eq("department_id", departmentId)
-          .in("status", ["draft", "active", "paused", "closed"]),
+          .in("status", statusFilter),
         supabase
           .from("program_expenses")
           .select(`
@@ -126,21 +137,40 @@ export function DepartmentExpensesPanel({
       return
     }
 
-    const openProgramList = openPrograms || []
-    const openProgramIds = new Set(openProgramList.map((row) => row.id as string))
+    let programList = yearPrograms || []
+    if (programId) {
+      programList = programList.filter((row) => row.id === programId)
+      if (programList.length === 0) {
+        // Still allow filter by explicit program id from join
+        programList = [
+          {
+            id: programId,
+            start_date: null,
+            end_date: null,
+            status: "closed",
+          },
+        ]
+      }
+    }
+    const programIds = new Set(programList.map((row) => row.id as string))
 
-    // Open years only — archived-year expenses are excluded from operating Financial.
     const rows = ((data || []) as DepartmentExpenseRow[]).filter((row) => {
-      const programId = row.program_id || row.program?.id || null
+      const rowProgramId = row.program_id || row.program?.id || null
       if (programId) {
-        return openProgramIds.has(programId)
+        if (rowProgramId === programId) return true
+        if (rowProgramId) return false
+        if (row.department_id !== departmentId) return false
+        return dateWithinOpenPrograms(row.expense_date, programList)
+      }
+      if (rowProgramId) {
+        return programIds.has(rowProgramId)
       }
       if (row.department_id !== departmentId) return false
-      return dateWithinOpenPrograms(row.expense_date, openProgramList)
+      return dateWithinOpenPrograms(row.expense_date, programList)
     })
     setItems(rows)
     setLoading(false)
-  }, [departmentId, supabase])
+  }, [departmentId, openYearsOnly, programId, supabase])
 
   useEffect(() => {
     void load()

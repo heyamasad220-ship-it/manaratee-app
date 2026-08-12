@@ -2,10 +2,8 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 
-import { Badge } from "@/components/ui/badge"
 import {
   Card,
   CardContent,
@@ -34,19 +32,6 @@ import {
 import { Button } from "@/components/ui/button"
 import { Loader2 } from "lucide-react"
 
-type EnrollmentLite = {
-  child_name?: string | null
-  program?: { name?: string | null } | null
-}
-
-type PaymentPlanRow = {
-  id: string
-  installment_amount: number | null
-  due_date: string | null
-  status: string
-  enrollment?: EnrollmentLite | null
-}
-
 function formatCurrency(value: number | null | undefined) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -68,46 +53,6 @@ function formatDate(value: string | null | undefined) {
     day: "numeric",
     year: "numeric",
   })
-}
-
-function getStatusBadge(status: string) {
-  switch (status) {
-    case "confirmed":
-    case "approved":
-    case "paid":
-    case "converted":
-    case "active":
-      return (
-        <Badge className="bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20">
-          {status}
-        </Badge>
-      )
-    case "pending":
-    case "waiting":
-      return (
-        <Badge className="bg-amber-500/10 text-amber-600 hover:bg-amber-500/20">
-          {status}
-        </Badge>
-      )
-    case "offered":
-      return (
-        <Badge className="bg-violet-500/10 text-violet-600 hover:bg-violet-500/20">
-          {status}
-        </Badge>
-      )
-    case "cancelled":
-    case "denied":
-    case "expired":
-    case "late":
-    case "superseded":
-      return (
-        <Badge className="bg-red-500/10 text-red-600 hover:bg-red-500/20">
-          {status}
-        </Badge>
-      )
-    default:
-      return <Badge variant="secondary">{status}</Badge>
-  }
 }
 
 function MetricCard({
@@ -187,17 +132,6 @@ function SimpleTable({
     </Card>
   )
 }
-
-const enrollmentSelect = `
-  *,
-  enrollment:enrollment_id (
-    *,
-    program:program_id (
-      id,
-      name
-    )
-  )
-`
 
 /** Staff-applied FA awards (Mark financial assistance) — who, offering, original vs assisted fee. */
 export function FinancialAssistanceReportPanel() {
@@ -349,71 +283,6 @@ export function FinancialAssistanceReportPanel() {
               "Remove"
             )}
           </Button>,
-        ])}
-      />
-    </div>
-  )
-}
-
-export function PaymentPlansReportPanel() {
-  const supabase = createClient()
-  const [loading, setLoading] = React.useState(true)
-  const [items, setItems] = React.useState<PaymentPlanRow[]>([])
-
-  React.useEffect(() => {
-    let cancelled = false
-    async function load() {
-      setLoading(true)
-      const { data, error } = await supabase
-        .from("program_payment_plans")
-        .select(enrollmentSelect)
-        .order("due_date")
-      if (!cancelled) {
-        if (error) {
-          console.warn("program_payment_plans could not be loaded:", error.message)
-          setItems([])
-        } else {
-          setItems((data || []) as PaymentPlanRow[])
-        }
-        setLoading(false)
-      }
-    }
-    void load()
-    return () => {
-      cancelled = true
-    }
-  }, [supabase])
-
-  const outstanding = items
-    .filter((item) => item.status !== "paid")
-    .reduce((sum, item) => sum + Number(item.installment_amount || 0), 0)
-
-  return (
-    <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-3">
-        <MetricCard label="Installments" value={items.length} />
-        <MetricCard
-          label="Outstanding"
-          value={formatCurrency(outstanding)}
-          valueClassName="text-amber-500"
-        />
-        <MetricCard
-          label="Late"
-          value={items.filter((item) => item.status === "late").length}
-          valueClassName="text-red-500"
-        />
-      </div>
-
-      <SimpleTable
-        loading={loading}
-        empty="No payment plan installments found."
-        headers={["Participant", YEAR_SEASON_LABEL, "Amount", "Due Date", "Status"]}
-        rows={items.map((item) => [
-          item.enrollment?.child_name || "-",
-          item.enrollment?.program?.name || "-",
-          formatCurrency(item.installment_amount),
-          formatDate(item.due_date),
-          getStatusBadge(item.status),
         ])}
       />
     </div>

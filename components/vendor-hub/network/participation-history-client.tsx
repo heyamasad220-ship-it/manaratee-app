@@ -9,7 +9,6 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Card, CardContent } from "@/components/ui/card"
-import { contactProfilePath } from "@/lib/vendor-hub/contact-centric-model"
 import type { ParticipationHistoryRow } from "@/lib/vendor-hub/participation-history-queries"
 import { VENDOR_HUB_ROUTES } from "@/lib/vendor-hub/vendor-hub-routes"
 
@@ -18,6 +17,11 @@ function formatDate(value?: string | null) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return "—"
   return date.toLocaleDateString()
+}
+
+function formatCurrency(amount: number | null) {
+  if (amount == null || !Number.isFinite(amount)) return "—"
+  return `$${amount.toFixed(2)}`
 }
 
 export function ParticipationHistoryClient({
@@ -33,7 +37,7 @@ export function ParticipationHistoryClient({
         <CardContent className="p-6 text-sm text-muted-foreground">
           {contactIdFilter
             ? "No vendor participation history for this contact yet."
-            : "No vendor participation history yet. Booth payments across bazaars will appear here."}
+            : "No vendor participation history yet. Event participation and booth payments will appear here."}
         </CardContent>
       </Card>
     )
@@ -42,7 +46,7 @@ export function ParticipationHistoryClient({
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-muted-foreground">
-        Cross-event vendor participation. Vendor identity links to CRM contacts — not duplicated here.
+        One row per vendor — event count and latest participation across bazaars.
       </p>
 
       <Card>
@@ -51,45 +55,43 @@ export function ParticipationHistoryClient({
             <TableHeader>
               <TableRow>
                 <TableHead>Business Name</TableHead>
-                <TableHead>Event</TableHead>
-                <TableHead>Event Date</TableHead>
-                <TableHead>Booth Type</TableHead>
-                <TableHead>Amount</TableHead>
+                <TableHead>Vendor Type</TableHead>
+                <TableHead className="text-right">Events</TableHead>
+                <TableHead>Last Event</TableHead>
+                <TableHead>Last Event Date</TableHead>
+                <TableHead className="text-right">Last Amount Paid</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {rows.map((row) => (
-                <TableRow key={row.id}>
+                <TableRow key={row.contactId}>
                   <TableCell>
-                    {row.contactId ? (
-                      <Link
-                        href={contactProfilePath(row.contactId)}
-                        className="font-medium text-primary hover:underline"
-                      >
-                        {row.businessName}
-                      </Link>
-                    ) : (
-                      row.businessName
-                    )}
+                    <Link
+                      href={VENDOR_HUB_ROUTES.network.vendor(row.contactId)}
+                      className="font-medium text-primary hover:underline"
+                    >
+                      {row.businessName}
+                    </Link>
                   </TableCell>
+                  <TableCell className="text-sm">{row.vendorType || "—"}</TableCell>
+                  <TableCell className="text-right tabular-nums">{row.eventCount}</TableCell>
                   <TableCell>
-                    {row.eventId ? (
+                    {row.lastEventId ? (
                       <Link
-                        href={VENDOR_HUB_ROUTES.events.detail(row.eventId)}
+                        href={VENDOR_HUB_ROUTES.events.detail(row.lastEventId)}
                         className="hover:text-primary hover:underline"
                       >
-                        {row.eventName}
+                        {row.lastEventName}
                       </Link>
                     ) : (
-                      row.eventName
+                      row.lastEventName
                     )}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {formatDate(row.eventDate)}
+                    {formatDate(row.lastEventDate)}
                   </TableCell>
-                  <TableCell className="text-sm">{row.boothType || "—"}</TableCell>
-                  <TableCell>
-                    {row.amount != null ? `$${row.amount.toFixed(2)}` : "—"}
+                  <TableCell className="text-right tabular-nums">
+                    {formatCurrency(row.lastAmountPaid)}
                   </TableCell>
                 </TableRow>
               ))}

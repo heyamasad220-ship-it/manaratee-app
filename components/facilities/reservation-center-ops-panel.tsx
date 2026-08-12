@@ -111,7 +111,7 @@ export function ReservationCenterOpsPanel({
             {temporaryHolds.length ? (
               temporaryHolds.map((hold) => (
                 <div
-                  key={`${hold.venueRentalId}-${hold.startAt}`}
+                  key={hold.id}
                   className="rounded border p-3 text-sm"
                 >
                   <div className="flex items-center justify-between gap-2">

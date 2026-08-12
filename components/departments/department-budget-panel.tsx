@@ -44,9 +44,13 @@ function formatCurrency(value: number) {
 export function DepartmentBudgetPanel({
   departmentId,
   departmentName,
+  programId = null,
+  readOnly = false,
 }: {
   departmentId: string
   departmentName: string
+  programId?: string | null
+  readOnly?: boolean
 }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -57,7 +61,7 @@ export function DepartmentBudgetPanel({
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
-    const result = await fetchDepartmentBudgetAction(departmentId)
+    const result = await fetchDepartmentBudgetAction(departmentId, { programId })
     if (!result.success) {
       setError(result.error)
       setSummary(null)
@@ -65,7 +69,7 @@ export function DepartmentBudgetPanel({
       setSummary(result.summary)
     }
     setLoading(false)
-  }, [departmentId])
+  }, [departmentId, programId])
 
   useEffect(() => {
     void load()
@@ -138,7 +142,7 @@ export function DepartmentBudgetPanel({
               without student-level payment details. Separate from Group giving donations.
             </CardDescription>
           </div>
-          {summary?.canManage ? (
+          {summary?.canManage && !readOnly ? (
             <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
               <Plus className="mr-1.5 size-4" />
               Add period
@@ -182,7 +186,7 @@ export function DepartmentBudgetPanel({
                       <TableHead className="text-right">Participant payments</TableHead>
                       <TableHead className="text-right">Payroll</TableHead>
                       <TableHead className="text-right">Profit</TableHead>
-                      {summary.canManage ? <TableHead className="w-[72px]" /> : null}
+                      {summary.canManage && !readOnly ? <TableHead className="w-[72px]" /> : null}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -203,7 +207,7 @@ export function DepartmentBudgetPanel({
                         >
                           {formatCurrency(period.profit)}
                         </TableCell>
-                        {summary.canManage ? (
+                        {summary.canManage && !readOnly ? (
                           <TableCell>
                             <Button
                               type="button"
@@ -248,7 +252,7 @@ export function DepartmentBudgetPanel({
                       >
                         {formatCurrency(summary.totals.profit)}
                       </TableCell>
-                      {summary.canManage ? <TableCell /> : null}
+                      {summary.canManage && !readOnly ? <TableCell /> : null}
                     </TableRow>
                   </TableBody>
                 </Table>

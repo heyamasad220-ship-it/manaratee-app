@@ -89,7 +89,7 @@ const STATIC_SIDEBAR_MODULES: SidebarModuleRow[] = [
   {
     name: "Event Management",
     slug: "event-management",
-    route: "/event-management/overview",
+    route: "/event-management",
     icon_name: "LayoutGrid",
     group_name: "Operations",
     sort_order: 50,
@@ -103,9 +103,9 @@ const STATIC_SIDEBAR_MODULES: SidebarModuleRow[] = [
     sort_order: 25,
   },
   {
-    name: "HR",
+    name: "Workforce",
     slug: "workforce",
-    route: "/workforce",
+    route: "/workforce/employees",
     icon_name: "Users",
     group_name: "People",
     sort_order: 20,
@@ -275,8 +275,8 @@ const moduleDefaultRouteOverride: Record<string, string> = {
   contacts: "/contacts/people",
   spaces: "/facilities/overview",
   programs: "/programs/catalog",
-  workforce: "/workforce",
-  hr: "/workforce",
+  workforce: "/workforce/employees",
+  hr: "/workforce/employees",
   finance: "/finance/transactions",
   bookings: "/bookings/overview",
 }
@@ -309,24 +309,8 @@ const moduleChildren: Record<string, SubItem[]> = {
     },
     { label: "Settings", href: "/bookings/settings/notifications", matchPrefix: "/bookings/settings", permissionKey: "bookings.manage" },
   ],
-  "event-management": [
-    { label: "Dashboard", href: "/event-management/overview", matchPrefix: "/event-management/overview", permissionKey: "events.view" },
-    {
-      label: "Master Calendar",
-      href: "/event-management/calendar",
-      matchPrefix: "/event-management/calendar",
-      permissionKey: "events.view",
-    },
-    { label: "Events", href: "/event-management", matchPrefix: "/event-management", exact: true, permissionKey: "events.view" },
-    { label: "Ticketing", href: "/event-management/ticketing", matchPrefix: "/event-management/ticketing", permissionKey: "ticketing.view" },
-    {
-      label: "Reports",
-      href: "/event-management/reports",
-      matchPrefix: "/event-management/reports",
-      permissionKey: "reports.view",
-    },
-    { label: "Settings", href: "/event-management/settings/notifications", matchPrefix: "/event-management/settings", permissionKey: "events.manage" },
-  ],
+  // Event Management group removed — Events / Ticketing / Settings are top-level.
+  "event-management": [],
   spaces: [
     { label: "Overview", href: "/facilities/overview", matchPrefix: "/facilities/overview", permissionKey: "spaces.view", advancedFacilities: true },
     { label: "Reservation Center", href: "/facilities/reservation-center", matchPrefix: "/facilities/reservation-center", permissionKey: "spaces.view", advancedFacilities: true },
@@ -346,49 +330,9 @@ const moduleChildren: Record<string, SubItem[]> = {
       permissionKey: "spaces.view",
     },
   ],
-  programs: [
-    {
-      label: "Catalog",
-      href: "/programs/catalog",
-      matchPrefix: "/programs/catalog",
-      permissionKey: "programs.view",
-    },
-    {
-      label: "Schedule",
-      href: "/programs/schedule",
-      matchPrefix: "/programs/schedule",
-      permissionKey: "programs.view",
-    },
-    {
-      label: "Calendar",
-      href: "/facilities/calendar?sources=program_facility",
-      matchPrefix: "/facilities/calendar",
-      permissionKey: "programs.view",
-    },
-    {
-      label: "Reports",
-      href: "/programs/reports",
-      matchPrefix: "/programs/reports",
-      alsoMatchPrefixes: ["/programs/registrations"],
-      permissionKey: "reports.view",
-    },
-  ],
+  // Catalog / Schedule / Calendar are in-page tabs on Programs (ProgramsSectionNav).
+  programs: [],
   finance: [
-    {
-      label: "Transactions",
-      href: "/finance/transactions",
-      matchPrefix: "/finance/transactions",
-      alsoMatchPrefixes: ["/reports"],
-      permissionKey: "reports.view",
-      permissionKeys: ["finance.view", "reports.view"],
-    },
-    {
-      label: "Payroll",
-      href: "/finance/payroll",
-      matchPrefix: "/finance/payroll",
-      permissionKey: "staff.view",
-      permissionKeys: ["finance.view", "staff.view"],
-    },
     {
       label: "Financial Assistance",
       href: "/finance/financial-assistance",
@@ -422,70 +366,191 @@ const moduleChildren: Record<string, SubItem[]> = {
   donations: DONATIONS_SIDEBAR_CHILDREN,
   workforce: [
     {
-      label: "Overview",
-      href: "/workforce",
-      matchPrefix: "/workforce",
-      exact: true,
-      permissionKey: "staff.view",
-    },
-    {
-      label: "Departments",
-      href: "/workforce/departments",
-      matchPrefix: "/workforce/departments",
-      permissionKey: "staff.view",
-    },
-    {
       label: "Employees",
       href: "/workforce/employees",
       matchPrefix: "/workforce/employees",
-      permissionKey: "staff.view",
-    },
-    {
-      label: "Volunteers",
-      href: "/workforce/volunteers",
-      matchPrefix: "/workforce/volunteers",
-      permissionKey: "staff.view",
-    },
-    {
-      label: "Childcare Providers",
-      href: "/workforce/childcare",
-      matchPrefix: "/workforce/childcare",
+      alsoMatchPrefixes: [
+        "/workforce/volunteers",
+        "/workforce/childcare",
+      ],
       permissionKey: "staff.view",
     },
   ],
   hr: [
     {
-      label: "Overview",
-      href: "/workforce",
-      matchPrefix: "/workforce",
-      exact: true,
+      label: "Employees",
+      href: "/workforce/employees",
+      matchPrefix: "/workforce/employees",
+      alsoMatchPrefixes: [
+        "/workforce/volunteers",
+        "/workforce/childcare",
+      ],
       permissionKey: "staff.view",
     },
-    {
+  ],
+}
+
+/** Top-level modules folded into one sidebar entry (menus to be simplified next). */
+const PROGRAMS_AND_EVENTS_MERGED_SLUGS = new Set([
+  "workforce",
+  "hr",
+  "finance",
+  "programs",
+  "event-management",
+])
+
+const PROGRAMS_AND_EVENTS_MODULE_LABEL = "Programs/ Events"
+const PROGRAMS_AND_EVENTS_MODULE_SLUG = "programs-and-events"
+
+function buildProgramsAndEventsChildren(availableSlugs: Set<string>): SubItem[] {
+  const hasWorkforce =
+    availableSlugs.has("workforce") || availableSlugs.has("hr")
+
+  const items: SubItem[] = []
+
+  // Drawer order: Departments, Programs, Events, Ticketing, Financial Assistance,
+  // Workforce, Reports, Settings.
+  if (hasWorkforce) {
+    items.push({
       label: "Departments",
       href: "/workforce/departments",
       matchPrefix: "/workforce/departments",
       permissionKey: "staff.view",
-    },
-    {
-      label: "Employees",
+    })
+  }
+
+  if (availableSlugs.has("programs")) {
+    items.push({
+      label: "Programs",
+      href: "/programs/catalog",
+      matchPrefix: "/programs/catalog",
+      alsoMatchPrefixes: ["/programs/schedule", "/programs/calendar"],
+      permissionKey: "programs.view",
+    })
+  }
+
+  if (availableSlugs.has("event-management")) {
+    items.push({
+      label: "Events",
+      href: "/event-management",
+      matchPrefix: "/event-management",
+      permissionKey: "events.view",
+    })
+    items.push({
+      label: "Ticketing",
+      href: "/event-management/ticketing",
+      matchPrefix: "/event-management/ticketing",
+      permissionKey: "ticketing.view",
+    })
+  }
+
+  if (availableSlugs.has("finance") || availableSlugs.has("programs")) {
+    items.push({
+      label: "Financial Assistance",
+      href: "/finance/financial-assistance",
+      matchPrefix: "/finance/financial-assistance",
+      permissionKey: "applications.view",
+      permissionKeys: ["finance.view", "applications.view"],
+    })
+  }
+
+  if (hasWorkforce) {
+    items.push({
+      label: WORKFORCE_MODULE_LABEL,
       href: "/workforce/employees",
       matchPrefix: "/workforce/employees",
+      alsoMatchPrefixes: [
+        "/workforce/volunteers",
+        "/workforce/childcare",
+      ],
       permissionKey: "staff.view",
-    },
-    {
-      label: "Volunteers",
-      href: "/workforce/volunteers",
-      matchPrefix: "/workforce/volunteers",
-      permissionKey: "staff.view",
-    },
-    {
-      label: "Childcare Providers",
-      href: "/workforce/childcare",
-      matchPrefix: "/workforce/childcare",
-      permissionKey: "staff.view",
-    },
-  ],
+    })
+  }
+
+  if (availableSlugs.has("programs") || availableSlugs.has("finance")) {
+    items.push({
+      label: "Reports",
+      href: "/programs/registrations",
+      matchPrefix: "/programs/registrations",
+      alsoMatchPrefixes: [
+        "/programs/reports",
+        "/finance/transactions",
+        "/finance/payroll",
+      ],
+      permissionKey: "reports.view",
+      permissionKeys: ["reports.view", "finance.view", "staff.view", "events.view"],
+    })
+  }
+
+  if (availableSlugs.has("event-management")) {
+    items.push({
+      label: "Settings",
+      href: "/event-management/settings/notifications",
+      matchPrefix: "/event-management/settings",
+      permissionKey: "events.manage",
+    })
+  }
+
+  return items
+}
+
+function collapseProgramsAndEventsNavItems(items: NavItem[]): NavItem[] {
+  const mergedSource = items.filter((item) => {
+    const slug = item.moduleSlug ? normalizeModuleSlug(item.moduleSlug) : ""
+    return PROGRAMS_AND_EVENTS_MERGED_SLUGS.has(slug)
+  })
+
+  if (mergedSource.length === 0) {
+    return items
+  }
+
+  const availableSlugs = new Set(
+    mergedSource.map((item) => normalizeModuleSlug(item.moduleSlug || ""))
+  )
+  const children = buildProgramsAndEventsChildren(availableSlugs)
+  if (children.length === 0) {
+    return items.filter((item) => {
+      const slug = item.moduleSlug ? normalizeModuleSlug(item.moduleSlug) : ""
+      return !PROGRAMS_AND_EVENTS_MERGED_SLUGS.has(slug)
+    })
+  }
+
+  const combined: NavItem = {
+    label: PROGRAMS_AND_EVENTS_MODULE_LABEL,
+    href: children[0]?.href || "/programs/catalog",
+    icon: GraduationCap,
+    matchPrefix: children[0]?.matchPrefix || "/programs",
+    alsoMatchPrefixes: [
+      "/workforce",
+      "/programs",
+      "/finance",
+      "/event-management",
+      "/reports",
+    ],
+    group: "Operations",
+    moduleSlug: PROGRAMS_AND_EVENTS_MODULE_SLUG,
+    children,
+  }
+
+  const result: NavItem[] = []
+  let inserted = false
+  for (const item of items) {
+    const slug = item.moduleSlug ? normalizeModuleSlug(item.moduleSlug) : ""
+    if (PROGRAMS_AND_EVENTS_MERGED_SLUGS.has(slug)) {
+      if (!inserted) {
+        result.push(combined)
+        inserted = true
+      }
+      continue
+    }
+    result.push(item)
+  }
+
+  if (!inserted) {
+    result.push(combined)
+  }
+
+  return result
 }
 
 function userCanAccess(permissionContext: UserPermissionContext, permissionKey?: string) {
@@ -551,7 +616,19 @@ function filterNavItemsByPermissions(items: NavItem[], permissionContext: UserPe
       ...item,
       children: item.children ? filterSubItemsByPermission(item.children, canAccess) : undefined,
     }))
-    .filter((item) => !(item.children && item.children.length === 0 && item.href === "#"))
+    .filter((item) => {
+      if (item.children && item.children.length === 0 && item.href === "#") {
+        return false
+      }
+      // Combined module with no visible groups after permissions.
+      if (
+        item.moduleSlug === PROGRAMS_AND_EVENTS_MODULE_SLUG &&
+        (!item.children || item.children.length === 0)
+      ) {
+        return false
+      }
+      return true
+    })
 
   if (
     isFacilitiesOnlyAccess({
@@ -675,7 +752,10 @@ function buildNavItems(
     },
   ]
 
-  return filterNavItemsByPermissions(allItems, permissionContext)
+  return filterNavItemsByPermissions(
+    collapseProgramsAndEventsNavItems(allItems),
+    permissionContext
+  )
 }
 
 export function SidebarProvider({ children }: { children: React.ReactNode }) {

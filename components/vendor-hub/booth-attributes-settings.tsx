@@ -4,7 +4,6 @@ import { useEffect, useState, useTransition } from "react"
 import { Loader2, Pencil, Plus, Trash2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -64,12 +63,6 @@ const emptyForm: AttributeFormState = {
   description: "",
   is_active: true,
   sort_order: 0,
-}
-
-const categoryLabels: Record<BoothAttributeCategory, string> = {
-  utility: "Utility",
-  placement: "Placement",
-  environment: "Environment",
 }
 
 export function BoothAttributesSettings() {
@@ -209,8 +202,6 @@ export function BoothAttributesSettings() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -218,12 +209,6 @@ export function BoothAttributesSettings() {
                 {attributes.map((attribute) => (
                   <TableRow key={attribute.id}>
                     <TableCell className="font-medium">{attribute.name}</TableCell>
-                    <TableCell>{categoryLabels[attribute.category]}</TableCell>
-                    <TableCell>
-                      <Badge variant={attribute.is_active ? "default" : "secondary"}>
-                        {attribute.is_active ? "Active" : "Hidden"}
-                      </Badge>
-                    </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         <Button variant="outline" size="sm" onClick={() => openEdit(attribute)}>

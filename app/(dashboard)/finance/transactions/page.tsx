@@ -1,16 +1,13 @@
 import { Suspense } from "react"
 
 import { Header } from "@/components/layout/header"
+import { ProgramsReportsNav } from "@/components/programs/programs-reports-nav"
 import { OrgReportsClient } from "@/components/reports/org-reports-client"
 import { FINANCE_TRANSACTIONS_PATH } from "@/lib/finance/finance-paths"
 import { hasPermission, PERMISSIONS } from "@/lib/permissions/permissions"
 import { redirect } from "next/navigation"
 
-export default async function FinanceTransactionsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ tab?: string }>
-}) {
+export default async function FinanceTransactionsPage() {
   const canView =
     (await hasPermission(PERMISSIONS.FINANCE_VIEW)) ||
     (await hasPermission(PERMISSIONS.REPORTS_VIEW))
@@ -18,11 +15,14 @@ export default async function FinanceTransactionsPage({
     redirect("/unauthorized")
   }
 
-  const { tab } = await searchParams
-
   return (
     <>
-      <Header title="Transactions" />
+      <Header title="Reports" />
+
+      <Suspense fallback={null}>
+        <ProgramsReportsNav />
+      </Suspense>
+
       <div className="flex flex-col gap-6 p-6">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Transactions</h1>
@@ -37,10 +37,7 @@ export default async function FinanceTransactionsPage({
             </div>
           }
         >
-          <OrgReportsClient
-            initialTab={tab}
-            basePath={FINANCE_TRANSACTIONS_PATH}
-          />
+          <OrgReportsClient basePath={FINANCE_TRANSACTIONS_PATH} />
         </Suspense>
       </div>
     </>

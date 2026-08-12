@@ -58,7 +58,6 @@ const STATUS_OPTIONS: ProgramOfferingStatus[] = [
   "draft",
   "active",
   "closed",
-  "archived",
 ]
 
 const WORKSPACE_TABS = [
@@ -323,7 +322,7 @@ export function OfferingSettingsBrandingRow({
       <div className="space-y-1.5">
         <Label>Description</Label>
         <div className="min-h-[180px] rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground whitespace-pre-wrap">
-          {description?.trim() || "No description on the year/season."}
+          {description?.trim() || "No description on the program."}
         </div>
       </div>
     </div>
@@ -537,7 +536,6 @@ export function OfferingOverviewFields({
               })
             }
             className="h-9 w-full rounded-md border bg-background px-3 text-sm disabled:opacity-60"
-            title="Use Archived to hide from customers without deleting."
           >
             {STATUS_OPTIONS.map((status) => (
               <option key={status} value={status}>
@@ -668,6 +666,8 @@ function OverviewFooter({
   onSave,
   offering,
   onDelete,
+  canDelete = true,
+  deleteBlockedReason = null,
 }: {
   isCreating: boolean
   isSaving: boolean
@@ -675,44 +675,52 @@ function OverviewFooter({
   onSave: () => void
   offering: ProgramOffering | null
   onDelete: (offeringId: string) => Promise<void>
+  canDelete?: boolean
+  deleteBlockedReason?: string | null
 }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-4">
       <div>
-        {offering && !offering.is_default ? (
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="text-destructive hover:text-destructive"
-                disabled={isSaving}
-              >
-                <Trash2 className="mr-1 h-4 w-4" />
-                Delete
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete {offering.name}?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This permanently removes the program, its registration
-                  options, and linked pricing setup. Programs with registrations
-                  cannot be deleted — use Archived instead.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  onClick={() => void onDelete(offering.id)}
+        {offering ? (
+          canDelete ? (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="text-destructive hover:text-destructive"
+                  disabled={isSaving}
                 >
-                  Delete program
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+                  <Trash2 className="mr-1 h-4 w-4" />
+                  Delete
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete {offering.name}?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This permanently removes the program, its registration
+                    options, and linked pricing setup. This cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    onClick={() => void onDelete(offering.id)}
+                  >
+                    Delete program
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              {deleteBlockedReason ||
+                "Delete is unavailable while this program has registrations or payments."}
+            </p>
+          )
         ) : null}
       </div>
       <Button type="button" onClick={onSave} disabled={isSaving || !canSave}>

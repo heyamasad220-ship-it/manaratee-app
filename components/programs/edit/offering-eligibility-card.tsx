@@ -29,6 +29,8 @@ export function OfferingEligibilityCard({
   disabled = false,
   plain = false,
   hideAudience = false,
+  /** Hide gender/ages when those live on the parent edit form (grades remain). */
+  hideGenderAndAges = false,
 }: {
   audienceType: OfferingAudienceType
   onAudienceTypeChange: (audience: OfferingAudienceType) => void
@@ -44,6 +46,7 @@ export function OfferingEligibilityCard({
   plain?: boolean
   /** Settings layout: audience is inferred from min age; hide the control. */
   hideAudience?: boolean
+  hideGenderAndAges?: boolean
 }) {
   const showGradeFields = gradesApplyForMinAge(minAge)
   const showAudience = !hideAudience && !plain
@@ -52,70 +55,74 @@ export function OfferingEligibilityCard({
     return (
       <EditSectionCard plain>
         <div className={cn("space-y-3", disabled && "opacity-60")}>
-          <p className="text-xs font-medium text-muted-foreground">
-            Select participants
-          </p>
+          {!hideGenderAndAges ? (
+            <>
+              <p className="text-xs font-medium text-muted-foreground">
+                Select participants
+              </p>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="gender">Gender</Label>
-            <select
-              id="gender"
-              value={programGender}
-              disabled={disabled}
-              onChange={(event) =>
-                onProgramGenderChange(event.target.value as ProgramGender)
-              }
-              className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-            >
-              <option value="Male">Male</option>
-              <option value="Female">Female</option>
-              <option value="All">Both</option>
-            </select>
-          </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="gender">Gender</Label>
+                <select
+                  id="gender"
+                  value={programGender}
+                  disabled={disabled}
+                  onChange={(event) =>
+                    onProgramGenderChange(event.target.value as ProgramGender)
+                  }
+                  className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                >
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="All">Both</option>
+                </select>
+              </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="min_age">Minimum Age</Label>
-            <select
-              id="min_age"
-              value={ageSelectValue(minAge)}
-              disabled={disabled}
-              onChange={(event) =>
-                onMinAgeChange(
-                  event.target.value ? Number(event.target.value) : null
-                )
-              }
-              className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-            >
-              <option value="">No minimum</option>
-              {AGE_OPTIONS.map((age) => (
-                <option key={age} value={age}>
-                  {age}
-                </option>
-              ))}
-            </select>
-          </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="min_age">Minimum Age</Label>
+                <select
+                  id="min_age"
+                  value={ageSelectValue(minAge)}
+                  disabled={disabled}
+                  onChange={(event) =>
+                    onMinAgeChange(
+                      event.target.value ? Number(event.target.value) : null
+                    )
+                  }
+                  className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                >
+                  <option value="">No minimum</option>
+                  {AGE_OPTIONS.map((age) => (
+                    <option key={age} value={age}>
+                      {age}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="max_age">Maximum Age</Label>
-            <select
-              id="max_age"
-              value={ageSelectValue(maxAge)}
-              disabled={disabled}
-              onChange={(event) =>
-                onMaxAgeChange(
-                  event.target.value ? Number(event.target.value) : null
-                )
-              }
-              className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-            >
-              <option value="">No maximum</option>
-              {AGE_OPTIONS.map((age) => (
-                <option key={age} value={age}>
-                  {age}
-                </option>
-              ))}
-            </select>
-          </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="max_age">Maximum Age</Label>
+                <select
+                  id="max_age"
+                  value={ageSelectValue(maxAge)}
+                  disabled={disabled}
+                  onChange={(event) =>
+                    onMaxAgeChange(
+                      event.target.value ? Number(event.target.value) : null
+                    )
+                  }
+                  className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                >
+                  <option value="">No maximum</option>
+                  {AGE_OPTIONS.map((age) => (
+                    <option key={age} value={age}>
+                      {age}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </>
+          ) : null}
 
           {showGradeFields ? (
             <div className="space-y-1.5">
@@ -175,66 +182,70 @@ export function OfferingEligibilityCard({
           </div>
         ) : null}
 
-        <div className="space-y-1.5">
-          <Label htmlFor="gender">Gender</Label>
-          <select
-            id="gender"
-            value={programGender}
-            disabled={disabled}
-            onChange={(event) =>
-              onProgramGenderChange(event.target.value as ProgramGender)
-            }
-            className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-          >
-            <option value="Male">Male</option>
-            <option value="Female">Female</option>
-            <option value="All">Both</option>
-          </select>
-        </div>
+        {!hideGenderAndAges ? (
+          <>
+            <div className="space-y-1.5">
+              <Label htmlFor="gender">Gender</Label>
+              <select
+                id="gender"
+                value={programGender}
+                disabled={disabled}
+                onChange={(event) =>
+                  onProgramGenderChange(event.target.value as ProgramGender)
+                }
+                className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+              >
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="All">Both</option>
+              </select>
+            </div>
 
-        <div className="space-y-1.5">
-          <Label htmlFor="min_age">Minimum Age</Label>
-          <select
-            id="min_age"
-            value={ageSelectValue(minAge)}
-            disabled={disabled}
-            onChange={(event) =>
-              onMinAgeChange(
-                event.target.value ? Number(event.target.value) : null
-              )
-            }
-            className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-          >
-            <option value="">No minimum</option>
-            {AGE_OPTIONS.map((age) => (
-              <option key={age} value={age}>
-                {age}
-              </option>
-            ))}
-          </select>
-        </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="min_age">Minimum Age</Label>
+              <select
+                id="min_age"
+                value={ageSelectValue(minAge)}
+                disabled={disabled}
+                onChange={(event) =>
+                  onMinAgeChange(
+                    event.target.value ? Number(event.target.value) : null
+                  )
+                }
+                className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+              >
+                <option value="">No minimum</option>
+                {AGE_OPTIONS.map((age) => (
+                  <option key={age} value={age}>
+                    {age}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-        <div className="space-y-1.5">
-          <Label htmlFor="max_age">Maximum Age</Label>
-          <select
-            id="max_age"
-            value={ageSelectValue(maxAge)}
-            disabled={disabled}
-            onChange={(event) =>
-              onMaxAgeChange(
-                event.target.value ? Number(event.target.value) : null
-              )
-            }
-            className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-          >
-            <option value="">No maximum</option>
-            {AGE_OPTIONS.map((age) => (
-              <option key={age} value={age}>
-                {age}
-              </option>
-            ))}
-          </select>
-        </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="max_age">Maximum Age</Label>
+              <select
+                id="max_age"
+                value={ageSelectValue(maxAge)}
+                disabled={disabled}
+                onChange={(event) =>
+                  onMaxAgeChange(
+                    event.target.value ? Number(event.target.value) : null
+                  )
+                }
+                className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+              >
+                <option value="">No maximum</option>
+                {AGE_OPTIONS.map((age) => (
+                  <option key={age} value={age}>
+                    {age}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </>
+        ) : null}
       </div>
 
       {showGradeFields ? (

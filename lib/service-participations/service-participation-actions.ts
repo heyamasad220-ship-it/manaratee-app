@@ -198,7 +198,7 @@ export async function registerChildForOpportunityChildcare(input: {
   }
 
   revalidateParticipationPaths(input.sourceType, input.sourceId)
-  revalidatePath("/event-management/reports/childcare")
+  revalidatePath("/programs/reports/childcare")
   revalidatePath("/workforce/childcare/registrations")
 }
 

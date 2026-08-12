@@ -33,6 +33,91 @@ const ENROLLMENT_TYPE_OPTIONS: Array<{
   },
 ]
 
+/** Waitlist / Attendance / Auto Register — title above, switch below, one row. */
+export function OfferingEnrollmentOptionToggles({
+  enableWaitlist,
+  onEnableWaitlistChange,
+  attendanceTracked = false,
+  onAttendanceTrackedChange,
+  openEnrollment = false,
+  onOpenEnrollmentChange,
+  disabled = false,
+  /** Compact labels for Advanced Settings row. */
+  compactLabels = false,
+}: {
+  enableWaitlist: boolean
+  onEnableWaitlistChange: (enabled: boolean) => void
+  attendanceTracked?: boolean
+  onAttendanceTrackedChange?: (enabled: boolean) => void
+  openEnrollment?: boolean
+  onOpenEnrollmentChange?: (enabled: boolean) => void
+  disabled?: boolean
+  compactLabels?: boolean
+}) {
+  return (
+    <div className={cn("grid gap-4 sm:grid-cols-3", disabled && "opacity-60")}>
+      <div className="space-y-2">
+        <Label htmlFor="enrollment-waitlist">Enable waitlist</Label>
+        <div className="flex items-center gap-3">
+          <Switch
+            id="enrollment-waitlist"
+            checked={enableWaitlist}
+            disabled={disabled}
+            onCheckedChange={onEnableWaitlistChange}
+          />
+          {!compactLabels ? (
+            <span className="text-sm text-muted-foreground">
+              {enableWaitlist ? "On" : "Off"}
+            </span>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="enrollment-attendance">Attendance</Label>
+        <div className="flex items-center gap-3">
+          <Switch
+            id="enrollment-attendance"
+            checked={attendanceTracked}
+            disabled={disabled}
+            onCheckedChange={(checked) => {
+              onAttendanceTrackedChange?.(checked)
+            }}
+          />
+          {!compactLabels ? (
+            <span className="text-sm text-muted-foreground">
+              {attendanceTracked ? "Track attendance" : "Off"}
+            </span>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="enrollment-open-path">
+          {compactLabels ? "Auto Register" : "Automatically register and pay"}
+        </Label>
+        <div className="flex items-center gap-3">
+          <Switch
+            id="enrollment-open-path"
+            checked={openEnrollment}
+            disabled={disabled}
+            onCheckedChange={(checked) => {
+              onOpenEnrollmentChange?.(checked)
+            }}
+          />
+          {!compactLabels ? (
+            <span className="text-sm text-muted-foreground">
+              {openEnrollment
+                ? "No approval — customers register and pay"
+                : "Require Apply / Approve first"}
+            </span>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function OfferingEnrollmentWindowCard({
   fullProgramEnabled,
   sessionRegistrationEnabled,
@@ -53,6 +138,10 @@ export function OfferingEnrollmentWindowCard({
   onAttendanceTrackedChange,
   disabled = false,
   plain = false,
+  /** Hide dates / auto-register when those live on the parent edit form. */
+  hideBasicFields = false,
+  /** When false, parent renders toggles elsewhere (e.g. under Sessions). */
+  showOptionToggles = true,
 }: {
   fullProgramEnabled: boolean
   sessionRegistrationEnabled: boolean
@@ -74,6 +163,8 @@ export function OfferingEnrollmentWindowCard({
   onAttendanceTrackedChange?: (enabled: boolean) => void
   disabled?: boolean
   plain?: boolean
+  hideBasicFields?: boolean
+  showOptionToggles?: boolean
 }) {
   const typeChecked: Record<EnrollmentTypeId, boolean> = {
     full_program: fullProgramEnabled,
@@ -89,12 +180,10 @@ export function OfferingEnrollmentWindowCard({
 
   const enrollmentModel = (
     <div className="space-y-1.5">
-      <Label>Enrollment Model</Label>
       <div
         className={cn(
-          plain
-            ? "space-y-2"
-            : "space-y-2 rounded-md border bg-background px-3 py-2",
+          "flex flex-wrap items-center gap-x-5 gap-y-2",
+          !plain && "rounded-md border bg-background px-3 py-2",
           disabled && "opacity-60"
         )}
       >
@@ -124,98 +213,62 @@ export function OfferingEnrollmentWindowCard({
     </div>
   )
 
+  const optionToggles = showOptionToggles ? (
+    <OfferingEnrollmentOptionToggles
+      enableWaitlist={enableWaitlist}
+      onEnableWaitlistChange={onEnableWaitlistChange}
+      attendanceTracked={attendanceTracked}
+      onAttendanceTrackedChange={onAttendanceTrackedChange}
+      openEnrollment={openEnrollment}
+      onOpenEnrollmentChange={onOpenEnrollmentChange}
+      disabled={disabled}
+    />
+  ) : null
+
   if (plain) {
     return (
       <EditSectionCard plain>
         <div className={cn("space-y-3", disabled && "opacity-60")}>
-          <div className="space-y-1.5">
-            <Label htmlFor="enrollment_open_date">Enrollment Opens</Label>
-            <div className="relative">
-              <CalendarIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                id="enrollment_open_date"
-                type="date"
-                className="h-9 bg-background pl-9"
-                value={enrollmentOpenDate}
-                disabled={disabled}
-                onChange={(event) =>
-                  onEnrollmentOpenDateChange(event.target.value)
-                }
-              />
-            </div>
-          </div>
+          {!hideBasicFields ? (
+            <>
+              <div className="space-y-1.5">
+                <Label htmlFor="enrollment_open_date">Enrollment Opens</Label>
+                <div className="relative">
+                  <CalendarIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="enrollment_open_date"
+                    type="date"
+                    className="h-9 bg-background pl-9"
+                    value={enrollmentOpenDate}
+                    disabled={disabled}
+                    onChange={(event) =>
+                      onEnrollmentOpenDateChange(event.target.value)
+                    }
+                  />
+                </div>
+              </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="enrollment_close_date">Enrollment Closes</Label>
-            <div className="relative">
-              <CalendarIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                id="enrollment_close_date"
-                type="date"
-                className="h-9 bg-background pl-9"
-                value={enrollmentCloseDate}
-                disabled={disabled}
-                onChange={(event) =>
-                  onEnrollmentCloseDateChange(event.target.value)
-                }
-              />
-            </div>
-          </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="enrollment_close_date">Enrollment Closes</Label>
+                <div className="relative">
+                  <CalendarIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="enrollment_close_date"
+                    type="date"
+                    className="h-9 bg-background pl-9"
+                    value={enrollmentCloseDate}
+                    disabled={disabled}
+                    onChange={(event) =>
+                      onEnrollmentCloseDateChange(event.target.value)
+                    }
+                  />
+                </div>
+              </div>
+            </>
+          ) : null}
 
           {enrollmentModel}
-
-          <div className="space-y-1.5">
-            <Label htmlFor="enrollment-open-path">
-              Automatically register and pay
-            </Label>
-            <div className="flex h-9 items-center gap-3">
-              <Switch
-                id="enrollment-open-path"
-                checked={openEnrollment}
-                disabled={disabled}
-                onCheckedChange={(checked) => {
-                  onOpenEnrollmentChange?.(checked)
-                }}
-              />
-              <span className="text-sm text-muted-foreground">
-                {openEnrollment
-                  ? "No approval — customers register and pay"
-                  : "Require Apply / Approve first"}
-              </span>
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="enrollment-waitlist">Enable waitlist</Label>
-            <div className="flex h-9 items-center gap-3">
-              <Switch
-                id="enrollment-waitlist"
-                checked={enableWaitlist}
-                disabled={disabled}
-                onCheckedChange={onEnableWaitlistChange}
-              />
-              <span className="text-sm text-muted-foreground">
-                {enableWaitlist ? "On" : "Off"}
-              </span>
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="enrollment-attendance">Attendance</Label>
-            <div className="flex h-9 items-center gap-3">
-              <Switch
-                id="enrollment-attendance"
-                checked={attendanceTracked}
-                disabled={disabled}
-                onCheckedChange={(checked) => {
-                  onAttendanceTrackedChange?.(checked)
-                }}
-              />
-              <span className="text-sm text-muted-foreground">
-                {attendanceTracked ? "Track attendance" : "Off"}
-              </span>
-            </div>
-          </div>
+          {optionToggles}
         </div>
       </EditSectionCard>
     )
@@ -224,109 +277,63 @@ export function OfferingEnrollmentWindowCard({
   return (
     <EditSectionCard title="Enrollment Window & Type">
       <div className="grid gap-4 lg:grid-cols-5">
-        <div className="space-y-1.5">
-          <Label htmlFor="enrollment_open_date">Enrollment Opens</Label>
-          <div className="relative">
-            <CalendarIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              id="enrollment_open_date"
-              type="date"
-              className="h-9 bg-background pl-9"
-              value={enrollmentOpenDate}
-              disabled={disabled}
-              onChange={(event) => onEnrollmentOpenDateChange(event.target.value)}
-            />
-          </div>
-        </div>
+        {!hideBasicFields ? (
+          <>
+            <div className="space-y-1.5">
+              <Label htmlFor="enrollment_open_date">Enrollment Opens</Label>
+              <div className="relative">
+                <CalendarIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="enrollment_open_date"
+                  type="date"
+                  className="h-9 bg-background pl-9"
+                  value={enrollmentOpenDate}
+                  disabled={disabled}
+                  onChange={(event) => onEnrollmentOpenDateChange(event.target.value)}
+                />
+              </div>
+            </div>
 
-        <div className="space-y-1.5">
-          <Label htmlFor="enrollment_close_date">Enrollment Closes</Label>
-          <div className="relative">
-            <CalendarIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              id="enrollment_close_date"
-              type="date"
-              className="h-9 bg-background pl-9"
-              value={enrollmentCloseDate}
-              disabled={disabled}
-              onChange={(event) =>
-                onEnrollmentCloseDateChange(event.target.value)
-              }
-            />
-          </div>
-        </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="enrollment_close_date">Enrollment Closes</Label>
+              <div className="relative">
+                <CalendarIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="enrollment_close_date"
+                  type="date"
+                  className="h-9 bg-background pl-9"
+                  value={enrollmentCloseDate}
+                  disabled={disabled}
+                  onChange={(event) =>
+                    onEnrollmentCloseDateChange(event.target.value)
+                  }
+                />
+              </div>
+            </div>
 
-        <div className="space-y-1.5">
-          <Label>Registration Status</Label>
-          <div className="flex h-9 items-center">
-            <Badge
-              variant="secondary"
-              className={cn(
-                "rounded-full px-2.5 py-0.5 text-xs font-medium",
-                registrationOpen
-                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                  : "border-zinc-200 bg-zinc-100 text-zinc-600"
-              )}
-            >
-              {registrationOpen ? "Open" : "Closed"}
-            </Badge>
-          </div>
-        </div>
+            <div className="space-y-1.5">
+              <Label>Registration Status</Label>
+              <div className="flex h-9 items-center">
+                <Badge
+                  variant="secondary"
+                  className={cn(
+                    "rounded-full px-2.5 py-0.5 text-xs font-medium",
+                    registrationOpen
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                      : "border-zinc-200 bg-zinc-100 text-zinc-600"
+                  )}
+                >
+                  {registrationOpen ? "Open" : "Closed"}
+                </Badge>
+              </div>
+            </div>
+          </>
+        ) : null}
 
         {enrollmentModel}
-
-        <div className="space-y-1.5">
-          <Label htmlFor="enrollment-open-path">
-            Automatically register and pay
-          </Label>
-          <div className="flex h-9 items-center gap-3">
-            <Switch
-              id="enrollment-open-path"
-              checked={openEnrollment}
-              disabled={disabled}
-              onCheckedChange={(checked) => {
-                onOpenEnrollmentChange?.(checked)
-              }}
-            />
-            <span className="text-sm text-muted-foreground">
-              {openEnrollment
-                ? "No approval — customers register and pay"
-                : "Require Apply / Approve first"}
-            </span>
-          </div>
-        </div>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="enrollment-waitlist">Enable waitlist</Label>
-          <div className="flex h-9 items-center gap-3">
-            <Switch
-              id="enrollment-waitlist"
-              checked={enableWaitlist}
-              disabled={disabled}
-              onCheckedChange={onEnableWaitlistChange}
-            />
-            <span className="text-sm text-muted-foreground">
-              {enableWaitlist ? "On" : "Off"}
-            </span>
-          </div>
-        </div>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="enrollment-attendance">Attendance</Label>
-          <div className="flex h-9 items-center gap-3">
-            <Switch
-              id="enrollment-attendance"
-              checked={attendanceTracked}
-              disabled={disabled}
-              onCheckedChange={(checked) => {
-                onAttendanceTrackedChange?.(checked)
-              }}
-            />
-            <span className="text-sm text-muted-foreground">
-              {attendanceTracked ? "Track attendance" : "Off"}
-            </span>
-          </div>
-        </div>
+        {optionToggles ? (
+          <div className="lg:col-span-5">{optionToggles}</div>
+        ) : null}
       </div>
     </EditSectionCard>
   )

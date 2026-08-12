@@ -1,6 +1,9 @@
+import { Suspense } from "react"
+
 import { Header } from "@/components/layout/header"
 import { OfferingCatalogView } from "@/components/programs/offering-catalog-view"
 import { ProgramCatalogFilters } from "@/components/programs/program-catalog-filters"
+import { ProgramsSectionNav } from "@/components/programs/programs-section-nav"
 import { getDepartments } from "@/lib/departments/department-queries"
 import { getActiveOfferingsForCatalog } from "@/lib/programs/offering-catalog-queries"
 import {
@@ -52,6 +55,10 @@ export default async function ProgramsPage({
   return (
     <>
       <Header title="Programs" />
+
+      <Suspense fallback={null}>
+        <ProgramsSectionNav />
+      </Suspense>
 
       <div className="p-6">
         <OfferingCatalogView

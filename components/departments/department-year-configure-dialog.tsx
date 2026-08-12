@@ -179,6 +179,7 @@ export function DepartmentYearConfigureDialog({
                 initialVisibility={toVisibility(visibility)}
                 programStatusFallback={program.status}
                 layout="stack"
+                hideDepartment
               />
             </form>
           ) : (

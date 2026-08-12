@@ -15,6 +15,29 @@ export type DepartmentApplicationListFilter =
   | "submitted"
   | "approved_pending_registration"
 
+/** New-student prior learning path. */
+export type ProgramApplicationPriorBackground =
+  | "starting_from_scratch"
+  | "moving_from_another_center"
+
+/** Preferred payment plan once approved / registering. */
+export type ProgramApplicationPaymentPreference =
+  | "full"
+  | "two_payments"
+  | "monthly"
+
+/** Structured answers on program_applications.application_answers (JSONB). */
+export type ProgramApplicationAnswers = {
+  previous_courses?: string | null
+  previous_certificates?: string | null
+  prior_background?: ProgramApplicationPriorBackground | null
+  prior_center_name?: string | null
+  needs_babysitter?: boolean | null
+  payment_preference?: ProgramApplicationPaymentPreference | null
+  /** All courses requested; `program_applications.offering_id` stores the primary. */
+  requested_offering_ids?: string[] | null
+}
+
 export const PROGRAM_APPLICATION_STATUS_LABELS: Record<
   ProgramApplicationStatus,
   string
@@ -33,6 +56,90 @@ export const PROGRAM_APPLICANT_TYPE_LABELS: Record<
   new: "New",
 }
 
+export const PROGRAM_APPLICATION_PRIOR_BACKGROUND_LABELS: Record<
+  ProgramApplicationPriorBackground,
+  string
+> = {
+  starting_from_scratch: "Starting from scratch",
+  moving_from_another_center: "Moving from another centre",
+}
+
+export const PROGRAM_APPLICATION_PAYMENT_PREFERENCE_LABELS: Record<
+  ProgramApplicationPaymentPreference,
+  string
+> = {
+  full: "Full payment",
+  two_payments: "Two payments (one per semester)",
+  monthly: "Monthly payment",
+}
+
+export const EMPTY_PROGRAM_APPLICATION_ANSWERS: ProgramApplicationAnswers = {
+  previous_courses: null,
+  previous_certificates: null,
+  prior_background: null,
+  prior_center_name: null,
+  needs_babysitter: null,
+  payment_preference: null,
+  requested_offering_ids: null,
+}
+
+export function normalizeProgramApplicationAnswers(
+  value: unknown
+): ProgramApplicationAnswers {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return { ...EMPTY_PROGRAM_APPLICATION_ANSWERS }
+  }
+  const row = value as Record<string, unknown>
+  const prior = row.prior_background
+  const payment = row.payment_preference
+  const requested = Array.isArray(row.requested_offering_ids)
+    ? row.requested_offering_ids
+        .map((id) => String(id || "").trim())
+        .filter(Boolean)
+    : null
+  return {
+    previous_courses:
+      typeof row.previous_courses === "string" ? row.previous_courses : null,
+    previous_certificates:
+      typeof row.previous_certificates === "string"
+        ? row.previous_certificates
+        : null,
+    prior_background:
+      prior === "starting_from_scratch" ||
+      prior === "moving_from_another_center"
+        ? prior
+        : null,
+    prior_center_name:
+      typeof row.prior_center_name === "string" ? row.prior_center_name : null,
+    needs_babysitter:
+      typeof row.needs_babysitter === "boolean" ? row.needs_babysitter : null,
+    payment_preference:
+      payment === "full" ||
+      payment === "two_payments" ||
+      payment === "monthly"
+        ? payment
+        : null,
+    requested_offering_ids: requested && requested.length > 0 ? requested : null,
+  }
+}
+
+/** Resolve selected course IDs from answers + primary offering_id. */
+export function resolveRequestedOfferingIds(
+  primaryOfferingId: string | null | undefined,
+  answers: ProgramApplicationAnswers | null | undefined
+): string[] {
+  const fromAnswers = answers?.requested_offering_ids || []
+  if (fromAnswers.length > 0) {
+    const primary = (primaryOfferingId || "").trim()
+    if (primary && !fromAnswers.includes(primary)) {
+      return [primary, ...fromAnswers]
+    }
+    return [...fromAnswers]
+  }
+  const primary = (primaryOfferingId || "").trim()
+  return primary ? [primary] : []
+}
+
 export type ProgramApplication = {
   id: string
   organization_id: string
@@ -45,12 +152,14 @@ export type ProgramApplication = {
   applicant_type: ProgramApplicantType
   status: ProgramApplicationStatus
   source: ProgramApplicationSource
+  application_answers: ProgramApplicationAnswers
   evaluation_notes: string | null
   evaluated_at: string | null
   evaluated_by_user_id: string | null
   enrollment_id: string | null
   waitlist_id: string | null
   created_by_user_id: string | null
+  updated_by_user_id: string | null
   created_at: string
   updated_at: string
 }
@@ -59,4 +168,8 @@ export type ProgramApplicationWithDetails = ProgramApplication & {
   program_name?: string
   offering_name?: string
   approved_offering_name?: string | null
+  /** Staff who last saved/evaluated — for Last Updated column. */
+  updated_by_name?: string | null
+  /** Staff who approved / not-approved — preferred when present. */
+  evaluated_by_name?: string | null
 }

@@ -27,7 +27,13 @@ async function ensureProgramFlyersBucket() {
     {
       public: true,
       fileSizeLimit: 10 * 1024 * 1024,
-      allowedMimeTypes: ["image/png", "image/jpeg", "image/webp", "image/gif"],
+      allowedMimeTypes: [
+        "image/png",
+        "image/jpeg",
+        "image/webp",
+        "image/gif",
+        "application/pdf",
+      ],
     }
   )
 

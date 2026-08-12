@@ -67,7 +67,7 @@ Features:
 * Organization filtering
 * Program details
 * Eligibility rules (ages, grades, gender, capacity groups)
-* Registration model, eligibility, capacity, and fee plans (offering manage **Settings**; unified fees + discounts save with page Save; run `scripts/200_program_pricing_billing_scope.sql`)
+* Registration model, eligibility, capacity, and fee plans (offering overview + edit dialog Advanced; unified fees + discounts save with dialog Save; run `scripts/200_program_pricing_billing_scope.sql`)
 * Program detail **Reports** — enrollments across offerings (filter + CSV)
 * Offering-scoped pricing (Phase 2A/2B)
 * **Department Settings** (`?tab=settings` on department workspace): General / Registration / Notifications stubs (`department_program_settings`); department-wide promo codes (`discount_codes.department_id`); Service Needs for that department’s years. Legacy `/programs/settings*` → `/workforce?tab=departments`. Run **`scripts/190_department_settings_promo_codes.sql`**.
@@ -89,7 +89,7 @@ Features:
 
 * Program sessions table
 * Session capacity fields
-* Add/edit sessions from offering manage Registration → Sessions (always available; tip if Selected Sessions / Day Pass off)
+* Add/edit sessions from offering edit dialog → Advanced → Sessions (always available; tip if Selected Sessions / Day Pass off)
 
 Pending:
 
@@ -108,6 +108,10 @@ Features:
 * Waitlist records
 * Registration detail pages
 * Status management
+* **Reports → Registrations** — family/contact payment view (`/programs/registrations`)
+* **Reports → Enrollments** — one row per participant demographics/consent (`/programs/reports/enrollments`)
+* **Reports → Payment Summary** — family balances, program fees (months × monthly), additional fees (`/programs/reports/tuition-plans`)
+* **Reports → Add-ons** — one row per purchased add-on (materials, lunch, uniforms, field trips) (`/programs/reports/addons`)
 
 Known Issue:
 
@@ -175,7 +179,7 @@ Features:
 * Subscription filtering
 * Permission filtering
 * Dynamic visibility
-* Module order: Dashboard → Contacts → HR → Membership → Fund Development → Finance → Programs → …
+* Module order: Dashboard → Contacts → **Programs/ Events** → Membership → Fund Development → …
 
 * Pinned footer: Billing (super admin SaaS subscription) → Settings
 
@@ -183,16 +187,16 @@ Features:
 
 ## Finance
 
-Status: Working
+Status: Working (nav folded into **Programs/ Events**)
 
 Routes:
 
 * `/finance` → `/finance/transactions`
-* `/finance/transactions` — org payment transactions (Donations + Programs) + failed tab
-* `/finance/payroll` — org payroll queue (Mark paid)
-* `/finance/financial-assistance` — FA hub (Overview / Submissions / Templates / Reports / Payment Plans)
+* `/finance/transactions` — org payment transactions (Donations + Programs); voided hidden by default (Status column filter); **Reports** tab under Programs/ Events
+* `/finance/payroll` — org payroll queue (Mark paid); **Reports** tab under Programs/ Events
+* `/finance/financial-assistance` — FA hub (Overview / Submissions / Templates / Reports / Payment Plans); top-level **Programs/ Events** drawer item
 
-Sidebar children: Transactions, Payroll, Financial Assistance.
+No separate Finance drawer group. Transactions and Payroll are tabs on **Reports**; Financial Assistance is its own drawer link.
 
 Permissions: `finance.view` (module; fallbacks include donations/staff/reports/applications view); child pages also accept `reports.view` / `staff.view` / `applications.view` as appropriate. Mark paid requires `finance.manage`.
 
@@ -313,7 +317,7 @@ Status: Working (simplified)
 
 Route: `/workforce` (Employees tab: `?tab=employees`)
 
-HR module sidebar opens a **second drawer** like other modules: Overview, Departments, Employees, Volunteers, Childcare Providers (paths under `/workforce` / `/workforce/departments` / `/workforce/employees` / `/workforce/volunteers` / `/workforce/childcare`). Org payroll queue under **Finance → Payroll**. In-page tabs remain for switching within the HR shell.
+HR / Workforce under **Programs/ Events**: Departments (drawer link), Workforce (Employees | Volunteers | Childcare Providers tabs). Org payroll queue under **Programs/ Events → Reports → Payroll**.
 
 Roster-only employee list using the shared HR directory shell (Export, Add Employee, Employees | Applications | Positions tabs, KPI cards, Active/Inactive status filter defaulting to Active, pagination), embedded under **HR → Overview → Employees**.
 
@@ -321,7 +325,7 @@ Roster-only employee list using the shared HR directory shell (Export, Add Emplo
 
 Removed tabs (redirect to Overview):
 
-* Departments → `/workforce?tab=departments` (department workspace still at `/workforce/departments/[id]`: **Overview** (years/seasons + flyer; Super Admin **Close year**), **Programs** (`?tab=programs` — offerings for workspace years incl. closed; year filter + Add Program; manage opens `/workforce/departments/[id]/programs/[programId]/offerings/[offeringId]` so sidebar stays on Departments; year/season `?tab=offerings` redirects here), **Participants** (UI label; URL `?tab=students`; stages Needs review / Approved — not registered / Roster; program filter on roster, no year filter; legacy `?tab=rosters|enrollments|applications`; year/season `?tab=reports` → Participants roster), Schedule, **Financial** (Payroll / Expenses / Financial Summary — employees managed under Payroll, merged columns, no email/phone; legacy `?tab=employees` → Payroll), optional Group giving, **Events** (UI label; URL `?tab=activity` — department `internal_events` list; **View Master Calendar** → EM read-only Master Calendar; **Create event** → Facilities calendar drawer with department + requester prefilled; all submits await approval), **Settings** (`?tab=settings` — General / Registration / Notifications stubs; department-wide Promo Codes; Service Needs; `&section=…`); legacy **`?tab=reports` (Archive) → Overview**; Department Heads: Staff Tools **My department** + sidebar **My department** when lacking `staff.view`; apply SQL `169`/`170`/`171`/`172`/`173`/`174`/`186`/`190`; scoped access via `lib/departments/department-access.ts` for department heads; legacy settings path redirects to Overview Departments tab). Historical QIL load: `scripts/import-qil-year.mjs`; consolidate course-as-programs → offerings: `scripts/migrate-qil-courses-to-offerings.mjs` (after `174`).
+* Departments → `/workforce?tab=departments` (department workspace at `/workforce/departments/[id]`: **department-level** Overview / Programs / Group giving / Events / Settings; **year-level** via `?year=` — Overview / Offerings / Registrations / Schedule / Financial / Reports; department Overview = flyer + description + Terms (`terms_html` / `terms_pdf_url`, SQL `241`); Programs catalog = `?tab=programs` without year; click program → `?year=` Program Overview; offering manage under `/workforce/departments/[id]/programs/...`; legacy tab aliases unchanged; apply SQL `169`/`170`/`171`/`172`/`173`/`174`/`186`/`190`/`203`/`241`; scoped access via `lib/departments/department-access.ts`). Historical QIL load: `scripts/import-qil-year.mjs`; consolidate course-as-programs → offerings: `scripts/migrate-qil-courses-to-offerings.mjs` (after `174`).
 * Positions → `/workforce?tab=employees&view=positions`
 * Time Off, Work Schedule, Notifications, Teams, Applications
 
@@ -354,14 +358,14 @@ Status: Working (real data)
 **Customer apply:**
 * Volunteer → `/customer/apply/volunteer` (Profile → Applications; **Copy apply link** on Volunteers). Approve creates/links a `volunteers` roster row.
 * Childcare → `/customer/apply/childcare` (Profile → Applications; **Copy apply link** on providers). Approving creates/links a childcare `staff` row for payroll hour logging.
-**Registrations:** `/event-management/reports/childcare` (Event Management → Reports)
+**Registrations:** `/programs/reports/childcare` (Programs/ Events → Reports → Childcare)
 
 Data source: approved `childcare_provider` applications (not mock data).
 
 Key files:
 
 * `app/(dashboard)/workforce/childcare/page.tsx`
-* `app/(dashboard)/event-management/reports/childcare/page.tsx`
+* `app/(dashboard)/programs/reports/childcare/page.tsx`
 * `components/hr/hr-childcare-panel.tsx`
 * `components/child-care/childcare-registrations-client.tsx`
 * `lib/hr/childcare-provider-actions.ts`

@@ -68,6 +68,9 @@ import {
   type ModuleOwner,
 } from "@/lib/applications/application-types"
 import { ApplicationStatusBadge } from "@/components/applications/application-status-badge"
+import { StatCard, StatCardsRow, type StatCardTone } from "@/components/ui/stat-card"
+import { createClient } from "@/lib/supabase/client"
+import { getCurrentOrganizationId } from "@/lib/current-organization"
 
 type ApplicationsModulePageProps = {
   moduleOwner: ModuleOwner
@@ -93,6 +96,23 @@ type ApplicationsModulePageProps = {
   }) => void
   /** When set, application detail links pass bazaar event context for participation sync. */
   vendorHubEventId?: string
+}
+
+function vendorFormBusinessName(formData: Record<string, unknown>): string {
+  const value = formData.business_name
+  return typeof value === "string" && value.trim() ? value.trim() : "—"
+}
+
+function vendorFormBusinessType(
+  formData: Record<string, unknown>,
+  typeNameById?: Record<string, string>
+): string {
+  const name = formData.vendor_type_name
+  if (typeof name === "string" && name.trim()) return name.trim()
+  const typeId =
+    typeof formData.vendor_type_id === "string" ? formData.vendor_type_id.trim() : ""
+  if (typeId && typeNameById?.[typeId]) return typeNameById[typeId]
+  return "—"
 }
 
 function buildPageUrl(
@@ -210,8 +230,13 @@ export function ApplicationsModulePage({
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState("")
   const [typeFilter, setTypeFilter] = useState(applicationTypeFromUrl ?? "all")
+  const [vendorTypeNameById, setVendorTypeNameById] = useState<Record<string, string>>({})
 
   const statusFilter = statusFilterValueForTab(statusTabId)
+  const isVendorOnboarding =
+    moduleOwner === "vendor_hub" && lockedApplicationType === "vendor"
+  const hideStatusTabs = isVendorOnboarding
+  const tableColSpan = 6
 
   const syncUrl = useCallback(
     (nextTab: ApplicationStatusTabId, nextType?: string) => {
@@ -292,7 +317,7 @@ export function ApplicationsModulePage({
         : Promise.resolve(null)
       const listPromise = needsList
         ? fetchApplicationsList({
-            pageSize: 100,
+            pageSize: isVendorOnboarding ? 500 : 100,
             moduleOwner,
             applicationType: listApplicationType,
             status:
@@ -300,6 +325,9 @@ export function ApplicationsModulePage({
                 ? (statusFilter.split(",") as ApplicationStatus[])
                 : undefined,
             search: search.trim() || undefined,
+            // Oldest first so first-activity / historical submitted dates are visible
+            // (newest-first hid ~36 import-day rows with no earlier activity at the top).
+            sortSubmittedAscending: isVendorOnboarding,
           })
         : Promise.resolve(null)
 
@@ -317,6 +345,26 @@ export function ApplicationsModulePage({
 
       if (listResult) {
         setApplications(listResult.applications)
+
+        if (isVendorOnboarding) {
+          try {
+            const orgId = await getCurrentOrganizationId()
+            if (orgId) {
+              const supabase = createClient()
+              const { data: types } = await supabase
+                .from("vendor_hub_vendor_types")
+                .select("id, name")
+                .eq("organization_id", orgId)
+              const map: Record<string, string> = {}
+              for (const type of types || []) {
+                map[type.id as string] = type.name as string
+              }
+              setVendorTypeNameById(map)
+            }
+          } catch {
+            setVendorTypeNameById({})
+          }
+        }
       } else {
         setApplications([])
       }
@@ -329,6 +377,7 @@ export function ApplicationsModulePage({
   }, [
     applicationTypeFromUrl,
     hubApplicationTypes,
+    isVendorOnboarding,
     lockedApplicationType,
     moduleOwner,
     search,
@@ -396,34 +445,45 @@ export function ApplicationsModulePage({
     label: string
     value: number
     icon: typeof FileText
-    iconClass?: string
+    tone: StatCardTone
   }> = [
-    { id: "total", label: "Total Applications", value: dashboardStats.total, icon: FileText },
+    {
+      id: "total",
+      label: "Total Applications",
+      value: dashboardStats.total,
+      icon: FileText,
+      tone: "blue",
+    },
     {
       id: "pending_review",
       label: "Pending Review",
       value: dashboardStats.pendingReview,
       icon: Clock,
-      iconClass: "text-amber-500",
+      tone: "amber",
     },
     {
       id: "approved",
       label: "Approved",
       value: dashboardStats.approved,
       icon: CheckCircle,
-      iconClass: "text-green-500",
+      tone: "emerald",
     },
     {
       id: "rejected",
       label: "Rejected",
       value: dashboardStats.rejected,
       icon: XCircle,
-      iconClass: "text-red-500",
+      tone: "rose",
     },
   ]
 
   return (
-    <div className={cn("flex flex-1 flex-col gap-5", embedded ? "" : section === "all" ? "p-6" : "")}>
+    <div
+      className={cn(
+        "flex flex-1 flex-col gap-5",
+        embedded ? "" : section === "all" && !hidePageHeader ? "p-6" : ""
+      )}
+    >
       {!embedded && !hidePageHeader && (
         <div>
           <h2 className="text-lg font-semibold">{title}</h2>
@@ -441,55 +501,58 @@ export function ApplicationsModulePage({
 
       {showOverview && (
         <>
-          <div className="flex flex-wrap gap-4 [&>*]:w-fit">
-            {statCards.map((card) => (
-              <button
-                key={card.id}
-                type="button"
-                onClick={() => handleCardClick(card.id)}
-                className="text-left"
-              >
-                <Card
+          <StatCardsRow equal columns={4}>
+            {statCards.map((card) => {
+              const isActive =
+                section !== "overview" &&
+                dashboardCardToTabId(card.id) === statusTabId
+              return (
+                <button
+                  key={card.id}
+                  type="button"
+                  onClick={() => handleCardClick(card.id)}
+                  className="h-full w-full min-w-0 text-left"
+                >
+                  <StatCard
+                    fill
+                    layout="header"
+                    label={card.label}
+                    value={card.value}
+                    icon={card.icon}
+                    tone={card.tone}
+                    className={cn(
+                      "h-full transition-shadow hover:shadow-sm",
+                      isActive && "ring-2 ring-primary/25"
+                    )}
+                  />
+                </button>
+              )
+            })}
+          </StatCardsRow>
+
+          {!hideStatusTabs ? (
+            <div className="flex flex-wrap gap-1 rounded-lg bg-muted p-1">
+              {APPLICATION_LIST_STATUS_TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
                   className={cn(
-                    "transition-colors hover:border-primary/40 hover:bg-muted/30",
-                    section !== "overview" &&
-                      dashboardCardToTabId(card.id) === statusTabId &&
-                      "border-primary ring-1 ring-primary/20"
+                    "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                    section !== "overview" && statusTabId === tab.id
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
                   )}
                 >
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">
-                      {card.label}
-                    </CardTitle>
-                    <card.icon className={cn("h-4 w-4 text-muted-foreground", card.iconClass)} />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{card.value}</div>
-                  </CardContent>
-                </Card>
-              </button>
-            ))}
-          </div>
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
 
-          <div className="flex flex-wrap gap-1 rounded-lg bg-muted p-1">
-            {APPLICATION_LIST_STATUS_TABS.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-                className={cn(
-                  "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                  section !== "overview" && statusTabId === tab.id
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          {(section === "overview" || section === "all") && typeOptions.length > 0 && (
+          {(section === "overview" || section === "all") &&
+            !lockedApplicationType &&
+            typeOptions.length > 0 && (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {typeOptions.map((type) => {
                 const TypeIcon = getTypeIcon(type.id)
@@ -522,7 +585,7 @@ export function ApplicationsModulePage({
 
       {showSubmissions && (
         <>
-          {section === "submissions" && (
+          {section === "submissions" && !hideStatusTabs ? (
             <div className="flex flex-wrap gap-1 rounded-lg bg-muted p-1">
               {APPLICATION_LIST_STATUS_TABS.map((tab) => (
                 <button
@@ -540,7 +603,7 @@ export function ApplicationsModulePage({
                 </button>
               ))}
             </div>
-          )}
+          ) : null}
 
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
         <div className="relative flex-1">
@@ -561,13 +624,24 @@ export function ApplicationsModulePage({
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Statuses</SelectItem>
-            {Object.entries(APPLICATION_STATUS_LABELS).map(([value, label]) => (
-              <SelectItem key={value} value={value}>
-                {label}
-              </SelectItem>
-            ))}
-            <SelectItem value={PENDING_STATUSES.join(",")}>Pending Review (group)</SelectItem>
+            {isVendorOnboarding ? (
+              <>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value={PENDING_STATUSES.join(",")}>Pending Review</SelectItem>
+                <SelectItem value="approved">Approved</SelectItem>
+                <SelectItem value="rejected">Rejected</SelectItem>
+              </>
+            ) : (
+              <>
+                <SelectItem value="all">All Statuses</SelectItem>
+                {Object.entries(APPLICATION_STATUS_LABELS).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+                <SelectItem value={PENDING_STATUSES.join(",")}>Pending Review (group)</SelectItem>
+              </>
+            )}
           </SelectContent>
         </Select>
 
@@ -604,18 +678,31 @@ export function ApplicationsModulePage({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Type</TableHead>
-                <TableHead>Applicant</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Submitted</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                {isVendorOnboarding ? (
+                  <>
+                    <TableHead>Applicant</TableHead>
+                    <TableHead>Business Name</TableHead>
+                    <TableHead>Business Type</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Submitted</TableHead>
+                    <TableHead>Status</TableHead>
+                  </>
+                ) : (
+                  <>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Applicant</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Submitted</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading && (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                  <TableCell colSpan={tableColSpan} className="py-8 text-center text-muted-foreground">
                     <div className="flex items-center justify-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Loading applications...
@@ -626,6 +713,33 @@ export function ApplicationsModulePage({
 
               {!loading &&
                 applications.map((app) => {
+                  if (isVendorOnboarding) {
+                    return (
+                      <TableRow
+                        key={app.id}
+                        className="cursor-pointer"
+                        onClick={() => router.push(applicationDetailHref(app.id))}
+                      >
+                        <TableCell className="font-medium">{app.applicant_name}</TableCell>
+                        <TableCell>{vendorFormBusinessName(app.form_data)}</TableCell>
+                        <TableCell>
+                          {vendorFormBusinessType(app.form_data, vendorTypeNameById)}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {app.applicant_email}
+                        </TableCell>
+                        <TableCell>
+                          {app.submitted_at
+                            ? new Date(app.submitted_at).toLocaleDateString()
+                            : "-"}
+                        </TableCell>
+                        <TableCell>
+                          <ApplicationStatusBadge status={app.status} />
+                        </TableCell>
+                      </TableRow>
+                    )
+                  }
+
                   const TypeIcon = getTypeIcon(app.application_type)
                   return (
                     <TableRow key={app.id}>
@@ -671,7 +785,7 @@ export function ApplicationsModulePage({
 
               {!loading && applications.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                  <TableCell colSpan={tableColSpan} className="py-8 text-center text-muted-foreground">
                     No applications found
                   </TableCell>
                 </TableRow>

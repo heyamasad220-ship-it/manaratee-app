@@ -5,6 +5,8 @@ export interface Department {
   description: string | null
   color: string
   flyer_url?: string | null
+  terms_html?: string | null
+  terms_pdf_url?: string | null
   created_at: string
   updated_at: string
 }

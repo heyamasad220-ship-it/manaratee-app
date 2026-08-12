@@ -252,7 +252,7 @@ export function ProgramPromoCodesSettingsPanel() {
       <CardContent className="space-y-8">
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
-            <Label htmlFor="promo-codes-program">Year/Season</Label>
+            <Label htmlFor="promo-codes-program">Program</Label>
             <Select value={selectedProgramId} onValueChange={setSelectedProgramId}>
               <SelectTrigger id="promo-codes-program">
                 <SelectValue placeholder="Select a program" />

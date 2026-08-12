@@ -3,7 +3,7 @@
 /** Primary CTA label for opening the Facilities event create drawer. */
 export const CREATE_EVENT_CTA_LABEL = "Create event"
 
-/** Event Management collaboration calendar (read-only). */
+/** Departments collaboration calendar (read-only). */
 export const MASTER_CALENDAR_LABEL = "Master Calendar"
 
 /** Outline CTA that opens the Master Calendar. */

@@ -262,20 +262,21 @@ async function findOrCreateContact(sb, orgId, contact, counters) {
 function mergeFormData(existingFormData, contact) {
   const base =
     existingFormData && typeof existingFormData === "object" ? { ...existingFormData } : {}
-  return {
+  const next = {
     ...base,
-    import_tag: IMPORT_TAG,
     business_name: contact.business_name || base.business_name || null,
     social: contact.social || base.social || null,
     selling: contact.selling || base.selling || null,
     products_services: contact.selling || base.products_services || null,
   }
+  delete next.import_tag
+  return next
 }
 
 async function ensureVendorApplication(sb, orgId, contactId, contact, counters) {
   const { data: existing } = await sb
     .from("applications")
-    .select("id, status, notes, form_data, applicant_name, applicant_phone")
+    .select("id, status, notes, form_data, applicant_name, applicant_phone, submitted_at")
     .eq("organization_id", orgId)
     .eq("contact_id", contactId)
     .eq("application_type", "vendor")
@@ -283,6 +284,55 @@ async function ensureVendorApplication(sb, orgId, contactId, contact, counters) 
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle()
+
+  const { data: contactRow } = await sb
+    .from("contacts")
+    .select("last_activity_at, created_at")
+    .eq("id", contactId)
+    .maybeSingle()
+
+  const [{ data: payments }, { data: participants }] = await Promise.all([
+    sb
+      .from("vendor_hub_payments")
+      .select("payment_date, created_at")
+      .eq("contact_id", contactId),
+    sb
+      .from("vendor_hub_participant_status")
+      .select("vendor_hub_event_id")
+      .eq("contact_id", contactId),
+  ])
+
+  const eventIds = [
+    ...new Set(
+      (participants || []).map((row) => row.vendor_hub_event_id).filter(Boolean)
+    ),
+  ]
+  let earliestEvent = null
+  if (eventIds.length > 0) {
+    const { data: events } = await sb
+      .from("vendor_hub_events")
+      .select("event_date")
+      .in("id", eventIds)
+    for (const event of events || []) {
+      const date = event.event_date
+      if (!date) continue
+      if (!earliestEvent || date < earliestEvent) earliestEvent = date
+    }
+  }
+
+  let earliestPayment = null
+  for (const payment of payments || []) {
+    const date = (payment.payment_date || payment.created_at || "").slice(0, 10)
+    if (!date) continue
+    if (!earliestPayment || date < earliestPayment) earliestPayment = date
+  }
+
+  const earliestParticipation =
+    [earliestPayment, earliestEvent].filter(Boolean).sort()[0] || null
+
+  const activityAt = earliestParticipation
+    ? `${earliestParticipation}T12:00:00.000Z`
+    : contactRow?.created_at || new Date().toISOString()
 
   const formData = mergeFormData(existing?.form_data, contact)
 
@@ -293,10 +343,7 @@ async function ensureVendorApplication(sb, orgId, contactId, contact, counters) 
       applicant_email: contact.email,
       applicant_phone: contact.phone || existing.applicant_phone,
       status: "approved",
-      reviewed_at: new Date().toISOString(),
-      notes: String(existing.notes || "").includes(IMPORT_TAG)
-        ? existing.notes
-        : `${existing.notes || ""}\n${IMPORT_TAG}:updated`.trim(),
+      submitted_at: existing.submitted_at || activityAt,
     }
 
     const { error } = await sb.from("applications").update(patch).eq("id", existing.id)
@@ -321,10 +368,8 @@ async function ensureVendorApplication(sb, orgId, contactId, contact, counters) 
       applicant_email: contact.email,
       applicant_phone: contact.phone,
       status: "approved",
-      submitted_at: new Date().toISOString(),
-      reviewed_at: new Date().toISOString(),
+      submitted_at: activityAt,
       form_data: formData,
-      notes: `${IMPORT_TAG}:org_vendor_application`,
     })
     .select("id")
     .single()

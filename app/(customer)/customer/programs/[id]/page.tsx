@@ -412,7 +412,7 @@ export default async function CustomerProgramDetailsPage({
                 {offerings.length === 1
                   ? isOfferingOpenEnrollment(offerings[0])
                     ? "Register and pay for this program."
-                    : "Apply for the available program under this year/season."
+                    : "Apply for the available offering under this program."
                   : "Select the level, camp, or track you want."}
               </CardDescription>
             </CardHeader>

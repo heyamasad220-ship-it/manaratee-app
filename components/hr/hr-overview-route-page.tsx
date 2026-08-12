@@ -3,13 +3,12 @@ import { Suspense } from "react"
 import { Header } from "@/components/layout/header"
 import { HrOverviewClient } from "@/components/hr/hr-overview-client"
 import { fetchChildcareProvidersData } from "@/lib/hr/childcare-provider-actions"
-import { fetchPeopleManagementOverview } from "@/lib/hr/hr-overview-actions"
 import { WORKFORCE_MODULE_LABEL } from "@/lib/hr/hr-module-label"
 import type { HrOverviewTab } from "@/lib/hr/hr-overview-path"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { PERMISSIONS, requirePermission } from "@/lib/permissions/permissions"
 
-/** Shared HR overview shell for path-based section routes. */
+/** Shared Workforce shell for path-based section routes. */
 export async function HrOverviewRoutePage({
   initialTab,
 }: {
@@ -17,8 +16,7 @@ export async function HrOverviewRoutePage({
 }) {
   await requirePermission(PERMISSIONS.STAFF_VIEW)
 
-  const [overview, organizationId, childcare] = await Promise.all([
-    fetchPeopleManagementOverview(),
+  const [organizationId, childcare] = await Promise.all([
     getSelectedOrganizationId(),
     fetchChildcareProvidersData(),
   ])
@@ -33,11 +31,6 @@ export async function HrOverviewRoutePage({
       >
         <HrOverviewClient
           organizationId={organizationId}
-          overviewStats={{
-            employees: overview.employees.totalEmployees,
-            volunteers: overview.volunteerContacts,
-            childcareProviders: overview.childcareProviders,
-          }}
           childcareProviders={childcare.providers}
           childcareStats={childcare.stats}
           initialTab={initialTab}

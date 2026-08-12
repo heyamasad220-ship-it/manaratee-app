@@ -1,5 +1,5 @@
 /**
- * Offering manage page — single Settings surface (no Overview / Enrollment tabs).
+ * Offering overview page — edit via dialog (`?edit=1` to auto-open).
  * Legacy `?tab=` values still resolve to this page for bookmarks.
  *
  * Department-linked years/seasons open under
@@ -42,8 +42,10 @@ export function isLegacyOfferingManageTab(tab?: string | null): boolean {
 
 export type OfferingManageHrefOptions = {
   departmentId?: string | null
-  /** @deprecated Ignored — manage is a single settings page. */
+  /** @deprecated Ignored — overview is a single page; edit opens in a dialog. */
   tab?: string
+  /** When true, append `?edit=1` to auto-open the edit dialog. */
+  edit?: boolean
 }
 
 /**
@@ -61,11 +63,11 @@ export function programOfferingManageHref(
       : tabOrOptions || {}
 
   const departmentId = options.departmentId?.trim() || null
-  if (departmentId) {
-    return `/workforce/departments/${departmentId}/programs/${programId}/offerings/${offeringId}`
-  }
+  const base = departmentId
+    ? `/workforce/departments/${departmentId}/programs/${programId}/offerings/${offeringId}`
+    : `/programs/${programId}/offerings/${offeringId}`
 
-  return `/programs/${programId}/offerings/${offeringId}`
+  return options.edit ? `${base}?edit=1` : base
 }
 
 export function programOfferingsIndexHref(programId: string) {

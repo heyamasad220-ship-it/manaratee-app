@@ -29,6 +29,7 @@ type ContactSearchPickerProps = {
   selectedLabel: string
   onChange: (contact: ContactSearchOption) => void
   onClear?: () => void
+  onCreateNew?: () => void
   disabled?: boolean
   label?: string
 }
@@ -45,6 +46,7 @@ export function ContactSearchPicker({
   selectedLabel,
   onChange,
   onClear,
+  onCreateNew,
   disabled = false,
   label = "Contact",
 }: ContactSearchPickerProps) {
@@ -121,11 +123,25 @@ export function ContactSearchPicker({
                 </div>
               ) : null}
               <CommandEmpty>
-                <div className="space-y-1 px-2 py-3 text-sm">
+                <div className="space-y-2 px-2 py-3 text-sm">
                   <p>No contact found.</p>
                   <p className="text-muted-foreground">
-                    Use Create new contact below, then finish creating the vendor.
+                    Create a contact first, then finish adding the vendor.
                   </p>
+                  {onCreateNew ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => {
+                        setOpen(false)
+                        onCreateNew()
+                      }}
+                    >
+                      Create new contact
+                    </Button>
+                  ) : null}
                 </div>
               </CommandEmpty>
               <CommandGroup>

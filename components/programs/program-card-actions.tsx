@@ -193,7 +193,7 @@ export function ProgramCardActions({
             variant="ghost"
             size="icon"
             className="h-8 w-8 shrink-0"
-            aria-label="Year/Season actions"
+            aria-label="Program actions"
             disabled={isBusy}
           >
             {isBusy ? (
@@ -262,7 +262,7 @@ export function ProgramCardActions({
                 onClick={onArchiveYear}
               >
                 <Archive className="h-4 w-4" />
-                Close year
+                Close program
               </DropdownMenuItem>
             </>
           ) : null}

@@ -71,7 +71,7 @@ export function ProgramServiceNeedsSettingsClient({
   if (programs.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
-        Create a year/season for this department first, then configure its service needs here.
+        Create a program for this department first, then configure its service needs here.
       </p>
     )
   }
@@ -79,21 +79,21 @@ export function ProgramServiceNeedsSettingsClient({
   return (
     <div className="space-y-6">
       <div className="max-w-md space-y-2">
-        <Label htmlFor="service-needs-program">Year / Season</Label>
+        <Label htmlFor="service-needs-program">Program</Label>
         <Select value={programId} onValueChange={setProgramId}>
           <SelectTrigger id="service-needs-program">
-            <SelectValue placeholder="Select a year / season" />
+            <SelectValue placeholder="Select a program" />
           </SelectTrigger>
           <SelectContent>
             {programs.map((program) => (
               <SelectItem key={program.id} value={program.id}>
-                {program.name || "Untitled year"}
+                {program.name || "Untitled program"}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
         <p className="text-xs text-muted-foreground">
-          Service needs still save on the selected year/season.
+          Service needs still save on the selected program.
         </p>
       </div>
 

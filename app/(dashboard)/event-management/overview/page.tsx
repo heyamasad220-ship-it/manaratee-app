@@ -1,56 +1,23 @@
-import { Suspense } from "react"
+import { redirect } from "next/navigation"
 
-import { EventManagementOverviewClient } from "@/components/events/event-management-overview-client"
-import {
-  getEventManagementDashboard,
-  parseDashboardTimePeriod,
-} from "@/lib/events/internal-event-dashboard-queries"
-import {
-  hasAnyPermission,
-  PERMISSIONS,
-  requireAnyPermission,
-} from "@/lib/permissions/permissions"
-
-function getSearchParam(
-  params: Record<string, string | string[] | undefined> | undefined,
-  key: string
-) {
-  const value = params?.[key]
+function getValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value
 }
 
-async function OverviewContent({
+/** Former Dashboard — merged into Events (`/event-management`). */
+export default async function EventManagementOverviewRedirectPage({
   searchParams,
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>
 }) {
-  await requireAnyPermission(PERMISSIONS.EVENTS_VIEW, PERMISSIONS.PROGRAMS_VIEW)
+  const resolved = await searchParams
+  const params = new URLSearchParams()
 
-  const resolvedSearchParams = await searchParams
-  const period = parseDashboardTimePeriod(getSearchParam(resolvedSearchParams, "period"))
+  for (const key of ["period", "q", "status", "department", "eventType", "view"]) {
+    const value = getValue(resolved?.[key])
+    if (value) params.set(key, value)
+  }
 
-  const [data, canManage] = await Promise.all([
-    getEventManagementDashboard(period),
-    hasAnyPermission(PERMISSIONS.EVENTS_MANAGE, PERMISSIONS.PROGRAMS_MANAGE),
-  ])
-
-  return (
-    <EventManagementOverviewClient
-      data={data}
-      period={period}
-      canManage={canManage}
-    />
-  )
-}
-
-export default function EventManagementOverviewPage({
-  searchParams,
-}: {
-  searchParams?: Promise<Record<string, string | string[] | undefined>>
-}) {
-  return (
-    <Suspense fallback={null}>
-      <OverviewContent searchParams={searchParams} />
-    </Suspense>
-  )
+  const query = params.toString()
+  redirect(query ? `/event-management?${query}` : "/event-management")
 }

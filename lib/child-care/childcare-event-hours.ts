@@ -162,7 +162,7 @@ export async function logChildcareEventHoursAction(input: {
   revalidatePath(workforceDepartmentDetailPath(departmentId))
   revalidatePath("/workforce")
   revalidatePath("/finance/payroll")
-  revalidatePath("/event-management/reports/childcare")
+  revalidatePath("/programs/reports/childcare")
   if (sourceId) {
     revalidatePath(`/event-management/${sourceId}`)
   }

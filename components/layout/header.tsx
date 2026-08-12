@@ -41,16 +41,26 @@ export function Header({ showSearch = false, actions, breadcrumbExtras }: Header
           .from("organizations")
           .select("logo_url")
           .eq("id", orgId)
-          .single()
+          .maybeSingle()
 
         if (error) {
-          console.error("Error loading organization logo:", error)
+          // PostgREST errors often stringify as `{}` in the Next overlay — log fields explicitly.
+          // Missing/unreadable org rows are expected (no logo); skip noisy console errors.
+          const message =
+            typeof error.message === "string" ? error.message.trim() : ""
+          if (message) {
+            console.warn(
+              "Error loading organization logo:",
+              error.code ?? "unknown",
+              message
+            )
+          }
           return
         }
 
         setLogoUrl(data?.logo_url || null)
       } catch (err) {
-        console.error("Header logo error:", err)
+        console.warn("Header logo error:", err)
       }
     }
 

@@ -1060,6 +1060,8 @@ export async function fetchDepartmentPayrollList(
     scope?: "visible" | "all-approved-for-budget"
     /** When true (default), only pay periods that overlap open year/season dates. */
     openYearsOnly?: boolean
+    /** When set, only pay periods overlapping this year/season (Reports). */
+    programId?: string | null
   }
 ): Promise<{
   rows: DepartmentPayPeriodRow[]
@@ -1085,13 +1087,41 @@ export async function fetchDepartmentPayrollList(
     : null
   const selfStaffId = selfRow ? (selfRow.id as string) : null
 
-  const openYearsOnly = options?.openYearsOnly !== false
-  const openPrograms = openYearsOnly
-    ? await loadDepartmentOpenPrograms(access.organizationId, departmentId)
-    : null
+  const programId = options?.programId?.trim() || null
+  const openYearsOnly = programId ? false : options?.openYearsOnly !== false
 
-  if (openYearsOnly && openPrograms && openPrograms.length === 0) {
-    return { rows: [], migrationRequired: false, canApprove, selfStaffId }
+  let filterPrograms: Array<{
+    startDate: string | null
+    endDate: string | null
+  }> | null = null
+
+  if (programId) {
+    const { data: program } = await access.supabase
+      .from("programs")
+      .select("id, start_date, end_date, department_id")
+      .eq("id", programId)
+      .eq("organization_id", access.organizationId)
+      .maybeSingle()
+    if (
+      !program ||
+      (program.department_id as string | null) !== departmentId
+    ) {
+      return { rows: [], migrationRequired: false, canApprove, selfStaffId }
+    }
+    filterPrograms = [
+      {
+        startDate: (program.start_date as string | null) ?? null,
+        endDate: (program.end_date as string | null) ?? null,
+      },
+    ]
+  } else if (openYearsOnly) {
+    filterPrograms = await loadDepartmentOpenPrograms(
+      access.organizationId,
+      departmentId
+    )
+    if (filterPrograms.length === 0) {
+      return { rows: [], migrationRequired: false, canApprove, selfStaffId }
+    }
   }
 
   const eligible = await loadPayrollEligibleStaff(
@@ -1185,8 +1215,12 @@ export async function fetchDepartmentPayrollList(
       }
     })
     .filter((row) => {
-      if (!openPrograms) return true
-      return periodOverlapsOpenPrograms(row.periodStart, row.periodEnd, openPrograms)
+      if (!filterPrograms) return true
+      return periodOverlapsOpenPrograms(
+        row.periodStart,
+        row.periodEnd,
+        filterPrograms
+      )
     })
 
   // Teachers without manage permission only see their own rows (UI list).
@@ -1204,9 +1238,12 @@ export async function fetchDepartmentPayrollList(
   }
 }
 
-export async function fetchDepartmentPayrollListAction(departmentId: string) {
+export async function fetchDepartmentPayrollListAction(
+  departmentId: string,
+  options?: { openYearsOnly?: boolean; programId?: string | null }
+) {
   try {
-    const result = await fetchDepartmentPayrollList(departmentId)
+    const result = await fetchDepartmentPayrollList(departmentId, options)
     return { success: true as const, ...result }
   } catch (error) {
     return {

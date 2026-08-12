@@ -8,6 +8,12 @@ import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-orga
 import { getDepartments } from "@/lib/departments/department-queries"
 import { canViewDepartment } from "@/lib/departments/department-access"
 import { hasPermission, PERMISSIONS } from "@/lib/permissions/permissions"
+import { isRichTextEmpty, sanitizeRichTextHtml } from "@/lib/ui/rich-text"
+
+function normalizeDepartmentDescription(value?: string | null) {
+  const sanitized = sanitizeRichTextHtml(value)
+  return isRichTextEmpty(sanitized) ? null : sanitized
+}
 
 type CreateDepartmentInput = {
   name: string
@@ -122,7 +128,7 @@ export async function createDepartment(input: CreateDepartmentInput) {
     .insert({
       organization_id: organizationId,
       name,
-      description: input.description?.trim() || null,
+      description: normalizeDepartmentDescription(input.description),
       color: normalizeDepartmentColor(input.color),
       flyer_url: input.flyerUrl?.trim() || null,
     })
@@ -150,7 +156,7 @@ export async function updateDepartment(input: UpdateDepartmentInput) {
     .from("departments")
     .update({
       name,
-      description: input.description?.trim() || null,
+      description: normalizeDepartmentDescription(input.description),
       color: normalizeDepartmentColor(input.color),
       flyer_url: input.flyerUrl?.trim() || null,
     })
@@ -269,6 +275,9 @@ export type DepartmentDetail = {
   name: string
   description: string | null
   color: string | null
+  flyer_url: string | null
+  terms_html: string | null
+  terms_pdf_url: string | null
   programsCount: number
   staff: DepartmentStaffMember[]
 }
@@ -285,16 +294,43 @@ export async function fetchDepartmentDetail(
   const organizationId = await getSelectedOrganizationId()
   if (!organizationId) return null
 
-  const { data: department, error } = await supabase
+  let department: {
+    id: string
+    name: string
+    description: string | null
+    color: string | null
+    flyer_url: string | null
+    terms_html?: string | null
+    terms_pdf_url?: string | null
+  } | null = null
+
+  const withTerms = await supabase
     .from("departments")
-    .select("id, name, description, color")
+    .select("id, name, description, color, flyer_url, terms_html, terms_pdf_url")
     .eq("organization_id", organizationId)
     .eq("id", departmentId)
     .maybeSingle()
 
-  if (error || !department) {
+  if (
+    withTerms.error &&
+    /terms_html|terms_pdf_url/i.test(withTerms.error.message || "")
+  ) {
+    // Older DBs may lack terms columns until scripts/241_department_terms.sql runs.
+    const retry = await supabase
+      .from("departments")
+      .select("id, name, description, color, flyer_url")
+      .eq("organization_id", organizationId)
+      .eq("id", departmentId)
+      .maybeSingle()
+    if (retry.error || !retry.data) return null
+    department = retry.data as typeof department
+  } else if (withTerms.error || !withTerms.data) {
     return null
+  } else {
+    department = withTerms.data as typeof department
   }
+
+  if (!department) return null
 
   const staffSelectWithPay =
     "id, contact_id, first_name, last_name, email, status, staff_type, hourly_rate, pay_basis, monthly_salary, position, position_id, hr_positions:position_id (name)"
@@ -400,8 +436,47 @@ export async function fetchDepartmentDetail(
     name: (department.name as string) || "Department",
     description: (department.description as string | null) ?? null,
     color: (department.color as string | null) ?? null,
+    flyer_url: (department.flyer_url as string | null) ?? null,
+    terms_html: (department.terms_html as string | null) ?? null,
+    terms_pdf_url: (department.terms_pdf_url as string | null) ?? null,
     programsCount: programsCount || 0,
     staff,
   }
+}
+
+export async function updateDepartmentTerms(input: {
+  id: string
+  termsHtml?: string | null
+  termsPdfUrl?: string | null
+}) {
+  const { organizationId, supabase } = await requireDepartmentWriteAccess()
+
+  const patch: Record<string, string | null> = {}
+  if (input.termsHtml !== undefined) {
+    patch.terms_html = normalizeDepartmentDescription(input.termsHtml)
+  }
+  if (input.termsPdfUrl !== undefined) {
+    patch.terms_pdf_url = input.termsPdfUrl?.trim() || null
+  }
+
+  if (Object.keys(patch).length === 0) return
+
+  const { error } = await supabase
+    .from("departments")
+    .update(patch)
+    .eq("id", input.id)
+    .eq("organization_id", organizationId)
+
+  if (error) {
+    console.error("updateDepartmentTerms error:", error)
+    if (/terms_html|terms_pdf_url/i.test(error.message || "")) {
+      throw new Error(
+        "Terms columns are missing. Run scripts/241_department_terms.sql in Supabase, then try again."
+      )
+    }
+    throw new Error(formatDepartmentError(error, "update terms for"))
+  }
+
+  revalidateDepartmentPaths(input.id)
 }
 

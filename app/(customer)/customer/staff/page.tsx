@@ -138,7 +138,7 @@ export default async function CustomerStaffToolsPage() {
                 Approve or decline requests from all departments.
               </p>
               <Button variant="outline" className="mt-4" asChild>
-                <Link href="/event-management/overview#event-requests">
+                <Link href="/event-management#attention-required">
                   <ClipboardList className="mr-2 h-4 w-4" />
                   Open admin queue
                 </Link>
@@ -206,7 +206,7 @@ export default async function CustomerStaffToolsPage() {
               </div>
             </div>
             <Button variant="outline" asChild>
-              <Link href="/event-management/overview">Open Event Management</Link>
+              <Link href="/event-management">Open Event Management</Link>
             </Button>
           </CardContent>
         </Card>

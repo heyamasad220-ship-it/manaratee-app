@@ -34,7 +34,13 @@ import {
   type ApplicationTypeDefinition,
 } from "@/lib/applications/application-types"
 import { ApplicationStatusBadge } from "@/components/applications/application-status-badge"
-import { formatVendorApplicationFormDataForReview } from "@/lib/vendor-hub/vendor-application-fields"
+import {
+  formatVendorApplicationFormDataForReview,
+  isVendorImportedApplication,
+  stripVendorImportNotes,
+} from "@/lib/vendor-hub/vendor-application-fields"
+import { vendorFirstActivityAt } from "@/lib/vendor-hub/vendor-activity"
+import { createClient } from "@/lib/supabase/client"
 
 export function ApplicationDetailClient({ applicationId }: { applicationId: string }) {
   const router = useRouter()
@@ -49,6 +55,7 @@ export function ApplicationDetailClient({ applicationId }: { applicationId: stri
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [contactActivityAt, setContactActivityAt] = useState<string | null>(null)
 
   const loadApplication = useCallback(async () => {
     setLoading(true)
@@ -72,6 +79,74 @@ export function ApplicationDetailClient({ applicationId }: { applicationId: stri
       setDocuments(documentRows)
       setTypeRegistry(registry)
       setReviewNotes(app.review_notes ?? "")
+
+      if (app.application_type === "vendor" && app.contact_id) {
+        const supabase = createClient()
+        const contactId = app.contact_id
+        const [
+          { data: contact },
+          { data: payments },
+          { data: participants },
+          { data: assignments },
+        ] = await Promise.all([
+          supabase
+            .from("contacts")
+            .select("created_at, last_activity_at")
+            .eq("id", contactId)
+            .maybeSingle(),
+          supabase
+            .from("vendor_hub_payments")
+            .select("payment_date, created_at")
+            .eq("contact_id", contactId),
+          supabase
+            .from("vendor_hub_participant_status")
+            .select("vendor_hub_event_id")
+            .eq("contact_id", contactId),
+          supabase
+            .from("vendor_hub_booth_assignments")
+            .select("event_id")
+            .eq("contact_id", contactId),
+        ])
+
+        const eventIds = [
+          ...new Set(
+            [
+              ...(participants || []).map(
+                (row) => row.vendor_hub_event_id as string | null
+              ),
+              ...(assignments || []).map((row) => row.event_id as string | null),
+            ].filter((id): id is string => Boolean(id))
+          ),
+        ]
+
+        let eventDates: Array<string | null> = []
+        if (eventIds.length > 0) {
+          const { data: events } = await supabase
+            .from("vendor_hub_events")
+            .select("event_date")
+            .in("id", eventIds)
+          eventDates = (events || []).map((event) => event.event_date as string | null)
+        }
+
+        const participationFirst = vendorFirstActivityAt([
+          ...(payments || []).map(
+            (payment) =>
+              (payment.payment_date as string | null) ||
+              (payment.created_at as string | null)
+          ),
+          ...eventDates,
+        ])
+
+        setContactActivityAt(
+          participationFirst ||
+            vendorFirstActivityAt([
+              contact?.last_activity_at as string | null | undefined,
+              contact?.created_at as string | null | undefined,
+            ])
+        )
+      } else {
+        setContactActivityAt(null)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load application")
     } finally {
@@ -147,11 +222,55 @@ export function ApplicationDetailClient({ applicationId }: { applicationId: stri
         )
       : []
 
+  const importedVendorApp =
+    application.application_type === "vendor" &&
+    isVendorImportedApplication({
+      formData: application.form_data,
+      notes: application.notes,
+    })
+
+  // Prefer earliest contact/bazaar activity when it is earlier than stored submitted_at
+  // (covers imports even after import_tag/notes were cleared).
+  const submittedDisplayAt = (() => {
+    if (application.application_type !== "vendor" || !contactActivityAt) {
+      return application.submitted_at
+    }
+    if (!application.submitted_at) return contactActivityAt
+    const activityMs = new Date(contactActivityAt).getTime()
+    const submittedMs = new Date(application.submitted_at).getTime()
+    if (Number.isNaN(activityMs) || Number.isNaN(submittedMs)) {
+      return application.submitted_at
+    }
+    return activityMs < submittedMs ? contactActivityAt : application.submitted_at
+  })()
+
+  const reviewedSameAsSubmitted =
+    Boolean(application.reviewed_at) &&
+    Boolean(application.submitted_at) &&
+    Math.abs(
+      new Date(application.reviewed_at as string).getTime() -
+        new Date(application.submitted_at as string).getTime()
+    ) < 2000
+
+  const reviewedDisplayAt =
+    (importedVendorApp || reviewedSameAsSubmitted) &&
+    (reviewedSameAsSubmitted || !application.reviewed_by)
+      ? null
+      : application.reviewed_at
+
+  const displayInternalNotes = stripVendorImportNotes(application.notes)
+
   const formSummary =
     typeof application.form_data.summary === "string"
       ? application.form_data.summary
       : Object.keys(application.form_data).length > 0
-        ? JSON.stringify(application.form_data, null, 2)
+        ? JSON.stringify(
+            Object.fromEntries(
+              Object.entries(application.form_data).filter(([key]) => key !== "import_tag")
+            ),
+            null,
+            2
+          )
         : "No additional details provided."
 
   return (
@@ -215,16 +334,16 @@ export function ApplicationDetailClient({ applicationId }: { applicationId: stri
             <div>
               <Label className="text-muted-foreground">Submitted</Label>
               <p className="font-medium">
-                {application.submitted_at
-                  ? new Date(application.submitted_at).toLocaleString()
+                {submittedDisplayAt
+                  ? new Date(submittedDisplayAt).toLocaleString()
                   : "-"}
               </p>
             </div>
             <div>
               <Label className="text-muted-foreground">Reviewed</Label>
               <p className="font-medium">
-                {application.reviewed_at
-                  ? new Date(application.reviewed_at).toLocaleString()
+                {reviewedDisplayAt
+                  ? new Date(reviewedDisplayAt).toLocaleString()
                   : "-"}
               </p>
             </div>
@@ -328,7 +447,7 @@ export function ApplicationDetailClient({ applicationId }: { applicationId: stri
             </CardHeader>
             <CardContent className="flex flex-col gap-3">
               <p className="whitespace-pre-wrap text-sm text-muted-foreground">
-                {application.notes || "No internal notes yet."}
+                {displayInternalNotes || "No internal notes yet."}
               </p>
               <Textarea
                 rows={3}

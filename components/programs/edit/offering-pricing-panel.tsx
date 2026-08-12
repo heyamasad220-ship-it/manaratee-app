@@ -61,7 +61,7 @@ export function OfferingPricingPanel({
   showPaymentStructure = false,
   showBillingSchedule = true,
   showDiscounts = true,
-  showBillingSetup = true,
+  showBillingSetup = false,
   showTitle = true,
   paymentStructureLayout = "vertical",
   split = false,

@@ -237,7 +237,7 @@ export function ProgramDetailClient({
             </Badge>
           </div>
           <p className="text-muted-foreground">
-            Manage year/season details and settings.
+            Manage program details and settings.
           </p>
         </div>
 

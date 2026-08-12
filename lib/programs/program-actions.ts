@@ -202,6 +202,13 @@ export async function createProgram(input: CreateProgramInput) {
         audience_type: programType,
         application_required:
           input.application_required ?? programKind !== "seasonal",
+        gender: input.gender || "All",
+        min_age: input.min_age ?? null,
+        max_age: input.max_age ?? null,
+        capacity_mode:
+          input.capacity && input.capacity > 0 ? "limited" : "unlimited",
+        capacity:
+          input.capacity && input.capacity > 0 ? input.capacity : null,
       },
     })
     offeringId = offering.id
@@ -271,6 +278,9 @@ type UpdateProgramInput = {
   payment_due_day?: number | null
 
   visibility?: "public" | "private" | "members_only"
+
+  /** Optional — updates academic vs seasonal classification. */
+  program_kind?: ProgramKind
 
   /**
    * When true (default), only identity + optional defaults + FA are written.
@@ -361,6 +371,10 @@ export async function updateProgram(input: UpdateProgramInput) {
     updated_at: new Date().toISOString(),
   }
 
+  if (input.program_kind) {
+    programPayload.program_kind = normalizeProgramKind(input.program_kind)
+  }
+
   if (!identityAndDefaultsOnly) {
     programPayload.capacity = input.capacity || 0
     programPayload.billing_type = input.billing_type
@@ -399,6 +413,45 @@ export async function updateProgram(input: UpdateProgramInput) {
   revalidatePath("/customer/programs")
   revalidatePath(`/customer/programs/${input.id}`)
   revalidatePath(`/customer/programs/${input.id}/register`)
+  if (input.department_id) {
+    revalidatePath(workforceDepartmentDetailPath(input.department_id))
+  }
+}
+
+/** Updates only academic vs seasonal classification. */
+export async function updateProgramKind(input: {
+  id: string
+  program_kind: ProgramKind
+  department_id?: string | null
+}) {
+  const supabase = await createClient()
+  const organizationId = await getSelectedOrganizationId()
+  if (!organizationId) {
+    throw new Error("No organization selected")
+  }
+
+  const { error } = await supabase
+    .from("programs")
+    .update({
+      program_kind: normalizeProgramKind(input.program_kind),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", input.id)
+    .eq("organization_id", organizationId)
+
+  if (error) {
+    if (isMissingProgramColumnError(error)) {
+      throw new Error(
+        "Program type column is missing. Run the program_kind migration."
+      )
+    }
+    throw new Error(error.message || "Failed to update program type")
+  }
+
+  revalidatePath("/programs")
+  revalidatePath("/programs/catalog")
+  revalidatePath(`/programs/${input.id}`)
+  revalidatePath(`/programs/${input.id}/offerings`)
   if (input.department_id) {
     revalidatePath(workforceDepartmentDetailPath(input.department_id))
   }

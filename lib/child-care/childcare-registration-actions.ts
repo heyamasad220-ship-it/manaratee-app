@@ -13,8 +13,8 @@ import type {
 
 function revalidateChildcarePaths() {
   revalidatePath("/customer/opportunities")
-  revalidatePath("/event-management/overview")
-  revalidatePath("/event-management/reports/childcare")
+  revalidatePath("/event-management")
+  revalidatePath("/programs/reports/childcare")
   revalidatePath("/workforce/childcare/registrations")
   revalidatePath("/workforce/childcare")
   revalidatePath("/child-care/registrations")

@@ -31,16 +31,13 @@ export async function isApprovedOrgVendor(input: {
 }): Promise<boolean> {
   const { supabase, organizationId, contactId } = input
 
-  const { count: appCount } = await supabase
-    .from("applications")
-    .select("id", { count: "exact", head: true })
-    .eq("organization_id", organizationId)
-    .eq("contact_id", contactId)
-    .eq("module_owner", VENDOR_ORG_APPLICATION_MODULE)
-    .eq("application_type", VENDOR_ORG_APPLICATION_TYPE)
-    .eq("status", "approved")
-
-  if ((appCount ?? 0) > 0) {
+  if (
+    await hasApprovedOrgVendorApplication({
+      supabase,
+      organizationId,
+      contactId,
+    })
+  ) {
     return true
   }
 
@@ -52,6 +49,24 @@ export async function isApprovedOrgVendor(input: {
     .eq("role", "vendor")
 
   return (roleCount ?? 0) > 0
+}
+
+/** True only when an approved org vendor application exists (ignores contact_roles). */
+export async function hasApprovedOrgVendorApplication(input: {
+  supabase: SupabaseClient
+  organizationId: string
+  contactId: string
+}): Promise<boolean> {
+  const { count } = await input.supabase
+    .from("applications")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", input.organizationId)
+    .eq("contact_id", input.contactId)
+    .eq("module_owner", VENDOR_ORG_APPLICATION_MODULE)
+    .eq("application_type", VENDOR_ORG_APPLICATION_TYPE)
+    .eq("status", "approved")
+
+  return (count ?? 0) > 0
 }
 
 export async function getApprovedVendorOrganizationsForAuthUser(

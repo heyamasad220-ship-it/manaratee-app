@@ -1,8 +1,8 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import Link from "next/link"
-import { BookOpen, Download, Loader2, UserRound, Users } from "lucide-react"
+import { Download, Loader2, UserRound, Users } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/table"
 import { TableColumnHeaderFilter } from "@/components/ui/table-column-header-filter"
 import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
+import { DEPARTMENT_OPEN_PROGRAM_STATUSES } from "@/lib/departments/department-program-statuses"
 import {
   fetchDepartmentParticipantsAction,
   type DepartmentParticipantCourseOption,
@@ -88,11 +89,26 @@ export function DepartmentParticipantsPanel({
   departmentId,
   departmentName,
   embedded = false,
+  stageNav = null,
+  showRoster = true,
+  alternateContent = null,
+  applicationsCount = 0,
+  approvedPendingCount = 0,
 }: {
   departmentId: string
   departmentName: string
-  /** Hide outer card title chrome when embedded in Participants tab. */
+  /** Hide outer card title chrome when embedded in Registrations tab. */
   embedded?: boolean
+  /** Rendered under KPI cards (e.g. Applications / Roster stage tabs). */
+  stageNav?: ReactNode
+  /** When false, hide the roster table (stats + stageNav still show). */
+  showRoster?: boolean
+  /** Content shown instead of the roster when `showRoster` is false. */
+  alternateContent?: ReactNode
+  /** Pending applications (submitted) for KPI cards. */
+  applicationsCount?: number
+  /** Approved but not yet registered for KPI cards. */
+  approvedPendingCount?: number
 }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -108,6 +124,7 @@ export function DepartmentParticipantsPanel({
   const [courseFilterInput, setCourseFilterInput] = useState("")
   const [teacherFilter, setTeacherFilter] = useState("")
   const [teacherFilterInput, setTeacherFilterInput] = useState("")
+  const didDefaultYear = useRef(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -134,6 +151,17 @@ export function DepartmentParticipantsPanel({
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    if (didDefaultYear.current || years.length === 0) return
+    didDefaultYear.current = true
+    const openYear = years.find((year) =>
+      (DEPARTMENT_OPEN_PROGRAM_STATUSES as readonly string[]).includes(year.status)
+    )
+    if (openYear) {
+      setYearFilterSelect(openYear.id)
+    }
+  }, [years])
 
   useEffect(() => {
     if (yearFilterSelect === "all") return
@@ -170,10 +198,6 @@ export function DepartmentParticipantsPanel({
       .map((row) => row.studentContactId || row.studentName)
       .filter(Boolean)
   ).size
-  const courseCount = new Set(
-    filteredParticipants.map((row) => row.courseName).filter(Boolean)
-  ).size
-  const withTeacher = filteredParticipants.filter((row) => Boolean(row.teacherName)).length
   const pendingCount = filteredParticipants.filter((row) => {
     const status = (row.status || "").toLowerCase()
     return status === "pending" || status === "pending_payment"
@@ -461,33 +485,37 @@ export function DepartmentParticipantsPanel({
   return (
     <div className="space-y-6">
       {!loading && !error ? (
-        <StatCardsRow equal columns={6}>
+        <StatCardsRow equal columns={4}>
           <StatCard
             layout="header"
             fill
-            tone="blue"
-            label="Enrollments"
-            value={filteredParticipants.length}
+            tone="amber"
+            label="Applications"
+            value={applicationsCount}
             icon={Users}
-            hint="Enrollment rows"
+            hint="Needs review"
           />
           <StatCard
             layout="header"
             fill
             tone="sky"
-            label="Participants"
-            value={uniqueStudents}
+            label="Approved"
+            value={approvedPendingCount}
             icon={UserRound}
-            hint="Unique participants"
+            hint="Not registered yet"
           />
           <StatCard
             layout="header"
             fill
-            tone="violet"
-            label={PROGRAM_LABEL_PLURAL}
-            value={courseCount}
-            icon={BookOpen}
-            hint={`Distinct ${PROGRAM_LABEL_PLURAL.toLowerCase()}`}
+            tone="blue"
+            label="On roster"
+            value={filteredParticipants.length}
+            icon={Users}
+            hint={
+              uniqueStudents === filteredParticipants.length
+                ? "Enrollment rows"
+                : `${uniqueStudents} unique people`
+            }
           />
           <StatCard
             layout="header"
@@ -496,62 +524,43 @@ export function DepartmentParticipantsPanel({
             label="Active / enrolled"
             value={activeCount}
             icon={Users}
-            hint="Enrolled / active"
-          />
-          <StatCard
-            layout="header"
-            fill
-            tone="amber"
-            label="Pending"
-            value={pendingCount}
-            icon={Users}
-            hint="Awaiting completion"
-          />
-          <StatCard
-            layout="header"
-            fill
-            tone="slate"
-            label="With teacher"
-            value={withTeacher}
-            icon={Users}
-            hint="Assigned instructor"
+            hint={
+              pendingCount > 0
+                ? `${pendingCount} awaiting completion`
+                : "Enrolled / active"
+            }
           />
         </StatCardsRow>
       ) : null}
 
-      {embedded ? (
-        <div className="space-y-3">
-          <div>
-            <h2 className="text-base font-semibold tracking-tight">Roster</h2>
-            <p className="text-sm text-muted-foreground">
-              Registered participants for {departmentName}. Payment details stay in
-              Programs billing.
-              {filtersActive
-                ? ` Showing ${filteredParticipants.length} of ${participants.length}.`
-                : null}
-            </p>
-          </div>
-          {rosterBody}
-        </div>
+      {stageNav}
+
+      {showRoster ? (
+        embedded ? (
+          <div className="space-y-3">{rosterBody}</div>
+        ) : (
+          <Card>
+            <CardHeader className="flex flex-col gap-3 space-y-0 pb-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Users className="size-4" />
+                  Registrations
+                </CardTitle>
+                <CardDescription>
+                  Participants enrolled in{" "}
+                  {YEAR_SEASON_LABEL_PLURAL.toLowerCase()} for {departmentName}.
+                  Payment details stay in Programs billing.
+                  {filtersActive
+                    ? ` Showing ${filteredParticipants.length} of ${participants.length}.`
+                    : null}
+                </CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent>{rosterBody}</CardContent>
+          </Card>
+        )
       ) : (
-        <Card>
-          <CardHeader className="flex flex-col gap-3 space-y-0 pb-2 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Users className="size-4" />
-                Roster
-              </CardTitle>
-              <CardDescription>
-                Participants enrolled in {YEAR_SEASON_LABEL_PLURAL.toLowerCase()} for{" "}
-                {departmentName}. Payment details stay in Programs billing.
-                {filtersActive
-                  ? ` Showing ${filteredParticipants.length} of ${participants.length}.`
-                  : null}
-              </CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent>{rosterBody}</CardContent>
-        </Card>
+        alternateContent
       )}
     </div>
   )

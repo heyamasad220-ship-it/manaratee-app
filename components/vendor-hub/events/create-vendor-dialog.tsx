@@ -35,6 +35,7 @@ type CreateVendorDialogProps = {
   onOpenChange: (open: boolean) => void
   vendorTypes: VendorHubVendorType[]
   onCreated: (vendor: VendorPickerOption) => void
+  title?: string
 }
 
 export function CreateVendorDialog({
@@ -42,6 +43,7 @@ export function CreateVendorDialog({
   onOpenChange,
   vendorTypes,
   onCreated,
+  title = "Create new vendor",
 }: CreateVendorDialogProps) {
   const [pending, startTransition] = useTransition()
   const [quickAddOpen, setQuickAddOpen] = useState(false)
@@ -103,10 +105,10 @@ export function CreateVendorDialog({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Create new vendor</DialogTitle>
+            <DialogTitle>{title}</DialogTitle>
             <DialogDescription>
-              Search Contacts for the person or business. If they are not found, create a contact —
-              we will add the vendor role and vendor profile automatically.
+              Search Contacts for the person or business. If they are not found, create a contact
+              first — then we add the vendor role and vendor profile.
             </DialogDescription>
           </DialogHeader>
 
@@ -130,6 +132,7 @@ export function CreateVendorDialog({
                   setContactId(null)
                   setContactLabel("")
                 }}
+                onCreateNew={() => setQuickAddOpen(true)}
               />
               <Button
                 type="button"
@@ -194,7 +197,7 @@ export function CreateVendorDialog({
               Cancel
             </Button>
             <Button type="button" onClick={handleSubmit} disabled={pending}>
-              {pending ? "Creating..." : "Create vendor"}
+              {pending ? "Saving..." : title === "Add Vendor" ? "Add Vendor" : "Create vendor"}
             </Button>
           </DialogFooter>
         </DialogContent>

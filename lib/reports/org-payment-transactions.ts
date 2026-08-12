@@ -1,31 +1,43 @@
 "use server"
 
 import { formatFinancialActivityPaymentStatus } from "@/lib/donations/donation-status"
+import { formatPaymentSourceLabel } from "@/lib/donations/payment-source-channel"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
+import {
+  formatPaymentMethodLabel,
+  formatPaymentTransactionStatus,
+  type PaymentTransactionStatus,
+} from "@/lib/programs/payment-transaction-display"
 import { getProgramPaymentTransactions } from "@/lib/programs/program-payment-transactions"
 import { createClient } from "@/lib/supabase/server"
 
-export type OrgPaymentTransactionStatus =
-  | "Succeeded"
-  | "Failed"
-  | "Refunded"
-  | "Partially Refunded"
-  | "Voided"
+export type OrgPaymentTransactionStatus = PaymentTransactionStatus
 
 export type OrgPaymentTransactionRow = {
   id: string
   module: "donations" | "programs"
-  moduleLabel: string
   paidAt: string | null
-  partyName: string
-  description: string | null
+  contactName: string
+  contactProfileId: string | null
+  departmentId: string | null
+  departmentName: string | null
+  programId: string | null
+  programName: string | null
+  offeringId: string | null
+  offeringName: string | null
+  offeringActivity: "active" | "closed" | null
+  paymentType: string
+  paymentMethod: string
   amount: number
   status: OrgPaymentTransactionStatus
   detailHref: string | null
   failureHint: string | null
 }
 
-function sortByDateDesc(a: OrgPaymentTransactionRow, b: OrgPaymentTransactionRow) {
+function sortByDateDesc(
+  a: OrgPaymentTransactionRow,
+  b: OrgPaymentTransactionRow
+) {
   const aTime = a.paidAt ? new Date(a.paidAt).getTime() : 0
   const bTime = b.paidAt ? new Date(b.paidAt).getTime() : 0
   return bTime - aTime
@@ -46,6 +58,7 @@ async function loadDonationPayments(
       refunded_amount,
       paid_at,
       created_at,
+      source,
       memo,
       donor:donor_id (
         full_name,
@@ -68,54 +81,67 @@ async function loadDonationPayments(
       | {
           full_name?: string | null
           contact_id?: string | null
-          contact?: { full_name?: string | null } | { full_name?: string | null }[] | null
+          contact?:
+            | { full_name?: string | null }
+            | { full_name?: string | null }[]
+            | null
         }
       | {
           full_name?: string | null
           contact_id?: string | null
-          contact?: { full_name?: string | null } | { full_name?: string | null }[] | null
+          contact?:
+            | { full_name?: string | null }
+            | { full_name?: string | null }[]
+            | null
         }[]
       | null
     const donorRow = Array.isArray(donor) ? donor[0] : donor
     const contactRaw = donorRow?.contact
     const contact = Array.isArray(contactRaw) ? contactRaw[0] : contactRaw
-    const partyName =
-      contact?.full_name?.trim() ||
-      donorRow?.full_name?.trim() ||
-      "Donor"
-    const status = formatFinancialActivityPaymentStatus({
-      status: row.status as string | null,
-      amount: row.amount as number | null,
-      refunded_amount: row.refunded_amount as number | null,
-    })
-    const contactId = donorRow?.contact_id || null
+    const contactName =
+      contact?.full_name?.trim() || donorRow?.full_name?.trim() || "Donor"
     const rawStatus = String(row.status || "").toLowerCase()
+    const status: OrgPaymentTransactionStatus =
+      rawStatus === "voided"
+        ? "Voided"
+        : rawStatus === "unresolved" || rawStatus === "failed"
+          ? "Failed"
+          : formatPaymentTransactionStatus(
+              formatFinancialActivityPaymentStatus({
+                status: row.status as string | null,
+                amount: row.amount as number | null,
+                refunded_amount: row.refunded_amount as number | null,
+              })
+            )
+    const contactId = donorRow?.contact_id || null
 
     return {
       id: `donation:${row.id}`,
       module: "donations" as const,
-      moduleLabel: "Donations",
       paidAt:
         (row.paid_at as string | null) ||
         (row.created_at as string | null) ||
         null,
-      partyName,
-      description: (row.memo as string | null) || null,
+      contactName,
+      contactProfileId: contactId,
+      departmentId: null,
+      departmentName: null,
+      programId: null,
+      programName: null,
+      offeringId: null,
+      offeringName: null,
+      offeringActivity: null,
+      paymentType: "Donation",
+      paymentMethod: formatPaymentMethodLabel(
+        formatPaymentSourceLabel(row.source as string | null)
+      ),
       amount: Number(row.amount || 0),
       status,
       detailHref: contactId
         ? `/contacts/${contactId}?tab=financial`
         : "/donations/reports/one-time",
       failureHint:
-        status === "Failed"
-          ? rawStatus === "voided"
-            ? "Voided payment"
-            : rawStatus === "pending_review"
-              ? "Needs review"
-              : rawStatus === "unresolved"
-                ? "Unresolved / declined"
-                : "Payment failed"
-          : null,
+        status === "Failed" ? "Card or payment method declined" : null,
     }
   })
 }
@@ -128,14 +154,25 @@ async function loadProgramPayments(
     return rows.map((row) => ({
       id: `program:${row.id}`,
       module: "programs" as const,
-      moduleLabel: "Programs",
       paidAt: row.paidAt,
-      partyName: row.participantName,
-      description: row.offeringName || row.programName || row.label,
+      contactName: row.contactName,
+      contactProfileId: row.contactProfileId,
+      departmentId: row.departmentId,
+      departmentName: row.departmentName,
+      programId: row.programId,
+      programName: row.programName,
+      offeringId: row.offeringId,
+      offeringName: row.offeringName,
+      offeringActivity: row.offeringActivity,
+      paymentType: row.paymentType,
+      paymentMethod: row.paymentMethod,
       amount: row.amount,
-      status: row.status as OrgPaymentTransactionStatus,
-      detailHref: `/programs/registrations/${row.enrollmentId}`,
-      failureHint: null,
+      status: row.status,
+      detailHref: row.contactProfileId
+        ? `/contacts/${row.contactProfileId}?tab=financial`
+        : `/programs/registrations/${row.enrollmentId}`,
+      failureHint:
+        row.status === "Failed" ? "Card or payment method declined" : null,
     }))
   } catch (error) {
     console.error("loadProgramPayments:", error)

@@ -28,6 +28,21 @@ export type ProgramCatalogFilterValues = {
 export function formatProgramCatalogDate(value: string | null) {
   if (!value) return "TBD"
 
+  // Date-only values (YYYY-MM-DD) must be formatted in UTC so US timezones
+  // do not shift the calendar day backward.
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value)
+  if (match) {
+    const date = new Date(
+      Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+    )
+    return date.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      timeZone: "UTC",
+    })
+  }
+
   return new Date(value).toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",

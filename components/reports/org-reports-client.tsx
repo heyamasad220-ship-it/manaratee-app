@@ -3,16 +3,19 @@
 import * as React from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import {
-  AlertTriangle,
-  CreditCard,
-  Loader2,
-  Sparkles,
-} from "lucide-react"
+import { Loader2 } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Button } from "@/components/ui/button"
+import { Label } from "@/components/ui/label"
+import { TableColumnHeaderFilter } from "@/components/ui/table-column-header-filter"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   Table,
   TableBody,
@@ -22,23 +25,33 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { financialActivityStatusBadgeClass } from "@/lib/donations/donation-status"
+import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
+import {
+  PROGRAM_LABEL,
+  YEAR_SEASON_LABEL,
+} from "@/lib/programs/program-display-labels"
 import {
   fetchOrgPaymentTransactionsAction,
   type OrgPaymentTransactionRow,
+  type OrgPaymentTransactionStatus,
 } from "@/lib/reports/org-payment-transactions"
 import { cn } from "@/lib/utils"
 
-const REPORT_TABS = [
-  { value: "payments", label: "Payment transactions" },
-  { value: "failed", label: "Failed transactions" },
-  { value: "more", label: "More reports" },
-] as const
+const ALL = "all"
+type OfferingActivityFilter = "all" | "active" | "closed"
+type PaymentStatusFilter = "default" | "all" | OrgPaymentTransactionStatus
 
-type ReportTab = (typeof REPORT_TABS)[number]["value"]
-
-function isReportTab(value: string | null): value is ReportTab {
-  return REPORT_TABS.some((tab) => tab.value === value)
-}
+const PAYMENT_STATUS_FILTERS: Array<{
+  value: PaymentStatusFilter
+  label: string
+}> = [
+  { value: "default", label: "Hide voided" },
+  { value: "Succeeded", label: "Succeeded" },
+  { value: "Failed", label: "Failed" },
+  { value: "Refunded", label: "Refunded" },
+  { value: "Voided", label: "Voided" },
+  { value: "all", label: "All statuses" },
+]
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat(undefined, {
@@ -58,85 +71,168 @@ function formatDate(value: string | null) {
   })
 }
 
+function uniqueOptions(
+  rows: OrgPaymentTransactionRow[],
+  getId: (row: OrgPaymentTransactionRow) => string | null,
+  getLabel: (row: OrgPaymentTransactionRow) => string | null
+) {
+  const map = new Map<string, string>()
+  for (const row of rows) {
+    const id = getId(row)
+    const label = getLabel(row)
+    if (!id || map.has(id)) continue
+    map.set(id, label || id)
+  }
+  return [...map.entries()]
+    .map(([id, label]) => ({ id, label }))
+    .sort((a, b) => a.label.localeCompare(b.label))
+}
+
 function PaymentTransactionsTable({
   rows,
-  emptyMessage,
+  paymentStatusFilter,
+  onPaymentStatusFilterChange,
 }: {
   rows: OrgPaymentTransactionRow[]
-  emptyMessage: string
+  paymentStatusFilter: PaymentStatusFilter
+  onPaymentStatusFilterChange: (value: PaymentStatusFilter) => void
 }) {
-  if (rows.length === 0) {
-    return (
-      <div className="rounded-lg border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
-        {emptyMessage}
-      </div>
-    )
-  }
-
   return (
     <div className="overflow-x-auto rounded-lg border">
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Date</TableHead>
-            <TableHead>Person</TableHead>
-            <TableHead>Module</TableHead>
-            <TableHead>Description</TableHead>
-            <TableHead>Status</TableHead>
+            <TableHead>Payment date</TableHead>
+            <TableHead>Contact</TableHead>
+            <TableHead>Program</TableHead>
+            <TableHead>Offering</TableHead>
+            <TableHead>Payment type</TableHead>
             <TableHead className="text-right">Amount</TableHead>
+            <TableHead>Payment method</TableHead>
+            <TableHead>
+              <TableColumnHeaderFilter
+                label="Status"
+                active={paymentStatusFilter !== "default"}
+              >
+                {({ close }) => (
+                  <Select
+                    value={paymentStatusFilter}
+                    onValueChange={(value) => {
+                      onPaymentStatusFilterChange(value as PaymentStatusFilter)
+                      close()
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Filter status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PAYMENT_STATUS_FILTERS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </TableColumnHeaderFilter>
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {rows.map((row) => (
-            <TableRow key={row.id}>
-              <TableCell>{formatDate(row.paidAt)}</TableCell>
-              <TableCell>
-                {row.detailHref ? (
-                  <Link
-                    href={row.detailHref}
-                    className="font-medium text-sky-600 hover:underline"
-                  >
-                    {row.partyName}
-                  </Link>
-                ) : (
-                  <span className="font-medium">{row.partyName}</span>
-                )}
-                {row.failureHint ? (
-                  <div className="text-xs text-destructive">{row.failureHint}</div>
-                ) : null}
-              </TableCell>
-              <TableCell>
-                <Badge variant="secondary">{row.moduleLabel}</Badge>
-              </TableCell>
-              <TableCell className="max-w-[240px] truncate text-sm text-muted-foreground">
-                {row.description || "—"}
-              </TableCell>
-              <TableCell>
-                <Badge
-                  variant="secondary"
-                  className={cn(
-                    "rounded-full",
-                    financialActivityStatusBadgeClass(row.status)
-                  )}
-                >
-                  {row.status}
-                </Badge>
-              </TableCell>
-              <TableCell className="text-right font-medium">
-                {formatCurrency(row.amount)}
+          {rows.length === 0 ? (
+            <TableRow>
+              <TableCell
+                colSpan={8}
+                className="py-10 text-center text-sm text-muted-foreground"
+              >
+                No matching transactions.
               </TableCell>
             </TableRow>
-          ))}
+          ) : null}
+          {rows.map((row) => {
+            const contactHref = row.contactProfileId
+              ? contactProfileHref(row.contactProfileId, "financial")
+              : row.detailHref
+            return (
+              <TableRow key={row.id}>
+                <TableCell className="whitespace-nowrap">
+                  {formatDate(row.paidAt)}
+                </TableCell>
+                <TableCell>
+                  {contactHref ? (
+                    <Link
+                      href={contactHref}
+                      className="font-medium text-sky-600 hover:underline"
+                    >
+                      {row.contactName}
+                    </Link>
+                  ) : (
+                    <span className="font-medium">{row.contactName}</span>
+                  )}
+                </TableCell>
+                <TableCell className="whitespace-nowrap">
+                  {row.programName || "—"}
+                </TableCell>
+                <TableCell className="whitespace-nowrap">
+                  {row.offeringName || "—"}
+                </TableCell>
+                <TableCell className="whitespace-nowrap">
+                  {row.paymentType}
+                </TableCell>
+                <TableCell className="text-right font-medium whitespace-nowrap">
+                  {formatCurrency(row.amount)}
+                </TableCell>
+                <TableCell className="whitespace-nowrap">
+                  {row.paymentMethod}
+                </TableCell>
+                <TableCell>
+                  <Badge
+                    variant="secondary"
+                    className={cn(
+                      "rounded-full",
+                      financialActivityStatusBadgeClass(row.status)
+                    )}
+                  >
+                    {row.status}
+                  </Badge>
+                </TableCell>
+              </TableRow>
+            )
+          })}
         </TableBody>
       </Table>
     </div>
   )
 }
 
-function useOrgPaymentRows(failedOnly: boolean) {
+export function OrgReportsClient({
+  basePath = "/finance/transactions",
+}: {
+  /** Path used for legacy tab URL cleanup (Finance Transactions or /reports). */
+  basePath?: string
+}) {
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
   const [rows, setRows] = React.useState<OrgPaymentTransactionRow[]>([])
+  const [departmentFilter, setDepartmentFilter] = React.useState(ALL)
+  const [programFilter, setProgramFilter] = React.useState(ALL)
+  const [offeringFilter, setOfferingFilter] = React.useState(ALL)
+  const [statusFilter, setStatusFilter] =
+    React.useState<OfferingActivityFilter>("active")
+  const [paymentStatusFilter, setPaymentStatusFilter] =
+    React.useState<PaymentStatusFilter>("default")
+
+  React.useEffect(() => {
+    const tab = searchParams.get("tab")
+    if (tab === "failed" || tab === "more" || tab === "payments") {
+      const params = new URLSearchParams(searchParams.toString())
+      params.delete("tab")
+      const query = params.toString()
+      router.replace(query ? `${basePath}?${query}` : basePath)
+    }
+  }, [basePath, router, searchParams])
 
   React.useEffect(() => {
     let cancelled = false
@@ -144,7 +240,6 @@ function useOrgPaymentRows(failedOnly: boolean) {
       setLoading(true)
       setError(null)
       const result = await fetchOrgPaymentTransactionsAction({
-        failedOnly,
         limit: 400,
       })
       if (cancelled) return
@@ -160,13 +255,100 @@ function useOrgPaymentRows(failedOnly: boolean) {
     return () => {
       cancelled = true
     }
-  }, [failedOnly])
+  }, [])
 
-  return { loading, error, rows }
-}
+  const departmentOptions = React.useMemo(
+    () =>
+      uniqueOptions(
+        rows,
+        (row) => row.departmentId,
+        (row) => row.departmentName
+      ),
+    [rows]
+  )
 
-function PaymentsTab({ failedOnly }: { failedOnly: boolean }) {
-  const { loading, error, rows } = useOrgPaymentRows(failedOnly)
+  const programOptions = React.useMemo(() => {
+    const scoped =
+      departmentFilter === ALL
+        ? rows
+        : rows.filter((row) => row.departmentId === departmentFilter)
+    return uniqueOptions(
+      scoped,
+      (row) => row.programId,
+      (row) => row.programName
+    )
+  }, [rows, departmentFilter])
+
+  const offeringOptions = React.useMemo(() => {
+    let scoped = rows
+    if (departmentFilter !== ALL) {
+      scoped = scoped.filter((row) => row.departmentId === departmentFilter)
+    }
+    if (programFilter !== ALL) {
+      scoped = scoped.filter((row) => row.programId === programFilter)
+    }
+    return uniqueOptions(
+      scoped,
+      (row) => row.offeringId,
+      (row) => row.offeringName
+    )
+  }, [rows, departmentFilter, programFilter])
+
+  React.useEffect(() => {
+    if (
+      programFilter !== ALL &&
+      !programOptions.some((option) => option.id === programFilter)
+    ) {
+      setProgramFilter(ALL)
+    }
+  }, [programFilter, programOptions])
+
+  React.useEffect(() => {
+    if (
+      offeringFilter !== ALL &&
+      !offeringOptions.some((option) => option.id === offeringFilter)
+    ) {
+      setOfferingFilter(ALL)
+    }
+  }, [offeringFilter, offeringOptions])
+
+  const filteredRows = React.useMemo(() => {
+    return rows.filter((row) => {
+      if (departmentFilter !== ALL && row.departmentId !== departmentFilter) {
+        return false
+      }
+      if (programFilter !== ALL && row.programId !== programFilter) {
+        return false
+      }
+      if (offeringFilter !== ALL && row.offeringId !== offeringFilter) {
+        return false
+      }
+      if (statusFilter !== ALL && row.offeringActivity !== statusFilter) {
+        return false
+      }
+      if (paymentStatusFilter === "default") {
+        return row.status !== "Voided"
+      }
+      if (paymentStatusFilter !== "all" && row.status !== paymentStatusFilter) {
+        return false
+      }
+      return true
+    })
+  }, [
+    rows,
+    departmentFilter,
+    programFilter,
+    offeringFilter,
+    statusFilter,
+    paymentStatusFilter,
+  ])
+
+  const filtersActive =
+    departmentFilter !== ALL ||
+    programFilter !== ALL ||
+    offeringFilter !== ALL ||
+    statusFilter !== "active" ||
+    paymentStatusFilter !== "default"
 
   if (loading) {
     return (
@@ -187,96 +369,116 @@ function PaymentsTab({ failedOnly }: { failedOnly: boolean }) {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
-          {failedOnly ? (
-            <AlertTriangle className="h-5 w-5 text-amber-600" />
-          ) : (
-            <CreditCard className="h-5 w-5" />
-          )}
-          {failedOnly ? "Failed transactions" : "Payment transactions"}
-        </h2>
-        <p className="text-sm text-muted-foreground">
-          {failedOnly
-            ? "Declined cards, voided payments, and other failed payment attempts across the organization."
-            : "Organization-wide payments from Donations and Programs."}
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+        <div className="space-y-1.5 sm:w-44">
+          <Label htmlFor="transactions-department">Department</Label>
+          <Select
+            value={departmentFilter}
+            onValueChange={(value) => {
+              setDepartmentFilter(value)
+              setProgramFilter(ALL)
+              setOfferingFilter(ALL)
+            }}
+          >
+            <SelectTrigger id="transactions-department">
+              <SelectValue placeholder="All departments" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>All departments</SelectItem>
+              {departmentOptions.map((option) => (
+                <SelectItem key={option.id} value={option.id}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5 sm:w-44">
+          <Label htmlFor="transactions-program">{YEAR_SEASON_LABEL}</Label>
+          <Select
+            value={programFilter}
+            onValueChange={(value) => {
+              setProgramFilter(value)
+              setOfferingFilter(ALL)
+            }}
+          >
+            <SelectTrigger id="transactions-program">
+              <SelectValue
+                placeholder={`All ${YEAR_SEASON_LABEL.toLowerCase()}s`}
+              />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>
+                All {YEAR_SEASON_LABEL.toLowerCase()}s
+              </SelectItem>
+              {programOptions.map((option) => (
+                <SelectItem key={option.id} value={option.id}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5 sm:w-44">
+          <Label htmlFor="transactions-offering">{PROGRAM_LABEL}</Label>
+          <Select value={offeringFilter} onValueChange={setOfferingFilter}>
+            <SelectTrigger id="transactions-offering">
+              <SelectValue
+                placeholder={`All ${PROGRAM_LABEL.toLowerCase()}s`}
+              />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>
+                All {PROGRAM_LABEL.toLowerCase()}s
+              </SelectItem>
+              {offeringOptions.map((option) => (
+                <SelectItem key={option.id} value={option.id}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5 sm:w-40">
+          <Label htmlFor="transactions-program-status">Program Status</Label>
+          <Select
+            value={statusFilter}
+            onValueChange={(value) =>
+              setStatusFilter(value as OfferingActivityFilter)
+            }
+          >
+            <SelectTrigger id="transactions-program-status">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="closed">Closed</SelectItem>
+              <SelectItem value={ALL}>All</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {filtersActive ? (
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => {
+              setDepartmentFilter(ALL)
+              setProgramFilter(ALL)
+              setOfferingFilter(ALL)
+              setStatusFilter("active")
+              setPaymentStatusFilter("default")
+            }}
+          >
+            Clear filters
+          </Button>
+        ) : null}
       </div>
+
       <PaymentTransactionsTable
-        rows={rows}
-        emptyMessage={
-          failedOnly
-            ? "No failed payment transactions found."
-            : "No payment transactions yet."
-        }
+        rows={filteredRows}
+        paymentStatusFilter={paymentStatusFilter}
+        onPaymentStatusFilterChange={setPaymentStatusFilter}
       />
     </div>
-  )
-}
-
-export function OrgReportsClient({
-  initialTab = "payments",
-  basePath = "/finance/transactions",
-}: {
-  initialTab?: string
-  /** Path used for tab URL sync (Finance Transactions or legacy /reports). */
-  basePath?: string
-}) {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const tabFromUrl = searchParams.get("tab")
-  const activeTab: ReportTab = isReportTab(tabFromUrl)
-    ? tabFromUrl
-    : isReportTab(initialTab)
-      ? initialTab
-      : "payments"
-
-  function selectTab(value: string) {
-    const next = isReportTab(value) ? value : "payments"
-    const params = new URLSearchParams(searchParams.toString())
-    if (next === "payments") {
-      params.delete("tab")
-    } else {
-      params.set("tab", next)
-    }
-    const query = params.toString()
-    router.replace(query ? `${basePath}?${query}` : basePath)
-  }
-
-  return (
-    <Tabs value={activeTab} onValueChange={selectTab} className="gap-4">
-      <TabsList>
-        {REPORT_TABS.map((tab) => (
-          <TabsTrigger key={tab.value} value={tab.value}>
-            {tab.label}
-          </TabsTrigger>
-        ))}
-      </TabsList>
-
-      <TabsContent value="payments" className="mt-0">
-        <PaymentsTab failedOnly={false} />
-      </TabsContent>
-
-      <TabsContent value="failed" className="mt-0">
-        <PaymentsTab failedOnly />
-      </TabsContent>
-
-      <TabsContent value="more" className="mt-0">
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center gap-3 py-14 text-center">
-            <Sparkles className="h-8 w-8 text-muted-foreground" />
-            <div className="space-y-1">
-              <h2 className="text-lg font-semibold tracking-tight">
-                More reports coming soon
-              </h2>
-              <p className="max-w-md text-sm text-muted-foreground">
-                This organization-wide Reports hub will grow as we add cross-module
-                analytics. Tell us what you need next.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </TabsContent>
-    </Tabs>
   )
 }

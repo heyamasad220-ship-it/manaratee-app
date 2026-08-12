@@ -49,8 +49,8 @@ The Programs module lets organizations create and manage programs (camps, classe
 
 ### Core concepts
 
-- **Year/Season** (DB: `programs`) — Top-level year container (name, dates, eligibility defaults, capacity metadata). Staff UI label: **Year/Season**.
-- **Program** (DB: `program_offerings`) — A sellable class/instance customers register for (e.g. “Beginner Tajweed — Centre”). Staff UI label: **Program** (formerly Offering). Sessions and registration options belong to an offering row. Shared label helpers: `lib/programs/program-display-labels.ts`.
+- **Program** (DB: `programs`) — Top-level program container (name, dates, eligibility defaults, capacity metadata). Staff UI label: **Program** (formerly Year/Season).
+- **Offering** (DB: `program_offerings`) — A sellable class/instance customers register for (e.g. “Beginner Tajweed — Centre”). Staff UI label: **Offering**. Sessions and registration options belong to an offering row. Shared label helpers: `lib/programs/program-display-labels.ts`.
 - **Registration option** — How a customer registers: `full_program`, `selected_sessions`, `single_session`, or `drop_in`.
 - **Fee plan** — Offering-scoped pricing configuration (tuition, lunch, extended care, discounts). Drives the quote engine.
 - **Enrollment** — A registration record linking registrant/participant **contacts** to a program offering.

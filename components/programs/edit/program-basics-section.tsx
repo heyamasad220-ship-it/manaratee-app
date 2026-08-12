@@ -79,6 +79,7 @@ export function ProgramBasicsSection({
   programStatusFallback = "draft",
   allowedStatuses,
   layout = "columns",
+  hideDepartment = false,
 }: {
   program?: ProgramBasicsDefaults | null
   programId?: string
@@ -90,6 +91,8 @@ export function ProgramBasicsSection({
   allowedStatuses?: StatusOptionValue[]
   /** `stack` = single full-width column (dialogs). `columns` = two-column edit page. */
   layout?: "columns" | "stack"
+  /** Hide department picker when already scoped to a department workspace. */
+  hideDepartment?: boolean
 }) {
   const currentStatus = status ?? programStatusFallback
   const statusOptions = (() => {
@@ -107,6 +110,10 @@ export function ProgramBasicsSection({
   const stacked = layout === "stack"
 
   const [flyerUrl, setFlyerUrl] = React.useState(program?.flyer_url ?? "")
+  const flyerColumnRef = React.useRef<HTMLDivElement>(null)
+  const [descriptionHeight, setDescriptionHeight] = React.useState<number | null>(
+    null
+  )
   const ageBounds = React.useMemo(
     () =>
       parseProgramAgeBounds({
@@ -125,6 +132,36 @@ export function ProgramBasicsSection({
     setFlyerUrl(program?.flyer_url ?? "")
   }, [program?.flyer_url])
 
+  React.useLayoutEffect(() => {
+    const column = flyerColumnRef.current
+    if (!column) return
+
+    const frame = column.querySelector<HTMLElement>("[data-flyer-frame]")
+    if (!frame) return
+
+    const syncHeight = () => {
+      const next = Math.round(frame.getBoundingClientRect().height)
+      setDescriptionHeight(next > 0 ? next : null)
+    }
+
+    syncHeight()
+    const observer = new ResizeObserver(syncHeight)
+    observer.observe(frame)
+    if (flyerUrl) {
+      const img = frame.querySelector("img")
+      if (img) {
+        if (img.complete) syncHeight()
+        else img.addEventListener("load", syncHeight)
+      }
+    }
+
+    return () => {
+      observer.disconnect()
+      const img = frame.querySelector("img")
+      img?.removeEventListener("load", syncHeight)
+    }
+  }, [flyerUrl])
+
   React.useEffect(() => {
     const next = parseProgramAgeBounds({
       min_age: program?.min_age ?? null,
@@ -138,23 +175,37 @@ export function ProgramBasicsSection({
   const publishingFields = (
     <BasicsSubsection title="Publishing">
       <input type="hidden" name="visibility" value={initialVisibility} />
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="min-w-0 space-y-1.5">
-          <Label htmlFor="department_id">Department</Label>
-          <select
-            id="department_id"
-            name="department_id"
-            defaultValue={program?.department_id || ""}
-            className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-          >
-            <option value="">No department</option>
-            {departments.map((department) => (
-              <option key={department.id} value={department.id}>
-                {department.name}
-              </option>
-            ))}
-          </select>
-        </div>
+      {hideDepartment ? (
+        <input
+          type="hidden"
+          name="department_id"
+          value={program?.department_id || ""}
+        />
+      ) : null}
+      <div
+        className={cn(
+          "grid gap-3",
+          hideDepartment ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2"
+        )}
+      >
+        {hideDepartment ? null : (
+          <div className="min-w-0 space-y-1.5">
+            <Label htmlFor="department_id">Department</Label>
+            <select
+              id="department_id"
+              name="department_id"
+              defaultValue={program?.department_id || ""}
+              className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+            >
+              <option value="">No department</option>
+              {departments.map((department) => (
+                <option key={department.id} value={department.id}>
+                  {department.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <div className="min-w-0 space-y-1.5">
           <Label htmlFor="status">Status</Label>
@@ -190,7 +241,7 @@ export function ProgramBasicsSection({
     >
       <div className="min-w-0 space-y-3">
         <div className="space-y-1.5">
-          <Label htmlFor="name">Year/Season Name *</Label>
+          <Label htmlFor="name">Program Name *</Label>
           <Input
             id="name"
             name="name"
@@ -199,45 +250,50 @@ export function ProgramBasicsSection({
           />
         </div>
 
-        <div className="overflow-hidden rounded-lg border bg-muted/40">
-          <div className="space-y-3 p-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="subtitle">Subtitle</Label>
-              <Input
-                id="subtitle"
-                name="subtitle"
-                defaultValue={program?.subtitle || ""}
-                placeholder="Short tagline shown under the year/season name"
-                className="bg-background"
-              />
-              <p className="text-xs text-muted-foreground">
-                A brief line customers see below the year/season title.
-              </p>
-            </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="subtitle">Subtitle</Label>
+          <Input
+            id="subtitle"
+            name="subtitle"
+            defaultValue={program?.subtitle || ""}
+            placeholder="Short tagline shown under the program name"
+          />
+          <p className="text-xs text-muted-foreground">
+            A brief line customers see below the program title.
+          </p>
+        </div>
 
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+          <div ref={flyerColumnRef} className="w-fit max-w-full shrink-0">
             <ProgramBrandingColors
               flyerUrl={flyerUrl}
               onFlyerUrlChange={setFlyerUrl}
               programId={programId}
               initialBackgroundColor={program?.background_color}
+              flyerFit="contain"
+            />
+          </div>
+          <div className="flex min-w-0 flex-1 flex-col space-y-1.5">
+            <Label htmlFor="description">Description</Label>
+            <Textarea
+              id="description"
+              name="description"
+              rows={12}
+              defaultValue={program?.description || ""}
+              placeholder="Describe what participants will experience..."
+              className="field-sizing-fixed min-h-[16rem] resize-y"
+              style={
+                descriptionHeight
+                  ? { height: descriptionHeight, minHeight: descriptionHeight }
+                  : undefined
+              }
             />
           </div>
         </div>
 
-        <div className="space-y-1.5">
-          <Label htmlFor="description">Description</Label>
-          <Textarea
-            id="description"
-            name="description"
-            rows={stacked ? 3 : 5}
-            defaultValue={program?.description || ""}
-            placeholder="Describe what participants will experience..."
-          />
-        </div>
-
         <BasicsSubsection
           title="Schedule"
-          description="Year/Season dates apply to all programs unless a program sets its own dates."
+          description="Program dates apply to all offerings unless an offering sets its own dates."
         >
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="min-w-0 space-y-1.5">
@@ -285,7 +341,7 @@ export function ProgramBasicsSection({
 
         <BasicsSubsection
           title="Eligibility"
-          description="Gender and age apply to the whole year/season. Programs inherit these for years like QIL; summer camps can still use capacity groups per program when needed."
+          description="Gender and age apply to the whole program. Offerings inherit these for years like QIL; summer camps can still use capacity groups per offering when needed."
         >
           <input type="hidden" name="min_age" value={ageSelectValue(minAge)} />
           <input type="hidden" name="max_age" value={ageSelectValue(maxAge)} />

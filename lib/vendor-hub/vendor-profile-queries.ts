@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
-import { getParticipationHistory } from "@/lib/vendor-hub/participation-history-queries"
-import type { ParticipationHistoryRow } from "@/lib/vendor-hub/participation-history-queries"
+import { getContactParticipationEvents } from "@/lib/vendor-hub/participation-history-queries"
+import type { ContactParticipationEventRow } from "@/lib/vendor-hub/participation-history-queries"
 import { getVendorHubVendorTypes } from "@/lib/vendor-hub/vendor-type-queries"
 import type { VendorHubVendorType } from "@/lib/vendor-hub/vendor-type-types"
 import {
@@ -37,7 +37,7 @@ export type VendorProfileData = {
   vendorTypeName: string | null
   status: string
   vendorTypes: VendorHubVendorType[]
-  participation: ParticipationHistoryRow[]
+  participation: ContactParticipationEventRow[]
   documents: VendorProfileDocument[]
 }
 
@@ -95,7 +95,7 @@ export async function getVendorProfile(
   const vendorTypeName =
     vendorTypes.find((type) => type.id === vendorTypeId)?.name || null
 
-  const participation = await getParticipationHistory(contactId)
+  const participation = await getContactParticipationEvents(contactId)
 
   let documents: VendorProfileDocument[] = []
   if (application?.id) {

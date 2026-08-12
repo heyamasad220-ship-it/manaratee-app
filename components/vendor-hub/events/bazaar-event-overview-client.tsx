@@ -1,10 +1,11 @@
 "use client"
 
 import Link from "next/link"
-import { DollarSign, LayoutGrid, Star } from "lucide-react"
+import { ClipboardList, DollarSign, LayoutGrid, Star } from "lucide-react"
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { StatCard, StatCardsRow, type StatCardTone } from "@/components/ui/stat-card"
 import { BazaarEventFlyerSharePanel } from "@/components/vendor-hub/events/bazaar-event-flyer-share-panel"
 import { BazaarEventQuickActions } from "@/components/vendor-hub/events/bazaar-event-quick-actions"
 import { VENDOR_HUB_ROUTES } from "@/lib/vendor-hub/vendor-hub-routes"
@@ -38,21 +39,39 @@ export function BazaarEventOverviewClient({
     metrics.vendorsParticipated > 0 &&
     metrics.vendorsPendingEvaluation > 0
 
-  const stats = [
+  const stats: Array<{
+    label: string
+    value: string | number
+    icon: typeof LayoutGrid
+    tone: StatCardTone
+    href?: string
+  }> = [
     {
       label: "Booth occupancy",
       value: `${metrics.boothsAssigned}/${metrics.boothsTotal}`,
       icon: LayoutGrid,
+      tone: "amber",
+      href: VENDOR_HUB_ROUTES.events.booths(event.id),
+    },
+    {
+      label: "Booth registrations",
+      value: metrics.boothRegistrations,
+      icon: ClipboardList,
+      tone: "sky",
+      href: VENDOR_HUB_ROUTES.events.booths(event.id),
     },
     {
       label: "Revenue collected",
       value: `$${metrics.revenueCollected.toFixed(2)}`,
       icon: DollarSign,
+      tone: "violet",
     },
     {
       label: "Evaluations pending",
       value: metrics.vendorsPendingEvaluation,
       icon: Star,
+      tone: "emerald",
+      href: VENDOR_HUB_ROUTES.events.evaluations(event.id),
     },
   ]
 
@@ -78,20 +97,35 @@ export function BazaarEventOverviewClient({
         </Card>
       ) : null}
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        {stats.map((stat) => (
-          <Card key={stat.label}>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {stat.label}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold">{stat.value}</p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      <StatCardsRow equal columns={4}>
+        {stats.map((stat) => {
+          const card = (
+            <StatCard
+              fill
+              layout="header"
+              label={stat.label}
+              value={stat.value}
+              icon={stat.icon}
+              tone={stat.tone}
+              className={stat.href ? "h-full transition-shadow hover:shadow-sm" : "h-full"}
+            />
+          )
+
+          if (!stat.href) {
+            return (
+              <div key={stat.label} className="min-w-0">
+                {card}
+              </div>
+            )
+          }
+
+          return (
+            <Link key={stat.label} href={stat.href} className="min-w-0">
+              {card}
+            </Link>
+          )
+        })}
+      </StatCardsRow>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
         <BazaarEventFlyerSharePanel event={event} />

@@ -4,9 +4,7 @@ import * as React from "react"
 import { Suspense } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 
-import { DepartmentsManager } from "@/components/departments/departments-manager"
 import { HrChildcarePanel } from "@/components/hr/hr-childcare-panel"
-import { HrOverviewDashboard } from "@/components/hr/hr-reports-client"
 import { StaffRecordsClient } from "@/components/hr/staff-records-client"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { VolunteersList } from "@/components/workforce/volunteers-list"
@@ -24,17 +22,11 @@ import type {
 
 export function HrOverviewClient({
   organizationId,
-  overviewStats,
   childcareProviders,
   childcareStats,
   initialTab,
 }: {
   organizationId: string | null
-  overviewStats: {
-    employees: number
-    volunteers: number
-    childcareProviders: number
-  }
   childcareProviders: ChildcareProviderRecord[]
   childcareStats: ChildcareProviderStats
   initialTab?: string | null
@@ -72,18 +64,6 @@ export function HrOverviewClient({
             </TabsTrigger>
           ))}
         </TabsList>
-
-        <TabsContent value="overview" className="mt-0">
-          <HrOverviewDashboard
-            organizationId={organizationId}
-            volunteerCount={overviewStats.volunteers}
-            childcareProviderCount={overviewStats.childcareProviders}
-          />
-        </TabsContent>
-
-        <TabsContent value="departments" className="mt-0">
-          <DepartmentsManager />
-        </TabsContent>
 
         <TabsContent value="employees" className="mt-0">
           <StaffRecordsClient organizationId={organizationId} />

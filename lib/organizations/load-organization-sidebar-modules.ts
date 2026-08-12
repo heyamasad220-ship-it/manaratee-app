@@ -28,8 +28,8 @@ const SIDEBAR_MODULE_DEFAULTS: Record<
     sort_order: 10,
   },
   workforce: {
-    name: "HR",
-    route: "/workforce",
+    name: "Workforce",
+    route: "/workforce/employees",
     icon_name: "Users",
     group_name: "People",
     sort_order: 20,
@@ -64,7 +64,7 @@ const SIDEBAR_MODULE_DEFAULTS: Record<
   },
   "event-management": {
     name: "Event Management",
-    route: "/event-management/overview",
+    route: "/event-management",
     icon_name: "LayoutGrid",
     group_name: "Operations",
     sort_order: 50,

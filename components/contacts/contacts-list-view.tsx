@@ -76,8 +76,18 @@ import {
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { ListPagination } from "@/components/ui/list-pagination"
+import {
+  TableColumnHeaderFilter,
+  TableColumnHeaderSort,
+} from "@/components/ui/table-column-header-filter"
 import { DEFAULT_LIST_PAGE_SIZE } from "@/lib/ui/list-pagination"
 import { cn } from "@/lib/utils"
+import { CreateVendorDialog } from "@/components/vendor-hub/events/create-vendor-dialog"
+import type { VendorHubVendorType } from "@/lib/vendor-hub/vendor-type-types"
+import {
+  isVendorInactiveByLastActivity,
+  vendorLastActivityAt,
+} from "@/lib/vendor-hub/vendor-activity"
 import {
   Search,
   Plus,
@@ -90,6 +100,13 @@ import {
   Trash2,
   Filter,
 } from "lucide-react"
+
+const LAST_ACTIVITY_SORT_OPTIONS = [
+  { value: "desc", label: "Newest first" },
+  { value: "asc", label: "Oldest first" },
+] as const
+
+type LastActivitySort = (typeof LAST_ACTIVITY_SORT_OPTIONS)[number]["value"]
 
 export interface ContactListItem {
   id: string
@@ -104,6 +121,7 @@ export interface ContactListItem {
   lastActivity?: string
   businessName?: string | null
   vendorType?: string | null
+  vendorTypeId?: string | null
 }
 
 export type ContactsListViewProps = {
@@ -357,7 +375,9 @@ export function ContactsListView({
   const [roleFilters, setRoleFilters] = useState<ContactRoleValue[]>(
     requiredRole ? [requiredRole] : []
   )
-  const [statusFilter, setStatusFilter] = useState<ContactStatus | "all">("all")
+  const [statusFilter, setStatusFilter] = useState<ContactStatus | "all">(
+    vendorNetworkLayout ? "Active" : "all"
+  )
   const [recordTypeFilter, setRecordTypeFilter] = useState<ContactRecordType | "all">(
     lockedRecordType || "all"
   )
@@ -367,6 +387,15 @@ export function ContactsListView({
   const [listPage, setListPage] = useState(1)
   const [listPageSize, setListPageSize] = useState(DEFAULT_LIST_PAGE_SIZE)
   const [listTotal, setListTotal] = useState(0)
+
+  // Vendor Network column filters (debounced text filters)
+  const [contactColumnFilterInput, setContactColumnFilterInput] = useState("")
+  const [contactColumnFilter, setContactColumnFilter] = useState("")
+  const [businessNameFilterInput, setBusinessNameFilterInput] = useState("")
+  const [businessNameFilter, setBusinessNameFilter] = useState("")
+  const [vendorTypeFilter, setVendorTypeFilter] = useState<string>("all")
+  const [vendorTypeOptions, setVendorTypeOptions] = useState<VendorHubVendorType[]>([])
+  const [lastActivitySort, setLastActivitySort] = useState<LastActivitySort>("desc")
 
   const [teamOptions, setTeamOptions] = useState<{ id: string; name: string }[]>([])
   const [teamPositionOptions, setTeamPositionOptions] = useState<{ id: string; name: string }[]>([])
@@ -416,6 +445,7 @@ export function ContactsListView({
           lastActivity: c.last_activity_at || c.updated_at || c.created_at,
           businessName: null,
           vendorType: null,
+          vendorTypeId: null,
         }
       })
     },
@@ -471,47 +501,66 @@ export function ContactsListView({
       return
     }
 
-    const from = (Math.max(1, listPage) - 1) * Math.max(1, listPageSize)
-    const to = from + Math.max(1, listPageSize) - 1
-    const trimmedSearch = searchQuery.trim()
+    const trimmedContact = contactColumnFilter.trim()
+    const trimmedBusiness = businessNameFilter.trim().toLowerCase()
 
-    let query = supabase
-      .from("contacts")
-      .select(contactFields, { count: "exact" })
-      .eq("organization_id", orgId)
-      .eq("contact_roles.role", role)
-      .order("full_name", { ascending: true })
-      .range(from, to)
+    let allRows: any[] = []
+    let from = 0
+    const pageSize = 1000
 
-    if (statusFilter !== "all") {
-      query = query.eq("status", statusToDbValue(statusFilter))
+    while (true) {
+      let query = supabase
+        .from("contacts")
+        .select(contactFields)
+        .eq("organization_id", orgId)
+        .eq("contact_roles.role", role)
+        .order("full_name", { ascending: true })
+        .range(from, from + pageSize - 1)
+
+      // Status Active/Inactive is applied from Last Activity after load (not DB status alone).
+
+      if (trimmedContact) {
+        const escapedSearch = trimmedContact.replace(/[%_\\,]/g, "\\$&")
+        const pattern = `%${escapedSearch}%`
+        query = query.or(
+          `full_name.ilike.${pattern},email.ilike.${pattern},phone.ilike.${pattern}`
+        )
+      }
+
+      const { data, error } = await query
+
+      if (error) {
+        console.error(
+          "Error loading vendor network contacts:",
+          error.message || error.code || error
+        )
+        setContacts([])
+        setListTotal(0)
+        setErrorMessage(error.message || "Could not load vendors.")
+        setLoading(false)
+        return
+      }
+
+      allRows = [...allRows, ...(data || [])]
+      if (!data || data.length < pageSize) break
+      from += pageSize
     }
 
-    if (trimmedSearch) {
-      const escapedSearch = trimmedSearch.replace(/[%_\\,]/g, "\\$&")
-      const pattern = `%${escapedSearch}%`
-      query = query.or(
-        `full_name.ilike.${pattern},email.ilike.${pattern},phone.ilike.${pattern}`
-      )
-    }
+    const now = Date.now()
+    const mapped = mapContactRows(allRows).map((contact, index) => {
+      const raw = allRows[index]
+      const lastActivity = vendorLastActivityAt({
+        last_activity_at: raw?.last_activity_at,
+        created_at: raw?.created_at,
+      })
+      const inactive = isVendorInactiveByLastActivity(lastActivity, now)
+      return {
+        ...contact,
+        lastActivity: lastActivity || contact.createdAt,
+        status: (inactive ? "Inactive" : "Active") as ContactStatus,
+      }
+    })
 
-    const { data, error, count } = await query
-
-    if (error) {
-      console.error(
-        "Error loading vendor network contacts:",
-        error.message || error.code || error
-      )
-      setContacts([])
-      setListTotal(0)
-      setErrorMessage(error.message || "Could not load vendors.")
-      setLoading(false)
-      return
-    }
-
-    setListTotal(count ?? 0)
-
-    const mapped = mapContactRows(data || [])
     const contactIds = mapped.map((c) => c.id)
     const [boothTypeByContact, businessMeta] = await Promise.all([
       loadVendorTypesByContact(supabase, contactIds),
@@ -530,28 +579,71 @@ export function ContactsListView({
       }
     }
 
-    setContacts(
-      mapped.map((c) => {
-        const catalogTypeId = businessMeta.vendorTypeIdByContact.get(c.id)
-        const catalogTypeName = catalogTypeId
-          ? catalogNameById.get(catalogTypeId) || null
-          : null
-        return {
-          ...c,
-          vendorType: catalogTypeName || boothTypeByContact.get(c.id) || null,
-          businessName: businessMeta.nameByContact.get(c.id) || c.name || null,
-        }
-      })
-    )
+    let enriched = mapped.map((c) => {
+      const catalogTypeId = businessMeta.vendorTypeIdByContact.get(c.id) || null
+      const catalogTypeName = catalogTypeId
+        ? catalogNameById.get(catalogTypeId) || null
+        : null
+      return {
+        ...c,
+        vendorTypeId: catalogTypeId,
+        vendorType: catalogTypeName || boothTypeByContact.get(c.id) || null,
+        businessName: businessMeta.nameByContact.get(c.id) || c.name || null,
+      }
+    })
+
+    if (statusFilter === "Active") {
+      enriched = enriched.filter((c) => c.status === "Active")
+    } else if (statusFilter === "Inactive") {
+      enriched = enriched.filter((c) => c.status === "Inactive")
+    }
+
+    if (trimmedBusiness) {
+      enriched = enriched.filter((c) =>
+        (c.businessName || "").toLowerCase().includes(trimmedBusiness)
+      )
+    }
+
+    if (vendorTypeFilter !== "all") {
+      if (vendorTypeFilter === "__none__") {
+        enriched = enriched.filter((c) => !c.vendorTypeId && !c.vendorType)
+      } else {
+        enriched = enriched.filter(
+          (c) =>
+            c.vendorTypeId === vendorTypeFilter ||
+            c.vendorType === vendorTypeFilter
+        )
+      }
+    }
+
+    enriched = [...enriched].sort((a, b) => {
+      const aTime = a.lastActivity ? new Date(a.lastActivity).getTime() : 0
+      const bTime = b.lastActivity ? new Date(b.lastActivity).getTime() : 0
+      const safeA = Number.isFinite(aTime) ? aTime : 0
+      const safeB = Number.isFinite(bTime) ? bTime : 0
+      if (safeA === safeB) {
+        return a.name.localeCompare(b.name)
+      }
+      return lastActivitySort === "asc" ? safeA - safeB : safeB - safeA
+    })
+
+    setListTotal(enriched.length)
+
+    const start = (Math.max(1, listPage) - 1) * Math.max(1, listPageSize)
+    const pageRows = enriched.slice(start, start + Math.max(1, listPageSize))
+    setContacts(pageRows)
     setLoading(false)
   }, [
+    businessNameFilter,
+    contactColumnFilter,
+    lastActivitySort,
     listPage,
     listPageSize,
     mapContactRows,
     requiredRole,
-    searchQuery,
     statusFilter,
     supabase,
+    vendorTypeFilter,
   ])
 
   const loadContacts = useCallback(
@@ -660,25 +752,68 @@ export function ContactsListView({
   useEffect(() => {
     if (!vendorNetworkLayout) return
     setListPage(1)
-  }, [searchQuery, statusFilter, vendorNetworkLayout])
+  }, [
+    contactColumnFilter,
+    businessNameFilter,
+    vendorTypeFilter,
+    statusFilter,
+    lastActivitySort,
+    vendorNetworkLayout,
+  ])
+
+  useEffect(() => {
+    if (!vendorNetworkLayout) return
+    void loadVendorNetworkPage()
+  }, [
+    vendorNetworkLayout,
+    loadVendorNetworkPage,
+    contactColumnFilter,
+    businessNameFilter,
+    vendorTypeFilter,
+    listPage,
+    listPageSize,
+    statusFilter,
+    lastActivitySort,
+  ])
+
+  useEffect(() => {
+    if (!vendorNetworkLayout) return
+    const timer = window.setTimeout(
+      () => setContactColumnFilter(contactColumnFilterInput.trim()),
+      350
+    )
+    return () => window.clearTimeout(timer)
+  }, [contactColumnFilterInput, vendorNetworkLayout])
+
+  useEffect(() => {
+    if (!vendorNetworkLayout) return
+    const timer = window.setTimeout(
+      () => setBusinessNameFilter(businessNameFilterInput.trim()),
+      350
+    )
+    return () => window.clearTimeout(timer)
+  }, [businessNameFilterInput, vendorNetworkLayout])
 
   useEffect(() => {
     if (!vendorNetworkLayout) return
 
-    const delay = searchQuery.trim() ? 350 : 0
-    const timer = window.setTimeout(() => {
-      void loadVendorNetworkPage()
-    }, delay)
+    async function loadVendorTypes() {
+      const orgId = await getCurrentOrganizationId()
+      if (!orgId) {
+        setVendorTypeOptions([])
+        return
+      }
+      const { data } = await supabase
+        .from("vendor_hub_vendor_types")
+        .select("*")
+        .eq("organization_id", orgId)
+        .order("sort_order", { ascending: true })
+        .order("name", { ascending: true })
+      setVendorTypeOptions((data || []) as VendorHubVendorType[])
+    }
 
-    return () => window.clearTimeout(timer)
-  }, [
-    vendorNetworkLayout,
-    loadVendorNetworkPage,
-    searchQuery,
-    listPage,
-    listPageSize,
-    statusFilter,
-  ])
+    void loadVendorTypes()
+  }, [supabase, vendorNetworkLayout])
 
   useEffect(() => {
     if (vendorNetworkLayout || !searchToLoad) return
@@ -944,22 +1079,24 @@ export function ContactsListView({
       )}
 
       <div className="flex flex-col gap-3">
-        <div className="relative w-full sm:max-w-md lg:max-w-lg">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder={
-              searchToLoad
-                ? "Search contacts by name, email, or phone..."
-                : "Search by name, email, or phone..."
-            }
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-          />
-        </div>
+        {!vendorNetworkLayout && (
+          <div className="relative w-full sm:max-w-md lg:max-w-lg">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder={
+                searchToLoad
+                  ? "Search contacts by name, email, or phone..."
+                  : "Search by name, email, or phone..."
+              }
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+        )}
 
         <div className="flex flex-wrap items-center gap-3">
-          {!hideRoleFilter && (
+          {!vendorNetworkLayout && !hideRoleFilter && (
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="outline" size="sm" className="shrink-0 sm:w-[200px]">
@@ -989,7 +1126,7 @@ export function ContactsListView({
             </Popover>
           )}
 
-          {!hideRecordTypeFilter && !lockedRecordType && (
+          {!vendorNetworkLayout && !hideRecordTypeFilter && !lockedRecordType && (
             <Select
               value={recordTypeFilter}
               onValueChange={(v) => setRecordTypeFilter(v as ContactRecordType | "all")}
@@ -1005,40 +1142,45 @@ export function ContactsListView({
             </Select>
           )}
 
-          <Select
-            value={statusFilter}
-            onValueChange={(v) => {
-              setStatusFilter(v as ContactStatus | "all")
-              if (vendorNetworkLayout) setListPage(1)
-            }}
-          >
-            <SelectTrigger className="h-9 shrink-0 sm:w-[150px]">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              {STATUS_OPTIONS.map((status) => (
-                <SelectItem key={status.value} value={status.label}>
-                  {status.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {!vendorNetworkLayout && (
+            <Select
+              value={statusFilter}
+              onValueChange={(v) => {
+                setStatusFilter(v as ContactStatus | "all")
+              }}
+            >
+              <SelectTrigger className="h-9 shrink-0 sm:w-[150px]">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                {STATUS_OPTIONS.map((status) => (
+                  <SelectItem key={status.value} value={status.label}>
+                    {status.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
 
           {headerAction}
           <Button
             size="sm"
-            className="shrink-0"
+            className={vendorNetworkLayout ? "ml-auto shrink-0" : "shrink-0"}
             onClick={() => {
+              if (vendorNetworkLayout) {
+                setShowAddDialog(true)
+                return
+              }
               resetAddForm()
               setShowAddDialog(true)
             }}
           >
             <Plus className="mr-1.5 h-4 w-4" />
-            Add Contact
+            {vendorNetworkLayout ? "Add Vendor" : "Add Contact"}
           </Button>
 
-          {showTeamFilters && (
+          {!vendorNetworkLayout && showTeamFilters && (
             <>
               <Select value={teamFilter} onValueChange={setTeamFilter}>
                 <SelectTrigger className="h-9 shrink-0 sm:w-[180px]">
@@ -1099,11 +1241,121 @@ export function ContactsListView({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Contact</TableHead>
+                <TableHead>
+                  {vendorNetworkLayout ? (
+                    <TableColumnHeaderFilter
+                      label="Contact"
+                      active={Boolean(contactColumnFilter)}
+                    >
+                      {({ close }) => (
+                        <div className="space-y-2">
+                          <Input
+                            placeholder="Filter by name, email, or phone..."
+                            value={contactColumnFilterInput}
+                            onChange={(event) =>
+                              setContactColumnFilterInput(event.target.value)
+                            }
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") {
+                                setContactColumnFilter(contactColumnFilterInput.trim())
+                                close()
+                              }
+                            }}
+                          />
+                          {contactColumnFilter ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="w-full"
+                              onClick={() => {
+                                setContactColumnFilterInput("")
+                                setContactColumnFilter("")
+                                close()
+                              }}
+                            >
+                              Clear
+                            </Button>
+                          ) : null}
+                        </div>
+                      )}
+                    </TableColumnHeaderFilter>
+                  ) : (
+                    "Contact"
+                  )}
+                </TableHead>
                 {vendorNetworkLayout ? (
                   <>
-                    <TableHead>Business Name</TableHead>
-                    <TableHead>Vendor Type</TableHead>
+                    <TableHead>
+                      <TableColumnHeaderFilter
+                        label="Business Name"
+                        active={Boolean(businessNameFilter)}
+                      >
+                        {({ close }) => (
+                          <div className="space-y-2">
+                            <Input
+                              placeholder="Filter by business name..."
+                              value={businessNameFilterInput}
+                              onChange={(event) =>
+                                setBusinessNameFilterInput(event.target.value)
+                              }
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter") {
+                                  setBusinessNameFilter(businessNameFilterInput.trim())
+                                  close()
+                                }
+                              }}
+                            />
+                            {businessNameFilter ? (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="w-full"
+                                onClick={() => {
+                                  setBusinessNameFilterInput("")
+                                  setBusinessNameFilter("")
+                                  close()
+                                }}
+                              >
+                                Clear
+                              </Button>
+                            ) : null}
+                          </div>
+                        )}
+                      </TableColumnHeaderFilter>
+                    </TableHead>
+                    <TableHead>
+                      <TableColumnHeaderFilter
+                        label="Vendor Type"
+                        active={vendorTypeFilter !== "all"}
+                      >
+                        {({ close }) => (
+                          <Select
+                            value={vendorTypeFilter}
+                            onValueChange={(value) => {
+                              setVendorTypeFilter(value)
+                              close()
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="All types" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All types</SelectItem>
+                              <SelectItem value="__none__">No type</SelectItem>
+                              {vendorTypeOptions
+                                .filter((type) => type.is_active)
+                                .map((type) => (
+                                  <SelectItem key={type.id} value={type.id}>
+                                    {type.name}
+                                  </SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </TableColumnHeaderFilter>
+                    </TableHead>
                   </>
                 ) : (
                   <>
@@ -1112,8 +1364,56 @@ export function ContactsListView({
                     <TableHead className="hidden lg:table-cell">Record Type</TableHead>
                   </>
                 )}
-                <TableHead>Status</TableHead>
-                <TableHead className="hidden sm:table-cell">Last Activity</TableHead>
+                <TableHead>
+                  {vendorNetworkLayout ? (
+                    <TableColumnHeaderFilter
+                      label="Status"
+                      active={statusFilter !== "all"}
+                    >
+                      {({ close }) => (
+                        <Select
+                          value={statusFilter}
+                          onValueChange={(value) => {
+                            setStatusFilter(value as ContactStatus | "all")
+                            close()
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="All Status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All Status</SelectItem>
+                            {STATUS_OPTIONS.map((status) => (
+                              <SelectItem key={status.value} value={status.label}>
+                                {status.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </TableColumnHeaderFilter>
+                  ) : (
+                    "Status"
+                  )}
+                </TableHead>
+                <TableHead className="hidden sm:table-cell">
+                  {vendorNetworkLayout ? (
+                    <div className="flex items-center gap-1">
+                      <span className="font-medium">Last Activity</span>
+                      <TableColumnHeaderSort
+                        label="Last Activity"
+                        value={lastActivitySort}
+                        active
+                        options={[...LAST_ACTIVITY_SORT_OPTIONS]}
+                        onChange={(value) =>
+                          setLastActivitySort(value as LastActivitySort)
+                        }
+                      />
+                    </div>
+                  ) : (
+                    "Last Activity"
+                  )}
+                </TableHead>
                 {!vendorNetworkLayout && (
                   <TableHead className="w-[80px] text-right">Actions</TableHead>
                 )}
@@ -1141,10 +1441,20 @@ export function ContactsListView({
                   >
                     {searchToLoad && !searchQuery.trim()
                       ? "Start typing to search for contacts."
-                      : emptyMessage ||
-                        (searchQuery.trim()
-                          ? "No contacts found."
-                          : "No contacts match the current filters.")}
+                      : vendorNetworkLayout
+                        ? statusFilter === "Active"
+                          ? "No active vendors match. Use the Status filter to view inactive vendors or All Status."
+                          : statusFilter === "Inactive"
+                            ? "No inactive vendors match."
+                            : contactColumnFilter ||
+                                businessNameFilter ||
+                                vendorTypeFilter !== "all"
+                              ? "No vendors match the current filters."
+                              : emptyMessage || "No vendors yet."
+                        : emptyMessage ||
+                          (searchQuery.trim()
+                            ? "No contacts found."
+                            : "No contacts match the current filters.")}
                   </TableCell>
                 </TableRow>
               ) : (
@@ -1300,7 +1610,12 @@ export function ContactsListView({
         />
       ) : null}
 
-      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+      <Dialog
+        open={!vendorNetworkLayout && showAddDialog}
+        onOpenChange={(open) => {
+          if (!vendorNetworkLayout) setShowAddDialog(open)
+        }}
+      >
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Add New Contact</DialogTitle>
@@ -1396,6 +1711,18 @@ export function ContactsListView({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {vendorNetworkLayout ? (
+        <CreateVendorDialog
+          open={showAddDialog}
+          onOpenChange={setShowAddDialog}
+          title="Add Vendor"
+          vendorTypes={vendorTypeOptions}
+          onCreated={() => {
+            void loadVendorNetworkPage()
+          }}
+        />
+      ) : null}
 
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <DialogContent className="max-w-md">

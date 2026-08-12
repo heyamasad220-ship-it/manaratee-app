@@ -43,6 +43,8 @@ export const OfferingRegistrationCapacitySection = React.forwardRef<
     enrolled?: number
     disabled?: boolean
     plain?: boolean
+    /** Hide program capacity when it lives on the parent edit form. */
+    hideSimpleCapacity?: boolean
   }
 >(function OfferingRegistrationCapacitySection(
   {
@@ -62,6 +64,7 @@ export const OfferingRegistrationCapacitySection = React.forwardRef<
     enrolled,
     disabled = false,
     plain = false,
+    hideSimpleCapacity = false,
   },
   ref
 ) {
@@ -103,25 +106,27 @@ export const OfferingRegistrationCapacitySection = React.forwardRef<
             className={cn("space-y-4", disabled && "pointer-events-none opacity-60")}
           >
             <div className="flex flex-wrap items-end gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="program-capacity">Program Capacity</Label>
-                <Input
-                  id="program-capacity"
-                  type="number"
-                  min="0"
-                  value={programCapacityValue}
-                  readOnly={programCapacityReadOnly}
-                  disabled={disabled}
-                  onChange={(event) =>
-                    onCapacityChange(Number(event.target.value || 0))
-                  }
-                  placeholder="e.g. 20"
-                  className={cn(
-                    "h-9 w-[140px]",
-                    programCapacityReadOnly && "bg-muted"
-                  )}
-                />
-              </div>
+              {!hideSimpleCapacity ? (
+                <div className="space-y-1.5">
+                  <Label htmlFor="program-capacity">Program Capacity</Label>
+                  <Input
+                    id="program-capacity"
+                    type="number"
+                    min="0"
+                    value={programCapacityValue}
+                    readOnly={programCapacityReadOnly}
+                    disabled={disabled}
+                    onChange={(event) =>
+                      onCapacityChange(Number(event.target.value || 0))
+                    }
+                    placeholder="e.g. 20"
+                    className={cn(
+                      "h-9 w-[140px]",
+                      programCapacityReadOnly && "bg-muted"
+                    )}
+                  />
+                </div>
+              ) : null}
 
               {!plain ? (
                 <div className="space-y-1.5">

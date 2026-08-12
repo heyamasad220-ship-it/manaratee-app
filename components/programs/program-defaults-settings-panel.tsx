@@ -169,14 +169,14 @@ export function ProgramDefaultsSettingsPanel({
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-sky-100 bg-sky-50/60 px-4 py-3 text-sm text-sky-950">
-        Set these once for the year/season. New programs inherit them.
-        Existing programs keep their own values unless they still have inherit
+        Set these once for the program. New offerings inherit them.
+        Existing offerings keep their own values unless they still have inherit
         turned on.
       </div>
 
       <EditSectionCard
-        title="Year/Season dates & enrollment window"
-        description="Default term and registration window for programs that inherit dates."
+        title="Program dates & enrollment window"
+        description="Default term and registration window for offerings that inherit dates."
       >
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div className="space-y-1.5">

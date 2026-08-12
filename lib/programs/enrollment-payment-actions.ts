@@ -980,7 +980,7 @@ export async function applyEnrollmentFinancialAssistanceAction(input: {
           enrollment_id: enrollmentId,
           installment_amount: monthlyAmount,
           due_date: `${y}-${m}-${d}`,
-          status: "scheduled",
+          status: "pending",
         }
       })
       if (planRows.length > 0) {
@@ -1114,7 +1114,7 @@ export async function createEnrollmentCustomPaymentPlanAction(input: {
         enrollment_id: enrollmentId,
         installment_amount: installmentAmount,
         due_date: `${y}-${m}-${d}`,
-        status: "scheduled",
+        status: "pending",
       }
     })
 

@@ -3,7 +3,7 @@
 **Status:** Implementation started (July 2026) — steps 1–3 in progress.  
 **Scope:** Going forward only. Existing enrollments (e.g. QIL) are treated as already past this pipeline.
 
-**SQL:** Run `scripts/182_program_registration_applications.sql` after `180`–`181`.
+**SQL:** Run `scripts/182_program_registration_applications.sql` after `180`–`181`. Run `scripts/236_program_application_answers.sql` for applicant form answers (`application_answers` JSONB).
 
 ### Built so far
 
@@ -11,9 +11,9 @@
 |--------|--------|
 | Reports: **Registrations** rename + **Payment transactions** tab | Done |
 | `program_applications` table + waitlist offering/offer columns | Done (SQL `182`) |
-| Customer apply (`/customer/programs/[id]/apply`) + New/Returning type | Done (await evaluation when `application_required`) |
+| Customer apply (`/customer/programs/[id]/apply`) + application form | Done (full name, returning/new, new-student background, course, babysitter, payment preference → `application_answers`) |
 | Open enrollment (`application_required = false`) — Register & pay, no approve | Done (SQL **`194`**; Add program + Registration settings) |
-| Department workspace **Applications** tab (approve / not approve + batch) | Done (approve other offering next) |
+| Department workspace **Applications** (row opens form sheet; approve / not approve + batch) | Done (approve other offering next) |
 | Waitlist on full + offer deadline | Not yet |
 | Gate Register on approved + seat/offer; fee on register | Not yet |
 | FA only after approval | Not yet |
@@ -47,15 +47,20 @@ Exact permission keys to map during implementation (`programs.manage`, `applicat
 
 ---
 
-## Application question: Returning vs New
+## Application form
 
-On apply (customer or staff):
+On apply (customer or staff) and when staff open an application from the department queue:
 
-- **Returning** or **New** is recorded on the application (shown to directors in the queue).
-- **All applicants** stay `submitted` until a director approves (or not).
-- After **Approved**, the student can **register** for the program (waitlist-on-full still pending).
+- **Full name**
+- **Returning** or **New** student
+- If **New**: previous courses, previous certificates, prior enrolment path (starting from scratch vs moving from another centre + centre name)
+- **Course** applying for (from year/season offerings)
+- **Babysitter** needed (yes/no)
+- **Payment preference** once approved: full payment, two payments (one per semester), or monthly
 
-Self-declared on the form; staff/admin can correct if needed.
+Structured answers live in `program_applications.application_answers` (JSONB). Staff `evaluation_notes` remain separate.
+
+Self-declared on the form; staff can correct while status is `submitted`.
 
 ---
 

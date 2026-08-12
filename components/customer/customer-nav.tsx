@@ -28,6 +28,7 @@ import {
 } from "@/lib/customer/customer-portal-modules"
 import {
   CUSTOMER_PROFILE_NAV_ITEMS,
+  filterCustomerProfileNavItems,
   isCustomerProfileNavItemActive,
   isCustomerProfilePath,
 } from "@/lib/customer/customer-profile-nav"
@@ -201,7 +202,10 @@ export function CustomerNav({
 
               {isProfileSection ? (
                 <div className="ml-4 flex flex-col gap-0.5 border-l border-border pl-3">
-                  {CUSTOMER_PROFILE_NAV_ITEMS.map((item) => {
+                  {filterCustomerProfileNavItems(
+                    CUSTOMER_PROFILE_NAV_ITEMS,
+                    isApprovedVendor
+                  ).map((item) => {
                     const isActive = isCustomerProfileNavItemActive(item.href, pathname)
 
                     return (

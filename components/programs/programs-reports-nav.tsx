@@ -6,10 +6,15 @@ import { usePathname, useSearchParams } from "next/navigation"
 import { cn } from "@/lib/utils"
 
 export type ProgramsReportsTabId =
-  | "overview"
   | "enrollment"
+  | "enrollments"
   | "attendance"
   | "waitlist"
+  | "childcare"
+  | "transactions"
+  | "tuition-plans"
+  | "addons"
+  | "payroll"
 
 export type ProgramsReportsTab = {
   id: ProgramsReportsTabId
@@ -18,11 +23,35 @@ export type ProgramsReportsTab = {
 }
 
 export const PROGRAMS_REPORTS_TABS: ProgramsReportsTab[] = [
-  { id: "overview", label: "Overview", href: "/programs/reports" },
   {
     id: "enrollment",
-    label: "Registrations",
+    label: "Registration",
     href: "/programs/registrations",
+  },
+  {
+    id: "enrollments",
+    label: "Enrollments",
+    href: "/programs/reports/enrollments",
+  },
+  {
+    id: "transactions",
+    label: "Transactions",
+    href: "/finance/transactions",
+  },
+  {
+    id: "addons",
+    label: "Add-ons",
+    href: "/programs/reports/addons",
+  },
+  {
+    id: "tuition-plans",
+    label: "Payment Summary",
+    href: "/programs/reports/tuition-plans",
+  },
+  {
+    id: "waitlist",
+    label: "Waitlist",
+    href: "/programs/reports?tab=waitlist",
   },
   {
     id: "attendance",
@@ -30,9 +59,14 @@ export const PROGRAMS_REPORTS_TABS: ProgramsReportsTab[] = [
     href: "/programs/reports?tab=attendance",
   },
   {
-    id: "waitlist",
-    label: "Waitlist",
-    href: "/programs/reports?tab=waitlist",
+    id: "childcare",
+    label: "Child Care",
+    href: "/programs/reports/childcare",
+  },
+  {
+    id: "payroll",
+    label: "Payroll",
+    href: "/finance/payroll",
   },
 ]
 
@@ -41,6 +75,42 @@ export function resolveProgramsReportsTab(
   searchParams: Pick<URLSearchParams, "get">
 ): ProgramsReportsTabId {
   if (
+    pathname === "/finance/transactions" ||
+    pathname.startsWith("/finance/transactions/")
+  ) {
+    return "transactions"
+  }
+  if (
+    pathname === "/finance/payroll" ||
+    pathname.startsWith("/finance/payroll/")
+  ) {
+    return "payroll"
+  }
+  if (
+    pathname === "/programs/reports/tuition-plans" ||
+    pathname.startsWith("/programs/reports/tuition-plans/")
+  ) {
+    return "tuition-plans"
+  }
+  if (
+    pathname === "/programs/reports/addons" ||
+    pathname.startsWith("/programs/reports/addons/")
+  ) {
+    return "addons"
+  }
+  if (
+    pathname === "/programs/reports/enrollments" ||
+    pathname.startsWith("/programs/reports/enrollments/")
+  ) {
+    return "enrollments"
+  }
+  if (
+    pathname === "/programs/reports/childcare" ||
+    pathname.startsWith("/programs/reports/childcare/")
+  ) {
+    return "childcare"
+  }
+  if (
     pathname === "/programs/registrations" ||
     pathname.startsWith("/programs/registrations/")
   ) {
@@ -48,11 +118,18 @@ export function resolveProgramsReportsTab(
   }
 
   const tab = searchParams.get("tab")
-  if (tab === "attendance" || tab === "waitlist" || tab === "enrollment") {
+  if (tab === "attendance" || tab === "waitlist") {
     return tab
   }
+  if (tab === "enrollments") {
+    return "enrollments"
+  }
+  if (tab === "addons" || tab === "add-ons") {
+    return "addons"
+  }
 
-  return "overview"
+  // Overview merged into Registrations — treat bare /programs/reports as enrollment.
+  return "enrollment"
 }
 
 export function ProgramsReportsNav() {

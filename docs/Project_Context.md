@@ -152,7 +152,7 @@ All customer pages must respect the active organization.
 People Management module
 Unified Applications engine
 Programs Module
-Staff UI labels: Year/Season (`programs`) → Program (`program_offerings`); see `lib/programs/program-display-labels.ts`.
+Staff UI labels: Program (`programs`) → Offering (`program_offerings`); see `lib/programs/program-display-labels.ts`.
 **Deferred naming (parked — high blast radius):** (1) DB rename `programs`→`seasons`, `program_offerings`→`programs` (fits years, seasons, camps); (2) align HR sidebar vs `/workforce/*` routes/folders; (3) Donations module → Fund Development in DB/routes (UI label already Fund Development). Do not start without a dedicated migration plan. Details in `docs/Features.md`.
 Registrations
 Financial Assistance
@@ -186,8 +186,8 @@ Routes remain under `/hr/*` / `/workforce/*` for now. Application submissions li
 
 Sidebar (HR):
 
-* Overview → `/workforce` (drawer + in-page tabs: Overview, Departments, Employees, Volunteers, Childcare Providers). Path sections: `/workforce/departments`, `/workforce/employees`, `/workforce/volunteers`, `/workforce/childcare`. Overview tab shows headcount metrics and employees by department. Employees includes Positions (`?view=positions`). Org payroll queue is **Finance → Payroll** (`/finance/payroll`); legacy `/workforce?tab=payroll` redirects there. Sidebar: HR opens a child drawer (same pattern as Programs/Finance). Legacy `/workforce?tab=…` redirects to the matching path. Legacy `/reports` redirects to **Finance → Transactions**.
-* Discount Policies → `/hr/settings` (Membership Benefits redirect path may apply). Department **list** is Overview → Departments (`/workforce?tab=departments`); department **workspace** remains `/workforce/departments/[id]` (Overview, Programs, **Participants** [Needs review / Approved — not registered / Roster], Schedule, Financial [Payroll / Expenses / Financial Summary — employees under Payroll], Reports for archived years; Group giving when a donations group is linked; **Events** = department events not individual gifts, URL `?tab=activity`). **Department Heads** open the workspace from Staff Tools (**My department**) or a sidebar **My department** link when they lack org-wide HR (`staff.view`). SaaS **Billing** stays in the footer.
+* Overview → `/workforce` (drawer + in-page tabs: Employees, Volunteers, Childcare Providers). Path sections: `/workforce/departments`, `/workforce/employees`, `/workforce/volunteers`, `/workforce/childcare`. Employees includes Positions (`?view=positions`). Org payroll queue is **Programs/ Events → Reports → Payroll** (`/finance/payroll`); legacy `/workforce?tab=payroll` redirects there. Sidebar: **Programs/ Events** merges Workforce, Programs, Financial Assistance, Event Management, and Reports. Legacy `/workforce?tab=…` redirects to the matching path. Legacy `/reports` redirects to **Reports → Transactions**.
+* Discount Policies → `/hr/settings` (Membership Benefits redirect path may apply). Department **list** is Overview → Departments (`/workforce?tab=departments`); department **workspace** remains `/workforce/departments/[id]` (Overview, Offerings, **Registrations** [Applications / Approved / Registrations], Schedule, Financial [Payroll / Expenses / Financial Summary — open years], **Reports** [year/season filter], Group giving when a donations group is linked; **Events** = department events not individual gifts, URL `?tab=activity`). **Department Heads** open the workspace from Staff Tools (**My department**) or a sidebar **My department** link when they lack org-wide HR (`staff.view`). SaaS **Billing** stays in the footer.
 
 **Finance** sidebar module (`finance`): Transactions (`/finance/transactions`), Payroll (`/finance/payroll`), Financial Assistance (`/finance/financial-assistance`). Enable with `scripts/192_finance_module_sidebar_restore.sql`.
 

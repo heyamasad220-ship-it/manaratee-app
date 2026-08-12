@@ -76,6 +76,37 @@ export function isOfferingVisibleToCustomers(status: ProgramOfferingStatus) {
   return status === "active" || status === "closed"
 }
 
+export function isOfferingCurrentlyActive(
+  offering: {
+    status: string
+    start_date?: string | null
+    end_date?: string | null
+    enrollment_open_date?: string | null
+    enrollment_close_date?: string | null
+    inherit_dates?: boolean | null
+  },
+  program?: Parameters<typeof resolveEffectiveOfferingDates>[1] | null
+): boolean {
+  if (String(offering.status || "").toLowerCase() !== "active") {
+    return false
+  }
+
+  const dates = program
+    ? resolveEffectiveOfferingDates(offering, program)
+    : {
+        start_date: offering.start_date ?? null,
+        end_date: offering.end_date ?? null,
+      }
+
+  const end = dateOnly(dates.end_date)
+  const today = todayDateOnly()
+  if (end && today > end) {
+    return false
+  }
+
+  return true
+}
+
 export function formatOfferingDateRange(
   startDate?: string | null,
   endDate?: string | null

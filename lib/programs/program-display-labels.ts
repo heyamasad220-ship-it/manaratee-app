@@ -1,16 +1,16 @@
 /**
  * Staff-facing names for the Programs hierarchy.
- * Database/code keep `programs` (year container) and `program_offerings` (sellable class).
+ * Database/code keep `programs` (program container) and `program_offerings` (sellable class).
  *
- * Department → Year/Season (programs row) → Program (offering row)
+ * Department → Program (programs row) → Offering (offering row)
  */
 
-export const YEAR_SEASON_LABEL = "Year/Season"
-export const YEAR_SEASON_LABEL_PLURAL = "Years/Seasons"
+export const YEAR_SEASON_LABEL = "Program"
+export const YEAR_SEASON_LABEL_PLURAL = "Programs"
 
 /** What customers register for (DB: program_offerings). */
-export const PROGRAM_LABEL = "Program"
-export const PROGRAM_LABEL_PLURAL = "Programs"
+export const PROGRAM_LABEL = "Offering"
+export const PROGRAM_LABEL_PLURAL = "Offerings"
 
 export function yearSeasonNoun(count: number) {
   return count === 1 ? YEAR_SEASON_LABEL : YEAR_SEASON_LABEL_PLURAL

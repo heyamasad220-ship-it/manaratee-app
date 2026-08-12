@@ -8,13 +8,16 @@ import type {
   ChargeType,
   FeeBillingScope,
   FeeRecurrence,
+  OfferingDiscount,
   OfferingFee,
   PaymentStructure,
   SimpleOfferingPricing,
   SimplePricingDiscountLine,
-  SimplePricingDiscounts,
 } from "@/lib/programs/offering-pricing-simple-types"
-import { defaultFeeName } from "@/lib/programs/offering-pricing-simple-types"
+import {
+  defaultFeeName,
+  OFFERING_DISCOUNT_NAME_LABELS,
+} from "@/lib/programs/offering-pricing-simple-types"
 import type {
   FeeComponentType,
   FeePlanType,
@@ -24,13 +27,21 @@ import type {
 } from "@/lib/programs/program-fee-plan-types"
 
 const OPTIONAL_CHARGE_PREFIX = "opt-charge:"
-const SIMPLE_DISCOUNT_KINDS = new Set([
+/** Kinds owned by the Fees-style discount rows UI. */
+const ROW_DISCOUNT_KINDS = new Set([
   "sibling",
   "early_bird",
   "full_payment",
-  "member_tag",
-  "staff_tag",
+  "simple_custom",
 ])
+/** Still preserved on save when present on the plan (not edited on offering). */
+const TAG_DISCOUNT_KINDS = new Set(["member_tag", "staff_tag", "member", "staff"])
+
+function newDiscountClientId() {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `discount-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+}
 
 function slugify(value: string) {
   return value
@@ -145,15 +156,17 @@ function emptyDiscountLine(
     percent: 0,
     endsBefore: "",
     discountTagId: null,
+    valueType: "percent",
+    amount: 0,
     ...overrides,
   }
 }
 
-export function createEmptyDiscounts(): SimplePricingDiscounts {
+export function createEmptyDiscounts(): {
+  member: SimplePricingDiscountLine
+  staff: SimplePricingDiscountLine
+} {
   return {
-    earlyBird: emptyDiscountLine({ percent: 10 }),
-    fullPayment: emptyDiscountLine({ percent: 5 }),
-    sibling: emptyDiscountLine({ percent: 10 }),
     member: emptyDiscountLine({ percent: 10 }),
     staff: emptyDiscountLine({ percent: 50 }),
   }
@@ -163,66 +176,88 @@ export function createEmptySimplePricing(): SimpleOfferingPricing {
   return {
     fees: [],
     paymentDueDay: null,
-    discounts: createEmptyDiscounts(),
+    discounts: [],
+    legacyTagDiscounts: createEmptyDiscounts(),
     paymentStructure: "one_time",
     installmentCount: null,
   }
 }
 
-function parseDiscountsFromRules(
-  rules: ProgramOfferingDiscountRule[]
-): SimplePricingDiscounts {
-  const discounts = createEmptyDiscounts()
+function parseDiscountValue(
+  rule: ProgramOfferingDiscountRule
+): { valueType: SimpleDiscountValueType; value: number } {
+  if (rule.discount_type === "fixed_amount") {
+    return { valueType: "fixed_amount", value: Number(rule.amount || 0) }
+  }
+  return { valueType: "percent", value: Number(rule.amount || 0) }
+}
+
+function parseDiscountsFromRules(rules: ProgramOfferingDiscountRule[]): {
+  discounts: OfferingDiscount[]
+  legacyTagDiscounts: {
+    member: SimplePricingDiscountLine
+    staff: SimplePricingDiscountLine
+  }
+} {
+  const discounts: OfferingDiscount[] = []
+  const legacyTagDiscounts = createEmptyDiscounts()
 
   for (const rule of rules) {
-    if (!rule.is_active && rule.amount <= 0) {
-      // still load inactive so UI can re-enable
-    }
-
     const conditions = (rule.conditions || {}) as Record<string, unknown>
     const kind =
       typeof conditions.kind === "string" ? conditions.kind : rule.rule_type
-    const percent =
-      rule.discount_type === "percent" ? Number(rule.amount || 0) : 0
+    const { valueType, value } = parseDiscountValue(rule)
+    const status = rule.is_active ? "active" : "closed"
 
     if (rule.rule_type === "early_bird" || kind === "early_bird") {
-      discounts.earlyBird = {
+      discounts.push({
+        clientId: newDiscountClientId(),
         ruleId: rule.id,
-        enabled: rule.is_active,
-        percent: percent || discounts.earlyBird.percent,
+        name: "early_bird",
+        valueType,
+        value: value || 10,
+        status,
         endsBefore:
           typeof conditions.ends_before === "string"
             ? conditions.ends_before
             : typeof conditions.endsBefore === "string"
               ? conditions.endsBefore
               : "",
-      }
+      })
       continue
     }
 
     if (rule.rule_type === "full_payment" || kind === "full_payment") {
-      discounts.fullPayment = {
+      discounts.push({
+        clientId: newDiscountClientId(),
         ruleId: rule.id,
-        enabled: rule.is_active,
-        percent: percent || discounts.fullPayment.percent,
-      }
+        name: "full_payment",
+        valueType,
+        value: value || 5,
+        status,
+      })
       continue
     }
 
-    if (rule.rule_type === "sibling") {
-      discounts.sibling = {
+    if (rule.rule_type === "sibling" || kind === "sibling") {
+      discounts.push({
+        clientId: newDiscountClientId(),
         ruleId: rule.id,
-        enabled: rule.is_active,
-        percent: percent || discounts.sibling.percent,
-      }
+        name: "sibling",
+        valueType,
+        value: value || 10,
+        status,
+      })
       continue
     }
 
     if (kind === "member_tag" || kind === "member") {
-      discounts.member = {
+      legacyTagDiscounts.member = {
         ruleId: rule.id,
         enabled: rule.is_active,
-        percent: percent || discounts.member.percent,
+        percent: valueType === "percent" ? value : 0,
+        amount: valueType === "fixed_amount" ? value : 0,
+        valueType,
         discountTagId:
           typeof conditions.discount_tag_id === "string"
             ? conditions.discount_tag_id
@@ -232,19 +267,38 @@ function parseDiscountsFromRules(
     }
 
     if (kind === "staff_tag" || kind === "staff") {
-      discounts.staff = {
+      legacyTagDiscounts.staff = {
         ruleId: rule.id,
         enabled: rule.is_active,
-        percent: percent || discounts.staff.percent,
+        percent: valueType === "percent" ? value : 0,
+        amount: valueType === "fixed_amount" ? value : 0,
+        valueType,
         discountTagId:
           typeof conditions.discount_tag_id === "string"
             ? conditions.discount_tag_id
             : null,
       }
+      continue
+    }
+
+    if (
+      rule.rule_type === "custom" ||
+      kind === "simple_custom" ||
+      kind === "custom"
+    ) {
+      discounts.push({
+        clientId: newDiscountClientId(),
+        ruleId: rule.id,
+        name: "custom",
+        customLabel: rule.label || "Custom",
+        valueType,
+        value,
+        status,
+      })
     }
   }
 
-  return discounts
+  return { discounts, legacyTagDiscounts }
 }
 
 export function parseSimplePricingFromWorkspace(
@@ -255,9 +309,11 @@ export function parseSimplePricingFromWorkspace(
   const bundle = getDefaultPlan(feePlans, components)
 
   if (!bundle) {
+    const parsed = parseDiscountsFromRules(discountRules)
     return {
       ...createEmptySimplePricing(),
-      discounts: parseDiscountsFromRules(discountRules),
+      discounts: parsed.discounts,
+      legacyTagDiscounts: parsed.legacyTagDiscounts,
     }
   }
 
@@ -289,10 +345,13 @@ export function parseSimplePricingFromWorkspace(
         ? "monthly"
         : "one_time"
 
+  const parsedDiscounts = parseDiscountsFromRules(discountRules)
+
   return {
     fees,
     paymentDueDay: bundle.plan.payment_due_day,
-    discounts: parseDiscountsFromRules(discountRules),
+    discounts: parsedDiscounts.discounts,
+    legacyTagDiscounts: parsedDiscounts.legacyTagDiscounts,
     paymentStructure,
     installmentCount: bundle.plan.installment_count,
   }
@@ -367,34 +426,40 @@ function derivePlanType(simple: SimpleOfferingPricing): FeePlanType {
   return "one_time"
 }
 
-function discountLineToRule(
-  line: SimplePricingDiscountLine,
-  rule_type: DiscountRuleInput["rule_type"],
-  label: string,
-  priority_rank: number,
-  extraConditions: Record<string, unknown> = {}
+function discountRowToRule(
+  row: OfferingDiscount,
+  priority_rank: number
 ): DiscountRuleInput | null {
-  if (!line.enabled && !line.ruleId) {
+  if (row.status === "closed" && !row.ruleId) {
     return null
   }
 
+  const ruleType =
+    row.name === "custom"
+      ? "custom"
+      : (row.name as DiscountRuleInput["rule_type"])
+  const label =
+    row.name === "custom"
+      ? row.customLabel?.trim() || "Custom"
+      : OFFERING_DISCOUNT_NAME_LABELS[row.name]
+
   return {
-    id: line.ruleId,
-    rule_type,
+    id: row.ruleId,
+    rule_type: ruleType,
     label,
-    discount_type: "percent",
-    amount: Math.max(0, Number(line.percent || 0)),
-    is_active: line.enabled,
+    discount_type: row.valueType,
+    amount: Math.max(0, Number(row.value || 0)),
+    is_active: row.status === "active",
     priority_rank,
     exclude_component_types:
-      rule_type === "early_bird"
+      row.name === "early_bird"
         ? ["registration_fee", "materials", "lunch", "extended_care", "custom"]
         : ["registration_fee"],
     conditions: {
-      ...extraConditions,
-      ...(rule_type === "early_bird"
+      kind: row.name === "custom" ? "simple_custom" : row.name,
+      ...(row.name === "early_bird"
         ? {
-            ends_before: line.endsBefore || null,
+            ends_before: row.endsBefore || null,
             applies_to_component_types: ["tuition"],
           }
         : {}),
@@ -402,68 +467,80 @@ function discountLineToRule(
   }
 }
 
+function tagLineToRule(
+  line: SimplePricingDiscountLine,
+  label: string,
+  priority_rank: number,
+  kind: "member_tag" | "staff_tag"
+): DiscountRuleInput | null {
+  if (!line.enabled && !line.ruleId) {
+    return null
+  }
+
+  const valueType = line.valueType ?? "percent"
+  const amount =
+    valueType === "fixed_amount"
+      ? Math.max(0, Number(line.amount || 0))
+      : Math.max(0, Number(line.percent || 0))
+
+  return {
+    id: line.ruleId,
+    rule_type: "custom",
+    label,
+    discount_type: valueType,
+    amount,
+    is_active: line.enabled,
+    priority_rank,
+    exclude_component_types: ["registration_fee"],
+    conditions: {
+      kind,
+      discount_tag_id: line.discountTagId || null,
+    },
+  }
+}
+
 export function buildDiscountRulesFromSimplePricing(
-  discounts: SimplePricingDiscounts,
-  existingRules: DiscountRuleInput[]
+  discounts: OfferingDiscount[],
+  existingRules: DiscountRuleInput[],
+  legacyTagDiscounts?: {
+    member: SimplePricingDiscountLine
+    staff: SimplePricingDiscountLine
+  }
 ): DiscountRuleInput[] {
   const managed: DiscountRuleInput[] = []
 
-  const earlyBird = discountLineToRule(
-    discounts.earlyBird,
-    "early_bird",
-    "Early Bird",
-    20,
-    { kind: "early_bird" }
-  )
-  if (earlyBird) managed.push(earlyBird)
+  discounts.forEach((row, index) => {
+    const rule = discountRowToRule(row, 10 + index * 10)
+    if (rule) managed.push(rule)
+  })
 
-  const fullPayment = discountLineToRule(
-    discounts.fullPayment,
-    "full_payment",
-    "Pay in Full",
-    30,
-    { kind: "full_payment" }
-  )
-  if (fullPayment) managed.push(fullPayment)
+  if (legacyTagDiscounts) {
+    const member = tagLineToRule(
+      legacyTagDiscounts.member,
+      "Member Discount",
+      40,
+      "member_tag"
+    )
+    if (member) managed.push(member)
 
-  const sibling = discountLineToRule(
-    discounts.sibling,
-    "sibling",
-    "Sibling Discount",
-    10
-  )
-  if (sibling) managed.push(sibling)
-
-  const member = discountLineToRule(
-    discounts.member,
-    "custom",
-    "Member Discount",
-    40,
-    {
-      kind: "member_tag",
-      discount_tag_id: discounts.member.discountTagId || null,
-    }
-  )
-  if (member) managed.push(member)
-
-  const staff = discountLineToRule(
-    discounts.staff,
-    "custom",
-    "Staff Discount",
-    50,
-    {
-      kind: "staff_tag",
-      discount_tag_id: discounts.staff.discountTagId || null,
-    }
-  )
-  if (staff) managed.push(staff)
+    const staff = tagLineToRule(
+      legacyTagDiscounts.staff,
+      "Staff Discount",
+      50,
+      "staff_tag"
+    )
+    if (staff) managed.push(staff)
+  }
 
   const preserved = existingRules.filter((rule) => {
     const kind =
       typeof rule.conditions?.kind === "string"
         ? rule.conditions.kind
         : rule.rule_type
-    return !SIMPLE_DISCOUNT_KINDS.has(String(kind)) && rule.rule_type !== "sibling"
+    if (ROW_DISCOUNT_KINDS.has(String(kind))) return false
+    if (kind === "sibling" || rule.rule_type === "sibling") return false
+    if (TAG_DISCOUNT_KINDS.has(String(kind))) return false
+    return true
   })
 
   return [...managed, ...preserved]
@@ -497,7 +574,8 @@ export function buildFeePlanStateFromSimplePricing(
     plans: [updatedDefault, ...otherPlans],
     discountRules: buildDiscountRulesFromSimplePricing(
       simple.discounts,
-      existing.discountRules
+      existing.discountRules,
+      simple.legacyTagDiscounts
     ),
     optionFeePlanLinks: existing.optionFeePlanLinks,
   }

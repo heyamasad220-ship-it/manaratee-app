@@ -208,12 +208,12 @@ npm run validate:contacts-security -- --post-m4   # after 111
 * programs — optional defaults; `capacity` temporarily = sum of limited offerings (S2 sync; catalog may also read offerings live in S6). S4: staff saves no longer write operational eligibility/capacity/`billing_*` as SSOT. **S5:** `program_type` CHECK adult|youth only (`179_drop_program_type_family.sql`; family backfilled to youth). Obsolete eligibility/capacity columns retained pending RPC cutover. **Status (`199`):** `draft` | `active` | `paused` | `closed` | `archived` — prefer **closed** (stays in department workspace) over **archived**.
 * program_offerings — S1 attribute columns; S4 registration panel writes here only. **F1 (`180`):** `inherit_dates`, `inherit_eligibility`, `inherit_enrollment` (existing rows overridden/`false`; new offerings default `true`). **F4 (`181`):** `care_enabled`. **Catalog branding (`191`):** `flyer_url`, `background_color` (placeholder when no flyer). Programs may have **zero** offerings; first created offering is `is_default`. Audience adult|youth. Catalog enrollment display uses offering `capacity_mode` / `capacity` (S6).
 * program_offering_fee_plan_components — **`200`:** `billing_scope` (`individual` \| `family` flat household). Discount rules: `full_payment` rule type added (`200`); early bird / member-staff tag conditions stored in `conditions` JSONB.
-* program_offering_registration_questions — **`201`:** custom registration prompts per offering (`yes_no` \| `text` \| `textarea`, required flag, sort order).
+* program_offering_registration_questions — **`201`:** custom registration prompts per offering (`yes_no` \| `text` \| `textarea`, required flag, sort order). **`239`:** adds `select` type + `options` jsonb (drop-down choices).
 * program_attendance — **F5 (`181`):** per enrollment/day status (`present`/`absent`/`late`/`excused`); teachers mark from `/my-classes/[offeringId]`.
 * program_enrollments — **`183`:** assigned offering staff (via `program_staff_assignments` + `contacts.auth_user_id`) may SELECT enrollments for their offerings so personal-portal teachers can load `/my-classes/[offeringId]` roster (org-member and “own enrollment” policies remain).
 * program_capacity_groups — S2 `offering_id` required (`177`); `program_id` retained for queries
 * program_schedule_items — S3 `offering_id` required (`178`); weekly class times edited on offering Schedule tab; optional `venue_id` for shared facility calendar/conflicts (`209`)
-* departments — RLS repair: `scripts/164_departments_rls_policies.sql` (org members can manage). App writes also authorize then use service role when needed. **`flyer_url` (migration `203`):** optional department flyer shown on HR → Departments cards.
+* departments — RLS repair: `scripts/164_departments_rls_policies.sql` (org members can manage). App writes also authorize then use service role when needed. **`flyer_url` (migration `203`):** optional department flyer shown on Departments cards / Overview. **`terms_html` + `terms_pdf_url` (migration `241`):** Terms and Conditions on department Overview (rich text + optional PDF in `program-flyers` storage).
 * venues — Spaces catalog under Facilities → Settings. **`color` + `flyer_url` (migration `204`):** card branding on Spaces settings (3-column grid like Departments). **Required:** run `scripts/204_venue_color_flyer.sql` in Supabase SQL Editor (includes `NOTIFY pgrst, 'reload schema'`) or color/flyer will not persist. **Per-day hours/rates:** `rental_space_pricing` (from `046`; seed `205`) — Sunday–Saturday open hours + flat/hourly; Spaces edit form replaces peak/non-peak buckets. **Setup/cleanup overrides (`222`):** nullable `venues.setup_minutes` / `cleanup_minutes` (NULL inherits org defaults on `venue_rental_settings`). **Calendar:** Facilities sidebar **Calendar** is `/facilities/calendar` (merged former Space Availability + Schedule); `/facilities/availability` redirects there. Module filtered views use `?sources=` against the same `resource_reservations` (+ program expand). **Overview:** `/facilities/overview` is the Facilities landing (read-only schedule metrics). **Inventory:** `facility_inventory_items` (migrations `207` + `208`) — Facilities → Inventory catalog with category, size/style/color, quantity, location, purchased_at, unit_cost, notes, active, sort_order. **Shared scheduling (migration `209`):** `program_schedule_items.venue_id`; `setup_minutes` / `cleanup_minutes` on `rental_reservations` and `internal_events` expand occupied windows in sync triggers to `resource_reservations`. Run **`scripts/209_shared_scheduling_foundation.sql`** after `208`. **Event location types (`210`):** `internal_events.location_type`, `location_address`. **Multi-venue events (`211`):** `internal_event_venues` junction; sync creates one `resource_reservations` row per venue; `internal_events.venue_id` remains primary. Run **`210`** then **`211`**. If submit fails with ON CONFLICT on resource_reservations, run **`212_fix_internal_event_sync_on_conflict.sql`**.
 * internal_event_venues — Facility spaces for an internal event (`211`). Unique `(internal_event_id, venue_id)`. Backfilled from `internal_events.venue_id`.
 * internal_events — **`flyer_url` (migration `214`):** optional event flyer on workspace Overview; uploads reuse `program-flyers` storage. Run `scripts/214_internal_event_flyer_url.sql` in Supabase SQL Editor (`NOTIFY pgrst, 'reload schema'`).
@@ -244,6 +244,7 @@ program_expenses.program_id → programs.id
 program_expenses.department_id → departments.id
 program_extended_care.enrollment_id → program_enrollments.id
 program_payment_plans.enrollment_id → program_enrollments.id
+program_payment_plans.organization_id → organizations.id (`240_program_payment_plans_organization_id.sql`)
 ```
 
 ---
@@ -257,7 +258,7 @@ program_payment_plans.enrollment_id → program_enrollments.id
 * program_enrollments
 * program_enrollment_sessions
 * program_waitlist
-* program_applications
+* program_applications (`application_answers` JSONB — run `scripts/236_program_application_answers.sql`)
 
 Key relationships:
 
@@ -301,7 +302,7 @@ program_waitlist.child_person_id → people.id
 program_waitlist.lunch_option_id → program_lunch_options.id
 ```
 
-> **Registration pipeline (July 2026):** Run `scripts/182_program_registration_applications.sql` for `program_applications` and waitlist `offering_id` / offer deadline columns. See [programs-registration-pipeline-design.md](./programs-registration-pipeline-design.md).
+> **Registration pipeline (July 2026):** Run `scripts/182_program_registration_applications.sql` for `program_applications` and waitlist `offering_id` / offer deadline columns. Run `scripts/236_program_application_answers.sql` for `application_answers` JSONB (applicant form). Run `scripts/237_program_application_updated_by.sql` for `updated_by_user_id`. See [programs-registration-pipeline-design.md](./programs-registration-pipeline-design.md).
 
 ---
 
@@ -575,11 +576,15 @@ rental_payments.venue_rental_id → venue_rentals.id
 * vendor_hub_events — includes `organizer_contact_id`, `organizer_name`, `venue_id` (`scripts/227_vendor_hub_event_organizer_venue.sql`)
 * vendor_hub_vendors
 * vendor_hub_booths
-* vendor_hub_booth_types
+* vendor_hub_booth_types — org defaults when `event_id` is null + `organization_id` set (`scripts/234_vendor_hub_default_booth_types.sql`); event-scoped types keep `event_id`
 * vendor_hub_booth_assignments
 * vendor_hub_payments
 * vendor_hub_announcements / vendor_hub_announcement_recipients — RLS helpers in `scripts/228_vendor_hub_announcements_rls_fix.sql` (avoids 42P17 recursion)
 * vendor_hub_events vendor SELECT — `scripts/229_vendor_hub_events_rls_perf.sql` (avoids statement timeouts after large imports)
+* Customer vendor profile — vendors may UPDATE own `applications` (vendor_hub/vendor) and SELECT org `vendor_hub_vendor_types` (`scripts/231_customer_vendor_profile_rls.sql`)
+* Vendor role backfill from approved applications — `scripts/232_backfill_vendor_roles_from_applications.sql`
+* Vendor inactive after 2 years of no activity — `scripts/233_vendor_inactive_after_two_years.sql`
+* Vendor import application cleanup — `scripts/235_fix_vendor_import_application_dates.sql` (submitted_at = earliest payment/event date; clear import notes/tags; clear fake reviewed_at)
 
 No foreign key relationships were included in the current relationship export for these tables.
 

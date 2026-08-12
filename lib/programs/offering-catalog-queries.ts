@@ -7,6 +7,7 @@ import {
   resolveEffectiveOfferingEligibility,
 } from "@/lib/programs/program-offering-inherit"
 import type { ProgramOffering } from "@/lib/programs/program-offering-types"
+import { YEAR_SEASON_LABEL } from "@/lib/programs/program-display-labels"
 import { getOfferingEnrollmentCount } from "@/lib/programs/program-staff-assignment-queries"
 import { createClient } from "@/lib/supabase/server"
 
@@ -318,7 +319,7 @@ async function hydrateCatalogRows(
       min_age: row.min_age == null ? null : Number(row.min_age),
       max_age: row.max_age == null ? null : Number(row.max_age),
       program_id: programId,
-      yearSeasonName: (program.name as string) || "Year/Season",
+      yearSeasonName: (program.name as string) || YEAR_SEASON_LABEL,
       department_id: (program.department_id as string | null) ?? null,
       department_name: (departmentRow?.name as string | null) ?? null,
       enrolled: enrolledById.get(row.id as string) ?? 0,

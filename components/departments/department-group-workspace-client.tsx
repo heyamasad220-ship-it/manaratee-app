@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
   ArrowLeft,
+  BarChart3,
   BookOpen,
   CalendarClock,
   CalendarDays,
@@ -25,7 +26,10 @@ import { DepartmentExpensesPanel } from "@/components/departments/department-exp
 import { DepartmentGroupGivingPanel } from "@/components/departments/department-group-giving-panel"
 import { DepartmentOverviewPanel } from "@/components/departments/department-overview-panel"
 import { DepartmentPayrollPanel } from "@/components/departments/department-payroll-panel"
+import { DepartmentProgramOverviewPanel } from "@/components/departments/department-program-overview-panel"
+import { DepartmentProgramsCatalogPanel } from "@/components/departments/department-programs-catalog-panel"
 import { DepartmentProgramsPanel } from "@/components/departments/department-programs-panel"
+import { DepartmentReportsPanel } from "@/components/departments/department-reports-panel"
 import { DepartmentSchedulePanel } from "@/components/departments/department-schedule-panel"
 import { DepartmentSettingsPanel } from "@/components/departments/department-settings-panel"
 import { DepartmentStudentsPanel } from "@/components/departments/department-students-panel"
@@ -54,6 +58,8 @@ import { WORKFORCE_DEPARTMENTS_PATH } from "@/lib/departments/department-paths"
 import {
   departmentGroupWorkspaceHref,
   donationGroupGivingListHref,
+  isDepartmentYearRequiredTab,
+  isDepartmentYearWorkspaceTab,
   parseDepartmentFinanceSection,
   parseDepartmentStudentsSection,
   parseDepartmentWorkspaceTab,
@@ -64,7 +70,11 @@ import {
   isSafeReturnToPath,
   RETURN_TO_QUERY_PARAM,
 } from "@/lib/navigation/return-to"
-import { PROGRAM_LABEL_PLURAL } from "@/lib/programs/program-display-labels"
+import {
+  PROGRAM_LABEL_PLURAL,
+  YEAR_SEASON_LABEL,
+  YEAR_SEASON_LABEL_PLURAL,
+} from "@/lib/programs/program-display-labels"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 
@@ -104,6 +114,7 @@ export function DepartmentGroupWorkspaceClient({
   const [groupEdit, setGroupEdit] = useState<GroupEditRecord | null>(null)
   const [editOpen, setEditOpen] = useState(false)
   const [refreshToken, setRefreshToken] = useState(0)
+  const [yearName, setYearName] = useState<string | null>(null)
 
   const returnTo = searchParams.get(RETURN_TO_QUERY_PARAM)
   const rawTab = searchParams.get("tab")
@@ -118,16 +129,15 @@ export function DepartmentGroupWorkspaceClient({
     searchParams.get("section")
   )
 
+  const safeReturnTo =
+    returnTo && isSafeReturnToPath(returnTo) ? returnTo : undefined
+
   const backHref =
     entryPoint === "donations"
       ? donationGroupGivingListHref(
-          returnTo && isSafeReturnToPath(returnTo)
-            ? returnTo
-            : DONATIONS_GROUP_GIVING_REPORT_PATH
+          safeReturnTo || DONATIONS_GROUP_GIVING_REPORT_PATH
         )
-      : returnTo && isSafeReturnToPath(returnTo)
-        ? returnTo
-        : WORKFORCE_DEPARTMENTS_PATH
+      : safeReturnTo || WORKFORCE_DEPARTMENTS_PATH
 
   const backLabel = entryPoint === "donations" ? "Group Giving" : "Departments"
 
@@ -201,16 +211,118 @@ export function DepartmentGroupWorkspaceClient({
     void load()
   }, [load])
 
+  useEffect(() => {
+    if (!yearProgramId) {
+      setYearName(null)
+      return
+    }
+
+    let cancelled = false
+    void supabase
+      .from("programs")
+      .select("id, name, department_id")
+      .eq("id", yearProgramId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (cancelled) return
+        if (!data || data.department_id !== departmentId) {
+          setYearName(null)
+          return
+        }
+        setYearName((data.name as string) || YEAR_SEASON_LABEL)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [departmentId, supabase, yearProgramId])
+
+  // Year-required tabs need `?year=`. Department tabs (including Programs) clear year.
+  useEffect(() => {
+    if (loading || !department) return
+
+    if (isDepartmentYearRequiredTab(activeTab) && !yearProgramId) {
+      router.replace(
+        departmentGroupWorkspaceHref(departmentId, {
+          tab: "overview",
+          returnTo: safeReturnTo,
+        }),
+        { scroll: false }
+      )
+      return
+    }
+
+    if (!isDepartmentYearWorkspaceTab(activeTab) && yearProgramId) {
+      router.replace(
+        departmentGroupWorkspaceHref(departmentId, {
+          tab: activeTab === "group-giving" && !pair ? "overview" : activeTab,
+          finance: activeTab === "financial" ? financeSection : undefined,
+          returnTo: safeReturnTo,
+        }),
+        { scroll: false }
+      )
+    }
+  }, [
+    activeTab,
+    department,
+    departmentId,
+    financeSection,
+    loading,
+    pair,
+    router,
+    safeReturnTo,
+    yearProgramId,
+  ])
+
   function handleTabChange(tab: string) {
     const next = parseDepartmentWorkspaceTab(tab)
-    // Don't show giving tabs when there is no paired group
-    const safeTab = !pair && next === "group-giving" ? "overview" : next
+    const hasGiving = Boolean(pair?.groupContactId)
+    const safeTab = !hasGiving && next === "group-giving" ? "overview" : next
+
+    if (isDepartmentYearRequiredTab(safeTab)) {
+      if (!yearProgramId) {
+        router.replace(
+          departmentGroupWorkspaceHref(departmentId, {
+            tab: "overview",
+            returnTo: safeReturnTo,
+          }),
+          { scroll: false }
+        )
+        return
+      }
+      router.replace(
+        departmentGroupWorkspaceHref(departmentId, {
+          tab: safeTab,
+          finance: safeTab === "financial" ? financeSection : undefined,
+          studentsSection: safeTab === "students" ? studentsSection : undefined,
+          yearProgramId,
+          returnTo: safeReturnTo,
+        }),
+        { scroll: false }
+      )
+      return
+    }
+
+    // Dual-purpose: keep year when already in year workspace.
+    if (
+      (safeTab === "programs" || safeTab === "overview") &&
+      yearProgramId
+    ) {
+      router.replace(
+        departmentGroupWorkspaceHref(departmentId, {
+          tab: safeTab,
+          yearProgramId,
+          returnTo: safeReturnTo,
+        }),
+        { scroll: false }
+      )
+      return
+    }
 
     router.replace(
       departmentGroupWorkspaceHref(departmentId, {
         tab: safeTab,
-        finance: safeTab === "financial" ? financeSection : undefined,
-        returnTo: returnTo && isSafeReturnToPath(returnTo) ? returnTo : undefined,
+        returnTo: safeReturnTo,
       }),
       { scroll: false }
     )
@@ -222,7 +334,8 @@ export function DepartmentGroupWorkspaceClient({
       departmentGroupWorkspaceHref(departmentId, {
         tab: "financial",
         finance: next,
-        returnTo: returnTo && isSafeReturnToPath(returnTo) ? returnTo : undefined,
+        yearProgramId: yearProgramId || undefined,
+        returnTo: safeReturnTo,
       }),
       { scroll: false }
     )
@@ -235,7 +348,8 @@ export function DepartmentGroupWorkspaceClient({
       departmentGroupWorkspaceHref(departmentId, {
         tab: "students",
         studentsSection: next,
-        returnTo: returnTo && isSafeReturnToPath(returnTo) ? returnTo : undefined,
+        yearProgramId: yearProgramId || undefined,
+        returnTo: safeReturnTo,
       }),
       { scroll: false }
     )
@@ -277,33 +391,60 @@ export function DepartmentGroupWorkspaceClient({
   const hasGiving = Boolean(pair?.groupContactId)
   const resolvedTab: GroupWorkspaceTab =
     !hasGiving && activeTab === "group-giving" ? "overview" : activeTab
+  const yearMode =
+    Boolean(yearProgramId) && isDepartmentYearWorkspaceTab(resolvedTab)
+
+  const departmentOverviewHref = departmentGroupWorkspaceHref(departmentId, {
+    tab: "overview",
+    returnTo: safeReturnTo,
+  })
+
+  const breadcrumbExtras = yearMode
+    ? [
+        { label: displayName, href: departmentOverviewHref },
+        { label: yearName || YEAR_SEASON_LABEL },
+      ]
+    : [{ label: displayName }]
+
+  const headerTitle = yearMode ? yearName || displayName : displayName
 
   return (
     <>
-      <Header title={displayName} breadcrumbExtras={[{ label: displayName }]} />
+      <Header title={headerTitle} breadcrumbExtras={breadcrumbExtras} />
       <div className="flex flex-col gap-6 p-6">
         <div className="flex flex-col gap-4 border-b border-border pb-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <span
-                className="inline-block size-3 rounded-full border"
-                style={{ backgroundColor: department.color || "#3b82f6" }}
-              />
-              <h1 className="text-2xl font-semibold tracking-tight">{displayName}</h1>
-              {mappedStatus ? (
-                <Badge
-                  variant="secondary"
-                  className={cn("font-normal", STATUS_COLORS[mappedStatus])}
-                >
-                  {mappedStatus}
+            {yearMode ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-2xl font-semibold tracking-tight">
+                  {yearName || YEAR_SEASON_LABEL}
+                </h1>
+                <Badge variant="outline" className="font-normal">
+                  {YEAR_SEASON_LABEL}
                 </Badge>
-              ) : null}
-              <Badge variant="outline" className="font-normal">
-                Department
-              </Badge>
-            </div>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center gap-2">
+                <span
+                  className="inline-block size-3 rounded-full border"
+                  style={{ backgroundColor: department.color || "#3b82f6" }}
+                />
+                <h1 className="text-2xl font-semibold tracking-tight">{displayName}</h1>
+                {mappedStatus ? (
+                  <Badge
+                    variant="secondary"
+                    className={cn("font-normal", STATUS_COLORS[mappedStatus])}
+                  >
+                    {mappedStatus}
+                  </Badge>
+                ) : null}
+                <Badge variant="outline" className="font-normal">
+                  Department
+                </Badge>
+              </div>
+            )}
           </div>
-          {groupEdit ? (
+          {!yearMode && groupEdit ? (
             <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
               <Pencil className="mr-1.5 h-4 w-4" />
               Edit group
@@ -313,52 +454,102 @@ export function DepartmentGroupWorkspaceClient({
 
         <Tabs value={resolvedTab} onValueChange={handleTabChange}>
           <TabsList className="flex h-auto flex-wrap justify-start gap-1">
-            <TabsTrigger value="overview" className="gap-2">
-              <LayoutDashboard className="size-4" />
-              Overview
-            </TabsTrigger>
-            <TabsTrigger value="programs" className="gap-2">
-              <BookOpen className="size-4" />
-              {PROGRAM_LABEL_PLURAL}
-            </TabsTrigger>
-            <TabsTrigger value="students" className="gap-2">
-              <Users className="size-4" />
-              Participants
-            </TabsTrigger>
-            <TabsTrigger value="schedule" className="gap-2">
-              <CalendarClock className="size-4" />
-              Schedule
-            </TabsTrigger>
-            <TabsTrigger value="financial" className="gap-2">
-              <PieChart className="size-4" />
-              Financial
-            </TabsTrigger>
-            {hasGiving ? (
-              <TabsTrigger value="group-giving" className="gap-2">
-                <Heart className="size-4" />
-                Group giving
-              </TabsTrigger>
-            ) : null}
-            <TabsTrigger value="activity" className="gap-2">
-              <CalendarDays className="size-4" />
-              Events
-            </TabsTrigger>
-            <TabsTrigger value="settings" className="gap-2">
-              <Settings className="size-4" />
-              Settings
-            </TabsTrigger>
+            {yearMode ? (
+              <>
+                <TabsTrigger value="overview" className="gap-2">
+                  <LayoutDashboard className="size-4" />
+                  Overview
+                </TabsTrigger>
+                <TabsTrigger value="programs" className="gap-2">
+                  <BookOpen className="size-4" />
+                  {PROGRAM_LABEL_PLURAL}
+                </TabsTrigger>
+                <TabsTrigger value="students" className="gap-2">
+                  <Users className="size-4" />
+                  Registrations
+                </TabsTrigger>
+                <TabsTrigger value="schedule" className="gap-2">
+                  <CalendarClock className="size-4" />
+                  Schedule
+                </TabsTrigger>
+                <TabsTrigger value="financial" className="gap-2">
+                  <PieChart className="size-4" />
+                  Financial
+                </TabsTrigger>
+                <TabsTrigger value="reports" className="gap-2">
+                  <BarChart3 className="size-4" />
+                  Reports
+                </TabsTrigger>
+              </>
+            ) : (
+              <>
+                <TabsTrigger value="overview" className="gap-2">
+                  <LayoutDashboard className="size-4" />
+                  Overview
+                </TabsTrigger>
+                <TabsTrigger value="programs" className="gap-2">
+                  <BookOpen className="size-4" />
+                  {YEAR_SEASON_LABEL_PLURAL}
+                </TabsTrigger>
+                {hasGiving ? (
+                  <TabsTrigger value="group-giving" className="gap-2">
+                    <Heart className="size-4" />
+                    Group giving
+                  </TabsTrigger>
+                ) : null}
+                <TabsTrigger value="activity" className="gap-2">
+                  <CalendarDays className="size-4" />
+                  Events
+                </TabsTrigger>
+                <TabsTrigger value="settings" className="gap-2">
+                  <Settings className="size-4" />
+                  Settings
+                </TabsTrigger>
+              </>
+            )}
           </TabsList>
         </Tabs>
 
-        {resolvedTab === "overview" ? (
+        {resolvedTab === "overview" && !yearProgramId ? (
           <DepartmentOverviewPanel
             departmentId={department.id}
             departmentName={displayName}
-            highlightYearProgramId={yearProgramId}
+            departmentDescription={department.description}
+            departmentFlyerUrl={department.flyer_url}
+            departmentColor={department.color}
+            departmentTermsHtml={department.terms_html}
+            departmentTermsPdfUrl={department.terms_pdf_url}
+            onDepartmentMetaChanged={load}
           />
         ) : null}
 
-        {resolvedTab === "programs" ? (
+        {resolvedTab === "overview" && yearProgramId ? (
+          <DepartmentProgramOverviewPanel
+            departmentId={department.id}
+            yearProgramId={yearProgramId}
+            onProgramMetaChanged={() => {
+              // Refresh header year name after rename.
+              void supabase
+                .from("programs")
+                .select("name")
+                .eq("id", yearProgramId)
+                .eq("department_id", departmentId)
+                .maybeSingle()
+                .then(({ data }) => {
+                  if (data?.name) setYearName(data.name as string)
+                })
+            }}
+          />
+        ) : null}
+
+        {resolvedTab === "programs" && !yearProgramId ? (
+          <DepartmentProgramsCatalogPanel
+            departmentId={department.id}
+            departmentName={displayName}
+          />
+        ) : null}
+
+        {resolvedTab === "programs" && yearProgramId ? (
           <DepartmentProgramsPanel
             departmentId={department.id}
             departmentName={displayName}
@@ -366,7 +557,7 @@ export function DepartmentGroupWorkspaceClient({
           />
         ) : null}
 
-        {resolvedTab === "students" ? (
+        {resolvedTab === "students" && yearProgramId ? (
           <DepartmentStudentsPanel
             departmentId={department.id}
             departmentName={displayName}
@@ -375,14 +566,14 @@ export function DepartmentGroupWorkspaceClient({
           />
         ) : null}
 
-        {resolvedTab === "schedule" ? (
+        {resolvedTab === "schedule" && yearProgramId ? (
           <DepartmentSchedulePanel
             departmentId={department.id}
             departmentName={displayName}
           />
         ) : null}
 
-        {resolvedTab === "financial" ? (
+        {resolvedTab === "financial" && yearProgramId ? (
           <div className="space-y-4">
             <Tabs
               value={financeSection}
@@ -427,6 +618,16 @@ export function DepartmentGroupWorkspaceClient({
               />
             ) : null}
           </div>
+        ) : null}
+
+        {resolvedTab === "reports" && yearProgramId ? (
+          <DepartmentReportsPanel
+            departmentId={department.id}
+            departmentName={displayName}
+            staff={department.staff}
+            onStaffChanged={load}
+            initialYearProgramId={yearProgramId}
+          />
         ) : null}
 
         {resolvedTab === "group-giving" && pair ? (

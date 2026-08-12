@@ -1,7 +1,9 @@
 import Link from "next/link"
+import { Suspense } from "react"
 import { Archive, Calendar, MapPin, Plus } from "lucide-react"
 
 import { Header } from "@/components/layout/header"
+import { EventManagementDashboardPanels } from "@/components/events/event-management-dashboard-panels"
 import { InternalEventCardActions } from "@/components/events/internal-event-card-actions"
 import { InternalEventCatalogFilters } from "@/components/events/internal-event-catalog-filters"
 import { InternalEventStatusSelect } from "@/components/events/internal-event-status-select"
@@ -17,6 +19,10 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { getDepartments } from "@/lib/departments/department-queries"
+import {
+  getEventManagementDashboard,
+  parseDashboardTimePeriod,
+} from "@/lib/events/internal-event-dashboard-queries"
 import { getEventTypes } from "@/lib/events/event-type-queries"
 import { getInternalEvents } from "@/lib/events/internal-event-queries"
 import { getInternalEventDeleteBlockersMap } from "@/lib/events/internal-event-actions"
@@ -35,6 +41,7 @@ type PageSearchParams = {
   department?: string
   eventType?: string
   view?: string
+  period?: string
 }
 
 function getValue(value: string | string[] | undefined) {
@@ -209,7 +216,7 @@ function EventsTable({
   )
 }
 
-export default async function EventManagementCatalogPage({
+async function EventManagementEventsContent({
   searchParams,
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>
@@ -223,14 +230,18 @@ export default async function EventManagementCatalogPage({
     department: getValue(resolvedSearchParams?.department) || "all",
     eventType: getValue(resolvedSearchParams?.eventType) || "all",
     view: getValue(resolvedSearchParams?.view) || "cards",
+    period: getValue(resolvedSearchParams?.period) || "",
   }
+  const period = parseDashboardTimePeriod(filters.period)
 
-  const [events, departments, eventTypes, canManage] = await Promise.all([
-    getInternalEvents(),
-    getDepartments(),
-    getEventTypes({ activeOnly: false }),
-    hasAnyPermission(PERMISSIONS.EVENTS_MANAGE, PERMISSIONS.PROGRAMS_MANAGE),
-  ])
+  const [events, departments, eventTypes, canManage, dashboard] =
+    await Promise.all([
+      getInternalEvents(),
+      getDepartments(),
+      getEventTypes({ activeOnly: false }),
+      hasAnyPermission(PERMISSIONS.EVENTS_MANAGE, PERMISSIONS.PROGRAMS_MANAGE),
+      getEventManagementDashboard(period),
+    ])
 
   const filteredEvents = events.filter((event) => matchesEvent(event, filters))
   const viewMode = filters.view === "table" ? "table" : "cards"
@@ -243,75 +254,79 @@ export default async function EventManagementCatalogPage({
       <Header title="Event Management" />
 
       <div className="flex flex-col gap-6 p-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Events</h1>
-            <p className="text-muted-foreground">
-              Internal department-owned events for planning and operations.
-            </p>
-          </div>
+        <EventManagementDashboardPanels
+          data={dashboard}
+          period={period}
+          canManage={canManage}
+        />
 
-          {canManage ? (
-            <Button asChild>
-              <Link href="/facilities/calendar?openNew=1">
-                <Plus className="mr-2 h-4 w-4" />
-                {CREATE_EVENT_CTA_LABEL}
-              </Link>
-            </Button>
-          ) : null}
-        </div>
+        <div className="space-y-4">
+          <h2 className="text-base font-semibold">All events</h2>
 
-        <Card>
-          <CardContent className="p-4">
-            <InternalEventCatalogFilters
-              departments={departments}
-              eventTypes={eventTypes}
-              initialFilters={{
-                q: filters.q || "",
-                status: filters.status || "all",
-                department: filters.department || "all",
-                eventType: filters.eventType || "all",
-                view: viewMode,
-              }}
-            />
-          </CardContent>
-        </Card>
-
-        {filteredEvents.length === 0 ? (
-          <Card className="flex flex-col items-center justify-center py-12">
-            <Archive className="mb-4 h-12 w-12 text-muted-foreground/50" />
-            <h3 className="text-lg font-medium">No events found</h3>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Create an event or adjust your filters.
-            </p>
-            {canManage ? (
-              <Button className="mt-4" asChild>
-                <Link href="/facilities/calendar?openNew=1">
-                  <Plus className="mr-2 h-4 w-4" />
-                  {CREATE_EVENT_CTA_LABEL}
-                </Link>
-              </Button>
-            ) : null}
-          </Card>
-        ) : viewMode === "table" ? (
-          <EventsTable
-            events={filteredEvents}
-            canManage={canManage}
-            deleteBlockers={deleteBlockers}
-          />
-        ) : (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {filteredEvents.map((event) => (
-              <EventCard
-                key={event.id}
-                event={event}
-                canManage={canManage}
-                deleteBlockedReason={deleteBlockers[event.id] ?? null}
+          <Card>
+            <CardContent className="p-4">
+              <InternalEventCatalogFilters
+                departments={departments}
+                eventTypes={eventTypes}
+                initialFilters={{
+                  q: filters.q || "",
+                  status: filters.status || "all",
+                  department: filters.department || "all",
+                  eventType: filters.eventType || "all",
+                  view: viewMode,
+                }}
               />
-            ))}
-          </div>
-        )}
+            </CardContent>
+          </Card>
+
+          {filteredEvents.length === 0 ? (
+            <Card className="flex flex-col items-center justify-center py-12">
+              <Archive className="mb-4 h-12 w-12 text-muted-foreground/50" />
+              <h3 className="text-lg font-medium">No events found</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Create an event or adjust your filters.
+              </p>
+              {canManage ? (
+                <Button className="mt-4" asChild>
+                  <Link href="/facilities/calendar?openNew=1">
+                    <Plus className="mr-2 h-4 w-4" />
+                    {CREATE_EVENT_CTA_LABEL}
+                  </Link>
+                </Button>
+              ) : null}
+            </Card>
+          ) : viewMode === "table" ? (
+            <EventsTable
+              events={filteredEvents}
+              canManage={canManage}
+              deleteBlockers={deleteBlockers}
+            />
+          ) : (
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {filteredEvents.map((event) => (
+                <EventCard
+                  key={event.id}
+                  event={event}
+                  canManage={canManage}
+                  deleteBlockedReason={deleteBlockers[event.id] ?? null}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </>
+  )
+}
+
+export default function EventManagementCatalogPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>
+}) {
+  return (
+    <Suspense fallback={null}>
+      <EventManagementEventsContent searchParams={searchParams} />
+    </Suspense>
   )
 }

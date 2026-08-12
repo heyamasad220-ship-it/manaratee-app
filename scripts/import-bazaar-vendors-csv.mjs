@@ -265,6 +265,11 @@ function loadPlannedRows(csvPath, limit) {
       activityDate && (!priorActivity || activityDate > priorActivity)
         ? activityDate
         : priorActivity
+    const priorEarliest = existingContact?.earliest_activity_date || null
+    const earliestActivity =
+      activityDate && (!priorEarliest || activityDate < priorEarliest)
+        ? activityDate
+        : priorEarliest
 
     contactsByEmail.set(email, {
       email,
@@ -285,6 +290,7 @@ function loadPlannedRows(csvPath, limit) {
       selling: selling || existingContact?.selling || null,
       social: social || existingContact?.social || null,
       latest_activity_date: latestActivity,
+      earliest_activity_date: earliestActivity,
     })
 
     const participationImportKey = importKey([
@@ -419,7 +425,7 @@ async function findOrCreateContact(sb, orgId, contact, counters) {
 async function ensureVendorApplication(sb, orgId, contactId, contact, counters) {
   const { data: existing } = await sb
     .from("applications")
-    .select("id, status, notes")
+    .select("id, status, notes, submitted_at")
     .eq("organization_id", orgId)
     .eq("contact_id", contactId)
     .eq("application_type", "vendor")
@@ -428,14 +434,30 @@ async function ensureVendorApplication(sb, orgId, contactId, contact, counters) 
     .limit(1)
     .maybeSingle()
 
+  const { data: contactRow } = await sb
+    .from("contacts")
+    .select("last_activity_at, created_at")
+    .eq("id", contactId)
+    .maybeSingle()
+
+  const activityAt =
+    (contact.earliest_activity_date
+      ? `${contact.earliest_activity_date}T12:00:00.000Z`
+      : null) ||
+    contactRow?.last_activity_at ||
+    (contact.latest_activity_date
+      ? `${contact.latest_activity_date}T12:00:00.000Z`
+      : null) ||
+    contactRow?.created_at ||
+    new Date().toISOString()
+
   if (existing?.id) {
     if (existing.status !== "approved") {
       const { error } = await sb
         .from("applications")
         .update({
           status: "approved",
-          reviewed_at: new Date().toISOString(),
-          notes: `${existing.notes || ""}\n${IMPORT_TAG}:approved`.trim(),
+          submitted_at: existing.submitted_at || activityAt,
         })
         .eq("id", existing.id)
       if (error) throw new Error(`Approve application: ${error.message}`)
@@ -457,15 +479,12 @@ async function ensureVendorApplication(sb, orgId, contactId, contact, counters) 
       applicant_email: contact.email,
       applicant_phone: contact.phone,
       status: "approved",
-      submitted_at: new Date().toISOString(),
-      reviewed_at: new Date().toISOString(),
+      submitted_at: activityAt,
       form_data: {
-        import_tag: IMPORT_TAG,
         business_name: contact.company_name,
         selling: contact.selling,
         social: contact.social,
       },
-      notes: `${IMPORT_TAG}:org_vendor_application`,
     })
     .select("id")
     .single()

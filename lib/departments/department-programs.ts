@@ -1,6 +1,6 @@
 "use server"
 
-import { loadDepartmentOpenPrograms } from "@/lib/departments/department-active-programs"
+import { loadDepartmentWorkspacePrograms } from "@/lib/departments/department-active-programs"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { getOfferingsForProgram } from "@/lib/programs/program-offering-queries"
 import type { ProgramOffering } from "@/lib/programs/program-offering-types"
@@ -23,6 +23,10 @@ export type DepartmentProgramsOfferingRow = {
   enrolled: number
   yearProgramId: string
   yearProgramName: string
+  primaryInstructor: string | null
+  tuitionAmount: number | null
+  daysLabel: string | null
+  timesLabel: string | null
 }
 
 export type DepartmentProgramsBundle = {
@@ -30,11 +34,78 @@ export type DepartmentProgramsBundle = {
   offerings: DepartmentProgramsOfferingRow[]
 }
 
+const DAY_ORDER: Record<string, number> = {
+  monday: 1,
+  tuesday: 2,
+  wednesday: 3,
+  thursday: 4,
+  friday: 5,
+  saturday: 6,
+  sunday: 7,
+}
+
+const DAY_SHORT: Record<string, string> = {
+  monday: "Mon",
+  tuesday: "Tue",
+  wednesday: "Wed",
+  thursday: "Thu",
+  friday: "Fri",
+  saturday: "Sat",
+  sunday: "Sun",
+}
+
+function formatTimeCompact(value: string | null | undefined) {
+  if (!value) return ""
+  const match = /^(\d{1,2}):(\d{2})/.exec(String(value).trim())
+  if (!match) return String(value)
+  const hour = Number(match[1])
+  const minute = Number(match[2])
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return String(value)
+  const period = hour >= 12 ? "pm" : "am"
+  const hour12 = hour % 12 || 12
+  if (minute === 0) return `${hour12}${period}`
+  return `${hour12}:${String(minute).padStart(2, "0")}${period}`
+}
+
+function formatDaysLabel(
+  items: Array<{ day_of_week: string | null }>
+): string | null {
+  const days = [
+    ...new Set(
+      items
+        .map((item) => String(item.day_of_week || "").toLowerCase())
+        .filter((day) => Boolean(DAY_SHORT[day]))
+    ),
+  ].sort((a, b) => (DAY_ORDER[a] || 99) - (DAY_ORDER[b] || 99))
+
+  if (days.length === 0) return null
+  return days.map((day) => DAY_SHORT[day]).join(", ")
+}
+
+function formatTimesLabel(
+  items: Array<{ start_time: string | null; end_time: string | null }>
+): string | null {
+  const ranges = [
+    ...new Set(
+      items
+        .map((item) => {
+          const start = formatTimeCompact(item.start_time)
+          const end = formatTimeCompact(item.end_time)
+          if (!start || !end) return ""
+          return `${start}-${end}`
+        })
+        .filter(Boolean)
+    ),
+  ]
+  if (ranges.length === 0) return null
+  return ranges.join(", ")
+}
+
 async function loadOpenYearsWithEnrollmentDates(
   organizationId: string,
   departmentId: string
 ): Promise<DepartmentProgramsYear[]> {
-  const open = await loadDepartmentOpenPrograms(organizationId, departmentId)
+  const open = await loadDepartmentWorkspacePrograms(organizationId, departmentId)
   if (open.length === 0) return []
 
   const supabase = await createClient()
@@ -95,6 +166,7 @@ export async function fetchDepartmentPrograms(
   }
 
   const offerings: DepartmentProgramsOfferingRow[] = []
+  const programIds = years.map((year) => year.id)
 
   for (const year of years) {
     const programOfferings = await getOfferingsForProgram(year.id)
@@ -117,8 +189,142 @@ export async function fetchDepartmentPrograms(
         enrolled: enrolledById.get(offering.id) || 0,
         yearProgramId: year.id,
         yearProgramName: year.name,
+        primaryInstructor: null,
+        tuitionAmount: null,
+        daysLabel: null,
+        timesLabel: null,
       })
     }
+  }
+
+  const offeringIds = offerings.map((row) => row.offering.id)
+  if (offeringIds.length === 0) {
+    return { years, offerings }
+  }
+
+  const supabase = await createClient()
+  const [{ data: assignments }, { data: scheduleItems }, { data: feePlans }] =
+    await Promise.all([
+      supabase
+        .from("program_staff_assignments")
+        .select(
+          "offering_id, assignment_role, is_active, contact:contact_id ( full_name )"
+        )
+        .eq("organization_id", organizationId)
+        .in("offering_id", offeringIds)
+        .eq("is_active", true)
+        .in("assignment_role", ["primary_instructor", "instructor"]),
+      supabase
+        .from("program_schedule_items")
+        .select("offering_id, day_of_week, start_time, end_time")
+        .eq("organization_id", organizationId)
+        .in("program_id", programIds)
+        .in("offering_id", offeringIds),
+      supabase
+        .from("program_offering_fee_plans")
+        .select("id, offering_id, is_default, is_active")
+        .eq("organization_id", organizationId)
+        .in("offering_id", offeringIds),
+    ])
+
+  const instructorByOffering = new Map<string, string>()
+  for (const row of assignments || []) {
+    const offeringId = row.offering_id as string
+    if (instructorByOffering.has(offeringId)) continue
+    const role = String(row.assignment_role || "")
+    if (role !== "primary_instructor" && role !== "instructor") continue
+    const contact = row.contact as { full_name?: string | null } | null
+    const name = (contact?.full_name || "").trim()
+    if (name) instructorByOffering.set(offeringId, name)
+  }
+
+  // Prefer primary_instructor over generic instructor when both exist.
+  for (const row of assignments || []) {
+    if (String(row.assignment_role || "") !== "primary_instructor") continue
+    const offeringId = row.offering_id as string
+    const contact = row.contact as { full_name?: string | null } | null
+    const name = (contact?.full_name || "").trim()
+    if (name) instructorByOffering.set(offeringId, name)
+  }
+
+  const scheduleByOffering = new Map<
+    string,
+    Array<{
+      day_of_week: string | null
+      start_time: string | null
+      end_time: string | null
+    }>
+  >()
+  for (const row of scheduleItems || []) {
+    const offeringId = row.offering_id as string
+    if (!offeringId) continue
+    const list = scheduleByOffering.get(offeringId) || []
+    list.push({
+      day_of_week: (row.day_of_week as string | null) ?? null,
+      start_time: (row.start_time as string | null) ?? null,
+      end_time: (row.end_time as string | null) ?? null,
+    })
+    scheduleByOffering.set(offeringId, list)
+  }
+
+  const plansByOffering = new Map<
+    string,
+    Array<{ id: string; is_default: boolean; is_active: boolean }>
+  >()
+  for (const row of feePlans || []) {
+    const offeringId = row.offering_id as string
+    if (!offeringId) continue
+    const list = plansByOffering.get(offeringId) || []
+    list.push({
+      id: row.id as string,
+      is_default: Boolean(row.is_default),
+      is_active: row.is_active !== false,
+    })
+    plansByOffering.set(offeringId, list)
+  }
+
+  const defaultPlanIdByOffering = new Map<string, string>()
+  const defaultPlanIds: string[] = []
+  for (const [offeringId, plans] of plansByOffering) {
+    const defaultPlan =
+      plans.find((plan) => plan.is_default && plan.is_active) ||
+      plans.find((plan) => plan.is_default) ||
+      plans.find((plan) => plan.is_active) ||
+      plans[0]
+    if (!defaultPlan) continue
+    defaultPlanIdByOffering.set(offeringId, defaultPlan.id)
+    defaultPlanIds.push(defaultPlan.id)
+  }
+
+  const tuitionByPlanId = new Map<string, number>()
+  if (defaultPlanIds.length > 0) {
+    const { data: tuitionComponents } = await supabase
+      .from("program_offering_fee_plan_components")
+      .select("fee_plan_id, amount, is_active")
+      .eq("organization_id", organizationId)
+      .in("fee_plan_id", defaultPlanIds)
+      .eq("component_type", "tuition")
+
+    for (const row of tuitionComponents || []) {
+      if (row.is_active === false) continue
+      const planId = row.fee_plan_id as string
+      const amount = Number(row.amount)
+      if (!Number.isFinite(amount)) continue
+      tuitionByPlanId.set(
+        planId,
+        (tuitionByPlanId.get(planId) || 0) + amount
+      )
+    }
+  }
+
+  for (const row of offerings) {
+    row.primaryInstructor = instructorByOffering.get(row.offering.id) || null
+    const schedule = scheduleByOffering.get(row.offering.id) || []
+    row.daysLabel = formatDaysLabel(schedule)
+    row.timesLabel = formatTimesLabel(schedule)
+    const planId = defaultPlanIdByOffering.get(row.offering.id)
+    row.tuitionAmount =
+      planId != null ? tuitionByPlanId.get(planId) ?? null : null
   }
 
   return { years, offerings }

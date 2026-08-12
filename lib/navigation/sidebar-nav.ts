@@ -30,6 +30,8 @@ export interface NavItem {
   href: string
   icon: import("lucide-react").LucideIcon
   matchPrefix: string
+  /** Extra path prefixes that keep this module selected (combined modules). */
+  alsoMatchPrefixes?: string[]
   children?: SubItem[]
   group?: string | null
   permissionKey?: string
@@ -63,7 +65,14 @@ export function subItemMatchesPath(
     if (child.href === "/donations/campaigns") {
       return isDonationCampaignsOverviewPath(pathname)
     }
-    return pathname === child.href
+    if (pathname === child.href) {
+      return true
+    }
+    return (
+      child.alsoMatchPrefixes?.some(
+        (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+      ) ?? false
+    )
   }
 
   if (pathname === child.href || pathname.startsWith(`${child.matchPrefix}/`)) {
@@ -125,7 +134,12 @@ export function isItemActive(
   navItems: NavItem[],
   profileListSegment: ContactsListSegment | null
 ) {
-  const matchesSelf = pathname.startsWith(item.matchPrefix)
+  const matchesPrefix = (prefix: string) =>
+    pathname === prefix || pathname.startsWith(`${prefix}/`)
+
+  const matchesSelf =
+    matchesPrefix(item.matchPrefix) ||
+    (item.alsoMatchPrefixes?.some(matchesPrefix) ?? false)
   const matchesChild =
     item.children?.some((child) =>
       subItemHasActiveDescendant(child, pathname, profileListSegment)
@@ -174,6 +188,35 @@ type SubItemMatch = {
   leaf: SubItem | null
 }
 
+function subItemPathMatchScore(
+  item: SubItem,
+  pathname: string,
+  profileListSegment: ContactsListSegment | null
+): number {
+  if (!subItemMatchesPath(item, pathname, profileListSegment)) {
+    return -1
+  }
+
+  let score = 0
+  if (
+    pathname === item.href ||
+    pathname === item.matchPrefix ||
+    pathname.startsWith(`${item.matchPrefix}/`)
+  ) {
+    score = Math.max(score, item.matchPrefix.length)
+  }
+  for (const prefix of item.alsoMatchPrefixes ?? []) {
+    if (pathname === prefix || pathname.startsWith(`${prefix}/`)) {
+      score = Math.max(score, prefix.length)
+    }
+  }
+  // Exact href match without a longer prefix still counts.
+  if (score === 0 && pathname === item.href) {
+    score = item.href.length
+  }
+  return score
+}
+
 function findDeepestSubItemMatch(
   items: SubItem[],
   pathname: string,
@@ -181,6 +224,7 @@ function findDeepestSubItemMatch(
   ancestors: SubItem[] = []
 ): SubItemMatch | null {
   let best: SubItemMatch | null = null
+  let bestScore = -1
 
   for (const item of items) {
     const nextAncestors = [...ancestors, item]
@@ -192,14 +236,24 @@ function findDeepestSubItemMatch(
         profileListSegment,
         nextAncestors
       )
-      if (nested) {
-        best = nested
+      if (nested?.leaf) {
+        const nestedScore = subItemPathMatchScore(
+          nested.leaf,
+          pathname,
+          profileListSegment
+        )
+        if (nestedScore > bestScore) {
+          best = nested
+          bestScore = nestedScore
+        }
       }
       continue
     }
 
-    if (subItemMatchesPath(item, pathname, profileListSegment)) {
+    const score = subItemPathMatchScore(item, pathname, profileListSegment)
+    if (score > bestScore) {
       best = { chain: ancestors, leaf: item }
+      bestScore = score
     }
   }
 
@@ -325,7 +379,8 @@ export function filterSubItemsByPermission(
         : undefined,
     }))
     .filter((child) => {
-      if (child.children && child.children.length === 0 && !child.href) {
+      // Drop empty folders after permission filtering (combined module groups).
+      if (Array.isArray(child.children) && child.children.length === 0) {
         return false
       }
       return true

@@ -49,6 +49,15 @@ export async function getOpenPrograms() {
     return []
   }
 
+  try {
+    const { autoCloseExpiredYearPrograms } = await import(
+      "@/lib/departments/department-year-auto-close"
+    )
+    await autoCloseExpiredYearPrograms({ organizationId })
+  } catch (error) {
+    console.error("autoCloseExpiredYearPrograms:", error)
+  }
+
   const { data, error } = await supabase
     .from("programs")
     .select("*")

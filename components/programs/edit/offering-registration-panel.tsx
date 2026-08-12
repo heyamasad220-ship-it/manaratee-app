@@ -9,6 +9,7 @@ import {
   OfferingEligibilityCard,
 } from "@/components/programs/edit/offering-eligibility-card"
 import {
+  OfferingEnrollmentOptionToggles,
   OfferingEnrollmentWindowCard,
 } from "@/components/programs/edit/offering-enrollment-window-card"
 import {
@@ -22,6 +23,7 @@ import {
   gradesApplyForMinAge,
 } from "@/components/programs/edit/utils"
 import type { ProgramGender } from "@/components/programs/edit/types"
+import { ProgramSessionsEditor } from "@/components/programs/program-sessions-editor"
 import { Button } from "@/components/ui/button"
 import { saveOfferingRegistrationPanel } from "@/lib/programs/offering-workspace-actions"
 import { parseProgramAgeBounds } from "@/lib/programs/program-eligibility-display"
@@ -34,6 +36,7 @@ import {
 } from "@/lib/programs/program-offering-inherit"
 import { isOfferingEnrollmentOpen } from "@/lib/programs/program-offering-display"
 import type { ProgramOffering } from "@/lib/programs/program-offering-types"
+import type { ProgramSession } from "@/lib/programs/program-session-types"
 import { saveRegistrationQuestionsForOffering } from "@/lib/programs/program-registration-question-actions"
 import {
   parseRegistrationQuestions,
@@ -112,6 +115,11 @@ export function OfferingRegistrationPanel({
   settingsSplit = false,
   /** When settingsSplit, portal the Capacity accordion into this DOM node (above Sessions). */
   capacityAccordionPortalTarget = null,
+  /**
+   * When provided (including null while mounting), Questions portals here
+   * instead of rendering after Enrollment.
+   */
+  questionsAccordionPortalTarget,
   /** Paired left of Registration in the settings two-column row. */
   generalSection = null,
   /** Paired right of Participants (e.g. Pricing) in the settings two-column row. */
@@ -119,6 +127,11 @@ export function OfferingRegistrationPanel({
   attendanceTracked,
   onAttendanceTrackedChange,
   onDirty,
+  /** Hide basics already on the parent edit form; keep advanced controls. */
+  omitBasicFields = false,
+  /** Sync basic field values from the parent form before save. */
+  basicFieldOverrides = null,
+  onSessionsChange,
 }: {
   program: Program
   offering: ProgramOffering
@@ -140,12 +153,24 @@ export function OfferingRegistrationPanel({
   plain?: boolean
   settingsSplit?: boolean
   capacityAccordionPortalTarget?: HTMLElement | null
+  questionsAccordionPortalTarget?: HTMLElement | null
   generalSection?: React.ReactNode
   participantsCompanion?: React.ReactNode
   /** Controlled attendance flag (offering attribute); falls back to offering. */
   attendanceTracked?: boolean
   onAttendanceTrackedChange?: (enabled: boolean) => void
   onDirty?: () => void
+  omitBasicFields?: boolean
+  basicFieldOverrides?: {
+    enrollmentOpenDate?: string
+    enrollmentCloseDate?: string
+    openEnrollment?: boolean
+    gender?: ProgramGender
+    minAge?: number | null
+    maxAge?: number | null
+    capacity?: number
+  } | null
+  onSessionsChange?: (sessions: ProgramSession[]) => void
 }) {
   const router = useRouter()
   const capacitySectionRef =
@@ -153,9 +178,11 @@ export function OfferingRegistrationPanel({
   const showWindow =
     settingsSplit || !sections || sections.includes("window")
   const showEligibility =
-    settingsSplit || !sections || sections.includes("eligibility")
+    (!settingsSplit && (!sections || sections.includes("eligibility"))) ||
+    (settingsSplit && !omitBasicFields)
   const showCapacity =
-    settingsSplit || !sections || sections.includes("capacity")
+    (!settingsSplit && (!sections || sections.includes("capacity"))) ||
+    (settingsSplit && !omitBasicFields)
   const source = React.useMemo(
     () => getOfferingRegistrationSource(offering, program),
     [offering, program]
@@ -285,6 +312,26 @@ export function OfferingRegistrationPanel({
     setSuccess(false)
 
     try {
+      const nextOpenEnrollment =
+        basicFieldOverrides?.openEnrollment ?? openEnrollment
+      const nextEnrollmentOpenDate =
+        basicFieldOverrides?.enrollmentOpenDate ?? enrollmentOpenDate
+      const nextEnrollmentCloseDate =
+        basicFieldOverrides?.enrollmentCloseDate ?? enrollmentCloseDate
+      const nextGender = basicFieldOverrides?.gender ?? programGender
+      const nextMinAge =
+        basicFieldOverrides?.minAge !== undefined
+          ? basicFieldOverrides.minAge
+          : minAge
+      const nextMaxAge =
+        basicFieldOverrides?.maxAge !== undefined
+          ? basicFieldOverrides.maxAge
+          : maxAge
+      const nextCapacity =
+        basicFieldOverrides?.capacity !== undefined
+          ? basicFieldOverrides.capacity
+          : capacity
+
       const flushedCapacityGroups =
         capacitySectionRef.current?.flushCapacityGroups() ??
         normalizedCapacityGroups
@@ -293,22 +340,22 @@ export function OfferingRegistrationPanel({
         programId: program.id,
         offeringId: offering.id,
         organizationId: program.organization_id,
-        min_age: minAge,
-        max_age: maxAge,
+        min_age: nextMinAge,
+        max_age: nextMaxAge,
         grade_levels: gradeLevels,
-        gender: programGender,
-        enrollment_open_date: enrollmentOpenDate || null,
-        enrollment_close_date: enrollmentCloseDate || null,
+        gender: nextGender,
+        enrollment_open_date: nextEnrollmentOpenDate || null,
+        enrollment_close_date: nextEnrollmentCloseDate || null,
         fullProgramEnabled,
         sessionRegistrationEnabled,
         singleSessionEnabled,
         dropInEnabled: false,
-        capacity,
+        capacity: nextCapacity,
         capacityGroups: flushedCapacityGroups,
         enable_waitlist: enableWaitlist,
         waitlist_capacity:
           waitlistCapacity.trim() === "" ? null : Number(waitlistCapacity),
-        application_required: !openEnrollment,
+        application_required: !nextOpenEnrollment,
         inherit_dates: false,
         inherit_eligibility: false,
         inherit_enrollment: false,
@@ -394,6 +441,32 @@ export function OfferingRegistrationPanel({
       }}
       disabled={disabled}
       plain={plain || settingsSplit}
+      hideBasicFields={omitBasicFields}
+      showOptionToggles={!settingsSplit}
+    />
+  ) : null
+
+  const enrollmentOptionToggles = settingsSplit ? (
+    <OfferingEnrollmentOptionToggles
+      enableWaitlist={enableWaitlist}
+      onEnableWaitlistChange={(value) => {
+        setEnableWaitlist(value)
+        touch()
+      }}
+      attendanceTracked={
+        attendanceTracked ?? Boolean(offering.attendance_tracked)
+      }
+      onAttendanceTrackedChange={(value) => {
+        onAttendanceTrackedChange?.(value)
+        touch()
+      }}
+      openEnrollment={openEnrollment}
+      onOpenEnrollmentChange={(value) => {
+        setOpenEnrollment(value)
+        touch()
+      }}
+      disabled={disabled}
+      compactLabels
     />
   ) : null
 
@@ -427,6 +500,7 @@ export function OfferingRegistrationPanel({
       disabled={disabled}
       plain={plain || settingsSplit}
       hideAudience={settingsSplit}
+      hideGenderAndAges={omitBasicFields}
     />
   ) : null
 
@@ -460,6 +534,7 @@ export function OfferingRegistrationPanel({
       enrolled={enrolled}
       disabled={disabled}
       plain={plain || settingsSplit}
+      hideSimpleCapacity={omitBasicFields}
     />
   ) : null
 
@@ -483,46 +558,66 @@ export function OfferingRegistrationPanel({
       showCapacity && capacityCard ? (
         <OfferingSettingsAccordionItem
           value="capacity"
-          step={4}
           title="Capacity"
         >
           {capacityCard}
         </OfferingSettingsAccordionItem>
       ) : null
 
+    const questionsAccordion = (
+      <OfferingSettingsAccordionItem
+        value="questions"
+        title="Questions"
+      >
+        <OfferingRegistrationQuestionsEditor
+          questions={registrationQuestions}
+          disabled={disabled}
+          onChange={(next) => {
+            setRegistrationQuestions(next)
+            touch()
+          }}
+        />
+      </OfferingSettingsAccordionItem>
+    )
+
     return (
       <>
         <OfferingSettingsAccordionItem
           value="registration"
-          step={1}
           title="Enrollment"
         >
           <div className="space-y-3">
             {windowCard}
+            {sessionRegistrationEnabled ? (
+              <div className="border-t pt-3">
+                <ProgramSessionsEditor
+                  programId={program.id}
+                  offeringId={offering.id}
+                  sessions={workspaceData.sessions}
+                  sessionRegistrationEnabled
+                  variant="basic"
+                  disabled={disabled}
+                  onSessionsChange={onSessionsChange}
+                />
+              </div>
+            ) : null}
+            {enrollmentOptionToggles}
             {statusMessages}
           </div>
         </OfferingSettingsAccordionItem>
-        <OfferingSettingsAccordionItem
-          value="participants"
-          step={2}
-          title="Participants"
-        >
-          {eligibilityCard}
-        </OfferingSettingsAccordionItem>
-        <OfferingSettingsAccordionItem
-          value="questions"
-          step={3}
-          title="Questions"
-        >
-          <OfferingRegistrationQuestionsEditor
-            questions={registrationQuestions}
-            disabled={disabled}
-            onChange={(next) => {
-              setRegistrationQuestions(next)
-              touch()
-            }}
-          />
-        </OfferingSettingsAccordionItem>
+        {eligibilityCard ? (
+          <OfferingSettingsAccordionItem
+            value="participants"
+            title="Participants"
+          >
+            {eligibilityCard}
+          </OfferingSettingsAccordionItem>
+        ) : null}
+        {questionsAccordionPortalTarget !== undefined
+          ? questionsAccordionPortalTarget
+            ? createPortal(questionsAccordion, questionsAccordionPortalTarget)
+            : null
+          : questionsAccordion}
         {capacityAccordion && capacityAccordionPortalTarget
           ? createPortal(capacityAccordion, capacityAccordionPortalTarget)
           : capacityAccordion}

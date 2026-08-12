@@ -1,29 +1,17 @@
 import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
+import {
+  DEPARTMENT_OPEN_PROGRAM_STATUSES,
+  DEPARTMENT_WORKSPACE_PROGRAM_STATUSES,
+} from "@/lib/departments/department-program-statuses"
+import { autoCloseExpiredYearPrograms } from "@/lib/departments/department-year-auto-close"
 
-/** Years visible in the department workspace (includes finished/closed years). */
-export const DEPARTMENT_WORKSPACE_PROGRAM_STATUSES = [
-  "draft",
-  "active",
-  "paused",
-  "closed",
-] as const
-
-/**
- * Years still operating for catalog / new-enrollment surfaces.
- * Closed years stay in the department workspace but are not sold as open.
- */
-export const DEPARTMENT_OPEN_PROGRAM_STATUSES = [
-  "draft",
-  "active",
-  "paused",
-] as const
-
-export type DepartmentOpenProgramStatus =
-  (typeof DEPARTMENT_OPEN_PROGRAM_STATUSES)[number]
-
-export type DepartmentWorkspaceProgramStatus =
-  (typeof DEPARTMENT_WORKSPACE_PROGRAM_STATUSES)[number]
+export {
+  DEPARTMENT_OPEN_PROGRAM_STATUSES,
+  DEPARTMENT_WORKSPACE_PROGRAM_STATUSES,
+  type DepartmentOpenProgramStatus,
+  type DepartmentWorkspaceProgramStatus,
+} from "@/lib/departments/department-program-statuses"
 
 export type DepartmentOpenProgram = {
   id: string
@@ -93,21 +81,24 @@ export function dateWithinOpenPrograms(
   })
 }
 
-/**
- * Load department year/season programs for the workspace (not archived).
- * Includes closed years so staff can report and compare across years.
- */
-export async function loadDepartmentOpenPrograms(
+async function loadDepartmentProgramsByStatuses(
   organizationId: string,
-  departmentId: string
+  departmentId: string,
+  statuses: readonly string[]
 ): Promise<DepartmentOpenProgram[]> {
+  try {
+    await autoCloseExpiredYearPrograms({ organizationId, departmentId })
+  } catch (error) {
+    console.error("autoCloseExpiredYearPrograms:", error)
+  }
+
   const supabase = await createClient()
   const { data, error } = await supabase
     .from("programs")
     .select("id, name, status, start_date, end_date")
     .eq("organization_id", organizationId)
     .eq("department_id", departmentId)
-    .in("status", [...DEPARTMENT_WORKSPACE_PROGRAM_STATUSES])
+    .in("status", [...statuses])
     .order("start_date", { ascending: false, nullsFirst: false })
     .order("name", { ascending: true })
 
@@ -119,6 +110,34 @@ export async function loadDepartmentOpenPrograms(
     startDate: (row.start_date as string | null) ?? null,
     endDate: (row.end_date as string | null) ?? null,
   }))
+}
+
+/**
+ * Operating years only (draft / active / paused) — Financial, catalog, new enrollment.
+ */
+export async function loadDepartmentOpenPrograms(
+  organizationId: string,
+  departmentId: string
+): Promise<DepartmentOpenProgram[]> {
+  return loadDepartmentProgramsByStatuses(
+    organizationId,
+    departmentId,
+    DEPARTMENT_OPEN_PROGRAM_STATUSES
+  )
+}
+
+/**
+ * Workspace years including closed — Offerings / Registrations / Reports compare.
+ */
+export async function loadDepartmentWorkspacePrograms(
+  organizationId: string,
+  departmentId: string
+): Promise<DepartmentOpenProgram[]> {
+  return loadDepartmentProgramsByStatuses(
+    organizationId,
+    departmentId,
+    DEPARTMENT_WORKSPACE_PROGRAM_STATUSES
+  )
 }
 
 export async function loadDepartmentOpenProgramIds(

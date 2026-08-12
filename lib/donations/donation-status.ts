@@ -118,8 +118,9 @@ export function financialActivityStatusBadgeClass(status: string) {
     case "Succeeded":
       return "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-50"
     case "Failed":
-    case "Voided":
       return "border-red-200 bg-red-50 text-red-700 hover:bg-red-50"
+    case "Voided":
+      return "border-zinc-200 bg-zinc-100 text-zinc-700 hover:bg-zinc-100"
     case "Refunded":
     case "Partially Refunded":
       return "border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-50"

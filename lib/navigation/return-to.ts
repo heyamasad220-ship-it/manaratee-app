@@ -42,7 +42,7 @@ export function getReturnToLabel(path: string): string {
   if (pathname.startsWith("/contacts/settings")) return "Contact Settings"
   if (pathname.startsWith("/bookings")) return "Bookings"
   if (pathname.startsWith("/programs")) return "Programs"
-  if (pathname.startsWith("/workforce")) return "HR"
+  if (pathname.startsWith("/workforce")) return "Workforce"
   if (pathname.startsWith("/memberships")) return "Memberships"
 
   const segments = pathname.split("/").filter(Boolean)

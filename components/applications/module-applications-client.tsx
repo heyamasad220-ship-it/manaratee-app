@@ -67,6 +67,7 @@ export function ModuleApplicationsClient({
   vendorHubEventId,
   showOverviewTab = true,
   extraTabs = [],
+  headerAction,
 }: {
   moduleOwner: ModuleOwner
   basePath: string
@@ -81,6 +82,8 @@ export function ModuleApplicationsClient({
   showOverviewTab?: boolean
   /** Extra page tabs (e.g. Programs Financial Assistance report panels). */
   extraTabs?: ModuleApplicationsExtraTab[]
+  /** Optional action beside the page title (e.g. Copy apply link). */
+  headerAction?: ReactNode
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -154,7 +157,7 @@ export function ModuleApplicationsClient({
       basePath={basePath}
       hubApplicationTypes={resolvedHubTypes}
       lockedApplicationType={lockedApplicationType}
-      section={overviewLeadingContent ? "all" : "submissions"}
+      section={showOverviewTab && !overviewLeadingContent ? "submissions" : "all"}
       hidePageHeader
       pageTab="submissions"
       vendorHubEventId={vendorHubEventId}
@@ -163,9 +166,12 @@ export function ModuleApplicationsClient({
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
-      <div>
-        <h2 className="text-lg font-semibold">{title}</h2>
-        <p className="text-sm text-muted-foreground">{description}</p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="text-lg font-semibold">{title}</h2>
+          <p className="text-sm text-muted-foreground">{description}</p>
+        </div>
+        {headerAction ? <div className="shrink-0">{headerAction}</div> : null}
       </div>
 
       {!mounted ? (

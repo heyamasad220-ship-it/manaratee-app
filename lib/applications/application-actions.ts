@@ -10,8 +10,8 @@ import { AFFILIATION_APPLICATION_TYPES } from "@/lib/contacts/contact-affiliatio
 import { hasPermission, PERMISSIONS } from "@/lib/permissions/permissions"
 import { syncVendorHubParticipantFromApplication } from "@/lib/vendor-hub/vendor-participant-actions"
 import {
+  hasApprovedOrgVendorApplication,
   hasPendingOrgVendorApplication,
-  isApprovedOrgVendor,
 } from "@/lib/vendor-hub/vendor-eligibility-queries"
 import {
   VENDOR_ORG_APPLICATION_MODULE,
@@ -225,13 +225,14 @@ export async function fetchApplicationsList(filters: ApplicationListFilters = {}
   const pageSize = filters.pageSize ?? 50
   const from = (page - 1) * pageSize
   const to = from + pageSize - 1
+  const submittedAscending = Boolean(filters.sortSubmittedAscending)
 
   let query = supabase
     .from("applications")
     .select("*", { count: "exact" })
     .eq("organization_id", organizationId)
-    .order("submitted_at", { ascending: false, nullsFirst: false })
-    .order("created_at", { ascending: false })
+    .order("submitted_at", { ascending: submittedAscending, nullsFirst: false })
+    .order("created_at", { ascending: submittedAscending })
 
   query = applyListFilters(query, filters)
 
@@ -377,12 +378,14 @@ export async function submitApplication(input: SubmitApplicationInput) {
     input.moduleOwner === VENDOR_ORG_APPLICATION_MODULE &&
     input.applicationType === VENDOR_ORG_APPLICATION_TYPE
   ) {
-    const approved = await isApprovedOrgVendor({
+    // Block only on an approved *application*. Imported contacts may keep a vendor
+    // role (Vendor Network / history) while still needing to submit a real apply form.
+    const approvedApplication = await hasApprovedOrgVendorApplication({
       supabase,
       organizationId,
       contactId,
     })
-    if (approved) {
+    if (approvedApplication) {
       throw new Error(
         "You are already an approved vendor for this organization. Reserve a booth on an open bazaar from My Bazaars."
       )

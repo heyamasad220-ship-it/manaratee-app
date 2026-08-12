@@ -110,13 +110,14 @@ export function StatCardsRow({
 
 type StatCardProps = {
   label: string
-  value: string | number
+  value: ReactNode
   icon?: LucideIcon
   hint?: string
   footer?: ReactNode
   layout?: "compact" | "default" | "header"
   className?: string
   iconClassName?: string
+  valueClassName?: string
   /** Soft tinted background / border color. */
   tone?: StatCardTone
   /** Grow to fill equal-row grid cells instead of fixed width. */
@@ -132,11 +133,17 @@ export function StatCard({
   layout = "default",
   className,
   iconClassName,
+  valueClassName,
   tone,
   fill = false,
 }: StatCardProps) {
   const colors = tone ? STAT_CARD_TONES[tone] : null
   const widthClass = fill ? "w-full min-w-0" : statCardWidthClassName
+  const valueClasses = cn(
+    "text-2xl font-bold tabular-nums",
+    colors?.value,
+    valueClassName
+  )
 
   if (layout === "header") {
     return (
@@ -168,7 +175,7 @@ export function StatCard({
           ) : null}
         </CardHeader>
         <CardContent className={cn(fill && "flex flex-1 flex-col")}>
-          <div className={cn("text-2xl font-bold tabular-nums", colors?.value)}>{value}</div>
+          <div className={valueClasses}>{value}</div>
           {hint ? (
             <p className={cn("mt-1 text-xs", colors?.hint ?? "text-muted-foreground")}>{hint}</p>
           ) : null}
@@ -186,7 +193,7 @@ export function StatCard({
             {Icon ? (
               <Icon className={cn("h-4 w-4", colors?.icon ?? "text-muted-foreground", iconClassName)} />
             ) : null}
-            <div className={cn("text-2xl font-bold tabular-nums", colors?.value)}>{value}</div>
+            <div className={valueClasses}>{value}</div>
           </div>
           <div className={cn("whitespace-nowrap text-sm", colors?.label ?? "text-muted-foreground")}>
             {label}
@@ -204,7 +211,7 @@ export function StatCard({
           <p className={cn("whitespace-nowrap text-sm", colors?.label ?? "text-muted-foreground")}>
             {label}
           </p>
-          <p className={cn("text-2xl font-bold tabular-nums", colors?.value)}>{value}</p>
+          <div className={valueClasses}>{value}</div>
           {hint ? (
             <p className={cn("mt-1 max-w-xs text-xs", colors?.hint ?? "text-muted-foreground")}>
               {hint}

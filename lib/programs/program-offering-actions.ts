@@ -320,6 +320,36 @@ export async function updateProgramOffering(
   if (input.attributes?.care_enabled !== undefined) {
     updatePayload.care_enabled = input.attributes.care_enabled
   }
+  if (input.attributes?.gender !== undefined) {
+    updatePayload.gender = input.attributes.gender
+  }
+  if (input.attributes?.min_age !== undefined) {
+    updatePayload.min_age = input.attributes.min_age
+  }
+  if (input.attributes?.max_age !== undefined) {
+    updatePayload.max_age = input.attributes.max_age
+  }
+  if (input.attributes?.audience_type !== undefined) {
+    updatePayload.audience_type = input.attributes.audience_type
+  }
+  if (input.attributes?.capacity_mode !== undefined) {
+    updatePayload.capacity_mode = input.attributes.capacity_mode
+  }
+  if (input.attributes?.capacity !== undefined) {
+    updatePayload.capacity = input.attributes.capacity
+  }
+  if (input.attributes?.application_required !== undefined) {
+    updatePayload.application_required = input.attributes.application_required
+  }
+  if (input.inherit_eligibility !== undefined) {
+    updatePayload.inherit_eligibility = input.inherit_eligibility
+  }
+  if (input.inherit_dates !== undefined) {
+    updatePayload.inherit_dates = input.inherit_dates
+  }
+  if (input.inherit_enrollment !== undefined) {
+    updatePayload.inherit_enrollment = input.inherit_enrollment
+  }
 
   const { data, error } = await supabase
     .from("program_offerings")
@@ -420,7 +450,42 @@ export async function deleteProgramOffering(offeringId: string) {
 
   if ((count ?? 0) > 0) {
     throw new Error(
-      "This program has registrations and cannot be deleted. Archive it instead."
+      "This program has registrations and cannot be deleted."
+    )
+  }
+
+  const { count: chargeCount, error: chargeError } = await supabase
+    .from("program_charges")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", organizationId)
+    .eq("offering_id", offeringId)
+
+  if (chargeError) {
+    console.error("deleteProgramOffering charge check:", chargeError)
+    throw new Error("Could not verify payments for this offering")
+  }
+
+  if ((chargeCount ?? 0) > 0) {
+    throw new Error(
+      "This program has payment records and cannot be deleted."
+    )
+  }
+
+  const { count: applicationCount, error: applicationError } = await supabase
+    .from("program_applications")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", organizationId)
+    .eq("offering_id", offeringId)
+    .in("status", ["submitted", "approved"])
+
+  if (applicationError) {
+    console.error("deleteProgramOffering application check:", applicationError)
+    throw new Error("Could not verify applications for this offering")
+  }
+
+  if ((applicationCount ?? 0) > 0) {
+    throw new Error(
+      "This program has applications and cannot be deleted."
     )
   }
 

@@ -1,8 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useMemo, useRef, useState, useTransition } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import {
   Ban,
   ChevronDown,
@@ -37,7 +37,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { TimeInput } from "@/components/ui/time-input"
 import { CREATE_EVENT_CTA_LABEL } from "@/lib/events/facility-event-request-href"
 import type { CalendarAudience } from "@/lib/reservations/calendar-audience"
-import { CALENDAR_AUDIENCE_PATHS } from "@/lib/reservations/calendar-audience"
+
 import { createReservationBlock } from "@/lib/reservations/reservation-actions"
 import { computeReservationConflicts } from "@/lib/reservations/reservation-conflicts"
 import {
@@ -78,6 +78,8 @@ type ReservationCalendarProps = {
   headerTitle?: string
   description?: string
   eventFormOptions?: FacilityEventFormOptions | null
+  /** Optional tab bar rendered under the page header (e.g. Programs section nav). */
+  sectionNav?: ReactNode
 }
 
 export type FacilityEventFormOptions = {
@@ -564,8 +566,10 @@ export function ReservationCalendar({
   headerTitle,
   description,
   eventFormOptions = null,
+  sectionNav,
 }: ReservationCalendarProps) {
   const router = useRouter()
+  const pathname = usePathname()
   const searchParams = useSearchParams()
   const [isPending, startTransition] = useTransition()
   const [blockOpen, setBlockOpen] = useState(false)
@@ -682,8 +686,7 @@ export function ReservationCalendar({
     if (next.date) params.set("date", next.date)
     if (next.view) params.set("view", next.view)
     // Preserve ?sources= so module filtered calendars stay filtered.
-
-    const pathname = CALENDAR_AUDIENCE_PATHS[audience]
+    // Stay on the current route (e.g. /programs/calendar vs /facilities/calendar).
 
     startTransition(() => {
       router.push(`${pathname}?${params.toString()}`)
@@ -717,7 +720,6 @@ export function ReservationCalendar({
       }
     }
     if (!changed) return
-    const pathname = CALENDAR_AUDIENCE_PATHS[audience]
     const query = params.toString()
     router.replace(query ? `${pathname}?${query}` : pathname)
   }
@@ -803,6 +805,7 @@ export function ReservationCalendar({
   return (
     <>
       <Header title={headerTitle || "Calendar"} />
+      {sectionNav}
 
       <div className="flex flex-col gap-4 p-4 sm:p-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

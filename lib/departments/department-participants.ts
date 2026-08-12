@@ -2,6 +2,7 @@
 
 import { DEPARTMENT_WORKSPACE_PROGRAM_STATUSES } from "@/lib/departments/department-active-programs"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
+import { YEAR_SEASON_LABEL } from "@/lib/programs/program-display-labels"
 import { contactLabel, loadContactsByIds } from "@/lib/programs/registration-display-helpers"
 import { createClient } from "@/lib/supabase/server"
 
@@ -36,6 +37,7 @@ export type DepartmentParticipantRow = {
 export type DepartmentParticipantYearOption = {
   id: string
   name: string
+  status: string
 }
 
 export type DepartmentParticipantCourseOption = {
@@ -69,7 +71,7 @@ export async function fetchDepartmentParticipants(
 
   const { data: programs, error: programsError } = await supabase
     .from("programs")
-    .select("id, name")
+    .select("id, name, status")
     .eq("organization_id", organizationId)
     .eq("department_id", departmentId)
     .in("status", [...DEPARTMENT_WORKSPACE_PROGRAM_STATUSES])
@@ -82,7 +84,8 @@ export async function fetchDepartmentParticipants(
 
   const years: DepartmentParticipantYearOption[] = (programs || []).map((row) => ({
     id: row.id as string,
-    name: (row.name as string) || "Year/Season",
+    name: (row.name as string) || YEAR_SEASON_LABEL,
+    status: (row.status as string) || "active",
   }))
   const programIds = years.map((row) => row.id)
   const programNameById = new Map(years.map((row) => [row.id, row.name]))
@@ -245,7 +248,7 @@ export async function fetchDepartmentParticipants(
       parentContactId,
       teacherName: offeringId ? teacherByOfferingId.get(offeringId) || null : null,
       courseName: offering?.name?.trim() || programNameById.get(programId) || "Course",
-      yearSeasonName: programNameById.get(programId) || "Year/Season",
+      yearSeasonName: programNameById.get(programId) || YEAR_SEASON_LABEL,
       programId,
       offeringId,
       status: (row.status as string | null) ?? null,

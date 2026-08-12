@@ -277,7 +277,35 @@ export function buildVendorApplicationFormData(
   }
 }
 
-const HIDDEN_FORM_DATA_KEYS = new Set(["selling"])
+const HIDDEN_FORM_DATA_KEYS = new Set(["selling", "import_tag"])
+
+const VENDOR_IMPORT_TAG_PREFIXES = ["VENDOR_UPDATE_CSV", "BAZAAR_VENDORS_CSV"] as const
+
+export function isVendorImportTag(value: unknown): boolean {
+  if (typeof value !== "string" || !value.trim()) return false
+  const trimmed = value.trim()
+  return VENDOR_IMPORT_TAG_PREFIXES.some((prefix) => trimmed.startsWith(prefix))
+}
+
+export function isVendorImportedApplication(input: {
+  formData?: Record<string, unknown> | null
+  notes?: string | null
+}): boolean {
+  if (isVendorImportTag(input.formData?.import_tag)) return true
+  const notes = input.notes?.trim()
+  if (!notes) return false
+  return VENDOR_IMPORT_TAG_PREFIXES.some((prefix) => notes.includes(prefix))
+}
+
+/** Strip CSV import markers from internal notes for staff display. */
+export function stripVendorImportNotes(notes: string | null | undefined): string | null {
+  if (!notes?.trim()) return null
+  const kept = notes
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !VENDOR_IMPORT_TAG_PREFIXES.some((prefix) => line.includes(prefix)))
+  return kept.length > 0 ? kept.join("\n") : null
+}
 
 /** Labeled rows for staff application review. */
 export function formatVendorApplicationFormDataForReview(

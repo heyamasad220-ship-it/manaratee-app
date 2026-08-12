@@ -1,9 +1,11 @@
 "use client"
 
 import { useMemo } from "react"
-import { Building2, CalendarDays, MapPin, Store } from "lucide-react"
+import Link from "next/link"
+import { Building2, CalendarDays, MapPin, Store, UserRound } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import type { ReservableBazaarEvent } from "@/lib/vendor-hub/vendor-participation-model"
 import type { VendorInboxMessage } from "@/lib/vendor-hub/vendor-announcement-types"
@@ -138,12 +140,20 @@ export function MyBazaarsClient({
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">My Bazaars</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Apply once per organization, then reserve booths on open bazaars. Your assignments and
-          payments across every community appear here — one login, no duplicate profiles.
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">My Bazaars</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Apply once per organization, then reserve booths on open bazaars. Your assignments and
+            payments across every community appear here — one login, no duplicate profiles.
+          </p>
+        </div>
+        <Button variant="outline" size="sm" className="shrink-0" asChild>
+          <Link href="/customer/profile/vendor">
+            <UserRound className="mr-2 h-4 w-4" />
+            Edit vendor profile
+          </Link>
+        </Button>
       </div>
 
       <VendorInboxSection messages={inboxMessages} />

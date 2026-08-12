@@ -14,6 +14,7 @@ import {
 import { workforceDepartmentDetailPath } from "@/lib/departments/department-paths"
 import { YEAR_SEASON_LABEL_PLURAL } from "@/lib/programs/program-display-labels"
 import { ProgramFlyerField } from "@/components/programs/edit/program-flyer-field"
+import { isRichTextEmpty, sanitizeRichTextHtml } from "@/lib/ui/rich-text"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import {
@@ -32,7 +33,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
+import { RichTextEditor } from "@/components/ui/rich-text-editor"
 import { cn } from "@/lib/utils"
 
 type Department = {
@@ -292,7 +293,17 @@ export function DepartmentsManager() {
                         </div>
 
                         <p className="line-clamp-2 text-sm text-muted-foreground">
-                          {department.description || "No description"}
+                          {(() => {
+                            const html = sanitizeRichTextHtml(
+                              department.description || ""
+                            )
+                            if (isRichTextEmpty(html)) return "No description"
+                            return html
+                              .replace(/<[^>]+>/g, " ")
+                              .replace(/&nbsp;/gi, " ")
+                              .replace(/\s+/g, " ")
+                              .trim()
+                          })()}
                         </p>
                       </div>
                     </div>
@@ -347,18 +358,17 @@ export function DepartmentsManager() {
             </div>
 
             <div className="flex flex-col gap-2">
-              <Label htmlFor="department-description">Description</Label>
-              <Textarea
-                id="department-description"
+              <Label>Description</Label>
+              <RichTextEditor
                 value={editingDepartment.description}
-                onChange={(event) =>
+                onChange={(html) =>
                   setEditingDepartment({
                     ...editingDepartment,
-                    description: event.target.value,
+                    description: html,
                   })
                 }
                 placeholder="Brief description of this department"
-                rows={2}
+                minHeightClassName="min-h-[120px]"
               />
             </div>
 

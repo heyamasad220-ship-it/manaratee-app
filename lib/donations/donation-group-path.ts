@@ -10,9 +10,60 @@ export type GroupWorkspaceTab =
   | "students"
   | "schedule"
   | "financial"
+  | "reports"
   | "group-giving"
   | "activity"
   | "settings"
+
+/**
+ * Year/program workspace tabs (shown when `?year=` is set).
+ * Dual-purpose tabs:
+ * - `overview` with `?year=` → Program Overview; without → department Overview
+ * - `programs` with `?year=` → Offerings; without → department Programs catalog
+ */
+export const DEPARTMENT_YEAR_WORKSPACE_TABS = [
+  "overview",
+  "programs",
+  "students",
+  "schedule",
+  "financial",
+  "reports",
+] as const satisfies readonly GroupWorkspaceTab[]
+
+/** Year tabs that must not load without `?year=` (redirect to department Overview). */
+export const DEPARTMENT_YEAR_REQUIRED_TABS = [
+  "students",
+  "schedule",
+  "financial",
+  "reports",
+] as const satisfies readonly GroupWorkspaceTab[]
+
+/** Tabs that belong to the department itself (no year required). */
+export const DEPARTMENT_LEVEL_WORKSPACE_TABS = [
+  "overview",
+  "programs",
+  "group-giving",
+  "activity",
+  "settings",
+] as const satisfies readonly GroupWorkspaceTab[]
+
+export function isDepartmentYearWorkspaceTab(
+  tab: GroupWorkspaceTab
+): tab is (typeof DEPARTMENT_YEAR_WORKSPACE_TABS)[number] {
+  return (DEPARTMENT_YEAR_WORKSPACE_TABS as readonly string[]).includes(tab)
+}
+
+export function isDepartmentYearRequiredTab(
+  tab: GroupWorkspaceTab
+): tab is (typeof DEPARTMENT_YEAR_REQUIRED_TABS)[number] {
+  return (DEPARTMENT_YEAR_REQUIRED_TABS as readonly string[]).includes(tab)
+}
+
+export function isDepartmentLevelWorkspaceTab(
+  tab: GroupWorkspaceTab
+): tab is (typeof DEPARTMENT_LEVEL_WORKSPACE_TABS)[number] {
+  return (DEPARTMENT_LEVEL_WORKSPACE_TABS as readonly string[]).includes(tab)
+}
 
 /** Sub-tabs under Department → Financial. */
 export type DepartmentFinanceSection = "payroll" | "expenses" | "budget"
@@ -108,13 +159,10 @@ export function mapDonationTabToWorkspaceTab(
     tab === "students" ||
     tab === "schedule" ||
     tab === "activity" ||
-    tab === "settings"
+    tab === "settings" ||
+    tab === "reports"
   ) {
     return tab
-  }
-  // Legacy Archive / Reports tab removed — fall through to Overview.
-  if (tab === "reports") {
-    return "overview"
   }
   // Legacy Employees tab → Financial / Payroll.
   if (tab === "employees") {
@@ -159,15 +207,12 @@ export function parseDepartmentWorkspaceTab(
     tab === "students" ||
     tab === "schedule" ||
     tab === "financial" ||
+    tab === "reports" ||
     tab === "group-giving" ||
     tab === "activity" ||
     tab === "settings"
   ) {
     return tab
-  }
-  // Legacy Archive / Reports tab removed.
-  if (tab === "reports") {
-    return "overview"
   }
   // Legacy Employees tab → Financial / Payroll.
   if (tab === "employees") {

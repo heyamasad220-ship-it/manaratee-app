@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { Header } from "@/components/layout/header"
+import { ProgramsSectionNav } from "@/components/programs/programs-section-nav"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 import {
@@ -609,6 +610,7 @@ export function ProgramsScheduleClient() {
   return (
     <>
       <Header title="Programs" />
+      <ProgramsSectionNav />
 
       <TooltipProvider>
         <div className={cn("flex flex-col gap-6 p-6", isPrintMode && "print:p-0")}>
