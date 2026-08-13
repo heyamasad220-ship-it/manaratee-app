@@ -21,7 +21,6 @@ import {
   summarizeRequiredCharges,
 } from "@/lib/programs/offering-pricing-mapper"
 import {
-  createDefaultDiscount,
   DISCOUNT_STATUS_LABELS,
   DISCOUNT_VALUE_TYPE_LABELS,
   FEE_BILLING_SCOPE_LABELS,
@@ -29,7 +28,11 @@ import {
   FEE_TYPE_LABELS,
   OFFERING_DISCOUNT_NAME_LABELS,
   PAYMENT_STRUCTURE_LABELS,
+  DEFAULT_PAYMENT_OPTIONS,
+  createDefaultDiscount,
   defaultFeeName,
+  hasMonthlyFeeRecurrence,
+  resolvePaymentOptionsBaseAmount,
   type ChargeType,
   type FeeBillingScope,
   type FeeRecurrence,
@@ -47,6 +50,8 @@ import { saveOfferingPricing } from "@/lib/programs/offering-workspace-actions"
 import type { OfferingWorkspaceData } from "@/lib/programs/offering-workspace-types"
 import type { ProgramOffering } from "@/lib/programs/program-offering-types"
 import type { ProgramRegistrationOption } from "@/lib/programs/program-registration-option-types"
+import { allowsAcademicBillingSchedules } from "@/lib/programs/program-kind-policy"
+import { normalizeProgramKind } from "@/lib/programs/program-kind"
 import { cn } from "@/lib/utils"
 
 type DiscountTagOption = { id: string; name: string }
@@ -54,6 +59,8 @@ type DiscountTagOption = { id: string; name: string }
 type OfferingPricingEditorContextValue = {
   offering: ProgramOffering
   programId: string
+  programKind: string
+  allowsMonthlyTuition: boolean
   pricing: SimpleOfferingPricing
   updatePricing: (
     updater: (current: SimpleOfferingPricing) => SimpleOfferingPricing
@@ -150,14 +157,20 @@ function FeeRow({
   fee,
   onChange,
   onRemove,
+  allowsMonthlyTuition,
 }: {
   fee: OfferingFee
   onChange: (next: OfferingFee) => void
   onRemove: () => void
+  allowsMonthlyTuition: boolean
 }) {
+  const recurrenceOptions = Object.entries(FEE_RECURRENCE_LABELS).filter(
+    ([value]) => allowsMonthlyTuition || value !== "monthly"
+  )
+
   return (
     <div className="space-y-2">
-      <div className="grid grid-cols-1 items-end gap-2 sm:grid-cols-[minmax(0,1.1fr)_minmax(0,0.7fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_auto_auto]">
+      <div className="grid grid-cols-1 items-start gap-2 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
         <div className="space-y-1.5">
           <Label className="text-xs">Name</Label>
           <select
@@ -212,10 +225,16 @@ function FeeRow({
             ))}
           </select>
         </div>
-        <div className="space-y-1.5">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1.5">
           <Label className="text-xs">Recurrence</Label>
+          <Label className="text-xs">Required</Label>
           <select
-            value={fee.recurrence}
+            id={`fee-recurrence-${fee.clientId}`}
+            value={
+              !allowsMonthlyTuition && fee.recurrence === "monthly"
+                ? "one_time"
+                : fee.recurrence
+            }
             onChange={(event) =>
               onChange({
                 ...fee,
@@ -224,27 +243,27 @@ function FeeRow({
             }
             className="h-9 w-full rounded-md border bg-background px-3 text-sm"
           >
-            {Object.entries(FEE_RECURRENCE_LABELS).map(([value, label]) => (
+            {recurrenceOptions.map(([value, label]) => (
               <option key={value} value={value}>
                 {label}
               </option>
             ))}
           </select>
+          <div className="flex h-9 items-center justify-center">
+            <Checkbox
+              checked={fee.required}
+              onCheckedChange={(checked) =>
+                onChange({ ...fee, required: checked === true })
+              }
+              aria-label="Required"
+            />
+          </div>
         </div>
-        <label className="flex h-9 items-center gap-2 text-sm">
-          <Checkbox
-            checked={fee.required}
-            onCheckedChange={(checked) =>
-              onChange({ ...fee, required: checked === true })
-            }
-          />
-          Required
-        </label>
         <Button
           type="button"
           variant="ghost"
           size="icon"
-          className="h-9 w-9 shrink-0 text-destructive hover:text-destructive"
+          className="mt-6 h-9 w-9 shrink-0 text-destructive hover:text-destructive"
           onClick={onRemove}
           aria-label={`Remove ${fee.name || "fee"}`}
         >
@@ -417,6 +436,7 @@ export function OfferingPricingEditorProvider({
   offering,
   workspaceData,
   registrationOptions,
+  programKind: programKindProp,
   onBeforeSave,
   saveHandlerRef,
   children,
@@ -425,11 +445,14 @@ export function OfferingPricingEditorProvider({
   offering: ProgramOffering
   workspaceData: OfferingWorkspaceData
   registrationOptions: ProgramRegistrationOption[]
+  programKind?: string | null
   onBeforeSave?: () => Promise<boolean>
   saveHandlerRef?: React.MutableRefObject<(() => Promise<boolean>) | null>
   children: React.ReactNode
 }) {
   const router = useRouter()
+  const programKind = normalizeProgramKind(programKindProp)
+  const allowsMonthlyTuition = allowsAcademicBillingSchedules(programKind)
   const feePlanStateRef = React.useRef<FeePlanEditorState>(
     buildInitialFeePlanState(offering, workspaceData, registrationOptions)
   )
@@ -506,18 +529,30 @@ export function OfferingPricingEditorProvider({
     offering.end_date,
   ])
   const showBillingSchedule =
-    pricing.paymentStructure === "monthly" ||
-    pricing.paymentStructure === "installments" ||
-    pricing.fees.some((fee) => fee.recurrence === "monthly")
+    allowsMonthlyTuition &&
+    (pricing.paymentStructure === "monthly" ||
+      pricing.paymentStructure === "installments" ||
+      pricing.fees.some((fee) => fee.recurrence === "monthly"))
 
   function updatePricing(
     updater: (current: SimpleOfferingPricing) => SimpleOfferingPricing
   ) {
     setPricing((current) => {
       const next = updater(current)
-      const hasMonthly = next.fees.some((fee) => fee.recurrence === "monthly")
+      const hasMonthly =
+        allowsMonthlyTuition &&
+        next.fees.some((fee) => fee.recurrence === "monthly")
+      const normalizedFees = allowsMonthlyTuition
+        ? next.fees
+        : next.fees.map((fee) =>
+            fee.recurrence === "monthly"
+              ? { ...fee, recurrence: "one_time" as const }
+              : fee
+          )
       const normalized: SimpleOfferingPricing = {
         ...next,
+        fees: normalizedFees,
+        paymentOptions: next.paymentOptions ?? { ...DEFAULT_PAYMENT_OPTIONS },
         paymentStructure:
           next.paymentStructure === "installments"
             ? "installments"
@@ -585,6 +620,8 @@ export function OfferingPricingEditorProvider({
     () => ({
       offering,
       programId,
+      programKind,
+      allowsMonthlyTuition,
       pricing,
       updatePricing,
       requiredTotal,
@@ -601,6 +638,8 @@ export function OfferingPricingEditorProvider({
     [
       offering,
       programId,
+      programKind,
+      allowsMonthlyTuition,
       pricing,
       requiredTotal,
       billingMonths,
@@ -627,7 +666,8 @@ export function OfferingPricingBillingSetupSection() {
 
 /** Unified fees list (replaces Charges + Optional Add-Ons). */
 export function OfferingPricingChargesSection() {
-  const { pricing, updatePricing } = useOfferingPricingEditor()
+  const { pricing, updatePricing, allowsMonthlyTuition } =
+    useOfferingPricingEditor()
 
   return (
     <EditSectionCard title="Fees" plain>
@@ -636,6 +676,7 @@ export function OfferingPricingChargesSection() {
           <FeeRow
             key={fee.clientId}
             fee={fee}
+            allowsMonthlyTuition={allowsMonthlyTuition}
             onChange={(next) =>
               updatePricing((current) => ({
                 ...current,
@@ -668,6 +709,73 @@ export function OfferingPricingChargesSection() {
           <Plus className="mr-1 h-4 w-4" />
           Add fee
         </Button>
+      </div>
+    </EditSectionCard>
+  )
+}
+
+/** Shown when any fee uses monthly recurrence. */
+export function OfferingPricingPaymentOptionsSection() {
+  const { pricing, updatePricing } = useOfferingPricingEditor()
+
+  if (!hasMonthlyFeeRecurrence(pricing.fees)) {
+    return null
+  }
+
+  const baseAmount = resolvePaymentOptionsBaseAmount(pricing.fees)
+  const semesterAmount = baseAmount / 2
+  const options = pricing.paymentOptions ?? DEFAULT_PAYMENT_OPTIONS
+
+  const rows = [
+    {
+      key: "payInFull" as const,
+      label: "Pay in Full",
+      schedule: `${formatPricingCurrency(baseAmount)} at registration`,
+      checked: options.payInFull,
+    },
+    {
+      key: "twoSemesterPayments" as const,
+      label: "2 Semester Payments",
+      schedule: `${formatPricingCurrency(semesterAmount)} × 2`,
+      checked: options.twoSemesterPayments,
+    },
+  ]
+
+  return (
+    <EditSectionCard title="Payment Options" plain>
+      <div className="space-y-3">
+        <p className="text-sm text-muted-foreground">
+          Choose which payment methods are available for monthly fees.
+        </p>
+        <div className="overflow-hidden rounded-md border">
+          <div className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] gap-3 border-b bg-muted/40 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            <span>Payment Option</span>
+            <span>Amount / Schedule</span>
+          </div>
+          {rows.map((row) => (
+            <label
+              key={row.key}
+              className="grid cursor-pointer grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] items-center gap-3 border-b px-3 py-3 last:border-b-0"
+            >
+              <span className="flex items-center gap-3 text-sm font-medium">
+                <Checkbox
+                  checked={row.checked}
+                  onCheckedChange={(checked) =>
+                    updatePricing((current) => ({
+                      ...current,
+                      paymentOptions: {
+                        ...(current.paymentOptions ?? DEFAULT_PAYMENT_OPTIONS),
+                        [row.key]: checked === true,
+                      },
+                    }))
+                  }
+                />
+                {row.label}
+              </span>
+              <span className="text-sm text-muted-foreground">{row.schedule}</span>
+            </label>
+          ))}
+        </div>
       </div>
     </EditSectionCard>
   )
@@ -730,12 +838,20 @@ export function OfferingPaymentStructureFields({
 }: {
   layout?: "horizontal" | "vertical"
 }) {
-  const { pricing, updatePricing } = useOfferingPricingEditor()
+  const { pricing, updatePricing, allowsMonthlyTuition } =
+    useOfferingPricingEditor()
+  const structureOptions = Object.entries(PAYMENT_STRUCTURE_LABELS).filter(
+    ([value]) => allowsMonthlyTuition || value !== "monthly"
+  )
 
   return (
     <div className="space-y-4">
       <RadioGroup
-        value={pricing.paymentStructure}
+        value={
+          !allowsMonthlyTuition && pricing.paymentStructure === "monthly"
+            ? "one_time"
+            : pricing.paymentStructure
+        }
         onValueChange={(value) =>
           updatePricing((current) => ({
             ...current,
@@ -749,7 +865,7 @@ export function OfferingPaymentStructureFields({
           layout === "horizontal" ? "sm:grid-cols-3" : "grid-cols-1"
         )}
       >
-        {Object.entries(PAYMENT_STRUCTURE_LABELS).map(([value, label]) => (
+        {structureOptions.map(([value, label]) => (
           <label
             key={value}
             className={cn(
@@ -915,6 +1031,7 @@ export function OfferingPricingEditorSections({
       ) : null}
 
       {showCharges ? <OfferingPricingChargesSection /> : null}
+      <OfferingPricingPaymentOptionsSection />
       {showBillingSchedule ? <OfferingPricingBillingScheduleSection /> : null}
       {showDiscounts ? <OfferingPricingDiscountsSection /> : null}
       {showPaymentStructure ? (
@@ -930,6 +1047,7 @@ export function OfferingSimplePricingEditor({
   offering,
   workspaceData,
   registrationOptions,
+  programKind = null,
   showSaveButton = true,
   onBeforeSave,
   showCharges = true,
@@ -943,6 +1061,7 @@ export function OfferingSimplePricingEditor({
   offering: ProgramOffering
   workspaceData: OfferingWorkspaceData
   registrationOptions: ProgramRegistrationOption[]
+  programKind?: string | null
   showSaveButton?: boolean
   onBeforeSave?: () => Promise<boolean>
   showCharges?: boolean
@@ -958,6 +1077,7 @@ export function OfferingSimplePricingEditor({
       offering={offering}
       workspaceData={workspaceData}
       registrationOptions={registrationOptions}
+      programKind={programKind}
       onBeforeSave={onBeforeSave}
     >
       <OfferingPricingEditorSections

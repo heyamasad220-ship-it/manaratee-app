@@ -1,8 +1,9 @@
 "use client"
 
+import Link from "next/link"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Briefcase, Loader2, Mail, Phone, User } from "lucide-react"
+import { ArrowLeft, Briefcase, ExternalLink, Loader2, Mail, Phone, User } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -12,6 +13,7 @@ import { EmployeeStaffAssignmentsPanel } from "@/components/hr/employee-staff-as
 import { EmployeeStaffDocumentsPanel } from "@/components/hr/employee-staff-documents-panel"
 import { ContactProgramAssignmentsPanel } from "@/components/contacts/contact-program-assignments-panel"
 import { PageBreadcrumbs } from "@/components/navigation/page-breadcrumbs"
+import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
 import { loadContactProgramAssignments } from "@/lib/programs/program-staff-assignment-actions"
 import type { ProgramStaffAssignmentWithDetails } from "@/lib/programs/program-staff-assignment-types"
 
@@ -31,6 +33,9 @@ type EmployeeRecord = {
   position_name: string | null
   department_name: string | null
   hr_job_role_name: string | null
+  pay_basis: "hourly" | "monthly"
+  hourly_rate: number | null
+  monthly_salary: number | null
 }
 
 const STAFF_TYPE_LABELS: Record<string, string> = {
@@ -85,6 +90,9 @@ export function EmployeeProfileClient({
             status,
             hire_date,
             position,
+            hourly_rate,
+            pay_basis,
+            monthly_salary,
             hr_positions:position_id (name),
             hr_job_roles:hr_job_role_id (name),
             departments:department_id (name)
@@ -112,6 +120,13 @@ export function EmployeeProfileClient({
           position_name: (data as any).hr_positions?.name || data.position || null,
           department_name: (data as any).departments?.name || null,
           hr_job_role_name: (data as any).hr_job_roles?.name || null,
+          pay_basis: (data as any).pay_basis === "monthly" ? "monthly" : "hourly",
+          hourly_rate:
+            (data as any).hourly_rate == null ? null : Number((data as any).hourly_rate),
+          monthly_salary:
+            (data as any).monthly_salary == null
+              ? null
+              : Number((data as any).monthly_salary),
         }
         setEmployee(record)
 
@@ -199,6 +214,14 @@ export function EmployeeProfileClient({
             {[employee.position_name, employee.department_name].filter(Boolean).join(" · ") ||
               "No position assigned"}
           </p>
+          {employee.contact_id ? (
+            <Button variant="outline" size="sm" className="mt-3" asChild>
+              <Link href={contactProfileHref(employee.contact_id)}>
+                <ExternalLink className="mr-1.5 size-3.5" />
+                Open contact profile
+              </Link>
+            </Button>
+          ) : null}
         </div>
       </div>
 
@@ -233,6 +256,24 @@ export function EmployeeProfileClient({
                       { year: "numeric", month: "long", day: "numeric" }
                     )
                   : "—"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground">Pay</dt>
+              <dd className="text-sm font-medium">
+                {employee.pay_basis === "monthly"
+                  ? employee.monthly_salary == null
+                    ? "Monthly"
+                    : `${new Intl.NumberFormat("en-US", {
+                        style: "currency",
+                        currency: "USD",
+                      }).format(employee.monthly_salary)}/mo`
+                  : employee.hourly_rate == null
+                    ? "Hourly"
+                    : `${new Intl.NumberFormat("en-US", {
+                        style: "currency",
+                        currency: "USD",
+                      }).format(employee.hourly_rate)}/hr`}
               </dd>
             </div>
             <div>

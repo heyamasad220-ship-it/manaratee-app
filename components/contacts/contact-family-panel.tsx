@@ -121,6 +121,10 @@ export function ContactFamilyPanel({
     email: "",
     phone: "",
     relationship: "",
+    grade: "",
+    allergies: "",
+    emergencyContact: "",
+    photoConsent: "",
   })
   const [linkMember, setLinkMember] = useState({
     contactId: "",
@@ -232,6 +236,10 @@ export function ContactFamilyPanel({
       email: member.email || "",
       phone: member.phone || "",
       relationship: member.relationship || "",
+      grade: member.grade || "",
+      allergies: member.allergies || "",
+      emergencyContact: member.emergencyContact || "",
+      photoConsent: member.photoConsent || "",
     })
   }
 
@@ -251,6 +259,10 @@ export function ContactFamilyPanel({
           email: editMember.email || null,
           phone: editMember.phone || null,
           relationship: editMember.relationship,
+          grade: editMember.grade || null,
+          allergies: editMember.allergies || null,
+          emergencyContact: editMember.emergencyContact || null,
+          photoConsent: editMember.photoConsent || null,
         })
         setEditingMember(null)
         await onChanged()
@@ -439,6 +451,12 @@ export function ContactFamilyPanel({
                             <>
                               <span className="text-muted-foreground/50">|</span>
                               <span>{age} years old</span>
+                            </>
+                          ) : null}
+                          {member.allergies ? (
+                            <>
+                              <span className="text-muted-foreground/50">|</span>
+                              <span>Allergies: {member.allergies}</span>
                             </>
                           ) : null}
                           {member.email ? (
@@ -807,6 +825,70 @@ export function ContactFamilyPanel({
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="edit-family-grade">Grade</Label>
+                <Input
+                  id="edit-family-grade"
+                  value={editMember.grade}
+                  onChange={(event) =>
+                    setEditMember((current) => ({
+                      ...current,
+                      grade: event.target.value,
+                    }))
+                  }
+                  placeholder="Optional"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-family-photo-consent">Photo consent</Label>
+                <Select
+                  value={editMember.photoConsent || undefined}
+                  onValueChange={(value) =>
+                    setEditMember((current) => ({
+                      ...current,
+                      photoConsent: value,
+                    }))
+                  }
+                >
+                  <SelectTrigger id="edit-family-photo-consent">
+                    <SelectValue placeholder="Select" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Yes">Yes</SelectItem>
+                    <SelectItem value="No">No</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-family-allergies">Allergies</Label>
+              <Input
+                id="edit-family-allergies"
+                value={editMember.allergies}
+                onChange={(event) =>
+                  setEditMember((current) => ({
+                    ...current,
+                    allergies: event.target.value,
+                  }))
+                }
+                placeholder="Optional"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-family-emergency">Emergency contact</Label>
+              <Input
+                id="edit-family-emergency"
+                value={editMember.emergencyContact}
+                onChange={(event) =>
+                  setEditMember((current) => ({
+                    ...current,
+                    emergencyContact: event.target.value,
+                  }))
+                }
+                placeholder="Name and phone"
+              />
             </div>
           </div>
 

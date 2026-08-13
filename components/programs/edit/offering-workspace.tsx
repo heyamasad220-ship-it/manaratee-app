@@ -267,6 +267,7 @@ export function OfferingWorkspace({
             offering={offering}
             workspaceData={workspaceData}
             registrationOptions={workspaceData.registrationOptions}
+            programKind={program.program_kind}
           />
         </TabsContent>
 

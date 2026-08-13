@@ -1,9 +1,6 @@
-import { Suspense } from "react"
-
 import { Header } from "@/components/layout/header"
 import { OfferingCatalogView } from "@/components/programs/offering-catalog-view"
 import { ProgramCatalogFilters } from "@/components/programs/program-catalog-filters"
-import { ProgramsSectionNav } from "@/components/programs/programs-section-nav"
 import { getDepartments } from "@/lib/departments/department-queries"
 import { getActiveOfferingsForCatalog } from "@/lib/programs/offering-catalog-queries"
 import {
@@ -11,6 +8,7 @@ import {
   PROGRAM_CATALOG_PAGE_SIZE,
 } from "@/lib/programs/program-catalog-helpers"
 import { PROGRAM_LABEL_PLURAL } from "@/lib/programs/program-display-labels"
+import { programOfferingManageHref } from "@/lib/programs/program-offering-paths"
 
 function getValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value
@@ -26,6 +24,9 @@ export default async function ProgramsPage({
   const filters = {
     q: getValue(resolvedSearchParams?.q) || "",
     department: getValue(resolvedSearchParams?.department) || "all",
+    gender: getValue(resolvedSearchParams?.gender) || "all",
+    audience: getValue(resolvedSearchParams?.audience) || "all",
+    age: getValue(resolvedSearchParams?.age) || "",
     page: getValue(resolvedSearchParams?.page) || "1",
   }
 
@@ -33,6 +34,9 @@ export default async function ProgramsPage({
     getActiveOfferingsForCatalog({
       q: filters.q,
       department: filters.department,
+      gender: filters.gender,
+      audience: filters.audience,
+      age: filters.age,
     }),
     getDepartments(),
   ])
@@ -54,11 +58,7 @@ export default async function ProgramsPage({
 
   return (
     <>
-      <Header title="Programs" />
-
-      <Suspense fallback={null}>
-        <ProgramsSectionNav />
-      </Suspense>
+      <Header title="Program Catalog" />
 
       <div className="p-6">
         <OfferingCatalogView
@@ -67,9 +67,14 @@ export default async function ProgramsPage({
           totalPages={totalPages}
           totalCount={totalCount}
           pageSize={PROGRAM_CATALOG_PAGE_SIZE}
-          title="Programs"
+          title="Program Catalog"
           emptyTitle={`No active ${PROGRAM_LABEL_PLURAL.toLowerCase()} found`}
           emptyDescription={`Add ${PROGRAM_LABEL_PLURAL.toLowerCase()} from a department workspace, or adjust your filters.`}
+          getOfferingHref={(offering) =>
+            programOfferingManageHref(offering.program_id, offering.id, {
+              departmentId: offering.department_id,
+            })
+          }
           buildPageHref={(targetPage) =>
             buildProgramCatalogHref(
               "/programs/catalog",
@@ -77,6 +82,9 @@ export default async function ProgramsPage({
                 q: filters.q,
                 status: "all",
                 department: filters.department,
+                gender: filters.gender,
+                audience: filters.audience,
+                age: filters.age,
                 view: "cards",
               },
               targetPage
@@ -87,10 +95,14 @@ export default async function ProgramsPage({
               departments={departments}
               hideStatusFilter
               hideViewToggle
+              showFamilyFilters
               initialFilters={{
                 q: filters.q || "",
                 status: "active",
                 department: filters.department || "all",
+                gender: filters.gender || "all",
+                audience: filters.audience || "all",
+                age: filters.age || "",
                 view: "cards",
               }}
             />

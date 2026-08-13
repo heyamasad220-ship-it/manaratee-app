@@ -79,7 +79,7 @@ export function DepartmentStudentPaymentsPanel({
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 text-base">
           <GraduationCap className="size-4" />
-          Tuition Transactions
+          Program Fee Transactions
         </CardTitle>
         <CardDescription>
           One row per enrollment for programs in {departmentName}: course fee, tuition months,

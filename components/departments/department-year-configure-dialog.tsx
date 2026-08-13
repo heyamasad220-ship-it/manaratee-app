@@ -17,7 +17,8 @@ import {
 import { fetchDepartmentYearBasicsAction } from "@/lib/departments/department-year-actions"
 import type { Department } from "@/lib/departments/department-types"
 import { updateProgramBasics } from "@/lib/programs/program-detail-actions"
-import { YEAR_SEASON_LABEL } from "@/lib/programs/program-display-labels"
+import { getHierarchyLabels } from "@/lib/programs/program-display-labels"
+import { normalizeProgramKind } from "@/lib/programs/program-kind"
 import type { Program } from "@/lib/programs/program-types"
 
 function toVisibility(value: string | null | undefined): VisibilityType {
@@ -48,6 +49,9 @@ export function DepartmentYearConfigureDialog({
   const [visibility, setVisibility] = React.useState<string | null>(null)
   const [programStatus, setProgramStatus] = React.useState("draft")
   const formRef = React.useRef<HTMLFormElement>(null)
+  const containerLabel = getHierarchyLabels(
+    normalizeProgramKind(program?.program_kind)
+  ).containerSingular
 
   React.useEffect(() => {
     if (!open || !programId) return
@@ -145,7 +149,7 @@ export function DepartmentYearConfigureDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[90vh] w-full max-w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
         <DialogHeader className="shrink-0 border-b px-6 py-4">
-          <DialogTitle>Configure {YEAR_SEASON_LABEL}</DialogTitle>
+          <DialogTitle>Configure {containerLabel}</DialogTitle>
           <DialogDescription>
             {programName || program?.name || "Edit name, dates, eligibility, flyer, and publishing."}
           </DialogDescription>
@@ -155,7 +159,7 @@ export function DepartmentYearConfigureDialog({
           {loading ? (
             <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Loading {YEAR_SEASON_LABEL.toLowerCase()}…
+              Loading {containerLabel.toLowerCase()}…
             </div>
           ) : program ? (
             <form
@@ -184,7 +188,7 @@ export function DepartmentYearConfigureDialog({
             </form>
           ) : (
             <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-              {error || `Could not load this ${YEAR_SEASON_LABEL.toLowerCase()}.`}
+              {error || `Could not load this ${containerLabel.toLowerCase()}.`}
             </p>
           )}
         </div>

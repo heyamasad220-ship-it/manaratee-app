@@ -581,7 +581,7 @@ async function buildContactFinancialSummary(
         created_at,
         child_name,
         programs:program_id ( name ),
-        program_charges:charge_id ( id, total, amount_paid, due_today, paid_at )
+        program_charges:charge_id ( id, total, amount_paid, due_today, paid_at, metadata )
       `
       )
       .eq("organization_id", organizationId)
@@ -615,6 +615,24 @@ async function buildContactFinancialSummary(
         .filter((id): id is string => Boolean(id))
 
       const enrollmentIds = (enrollments || []).map((row) => row.id as string)
+
+      // Addon charges (e.g. Sunday School transaction fees) sit beside registration charges.
+      const { data: addonCharges } =
+        enrollmentIds.length > 0
+          ? await supabase
+              .from("program_charges")
+              .select(
+                "id, enrollment_id, total, amount_paid, paid_at, metadata, charge_type"
+              )
+              .eq("organization_id", organizationId)
+              .in("enrollment_id", enrollmentIds)
+              .eq("charge_type", "addon")
+          : { data: [] as Array<Record<string, unknown>> }
+
+      for (const addon of addonCharges || []) {
+        if (addon.id) chargeIds.push(addon.id as string)
+      }
+
       const faByEnrollment = await getActiveFaAwardsByEnrollmentIds(
         organizationId,
         enrollmentIds
@@ -685,6 +703,12 @@ async function buildContactFinancialSummary(
         // Remaining balance from fee − paid (due_today on charges is often the original due, not remaining).
         const due = Math.max(total - paid, 0)
         const faAward = faByEnrollment.get(enrollment.id as string) || null
+        const chargeMeta = (charge as { metadata?: Record<string, unknown> } | null)
+          ?.metadata
+        const hideAllocatedPaymentLine =
+          chargeMeta?.family_payment_host === false ||
+          (Number(chargeMeta?.sibling_index) > 0 &&
+            String(chargeMeta?.import_tag || "").includes("SUNDAY_SCHOOL"))
 
         const schedules = charge?.id ? schedulesByChargeId.get(charge.id) || [] : []
         const paidSchedules = schedules.filter(
@@ -732,7 +756,7 @@ async function buildContactFinancialSummary(
               href: `/programs/registrations/${enrollment.id}`,
             })
           }
-        } else if (paid > 0) {
+        } else if (paid > 0 && !hideAllocatedPaymentLine) {
           otherPaidTotal += paid
           const paymentDate = charge?.paid_at || enrollmentDate
           activityDates.push(paymentDate)
@@ -788,6 +812,82 @@ async function buildContactFinancialSummary(
             sourceModule: "programs",
             href: `/programs/registrations/${enrollment.id}`,
           })
+        }
+      }
+
+      const enrollmentProgramName = new Map<string, string>()
+      for (const enrollment of enrollments || []) {
+        const programRel = enrollment.programs as
+          | { name: string }
+          | { name: string }[]
+          | null
+        const name = Array.isArray(programRel)
+          ? programRel[0]?.name
+          : programRel?.name
+        enrollmentProgramName.set(
+          enrollment.id as string,
+          name || "Program enrollment"
+        )
+      }
+
+      for (const addon of addonCharges || []) {
+        const addonId = addon.id as string
+        const enrollmentId = addon.enrollment_id as string
+        const programName =
+          enrollmentProgramName.get(enrollmentId) || "Program enrollment"
+        const schedules = schedulesByChargeId.get(addonId) || []
+        const paidSchedules = schedules.filter(
+          (row) =>
+            (row.status || "").toLowerCase() === "paid" &&
+            Number(row.amount || 0) > 0
+        )
+        const meta = addon.metadata as Record<string, unknown> | null
+        const feeLabel =
+          (typeof meta?.label === "string" && meta.label) || "Transaction fee"
+
+        if (paidSchedules.length > 0) {
+          for (const schedule of paidSchedules) {
+            const paymentAmount = Number(schedule.amount || 0)
+            const paymentDate =
+              schedule.paid_at ||
+              schedule.due_date ||
+              (addon.paid_at as string | null) ||
+              new Date().toISOString()
+            otherPaidTotal += paymentAmount
+            activityDates.push(paymentDate)
+            timeline.push({
+              id: `program-addon-${schedule.id}`,
+              date: paymentDate,
+              eventType: activityTypeLabel("programs"),
+              description: `${programName} — ${schedule.label || feeLabel}`,
+              amount: paymentAmount,
+              method: null,
+              status: "Succeeded",
+              sourceModule: "programs",
+              filterCategory: "programs",
+              href: `/programs/registrations/${enrollmentId}`,
+            })
+          }
+        } else {
+          const paid = Number(addon.amount_paid || 0)
+          if (paid > 0) {
+            const paymentDate =
+              (addon.paid_at as string | null) || new Date().toISOString()
+            otherPaidTotal += paid
+            activityDates.push(paymentDate)
+            timeline.push({
+              id: `program-addon-${addonId}`,
+              date: paymentDate,
+              eventType: activityTypeLabel("programs"),
+              description: `${programName} — ${feeLabel}`,
+              amount: paid,
+              method: null,
+              status: "Succeeded",
+              sourceModule: "programs",
+              filterCategory: "programs",
+              href: `/programs/registrations/${enrollmentId}`,
+            })
+          }
         }
       }
     }

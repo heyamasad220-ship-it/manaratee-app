@@ -46,11 +46,14 @@ export function DepartmentBudgetPanel({
   departmentName,
   programId = null,
   readOnly = false,
+  stickyStatsTop,
 }: {
   departmentId: string
   departmentName: string
   programId?: string | null
   readOnly?: boolean
+  /** CSS `top` so KPI cards stick below department workspace tab chrome. */
+  stickyStatsTop?: string
 }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -89,44 +92,53 @@ export function DepartmentBudgetPanel({
   return (
     <div className="space-y-6">
       {!loading && !error && summary ? (
-        <StatCardsRow equal columns={4}>
-          <StatCard
-            layout="header"
-            fill
-            tone="emerald"
-            label="Tuition"
-            value={formatCurrency(summary.totals.studentTuition)}
-            icon={DollarSign}
-            hint="Participant payments"
-          />
-          <StatCard
-            layout="header"
-            fill
-            tone="amber"
-            label="Payroll"
-            value={formatCurrency(summary.totals.teacherSalaries)}
-            icon={Wallet}
-            hint="Approved payroll"
-          />
-          <StatCard
-            layout="header"
-            fill
-            tone={summary.totals.profit >= 0 ? "emerald" : "rose"}
-            label="Profit"
-            value={formatCurrency(summary.totals.profit)}
-            icon={TrendingUp}
-            hint="Tuition − payroll"
-          />
-          <StatCard
-            layout="header"
-            fill
-            tone="violet"
-            label="Periods"
-            value={periods.length}
-            icon={PieChart}
-            hint="Budget date ranges"
-          />
-        </StatCardsRow>
+        <div
+          className={
+            stickyStatsTop
+              ? "sticky z-30 bg-background/95 py-1 backdrop-blur supports-[backdrop-filter]:bg-background/90"
+              : undefined
+          }
+          style={stickyStatsTop ? { top: stickyStatsTop } : undefined}
+        >
+          <StatCardsRow equal columns={4}>
+            <StatCard
+              layout="header"
+              fill
+              tone="emerald"
+              label="Program Fee"
+              value={formatCurrency(summary.totals.studentTuition)}
+              icon={DollarSign}
+              hint="Participant payments"
+            />
+            <StatCard
+              layout="header"
+              fill
+              tone="amber"
+              label="Payroll"
+              value={formatCurrency(summary.totals.teacherSalaries)}
+              icon={Wallet}
+              hint="Approved payroll"
+            />
+            <StatCard
+              layout="header"
+              fill
+              tone={summary.totals.profit >= 0 ? "emerald" : "rose"}
+              label="Profit"
+              value={formatCurrency(summary.totals.profit)}
+              icon={TrendingUp}
+              hint="Program Fee − payroll"
+            />
+            <StatCard
+              layout="header"
+              fill
+              tone="violet"
+              label="Periods"
+              value={periods.length}
+              icon={PieChart}
+              hint="Budget date ranges"
+            />
+          </StatCardsRow>
+        </div>
       ) : null}
 
       <Card>

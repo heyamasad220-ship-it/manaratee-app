@@ -68,6 +68,7 @@ export function ProgramCardActions({
   onConfigure,
   onArchiveYear,
   hideDelete = false,
+  hideEdit = false,
 }: {
   programId: string
   programName: string
@@ -82,6 +83,8 @@ export function ProgramCardActions({
   onArchiveYear?: () => void
   /** Department year cards: use Archive instead of permanent Delete. */
   hideDelete?: boolean
+  /** Hide the primary Edit / View Details item (e.g. card click opens Overview). */
+  hideEdit?: boolean
 }) {
   const router = useRouter()
   const canShareRegistration = programStatus === "active"
@@ -204,7 +207,7 @@ export function ProgramCardActions({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-52">
-          {onConfigure ? (
+          {hideEdit ? null : onConfigure ? (
             <DropdownMenuItem onClick={onConfigure}>
               <Pencil className="h-4 w-4" />
               {editLabel}

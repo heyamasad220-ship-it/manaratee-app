@@ -35,7 +35,9 @@ export default async function ProgramsAddonsReportPage() {
         </div>
 
         {result.success ? (
-          <AddonsReportTable rows={result.rows} />
+          <Suspense fallback={null}>
+            <AddonsReportTable rows={result.rows} />
+          </Suspense>
         ) : (
           <p className="text-sm text-destructive">{result.error}</p>
         )}

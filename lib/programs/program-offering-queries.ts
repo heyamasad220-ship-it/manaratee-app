@@ -65,8 +65,8 @@ export async function getOfferingsForProgram(programId: string) {
     .select("*")
     .eq("organization_id", organizationId)
     .eq("program_id", programId)
-    .order("is_default", { ascending: false })
-    .order("start_date", { ascending: true })
+    .order("sort_order", { ascending: true })
+    .order("name", { ascending: true })
 
   if (error) {
     console.error("getOfferingsForProgram:", error.message)
@@ -109,8 +109,8 @@ export async function getCustomerOfferingsForProgram(
     .eq("organization_id", organizationId)
     .eq("program_id", programId)
     .in("status", ["active", "closed"])
-    .order("is_default", { ascending: false })
-    .order("start_date", { ascending: true })
+    .order("sort_order", { ascending: true })
+    .order("name", { ascending: true })
 
   if (error) {
     console.error("getCustomerOfferingsForProgram:", error.message)

@@ -21,6 +21,7 @@ import {
 import { userHasActiveMembership } from "@/lib/memberships/membership-queries"
 import { isProgramPublishedForRegistration } from "@/lib/programs/program-enrollment-availability"
 import { isOfferingEnrollmentOpenForProgram } from "@/lib/programs/program-offering-display"
+import { shouldWaitlistForFullCampPriority } from "@/lib/programs/session-package-priority"
 
 type RegisterForProgramRpcResult = {
   ok: boolean
@@ -121,6 +122,14 @@ function mapRegisterForProgramError(
     redirect(`${redirectBase}?error=capacity-full`)
   }
 
+  if (normalized.includes("grant_enrollment_session_access:capacity-full")) {
+    redirect(`${redirectBase}?error=capacity-full`)
+  }
+
+  if (normalized.includes("selected-weeks-priority")) {
+    redirect(`${redirectBase}?error=selected-weeks-priority`)
+  }
+
   if (normalized.includes("register_for_program:already-enrolled")) {
     redirect(`${redirectBase}?error=already-enrolled`)
   }
@@ -211,6 +220,7 @@ async function registerSingleParticipant(input: {
   supabase: Awaited<ReturnType<typeof createClient>>
   organizationId: string
   programId: string
+  offeringId: string
   registrationOptionId: string
   participant: ParticipantRegistrationSelection
   sessionIdsForAccess: string[]
@@ -291,6 +301,14 @@ async function registerSingleParticipant(input: {
       enrollmentId: result.enrollment_id,
       context: "register_for_program",
     })
+  }
+
+  if (result.mode === "waitlist" && result.waitlist_id) {
+    await input.supabase
+      .from("program_waitlist")
+      .update({ offering_id: input.offeringId })
+      .eq("id", result.waitlist_id)
+      .eq("organization_id", input.organizationId)
   }
 
   return result
@@ -449,14 +467,41 @@ export async function registerForProgram(formData: FormData) {
       ? (
           await supabase
             .from("program_sessions")
-            .select("id, name")
+            .select("id, name, start_date, end_date")
             .eq("organization_id", organizationId)
             .eq("program_id", programId)
             .in("id", sessionIdsForAccess)
         ).data || []
       : []
 
-  const rpcMode = currentMode === "waitlist" || mode === "waitlist" ? "waitlist" : "enroll"
+  const { data: offeringSessions } = await supabase
+    .from("program_sessions")
+    .select("id, start_date, end_date, status")
+    .eq("organization_id", organizationId)
+    .eq("offering_id", offering.id)
+    .eq("status", "active")
+
+  const forceWaitlistForPriority = shouldWaitlistForFullCampPriority({
+    selectedSessionsOpen: offering.selected_sessions_open !== false,
+    optionType: registrationOption.option_type,
+    selectedSessionIds: sessionIdsForAccess,
+    sessions: (offeringSessions || []) as Array<{
+      id: string
+      start_date: string | null
+      end_date: string | null
+    }>,
+  })
+
+  if (forceWaitlistForPriority && !offering.enable_waitlist) {
+    redirect(`${redirectBase}?error=selected-weeks-priority`)
+  }
+
+  const rpcMode =
+    currentMode === "waitlist" ||
+    mode === "waitlist" ||
+    forceWaitlistForPriority
+      ? "waitlist"
+      : "enroll"
 
   const registrationTargets: ParticipantRegistrationSelection[] = isAdultProgram
     ? participants.length > 0
@@ -479,6 +524,7 @@ export async function registerForProgram(formData: FormData) {
       supabase,
       organizationId,
       programId,
+      offeringId: offering.id,
       registrationOptionId,
       participant,
       sessionIdsForAccess,

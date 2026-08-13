@@ -72,6 +72,7 @@ export function DepartmentExpensesPanel({
   openYearsOnly = true,
   programId = null,
   readOnly = false,
+  stickyStatsTop,
 }: {
   departmentId: string
   departmentName: string
@@ -79,6 +80,8 @@ export function DepartmentExpensesPanel({
   openYearsOnly?: boolean
   programId?: string | null
   readOnly?: boolean
+  /** CSS `top` so KPI cards stick below department workspace tab chrome. */
+  stickyStatsTop?: string
 }) {
   const supabase = createClient()
   const [loading, setLoading] = useState(true)
@@ -182,35 +185,44 @@ export function DepartmentExpensesPanel({
   return (
     <div className="space-y-6">
       {!loading && !error ? (
-        <StatCardsRow equal columns={3}>
-          <StatCard
-            layout="header"
-            fill
-            tone="amber"
-            label="Expenses"
-            value={items.length}
-            icon={Receipt}
-            hint="Department expense rows"
-          />
-          <StatCard
-            layout="header"
-            fill
-            tone="rose"
-            label="Total spent"
-            value={formatCurrency(totalSpent)}
-            icon={DollarSign}
-            hint="Sum of amounts"
-          />
-          <StatCard
-            layout="header"
-            fill
-            tone="violet"
-            label="Vendors"
-            value={vendorCount}
-            icon={Store}
-            hint="Distinct vendors"
-          />
-        </StatCardsRow>
+        <div
+          className={
+            stickyStatsTop
+              ? "sticky z-30 bg-background/95 py-1 backdrop-blur supports-[backdrop-filter]:bg-background/90"
+              : undefined
+          }
+          style={stickyStatsTop ? { top: stickyStatsTop } : undefined}
+        >
+          <StatCardsRow equal columns={3}>
+            <StatCard
+              layout="header"
+              fill
+              tone="amber"
+              label="Expenses"
+              value={items.length}
+              icon={Receipt}
+              hint="Department expense rows"
+            />
+            <StatCard
+              layout="header"
+              fill
+              tone="rose"
+              label="Total spent"
+              value={formatCurrency(totalSpent)}
+              icon={DollarSign}
+              hint="Sum of amounts"
+            />
+            <StatCard
+              layout="header"
+              fill
+              tone="violet"
+              label="Vendors"
+              value={vendorCount}
+              icon={Store}
+              hint="Distinct vendors"
+            />
+          </StatCardsRow>
+        </div>
       ) : null}
 
       <Card>

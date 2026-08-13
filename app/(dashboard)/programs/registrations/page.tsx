@@ -18,6 +18,10 @@ import {
   PROGRAM_LABEL,
   YEAR_SEASON_LABEL,
 } from "@/lib/programs/program-display-labels"
+import {
+  normalizeProgramKind,
+  type ProgramKind,
+} from "@/lib/programs/program-kind"
 import { isOfferingCurrentlyActive } from "@/lib/programs/program-offering-display"
 import {
   buildEnrollmentFeeBreakdown,
@@ -208,7 +212,8 @@ function mergeAdditionalFees(fees: AdditionalFeeItem[]): AdditionalFeeItem[] {
 
 function aggregateFamilyRegistrationRows(
   rows: RegistrationRow[],
-  departmentNameById: Map<string, string>
+  departmentNameById: Map<string, string>,
+  programKindById: Map<string, ProgramKind>
 ) {
   const groups = new Map<string, RegistrationRow[]>()
 
@@ -310,6 +315,7 @@ function aggregateFamilyRegistrationRows(
         departmentName,
         programId: primary.program_id,
         programName: primary.program_name,
+        programKind: programKindById.get(primary.program_id || "") || "academic",
         offeringIds,
         offeringNames,
         offeringActivity,
@@ -384,6 +390,12 @@ export default async function ProgramsRegistrationsPage({
 
   const programNameById = new Map(
     programs.map((program) => [program.id, program.name])
+  )
+  const programKindById = new Map(
+    programs.map((program) => [
+      program.id,
+      normalizeProgramKind(program.program_kind),
+    ])
   )
   const programDepartmentById = new Map(
     programs.map((program) => [
@@ -819,7 +831,8 @@ export default async function ProgramsRegistrationsPage({
 
   const familyRows = aggregateFamilyRegistrationRows(
     filteredRows,
-    departmentNameById
+    departmentNameById,
+    programKindById
   )
 
   const filtersActive = hasActiveFilters(filters)
@@ -873,15 +886,17 @@ export default async function ProgramsRegistrationsPage({
         ) : (
           <Card>
             <CardContent className="p-0">
-              <ProgramsRegistrationsTable
-                emptyMessage="No registrations found"
-                emptyDescription={
-                  filtersActive
-                    ? "Try clearing filters, or registrations will appear here after enrollment."
-                    : "Registrations for open years will appear here after enrollment."
-                }
-                rows={familyRows}
-              />
+              <Suspense fallback={null}>
+                <ProgramsRegistrationsTable
+                  emptyMessage="No registrations found"
+                  emptyDescription={
+                    filtersActive
+                      ? "Try clearing filters, or registrations will appear here after enrollment."
+                      : "Registrations for open years will appear here after enrollment."
+                  }
+                  rows={familyRows}
+                />
+              </Suspense>
             </CardContent>
           </Card>
         )}

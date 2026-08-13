@@ -30,6 +30,8 @@ export interface ProgramOffering extends ProgramOfferingAttributes {
   /** F1: when true, waitlist (+ enrollment-type defaults) resolve from the program. */
   inherit_enrollment?: boolean
   status: ProgramOfferingStatus
+  /** Staff list order within the program (lower first). */
+  sort_order?: number
   /** Catalog flyer (optional). */
   flyer_url?: string | null
   /** Catalog placeholder color when no flyer (hex, e.g. #2563eb). */

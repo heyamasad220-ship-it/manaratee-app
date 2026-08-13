@@ -30,14 +30,12 @@ import type {
   AddonReportPaymentStatus,
   AddonReportRow,
 } from "@/lib/programs/addon-display"
-import {
-  PROGRAM_LABEL,
-  YEAR_SEASON_LABEL,
-} from "@/lib/programs/program-display-labels"
+import { getReportHierarchyLabels } from "@/lib/programs/program-display-labels"
 import {
   DEFAULT_LIST_PAGE_SIZE,
   slicePageItems,
 } from "@/lib/ui/list-pagination"
+import { useProgramKindReportPreset } from "@/hooks/use-program-kind-report-preset"
 
 type OfferingActivityFilter = "all" | "active" | "closed"
 type PaymentStatusFilter = "all" | AddonReportPaymentStatus
@@ -102,6 +100,7 @@ export function AddonsReportTable({
   const [searchInput, setSearchInput] = useState("")
   const [searchFilter, setSearchFilter] = useState("")
   const [departmentFilter, setDepartmentFilter] = useState(ALL)
+  const { kindFilter, setKindFilter } = useProgramKindReportPreset()
   const [programFilter, setProgramFilter] = useState(ALL)
   const [offeringFilter, setOfferingFilter] = useState(ALL)
   const [statusFilter, setStatusFilter] =
@@ -109,6 +108,15 @@ export function AddonsReportTable({
   const [addonTypeFilter, setAddonTypeFilter] = useState(ALL)
   const [paymentStatusFilter, setPaymentStatusFilter] =
     useState<PaymentStatusFilter>(ALL)
+
+  useEffect(() => {
+    setProgramFilter(ALL)
+    setOfferingFilter(ALL)
+  }, [kindFilter])
+
+  const reportLabels = getReportHierarchyLabels(
+    kindFilter === "all" ? null : kindFilter
+  )
 
   const departmentOptions = useMemo(
     () =>
@@ -121,20 +129,26 @@ export function AddonsReportTable({
   )
 
   const programOptions = useMemo(() => {
-    const scoped =
-      departmentFilter === ALL
-        ? rows
-        : rows.filter((row) => row.departmentId === departmentFilter)
+    let scoped = rows
+    if (departmentFilter !== ALL) {
+      scoped = scoped.filter((row) => row.departmentId === departmentFilter)
+    }
+    if (kindFilter !== "all") {
+      scoped = scoped.filter((row) => row.programKind === kindFilter)
+    }
     return uniqueOptions(
       scoped,
       (row) => row.programId,
       (row) => row.programName
     )
-  }, [rows, departmentFilter])
+  }, [rows, departmentFilter, kindFilter])
 
   const offeringOptions = useMemo(() => {
     const scoped = rows.filter((row) => {
       if (departmentFilter !== ALL && row.departmentId !== departmentFilter) {
+        return false
+      }
+      if (kindFilter !== "all" && row.programKind !== kindFilter) {
         return false
       }
       if (programFilter !== ALL && row.programId !== programFilter) {
@@ -147,7 +161,7 @@ export function AddonsReportTable({
       (row) => row.offeringId,
       (row) => row.offeringName
     )
-  }, [rows, departmentFilter, programFilter])
+  }, [rows, departmentFilter, kindFilter, programFilter])
 
   const addonTypeOptions = useMemo(() => {
     const types = [...new Set(rows.map((row) => row.addonType).filter(Boolean))]
@@ -185,6 +199,9 @@ export function AddonsReportTable({
       if (departmentFilter !== ALL && row.departmentId !== departmentFilter) {
         return false
       }
+      if (kindFilter !== "all" && row.programKind !== kindFilter) {
+        return false
+      }
       if (programFilter !== ALL && row.programId !== programFilter) {
         return false
       }
@@ -217,6 +234,7 @@ export function AddonsReportTable({
   }, [
     rows,
     departmentFilter,
+    kindFilter,
     programFilter,
     offeringFilter,
     statusFilter,
@@ -231,6 +249,7 @@ export function AddonsReportTable({
     setPage(1)
   }, [
     departmentFilter,
+    kindFilter,
     programFilter,
     offeringFilter,
     statusFilter,
@@ -240,6 +259,7 @@ export function AddonsReportTable({
 
   const filtersActive =
     departmentFilter !== ALL ||
+    kindFilter !== "all" ||
     programFilter !== ALL ||
     offeringFilter !== ALL ||
     statusFilter !== "active" ||
@@ -282,8 +302,28 @@ export function AddonsReportTable({
             </SelectContent>
           </Select>
         </div>
+        <div className="space-y-1.5 sm:w-36">
+          <Label htmlFor="addons-kind">Type</Label>
+          <Select
+            value={kindFilter}
+            onValueChange={(value) => {
+              setKindFilter(value as "all" | "academic" | "seasonal")
+              setProgramFilter(ALL)
+              setOfferingFilter(ALL)
+            }}
+          >
+            <SelectTrigger id="addons-kind">
+              <SelectValue placeholder="All types" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All types</SelectItem>
+              <SelectItem value="academic">Academic</SelectItem>
+              <SelectItem value="seasonal">Seasonal</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
         <div className="space-y-1.5 sm:w-44">
-          <Label>{YEAR_SEASON_LABEL}</Label>
+          <Label>{reportLabels.containerSingular}</Label>
           <Select
             value={programFilter}
             onValueChange={(value) => {
@@ -293,12 +333,12 @@ export function AddonsReportTable({
           >
             <SelectTrigger>
               <SelectValue
-                placeholder={`All ${YEAR_SEASON_LABEL.toLowerCase()}s`}
+                placeholder={`All ${reportLabels.containerPlural.toLowerCase()}`}
               />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={ALL}>
-                All {YEAR_SEASON_LABEL.toLowerCase()}s
+                All {reportLabels.containerPlural.toLowerCase()}
               </SelectItem>
               {programOptions.map((option) => (
                 <SelectItem key={option.id} value={option.id}>
@@ -309,16 +349,16 @@ export function AddonsReportTable({
           </Select>
         </div>
         <div className="space-y-1.5 sm:w-44">
-          <Label>{PROGRAM_LABEL}</Label>
+          <Label>{reportLabels.offeringSingular}</Label>
           <Select value={offeringFilter} onValueChange={setOfferingFilter}>
             <SelectTrigger>
               <SelectValue
-                placeholder={`All ${PROGRAM_LABEL.toLowerCase()}s`}
+                placeholder={`All ${reportLabels.offeringPlural.toLowerCase()}`}
               />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={ALL}>
-                All {PROGRAM_LABEL.toLowerCase()}s
+                All {reportLabels.offeringPlural.toLowerCase()}
               </SelectItem>
               {offeringOptions.map((option) => (
                 <SelectItem key={option.id} value={option.id}>
@@ -389,6 +429,7 @@ export function AddonsReportTable({
             className="sm:mb-0.5"
             onClick={() => {
               setDepartmentFilter(ALL)
+              setKindFilter("all")
               setProgramFilter(ALL)
               setOfferingFilter(ALL)
               setStatusFilter("active")
@@ -409,8 +450,8 @@ export function AddonsReportTable({
             <TableRow>
               <TableHead>Contact</TableHead>
               <TableHead>Participant</TableHead>
-              <TableHead>Program</TableHead>
-              <TableHead>Offering</TableHead>
+              <TableHead>{reportLabels.containerSingular}</TableHead>
+              <TableHead>{reportLabels.offeringSingular}</TableHead>
               <TableHead>Add-on Type</TableHead>
               <TableHead className="text-right">Quantity</TableHead>
               <TableHead className="text-right">Amount Due</TableHead>

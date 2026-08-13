@@ -174,6 +174,18 @@ export async function duplicateProgramOffering(
   const offeringStatus =
     source.status === "archived" ? "draft" : (source.status as string)
 
+  const sortOrder = await (async () => {
+    const { data: maxRow } = await supabase
+      .from("program_offerings")
+      .select("sort_order")
+      .eq("organization_id", organizationId)
+      .eq("program_id", programId)
+      .order("sort_order", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    return Number(maxRow?.sort_order || 0) + 10
+  })()
+
   const { data: created, error: createError } = await supabase
     .from("program_offerings")
     .insert({
@@ -187,6 +199,7 @@ export async function duplicateProgramOffering(
       enrollment_open_date: source.enrollment_open_date,
       enrollment_close_date: source.enrollment_close_date,
       status: offeringStatus,
+      sort_order: sortOrder,
       inherit_dates: source.inherit_dates ?? false,
       inherit_eligibility: source.inherit_eligibility ?? false,
       inherit_enrollment: source.inherit_enrollment ?? false,
@@ -204,6 +217,8 @@ export async function duplicateProgramOffering(
       capacity: source.capacity ?? null,
       enable_waitlist: source.enable_waitlist ?? false,
       waitlist_capacity: source.waitlist_capacity ?? null,
+      selected_sessions_open: source.selected_sessions_open !== false,
+      waitlist_offer_deadline_days: source.waitlist_offer_deadline_days ?? null,
       waitlist_offer_deadline_days: source.waitlist_offer_deadline_days ?? null,
       registration_mode: source.registration_mode ?? "required",
       attendance_tracked: source.attendance_tracked ?? false,

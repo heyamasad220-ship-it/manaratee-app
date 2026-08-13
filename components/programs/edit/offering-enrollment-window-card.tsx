@@ -9,6 +9,12 @@ import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
 
 import { EditSectionCard } from "./edit-section-card"
+import {
+  allowsSeasonalSessionPackages,
+  isRegistrationOptionAllowedForKind,
+  type ProgramKindRegistrationOptionId,
+} from "@/lib/programs/program-kind-policy"
+import { normalizeProgramKind, type ProgramKind } from "@/lib/programs/program-kind"
 
 export type EnrollmentTypeId =
   | "full_program"
@@ -18,18 +24,22 @@ export type EnrollmentTypeId =
 const ENROLLMENT_TYPE_OPTIONS: Array<{
   value: EnrollmentTypeId
   label: string
+  policyId: ProgramKindRegistrationOptionId
 }> = [
   {
     value: "full_program",
     label: "Entire Program",
+    policyId: "full_program",
   },
   {
     value: "selected_sessions",
     label: "Selected Sessions",
+    policyId: "session",
   },
   {
     value: "single_session",
     label: "Day Pass",
+    policyId: "single_session",
   },
 ]
 
@@ -41,6 +51,9 @@ export function OfferingEnrollmentOptionToggles({
   onAttendanceTrackedChange,
   openEnrollment = false,
   onOpenEnrollmentChange,
+  selectedSessionsOpen = true,
+  onSelectedSessionsOpenChange,
+  showSelectedSessionsPriority = false,
   disabled = false,
   /** Compact labels for Advanced Settings row. */
   compactLabels = false,
@@ -51,11 +64,22 @@ export function OfferingEnrollmentOptionToggles({
   onAttendanceTrackedChange?: (enabled: boolean) => void
   openEnrollment?: boolean
   onOpenEnrollmentChange?: (enabled: boolean) => void
+  selectedSessionsOpen?: boolean
+  onSelectedSessionsOpenChange?: (open: boolean) => void
+  showSelectedSessionsPriority?: boolean
   disabled?: boolean
   compactLabels?: boolean
 }) {
   return (
-    <div className={cn("grid gap-4 sm:grid-cols-3", disabled && "opacity-60")}>
+    <div
+      className={cn(
+        "grid gap-4",
+        showSelectedSessionsPriority
+          ? "sm:grid-cols-2 lg:grid-cols-4"
+          : "sm:grid-cols-3",
+        disabled && "opacity-60"
+      )}
+    >
       <div className="space-y-2">
         <Label htmlFor="enrollment-waitlist">Enable waitlist</Label>
         <div className="flex items-center gap-3">
@@ -72,6 +96,29 @@ export function OfferingEnrollmentOptionToggles({
           ) : null}
         </div>
       </div>
+
+      {showSelectedSessionsPriority ? (
+        <div className="space-y-2">
+          <Label htmlFor="enrollment-selected-open">Accept selected weeks</Label>
+          <div className="flex items-center gap-3">
+            <Switch
+              id="enrollment-selected-open"
+              checked={selectedSessionsOpen}
+              disabled={disabled}
+              onCheckedChange={(checked) => {
+                onSelectedSessionsOpenChange?.(checked)
+              }}
+            />
+            {!compactLabels ? (
+              <span className="text-sm text-muted-foreground">
+                {selectedSessionsOpen
+                  ? "Open (fill waitlist)"
+                  : "Full camp priority"}
+              </span>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
 
       <div className="space-y-2">
         <Label htmlFor="enrollment-attendance">Attendance</Label>
@@ -136,6 +183,9 @@ export function OfferingEnrollmentWindowCard({
   onOpenEnrollmentChange,
   attendanceTracked = false,
   onAttendanceTrackedChange,
+  selectedSessionsOpen = true,
+  onSelectedSessionsOpenChange,
+  programKind = "academic",
   disabled = false,
   plain = false,
   /** Hide dates / auto-register when those live on the parent edit form. */
@@ -161,11 +211,20 @@ export function OfferingEnrollmentWindowCard({
   onOpenEnrollmentChange?: (enabled: boolean) => void
   attendanceTracked?: boolean
   onAttendanceTrackedChange?: (enabled: boolean) => void
+  selectedSessionsOpen?: boolean
+  onSelectedSessionsOpenChange?: (open: boolean) => void
+  programKind?: ProgramKind | string | null
   disabled?: boolean
   plain?: boolean
   hideBasicFields?: boolean
   showOptionToggles?: boolean
 }) {
+  const kind = normalizeProgramKind(programKind)
+  const allowSessionPackages = allowsSeasonalSessionPackages(kind)
+  const visibleEnrollmentTypes = ENROLLMENT_TYPE_OPTIONS.filter((option) =>
+    isRegistrationOptionAllowedForKind(kind, option.policyId)
+  )
+
   const typeChecked: Record<EnrollmentTypeId, boolean> = {
     full_program: fullProgramEnabled,
     selected_sessions: sessionRegistrationEnabled,
@@ -187,7 +246,7 @@ export function OfferingEnrollmentWindowCard({
           disabled && "opacity-60"
         )}
       >
-        {ENROLLMENT_TYPE_OPTIONS.map((option) => (
+        {visibleEnrollmentTypes.map((option) => (
           <label
             key={option.value}
             className="flex cursor-pointer items-center gap-2 text-sm"
@@ -207,7 +266,9 @@ export function OfferingEnrollmentWindowCard({
       </div>
       {!plain ? (
         <p className="text-xs text-muted-foreground">
-          Choose one or more ways customers can register.
+          {kind === "academic"
+            ? "Academic programs use full-program registration. Selected sessions and day passes are for seasonal programs."
+            : "Choose one or more ways customers can register."}
         </p>
       ) : null}
     </div>
@@ -221,6 +282,11 @@ export function OfferingEnrollmentWindowCard({
       onAttendanceTrackedChange={onAttendanceTrackedChange}
       openEnrollment={openEnrollment}
       onOpenEnrollmentChange={onOpenEnrollmentChange}
+      selectedSessionsOpen={selectedSessionsOpen}
+      onSelectedSessionsOpenChange={onSelectedSessionsOpenChange}
+      showSelectedSessionsPriority={
+        allowSessionPackages && sessionRegistrationEnabled
+      }
       disabled={disabled}
     />
   ) : null

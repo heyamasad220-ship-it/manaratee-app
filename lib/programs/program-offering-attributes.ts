@@ -27,6 +27,11 @@ export type ProgramOfferingAttributes = {
   enable_waitlist: boolean
   waitlist_capacity: number | null
   waitlist_offer_deadline_days: number | null
+  /**
+   * When false, partial selected weeks go to waitlist so full Camp 1/Camp 2
+   * packages get priority. When true, selected weeks may take remaining seats.
+   */
+  selected_sessions_open: boolean
   registration_mode: OfferingRegistrationMode
   /**
    * When true (default), customers Apply and await approval before Register.
@@ -75,6 +80,7 @@ export const OFFERING_ATTRIBUTE_COLUMNS = [
   "enable_waitlist",
   "waitlist_capacity",
   "waitlist_offer_deadline_days",
+  "selected_sessions_open",
   "registration_mode",
   "application_required",
   "attendance_tracked",
@@ -134,6 +140,7 @@ export function attributesFromProgramRow(
     enable_waitlist: program.enable_waitlist ?? false,
     waitlist_capacity: program.waitlist_capacity ?? null,
     waitlist_offer_deadline_days: program.waitlist_offer_deadline_days ?? null,
+    selected_sessions_open: true,
     registration_mode: deriveRegistrationMode({
       fullProgramEnabled: program.full_program_registration_enabled,
       sessionRegistrationEnabled: program.session_registration_enabled,
@@ -179,6 +186,7 @@ export function attributesFromOfferingRow(
     waitlist_capacity: (row.waitlist_capacity as number | null | undefined) ?? null,
     waitlist_offer_deadline_days:
       (row.waitlist_offer_deadline_days as number | null | undefined) ?? null,
+    selected_sessions_open: row.selected_sessions_open !== false,
     registration_mode:
       (row.registration_mode as OfferingRegistrationMode | undefined) ??
       "required",

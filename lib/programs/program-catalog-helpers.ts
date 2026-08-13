@@ -21,6 +21,9 @@ export type ProgramCatalogFilterValues = {
   q?: string
   status?: string
   department?: string
+  gender?: string
+  audience?: string
+  age?: string
   view?: string
   page?: string
 }
@@ -150,6 +153,13 @@ export function buildProgramCatalogHref(
   if (filters.department && filters.department !== "all") {
     params.set("department", filters.department)
   }
+  if (filters.gender && filters.gender !== "all") {
+    params.set("gender", filters.gender)
+  }
+  if (filters.audience && filters.audience !== "all") {
+    params.set("audience", filters.audience)
+  }
+  if (filters.age?.trim()) params.set("age", filters.age.trim())
   if (filters.view === "table") params.set("view", "table")
   if (page > 1) params.set("page", String(page))
   const query = params.toString()

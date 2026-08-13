@@ -14,6 +14,7 @@ export type AddonReportRow = {
   participantName: string
   programId: string | null
   programName: string
+  programKind: "academic" | "seasonal"
   offeringId: string | null
   offeringName: string
   offeringActivity: "active" | "closed"

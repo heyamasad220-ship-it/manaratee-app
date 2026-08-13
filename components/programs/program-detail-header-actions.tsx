@@ -12,23 +12,26 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
-  PROGRAM_LABEL_PLURAL,
-  YEAR_SEASON_LABEL,
+  getHierarchyLabels,
 } from "@/lib/programs/program-display-labels"
 import {
   buildProgramCustomerUrl,
   buildProgramRegistrationUrl,
 } from "@/lib/programs/program-customer-url"
+import type { ProgramKind } from "@/lib/programs/program-kind"
 
 export function ProgramDetailHeaderActions({
   programId,
   programStatus,
+  programKind,
   onEditProgram,
 }: {
   programId: string
   programStatus: string
+  programKind?: ProgramKind | string | null
   onEditProgram?: () => void
 }) {
+  const hierarchy = getHierarchyLabels(programKind)
   const router = useRouter()
   const [feedback, setFeedback] = React.useState<string | null>(null)
 
@@ -80,10 +83,10 @@ export function ProgramDetailHeaderActions({
             }}
           >
             <Pencil className="mr-2 h-4 w-4" />
-            Edit {YEAR_SEASON_LABEL.toLowerCase()}
+            Edit {hierarchy.containerSingular.toLowerCase()}
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => router.push(`/programs/${programId}/offerings`)}>
-            Manage {PROGRAM_LABEL_PLURAL.toLowerCase()}
+            Manage {hierarchy.offeringPlural.toLowerCase()}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react"
+import Link from "next/link"
 import { Calendar, ChevronLeft, ChevronRight, Users } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -53,23 +54,32 @@ function OfferingStatusBadge({ status }: { status: OfferingCatalogCard["status"]
   )
 }
 
-function OfferingCatalogCardView({ offering }: { offering: OfferingCatalogCard }) {
-  const enrollmentLabel = formatOfferingEnrollmentLabel(offering.enrolled, offering)
-  const percent = getOfferingEnrollmentPercent(offering.enrolled, offering)
+function OfferingCatalogCardView({
+  offering,
+  href,
+  showStatus = true,
+}: {
+  offering: OfferingCatalogCard
+  href?: string | null
+  showStatus?: boolean
+}) {
+  const enrollmentLabel = formatOfferingEnrollmentLabel(offering.enrolled, offering, {
+    // Catalog cards don't load sessions; treat limited capacity as per-session seats.
+    capacityAppliesPerSession: offering.capacity_mode === "limited",
+  })
+  const percent = getOfferingEnrollmentPercent(offering.enrolled, offering, {
+    capacityAppliesPerSession: offering.capacity_mode === "limited",
+  })
   const capacityForColor = catalogCapacityFromProgramTotal(
     offering.capacity_mode === "limited" ? Number(offering.capacity || 0) : 0
   )
+  // Don't mark the whole offering full from unique headcount — seats are per session.
   const acceptingRegistration =
     offering.status === "active" &&
     isOfferingEnrollmentOpen({
       enrollment_open_date: offering.display_enrollment_open_date,
       enrollment_close_date: offering.display_enrollment_close_date,
-    }) &&
-    !(
-      offering.capacity_mode === "limited" &&
-      Number(offering.capacity || 0) > 0 &&
-      offering.enrolled >= Number(offering.capacity || 0)
-    )
+    })
 
   const ageLabel = formatProgramAgeEligibility({
     min_age: offering.display_min_age,
@@ -77,6 +87,12 @@ function OfferingCatalogCardView({ offering }: { offering: OfferingCatalogCard }
   })
   const audienceLabel = `${formatProgramGenderLabel(offering.display_gender)} • ${ageLabel}`
   const pickedColor = normalizeHexColor(offering.background_color)
+
+  const offeringTitle = (
+    <span className="text-base font-semibold leading-snug tracking-tight text-blue-700 hover:text-blue-800 hover:underline">
+      {offering.name}
+    </span>
+  )
 
   return (
     <Card className="overflow-hidden border-border/80 shadow-sm">
@@ -102,7 +118,7 @@ function OfferingCatalogCardView({ offering }: { offering: OfferingCatalogCard }
           ) : (
             <div className="flex h-full items-center justify-center px-2 text-center">
               <span className="line-clamp-4 text-sm font-semibold leading-snug text-white/95">
-                {offering.name.trim() || "Program"}
+                {offering.yearSeasonName.trim() || offering.name.trim() || "Program"}
               </span>
             </div>
           )}
@@ -110,11 +126,17 @@ function OfferingCatalogCardView({ offering }: { offering: OfferingCatalogCard }
 
         <div className="min-w-0 flex-1 space-y-3">
           <div className="min-w-0 space-y-1.5">
-            <p className="text-base font-semibold leading-snug tracking-tight">
-              {offering.name}
+            <p className="text-base font-semibold leading-snug tracking-tight text-foreground">
+              {offering.yearSeasonName}
             </p>
-            <p className="text-sm text-muted-foreground">{offering.yearSeasonName}</p>
-            <OfferingStatusBadge status={offering.status} />
+            {href ? (
+              <Link href={href} className="inline-block">
+                {offeringTitle}
+              </Link>
+            ) : (
+              offeringTitle
+            )}
+            {showStatus ? <OfferingStatusBadge status={offering.status} /> : null}
           </div>
 
           <div className="space-y-1.5 text-sm text-muted-foreground">
@@ -177,11 +199,13 @@ export function OfferingCatalogView({
   totalPages,
   totalCount,
   pageSize = PROGRAM_CATALOG_PAGE_SIZE,
-  title = "Programs",
+  title = "Program Catalog",
   emptyTitle = "No active programs found",
   emptyDescription = "Add programs from a department workspace, or adjust your filters.",
   buildPageHref,
   filters,
+  getOfferingHref,
+  showStatus = true,
 }: {
   offerings: OfferingCatalogCard[]
   page: number
@@ -193,6 +217,8 @@ export function OfferingCatalogView({
   emptyDescription?: string
   buildPageHref: (page: number) => string
   filters?: ReactNode
+  getOfferingHref?: (offering: OfferingCatalogCard) => string | null
+  showStatus?: boolean
 }) {
   const from = totalCount === 0 ? 0 : (page - 1) * pageSize + 1
   const to = Math.min(page * pageSize, totalCount)
@@ -213,7 +239,12 @@ export function OfferingCatalogView({
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {offerings.map((offering) => (
-            <OfferingCatalogCardView key={offering.id} offering={offering} />
+            <OfferingCatalogCardView
+              key={offering.id}
+              offering={offering}
+              href={getOfferingHref?.(offering) ?? null}
+              showStatus={showStatus}
+            />
           ))}
         </div>
       )}

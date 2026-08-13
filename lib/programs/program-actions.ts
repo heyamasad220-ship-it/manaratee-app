@@ -116,6 +116,38 @@ export async function createProgram(input: CreateProgramInput) {
   const programType = normalizeProgramAudienceType(input.program_type)
   const programKind = normalizeProgramKind(input.program_kind)
 
+  const { getOrganizationProgramKindsEntitlement } = await import(
+    "@/lib/programs/organization-program-kinds"
+  )
+  const {
+    organizationAllowsProgramKind,
+    assertRegistrationFlagsAllowedForKind,
+  } = await import("@/lib/programs/program-kind-policy")
+
+  const entitlement = await getOrganizationProgramKindsEntitlement()
+  if (!organizationAllowsProgramKind(entitlement, programKind)) {
+    throw new Error(
+      entitlement === "academic"
+        ? "This organization is subscribed to Academic Programs only."
+        : entitlement === "seasonal"
+          ? "This organization is subscribed to Seasonal Programs only."
+          : "This program type is not enabled for your organization."
+    )
+  }
+
+  const registrationCheck = assertRegistrationFlagsAllowedForKind({
+    programKind,
+    session_registration_enabled: input.session_registration_enabled,
+  })
+  if (!registrationCheck.ok) {
+    throw new Error(registrationCheck.error)
+  }
+
+  const sessionRegistrationEnabled =
+    programKind === "academic"
+      ? false
+      : (input.session_registration_enabled ?? false)
+
   const insertPayload: Record<string, unknown> = {
       organization_id: organizationId,
       name: input.name,
@@ -147,8 +179,7 @@ export async function createProgram(input: CreateProgramInput) {
 
       full_program_registration_enabled:
         input.full_program_registration_enabled ?? true,
-      session_registration_enabled:
-        input.session_registration_enabled ?? false,
+      session_registration_enabled: sessionRegistrationEnabled,
 
       capacity: input.capacity || 0,
       enrolled: 0,
@@ -372,7 +403,66 @@ export async function updateProgram(input: UpdateProgramInput) {
   }
 
   if (input.program_kind) {
-    programPayload.program_kind = normalizeProgramKind(input.program_kind)
+    const nextKind = normalizeProgramKind(input.program_kind)
+    const { getOrganizationProgramKindsEntitlement } = await import(
+      "@/lib/programs/organization-program-kinds"
+    )
+    const {
+      organizationAllowsProgramKind,
+      assertRegistrationFlagsAllowedForKind,
+    } = await import("@/lib/programs/program-kind-policy")
+    const entitlement = await getOrganizationProgramKindsEntitlement()
+    if (!organizationAllowsProgramKind(entitlement, nextKind)) {
+      throw new Error(
+        entitlement === "academic"
+          ? "This organization is subscribed to Academic Programs only."
+          : entitlement === "seasonal"
+            ? "This organization is subscribed to Seasonal Programs only."
+            : "This program type is not enabled for your organization."
+      )
+    }
+    const registrationCheck = assertRegistrationFlagsAllowedForKind({
+      programKind: nextKind,
+      session_registration_enabled: input.session_registration_enabled,
+      single_session_registration_enabled:
+        input.single_session_registration_enabled,
+      drop_in_registration_enabled: input.drop_in_registration_enabled,
+    })
+    if (!registrationCheck.ok) {
+      throw new Error(registrationCheck.error)
+    }
+    programPayload.program_kind = nextKind
+    if (nextKind === "academic") {
+      programPayload.session_registration_enabled = false
+      programPayload.single_session_registration_enabled = false
+    }
+  } else {
+    const { data: existingKindRow } = await supabase
+      .from("programs")
+      .select("program_kind")
+      .eq("id", input.id)
+      .eq("organization_id", organizationId)
+      .maybeSingle()
+    const existingKind = normalizeProgramKind(
+      (existingKindRow as { program_kind?: string } | null)?.program_kind
+    )
+    const { assertRegistrationFlagsAllowedForKind } = await import(
+      "@/lib/programs/program-kind-policy"
+    )
+    const registrationCheck = assertRegistrationFlagsAllowedForKind({
+      programKind: existingKind,
+      session_registration_enabled: input.session_registration_enabled,
+      single_session_registration_enabled:
+        input.single_session_registration_enabled,
+      drop_in_registration_enabled: input.drop_in_registration_enabled,
+    })
+    if (!registrationCheck.ok) {
+      throw new Error(registrationCheck.error)
+    }
+    if (existingKind === "academic") {
+      programPayload.session_registration_enabled = false
+      programPayload.single_session_registration_enabled = false
+    }
   }
 
   if (!identityAndDefaultsOnly) {
@@ -430,12 +520,36 @@ export async function updateProgramKind(input: {
     throw new Error("No organization selected")
   }
 
+  const nextKind = normalizeProgramKind(input.program_kind)
+  const { getOrganizationProgramKindsEntitlement } = await import(
+    "@/lib/programs/organization-program-kinds"
+  )
+  const { organizationAllowsProgramKind } = await import(
+    "@/lib/programs/program-kind-policy"
+  )
+  const entitlement = await getOrganizationProgramKindsEntitlement()
+  if (!organizationAllowsProgramKind(entitlement, nextKind)) {
+    throw new Error(
+      entitlement === "academic"
+        ? "This organization is subscribed to Academic Programs only."
+        : entitlement === "seasonal"
+          ? "This organization is subscribed to Seasonal Programs only."
+          : "This program type is not enabled for your organization."
+    )
+  }
+
+  const updatePayload: Record<string, unknown> = {
+    program_kind: nextKind,
+    updated_at: new Date().toISOString(),
+  }
+  if (nextKind === "academic") {
+    updatePayload.session_registration_enabled = false
+    updatePayload.single_session_registration_enabled = false
+  }
+
   const { error } = await supabase
     .from("programs")
-    .update({
-      program_kind: normalizeProgramKind(input.program_kind),
-      updated_at: new Date().toISOString(),
-    })
+    .update(updatePayload)
     .eq("id", input.id)
     .eq("organization_id", organizationId)
 

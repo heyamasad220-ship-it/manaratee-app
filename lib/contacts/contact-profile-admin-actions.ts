@@ -22,6 +22,10 @@ export type ContactFamilyMemberRow = {
   relationship: string
   email: string
   phone: string
+  grade: string
+  allergies: string
+  emergencyContact: string
+  photoConsent: string
 }
 
 export type ContactPersonDetails = {
@@ -120,6 +124,10 @@ function mapFamilyMembers(
       date_of_birth: string | null
       email: string | null
       phone: string | null
+      grade: string | null
+      allergies: string | null
+      emergency_contact: string | null
+      photo_consent: string | null
     } | null
   }>
 ): ContactFamilyMemberRow[] {
@@ -138,6 +146,10 @@ function mapFamilyMembers(
         relationship: (row.relationship_type as string) || "",
         email: person.email || "",
         phone: person.phone || "",
+        grade: person.grade || "",
+        allergies: person.allergies || "",
+        emergencyContact: person.emergency_contact || "",
+        photoConsent: person.photo_consent || "",
       }
     })
     .filter((member): member is ContactFamilyMemberRow => member !== null)
@@ -276,12 +288,41 @@ export async function loadContactProfileExtendedData(
             gender,
             date_of_birth,
             email,
-            phone
+            phone,
+            grade,
+            allergies,
+            emergency_contact,
+            photo_consent
           )
         `)
         .eq("organization_id", organizationId)
         .eq("person_id", parentPersonId),
     ])
+
+    let familyRows = familyResult.data || []
+    if (familyResult.error) {
+      console.warn(
+        "loadContactProfileExtendedData family (participant details):",
+        familyResult.error.message
+      )
+      const fallback = await supabase
+        .from("person_relationships")
+        .select(`
+          relationship_type,
+          people:related_person_id (
+            id,
+            first_name,
+            last_name,
+            gender,
+            date_of_birth,
+            email,
+            phone
+          )
+        `)
+        .eq("organization_id", organizationId)
+        .eq("person_id", parentPersonId)
+      familyRows = fallback.data || []
+    }
 
     if (personResult.data) {
       personDetails = {
@@ -290,11 +331,11 @@ export async function loadContactProfileExtendedData(
       }
     }
 
-    if (!familyResult.error) {
+    if (!familyResult.error || familyRows.length > 0) {
       familyMembers = await attachFamilyMemberContactIds(
         supabase,
         organizationId,
-        mapFamilyMembers((familyResult.data || []) as any[])
+        mapFamilyMembers(familyRows as any[])
       )
     }
   }
@@ -458,6 +499,10 @@ export async function updateContactFamilyMember(input: {
   email?: string | null
   phone?: string | null
   relationship: string
+  grade?: string | null
+  allergies?: string | null
+  emergencyContact?: string | null
+  photoConsent?: string | null
 }) {
   const relatedPersonId = input.relatedPersonId.trim()
   const firstName = properCasePersonNameIfNeeded(input.firstName)
@@ -465,6 +510,10 @@ export async function updateContactFamilyMember(input: {
   const relationship = input.relationship.trim()
   const email = input.email?.trim().toLowerCase() || null
   const phone = normalizePhone(input.phone) || null
+  const grade = input.grade?.trim() || null
+  const allergies = input.allergies?.trim() || null
+  const emergencyContact = input.emergencyContact?.trim() || null
+  const photoConsent = input.photoConsent?.trim() || null
 
   if (!relatedPersonId) {
     throw new Error("Family member is required.")
@@ -513,6 +562,10 @@ export async function updateContactFamilyMember(input: {
       date_of_birth: dateOfBirth,
       email,
       phone,
+      grade,
+      allergies,
+      emergency_contact: emergencyContact,
+      photo_consent: photoConsent,
     })
     .eq("organization_id", organizationId)
     .eq("id", relatedPersonId)
@@ -529,6 +582,24 @@ export async function updateContactFamilyMember(input: {
 
   if (relationshipError) {
     throw new Error(relationshipError.message || "Could not update family relationship.")
+  }
+
+  try {
+    const { syncEnrollmentNotesForPerson } = await import(
+      "@/lib/programs/participant-profile-actions"
+    )
+    await syncEnrollmentNotesForPerson({
+      organizationId,
+      personId: relatedPersonId,
+      allergies,
+      photoConsent,
+      emergencyContact,
+    })
+  } catch (error) {
+    console.warn(
+      "syncEnrollmentNotesForPerson after updateContactFamilyMember:",
+      error instanceof Error ? error.message : error
+    )
   }
 
   const { data: memberContact } = await supabase

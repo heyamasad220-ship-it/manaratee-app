@@ -686,7 +686,7 @@ export function ReservationCalendar({
     if (next.date) params.set("date", next.date)
     if (next.view) params.set("view", next.view)
     // Preserve ?sources= so module filtered calendars stay filtered.
-    // Stay on the current route (e.g. /programs/calendar vs /facilities/calendar).
+    // Stay on the current route (e.g. /facilities/calendar vs filtered module calendars).
 
     startTransition(() => {
       router.push(`${pathname}?${params.toString()}`)

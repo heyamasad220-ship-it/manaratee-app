@@ -35,6 +35,8 @@ export interface NavItem {
   children?: SubItem[]
   group?: string | null
   permissionKey?: string
+  /** Any of these permissions grants access (for shared/top-level items). */
+  permissionKeys?: string[]
   moduleSlug?: string
   requiresSuperAdmin?: boolean
   /** Always shown last in the primary nav rail (e.g. Billing, org Settings). */

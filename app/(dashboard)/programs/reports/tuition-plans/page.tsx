@@ -32,7 +32,9 @@ export default async function ProgramsPaymentSummaryReportPage() {
             Family registration balances, program fees, and additional charges.
           </p>
         </div>
-        <PaymentSummaryReportPanel />
+        <Suspense fallback={null}>
+          <PaymentSummaryReportPanel />
+        </Suspense>
       </div>
     </>
   )

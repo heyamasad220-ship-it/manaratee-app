@@ -27,6 +27,7 @@ import {
   isTerminalEnrollmentStatus,
   loadContactsByIds,
 } from "@/lib/programs/registration-display-helpers"
+import { resolveEnrollmentParticipantPersonId } from "@/lib/programs/participant-profile-path"
 import { createClient } from "@/lib/supabase/server"
 
 type EnrollmentRow = {
@@ -118,6 +119,12 @@ export default async function ProgramsEnrollmentsReportPage() {
   const programIds = programs.map((program) => program.id)
   const programNameById = new Map(
     programs.map((program) => [program.id, program.name])
+  )
+  const programKindById = new Map(
+    programs.map((program) => [
+      program.id,
+      program.program_kind === "seasonal" ? ("seasonal" as const) : ("academic" as const),
+    ])
   )
   const programDepartmentById = new Map(
     programs.map((program) => [
@@ -280,6 +287,13 @@ export default async function ProgramsEnrollmentsReportPage() {
 
     return {
       id: enrollment.id,
+      participantPersonId: resolveEnrollmentParticipantPersonId({
+        childPersonId: enrollment.child_person_id,
+        participantContactPersonId: enrollment.participant_contact_id
+          ? contactsById.get(enrollment.participant_contact_id)?.person_id ||
+            null
+          : null,
+      }),
       contactName,
       contactProfileId: enrollment.registrant_contact_id,
       contactEmail,
@@ -308,6 +322,9 @@ export default async function ProgramsEnrollmentsReportPage() {
       programName: programId
         ? programNameById.get(programId) || YEAR_SEASON_LABEL
         : YEAR_SEASON_LABEL,
+      programKind: programId
+        ? programKindById.get(programId) || "academic"
+        : "academic",
       offeringId,
       offeringName: offeringId
         ? offeringNameById.get(offeringId) || PROGRAM_LABEL
@@ -336,7 +353,9 @@ export default async function ProgramsEnrollmentsReportPage() {
         {loadError ? (
           <p className="text-sm text-destructive">{loadError}</p>
         ) : (
-          <EnrollmentsReportTable rows={rows} />
+          <Suspense fallback={null}>
+            <EnrollmentsReportTable rows={rows} />
+          </Suspense>
         )}
       </div>
     </>

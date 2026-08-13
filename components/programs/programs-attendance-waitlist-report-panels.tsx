@@ -10,11 +10,14 @@ import {
 } from "@/components/programs/offering-operations-report-panels"
 import { Card, CardContent } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
+import { useProgramKindReportPreset } from "@/hooks/use-program-kind-report-preset"
 import {
+  getReportHierarchyLabels,
   PROGRAM_LABEL,
-  PROGRAM_LABEL_PLURAL,
   YEAR_SEASON_LABEL,
 } from "@/lib/programs/program-display-labels"
+import type { ProgramKind } from "@/lib/programs/program-kind"
+import { normalizeProgramKind } from "@/lib/programs/program-kind"
 import { createClient } from "@/lib/supabase/client"
 
 export type ReportOfferingOption = {
@@ -22,6 +25,7 @@ export type ReportOfferingOption = {
   name: string
   programId: string
   programName: string
+  programKind: ProgramKind
   departmentId: string | null
   departmentName: string | null
   attendanceTracked: boolean
@@ -47,7 +51,7 @@ async function loadReportOfferings(): Promise<ReportOfferingOption[]> {
       care_enabled,
       enable_waitlist,
       status,
-      program:program_id ( name, department_id )
+      program:program_id ( name, department_id, program_kind )
     `
     )
     .eq("status", "active")
@@ -93,7 +97,11 @@ async function loadReportOfferings(): Promise<ReportOfferingOption[]> {
 
   return (data || []).map((row) => {
     const program = row.program as
-      | { name?: string; department_id?: string | null }
+      | {
+          name?: string
+          department_id?: string | null
+          program_kind?: string | null
+        }
       | null
     const departmentId = program?.department_id ?? null
     return {
@@ -101,6 +109,7 @@ async function loadReportOfferings(): Promise<ReportOfferingOption[]> {
       name: (row.name as string) || PROGRAM_LABEL,
       programId: row.program_id as string,
       programName: program?.name || YEAR_SEASON_LABEL,
+      programKind: normalizeProgramKind(program?.program_kind),
       departmentId,
       departmentName: departmentId
         ? departmentNameById.get(departmentId) || null
@@ -134,21 +143,29 @@ function ReportFilters({
   departments,
   departmentId,
   onDepartmentChange,
+  kindFilter,
+  onKindChange,
   offerings,
   offeringId,
   onOfferingChange,
+  offeringLabelSingular,
+  offeringLabelPlural,
   loading,
 }: {
   departments: ReportDepartmentOption[]
   departmentId: string
   onDepartmentChange: (departmentId: string) => void
+  kindFilter: "all" | ProgramKind
+  onKindChange: (kind: "all" | ProgramKind) => void
   offerings: ReportOfferingOption[]
   offeringId: string
   onOfferingChange: (offeringId: string) => void
+  offeringLabelSingular: string
+  offeringLabelPlural: string
   loading: boolean
 }) {
   return (
-    <div className="flex w-full flex-col gap-3 sm:max-w-xl sm:flex-row sm:items-end">
+    <div className="flex w-full flex-col gap-3 sm:max-w-3xl sm:flex-row sm:items-end">
       <div className="min-w-0 flex-1 space-y-1.5">
         <Label htmlFor="report-department-filter">Department</Label>
         <select
@@ -167,7 +184,23 @@ function ReportFilters({
         </select>
       </div>
       <div className="min-w-0 flex-1 space-y-1.5">
-        <Label htmlFor="report-offering-filter">{PROGRAM_LABEL}</Label>
+        <Label htmlFor="report-kind-filter">Type</Label>
+        <select
+          id="report-kind-filter"
+          value={kindFilter}
+          onChange={(event) =>
+            onKindChange(event.target.value as "all" | ProgramKind)
+          }
+          disabled={loading}
+          className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+        >
+          <option value="all">All types</option>
+          <option value="academic">Academic</option>
+          <option value="seasonal">Seasonal</option>
+        </select>
+      </div>
+      <div className="min-w-0 flex-1 space-y-1.5">
+        <Label htmlFor="report-offering-filter">{offeringLabelSingular}</Label>
         <select
           id="report-offering-filter"
           value={offeringId}
@@ -175,10 +208,10 @@ function ReportFilters({
           disabled={loading}
           className="h-10 w-full rounded-md border bg-background px-3 text-sm"
         >
-          <option value="">All {PROGRAM_LABEL_PLURAL.toLowerCase()}</option>
+          <option value="">All {offeringLabelPlural.toLowerCase()}</option>
           {offerings.length === 0 ? (
             <option value="__none" disabled>
-              No active {PROGRAM_LABEL_PLURAL.toLowerCase()}
+              No active {offeringLabelPlural.toLowerCase()}
             </option>
           ) : (
             offerings.map((offering) => (
@@ -197,7 +230,12 @@ function useReportOfferings() {
   const [loading, setLoading] = React.useState(true)
   const [offerings, setOfferings] = React.useState<ReportOfferingOption[]>([])
   const [departmentId, setDepartmentId] = React.useState("")
+  const { kindFilter, setKindFilter } = useProgramKindReportPreset()
   const [selectedId, setSelectedId] = React.useState("")
+
+  const reportLabels = getReportHierarchyLabels(
+    kindFilter === "all" ? null : kindFilter
+  )
 
   React.useEffect(() => {
     let cancelled = false
@@ -225,11 +263,16 @@ function useReportOfferings() {
   )
 
   const filteredOfferings = React.useMemo(() => {
-    if (!departmentId) return offerings
-    return offerings.filter(
-      (offering) => offering.departmentId === departmentId
-    )
-  }, [offerings, departmentId])
+    return offerings.filter((offering) => {
+      if (departmentId && offering.departmentId !== departmentId) {
+        return false
+      }
+      if (kindFilter !== "all" && offering.programKind !== kindFilter) {
+        return false
+      }
+      return true
+    })
+  }, [offerings, departmentId, kindFilter])
 
   React.useEffect(() => {
     setSelectedId((current) => {
@@ -246,11 +289,19 @@ function useReportOfferings() {
     setDepartmentId(nextDepartmentId)
   }
 
+  function handleKindChange(next: "all" | ProgramKind) {
+    setKindFilter(next)
+    setSelectedId("")
+  }
+
   return {
     loading,
     departments,
     departmentId,
     setDepartmentId: handleDepartmentChange,
+    kindFilter,
+    setKindFilter: handleKindChange,
+    reportLabels,
     offerings: filteredOfferings,
     selected,
     selectedId,
@@ -265,6 +316,9 @@ export function ProgramsAttendanceReportPanel() {
     departments,
     departmentId,
     setDepartmentId,
+    kindFilter,
+    setKindFilter,
+    reportLabels,
     offerings,
     selected,
     selectedId,
@@ -280,7 +334,7 @@ export function ProgramsAttendanceReportPanel() {
     )
   }
 
-  if (offerings.length === 0 && !departmentId) {
+  if (offerings.length === 0 && !departmentId && kindFilter === "all") {
     return (
       <Card>
         <CardContent className="py-10 text-center text-sm text-muted-foreground">
@@ -300,17 +354,23 @@ export function ProgramsAttendanceReportPanel() {
             Attendance
           </h2>
           <p className="text-sm text-muted-foreground">
-            Review class attendance by program. Enable tracking on the program
-            Overview → Feature packs.
+            Review class attendance by{" "}
+            {reportLabels.offeringSingular.toLowerCase()}. Enable tracking on
+            the {reportLabels.offeringSingular.toLowerCase()} Overview → Feature
+            packs.
           </p>
         </div>
         <ReportFilters
           departments={departments}
           departmentId={departmentId}
           onDepartmentChange={setDepartmentId}
+          kindFilter={kindFilter}
+          onKindChange={setKindFilter}
           offerings={offerings}
           offeringId={selectedId}
           onOfferingChange={setSelectedId}
+          offeringLabelSingular={reportLabels.offeringSingular}
+          offeringLabelPlural={reportLabels.offeringPlural}
           loading={loading}
         />
       </div>
@@ -319,8 +379,8 @@ export function ProgramsAttendanceReportPanel() {
         <Card>
           <CardContent className="py-10 text-center text-sm text-muted-foreground">
             {offerings.length === 0
-              ? "No active programs in this department."
-              : `Select a ${PROGRAM_LABEL.toLowerCase()} to review attendance.`}
+              ? `No active ${reportLabels.offeringPlural.toLowerCase()} for this filter.`
+              : `Select a ${reportLabels.offeringSingular.toLowerCase()} to review attendance.`}
           </CardContent>
         </Card>
       ) : (
@@ -336,8 +396,9 @@ export function ProgramsAttendanceReportPanel() {
               <span className="font-medium text-foreground">
                 {selected.name}
               </span>
-              . Enable it on the program Overview → Feature packs so teachers
-              can mark attendance in My Classes.
+              . Enable it on the {reportLabels.offeringSingular.toLowerCase()}{" "}
+              Overview → Feature packs so teachers can mark attendance in My
+              Classes.
             </div>
           )}
 
@@ -361,6 +422,9 @@ export function ProgramsWaitlistReportPanel() {
     departments,
     departmentId,
     setDepartmentId,
+    kindFilter,
+    setKindFilter,
+    reportLabels,
     offerings,
     selected,
     selectedId,
@@ -376,7 +440,7 @@ export function ProgramsWaitlistReportPanel() {
     )
   }
 
-  if (offerings.length === 0 && !departmentId) {
+  if (offerings.length === 0 && !departmentId && kindFilter === "all") {
     return (
       <Card>
         <CardContent className="py-10 text-center text-sm text-muted-foreground">
@@ -396,17 +460,23 @@ export function ProgramsWaitlistReportPanel() {
             Waitlist
           </h2>
           <p className="text-sm text-muted-foreground">
-            View waitlist entries by program. Turn waitlist on or off under the
-            program Enrollment settings.
+            View waitlist entries by{" "}
+            {reportLabels.offeringSingular.toLowerCase()}. Turn waitlist on or
+            off under the {reportLabels.offeringSingular.toLowerCase()}{" "}
+            Enrollment settings.
           </p>
         </div>
         <ReportFilters
           departments={departments}
           departmentId={departmentId}
           onDepartmentChange={setDepartmentId}
+          kindFilter={kindFilter}
+          onKindChange={setKindFilter}
           offerings={offerings}
           offeringId={selectedId}
           onOfferingChange={setSelectedId}
+          offeringLabelSingular={reportLabels.offeringSingular}
+          offeringLabelPlural={reportLabels.offeringPlural}
           loading={loading}
         />
       </div>
@@ -414,7 +484,8 @@ export function ProgramsWaitlistReportPanel() {
       {offerings.length === 0 ? (
         <Card>
           <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            No active programs in this department.
+            No active {reportLabels.offeringPlural.toLowerCase()} for this
+            filter.
           </CardContent>
         </Card>
       ) : selected ? (
@@ -425,8 +496,8 @@ export function ProgramsWaitlistReportPanel() {
               <span className="font-medium text-foreground">
                 {selected.name}
               </span>
-              . Enable it on the program Enrollment tab when you want a queue
-              for full classes.
+              . Enable it on the {reportLabels.offeringSingular.toLowerCase()}{" "}
+              Enrollment tab when you want a queue for full classes.
             </div>
           ) : null}
 
@@ -442,7 +513,7 @@ export function ProgramsWaitlistReportPanel() {
             new Set(offerings.map((offering) => offering.programId))
           )}
           offeringIds={offerings.map((offering) => offering.id)}
-          offeringName={`all ${PROGRAM_LABEL_PLURAL.toLowerCase()}`}
+          offeringName={`all ${reportLabels.offeringPlural.toLowerCase()}`}
         />
       )}
     </div>

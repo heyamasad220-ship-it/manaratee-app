@@ -1,8 +1,6 @@
 "use client"
 
 import * as React from "react"
-import { Header } from "@/components/layout/header"
-import { ProgramsSectionNav } from "@/components/programs/programs-section-nav"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 import {
@@ -220,7 +218,15 @@ function emptyForm(
   }
 }
 
-export function ProgramsScheduleClient() {
+export function ProgramsScheduleBuilder({
+  departmentId = null,
+  embedded = false,
+}: {
+  /** When set, only programs (and their activities) for this department. */
+  departmentId?: string | null
+  /** Hide page chrome (Header / Programs section nav). */
+  embedded?: boolean
+}) {
   const supabase = createClient()
 
   const [loading, setLoading] = React.useState(true)
@@ -247,17 +253,22 @@ export function ProgramsScheduleClient() {
   React.useEffect(() => {
     void fetchScheduleData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [departmentId])
 
   async function fetchScheduleData() {
     setLoading(true)
 
     try {
+      let programsQuery = supabase
+        .from("programs")
+        .select("id, name, age_groups, start_date, end_date, enrolled, capacity, department_id")
+        .order("name")
+      if (departmentId) {
+        programsQuery = programsQuery.eq("department_id", departmentId)
+      }
+
       const [programsResult, categoriesResult, activitiesResult] = await Promise.all([
-        supabase
-          .from("programs")
-          .select("id, name, age_groups, start_date, end_date, enrolled, capacity, department_id")
-          .order("name"),
+        programsQuery,
         supabase.from("schedule_categories").select("id, name, color_class").order("name"),
         supabase
           .from("schedule_activities")
@@ -297,7 +308,12 @@ export function ProgramsScheduleClient() {
         const nextPrograms = (programsResult.data || []) as Program[]
         setPrograms(nextPrograms)
 
-        setSelectedProgramId((current) => current || nextPrograms[0]?.id || "")
+        setSelectedProgramId((current) => {
+          if (current && nextPrograms.some((program) => program.id === current)) {
+            return current
+          }
+          return nextPrograms[0]?.id || ""
+        })
         setSelectedAgeGroupName((current) => {
           if (current) return current
           return nextPrograms[0]?.age_groups?.[0] || ""
@@ -315,7 +331,18 @@ export function ProgramsScheduleClient() {
         console.warn("schedule_activities could not be loaded:", activitiesResult.error.message)
         setActivities([])
       } else {
-        setActivities((activitiesResult.data || []) as ScheduleActivity[])
+        const nextActivities = (activitiesResult.data || []) as ScheduleActivity[]
+        const programIds = new Set(
+          ((programsResult.data || []) as Program[]).map((program) => program.id)
+        )
+        setActivities(
+          departmentId
+            ? nextActivities.filter(
+                (activity) =>
+                  activity.program_id != null && programIds.has(activity.program_id)
+              )
+            : nextActivities
+        )
       }
     } catch (error) {
       console.error("Schedule page error:", error)
@@ -608,17 +635,22 @@ export function ProgramsScheduleClient() {
   }
 
   return (
-    <>
-      <Header title="Programs" />
-      <ProgramsSectionNav />
-
-      <TooltipProvider>
-        <div className={cn("flex flex-col gap-6 p-6", isPrintMode && "print:p-0")}>
+    <TooltipProvider>
+        <div className={cn("flex flex-col gap-6", !embedded && "p-6", isPrintMode && "print:p-0")}>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between print:hidden">
             <div>
-              <h1 className="text-2xl font-semibold tracking-tight">Schedule Builder</h1>
-              <p className="text-muted-foreground">
-                Create and manage weekly schedules using your existing programs.
+              <h1
+                className={cn(
+                  "font-semibold tracking-tight",
+                  embedded ? "text-lg" : "text-2xl"
+                )}
+              >
+                Schedule Builder
+              </h1>
+              <p className="text-muted-foreground text-sm">
+                {embedded
+                  ? "Plan weekly activities for this department's programs."
+                  : "Create and manage weekly schedules using your existing programs."}
               </p>
             </div>
 
@@ -1082,7 +1114,6 @@ export function ProgramsScheduleClient() {
           </Dialog>
         </div>
       </TooltipProvider>
-    </>
   )
 }
 

@@ -375,12 +375,11 @@ TypeScript helpers: `lib/programs/program-lifecycle-types.ts`
 
 ### Sidebar navigation (`components/layout/sidebar.tsx`)
 
-Programs module (Catalog first). **Departments** is under **HR** (`/workforce/departments`), not Programs.
+Programs module (Catalog). **Departments** is under **Programs/ Events** (`/workforce/departments`), not Programs.
 
 | Nav item | Route | Permission |
 |----------|-------|------------|
-| Catalog | `/programs/catalog` | `programs.view` |
-| Schedule | `/programs/schedule` | `programs.view` |
+| Program Catalog | `/programs/catalog` | `programs.view` |
 | Financial Assistance | `/finance/financial-assistance` (legacy `/programs/financial-assistance` redirects) | `applications.view` / `finance.view` — Overview / Submissions / Templates + FA report + Payment Plans tabs |
 | Reports | `/programs/reports` | `reports.view` — Overview / Registrations / Attendance / Waitlist. Payment transactions → **Finance → Transactions**; expenses → department workspace |
 | Settings | Per-department **Settings** on the department workspace (`/workforce/departments/[id]?tab=settings`) — not in the Programs sidebar | `staff.view` / department head |
@@ -390,7 +389,7 @@ Programs module (Catalog first). **Departments** is under **HR** (`/workforce/de
 | Route | Purpose |
 |-------|---------|
 | `/programs` | Redirect / landing |
-| `/programs/catalog` | Program list |
+| `/programs/catalog` | Program Catalog (active offerings; flyer inherits from parent program when offering has none) |
 | `/programs/create` | **Quick Create** — basics + eligibility; redirects to `/programs/[id]` after save |
 | `/programs/[id]` | Program detail home (Overview inline edit + Offerings; Catalog → Edit) |
 | `/programs/[id]/offerings` | Redirects to first non-archived offering manage page (or program detail if none) |
@@ -403,7 +402,8 @@ Programs module (Catalog first). **Departments** is under **HR** (`/workforce/de
 | `/programs/instructors` | Instructor assignments |
 | `/programs/registrations` | Registration balances (Fee / Received / Balance; status Paid / Open / Refunded) |
 | `/programs/registrations/[type]/[id]` | Enrollment or waitlist detail |
-| `/programs/schedule` | Cross-program schedule view |
+| `/programs/schedule` | Legacy redirect: `?program=` → offering Schedule; bare → Departments. Activity planner is on Department → Schedule → Activity planner |
+| `/programs/calendar` | Legacy redirect → `/facilities/calendar` (space availability) |
 | `/programs/reports` | Reports |
 | `/programs/settings` | Redirects to `/workforce?tab=departments` (settings live on each department) |
 | `/programs/settings/service-needs` | Redirects to `/workforce?tab=departments` |

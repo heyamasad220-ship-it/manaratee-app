@@ -15,6 +15,12 @@ export type FeeBillingScope = "individual" | "family"
 /** @deprecated Prefer FeeRecurrence on each fee. Kept for payment-structure UI. */
 export type PaymentStructure = "one_time" | "monthly" | "installments"
 
+/** Customer payment methods offered when a fee uses monthly recurrence. */
+export type OfferingPaymentOptions = {
+  payInFull: boolean
+  twoSemesterPayments: boolean
+}
+
 /** @deprecated Add-ons merged into OfferingFee. */
 export type AddonBillingMethod = "flat" | "per_day" | "per_session" | "per_week"
 
@@ -103,6 +109,11 @@ export type SimpleOfferingPricing = {
   /** Derived for billing calendar / legacy payment structure. */
   paymentStructure: PaymentStructure
   installmentCount: number | null
+  /**
+   * Shown when any fee recurrence is monthly.
+   * Pay in Full + 2 Semester Payments (not month-by-month).
+   */
+  paymentOptions: OfferingPaymentOptions
   /** @deprecated Migrated into fees on parse. */
   charges?: OfferingCharge[]
   /** @deprecated Migrated into fees on parse. */
@@ -110,7 +121,7 @@ export type SimpleOfferingPricing = {
 }
 
 export const FEE_TYPE_LABELS: Record<ChargeType, string> = {
-  tuition: "Tuition",
+  tuition: "Program Fee",
   registration_fee: "Registration Fee",
   book_fee: "Book Fee",
   materials: "Materials Fee",
@@ -144,6 +155,27 @@ export const PAYMENT_STRUCTURE_LABELS: Record<PaymentStructure, string> = {
   one_time: "One-Time Payment",
   monthly: "Monthly Billing",
   installments: "Installments",
+}
+
+export const DEFAULT_PAYMENT_OPTIONS: OfferingPaymentOptions = {
+  payInFull: true,
+  twoSemesterPayments: true,
+}
+
+export function hasMonthlyFeeRecurrence(fees: OfferingFee[]) {
+  return fees.some((fee) => fee.recurrence === "monthly")
+}
+
+/** Base amount for Pay in Full / semester schedule labels. */
+export function resolvePaymentOptionsBaseAmount(fees: OfferingFee[]) {
+  const monthly = fees.filter((fee) => fee.recurrence === "monthly")
+  const requiredTuition = monthly.find(
+    (fee) => fee.required && fee.feeType === "tuition"
+  )
+  if (requiredTuition) return Number(requiredTuition.amount || 0)
+  const required = monthly.find((fee) => fee.required)
+  if (required) return Number(required.amount || 0)
+  return Number(monthly[0]?.amount || 0)
 }
 
 export const OFFERING_DISCOUNT_NAME_LABELS: Record<OfferingDiscountName, string> =

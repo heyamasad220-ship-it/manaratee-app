@@ -47,15 +47,12 @@ import type { InvalidFeePlanLink } from "@/lib/programs/program-fee-plan-queries
 import type { ProgramRegistrationOption } from "@/lib/programs/program-registration-option-types"
 import type { Program } from "@/lib/programs/program-types"
 import {
+  normalizeProgramKind,
   PROGRAM_KIND_DESCRIPTIONS,
   PROGRAM_KIND_LABELS,
   type ProgramKind,
 } from "@/lib/programs/program-kind"
-import {
-  PROGRAM_LABEL_PLURAL,
-  YEAR_SEASON_LABEL,
-  YEAR_SEASON_LABEL_PLURAL,
-} from "@/lib/programs/program-display-labels"
+import { getHierarchyLabels } from "@/lib/programs/program-display-labels"
 import {
   getAgeGroupLabelsFromMinMax,
   parseProgramAgeBounds,
@@ -63,7 +60,7 @@ import {
 
 const PROGRAM_FORM_TABS = [
   { value: "basics", label: "General", editOnly: false },
-  { value: "offerings", label: "Programs", editOnly: true },
+  { value: "offerings", label: "Offerings", editOnly: true },
 ] as const
 
 type ProgramFormTab = (typeof PROGRAM_FORM_TABS)[number]["value"]
@@ -129,6 +126,10 @@ type ProgramFormCreateProps = {
   organizationId: string
   /** Prefill department from `?department=` (e.g. department workspace Create). */
   defaultDepartmentId?: string | null
+  /** Org packaging: which program modes may be created. Default both. */
+  allowedProgramKinds?: ProgramKind[]
+  /** When set (e.g. `?kind=seasonal`), lock mode and skip the type picker. */
+  lockedProgramKind?: ProgramKind | null
 }
 
 export type ProgramFormProps = ProgramFormEditProps | ProgramFormCreateProps
@@ -287,13 +288,6 @@ export function ProgramForm(props: ProgramFormProps) {
   const formRef = React.useRef<HTMLFormElement>(null)
   const continueAfterSaveRef = React.useRef(false)
   const isCreate = props.mode === "create"
-  const visibleTabs = React.useMemo(
-    () =>
-      isCreate
-        ? PROGRAM_FORM_TABS.filter((tab) => !tab.editOnly)
-        : PROGRAM_FORM_TABS,
-    [isCreate]
-  )
   const [activeTab, setActiveTab] = React.useState<ProgramFormTab>(() => {
     const tab = resolveInitialTab(searchParams.get("tab"))
     if (isCreate && tab === "offerings") {
@@ -301,8 +295,50 @@ export function ProgramForm(props: ProgramFormProps) {
     }
     return tab
   })
-  const [programKind, setProgramKind] = React.useState<ProgramKind>("academic")
-  const [openEnrollment, setOpenEnrollment] = React.useState(false)
+  const [programKind, setProgramKind] = React.useState<ProgramKind>(() => {
+    if (props.mode === "create" && props.lockedProgramKind) {
+      return props.lockedProgramKind
+    }
+    if (props.mode === "create" && props.allowedProgramKinds?.length) {
+      return props.allowedProgramKinds[0] ?? "academic"
+    }
+    if (props.mode === "edit") {
+      return normalizeProgramKind(props.program.program_kind)
+    }
+    return "academic"
+  })
+  const hierarchy = getHierarchyLabels(programKind)
+  const formTabs = React.useMemo(
+    () =>
+      PROGRAM_FORM_TABS.map((tab) =>
+        tab.value === "offerings"
+          ? { ...tab, label: hierarchy.offeringPlural }
+          : tab
+      ),
+    [hierarchy.offeringPlural]
+  )
+  const visibleTabs = React.useMemo(
+    () =>
+      isCreate
+        ? formTabs.filter((tab) => !tab.editOnly)
+        : formTabs,
+    [formTabs, isCreate]
+  )
+  const allowedProgramKinds: ProgramKind[] =
+    props.mode === "create" && props.allowedProgramKinds?.length
+      ? props.allowedProgramKinds
+      : ["academic", "seasonal"]
+  const lockedProgramKind =
+    props.mode === "create" ? props.lockedProgramKind ?? null : null
+  const showKindPicker =
+    isCreate && !lockedProgramKind && allowedProgramKinds.length > 1
+  const [openEnrollment, setOpenEnrollment] = React.useState(
+    () =>
+      props.mode === "create" &&
+      (props.lockedProgramKind ??
+        props.allowedProgramKinds?.[0] ??
+        "academic") === "seasonal"
+  )
   const [maxUnlockedTabIndex, setMaxUnlockedTabIndex] = React.useState(() => {
     if (isCreate) {
       return 0
@@ -490,7 +526,7 @@ export function ProgramForm(props: ProgramFormProps) {
     payload: ReturnType<typeof buildFormPayload>
   ) {
     if (!payload.name.trim()) {
-      setSaveError(`${YEAR_SEASON_LABEL} name is required.`)
+      setSaveError(`${hierarchy.containerSingular} name is required.`)
       continueAfterSaveRef.current = false
       return
     }
@@ -561,7 +597,7 @@ export function ProgramForm(props: ProgramFormProps) {
     payload: ReturnType<typeof buildFormPayload>
   ) {
     if (!payload.name.trim()) {
-      setSaveError(`${YEAR_SEASON_LABEL} name is required.`)
+      setSaveError(`${hierarchy.containerSingular} name is required.`)
       continueAfterSaveRef.current = false
       return
     }
@@ -686,8 +722,8 @@ export function ProgramForm(props: ProgramFormProps) {
         error instanceof Error
           ? error.message
           : isCreate
-            ? `Failed to create ${YEAR_SEASON_LABEL.toLowerCase()}. Please try again.`
-            : `Failed to save ${YEAR_SEASON_LABEL.toLowerCase()}. Please try again.`
+            ? `Failed to create ${hierarchy.containerSingular.toLowerCase()}. Please try again.`
+            : `Failed to save ${hierarchy.containerSingular.toLowerCase()}. Please try again.`
       )
     } finally {
       setIsSaving(false)
@@ -696,11 +732,11 @@ export function ProgramForm(props: ProgramFormProps) {
 
   const backHref = "/programs/catalog"
   const pageTitle = isCreate
-    ? `Create ${YEAR_SEASON_LABEL}`
-    : `Edit ${YEAR_SEASON_LABEL}`
+    ? `Create ${hierarchy.containerSingular}`
+    : `Edit ${hierarchy.containerSingular}`
   const pageDescription = isCreate
-    ? `Work through each tab in order. Save a tab before moving on. New ${YEAR_SEASON_LABEL_PLURAL.toLowerCase()} start as Draft.`
-    : `Save each tab as you go. The ${YEAR_SEASON_LABEL.toLowerCase()} stays Draft until you set status to Active on the General tab.`
+    ? `Work through each tab in order. Save a tab before moving on. New ${hierarchy.containerPlural.toLowerCase()} start as Draft.`
+    : `Save each tab as you go. The ${hierarchy.containerSingular.toLowerCase()} stays Draft until you set status to Active on the General tab.`
   const isLastTab =
     activeTab === visibleTabs[visibleTabs.length - 1]?.value
 
@@ -714,8 +750,8 @@ export function ProgramForm(props: ProgramFormProps) {
           >
             <ArrowLeft className="h-4 w-4" />
             {isCreate
-              ? `Back to ${YEAR_SEASON_LABEL_PLURAL}`
-              : `Back to ${YEAR_SEASON_LABEL}`}
+              ? `Back to ${hierarchy.containerPlural}`
+              : `Back to ${hierarchy.containerSingular}`}
           </Link>
 
           <div className="ml-auto">
@@ -741,7 +777,7 @@ export function ProgramForm(props: ProgramFormProps) {
           <p className="mt-1 text-sm text-muted-foreground">{pageDescription}</p>
           {showCreatedBanner ? (
             <p className="mt-3 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
-              {YEAR_SEASON_LABEL} created. Add {PROGRAM_LABEL_PLURAL.toLowerCase()}{" "}
+              {hierarchy.containerSingular} created. Add {hierarchy.offeringPlural.toLowerCase()}{" "}
               — these are what customers register for (for example, Beginner ESL
               or June Camp).
             </p>
@@ -753,7 +789,7 @@ export function ProgramForm(props: ProgramFormProps) {
           ) : null}
           {saveSuccess ? (
             <p className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-              {YEAR_SEASON_LABEL} saved successfully.
+              {hierarchy.containerSingular} saved successfully.
             </p>
           ) : null}
         </div>
@@ -774,45 +810,57 @@ export function ProgramForm(props: ProgramFormProps) {
           <TabsContent forceMount value="basics" className="mt-0 space-y-4">
             {isCreate ? (
               <div className="space-y-3 rounded-lg border p-4">
-                <div>
-                  <p className="text-sm font-semibold">What are you creating?</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Choose once — this controls whether you get offerings (classes)
-                    or a single seasonal camp page.
-                  </p>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {(Object.keys(PROGRAM_KIND_LABELS) as ProgramKind[]).map(
-                    (kind) => (
-                      <label
-                        key={kind}
-                        className={
-                          programKind === kind
-                            ? "flex cursor-pointer flex-col gap-1 rounded-lg border-2 border-blue-600 bg-blue-50/50 p-3"
-                            : "flex cursor-pointer flex-col gap-1 rounded-lg border p-3 hover:bg-muted/40"
-                        }
-                      >
-                        <span className="flex items-center gap-2 text-sm font-medium">
-                          <input
-                            type="radio"
-                            name="program_kind"
-                            value={kind}
-                            checked={programKind === kind}
-                            onChange={() => {
-                              setProgramKind(kind)
-                              setOpenEnrollment(kind === "seasonal")
-                            }}
-                            className="size-3.5"
-                          />
-                          {PROGRAM_KIND_LABELS[kind]}
-                        </span>
-                        <span className="pl-5 text-xs text-muted-foreground">
-                          {PROGRAM_KIND_DESCRIPTIONS[kind]}
-                        </span>
-                      </label>
-                    )
-                  )}
-                </div>
+                {showKindPicker ? (
+                  <>
+                    <div>
+                      <p className="text-sm font-semibold">What are you creating?</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Choose once — this controls whether you get offerings
+                        (classes) or a seasonal camp/season product.
+                      </p>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {allowedProgramKinds.map((kind) => (
+                        <label
+                          key={kind}
+                          className={
+                            programKind === kind
+                              ? "flex cursor-pointer flex-col gap-1 rounded-lg border-2 border-blue-600 bg-blue-50/50 p-3"
+                              : "flex cursor-pointer flex-col gap-1 rounded-lg border p-3 hover:bg-muted/40"
+                          }
+                        >
+                          <span className="flex items-center gap-2 text-sm font-medium">
+                            <input
+                              type="radio"
+                              name="program_kind"
+                              value={kind}
+                              checked={programKind === kind}
+                              onChange={() => {
+                                setProgramKind(kind)
+                                setOpenEnrollment(kind === "seasonal")
+                              }}
+                              className="size-3.5"
+                            />
+                            {PROGRAM_KIND_LABELS[kind]}
+                          </span>
+                          <span className="pl-5 text-xs text-muted-foreground">
+                            {PROGRAM_KIND_DESCRIPTIONS[kind]}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <div className="rounded-md border bg-muted/20 px-3 py-2 text-sm">
+                    <span className="font-medium">
+                      {PROGRAM_KIND_LABELS[programKind]}
+                    </span>
+                    <span className="text-muted-foreground">
+                      {" "}
+                      — {PROGRAM_KIND_DESCRIPTIONS[programKind]}
+                    </span>
+                  </div>
+                )}
                 <label className="flex items-start justify-between gap-3 rounded-md border bg-muted/20 p-3 text-sm">
                   <span className="space-y-0.5">
                     <span className="block font-medium">

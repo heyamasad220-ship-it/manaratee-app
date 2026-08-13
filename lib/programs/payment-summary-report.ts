@@ -37,6 +37,7 @@ export type PaymentSummaryRow = {
   status: PaymentSummaryStatus
   programId: string | null
   programName: string
+  programKind: "academic" | "seasonal"
   offeringIds: string[]
   offeringNames: string[]
 }
@@ -185,6 +186,12 @@ export async function getPaymentSummaryRows(): Promise<
 
     const programNameById = new Map(
       programs.map((program) => [program.id, program.name])
+    )
+    const programKindById = new Map(
+      programs.map((program) => [
+        program.id,
+        program.program_kind === "seasonal" ? "seasonal" : "academic",
+      ] as const)
     )
 
     const { data: enrollmentData, error: enrollmentError } = await supabase
@@ -508,6 +515,9 @@ export async function getPaymentSummaryRows(): Promise<
           programName: primary.program_id
             ? programNameById.get(primary.program_id) || YEAR_SEASON_LABEL
             : YEAR_SEASON_LABEL,
+          programKind: primary.program_id
+            ? programKindById.get(primary.program_id) || "academic"
+            : "academic",
           offeringIds: offeringIdList,
           offeringNames: offeringNameList,
         }

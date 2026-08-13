@@ -4,6 +4,7 @@ import { Archive, Calendar, MapPin, Plus } from "lucide-react"
 
 import { Header } from "@/components/layout/header"
 import { EventManagementDashboardPanels } from "@/components/events/event-management-dashboard-panels"
+import { EventManagementSectionNav } from "@/components/events/event-management-section-nav"
 import { InternalEventCardActions } from "@/components/events/internal-event-card-actions"
 import { InternalEventCatalogFilters } from "@/components/events/internal-event-catalog-filters"
 import { InternalEventStatusSelect } from "@/components/events/internal-event-status-select"
@@ -251,7 +252,10 @@ async function EventManagementEventsContent({
 
   return (
     <>
-      <Header title="Event Management" />
+      <Header title="Events" />
+      <Suspense fallback={null}>
+        <EventManagementSectionNav />
+      </Suspense>
 
       <div className="flex flex-col gap-6 p-6">
         <EventManagementDashboardPanels

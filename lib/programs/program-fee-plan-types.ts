@@ -103,7 +103,7 @@ export const FEE_PLAN_TYPE_LABELS: Record<FeePlanType, string> = {
 }
 
 export const FEE_COMPONENT_TYPE_LABELS: Record<FeeComponentType, string> = {
-  tuition: "Tuition",
+  tuition: "Program Fee",
   registration_fee: "Registration Fee",
   materials: "Materials",
   lunch: "Lunch",

@@ -1,11 +1,12 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { BarChart3, DollarSign, PieChart, Wallet } from "lucide-react"
+import { BarChart3, DollarSign, PieChart, Users, Wallet } from "lucide-react"
 
 import { DepartmentBudgetPanel } from "@/components/departments/department-budget-panel"
 import { DepartmentExpensesPanel } from "@/components/departments/department-expenses-panel"
 import { DepartmentPayrollPanel } from "@/components/departments/department-payroll-panel"
+import { FinancePayrollQueuePanel } from "@/components/finance/finance-payroll-queue-panel"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { DepartmentStaffMember } from "@/lib/departments/department-actions"
@@ -15,7 +16,7 @@ import {
   YEAR_SEASON_LABEL_PLURAL,
 } from "@/lib/programs/program-display-labels"
 
-type ReportSection = "payroll" | "expenses" | "budget"
+type ReportSection = "employees" | "payroll" | "expenses" | "budget"
 
 type YearOption = {
   id: string
@@ -38,7 +39,7 @@ export function DepartmentReportsPanel({
 }) {
   const [years, setYears] = useState<YearOption[]>([])
   const [yearId, setYearId] = useState<string>(initialYearProgramId || "")
-  const [section, setSection] = useState<ReportSection>("payroll")
+  const [section, setSection] = useState<ReportSection>("employees")
   const [loadingYears, setLoadingYears] = useState(true)
 
   const loadYears = useCallback(async () => {
@@ -114,6 +115,10 @@ export function DepartmentReportsPanel({
         onValueChange={(value) => setSection(value as ReportSection)}
       >
         <TabsList className="flex h-auto flex-wrap justify-start gap-1">
+          <TabsTrigger value="employees" className="gap-2">
+            <Users className="size-4" />
+            Employees
+          </TabsTrigger>
           <TabsTrigger value="payroll" className="gap-2">
             <Wallet className="size-4" />
             Payroll
@@ -136,7 +141,7 @@ export function DepartmentReportsPanel({
         </p>
       ) : (
         <>
-          {section === "payroll" ? (
+          {section === "employees" ? (
             <DepartmentPayrollPanel
               departmentId={departmentId}
               departmentName={
@@ -149,7 +154,34 @@ export function DepartmentReportsPanel({
               openYearsOnly={false}
               programId={yearId}
               readOnly
+              variant="roster"
             />
+          ) : null}
+          {section === "payroll" ? (
+            <div className="space-y-6">
+              <DepartmentPayrollPanel
+                departmentId={departmentId}
+                departmentName={
+                  selectedYear
+                    ? `${departmentName} · ${selectedYear.name}`
+                    : departmentName
+                }
+                staff={staff}
+                onStaffChanged={onStaffChanged}
+                openYearsOnly={false}
+                programId={yearId}
+                readOnly
+                variant="periods"
+              />
+              <FinancePayrollQueuePanel
+                departmentId={departmentId}
+                departmentName={
+                  selectedYear
+                    ? `${departmentName} · ${selectedYear.name}`
+                    : departmentName
+                }
+              />
+            </div>
           ) : null}
           {section === "expenses" ? (
             <DepartmentExpensesPanel

@@ -118,8 +118,8 @@ Keep existing: `offering_type`, dates, enrollment window, status, `is_default`.
 
 - Add `offering_id` to `program_schedule_items` (required after backfill).  
 - Backfill: attach existing items to default offering.  
-- Offering Schedule tab edits weekly slots via `OfferingWeeklyScheduleEditor` (`program_schedule_items`).  
-- `/programs/schedule?program=` redirects to that offering’s Schedule tab; bare `/programs/schedule` keeps the org `schedule_activities` calendar.  
+- Offering Schedule tab edits weekly slots via `OfferingWeeklyScheduleEditor` (`program_schedule_items`).
+- `/programs/schedule?program=` redirects to that offering’s Schedule tab; bare `/programs/schedule` redirects to Departments. The `schedule_activities` Activity planner is under **Department → Schedule → Activity planner** (scoped to that department).
 - Sessions remain offering-scoped (unchanged).  
 - Duplicate / year-copy copy weekly schedule items.  
 **SQL:** `scripts/178_program_schedule_items_offering.sql`  

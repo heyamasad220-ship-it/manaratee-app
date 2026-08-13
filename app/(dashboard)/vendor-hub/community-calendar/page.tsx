@@ -1,21 +1,8 @@
-import { CommunityCalendarClient } from "@/components/vendor-hub/community-calendar/community-calendar-client"
-import { PageBreadcrumbs } from "@/components/navigation/page-breadcrumbs"
+import { redirect } from "next/navigation"
 
-export default function CommunityCalendarPage() {
-  return (
-    <>
-      <div className="border-b border-border bg-card px-6 pt-6 pb-2">
-        <PageBreadcrumbs
-          className="mb-2"
-          items={[
-            { label: "Vendor Hub", href: "/vendor-hub" },
-            { label: "Community Calendar" },
-          ]}
-        />
-      </div>
-      <div className="p-6">
-        <CommunityCalendarClient />
-      </div>
-    </>
-  )
+import { COMMUNITY_CALENDAR_PATH } from "@/lib/community-calendar/routes"
+
+/** Legacy Vendor Hub path — Community Calendar is a shared top-level surface. */
+export default function VendorHubCommunityCalendarRedirectPage() {
+  redirect(COMMUNITY_CALENDAR_PATH)
 }

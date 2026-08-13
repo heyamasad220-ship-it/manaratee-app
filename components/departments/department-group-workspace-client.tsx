@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
@@ -33,6 +33,7 @@ import { DepartmentReportsPanel } from "@/components/departments/department-repo
 import { DepartmentSchedulePanel } from "@/components/departments/department-schedule-panel"
 import { DepartmentSettingsPanel } from "@/components/departments/department-settings-panel"
 import { DepartmentStudentsPanel } from "@/components/departments/department-students-panel"
+import { FinancePayrollQueuePanel } from "@/components/finance/finance-payroll-queue-panel"
 import { DonationGroupEditForm } from "@/components/donations/donation-group-edit-form"
 import { Header } from "@/components/layout/header"
 import { Badge } from "@/components/ui/badge"
@@ -61,6 +62,7 @@ import {
   isDepartmentYearRequiredTab,
   isDepartmentYearWorkspaceTab,
   parseDepartmentFinanceSection,
+  parseDepartmentScheduleSection,
   parseDepartmentStudentsSection,
   parseDepartmentWorkspaceTab,
   type GroupWorkspaceTab,
@@ -71,10 +73,15 @@ import {
   RETURN_TO_QUERY_PARAM,
 } from "@/lib/navigation/return-to"
 import {
-  PROGRAM_LABEL_PLURAL,
-  YEAR_SEASON_LABEL,
+  STAFF_MAIN_CONTENT_STICKY_TOP_CLASS,
+  STAFF_MAIN_CONTENT_STICKY_TOP_REM,
+} from "@/lib/layout/staff-dashboard-chrome"
+import {
+  getHierarchyLabels,
   YEAR_SEASON_LABEL_PLURAL,
 } from "@/lib/programs/program-display-labels"
+import type { ProgramKind } from "@/lib/programs/program-kind"
+import { normalizeProgramKind } from "@/lib/programs/program-kind"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 
@@ -115,12 +122,21 @@ export function DepartmentGroupWorkspaceClient({
   const [editOpen, setEditOpen] = useState(false)
   const [refreshToken, setRefreshToken] = useState(0)
   const [yearName, setYearName] = useState<string | null>(null)
+  const [yearProgramKind, setYearProgramKind] = useState<ProgramKind | null>(
+    null
+  )
+  const stickyChromeRef = useRef<HTMLDivElement>(null)
+  const [stickyChromeHeight, setStickyChromeHeight] = useState(0)
 
   const returnTo = searchParams.get(RETURN_TO_QUERY_PARAM)
   const rawTab = searchParams.get("tab")
   const activeTab = parseDepartmentWorkspaceTab(rawTab)
   const yearProgramId = searchParams.get("year")
   const financeSection = parseDepartmentFinanceSection(
+    rawTab,
+    searchParams.get("section")
+  )
+  const scheduleSection = parseDepartmentScheduleSection(
     rawTab,
     searchParams.get("section")
   )
@@ -140,6 +156,36 @@ export function DepartmentGroupWorkspaceClient({
       : safeReturnTo || WORKFORCE_DEPARTMENTS_PATH
 
   const backLabel = entryPoint === "donations" ? "Group Giving" : "Departments"
+
+  const hasGivingPreview = Boolean(pair?.groupContactId)
+  const resolvedTabPreview: GroupWorkspaceTab =
+    !hasGivingPreview && activeTab === "group-giving" ? "overview" : activeTab
+  const yearModePreview =
+    Boolean(yearProgramId) && isDepartmentYearWorkspaceTab(resolvedTabPreview)
+  const showFinanceChromePreview =
+    resolvedTabPreview === "financial" && !yearModePreview
+
+  useLayoutEffect(() => {
+    const el = stickyChromeRef.current
+    if (!el) return
+    const sync = () => setStickyChromeHeight(el.offsetHeight)
+    sync()
+    const observer = new ResizeObserver(sync)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [
+    resolvedTabPreview,
+    yearModePreview,
+    hasGivingPreview,
+    showFinanceChromePreview,
+    loading,
+    department,
+  ])
+
+  const financeStatsStickyTop =
+    stickyChromeHeight > 0
+      ? `calc(${STAFF_MAIN_CONTENT_STICKY_TOP_REM}rem + ${stickyChromeHeight}px)`
+      : `${STAFF_MAIN_CONTENT_STICKY_TOP_REM}rem`
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -214,22 +260,30 @@ export function DepartmentGroupWorkspaceClient({
   useEffect(() => {
     if (!yearProgramId) {
       setYearName(null)
+      setYearProgramKind(null)
       return
     }
 
     let cancelled = false
     void supabase
       .from("programs")
-      .select("id, name, department_id")
+      .select("id, name, department_id, program_kind")
       .eq("id", yearProgramId)
       .maybeSingle()
       .then(({ data }) => {
         if (cancelled) return
         if (!data || data.department_id !== departmentId) {
           setYearName(null)
+          setYearProgramKind(null)
           return
         }
-        setYearName((data.name as string) || YEAR_SEASON_LABEL)
+        const kind = normalizeProgramKind(
+          (data as { program_kind?: string }).program_kind
+        )
+        setYearProgramKind(kind)
+        setYearName(
+          (data.name as string) || getHierarchyLabels(kind).containerSingular
+        )
       })
 
     return () => {
@@ -257,6 +311,8 @@ export function DepartmentGroupWorkspaceClient({
         departmentGroupWorkspaceHref(departmentId, {
           tab: activeTab === "group-giving" && !pair ? "overview" : activeTab,
           finance: activeTab === "financial" ? financeSection : undefined,
+          scheduleSection:
+            activeTab === "schedule" ? scheduleSection : undefined,
           returnTo: safeReturnTo,
         }),
         { scroll: false }
@@ -271,6 +327,7 @@ export function DepartmentGroupWorkspaceClient({
     pair,
     router,
     safeReturnTo,
+    scheduleSection,
     yearProgramId,
   ])
 
@@ -322,6 +379,8 @@ export function DepartmentGroupWorkspaceClient({
     router.replace(
       departmentGroupWorkspaceHref(departmentId, {
         tab: safeTab,
+        finance: safeTab === "financial" ? financeSection : undefined,
+        scheduleSection: safeTab === "schedule" ? scheduleSection : undefined,
         returnTo: safeReturnTo,
       }),
       { scroll: false }
@@ -334,7 +393,18 @@ export function DepartmentGroupWorkspaceClient({
       departmentGroupWorkspaceHref(departmentId, {
         tab: "financial",
         finance: next,
-        yearProgramId: yearProgramId || undefined,
+        returnTo: safeReturnTo,
+      }),
+      { scroll: false }
+    )
+  }
+
+  function handleScheduleSectionChange(section: string) {
+    const next = parseDepartmentScheduleSection("schedule", section)
+    router.replace(
+      departmentGroupWorkspaceHref(departmentId, {
+        tab: "schedule",
+        scheduleSection: next,
         returnTo: safeReturnTo,
       }),
       { scroll: false }
@@ -398,15 +468,22 @@ export function DepartmentGroupWorkspaceClient({
     tab: "overview",
     returnTo: safeReturnTo,
   })
+  const departmentProgramsHref = departmentGroupWorkspaceHref(departmentId, {
+    tab: "programs",
+    returnTo: safeReturnTo,
+  })
 
+  const yearLabels = getHierarchyLabels(yearProgramKind)
   const breadcrumbExtras = yearMode
     ? [
         { label: displayName, href: departmentOverviewHref },
-        { label: yearName || YEAR_SEASON_LABEL },
+        { label: yearLabels.containerPlural, href: departmentProgramsHref },
+        { label: yearName || yearLabels.containerSingular },
       ]
     : [{ label: displayName }]
 
   const headerTitle = yearMode ? yearName || displayName : displayName
+  const showFinanceChrome = resolvedTab === "financial" && !yearMode
 
   return (
     <>
@@ -417,10 +494,10 @@ export function DepartmentGroupWorkspaceClient({
             {yearMode ? (
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-2xl font-semibold tracking-tight">
-                  {yearName || YEAR_SEASON_LABEL}
+                  {yearName || yearLabels.containerSingular}
                 </h1>
                 <Badge variant="outline" className="font-normal">
-                  {YEAR_SEASON_LABEL}
+                  {yearLabels.containerSingular}
                 </Badge>
               </div>
             ) : (
@@ -452,63 +529,98 @@ export function DepartmentGroupWorkspaceClient({
           ) : null}
         </div>
 
-        <Tabs value={resolvedTab} onValueChange={handleTabChange}>
-          <TabsList className="flex h-auto flex-wrap justify-start gap-1">
-            {yearMode ? (
-              <>
-                <TabsTrigger value="overview" className="gap-2">
-                  <LayoutDashboard className="size-4" />
-                  Overview
-                </TabsTrigger>
-                <TabsTrigger value="programs" className="gap-2">
-                  <BookOpen className="size-4" />
-                  {PROGRAM_LABEL_PLURAL}
-                </TabsTrigger>
-                <TabsTrigger value="students" className="gap-2">
-                  <Users className="size-4" />
-                  Registrations
-                </TabsTrigger>
-                <TabsTrigger value="schedule" className="gap-2">
-                  <CalendarClock className="size-4" />
-                  Schedule
-                </TabsTrigger>
-                <TabsTrigger value="financial" className="gap-2">
-                  <PieChart className="size-4" />
-                  Financial
-                </TabsTrigger>
-                <TabsTrigger value="reports" className="gap-2">
-                  <BarChart3 className="size-4" />
-                  Reports
-                </TabsTrigger>
-              </>
-            ) : (
-              <>
-                <TabsTrigger value="overview" className="gap-2">
-                  <LayoutDashboard className="size-4" />
-                  Overview
-                </TabsTrigger>
-                <TabsTrigger value="programs" className="gap-2">
-                  <BookOpen className="size-4" />
-                  {YEAR_SEASON_LABEL_PLURAL}
-                </TabsTrigger>
-                {hasGiving ? (
-                  <TabsTrigger value="group-giving" className="gap-2">
-                    <Heart className="size-4" />
-                    Group giving
+        <div
+          ref={stickyChromeRef}
+          className={cn(
+            "sticky z-40 -mx-6 space-y-3 border-b border-border bg-background/95 px-6 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/90",
+            STAFF_MAIN_CONTENT_STICKY_TOP_CLASS
+          )}
+        >
+          <Tabs value={resolvedTab} onValueChange={handleTabChange} className="gap-0">
+            <TabsList className="flex h-auto flex-wrap justify-start gap-1">
+              {yearMode ? (
+                <>
+                  <TabsTrigger value="overview" className="gap-2">
+                    <LayoutDashboard className="size-4" />
+                    Overview
                   </TabsTrigger>
-                ) : null}
-                <TabsTrigger value="activity" className="gap-2">
-                  <CalendarDays className="size-4" />
-                  Events
+                  <TabsTrigger value="programs" className="gap-2">
+                    <BookOpen className="size-4" />
+                    {yearLabels.offeringPlural}
+                  </TabsTrigger>
+                  <TabsTrigger value="students" className="gap-2">
+                    <Users className="size-4" />
+                    Registrations
+                  </TabsTrigger>
+                </>
+              ) : (
+                <>
+                  <TabsTrigger value="overview" className="gap-2">
+                    <LayoutDashboard className="size-4" />
+                    Overview
+                  </TabsTrigger>
+                  <TabsTrigger value="programs" className="gap-2">
+                    <BookOpen className="size-4" />
+                    {YEAR_SEASON_LABEL_PLURAL}
+                  </TabsTrigger>
+                  <TabsTrigger value="schedule" className="gap-2">
+                    <CalendarClock className="size-4" />
+                    Schedule
+                  </TabsTrigger>
+                  <TabsTrigger value="financial" className="gap-2">
+                    <PieChart className="size-4" />
+                    Financial
+                  </TabsTrigger>
+                  <TabsTrigger value="reports" className="gap-2">
+                    <BarChart3 className="size-4" />
+                    Reports
+                  </TabsTrigger>
+                  {hasGiving ? (
+                    <TabsTrigger value="group-giving" className="gap-2">
+                      <Heart className="size-4" />
+                      Group giving
+                    </TabsTrigger>
+                  ) : null}
+                  <TabsTrigger value="activity" className="gap-2">
+                    <CalendarDays className="size-4" />
+                    Events
+                  </TabsTrigger>
+                  <TabsTrigger value="settings" className="gap-2">
+                    <Settings className="size-4" />
+                    Settings
+                  </TabsTrigger>
+                </>
+              )}
+            </TabsList>
+          </Tabs>
+
+          {showFinanceChrome ? (
+            <Tabs
+              value={financeSection}
+              onValueChange={handleFinanceSectionChange}
+              className="gap-0"
+            >
+              <TabsList className="flex h-auto flex-wrap justify-start gap-1">
+                <TabsTrigger value="employees" className="gap-2">
+                  <Users className="size-4" />
+                  Employees
                 </TabsTrigger>
-                <TabsTrigger value="settings" className="gap-2">
-                  <Settings className="size-4" />
-                  Settings
+                <TabsTrigger value="payroll" className="gap-2">
+                  <Wallet className="size-4" />
+                  Payroll
                 </TabsTrigger>
-              </>
-            )}
-          </TabsList>
-        </Tabs>
+                <TabsTrigger value="expenses" className="gap-2">
+                  <DollarSign className="size-4" />
+                  Expenses
+                </TabsTrigger>
+                <TabsTrigger value="budget" className="gap-2">
+                  <PieChart className="size-4" />
+                  Financial Summary
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          ) : null}
+        </div>
 
         {resolvedTab === "overview" && !yearProgramId ? (
           <DepartmentOverviewPanel
@@ -566,41 +678,44 @@ export function DepartmentGroupWorkspaceClient({
           />
         ) : null}
 
-        {resolvedTab === "schedule" && yearProgramId ? (
+        {resolvedTab === "schedule" && !yearMode ? (
           <DepartmentSchedulePanel
             departmentId={department.id}
             departmentName={displayName}
+            initialSection={scheduleSection}
+            onSectionChange={handleScheduleSectionChange}
           />
         ) : null}
 
-        {resolvedTab === "financial" && yearProgramId ? (
+        {resolvedTab === "financial" && !yearMode ? (
           <div className="space-y-4">
-            <Tabs
-              value={financeSection}
-              onValueChange={handleFinanceSectionChange}
-            >
-              <TabsList className="flex h-auto flex-wrap justify-start gap-1">
-                <TabsTrigger value="payroll" className="gap-2">
-                  <Wallet className="size-4" />
-                  Payroll
-                </TabsTrigger>
-                <TabsTrigger value="expenses" className="gap-2">
-                  <DollarSign className="size-4" />
-                  Expenses
-                </TabsTrigger>
-                <TabsTrigger value="budget" className="gap-2">
-                  <PieChart className="size-4" />
-                  Financial Summary
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-
-            {financeSection === "payroll" ? (
+            {financeSection === "employees" ? (
               <DepartmentPayrollPanel
                 departmentId={department.id}
                 departmentName={displayName}
                 staff={department.staff}
                 onStaffChanged={load}
+                stickyStatsTop={financeStatsStickyTop}
+                variant="roster"
+              />
+            ) : null}
+
+            {financeSection === "payroll" ? (
+              <FinancePayrollQueuePanel
+                departmentId={department.id}
+                departmentName={displayName}
+                stickyStatsTop={financeStatsStickyTop}
+                employeeCount={department.staff.length}
+                compactStats
+                actions={
+                  <DepartmentPayrollPanel
+                    departmentId={department.id}
+                    departmentName={displayName}
+                    staff={department.staff}
+                    onStaffChanged={load}
+                    variant="periods"
+                  />
+                }
               />
             ) : null}
 
@@ -608,6 +723,7 @@ export function DepartmentGroupWorkspaceClient({
               <DepartmentExpensesPanel
                 departmentId={department.id}
                 departmentName={displayName}
+                stickyStatsTop={financeStatsStickyTop}
               />
             ) : null}
 
@@ -615,18 +731,18 @@ export function DepartmentGroupWorkspaceClient({
               <DepartmentBudgetPanel
                 departmentId={department.id}
                 departmentName={displayName}
+                stickyStatsTop={financeStatsStickyTop}
               />
             ) : null}
           </div>
         ) : null}
 
-        {resolvedTab === "reports" && yearProgramId ? (
+        {resolvedTab === "reports" && !yearMode ? (
           <DepartmentReportsPanel
             departmentId={department.id}
             departmentName={displayName}
             staff={department.staff}
             onStaffChanged={load}
-            initialYearProgramId={yearProgramId}
           />
         ) : null}
 

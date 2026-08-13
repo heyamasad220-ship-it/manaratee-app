@@ -244,6 +244,7 @@ export function ProgramDetailClient({
         <ProgramDetailHeaderActions
           programId={program.id}
           programStatus={program.status}
+          programKind={program.program_kind}
           onEditProgram={startEditingOverview}
         />
       </div>

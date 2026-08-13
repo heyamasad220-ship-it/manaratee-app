@@ -34,8 +34,7 @@ import {
 } from "@/components/ui/table"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import {
-  PROGRAM_LABEL,
-  YEAR_SEASON_LABEL,
+  getHierarchyLabels,
 } from "@/lib/programs/program-display-labels"
 import {
   contactLabel,
@@ -183,7 +182,10 @@ export default async function RegistrationDetailPage({
     enrolled: number
     waitlist: number
     status: string
+    program_kind?: string | null
   } | null
+
+  const hierarchy = getHierarchyLabels(program?.program_kind)
 
   const offering = enrollment.program_offerings as {
     id: string
@@ -279,7 +281,7 @@ export default async function RegistrationDetailPage({
                 ) : null}
               </div>
               <p className="mt-2 text-muted-foreground">
-                {participantName} · {program?.name || `Unknown ${YEAR_SEASON_LABEL}`}
+                {participantName} · {program?.name || `Unknown ${hierarchy.containerSingular}`}
               </p>
               <p className="text-xs text-muted-foreground">
                 ID {enrollment.id}
@@ -301,7 +303,7 @@ export default async function RegistrationDetailPage({
                 <Button variant="outline" asChild>
                   <Link href={`/programs/${program.id}`}>
                     <ExternalLink className="mr-2 h-4 w-4" />
-                    View {YEAR_SEASON_LABEL}
+                    View {hierarchy.containerSingular}
                   </Link>
                 </Button>
               </div>
@@ -429,15 +431,15 @@ export default async function RegistrationDetailPage({
 
           <Card>
             <CardHeader>
-              <CardTitle>{YEAR_SEASON_LABEL} Context</CardTitle>
+              <CardTitle>{hierarchy.containerSingular} Context</CardTitle>
               <CardDescription>
-                {YEAR_SEASON_LABEL}, {PROGRAM_LABEL.toLowerCase()}, and
+                {hierarchy.containerSingular}, {hierarchy.offeringSingular.toLowerCase()}, and
                 registration option for this record.
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-5 sm:grid-cols-2">
-              <DetailItem label={YEAR_SEASON_LABEL} value={program?.name} />
-              <DetailItem label={PROGRAM_LABEL} value={offeringLabel} />
+              <DetailItem label={hierarchy.containerSingular} value={program?.name} />
+              <DetailItem label={hierarchy.offeringSingular} value={offeringLabel} />
               <DetailItem
                 label="Registration Option"
                 value={registrationOptionLabel}
@@ -449,7 +451,7 @@ export default async function RegistrationDetailPage({
               {program ? (
                 <>
                   <DetailItem
-                    label={`${YEAR_SEASON_LABEL} Dates`}
+                    label={`${hierarchy.containerSingular} Dates`}
                     value={`${formatDate(program.start_date)} – ${formatDate(program.end_date)}`}
                   />
                   <DetailItem

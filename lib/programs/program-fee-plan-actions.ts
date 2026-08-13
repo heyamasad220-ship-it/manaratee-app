@@ -181,6 +181,26 @@ export async function saveOfferingFeePlans(input: {
     }
   }
 
+  const { data: programRow } = await supabase
+    .from("programs")
+    .select("program_kind")
+    .eq("organization_id", organizationId)
+    .eq("id", input.programId)
+    .maybeSingle()
+
+  if (programRow) {
+    const { assertFeePlanTypeAllowedForKind } = await import(
+      "@/lib/programs/program-kind-policy"
+    )
+    for (const plan of plans) {
+      const check = assertFeePlanTypeAllowedForKind({
+        programKind: (programRow as { program_kind?: string }).program_kind,
+        planType: plan.plan_type,
+      })
+      if (!check.ok) throw new Error(check.error)
+    }
+  }
+
   if (plans.length === 0) {
     return
   }

@@ -19,6 +19,31 @@
 | 12 | **Program kinds:** `academic` (year + offerings) vs `seasonal` (camp/season as one product). Same Programs menu; different create + settings chrome. SQL **`193`**. |
 | 13 | **Department is home** for dept-linked years/seasons: manage at `/workforce/departments/[id]/programs/[programId]/offerings/[offeringId]` so HR → Departments stays selected; legacy Programs-module URLs redirect. |
 
+## Decisions locked (August 2026) — Academic vs Seasonal product modes
+
+Shared Programs domain + registration/payment infra; two modes with distinct create/config/features/validation/terminology/reports. Hide + reject incompatible options by kind.
+
+| # | Decision |
+|---|----------|
+| A1 | Seasonal may have **multiple offerings** (age/gender bands) |
+| A2 | Gate by `program_kind` (not separate feature packs) for now |
+| A3 | Org entitlement: `organizations.program_kinds` = `academic` \| `seasonal` \| `both` (SQL **`246`**, default `both`) |
+| A4 | **Hard API validation** (not UI-only) via `lib/programs/program-kind-policy.ts` |
+| A5 | Terminology per mode via `getHierarchyLabels` / `getReportHierarchyLabels` (**Phases 2 + 5**); **no DB rename** yet |
+| A6 | Reports: shared engine + **Type** filter, kind-aware labels, and URL presets `?kind=` (**Phases 2–4**); not two report systems |
+
+**Phase 2 create chrome:** Department Programs catalog uses separate **Add Year** / **Add Season** CTAs (kind locked in dialog). Academic year → Add offering locks kind. `/programs/create?kind=` locks the create wizard.
+
+**Phase 3 report Type filters (Aug 2026):** Enrollments, Add-ons, and org Transactions join Registrations + Payment Summary — each has Type (Academic/Seasonal), kind-scoped Year/Season + Offering/Program option lists, and kind-aware column labels. Transactions hide donation rows (`programKind === null`) when a Type is selected.
+
+**Phase 4 report presets (Aug 2026):** Type filter syncs to `?kind=academic|seasonal` (`useProgramKindReportPreset`); Programs report nav preserves the preset across tabs. Attendance + Waitlist gain the same Type filter + kind-aware offering labels.
+
+**Phase 5 terminology polish (Aug 2026):** Known-kind staff surfaces use `getHierarchyLabels` — program create/edit form, year configure dialog, year defaults settings, offerings section, program detail header actions, registration detail, department year breadcrumb.
+
+**Phase 6 packaging UI (Aug 2026):** Org entitlement `organizations.program_kinds` editable from Platform Admin → Organizations → Modules (**Program modes**) and tenant **Billing** (org super-admin). Shared card: `organization-program-kinds-settings-card.tsx`; API `PATCH /api/platform/organizations/[id]/program-kinds`. Run SQL **`246`**.
+
+**Policy defaults:** Academic → full-program registration only; monthly / semester-style fee plans. Seasonal → full-program + selected sessions + day pass (+ drop-in); one-time / deposit / per-session / installments — **no monthly academic tuition**.
+
 Inherit columns (F1): `inherit_dates`, `inherit_eligibility`, `inherit_enrollment` on `program_offerings`.  
 New offerings default `true`; migration backfills existing rows to `false`. Seasonal programs hide inherit toggles (leaf is the top-level product UI).
 

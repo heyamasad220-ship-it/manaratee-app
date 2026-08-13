@@ -158,6 +158,14 @@ export async function getAddonReportRows(): Promise<
     const programNameById = new Map(
       programs.map((program) => [program.id, program.name])
     )
+    const programKindById = new Map(
+      programs.map((program) => [
+        program.id,
+        program.program_kind === "seasonal"
+          ? ("seasonal" as const)
+          : ("academic" as const),
+      ])
+    )
     const programDepartmentById = new Map(
       programs.map((program) => [
         program.id,
@@ -392,6 +400,9 @@ export async function getAddonReportRows(): Promise<
           programName: programId
             ? programNameById.get(programId) || YEAR_SEASON_LABEL
             : YEAR_SEASON_LABEL,
+          programKind: programId
+            ? programKindById.get(programId) || "academic"
+            : "academic",
           offeringId,
           offeringName: offeringId
             ? offeringNameById.get(offeringId) || PROGRAM_LABEL

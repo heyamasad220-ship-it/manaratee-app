@@ -330,7 +330,7 @@ const moduleChildren: Record<string, SubItem[]> = {
       permissionKey: "spaces.view",
     },
   ],
-  // Catalog / Schedule / Calendar are in-page tabs on Programs (ProgramsSectionNav).
+  // Programs catalog is a single page (no in-page Catalog/Calendar tabs).
   programs: [],
   finance: [
     {
@@ -346,7 +346,6 @@ const moduleChildren: Record<string, SubItem[]> = {
     { label: "Dashboard", href: "/vendor-hub", matchPrefix: "/vendor-hub", permissionKey: "vendor_hub.view" },
     { label: "Vendor Network", href: "/vendor-hub/network/vendors", matchPrefix: "/vendor-hub/network", permissionKey: "vendor_hub.view" },
     { label: "Bazaar Events", href: "/vendor-hub/events", matchPrefix: "/vendor-hub/events", permissionKey: "vendor_hub.manage" },
-    { label: "Community Calendar", href: "/vendor-hub/community-calendar", matchPrefix: "/vendor-hub/community-calendar", permissionKey: "vendor_hub.view" },
     { label: "Reports", href: "/vendor-hub/reports", matchPrefix: "/vendor-hub/reports", permissionKey: "reports.view" },
     { label: "Settings", href: "/vendor-hub/settings", matchPrefix: "/vendor-hub/settings", permissionKey: "vendor_hub.manage" },
   ],
@@ -421,10 +420,9 @@ function buildProgramsAndEventsChildren(availableSlugs: Set<string>): SubItem[] 
 
   if (availableSlugs.has("programs")) {
     items.push({
-      label: "Programs",
+      label: "Program Catalog",
       href: "/programs/catalog",
       matchPrefix: "/programs/catalog",
-      alsoMatchPrefixes: ["/programs/schedule", "/programs/calendar"],
       permissionKey: "programs.view",
     })
   }
@@ -553,6 +551,65 @@ function collapseProgramsAndEventsNavItems(items: NavItem[]): NavItem[] {
   return result
 }
 
+/** Shared Community Calendar — top-level when Vendor Hub and/or Event Management is enabled. */
+function injectCommunityCalendarNavItem(
+  items: NavItem[],
+  rows: SidebarModuleRow[]
+): NavItem[] {
+  const enabledSlugs = new Set(
+    rows.map((row) => normalizeModuleSlug(row.slug))
+  )
+  const hasVendorHub = enabledSlugs.has("vendor-hub")
+  const hasEvents = enabledSlugs.has("event-management")
+  if (!hasVendorHub && !hasEvents) {
+    return items
+  }
+
+  if (items.some((item) => item.matchPrefix === "/community-calendar")) {
+    return items
+  }
+
+  const calendarItem: NavItem = {
+    label: "Community Calendar",
+    href: "/community-calendar",
+    icon: Calendar,
+    matchPrefix: "/community-calendar",
+    alsoMatchPrefixes: ["/vendor-hub/community-calendar"],
+    permissionKeys: [
+      "vendor_hub.view",
+      "vendor_hub.manage",
+      "applications.view",
+      "events.view",
+      "events.manage",
+    ],
+  }
+
+  const result = [...items]
+  // Prefer insert after Programs/Events or Vendor Hub (whichever appears later).
+  let insertAt = -1
+  for (let i = 0; i < result.length; i++) {
+    const slug = result[i].moduleSlug
+      ? normalizeModuleSlug(result[i].moduleSlug || "")
+      : ""
+    if (
+      slug === "vendor-hub" ||
+      slug === PROGRAMS_AND_EVENTS_MODULE_SLUG ||
+      result[i].label === PROGRAMS_AND_EVENTS_MODULE_LABEL
+    ) {
+      insertAt = i
+    }
+  }
+
+  if (insertAt >= 0) {
+    result.splice(insertAt + 1, 0, calendarItem)
+  } else {
+    const dashboardIndex = result.findIndex((item) => item.label === "Dashboard")
+    result.splice(dashboardIndex >= 0 ? dashboardIndex + 1 : 0, 0, calendarItem)
+  }
+
+  return result
+}
+
 function userCanAccess(permissionContext: UserPermissionContext, permissionKey?: string) {
   if (!permissionKey) return true
   if (permissionContext.isOwner) return true
@@ -609,6 +666,11 @@ function filterNavItemsByPermissions(items: NavItem[], permissionContext: UserPe
       // Always show them in the rail; sub-nav items remain permission-gated.
       if (item.moduleSlug) {
         return true
+      }
+      if (item.permissionKeys?.length) {
+        return item.permissionKeys.some((key) =>
+          userCanAccess(permissionContext, key)
+        )
       }
       return userCanAccessModule(permissionContext, item.permissionKey, item.moduleSlug)
     })
@@ -753,7 +815,10 @@ function buildNavItems(
   ]
 
   return filterNavItemsByPermissions(
-    collapseProgramsAndEventsNavItems(allItems),
+    injectCommunityCalendarNavItem(
+      collapseProgramsAndEventsNavItems(allItems),
+      rows
+    ),
     permissionContext
   )
 }

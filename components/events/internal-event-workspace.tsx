@@ -15,6 +15,7 @@ import {
 import { Header } from "@/components/layout/header"
 import { InternalEventCardActions } from "@/components/events/internal-event-card-actions"
 import { InternalEventChildcareTab } from "@/components/events/internal-event-childcare-tab"
+import { InternalEventCommunityCalendarCard } from "@/components/events/internal-event-community-calendar-card"
 import { InternalEventFlyerCard } from "@/components/events/internal-event-flyer-card"
 import { InternalEventModuleSetupPanel } from "@/components/events/internal-event-module-setup-panel"
 import {
@@ -234,6 +235,12 @@ export function InternalEventWorkspace({
                 <InternalEventFlyerCard
                   eventId={event.id}
                   flyerUrl={event.flyer_url ?? null}
+                  canManage={canManage}
+                />
+
+                <InternalEventCommunityCalendarCard
+                  eventId={event.id}
+                  communityCalendarStatus={event.community_calendar_status}
                   canManage={canManage}
                 />
               </div>

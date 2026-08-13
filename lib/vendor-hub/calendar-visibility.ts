@@ -1,58 +1,12 @@
-export type BazaarCalendarVisibility = "private" | "community_visible" | "published"
-
-export const BAZAAR_CALENDAR_VISIBILITY_OPTIONS: {
-  value: BazaarCalendarVisibility
-  label: string
-  description: string
-}[] = [
-  {
-    value: "private",
-    label: "Private",
-    description: "Staff only — not shown on the community calendar.",
-  },
-  {
-    value: "community_visible",
-    label: "Community Visible",
-    description: "Visible to organization members on the community calendar.",
-  },
-  {
-    value: "published",
-    label: "Public",
-    description: "Publicly listed on the community calendar.",
-  },
-]
-
-export const CALENDAR_VISIBILITY_LABELS: Record<string, string> = {
-  private: "Private",
-  not_published: "Private",
-  ready_to_publish: "Private",
-  community_visible: "Community Visible",
-  published: "Public",
-}
-
-/** Map UI visibility to the value stored on vendor_hub_events.calendar_status. */
-export function calendarStatusFromVisibility(
-  visibility: BazaarCalendarVisibility
-): string {
-  if (visibility === "private") {
-    return "not_published"
-  }
-  return visibility
-}
-
-/** Map stored calendar_status back to UI visibility. */
-export function visibilityFromCalendarStatus(
-  status: string | null | undefined
-): BazaarCalendarVisibility {
-  if (status === "community_visible") {
-    return "community_visible"
-  }
-  if (status === "published") {
-    return "published"
-  }
-  return "private"
-}
-
-export function isVisibleOnCommunityCalendar(status: string | null | undefined) {
-  return status === "community_visible" || status === "published"
-}
+/**
+ * @deprecated Import from `@/lib/community-calendar/calendar-visibility`.
+ * Re-exported for Vendor Hub bazaar create/edit callers.
+ */
+export {
+  CALENDAR_VISIBILITY_LABELS,
+  calendarStatusFromVisibility,
+  isVisibleOnCommunityCalendar,
+  visibilityFromCalendarStatus,
+  COMMUNITY_CALENDAR_VISIBILITY_OPTIONS as BAZAAR_CALENDAR_VISIBILITY_OPTIONS,
+  type CommunityCalendarVisibility as BazaarCalendarVisibility,
+} from "@/lib/community-calendar/calendar-visibility"

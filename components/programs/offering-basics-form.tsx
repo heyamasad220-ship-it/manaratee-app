@@ -18,6 +18,7 @@ import {
   type ProgramOfferingStatus,
 } from "@/lib/programs/program-offering-types"
 import {
+  PROGRAM_KIND_DESCRIPTIONS,
   PROGRAM_KIND_LABELS,
   type ProgramKind,
 } from "@/lib/programs/program-kind"
@@ -58,6 +59,10 @@ export type OfferingBasicsFormProps = {
   /** Edit-only: include closed if the offering is already closed. */
   statusOptions?: ProgramOfferingStatus[]
   kindRadioName?: string
+  /** Org entitlement — hide modes the tenant cannot create. */
+  allowedKinds?: ProgramKind[]
+  /** When true, Type radio is hidden (kind locked by entry CTA / parent). */
+  hideKindPicker?: boolean
 }
 
 export function OfferingBasicsForm({
@@ -71,45 +76,62 @@ export function OfferingBasicsForm({
   staffOptions = [],
   statusOptions = ["draft", "active"],
   kindRadioName = "offering-form-kind",
+  allowedKinds,
+  hideKindPicker = false,
 }: OfferingBasicsFormProps) {
   const isSeasonal = values.kind === "seasonal"
+  const kindChoices =
+    allowedKinds && allowedKinds.length > 0
+      ? allowedKinds
+      : (Object.keys(PROGRAM_KIND_LABELS) as ProgramKind[])
+  const showKindPicker = !hideKindPicker && kindChoices.length > 1
 
   return (
     <div className="space-y-4">
-      <div className="space-y-2">
-        <Label>Type</Label>
-        <div className="grid gap-2 sm:grid-cols-2">
-          {(Object.keys(PROGRAM_KIND_LABELS) as ProgramKind[]).map((kind) => (
-            <label
-              key={kind}
-              className={cn(
-                "flex cursor-pointer items-center gap-2 rounded-md border p-3 text-sm font-medium transition-colors",
-                values.kind === kind
-                  ? "border-sky-500 bg-sky-50/80"
-                  : "hover:bg-muted/40",
-                disabled && "cursor-not-allowed opacity-60"
-              )}
-            >
-              <input
-                type="radio"
-                name={kindRadioName}
-                className="accent-sky-600"
-                checked={values.kind === kind}
-                onChange={() =>
-                  onChange({
-                    kind,
-                    ...(mode === "create"
-                      ? { openEnrollment: kind === "seasonal" }
-                      : {}),
-                  })
-                }
-                disabled={disabled}
-              />
-              {PROGRAM_KIND_LABELS[kind]}
-            </label>
-          ))}
+      {showKindPicker ? (
+        <div className="space-y-2">
+          <Label>Type</Label>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {kindChoices.map((kind) => (
+              <label
+                key={kind}
+                className={cn(
+                  "flex cursor-pointer items-center gap-2 rounded-md border p-3 text-sm font-medium transition-colors",
+                  values.kind === kind
+                    ? "border-sky-500 bg-sky-50/80"
+                    : "hover:bg-muted/40",
+                  disabled && "cursor-not-allowed opacity-60"
+                )}
+              >
+                <input
+                  type="radio"
+                  name={kindRadioName}
+                  className="accent-sky-600"
+                  checked={values.kind === kind}
+                  onChange={() =>
+                    onChange({
+                      kind,
+                      ...(mode === "create"
+                        ? { openEnrollment: kind === "seasonal" }
+                        : {}),
+                    })
+                  }
+                  disabled={disabled}
+                />
+                {PROGRAM_KIND_LABELS[kind]}
+              </label>
+            ))}
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="rounded-md border bg-muted/20 px-3 py-2 text-sm">
+          <span className="font-medium">{PROGRAM_KIND_LABELS[values.kind]}</span>
+          <span className="text-muted-foreground">
+            {" "}
+            — {PROGRAM_KIND_DESCRIPTIONS[values.kind]}
+          </span>
+        </div>
+      )}
 
       <div className="space-y-2">
         <Label htmlFor={`${mode}-offering-name`}>Name</Label>
@@ -354,7 +376,7 @@ export function OfferingBasicsForm({
                   min={0}
                   step="0.01"
                   inputMode="decimal"
-                  placeholder="Tuition"
+                  placeholder="Program Fee"
                   value={values.feeAmount ?? ""}
                   onChange={(event) =>
                     onChange({ feeAmount: event.target.value })

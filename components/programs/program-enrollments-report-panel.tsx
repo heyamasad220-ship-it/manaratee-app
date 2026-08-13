@@ -24,10 +24,9 @@ import {
 import { programOfferingManageHref } from "@/lib/programs/program-offering-paths"
 import type { ProgramOffering } from "@/lib/programs/program-offering-types"
 import {
-  PROGRAM_LABEL,
-  PROGRAM_LABEL_PLURAL,
-  YEAR_SEASON_LABEL,
+  getHierarchyLabels,
 } from "@/lib/programs/program-display-labels"
+import type { ProgramKind } from "@/lib/programs/program-kind"
 
 function formatDate(value: string | null) {
   if (!value) return "—"
@@ -71,12 +70,15 @@ function downloadCsv(filename: string, rows: string[][]) {
 export function ProgramEnrollmentsReportPanel({
   programId,
   programName,
+  programKind,
   offerings,
 }: {
   programId: string
   programName: string
+  programKind?: ProgramKind | string | null
   offerings: ProgramOffering[]
 }) {
+  const hierarchy = getHierarchyLabels(programKind)
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
   const [rows, setRows] = React.useState<ProgramEnrollmentReportRow[]>([])
@@ -131,7 +133,7 @@ export function ProgramEnrollmentsReportPanel({
       [
         [
           "Participant",
-          PROGRAM_LABEL,
+          hierarchy.offeringSingular,
           "Teacher",
           "Status",
           "Parent",
@@ -159,8 +161,8 @@ export function ProgramEnrollmentsReportPanel({
         <div>
           <h2 className="text-lg font-semibold tracking-tight">Enrollments</h2>
           <p className="text-sm text-muted-foreground">
-            Participants registered across {PROGRAM_LABEL_PLURAL.toLowerCase()} for
-            this {YEAR_SEASON_LABEL.toLowerCase()}.
+            Participants registered across {hierarchy.offeringPlural.toLowerCase()} for
+            this {hierarchy.containerSingular.toLowerCase()}.
           </p>
         </div>
         <Button
@@ -177,14 +179,14 @@ export function ProgramEnrollmentsReportPanel({
 
       <div className="flex flex-wrap items-end gap-4 rounded-lg border bg-card p-3">
         <div className="space-y-1.5">
-          <Label htmlFor="report-offering">{PROGRAM_LABEL}</Label>
+          <Label htmlFor="report-offering">{hierarchy.offeringSingular}</Label>
           <select
             id="report-offering"
             value={offeringFilter}
             onChange={(event) => setOfferingFilter(event.target.value)}
             className="h-9 min-w-[12rem] rounded-md border bg-background px-3 text-sm"
           >
-            <option value="all">All {PROGRAM_LABEL_PLURAL.toLowerCase()}</option>
+            <option value="all">All {hierarchy.offeringPlural.toLowerCase()}</option>
             {activeOfferings.map((offering) => (
               <option key={offering.id} value={offering.id}>
                 {offering.name}
@@ -223,7 +225,7 @@ export function ProgramEnrollmentsReportPanel({
           layout="header"
           fill
           tone="violet"
-          label={PROGRAM_LABEL_PLURAL}
+          label={hierarchy.offeringPlural}
           value={byOffering}
         />
         <StatCard
@@ -261,7 +263,7 @@ export function ProgramEnrollmentsReportPanel({
             <TableHeader>
               <TableRow>
                 <TableHead>Participant</TableHead>
-                <TableHead>{PROGRAM_LABEL}</TableHead>
+                <TableHead>{hierarchy.offeringSingular}</TableHead>
                 <TableHead>Teacher</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Parent / Guardian</TableHead>

@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { departmentsMasterCalendarHref } from "@/lib/departments/departments-section-path"
+import { eventManagementMasterCalendarHref } from "@/lib/events/event-management-section-path"
 import { getInternalEventStatusLabel } from "@/lib/events/internal-event-status"
 import {
   formatInternalEventLocation,
@@ -50,7 +50,7 @@ type InternalEventsCalendarClientProps = {
   initialDepartmentId: string | null
   canBookSpace: boolean
   returnTo?: string | null
-  /** When true, page already rendered Header + Departments tabs. */
+  /** When true, page already rendered Header + Events section tabs. */
   hideHeader?: boolean
 }
 
@@ -176,7 +176,7 @@ export function InternalEventsCalendarClient({
       next.department === undefined ? initialDepartmentId : next.department
     startTransition(() => {
       router.push(
-        departmentsMasterCalendarHref({
+        eventManagementMasterCalendarHref({
           month: next.month ?? toMonthParam(monthAnchor),
           departmentId: department,
           returnTo,
@@ -195,7 +195,7 @@ export function InternalEventsCalendarClient({
       departmentId: initialDepartmentId,
       returnTo:
         returnTo ||
-        departmentsMasterCalendarHref({
+        eventManagementMasterCalendarHref({
           departmentId: initialDepartmentId,
         }),
       openNew: true,
@@ -215,7 +215,7 @@ export function InternalEventsCalendarClient({
 
   return (
     <>
-      {hideHeader ? null : <Header title="Departments" />}
+      {hideHeader ? null : <Header title="Events" />}
 
       <div className="flex flex-col gap-6 p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">

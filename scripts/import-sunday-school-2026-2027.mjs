@@ -9,7 +9,10 @@
  *
  * Fee rules (confirmed Aug 2026):
  *   - $120 per student (sibling #2+ get 5% off → $114)
- *   - ADDONS_AMOUNT = $5 transaction fee (staff families are 50% of that)
+ *   - Payments sheet is source of truth for money received:
+ *       REGISTRATION_AMOUNT → tuition payments (amount + date)
+ *       ADDONS_AMOUNT → $5 transaction fee (staff families are 50% of that)
+ *   - Master Registration Report is source of truth for tuition due / discounts
  *   - Staff families: 50% staff discount
  *   - Habiba Hassan: 3% full-payment discount; tuition $234; paid $240 (extra $6)
  *   - Skip Zachie/Ihab Neel; skip withdrawn/cancelled (Walaa Hatamleh, Rosemary Admiral)
@@ -315,6 +318,44 @@ function resolveChargeStatus(total, paid) {
   if (paid + 0.009 >= total) return "paid"
   if (paid > 0) return "partially_paid"
   return "pending_payment"
+}
+
+function isoDateOnly(iso) {
+  if (!iso) return null
+  return String(iso).slice(0, 10)
+}
+
+async function replaceChargePaymentSchedules(sb, chargeId, payments, labelPrefix) {
+  await sb
+    .from("program_charge_schedule")
+    .delete()
+    .eq("organization_id", ORG_ID)
+    .eq("charge_id", chargeId)
+
+  if (!payments?.length) return 0
+
+  const rows = payments.map((payment, index) => ({
+    organization_id: ORG_ID,
+    charge_id: chargeId,
+    schedule_type: "custom",
+    label: `${labelPrefix} ${isoDateOnly(payment.iso) || index + 1}`,
+    due_date: isoDateOnly(payment.iso),
+    amount: round2(payment.amount),
+    sequence_number: index + 1,
+    status: "paid",
+    charge_category: "tuition",
+    paid_at: payment.iso,
+    metadata: {
+      import_tag: IMPORT_TAG,
+      payment_key: payment.key,
+      amount_type: payment.amountType || null,
+      source: "payments_sheet",
+    },
+  }))
+
+  const { error } = await sb.from("program_charge_schedule").insert(rows)
+  if (error) throw new Error(`schedule insert: ${error.message}`)
+  return rows.length
 }
 
 async function must(label, promise) {
@@ -1122,19 +1163,67 @@ function attachPayments(families, payRows, report) {
 }
 
 function allocateTuitionPaid(family) {
-  // Master Registration Report is the source of truth for tuition due/paid.
-  // Do not fold SUBSCRIPTION_AMOUNT (e.g. Habiba $2,042.82) into program fees.
-  family.addonPayments = family.payments.filter(
+  // Payments sheet is the source of truth for money received.
+  const tuitionPayments = (family.payments || [])
+    .filter(
+      (p) =>
+        p.amountType === "REGISTRATION_AMOUNT" &&
+        p.amount > 0 &&
+        p.status !== "refunded"
+    )
+    .sort((a, b) => String(a.iso || "").localeCompare(String(b.iso || "")))
+
+  family.tuitionPayments = tuitionPayments
+  family.addonPayments = (family.payments || []).filter(
     (p) =>
       p.amountType === "ADDONS_AMOUNT" &&
       p.status !== "refunded" &&
       p.amount > 0
   )
-  if ((!family.addonTotal || family.addonTotal <= 0) && family.addonPayments.length) {
-    family.addonTotal = round2(
-      family.addonPayments.reduce((sum, p) => sum + p.amount, 0)
-    )
-  }
+
+  const sheetTuitionPaid = round2(
+    tuitionPayments.reduce((sum, p) => sum + p.amount, 0)
+  )
+  const sheetAddonPaid = round2(
+    family.addonPayments.reduce((sum, p) => sum + p.amount, 0)
+  )
+
+  // Prefer sheet tuition paid; fall back to Master Registration Paid when no rows match.
+  const familyPaid =
+    tuitionPayments.length > 0
+      ? sheetTuitionPaid
+      : family.masterPaid != null
+        ? family.masterPaid
+        : 0
+
+  family.tuitionPaid = familyPaid
+  family.addonTotal =
+    sheetAddonPaid > 0.009
+      ? sheetAddonPaid
+      : family.masterAddons != null && family.masterAddons > 0
+        ? family.masterAddons
+        : 0
+
+  family.paidSource =
+    tuitionPayments.length > 0 ? "payments_sheet" : "master_paid"
+
+  // Re-allocate paid shares across children (due amounts already set from Master fee).
+  const familyDue = round2(
+    family.children.reduce((sum, child) => sum + (child.totalAmount || 0), 0)
+  )
+  let remainingPaid = familyPaid
+  family.children.forEach((child, index) => {
+    if (index === family.children.length - 1) {
+      child.amountPaid = round2(Math.max(0, remainingPaid))
+    } else {
+      const share =
+        familyDue > 0.009
+          ? round2((familyPaid * child.totalAmount) / familyDue)
+          : 0
+      child.amountPaid = share
+      remainingPaid = round2(remainingPaid - share)
+    }
+  })
 }
 
 async function main() {
@@ -1500,6 +1589,8 @@ async function main() {
                 plan_count: child.planCount,
                 sibling_index: child.siblingIndex,
                 discount_kind: family.discountKind,
+                family_payment_host: child.siblingIndex === 0,
+                paid_source: family.paidSource || null,
               },
               quote_snapshot: { import: IMPORT_TAG },
             })
@@ -1543,6 +1634,26 @@ async function main() {
           })
         })
         await sb.from("program_charge_lines").insert(lines)
+
+        // Actual Payments-sheet tuition events live on the family host charge only
+        // so Contact → Financial shows real $120 dates instead of split child shares.
+        if (
+          child.siblingIndex === 0 &&
+          (family.tuitionPayments || []).length > 0
+        ) {
+          await replaceChargePaymentSchedules(
+            sb,
+            charge.id,
+            family.tuitionPayments,
+            "Payment"
+          )
+        } else {
+          await sb
+            .from("program_charge_schedule")
+            .delete()
+            .eq("organization_id", ORG_ID)
+            .eq("charge_id", charge.id)
+        }
 
         if (child.planCount > 0) {
           const planResult = await upsertEnrollmentPaymentPlans(sb, {
@@ -1606,22 +1717,25 @@ async function main() {
               .eq("charge_type", "addon")
               .contains("metadata", { import_key: addonKey })
               .maybeSingle()
-            if (!existingAddon) {
-              const addonPaidAt =
-                family.addonPayments.find((p) => p.iso)?.iso ||
-                family.payments.find((p) => p.amount > 0 && p.iso)?.iso ||
-                null
-              const qty =
-                family.children.length > 1 &&
-                approxEqual(addonAmount, family.children.length * TXN_FEE)
-                  ? family.children.length
-                  : family.children.length > 1 &&
-                      approxEqual(
-                        addonAmount,
-                        family.children.length * (TXN_FEE / 2)
-                      )
-                    ? family.children.length
-                    : 1
+
+            const addonPayments =
+              family.addonPayments?.length > 0
+                ? family.addonPayments
+                : [
+                    {
+                      amount: addonAmount,
+                      iso:
+                        family.payments.find((p) => p.amount > 0 && p.iso)?.iso ||
+                        null,
+                      key: addonKey,
+                      amountType: "ADDONS_AMOUNT",
+                    },
+                  ]
+            const addonPaidAt = addonPayments.find((p) => p.iso)?.iso || null
+            const qty = addonPayments.length > 1 ? addonPayments.length : 1
+
+            let addonChargeId = existingAddon?.id || null
+            if (!addonChargeId) {
               const addonCharge = await must(
                 `addon fee ${family.parentEmail || family.parentPhone}`,
                 sb
@@ -1652,6 +1766,7 @@ async function main() {
                       import_key: addonKey,
                       label: "Transaction fee",
                       staff_half: family.discountKind === "staff",
+                      paid_source: family.paidSource || null,
                     },
                     quote_snapshot: {
                       import: IMPORT_TAG,
@@ -1661,9 +1776,10 @@ async function main() {
                   .select("id")
                   .single()
               )
+              addonChargeId = addonCharge.id
               await sb.from("program_charge_lines").insert({
                 organization_id: ORG_ID,
-                charge_id: addonCharge.id,
+                charge_id: addonChargeId,
                 line_type: "addon",
                 label: "Transaction fee",
                 quantity: qty,
@@ -1676,7 +1792,25 @@ async function main() {
                 },
               })
               report.createdAddonCharges += 1
+            } else {
+              await sb
+                .from("program_charges")
+                .update({
+                  total: addonAmount,
+                  subtotal: addonAmount,
+                  amount_paid: addonAmount,
+                  paid_at: addonPaidAt,
+                })
+                .eq("id", addonChargeId)
+                .eq("organization_id", ORG_ID)
             }
+
+            await replaceChargePaymentSchedules(
+              sb,
+              addonChargeId,
+              addonPayments,
+              "Transaction fee"
+            )
           }
         }
       }

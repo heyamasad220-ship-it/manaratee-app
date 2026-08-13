@@ -585,6 +585,7 @@ export function OfferingEditDialog({
                     offering={offering}
                     workspaceData={workspaceData}
                     registrationOptions={workspaceData.registrationOptions}
+                    programKind={program.program_kind}
                     saveHandlerRef={pricingSaveRef}
                   >
                     <OfferingPricingPanel
@@ -592,6 +593,7 @@ export function OfferingEditDialog({
                       offering={offering}
                       workspaceData={workspaceData}
                       registrationOptions={workspaceData.registrationOptions}
+                      programKind={program.program_kind}
                       showSaveButton={false}
                       showTitle={false}
                       showPaymentStructure={false}

@@ -43,6 +43,10 @@ export async function createDefaultOffering(input: CreateDefaultOfferingInput) {
     .maybeSingle()
 
   const attributes = attributesFromProgramRow(program || {})
+  const sortOrder = await nextOfferingSortOrder(
+    input.organizationId,
+    input.programId
+  )
 
   const { data, error } = await supabase
     .from("program_offerings")
@@ -57,6 +61,7 @@ export async function createDefaultOffering(input: CreateDefaultOfferingInput) {
       enrollment_open_date: input.enrollmentOpenDate ?? null,
       enrollment_close_date: input.enrollmentCloseDate ?? null,
       status: offeringStatus,
+      sort_order: sortOrder,
       ...DEFAULT_NEW_OFFERING_INHERIT_FLAGS,
       ...attributes,
     })
@@ -188,6 +193,85 @@ function revalidateProgramPaths(programId: string) {
   revalidatePath(`/customer/programs/${programId}/register`)
 }
 
+async function nextOfferingSortOrder(
+  organizationId: string,
+  programId: string
+) {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from("program_offerings")
+    .select("sort_order")
+    .eq("organization_id", organizationId)
+    .eq("program_id", programId)
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error) {
+    console.error("nextOfferingSortOrder:", error.message)
+    return 10
+  }
+
+  return Number(data?.sort_order || 0) + 10
+}
+
+export async function reorderProgramOfferings(input: {
+  programId: string
+  orderedOfferingIds: string[]
+}) {
+  const supabase = await createClient()
+  const organizationId = await getSelectedOrganizationId()
+
+  if (!organizationId) {
+    throw new Error("No organization selected")
+  }
+
+  const uniqueIds = Array.from(
+    new Set(input.orderedOfferingIds.filter(Boolean))
+  )
+  if (uniqueIds.length === 0) {
+    return
+  }
+
+  const { data: existing, error: loadError } = await supabase
+    .from("program_offerings")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("program_id", input.programId)
+    .neq("status", "archived")
+
+  if (loadError) {
+    console.error("reorderProgramOfferings load:", loadError.message)
+    throw new Error("Failed to load offerings for reorder.")
+  }
+
+  const allowedIds = new Set((existing || []).map((row) => row.id as string))
+  const orderedInProgram = uniqueIds.filter((id) => allowedIds.has(id))
+
+  if (orderedInProgram.length !== allowedIds.size) {
+    throw new Error("Offerings list is out of date. Refresh and try again.")
+  }
+
+  const updates = await Promise.all(
+    orderedInProgram.map((id, index) =>
+      supabase
+        .from("program_offerings")
+        .update({ sort_order: (index + 1) * 10 })
+        .eq("id", id)
+        .eq("organization_id", organizationId)
+        .eq("program_id", input.programId)
+    )
+  )
+
+  const failed = updates.find((result) => result.error)
+  if (failed?.error) {
+    console.error("reorderProgramOfferings:", failed.error)
+    throw new Error("Failed to save offering order.")
+  }
+
+  revalidateProgramPaths(input.programId)
+}
+
 export async function createProgramOffering(
   programId: string,
   input: ProgramOfferingInput,
@@ -223,6 +307,10 @@ export async function createProgramOffering(
     .neq("status", "archived")
 
   const isDefault = (existingCount ?? 0) === 0
+  const sortOrder = await nextOfferingSortOrder(
+    resolvedOrganizationId,
+    programId
+  )
 
   const { data, error } = await supabase
     .from("program_offerings")
@@ -239,6 +327,7 @@ export async function createProgramOffering(
       enrollment_close_date:
         input.enrollment_close_date ?? program.enrollment_close_date,
       status: offeringStatus,
+      sort_order: sortOrder,
       inherit_dates:
         input.inherit_dates ?? DEFAULT_NEW_OFFERING_INHERIT_FLAGS.inherit_dates,
       inherit_eligibility:

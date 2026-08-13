@@ -26,16 +26,14 @@ import {
 } from "@/components/ui/table"
 import { financialActivityStatusBadgeClass } from "@/lib/donations/donation-status"
 import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
-import {
-  PROGRAM_LABEL,
-  YEAR_SEASON_LABEL,
-} from "@/lib/programs/program-display-labels"
+import { getReportHierarchyLabels } from "@/lib/programs/program-display-labels"
 import {
   fetchOrgPaymentTransactionsAction,
   type OrgPaymentTransactionRow,
   type OrgPaymentTransactionStatus,
 } from "@/lib/reports/org-payment-transactions"
 import { cn } from "@/lib/utils"
+import { useProgramKindReportPreset } from "@/hooks/use-program-kind-report-preset"
 
 const ALL = "all"
 type OfferingActivityFilter = "all" | "active" | "closed"
@@ -92,10 +90,14 @@ function PaymentTransactionsTable({
   rows,
   paymentStatusFilter,
   onPaymentStatusFilterChange,
+  programColumnLabel,
+  offeringColumnLabel,
 }: {
   rows: OrgPaymentTransactionRow[]
   paymentStatusFilter: PaymentStatusFilter
   onPaymentStatusFilterChange: (value: PaymentStatusFilter) => void
+  programColumnLabel: string
+  offeringColumnLabel: string
 }) {
   return (
     <div className="overflow-x-auto rounded-lg border">
@@ -104,8 +106,8 @@ function PaymentTransactionsTable({
           <TableRow>
             <TableHead>Payment date</TableHead>
             <TableHead>Contact</TableHead>
-            <TableHead>Program</TableHead>
-            <TableHead>Offering</TableHead>
+            <TableHead>{programColumnLabel}</TableHead>
+            <TableHead>{offeringColumnLabel}</TableHead>
             <TableHead>Payment type</TableHead>
             <TableHead className="text-right">Amount</TableHead>
             <TableHead>Payment method</TableHead>
@@ -217,12 +219,22 @@ export function OrgReportsClient({
   const [error, setError] = React.useState<string | null>(null)
   const [rows, setRows] = React.useState<OrgPaymentTransactionRow[]>([])
   const [departmentFilter, setDepartmentFilter] = React.useState(ALL)
+  const { kindFilter, setKindFilter } = useProgramKindReportPreset()
   const [programFilter, setProgramFilter] = React.useState(ALL)
   const [offeringFilter, setOfferingFilter] = React.useState(ALL)
   const [statusFilter, setStatusFilter] =
     React.useState<OfferingActivityFilter>("active")
   const [paymentStatusFilter, setPaymentStatusFilter] =
     React.useState<PaymentStatusFilter>("default")
+
+  React.useEffect(() => {
+    setProgramFilter(ALL)
+    setOfferingFilter(ALL)
+  }, [kindFilter])
+
+  const reportLabels = getReportHierarchyLabels(
+    kindFilter === "all" ? null : kindFilter
+  )
 
   React.useEffect(() => {
     const tab = searchParams.get("tab")
@@ -268,21 +280,27 @@ export function OrgReportsClient({
   )
 
   const programOptions = React.useMemo(() => {
-    const scoped =
-      departmentFilter === ALL
-        ? rows
-        : rows.filter((row) => row.departmentId === departmentFilter)
+    let scoped = rows
+    if (departmentFilter !== ALL) {
+      scoped = scoped.filter((row) => row.departmentId === departmentFilter)
+    }
+    if (kindFilter !== "all") {
+      scoped = scoped.filter((row) => row.programKind === kindFilter)
+    }
     return uniqueOptions(
       scoped,
       (row) => row.programId,
       (row) => row.programName
     )
-  }, [rows, departmentFilter])
+  }, [rows, departmentFilter, kindFilter])
 
   const offeringOptions = React.useMemo(() => {
     let scoped = rows
     if (departmentFilter !== ALL) {
       scoped = scoped.filter((row) => row.departmentId === departmentFilter)
+    }
+    if (kindFilter !== "all") {
+      scoped = scoped.filter((row) => row.programKind === kindFilter)
     }
     if (programFilter !== ALL) {
       scoped = scoped.filter((row) => row.programId === programFilter)
@@ -292,7 +310,7 @@ export function OrgReportsClient({
       (row) => row.offeringId,
       (row) => row.offeringName
     )
-  }, [rows, departmentFilter, programFilter])
+  }, [rows, departmentFilter, kindFilter, programFilter])
 
   React.useEffect(() => {
     if (
@@ -317,6 +335,12 @@ export function OrgReportsClient({
       if (departmentFilter !== ALL && row.departmentId !== departmentFilter) {
         return false
       }
+      if (kindFilter !== "all") {
+        // Donations have null programKind — hide them when filtering by type.
+        if (row.programKind !== kindFilter) {
+          return false
+        }
+      }
       if (programFilter !== ALL && row.programId !== programFilter) {
         return false
       }
@@ -337,6 +361,7 @@ export function OrgReportsClient({
   }, [
     rows,
     departmentFilter,
+    kindFilter,
     programFilter,
     offeringFilter,
     statusFilter,
@@ -345,6 +370,7 @@ export function OrgReportsClient({
 
   const filtersActive =
     departmentFilter !== ALL ||
+    kindFilter !== "all" ||
     programFilter !== ALL ||
     offeringFilter !== ALL ||
     statusFilter !== "active" ||
@@ -393,8 +419,30 @@ export function OrgReportsClient({
             </SelectContent>
           </Select>
         </div>
+        <div className="space-y-1.5 sm:w-36">
+          <Label htmlFor="transactions-kind">Type</Label>
+          <Select
+            value={kindFilter}
+            onValueChange={(value) => {
+              setKindFilter(value as "all" | "academic" | "seasonal")
+              setProgramFilter(ALL)
+              setOfferingFilter(ALL)
+            }}
+          >
+            <SelectTrigger id="transactions-kind">
+              <SelectValue placeholder="All types" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All types</SelectItem>
+              <SelectItem value="academic">Academic</SelectItem>
+              <SelectItem value="seasonal">Seasonal</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
         <div className="space-y-1.5 sm:w-44">
-          <Label htmlFor="transactions-program">{YEAR_SEASON_LABEL}</Label>
+          <Label htmlFor="transactions-program">
+            {reportLabels.containerSingular}
+          </Label>
           <Select
             value={programFilter}
             onValueChange={(value) => {
@@ -404,12 +452,12 @@ export function OrgReportsClient({
           >
             <SelectTrigger id="transactions-program">
               <SelectValue
-                placeholder={`All ${YEAR_SEASON_LABEL.toLowerCase()}s`}
+                placeholder={`All ${reportLabels.containerPlural.toLowerCase()}`}
               />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={ALL}>
-                All {YEAR_SEASON_LABEL.toLowerCase()}s
+                All {reportLabels.containerPlural.toLowerCase()}
               </SelectItem>
               {programOptions.map((option) => (
                 <SelectItem key={option.id} value={option.id}>
@@ -420,16 +468,18 @@ export function OrgReportsClient({
           </Select>
         </div>
         <div className="space-y-1.5 sm:w-44">
-          <Label htmlFor="transactions-offering">{PROGRAM_LABEL}</Label>
+          <Label htmlFor="transactions-offering">
+            {reportLabels.offeringSingular}
+          </Label>
           <Select value={offeringFilter} onValueChange={setOfferingFilter}>
             <SelectTrigger id="transactions-offering">
               <SelectValue
-                placeholder={`All ${PROGRAM_LABEL.toLowerCase()}s`}
+                placeholder={`All ${reportLabels.offeringPlural.toLowerCase()}`}
               />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={ALL}>
-                All {PROGRAM_LABEL.toLowerCase()}s
+                All {reportLabels.offeringPlural.toLowerCase()}
               </SelectItem>
               {offeringOptions.map((option) => (
                 <SelectItem key={option.id} value={option.id}>
@@ -463,6 +513,7 @@ export function OrgReportsClient({
             variant="ghost"
             onClick={() => {
               setDepartmentFilter(ALL)
+              setKindFilter("all")
               setProgramFilter(ALL)
               setOfferingFilter(ALL)
               setStatusFilter("active")
@@ -478,6 +529,8 @@ export function OrgReportsClient({
         rows={filteredRows}
         paymentStatusFilter={paymentStatusFilter}
         onPaymentStatusFilterChange={setPaymentStatusFilter}
+        programColumnLabel={reportLabels.containerSingular}
+        offeringColumnLabel={reportLabels.offeringSingular}
       />
     </div>
   )

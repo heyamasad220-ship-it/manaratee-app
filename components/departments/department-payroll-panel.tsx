@@ -1,7 +1,6 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
-import Link from "next/link"
 import {
   Check,
   Clock,
@@ -11,12 +10,12 @@ import {
   Plus,
   Send,
   Trash2,
-  UserMinus,
   Users,
   Wallet,
   X,
 } from "lucide-react"
 
+import { DepartmentEmployeeProfileSheet } from "@/components/departments/department-employee-profile-sheet"
 import { HrContactPicker } from "@/components/hr/hr-contact-picker"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -48,13 +47,10 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
-import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
 import type { DepartmentStaffMember } from "@/lib/departments/department-actions"
 import {
   addEmployeeToDepartmentAction,
   listHrPositionsForDepartmentFormAction,
-  removeStaffFromDepartmentAction,
-  updateDepartmentEmployeeAction,
 } from "@/lib/departments/department-staff-actions"
 import {
   approvePayPeriodAction,
@@ -151,6 +147,8 @@ export function DepartmentPayrollPanel({
   openYearsOnly = true,
   programId = null,
   readOnly = false,
+  stickyStatsTop,
+  variant = "combined",
 }: {
   departmentId: string
   departmentName: string
@@ -159,6 +157,14 @@ export function DepartmentPayrollPanel({
   openYearsOnly?: boolean
   programId?: string | null
   readOnly?: boolean
+  /** CSS `top` so KPI cards stick below department workspace tab chrome. */
+  stickyStatsTop?: string
+  /**
+   * `roster` — Employees tab (staff only).
+   * `periods` — Payroll tab (pay periods, log hours, create periods).
+   * `combined` — legacy / reports mixed view.
+   */
+  variant?: "roster" | "periods" | "combined"
 }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -172,7 +178,7 @@ export function DepartmentPayrollPanel({
   const [detailRow, setDetailRow] = useState<DepartmentPayPeriodRow | null>(null)
   const [detailLogs, setDetailLogs] = useState<DepartmentHourLogRow[]>([])
   const [employeeDialogOpen, setEmployeeDialogOpen] = useState(false)
-  const [editingMember, setEditingMember] = useState<DepartmentStaffMember | null>(null)
+  const [profileStaffId, setProfileStaffId] = useState<string | null>(null)
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null)
   const [selectedContactLabel, setSelectedContactLabel] = useState("")
   const [staffType, setStaffType] = useState<string>("full_time")
@@ -185,8 +191,6 @@ export function DepartmentPayrollPanel({
   const [positionsLoading, setPositionsLoading] = useState(false)
   const [employeeError, setEmployeeError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
-
-  const isEditingEmployee = Boolean(editingMember)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -217,7 +221,7 @@ export function DepartmentPayrollPanel({
     let cancelled = false
     async function loadPositions() {
       setPositionsLoading(true)
-      const result = await listHrPositionsForDepartmentFormAction()
+      const result = await listHrPositionsForDepartmentFormAction(departmentId)
       if (!cancelled) {
         if (result.success) setPositions(result.positions)
         else setPositions([])
@@ -228,24 +232,33 @@ export function DepartmentPayrollPanel({
     return () => {
       cancelled = true
     }
-  }, [employeeDialogOpen])
+  }, [employeeDialogOpen, departmentId])
 
   const staffById = useMemo(() => {
     return new Map(staff.map((member) => [member.staffId, member]))
   }, [staff])
 
+  const showRoster = variant === "roster" || variant === "combined"
+  const showPeriods = variant === "periods" || variant === "combined"
+  const isRosterOnly = variant === "roster"
+  const isPeriodsOnly = variant === "periods"
+
   const mergedRows: MergedRow[] = useMemo(() => {
-    const payRows: MergedRow[] = rows.map((pay) => ({
-      kind: "pay",
-      pay,
-      member: staffById.get(pay.staffId) ?? null,
-    }))
+    const payRows: MergedRow[] = showPeriods
+      ? rows.map((pay) => ({
+          kind: "pay",
+          pay,
+          member: staffById.get(pay.staffId) ?? null,
+        }))
+      : []
+    if (!showRoster) return payRows
+
     const staffIdsWithPay = new Set(rows.map((row) => row.staffId))
     const staffOnly: MergedRow[] = staff
-      .filter((member) => !staffIdsWithPay.has(member.staffId))
+      .filter((member) => (isRosterOnly ? true : !staffIdsWithPay.has(member.staffId)))
       .map((member) => ({ kind: "staff", member }))
     return [...payRows, ...staffOnly]
-  }, [rows, staff, staffById])
+  }, [rows, staff, staffById, showPeriods, showRoster, isRosterOnly])
 
   async function openDetail(row: DepartmentPayPeriodRow) {
     setDetailRow(row)
@@ -275,7 +288,6 @@ export function DepartmentPayrollPanel({
   }
 
   function resetEmployeeForm() {
-    setEditingMember(null)
     setSelectedContactId(null)
     setSelectedContactLabel("")
     setStaffType("full_time")
@@ -292,18 +304,8 @@ export function DepartmentPayrollPanel({
     setEmployeeDialogOpen(true)
   }
 
-  function openEditEmployee(member: DepartmentStaffMember) {
-    setEditingMember(member)
-    setSelectedContactId(member.contactId)
-    setSelectedContactLabel(member.fullName)
-    setStaffType(member.staffType || "full_time")
-    setEmploymentStatus(member.employmentStatus || "active")
-    setPositionId(member.positionId || "")
-    setEmployeePayBasis(member.payBasis || "hourly")
-    setHourlyRate(member.hourlyRate == null ? "" : String(member.hourlyRate))
-    setMonthlySalary(member.monthlySalary == null ? "" : String(member.monthlySalary))
-    setEmployeeError(null)
-    setEmployeeDialogOpen(true)
+  function openEmployeeProfile(staffId: string) {
+    setProfileStaffId(staffId)
   }
 
   function parseMoneyInput(value: string, label: string): number | null | undefined {
@@ -324,39 +326,6 @@ export function DepartmentPayrollPanel({
     if (parsedSalary === undefined) return
 
     const selectedPosition = positions.find((item) => item.id === positionId)
-
-    if (isEditingEmployee && editingMember) {
-      setEmployeeError(null)
-      startTransition(async () => {
-        const result = await updateDepartmentEmployeeAction({
-          departmentId,
-          staffId: editingMember.staffId,
-          staff_type: staffType as
-            | "full_time"
-            | "part_time"
-            | "temporary"
-            | "contract"
-            | "seasonal",
-          status: employmentStatus as "active" | "inactive" | "on_leave" | "pending",
-          position_id: positionId || null,
-          position_name: selectedPosition?.name || null,
-          pay_basis: employeePayBasis,
-          hourly_rate: parsedRate,
-          monthly_salary: parsedSalary,
-        })
-
-        if (!result.success) {
-          setEmployeeError(result.error)
-          return
-        }
-
-        setEmployeeDialogOpen(false)
-        resetEmployeeForm()
-        await onStaffChanged()
-        await load()
-      })
-      return
-    }
 
     if (!selectedContactId) {
       setEmployeeError("Select a contact first. Create them in Contacts if they are not listed.")
@@ -394,29 +363,6 @@ export function DepartmentPayrollPanel({
     })
   }
 
-  function handleRemoveEmployee(member: DepartmentStaffMember) {
-    if (
-      !window.confirm(
-        `Remove ${member.fullName} from this department? They remain an employee in HR.`
-      )
-    ) {
-      return
-    }
-
-    startTransition(async () => {
-      const result = await removeStaffFromDepartmentAction({
-        departmentId,
-        staffId: member.staffId,
-      })
-      if (!result.success) {
-        alert(result.error)
-        return
-      }
-      await onStaffChanged()
-      await load()
-    })
-  }
-
   const pendingCount = rows.filter((row) => row.status === "pending").length
   const draftCount = rows.filter((row) => row.status === "draft").length
   const approvedTotal = rows
@@ -429,91 +375,156 @@ export function DepartmentPayrollPanel({
 
   return (
     <div className="space-y-6">
-      {!loading && !error ? (
-        <StatCardsRow equal columns={6}>
-          <StatCard
-            layout="header"
-            fill
-            tone="blue"
-            label="Employees"
-            value={staff.length}
-            icon={Users}
-            hint="Assigned to department"
-          />
-          <StatCard
-            layout="header"
-            fill
-            tone="amber"
-            label="Pending"
-            value={pendingCount}
-            icon={Send}
-            hint="Awaiting approval"
-          />
-          <StatCard
-            layout="header"
-            fill
-            tone="emerald"
-            label="Approved"
-            value={formatCurrency(approvedTotal)}
-            icon={Check}
-            hint="Approved pay total"
-          />
-          <StatCard
-            layout="header"
-            fill
-            tone="slate"
-            label="Draft"
-            value={draftCount}
-            icon={FileText}
-            hint="Not submitted"
-          />
-          <StatCard
-            layout="header"
-            fill
-            tone="sky"
-            label="Hours"
-            value={Math.round(hoursTotal * 10) / 10}
-            icon={Clock}
-            hint="Hourly rows"
-          />
-          <StatCard
-            layout="header"
-            fill
-            tone="violet"
-            label="Childcare"
-            value={childcareCount}
-            icon={Wallet}
-            hint="Provider lines"
-          />
-        </StatCardsRow>
+      {!loading && !error && !isPeriodsOnly ? (
+        <div
+          className={
+            stickyStatsTop
+              ? "sticky z-30 bg-background/95 py-1 backdrop-blur supports-[backdrop-filter]:bg-background/90"
+              : undefined
+          }
+          style={stickyStatsTop ? { top: stickyStatsTop } : undefined}
+        >
+          {isRosterOnly ? (
+            <StatCardsRow equal columns={2}>
+              <StatCard
+                layout="header"
+                fill
+                tone="blue"
+                label="Employees"
+                value={staff.length}
+                icon={Users}
+                hint="Assigned to department"
+              />
+              <StatCard
+                layout="header"
+                fill
+                tone="emerald"
+                label="Active"
+                value={staff.filter((m) => m.employmentStatus === "active").length}
+                icon={Check}
+                hint="Employment status active"
+              />
+            </StatCardsRow>
+          ) : (
+            <StatCardsRow equal columns={6}>
+              <StatCard
+                layout="header"
+                fill
+                tone="blue"
+                label="Employees"
+                value={staff.length}
+                icon={Users}
+                hint="Assigned to department"
+              />
+              <StatCard
+                layout="header"
+                fill
+                tone="amber"
+                label="Pending"
+                value={pendingCount}
+                icon={Send}
+                hint="Awaiting approval"
+              />
+              <StatCard
+                layout="header"
+                fill
+                tone="emerald"
+                label="Approved"
+                value={formatCurrency(approvedTotal)}
+                icon={Check}
+                hint="Approved pay total"
+              />
+              <StatCard
+                layout="header"
+                fill
+                tone="slate"
+                label="Draft"
+                value={draftCount}
+                icon={FileText}
+                hint="Not submitted"
+              />
+              <StatCard
+                layout="header"
+                fill
+                tone="sky"
+                label="Hours"
+                value={Math.round(hoursTotal * 10) / 10}
+                icon={Clock}
+                hint="Hourly rows"
+              />
+              <StatCard
+                layout="header"
+                fill
+                tone="violet"
+                label="Childcare"
+                value={childcareCount}
+                icon={Wallet}
+                hint="Provider lines"
+              />
+            </StatCardsRow>
+          )}
+        </div>
       ) : null}
 
+      {isPeriodsOnly ? (
+        <>
+          {!readOnly ? (
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button type="button" size="sm" onClick={() => setLogOpen(true)}>
+                <Plus className="mr-1.5 size-4" />
+                Log hours
+              </Button>
+              {canApprove ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setSalaryOpen(true)}
+                >
+                  Create pay period
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
+          {migrationRequired ? (
+            <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              Run <code className="text-xs">scripts/171_department_staff_hour_logs.sql</code>{" "}
+              (after 169/170) in Supabase to enable hour logging and approvals. Custom date
+              ranges also need <code className="text-xs">172</code>.
+            </p>
+          ) : null}
+        </>
+      ) : (
       <Card>
         <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 pb-2">
           <div>
             <CardTitle className="flex items-center gap-2 text-base">
-              <Wallet className="size-4" />
-              Employees & Payroll
+              <Users className="size-4" />
+              Employees
             </CardTitle>
             <CardDescription>
               {readOnly
-                ? `Historical pay periods for ${departmentName}. Switch program above to compare.`
-                : `Open program pay periods for ${departmentName}. Closed-program history is under Reports.`}
+                ? `Historical employees for ${departmentName}. Switch program above to compare.`
+                : isRosterOnly
+                  ? `Employees assigned to ${departmentName}. Manage hours and pay periods under Financial → Payroll.`
+                  : `Employees assigned to ${departmentName}. Log hours and create pay periods here; approved pay shows under Financial → Payroll.`}
             </CardDescription>
           </div>
           {!readOnly ? (
           <div className="flex flex-wrap gap-2">
-            {canApprove ? (
+            {showRoster && canApprove ? (
               <Button type="button" size="sm" variant="outline" onClick={openAddEmployee}>
                 <Plus className="mr-1.5 size-4" />
                 Add employee
               </Button>
             ) : null}
-            <Button type="button" size="sm" onClick={() => setLogOpen(true)}>
-              <Plus className="mr-1.5 size-4" />
-              Log hours
-            </Button>
-            {canApprove ? (
+            {showPeriods ? (
+              <Button type="button" size="sm" onClick={() => setLogOpen(true)}>
+                <Plus className="mr-1.5 size-4" />
+                Log hours
+              </Button>
+            ) : null}
+            {showPeriods && canApprove ? (
               <Button
                 type="button"
                 size="sm"
@@ -530,13 +541,13 @@ export function DepartmentPayrollPanel({
           {loading ? (
             <p className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
               <Loader2 className="size-4 animate-spin" />
-              Loading payroll...
+              Loading employees...
             </p>
           ) : error ? (
             <p className="py-4 text-sm text-destructive">{error}</p>
           ) : (
             <>
-              {migrationRequired ? (
+              {showPeriods && migrationRequired ? (
                 <p className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
                   Run <code className="text-xs">scripts/171_department_staff_hour_logs.sql</code>{" "}
                   (after 169/170) in Supabase to enable hour logging and approvals. Custom date
@@ -545,8 +556,9 @@ export function DepartmentPayrollPanel({
               ) : null}
               {mergedRows.length === 0 ? (
                 <p className="py-8 text-center text-sm text-muted-foreground">
-                  No employees or pay periods yet. Add an employee, then create a pay period and
-                  log hours.
+                  {isRosterOnly
+                    ? "No employees assigned yet. Add an employee to get started."
+                    : "No employees or pay periods yet. Add an employee, then create a pay period and log hours."}
                 </p>
               ) : (
                 <div className="overflow-x-auto rounded-md border">
@@ -556,11 +568,15 @@ export function DepartmentPayrollPanel({
                         <TableHead>Name</TableHead>
                         <TableHead>Position</TableHead>
                         <TableHead>Pay</TableHead>
-                        <TableHead>Hours</TableHead>
-                        <TableHead>Pay period</TableHead>
-                        <TableHead className="text-right">Total payment</TableHead>
+                        {showPeriods ? (
+                          <>
+                            <TableHead>Hours</TableHead>
+                            <TableHead>Pay period</TableHead>
+                            <TableHead className="text-right">Total payment</TableHead>
+                          </>
+                        ) : null}
                         <TableHead>Status</TableHead>
-                        <TableHead className="w-[280px]" />
+                        {showPeriods ? <TableHead className="w-[280px]" /> : null}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -568,18 +584,13 @@ export function DepartmentPayrollPanel({
                         if (item.kind === "staff") {
                           const member = item.member
                           return (
-                            <TableRow key={`staff-${member.staffId}`}>
-                              <TableCell className="font-medium">
-                                {member.contactId ? (
-                                  <Link
-                                    href={contactProfileHref(member.contactId)}
-                                    className="text-primary hover:underline"
-                                  >
-                                    {member.fullName}
-                                  </Link>
-                                ) : (
-                                  member.fullName
-                                )}
+                            <TableRow
+                              key={`staff-${member.staffId}`}
+                              className="cursor-pointer"
+                              onClick={() => openEmployeeProfile(member.staffId)}
+                            >
+                              <TableCell className="font-medium text-primary">
+                                {member.fullName}
                               </TableCell>
                               <TableCell className="text-muted-foreground">
                                 {member.positionName || "—"}
@@ -587,39 +598,19 @@ export function DepartmentPayrollPanel({
                               <TableCell className="tabular-nums text-muted-foreground">
                                 {formatPayRate(member)}
                               </TableCell>
-                              <TableCell className="text-muted-foreground">—</TableCell>
-                              <TableCell className="text-muted-foreground">—</TableCell>
-                              <TableCell className="text-right text-muted-foreground">—</TableCell>
+                              {showPeriods ? (
+                                <>
+                                  <TableCell className="text-muted-foreground">—</TableCell>
+                                  <TableCell className="text-muted-foreground">—</TableCell>
+                                  <TableCell className="text-right text-muted-foreground">
+                                    —
+                                  </TableCell>
+                                </>
+                              ) : null}
                               <TableCell className="capitalize text-muted-foreground">
                                 {member.employmentStatus || "—"}
                               </TableCell>
-                              <TableCell>
-                                {canApprove ? (
-                                  <div className="flex flex-wrap justify-end gap-1">
-                                    <Button
-                                      type="button"
-                                      size="sm"
-                                      variant="outline"
-                                      disabled={isPending}
-                                      onClick={() => openEditEmployee(member)}
-                                    >
-                                      <Pencil className="mr-1 size-3.5" />
-                                      Edit
-                                    </Button>
-                                    <Button
-                                      type="button"
-                                      size="sm"
-                                      variant="outline"
-                                      className="text-destructive hover:text-destructive"
-                                      disabled={isPending}
-                                      onClick={() => handleRemoveEmployee(member)}
-                                    >
-                                      <UserMinus className="mr-1 size-3.5" />
-                                      Remove
-                                    </Button>
-                                  </div>
-                                ) : null}
-                              </TableCell>
+                              {showPeriods ? <TableCell /> : null}
                             </TableRow>
                           )
                         }
@@ -759,14 +750,14 @@ export function DepartmentPayrollPanel({
                                     </Button>
                                   </>
                                 ) : null}
-                                {canApprove && member ? (
+                                {!isPeriodsOnly && canApprove && member ? (
                                   <Button
                                     type="button"
                                     size="sm"
                                     variant="ghost"
                                     disabled={isPending}
-                                    title="Edit employment details"
-                                    onClick={() => openEditEmployee(member)}
+                                    title="Open employee profile"
+                                    onClick={() => openEmployeeProfile(member.staffId)}
                                   >
                                     <Users className="size-3.5" />
                                   </Button>
@@ -784,25 +775,25 @@ export function DepartmentPayrollPanel({
           )}
         </CardContent>
       </Card>
+      )}
 
-      <Dialog
-        open={employeeDialogOpen}
-        onOpenChange={(open) => {
-          setEmployeeDialogOpen(open)
-          if (!open) resetEmployeeForm()
-        }}
-      >
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>
-              {isEditingEmployee ? "Edit employee" : "Add employee"}
-            </DialogTitle>
-            <DialogDescription>
-              {isEditingEmployee
-                ? `Update employment details for ${editingMember?.fullName || "this employee"} in ${departmentName}. Contact name and email are edited on the contact page.`
-                : `Choose an existing contact. If they are already an employee, they are assigned to ${departmentName}. Otherwise a new employee record is created for this department. Create the person in Contacts first if they are missing.`}
-            </DialogDescription>
-          </DialogHeader>
+      {showRoster ? (
+        <Dialog
+          open={employeeDialogOpen}
+          onOpenChange={(open) => {
+            setEmployeeDialogOpen(open)
+            if (!open) resetEmployeeForm()
+          }}
+        >
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Add employee</DialogTitle>
+              <DialogDescription>
+                Choose an existing contact. If they are already an employee, they are assigned to{" "}
+                {departmentName}. Otherwise a new employee record is created for this department.
+                Create the person in Contacts first if they are missing.
+              </DialogDescription>
+            </DialogHeader>
 
           <div className="space-y-4 py-2">
             {employeeError ? (
@@ -811,19 +802,6 @@ export function DepartmentPayrollPanel({
               </div>
             ) : null}
 
-            {isEditingEmployee ? (
-              <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm">
-                <p className="font-medium">{editingMember?.fullName}</p>
-                {editingMember?.contactId ? (
-                  <Link
-                    href={contactProfileHref(editingMember.contactId)}
-                    className="text-xs text-primary hover:underline"
-                  >
-                    Open contact page
-                  </Link>
-                ) : null}
-              </div>
-            ) : (
               <HrContactPicker
                 selectedContactId={selectedContactId}
                 selectedLabel={selectedContactLabel}
@@ -839,7 +817,6 @@ export function DepartmentPayrollPanel({
                 }}
                 disabled={isPending}
               />
-            )}
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
@@ -970,8 +947,6 @@ export function DepartmentPayrollPanel({
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Saving...
                 </>
-              ) : isEditingEmployee ? (
-                "Save changes"
               ) : (
                 "Add to department"
               )}
@@ -979,7 +954,25 @@ export function DepartmentPayrollPanel({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      ) : null}
 
+      <DepartmentEmployeeProfileSheet
+        open={Boolean(profileStaffId)}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) setProfileStaffId(null)
+        }}
+        departmentId={departmentId}
+        departmentName={departmentName}
+        staffId={profileStaffId}
+        readOnly={readOnly}
+        onChanged={async () => {
+          await onStaffChanged()
+          await load()
+        }}
+      />
+
+      {showPeriods ? (
+        <>
       <LogHoursDialog
         open={logOpen}
         onOpenChange={setLogOpen}
@@ -1066,6 +1059,8 @@ export function DepartmentPayrollPanel({
           ) : null}
         </DialogContent>
       </Dialog>
+        </>
+      ) : null}
     </div>
   )
 }

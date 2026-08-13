@@ -46,6 +46,8 @@ export type OfferingManageHrefOptions = {
   tab?: string
   /** When true, append `?edit=1` to auto-open the edit dialog. */
   edit?: boolean
+  /** Deep-link to a session roster on the offering overview. */
+  sessionId?: string | null
 }
 
 /**
@@ -67,7 +69,11 @@ export function programOfferingManageHref(
     ? `/workforce/departments/${departmentId}/programs/${programId}/offerings/${offeringId}`
     : `/programs/${programId}/offerings/${offeringId}`
 
-  return options.edit ? `${base}?edit=1` : base
+  const params = new URLSearchParams()
+  if (options.edit) params.set("edit", "1")
+  if (options.sessionId) params.set("session", options.sessionId)
+  const query = params.toString()
+  return query ? `${base}?${query}` : base
 }
 
 export function programOfferingsIndexHref(programId: string) {

@@ -319,6 +319,85 @@ export function extractEmergencyContactFromNotes(
   return value || null
 }
 
+function replaceOrAppendNoteLine(
+  notes: string | null | undefined,
+  labelPattern: RegExp,
+  nextLine: string | null
+) {
+  const lines = String(notes || "")
+    .split(/\r?\n/)
+    .map((line) => line.trimEnd())
+  const nextLines: string[] = []
+  let replaced = false
+
+  for (const line of lines) {
+    if (!line.trim()) {
+      if (nextLines.length > 0 && nextLines[nextLines.length - 1] !== "") {
+        nextLines.push("")
+      }
+      continue
+    }
+    if (labelPattern.test(line)) {
+      if (nextLine && !replaced) {
+        nextLines.push(nextLine)
+        replaced = true
+      }
+      continue
+    }
+    nextLines.push(line)
+  }
+
+  if (nextLine && !replaced) {
+    nextLines.push(nextLine)
+  }
+
+  return nextLines
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+}
+
+/** Upsert structured participant detail lines inside enrollment notes. */
+export function upsertParticipantDetailNotes(
+  notes: string | null | undefined,
+  input: {
+    allergies?: string | null
+    photoConsent?: string | null
+    emergencyContact?: string | null
+  }
+) {
+  let next = String(notes || "")
+
+  if (input.allergies !== undefined) {
+    const value = input.allergies?.trim() || null
+    next = replaceOrAppendNoteLine(
+      next,
+      /^Allergies:\s*/i,
+      value ? `Allergies: ${value}` : null
+    )
+  }
+
+  if (input.photoConsent !== undefined) {
+    const value = input.photoConsent?.trim() || null
+    next = replaceOrAppendNoteLine(
+      next,
+      /^Photo consent:\s*/i,
+      value ? `Photo consent: ${value}` : null
+    )
+  }
+
+  if (input.emergencyContact !== undefined) {
+    const value = input.emergencyContact?.trim() || null
+    next = replaceOrAppendNoteLine(
+      next,
+      /^Emergency contact(?:\s*details)?\s*:/i,
+      value ? `Emergency contact: ${value}` : null
+    )
+  }
+
+  return next || null
+}
+
 /** Display “10 × $120.00”. One-time amounts omit the multiplier. */
 export function formatMonthsTimesFee(
   months: number,

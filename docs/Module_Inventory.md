@@ -63,6 +63,7 @@ Status: Working
 Features:
 
 * Program CRUD
+* **Program kinds** — Academic vs Seasonal (`programs.program_kind`); org entitlement `organizations.program_kinds` (SQL **`246`**); policy + hard validation in `program-kind-policy.ts`; Phase 2–5 terminology/create/report work; Phase 6 packaging UI on Platform Admin Modules tab + tenant Billing
 * **Quick Create** + program detail inline edit + offering manage (see `docs/programs-staff-setup-ui.md`)
 * Organization filtering
 * Program details
@@ -109,7 +110,7 @@ Features:
 * Registration detail pages
 * Status management
 * **Reports → Registrations** — family/contact payment view (`/programs/registrations`)
-* **Reports → Enrollments** — one row per participant demographics/consent (`/programs/reports/enrollments`)
+* **Reports → Enrollments** — one row per participant demographics/consent (`/programs/reports/enrollments`); row opens **Participant profile** (`/programs/participants/[personId]`: identity, household, enrollments, attendance, waitlist/applications, session access; no financials). Edit updates `people` (+ enrollment note sync); apply SQL `242`.
 * **Reports → Payment Summary** — family balances, program fees (months × monthly), additional fees (`/programs/reports/tuition-plans`)
 * **Reports → Add-ons** — one row per purchased add-on (materials, lunch, uniforms, field trips) (`/programs/reports/addons`)
 
@@ -325,7 +326,7 @@ Roster-only employee list using the shared HR directory shell (Export, Add Emplo
 
 Removed tabs (redirect to Overview):
 
-* Departments → `/workforce?tab=departments` (department workspace at `/workforce/departments/[id]`: **department-level** Overview / Programs / Group giving / Events / Settings; **year-level** via `?year=` — Overview / Offerings / Registrations / Schedule / Financial / Reports; department Overview = flyer + description + Terms (`terms_html` / `terms_pdf_url`, SQL `241`); Programs catalog = `?tab=programs` without year; click program → `?year=` Program Overview; offering manage under `/workforce/departments/[id]/programs/...`; legacy tab aliases unchanged; apply SQL `169`/`170`/`171`/`172`/`173`/`174`/`186`/`190`/`203`/`241`; scoped access via `lib/departments/department-access.ts`). Historical QIL load: `scripts/import-qil-year.mjs`; consolidate course-as-programs → offerings: `scripts/migrate-qil-courses-to-offerings.mjs` (after `174`).
+* Departments → `/workforce?tab=departments` (department workspace at `/workforce/departments/[id]`: **department-level** Overview / Programs / Schedule (**Class times** [space column + Facilities/Master Calendar CTAs] | **Activity planner**) / Financial / Reports / Group giving / Events (**View Master Calendar** / **Check space availability** / **Create event**) / Settings; **year-level** via `?year=` — Overview / Offerings / Registrations; department Overview = flyer + description + Terms (`terms_html` / `terms_pdf_url`, SQL `241`); Programs catalog = `?tab=programs` without year; click program → `?year=` Program Overview; offering manage under `/workforce/departments/[id]/programs/...`; legacy tab aliases unchanged; apply SQL `169`/`170`/`171`/`172`/`173`/`174`/`186`/`190`/`203`/`241`; scoped access via `lib/departments/department-access.ts`). Historical QIL load: `scripts/import-qil-year.mjs`; consolidate course-as-programs → offerings: `scripts/migrate-qil-courses-to-offerings.mjs` (after `174`).
 * Positions → `/workforce?tab=employees&view=positions`
 * Time Off, Work Schedule, Notifications, Teams, Applications
 
@@ -442,3 +443,15 @@ Redirects from old tab URLs (`?tab=general`, `?tab=roles`, `?tab=discount-polici
 **Removed as a separate hub.** Headcount metrics (Active Employees, Departments, Volunteers, Childcare Providers), employees-by-department, and recent hires live on **HR → Overview** (`/workforce`). Attendance Rate and Time Off placeholders were dropped. Legacy `/hr/reports` and `/workforce/reports` redirect to `/workforce`.
 
 Key file: `components/hr/hr-reports-client.tsx` (`HrOverviewDashboard`)
+
+---
+
+## Community Calendar
+
+Status: Working (shared)
+
+* Route: `/community-calendar` (top-level sidebar when Vendor Hub and/or Event Management is enabled)
+* Sources: Vendor Hub bazaars (`vendor_hub_events.calendar_status`) + Event Management (`internal_events.community_calendar_status`; SQL `247`)
+* Legacy: `/vendor-hub/community-calendar` redirects
+* Publish: bazaar create/edit; Event workspace Overview → Community Calendar card
+* Key files: `lib/community-calendar/*`, `components/community-calendar/community-calendar-client.tsx`

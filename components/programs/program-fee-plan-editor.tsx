@@ -45,6 +45,8 @@ import {
   FEE_COMPONENT_TYPE_LABELS,
   FEE_PLAN_TYPE_LABELS,
 } from "@/lib/programs/program-fee-plan-types"
+import { PROGRAM_KIND_FEE_PLAN_TYPES } from "@/lib/programs/program-kind-policy"
+import { normalizeProgramKind } from "@/lib/programs/program-kind"
 import type { ProgramRegistrationOption } from "@/lib/programs/program-registration-option-types"
 import { REGISTRATION_OPTION_LABELS } from "@/lib/programs/program-registration-option-types"
 
@@ -209,6 +211,7 @@ export function ProgramFeePlanEditor({
   onChange,
   draftMode = false,
   showBillingScheduleLink = true,
+  programKind = "academic",
 }: {
   programId: string
   offeringId: string
@@ -219,9 +222,14 @@ export function ProgramFeePlanEditor({
   onChange: (state: FeePlanEditorState) => void
   draftMode?: boolean
   showBillingScheduleLink?: boolean
+  programKind?: string | null
 }) {
   const canLinkBillingSchedule =
     !draftMode && hasPersistedProgramContext(programId, offeringId)
+  const allowedPlanTypes = PROGRAM_KIND_FEE_PLAN_TYPES[normalizeProgramKind(programKind)]
+  const planTypeOptions = Object.entries(FEE_PLAN_TYPE_LABELS).filter(([value]) =>
+    allowedPlanTypes.includes(value as FeePlanType)
+  )
   const [draftPlans, setDraftPlans] = React.useState<FeePlanInput[]>(() =>
     buildInitialPlans(plans, components)
   )
@@ -473,7 +481,7 @@ export function ProgramFeePlanEditor({
                   }
                   className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                 >
-                  {Object.entries(FEE_PLAN_TYPE_LABELS).map(([value, label]) => (
+                  {planTypeOptions.map(([value, label]) => (
                     <option key={value} value={value}>
                       {label}
                     </option>
@@ -638,7 +646,7 @@ export function ProgramFeePlanEditor({
                               <option value="per_session">Per Session</option>
                               <option value="per_month">Per Month</option>
                               <option value="percent_of_tuition">
-                                Percent of Tuition
+                                Percent of Program Fee
                               </option>
                             </select>
                           </TableCell>

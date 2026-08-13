@@ -173,7 +173,7 @@ export function EventManagementDashboardPanels({
     <div className="flex flex-col gap-4 sm:gap-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Events</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Overview</h1>
           <p className="text-muted-foreground">
             Monitor operations and manage internal department-owned events.
           </p>
@@ -281,7 +281,7 @@ export function EventManagementDashboardPanels({
               Today&apos;s Schedule
             </CardTitle>
             <Button variant="ghost" size="sm" asChild>
-              <Link href="/facilities/calendar" className="text-xs">
+              <Link href="/event-management/calendar" className="text-xs">
                 View Calendar
                 <ChevronRight className="ml-1 h-3 w-3" />
               </Link>

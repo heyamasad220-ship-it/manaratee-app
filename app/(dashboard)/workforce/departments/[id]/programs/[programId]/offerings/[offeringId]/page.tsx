@@ -6,8 +6,13 @@ import { workforceDepartmentDetailPath } from "@/lib/departments/department-path
 import { getDepartments } from "@/lib/departments/department-queries"
 import { departmentGroupWorkspaceHref } from "@/lib/donations/donation-group-path"
 import { getOfferingManageSummary } from "@/lib/programs/offering-manage-summary"
+import {
+  getOfferingSessionEnrollmentSummary,
+  getOfferingSessionRoster,
+} from "@/lib/programs/offering-session-enrollment"
 import { getOfferingWorkspaceData } from "@/lib/programs/offering-workspace-queries"
 import { getOfferingCapacityGroups } from "@/lib/programs/program-capacity-group-queries"
+import { PROGRAM_LABEL_PLURAL } from "@/lib/programs/program-display-labels"
 import { getOfferingsForProgram } from "@/lib/programs/program-offering-queries"
 import { getProgramById } from "@/lib/programs/program-queries"
 import { getOfferingRosterEnrollments } from "@/lib/programs/program-staff-assignment-queries"
@@ -15,16 +20,18 @@ import { getOfferingRosterEnrollments } from "@/lib/programs/program-staff-assig
 /**
  * Department-scoped offering overview — keeps HR → Departments selected.
  * Edit opens in a dialog (optional `?edit=1`).
+ * Session roster: `?session={sessionId}`.
  */
 export default async function DepartmentProgramOfferingManagePage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string; programId: string; offeringId: string }>
-  searchParams?: Promise<{ tab?: string; edit?: string }>
+  searchParams?: Promise<{ tab?: string; edit?: string; session?: string }>
 }) {
   const { id: departmentId, programId, offeringId } = await params
   const resolvedSearchParams = searchParams ? await searchParams : {}
+  const sessionId = resolvedSearchParams.session?.trim() || null
 
   const [program, offerings, departments, capacityGroups] = await Promise.all([
     getProgramById(programId),
@@ -60,16 +67,40 @@ export default async function DepartmentProgramOfferingManagePage({
     notFound()
   }
 
-  const [workspaceData, summary, roster] = await Promise.all([
-    getOfferingWorkspaceData(programId, selectedOffering, program.organization_id),
-    getOfferingManageSummary(selectedOffering.id, program.organization_id),
-    getOfferingRosterEnrollments(selectedOffering.id, program.organization_id),
-  ])
+  const [workspaceData, summary, roster, sessionEnrollment, sessionRoster] =
+    await Promise.all([
+      getOfferingWorkspaceData(
+        programId,
+        selectedOffering,
+        program.organization_id
+      ),
+      getOfferingManageSummary(selectedOffering.id, program.organization_id),
+      getOfferingRosterEnrollments(
+        selectedOffering.id,
+        program.organization_id
+      ),
+      getOfferingSessionEnrollmentSummary(
+        selectedOffering.id,
+        program.organization_id
+      ),
+      sessionId
+        ? getOfferingSessionRoster(
+            selectedOffering.id,
+            sessionId,
+            program.organization_id
+          )
+        : Promise.resolve(null),
+    ])
 
-  const backHref = departmentGroupWorkspaceHref(departmentId, {
+  const departmentOverviewHref = departmentGroupWorkspaceHref(departmentId)
+  const programOverviewHref = departmentGroupWorkspaceHref(departmentId, {
+    yearProgramId: programId,
+  })
+  const offeringsListHref = departmentGroupWorkspaceHref(departmentId, {
     tab: "programs",
     yearProgramId: programId,
   })
+  const backHref = offeringsListHref
 
   const enrolledNames = roster.map(
     (row) => row.child_name || row.parent_name || "Participant"
@@ -82,9 +113,25 @@ export default async function DepartmentProgramOfferingManagePage({
         breadcrumbExtras={[
           {
             label: department.name,
-            href: backHref,
+            href: departmentOverviewHref,
           },
-          { label: selectedOffering.name },
+          {
+            label: program.name,
+            href: programOverviewHref,
+          },
+          {
+            label: PROGRAM_LABEL_PLURAL,
+            href: offeringsListHref,
+          },
+          {
+            label: selectedOffering.name,
+            href: sessionRoster
+              ? `/workforce/departments/${departmentId}/programs/${programId}/offerings/${offeringId}`
+              : undefined,
+          },
+          ...(sessionRoster
+            ? [{ label: sessionRoster.session.name }]
+            : []),
         ]}
       />
       <OfferingManageClient
@@ -95,6 +142,8 @@ export default async function DepartmentProgramOfferingManagePage({
         capacityGroups={capacityGroups}
         summary={summary}
         enrolledNames={enrolledNames}
+        sessionEnrollment={sessionEnrollment}
+        sessionRoster={sessionRoster}
         initialEditOpen={resolvedSearchParams.edit === "1"}
         navigationContext={{
           mode: "department",

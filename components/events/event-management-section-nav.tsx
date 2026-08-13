@@ -5,18 +5,18 @@ import { usePathname } from "next/navigation"
 
 import { cn } from "@/lib/utils"
 import {
-  DEPARTMENTS_SECTION_TABS,
-  resolveDepartmentsSectionTab,
-} from "@/lib/departments/departments-section-path"
+  EVENT_MANAGEMENT_SECTION_TABS,
+  resolveEventManagementSectionTab,
+} from "@/lib/events/event-management-section-path"
 
-export function DepartmentsSectionNav() {
+export function EventManagementSectionNav() {
   const pathname = usePathname()
-  const activeId = resolveDepartmentsSectionTab(pathname)
+  const activeId = resolveEventManagementSectionTab(pathname)
 
   return (
     <div className="border-b border-border bg-background">
       <nav className="-mb-px flex gap-0 overflow-x-auto">
-        {DEPARTMENTS_SECTION_TABS.map((tab) => {
+        {EVENT_MANAGEMENT_SECTION_TABS.map((tab) => {
           const active = tab.id === activeId
           return (
             <Link

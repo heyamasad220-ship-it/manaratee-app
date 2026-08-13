@@ -26,20 +26,20 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
-import {
-  PROGRAM_LABEL,
-  YEAR_SEASON_LABEL,
-} from "@/lib/programs/program-display-labels"
+import { participantProfileHref } from "@/lib/programs/participant-profile-path"
+import { getReportHierarchyLabels } from "@/lib/programs/program-display-labels"
 import {
   DEFAULT_LIST_PAGE_SIZE,
   slicePageItems,
 } from "@/lib/ui/list-pagination"
+import { useProgramKindReportPreset } from "@/hooks/use-program-kind-report-preset"
 
 export type OfferingActivityStatus = "active" | "closed"
 export type EnrollmentRowStatus = "active" | "cancelled"
 
 export type EnrollmentsReportTableRow = {
   id: string
+  participantPersonId: string | null
   contactName: string
   contactProfileId: string | null
   contactEmail: string | null
@@ -56,6 +56,7 @@ export type EnrollmentsReportTableRow = {
   departmentName: string
   programId: string | null
   programName: string
+  programKind: "academic" | "seasonal"
   offeringId: string | null
   offeringName: string
   offeringActivity: OfferingActivityStatus
@@ -101,10 +102,20 @@ export function EnrollmentsReportTable({
   const [searchInput, setSearchInput] = useState("")
   const [searchFilter, setSearchFilter] = useState("")
   const [departmentFilter, setDepartmentFilter] = useState(ALL)
+  const { kindFilter, setKindFilter } = useProgramKindReportPreset()
   const [programFilter, setProgramFilter] = useState(ALL)
   const [offeringFilter, setOfferingFilter] = useState(ALL)
   const [statusFilter, setStatusFilter] =
     useState<OfferingActivityFilter>("active")
+
+  useEffect(() => {
+    setProgramFilter(ALL)
+    setOfferingFilter(ALL)
+  }, [kindFilter])
+
+  const reportLabels = getReportHierarchyLabels(
+    kindFilter === "all" ? null : kindFilter
+  )
 
   const departmentOptions = useMemo(
     () =>
@@ -117,54 +128,68 @@ export function EnrollmentsReportTable({
   )
 
   const programOptions = useMemo(() => {
-    const scoped =
-      departmentFilter === ALL
-        ? rows
-        : rows.filter((row) => row.departmentId === departmentFilter)
+    let scoped = rows
+    if (departmentFilter !== ALL) {
+      scoped = scoped.filter((row) => row.departmentId === departmentFilter)
+    }
+    if (kindFilter !== "all") {
+      scoped = scoped.filter((row) => row.programKind === kindFilter)
+    }
     return uniqueOptions(
       scoped,
       (row) => row.programId,
       (row) => row.programName
     )
-  }, [rows, departmentFilter])
+  }, [rows, departmentFilter, kindFilter])
+
+  const safeProgramFilter = useMemo(() => {
+    if (programFilter === ALL) return ALL
+    return programOptions.some((option) => option.id === programFilter)
+      ? programFilter
+      : ALL
+  }, [programFilter, programOptions])
 
   const offeringOptions = useMemo(() => {
     let scoped = rows
     if (departmentFilter !== ALL) {
       scoped = scoped.filter((row) => row.departmentId === departmentFilter)
     }
-    if (programFilter !== ALL) {
-      scoped = scoped.filter((row) => row.programId === programFilter)
+    if (kindFilter !== "all") {
+      scoped = scoped.filter((row) => row.programKind === kindFilter)
+    }
+    if (safeProgramFilter !== ALL) {
+      scoped = scoped.filter((row) => row.programId === safeProgramFilter)
     }
     return uniqueOptions(
       scoped,
       (row) => row.offeringId,
       (row) => row.offeringName
     )
-  }, [rows, departmentFilter, programFilter])
+  }, [rows, departmentFilter, kindFilter, safeProgramFilter])
 
-  useEffect(() => {
-    if (
-      programFilter !== ALL &&
-      !programOptions.some((option) => option.id === programFilter)
-    ) {
-      setProgramFilter(ALL)
-    }
-  }, [programFilter, programOptions])
-
-  useEffect(() => {
-    if (
-      offeringFilter !== ALL &&
-      !offeringOptions.some((option) => option.id === offeringFilter)
-    ) {
-      setOfferingFilter(ALL)
-    }
+  const safeOfferingFilter = useMemo(() => {
+    if (offeringFilter === ALL) return ALL
+    return offeringOptions.some((option) => option.id === offeringFilter)
+      ? offeringFilter
+      : ALL
   }, [offeringFilter, offeringOptions])
+
+  useEffect(() => {
+    if (programFilter !== safeProgramFilter) {
+      setProgramFilter(safeProgramFilter)
+    }
+  }, [programFilter, safeProgramFilter])
+
+  useEffect(() => {
+    if (offeringFilter !== safeOfferingFilter) {
+      setOfferingFilter(safeOfferingFilter)
+    }
+  }, [offeringFilter, safeOfferingFilter])
 
   useEffect(() => {
     const handle = window.setTimeout(() => {
       setSearchFilter(searchInput)
-      setPage(1)
+      setPage((current) => (current === 1 ? current : 1))
     }, 200)
     return () => window.clearTimeout(handle)
   }, [searchInput])
@@ -174,10 +199,13 @@ export function EnrollmentsReportTable({
       if (departmentFilter !== ALL && row.departmentId !== departmentFilter) {
         return false
       }
-      if (programFilter !== ALL && row.programId !== programFilter) {
+      if (kindFilter !== "all" && row.programKind !== kindFilter) {
         return false
       }
-      if (offeringFilter !== ALL && row.offeringId !== offeringFilter) {
+      if (safeProgramFilter !== ALL && row.programId !== safeProgramFilter) {
+        return false
+      }
+      if (safeOfferingFilter !== ALL && row.offeringId !== safeOfferingFilter) {
         return false
       }
       if (statusFilter !== ALL && row.offeringActivity !== statusFilter) {
@@ -196,8 +224,9 @@ export function EnrollmentsReportTable({
   }, [
     rows,
     departmentFilter,
-    programFilter,
-    offeringFilter,
+    kindFilter,
+    safeProgramFilter,
+    safeOfferingFilter,
     statusFilter,
     searchFilter,
   ])
@@ -205,8 +234,14 @@ export function EnrollmentsReportTable({
   const pageRows = slicePageItems(filteredRows, page, pageSize)
 
   useEffect(() => {
-    setPage(1)
-  }, [departmentFilter, programFilter, offeringFilter, statusFilter])
+    setPage((current) => (current === 1 ? current : 1))
+  }, [
+    departmentFilter,
+    kindFilter,
+    safeProgramFilter,
+    safeOfferingFilter,
+    statusFilter,
+  ])
 
   return (
     <div className="space-y-4">
@@ -224,7 +259,11 @@ export function EnrollmentsReportTable({
           <Label>Department</Label>
           <Select
             value={departmentFilter}
-            onValueChange={(value) => setDepartmentFilter(value)}
+            onValueChange={(value) => {
+              setDepartmentFilter(value)
+              setProgramFilter(ALL)
+              setOfferingFilter(ALL)
+            }}
           >
             <SelectTrigger>
               <SelectValue placeholder="All departments" />
@@ -239,20 +278,40 @@ export function EnrollmentsReportTable({
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-1.5 sm:w-44">
-          <Label>{YEAR_SEASON_LABEL}</Label>
+        <div className="space-y-1.5 sm:w-40">
+          <Label>Type</Label>
           <Select
-            value={programFilter}
+            value={kindFilter}
+            onValueChange={(value) => {
+              setKindFilter(value as "all" | "academic" | "seasonal")
+              setProgramFilter(ALL)
+              setOfferingFilter(ALL)
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="All types" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All types</SelectItem>
+              <SelectItem value="academic">Academic</SelectItem>
+              <SelectItem value="seasonal">Seasonal</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5 sm:w-44">
+          <Label>{reportLabels.containerSingular}</Label>
+          <Select
+            value={safeProgramFilter}
             onValueChange={(value) => setProgramFilter(value)}
           >
             <SelectTrigger>
               <SelectValue
-                placeholder={`All ${YEAR_SEASON_LABEL.toLowerCase()}s`}
+                placeholder={`All ${reportLabels.containerPlural.toLowerCase()}`}
               />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={ALL}>
-                All {YEAR_SEASON_LABEL.toLowerCase()}s
+                All {reportLabels.containerPlural.toLowerCase()}
               </SelectItem>
               {programOptions.map((option) => (
                 <SelectItem key={option.id} value={option.id}>
@@ -263,19 +322,19 @@ export function EnrollmentsReportTable({
           </Select>
         </div>
         <div className="space-y-1.5 sm:w-44">
-          <Label>{PROGRAM_LABEL}</Label>
+          <Label>{reportLabels.offeringSingular}</Label>
           <Select
-            value={offeringFilter}
+            value={safeOfferingFilter}
             onValueChange={(value) => setOfferingFilter(value)}
           >
             <SelectTrigger>
               <SelectValue
-                placeholder={`All ${PROGRAM_LABEL.toLowerCase()}s`}
+                placeholder={`All ${reportLabels.offeringPlural.toLowerCase()}`}
               />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={ALL}>
-                All {PROGRAM_LABEL.toLowerCase()}s
+                All {reportLabels.offeringPlural.toLowerCase()}
               </SelectItem>
               {offeringOptions.map((option) => (
                 <SelectItem key={option.id} value={option.id}>
@@ -304,8 +363,9 @@ export function EnrollmentsReportTable({
           </Select>
         </div>
         {(departmentFilter !== ALL ||
-          programFilter !== ALL ||
-          offeringFilter !== ALL ||
+          kindFilter !== "all" ||
+          safeProgramFilter !== ALL ||
+          safeOfferingFilter !== ALL ||
           statusFilter !== "active" ||
           searchFilter) && (
           <Button
@@ -314,6 +374,7 @@ export function EnrollmentsReportTable({
             className="sm:mb-0.5"
             onClick={() => {
               setDepartmentFilter(ALL)
+              setKindFilter("all")
               setProgramFilter(ALL)
               setOfferingFilter(ALL)
               setStatusFilter("active")
@@ -336,15 +397,16 @@ export function EnrollmentsReportTable({
               <TableHead>Age</TableHead>
               <TableHead>Gender</TableHead>
               <TableHead>Allergies</TableHead>
-              <TableHead>Emergency contact</TableHead>
               <TableHead>Photo consent</TableHead>
+              <TableHead>{reportLabels.containerSingular}</TableHead>
+              <TableHead>{reportLabels.offeringSingular}</TableHead>
               <TableHead>Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {pageRows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="p-0">
+                <TableCell colSpan={10} className="p-0">
                   <Card className="border-0 shadow-none">
                     <CardContent className="flex flex-col items-center gap-2 py-12 text-center">
                       <Users className="h-8 w-8 text-muted-foreground" />
@@ -357,66 +419,92 @@ export function EnrollmentsReportTable({
                 </TableCell>
               </TableRow>
             ) : (
-              pageRows.map((row) => (
-                <TableRow key={row.id}>
-                  <TableCell className="min-w-[12rem] align-top">
-                    <div className="space-y-0.5">
-                      {row.contactProfileId ? (
-                        <Link
-                          href={contactProfileHref(row.contactProfileId)}
-                          className="font-medium text-primary hover:underline"
-                        >
-                          {row.contactName}
-                        </Link>
-                      ) : (
-                        <span className="font-medium">{row.contactName}</span>
-                      )}
-                      {row.contactEmail ? (
-                        <div className="text-xs text-muted-foreground">
-                          {row.contactEmail}
-                        </div>
-                      ) : null}
-                      {row.contactPhone ? (
-                        <div className="text-xs text-muted-foreground">
-                          {row.contactPhone}
-                        </div>
-                      ) : null}
-                    </div>
-                  </TableCell>
-                  <TableCell className="min-w-[10rem] font-medium align-top">
-                    {row.participantName}
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap align-top">
-                    {row.dateOfBirthLabel}
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap align-top">
-                    {row.ageLabel}
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap align-top">
-                    {row.genderLabel}
-                  </TableCell>
-                  <TableCell className="max-w-[14rem] align-top text-sm">
-                    {row.allergiesLabel}
-                  </TableCell>
-                  <TableCell className="max-w-[14rem] align-top text-sm">
-                    {row.emergencyContactLabel}
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap align-top">
-                    {row.photoConsentLabel}
-                  </TableCell>
-                  <TableCell className="align-top">
-                    <Badge
-                      variant={
-                        row.enrollmentStatus === "active" ? "default" : "outline"
-                      }
-                    >
-                      {row.enrollmentStatus === "active"
-                        ? "Active"
-                        : "Cancelled"}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              ))
+              pageRows.map((row) => {
+                const profileHref = row.participantPersonId
+                  ? participantProfileHref(row.participantPersonId, {
+                      returnTo: "/programs/reports/enrollments",
+                    })
+                  : null
+
+                return (
+                  <TableRow
+                    key={row.id}
+                    className={
+                      profileHref
+                        ? "cursor-pointer hover:bg-muted/40"
+                        : undefined
+                    }
+                    onClick={() => {
+                      if (!profileHref) return
+                      window.location.assign(profileHref)
+                    }}
+                  >
+                    <TableCell className="min-w-[12rem] align-top">
+                      <div className="space-y-0.5">
+                        {row.contactProfileId ? (
+                          <Link
+                            href={contactProfileHref(row.contactProfileId)}
+                            prefetch={false}
+                            className="font-medium text-primary hover:underline"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            {row.contactName}
+                          </Link>
+                        ) : (
+                          <span className="font-medium">{row.contactName}</span>
+                        )}
+                        {row.contactEmail ? (
+                          <div className="text-xs text-muted-foreground">
+                            {row.contactEmail}
+                          </div>
+                        ) : null}
+                        {row.contactPhone ? (
+                          <div className="text-xs text-muted-foreground">
+                            {row.contactPhone}
+                          </div>
+                        ) : null}
+                      </div>
+                    </TableCell>
+                    <TableCell className="min-w-[10rem] font-medium align-top">
+                      {row.participantName}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap align-top">
+                      {row.dateOfBirthLabel}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap align-top">
+                      {row.ageLabel}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap align-top">
+                      {row.genderLabel}
+                    </TableCell>
+                    <TableCell className="max-w-[14rem] align-top text-sm">
+                      {row.allergiesLabel}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap align-top">
+                      {row.photoConsentLabel}
+                    </TableCell>
+                    <TableCell className="min-w-[10rem] align-top text-sm">
+                      {row.programName}
+                    </TableCell>
+                    <TableCell className="min-w-[8rem] align-top text-sm">
+                      {row.offeringName}
+                    </TableCell>
+                    <TableCell className="align-top">
+                      <Badge
+                        variant={
+                          row.enrollmentStatus === "active"
+                            ? "default"
+                            : "outline"
+                        }
+                      >
+                        {row.enrollmentStatus === "active"
+                          ? "Active"
+                          : "Cancelled"}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                )
+              })
             )}
           </TableBody>
         </Table>

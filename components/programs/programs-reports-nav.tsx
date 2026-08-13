@@ -3,6 +3,10 @@
 import Link from "next/link"
 import { usePathname, useSearchParams } from "next/navigation"
 
+import {
+  parseProgramKindReportFilter,
+  withProgramKindReportQuery,
+} from "@/lib/programs/program-kind-report-preset"
 import { cn } from "@/lib/utils"
 
 export type ProgramsReportsTabId =
@@ -136,16 +140,18 @@ export function ProgramsReportsNav() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const activeId = resolveProgramsReportsTab(pathname, searchParams)
+  const kindFilter = parseProgramKindReportFilter(searchParams.get("kind"))
 
   return (
     <div className="border-b border-border bg-background">
       <nav className="-mb-px flex gap-0 overflow-x-auto">
         {PROGRAMS_REPORTS_TABS.map((tab) => {
           const active = tab.id === activeId
+          const href = withProgramKindReportQuery(tab.href, kindFilter)
           return (
             <Link
               key={tab.id}
-              href={tab.href}
+              href={href}
               className={cn(
                 "relative shrink-0 px-4 py-2.5 text-sm font-medium transition-colors",
                 active

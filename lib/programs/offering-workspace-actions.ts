@@ -30,6 +30,7 @@ import {
   deriveCapacityMode,
   deriveRegistrationMode,
 } from "@/lib/programs/program-offering-attributes"
+import { autoPromoteSelectedSessionsWaitlist } from "@/lib/programs/selected-sessions-priority-actions"
 
 function inferProgramTypeFromMinAge(
   minAge: number | null
@@ -205,6 +206,8 @@ export async function saveOfferingRegistrationPanel(input: {
   capacityGroups: ProgramCapacityGroupInput[]
   enable_waitlist: boolean
   waitlist_capacity: number | null
+  /** false = full camp priority (selected weeks waitlist). */
+  selected_sessions_open?: boolean
   /** false = Register & pay immediately (no Apply/Approve). */
   application_required?: boolean
   inherit_dates?: boolean
@@ -229,6 +232,41 @@ export async function saveOfferingRegistrationPanel(input: {
   if (input.organizationId !== organizationId) {
     throw new Error("Organization mismatch while saving registration settings.")
   }
+
+  const { data: programKindRow, error: programKindError } = await supabase
+    .from("programs")
+    .select("program_kind")
+    .eq("id", input.programId)
+    .eq("organization_id", organizationId)
+    .maybeSingle()
+
+  if (programKindError) {
+    throw new Error(programKindError.message)
+  }
+
+  const { assertRegistrationFlagsAllowedForKind } = await import(
+    "@/lib/programs/program-kind-policy"
+  )
+  const { normalizeProgramKind } = await import("@/lib/programs/program-kind")
+  const programKind = normalizeProgramKind(
+    (programKindRow as { program_kind?: string } | null)?.program_kind
+  )
+  const registrationCheck = assertRegistrationFlagsAllowedForKind({
+    programKind,
+    session_registration_enabled: input.sessionRegistrationEnabled,
+    single_session_registration_enabled: input.singleSessionEnabled,
+    drop_in_registration_enabled: input.dropInEnabled,
+  })
+  if (!registrationCheck.ok) {
+    throw new Error(registrationCheck.error)
+  }
+
+  const sessionRegistrationEnabled =
+    programKind === "academic" ? false : input.sessionRegistrationEnabled
+  const singleSessionEnabled =
+    programKind === "academic" ? false : input.singleSessionEnabled
+  const dropInEnabled =
+    programKind === "academic" ? false : input.dropInEnabled
 
   const programType = inferProgramTypeFromMinAge(input.min_age)
   const gradeLevels = programType === "adult" ? [] : input.grade_levels
@@ -261,12 +299,19 @@ export async function saveOfferingRegistrationPanel(input: {
   const registrationMode = deriveRegistrationMode({
     fullProgramEnabled: input.fullProgramEnabled,
     sessionRegistrationEnabled:
-      input.sessionRegistrationEnabled ||
-      input.singleSessionEnabled ||
-      input.dropInEnabled,
+      sessionRegistrationEnabled || singleSessionEnabled || dropInEnabled,
   })
 
   // S4: offering is SSOT for eligibility / capacity / registration mode.
+  const previousOpen = await supabase
+    .from("program_offerings")
+    .select("selected_sessions_open")
+    .eq("id", input.offeringId)
+    .eq("organization_id", organizationId)
+    .maybeSingle()
+
+  const nextSelectedSessionsOpen = input.selected_sessions_open !== false
+
   const { error: offeringError } = await supabase
     .from("program_offerings")
     .update({
@@ -282,6 +327,7 @@ export async function saveOfferingRegistrationPanel(input: {
       capacity: capacityMode === "limited" ? resolvedCapacity : null,
       enable_waitlist: input.enable_waitlist,
       waitlist_capacity: input.waitlist_capacity,
+      selected_sessions_open: nextSelectedSessionsOpen,
       registration_mode: registrationMode,
       application_required: input.application_required !== false,
       enrollment_open_date: input.enrollment_open_date || null,
@@ -296,7 +342,23 @@ export async function saveOfferingRegistrationPanel(input: {
 
   if (offeringError) {
     console.error("[saveOfferingRegistrationPanel] offering:", offeringError)
+    if (offeringError.message?.includes("selected_sessions_open")) {
+      throw new Error(
+        "Run scripts/245_selected_sessions_priority.sql in Supabase, then try again."
+      )
+    }
     throw new Error("Failed to save offering registration settings.")
+  }
+
+  if (
+    nextSelectedSessionsOpen &&
+    previousOpen.data?.selected_sessions_open === false
+  ) {
+    await autoPromoteSelectedSessionsWaitlist({
+      organizationId,
+      programId: input.programId,
+      offeringId: input.offeringId,
+    })
   }
 
   // Catalog dual-read: program.capacity = sum of limited offerings.
@@ -307,9 +369,9 @@ export async function saveOfferingRegistrationPanel(input: {
     programId: input.programId,
     offeringId: input.offeringId,
     fullProgramEnabled: input.fullProgramEnabled,
-    sessionRegistrationEnabled: input.sessionRegistrationEnabled,
-    singleSessionEnabled: input.singleSessionEnabled,
-    dropInEnabled: input.dropInEnabled,
+    sessionRegistrationEnabled,
+    singleSessionEnabled,
+    dropInEnabled,
   })
 
   revalidateOfferingPaths(input.programId)

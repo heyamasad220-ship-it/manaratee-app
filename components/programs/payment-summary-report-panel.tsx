@@ -30,13 +30,13 @@ import {
   type PaymentSummaryStatus,
 } from "@/lib/programs/payment-summary-report"
 import {
-  PROGRAM_LABEL,
-  YEAR_SEASON_LABEL,
+  getReportHierarchyLabels,
 } from "@/lib/programs/program-display-labels"
 import {
   DEFAULT_LIST_PAGE_SIZE,
   slicePageItems,
 } from "@/lib/ui/list-pagination"
+import { useProgramKindReportPreset } from "@/hooks/use-program-kind-report-preset"
 
 const ALL = "all"
 const TABLE_COLSPAN = 8
@@ -94,10 +94,20 @@ export function PaymentSummaryReportPanel() {
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
   const [items, setItems] = React.useState<PaymentSummaryRow[]>([])
+  const { kindFilter, setKindFilter } = useProgramKindReportPreset()
   const [programFilter, setProgramFilter] = React.useState(ALL)
   const [offeringFilter, setOfferingFilter] = React.useState(ALL)
   const [page, setPage] = React.useState(1)
   const [pageSize, setPageSize] = React.useState(DEFAULT_LIST_PAGE_SIZE)
+
+  React.useEffect(() => {
+    setProgramFilter(ALL)
+    setOfferingFilter(ALL)
+  }, [kindFilter])
+
+  const reportLabels = getReportHierarchyLabels(
+    kindFilter === "all" ? null : kindFilter
+  )
 
   React.useEffect(() => {
     let cancelled = false
@@ -120,32 +130,37 @@ export function PaymentSummaryReportPanel() {
     }
   }, [])
 
-  const programOptions = React.useMemo(
-    () =>
-      uniqueOptions(
-        items,
-        (row) => row.programId,
-        (row) => row.programName
-      ),
-    [items]
-  )
+  const programOptions = React.useMemo(() => {
+    const scoped =
+      kindFilter === "all"
+        ? items
+        : items.filter((row) => row.programKind === kindFilter)
+    return uniqueOptions(
+      scoped,
+      (row) => row.programId,
+      (row) => row.programName
+    )
+  }, [items, kindFilter])
 
   const offeringOptions = React.useMemo(() => {
-    const scoped =
-      programFilter === ALL
-        ? items
-        : items.filter((row) => row.programId === programFilter)
+    let scoped = items
+    if (kindFilter !== "all") {
+      scoped = scoped.filter((row) => row.programKind === kindFilter)
+    }
+    if (programFilter !== ALL) {
+      scoped = scoped.filter((row) => row.programId === programFilter)
+    }
     const map = new Map<string, string>()
     for (const row of scoped) {
       row.offeringIds.forEach((id, index) => {
         if (!id || map.has(id)) return
-        map.set(id, row.offeringNames[index] || PROGRAM_LABEL)
+        map.set(id, row.offeringNames[index] || reportLabels.offeringSingular)
       })
     }
     return [...map.entries()]
       .map(([id, label]) => ({ id, label }))
       .sort((a, b) => a.label.localeCompare(b.label))
-  }, [items, programFilter])
+  }, [items, kindFilter, programFilter, reportLabels.offeringSingular])
 
   React.useEffect(() => {
     if (
@@ -167,6 +182,7 @@ export function PaymentSummaryReportPanel() {
 
   const filteredRows = React.useMemo(() => {
     return items.filter((row) => {
+      if (kindFilter !== "all" && row.programKind !== kindFilter) return false
       if (programFilter !== ALL && row.programId !== programFilter) return false
       if (
         offeringFilter !== ALL &&
@@ -176,24 +192,47 @@ export function PaymentSummaryReportPanel() {
       }
       return true
     })
-  }, [items, programFilter, offeringFilter])
+  }, [items, kindFilter, programFilter, offeringFilter])
 
   React.useEffect(() => {
     setPage(1)
-  }, [programFilter, offeringFilter, items])
+  }, [kindFilter, programFilter, offeringFilter, items])
 
   const pageRows = React.useMemo(
     () => slicePageItems(filteredRows, page, pageSize),
     [filteredRows, page, pageSize]
   )
 
-  const filtersActive = programFilter !== ALL || offeringFilter !== ALL
+  const filtersActive =
+    kindFilter !== "all" || programFilter !== ALL || offeringFilter !== ALL
 
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+        <div className="space-y-1.5 sm:w-44">
+          <Label htmlFor="payment-summary-kind">Type</Label>
+          <Select
+            value={kindFilter}
+            onValueChange={(value) => {
+              setKindFilter(value as "all" | "academic" | "seasonal")
+              setProgramFilter(ALL)
+              setOfferingFilter(ALL)
+            }}
+          >
+            <SelectTrigger id="payment-summary-kind">
+              <SelectValue placeholder="All types" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All types</SelectItem>
+              <SelectItem value="academic">Academic</SelectItem>
+              <SelectItem value="seasonal">Seasonal</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
         <div className="space-y-1.5 sm:w-56">
-          <Label htmlFor="payment-summary-program">{YEAR_SEASON_LABEL}</Label>
+          <Label htmlFor="payment-summary-program">
+            {reportLabels.containerSingular}
+          </Label>
           <Select
             value={programFilter}
             onValueChange={(value) => {
@@ -203,12 +242,12 @@ export function PaymentSummaryReportPanel() {
           >
             <SelectTrigger id="payment-summary-program">
               <SelectValue
-                placeholder={`All ${YEAR_SEASON_LABEL.toLowerCase()}s`}
+                placeholder={`All ${reportLabels.containerPlural.toLowerCase()}`}
               />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={ALL}>
-                All {YEAR_SEASON_LABEL.toLowerCase()}s
+                All {reportLabels.containerPlural.toLowerCase()}
               </SelectItem>
               {programOptions.map((option) => (
                 <SelectItem key={option.id} value={option.id}>
@@ -219,16 +258,18 @@ export function PaymentSummaryReportPanel() {
           </Select>
         </div>
         <div className="space-y-1.5 sm:w-56">
-          <Label htmlFor="payment-summary-offering">{PROGRAM_LABEL}</Label>
+          <Label htmlFor="payment-summary-offering">
+            {reportLabels.offeringSingular}
+          </Label>
           <Select value={offeringFilter} onValueChange={setOfferingFilter}>
             <SelectTrigger id="payment-summary-offering">
               <SelectValue
-                placeholder={`All ${PROGRAM_LABEL.toLowerCase()}s`}
+                placeholder={`All ${reportLabels.offeringPlural.toLowerCase()}`}
               />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={ALL}>
-                All {PROGRAM_LABEL.toLowerCase()}s
+                All {reportLabels.offeringPlural.toLowerCase()}
               </SelectItem>
               {offeringOptions.map((option) => (
                 <SelectItem key={option.id} value={option.id}>
@@ -243,6 +284,7 @@ export function PaymentSummaryReportPanel() {
             type="button"
             variant="ghost"
             onClick={() => {
+              setKindFilter("all")
               setProgramFilter(ALL)
               setOfferingFilter(ALL)
             }}

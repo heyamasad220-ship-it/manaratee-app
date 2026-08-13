@@ -4,11 +4,15 @@ import { Header } from "@/components/layout/header"
 import { OfferingManageClient } from "@/components/programs/offering-manage-client"
 import { getDepartments } from "@/lib/departments/department-queries"
 import { getOfferingManageSummary } from "@/lib/programs/offering-manage-summary"
+import {
+  getOfferingSessionEnrollmentSummary,
+  getOfferingSessionRoster,
+} from "@/lib/programs/offering-session-enrollment"
 import { getOfferingWorkspaceData } from "@/lib/programs/offering-workspace-queries"
 import { getOfferingCapacityGroups } from "@/lib/programs/program-capacity-group-queries"
+import { PROGRAM_LABEL_PLURAL } from "@/lib/programs/program-display-labels"
 import { getOfferingsForProgram } from "@/lib/programs/program-offering-queries"
 import { programOfferingManageHref } from "@/lib/programs/program-offering-paths"
-import { isSeasonalProgramKind } from "@/lib/programs/program-kind"
 import { getProgramById } from "@/lib/programs/program-queries"
 import { getOfferingRosterEnrollments } from "@/lib/programs/program-staff-assignment-queries"
 
@@ -17,10 +21,11 @@ export default async function ManageProgramOfferingPage({
   searchParams,
 }: {
   params: Promise<{ id: string; offeringId: string }>
-  searchParams?: Promise<{ tab?: string; edit?: string }>
+  searchParams?: Promise<{ tab?: string; edit?: string; session?: string }>
 }) {
   const { id, offeringId } = await params
   const resolvedSearchParams = searchParams ? await searchParams : {}
+  const sessionId = resolvedSearchParams.session?.trim() || null
 
   const program = await getProgramById(id)
 
@@ -32,10 +37,10 @@ export default async function ManageProgramOfferingPage({
   if (program.department_id) {
     const target = programOfferingManageHref(id, offeringId, {
       departmentId: program.department_id,
+      sessionId,
+      edit: resolvedSearchParams.edit === "1",
     })
-    const editQuery =
-      resolvedSearchParams.edit === "1" ? "?edit=1" : ""
-    redirect(`${target}${editQuery}`)
+    redirect(target)
   }
 
   const [offerings, departments, capacityGroups] = await Promise.all([
@@ -51,11 +56,26 @@ export default async function ManageProgramOfferingPage({
     notFound()
   }
 
-  const [workspaceData, summary, roster] = await Promise.all([
-    getOfferingWorkspaceData(id, selectedOffering, program.organization_id),
-    getOfferingManageSummary(selectedOffering.id, program.organization_id),
-    getOfferingRosterEnrollments(selectedOffering.id, program.organization_id),
-  ])
+  const [workspaceData, summary, roster, sessionEnrollment, sessionRoster] =
+    await Promise.all([
+      getOfferingWorkspaceData(id, selectedOffering, program.organization_id),
+      getOfferingManageSummary(selectedOffering.id, program.organization_id),
+      getOfferingRosterEnrollments(
+        selectedOffering.id,
+        program.organization_id
+      ),
+      getOfferingSessionEnrollmentSummary(
+        selectedOffering.id,
+        program.organization_id
+      ),
+      sessionId
+        ? getOfferingSessionRoster(
+            selectedOffering.id,
+            sessionId,
+            program.organization_id
+          )
+        : Promise.resolve(null),
+    ])
 
   const departmentName =
     departments.find((department) => department.id === program.department_id)
@@ -64,20 +84,27 @@ export default async function ManageProgramOfferingPage({
   const enrolledNames = roster.map(
     (row) => row.child_name || row.parent_name || "Participant"
   )
-  const seasonalMode = isSeasonalProgramKind(program.program_kind)
 
   return (
     <>
       <Header
         title="Programs"
-        breadcrumbExtras={
-          seasonalMode
-            ? [{ label: selectedOffering.name }]
-            : [
-                { label: program.name, href: `/programs/${program.id}` },
-                { label: selectedOffering.name },
-              ]
-        }
+        breadcrumbExtras={[
+          { label: program.name, href: `/programs/${program.id}` },
+          {
+            label: PROGRAM_LABEL_PLURAL,
+            href: `/programs/${program.id}/offerings`,
+          },
+          {
+            label: selectedOffering.name,
+            href: sessionRoster
+              ? `/programs/${program.id}/offerings/${offeringId}`
+              : undefined,
+          },
+          ...(sessionRoster
+            ? [{ label: sessionRoster.session.name }]
+            : []),
+        ]}
       />
       <OfferingManageClient
         program={program}
@@ -87,6 +114,8 @@ export default async function ManageProgramOfferingPage({
         capacityGroups={capacityGroups}
         summary={summary}
         enrolledNames={enrolledNames}
+        sessionEnrollment={sessionEnrollment}
+        sessionRoster={sessionRoster}
         initialEditOpen={resolvedSearchParams.edit === "1"}
         navigationContext={{
           mode: "programs",

@@ -25,23 +25,20 @@ export const DEPARTMENT_YEAR_WORKSPACE_TABS = [
   "overview",
   "programs",
   "students",
-  "schedule",
-  "financial",
-  "reports",
 ] as const satisfies readonly GroupWorkspaceTab[]
 
 /** Year tabs that must not load without `?year=` (redirect to department Overview). */
 export const DEPARTMENT_YEAR_REQUIRED_TABS = [
   "students",
-  "schedule",
-  "financial",
-  "reports",
 ] as const satisfies readonly GroupWorkspaceTab[]
 
 /** Tabs that belong to the department itself (no year required). */
 export const DEPARTMENT_LEVEL_WORKSPACE_TABS = [
   "overview",
   "programs",
+  "schedule",
+  "financial",
+  "reports",
   "group-giving",
   "activity",
   "settings",
@@ -66,10 +63,17 @@ export function isDepartmentLevelWorkspaceTab(
 }
 
 /** Sub-tabs under Department → Financial. */
-export type DepartmentFinanceSection = "payroll" | "expenses" | "budget"
+export type DepartmentFinanceSection =
+  | "employees"
+  | "payroll"
+  | "expenses"
+  | "budget"
 
 /** Stage filters under Department → Students. */
 export type DepartmentStudentsSection = "review" | "approved" | "roster"
+
+/** Sub-tabs under Department → Schedule. */
+export type DepartmentScheduleSection = "class-times" | "activity-planner"
 
 /** Sub-tabs under Department → Settings. */
 export type DepartmentSettingsSection =
@@ -108,6 +112,7 @@ export function departmentGroupWorkspaceHref(
     tab?: GroupWorkspaceTab
     finance?: DepartmentFinanceSection
     studentsSection?: DepartmentStudentsSection
+    scheduleSection?: DepartmentScheduleSection
     settingsSection?: DepartmentSettingsSection
     /** Prefill Programs year/season filter (open program id). */
     yearProgramId?: string
@@ -121,7 +126,7 @@ export function departmentGroupWorkspaceHref(
   if (
     options?.tab === "financial" &&
     options.finance &&
-    options.finance !== "payroll"
+    options.finance !== "employees"
   ) {
     params.set("section", options.finance)
   }
@@ -131,6 +136,13 @@ export function departmentGroupWorkspaceHref(
     options.studentsSection !== "roster"
   ) {
     params.set("section", options.studentsSection)
+  }
+  if (
+    options?.tab === "schedule" &&
+    options.scheduleSection &&
+    options.scheduleSection !== "class-times"
+  ) {
+    params.set("section", options.scheduleSection)
   }
   if (
     options?.tab === "settings" &&
@@ -282,10 +294,23 @@ export function parseDepartmentFinanceSection(
 ): DepartmentFinanceSection {
   if (tab === "expenses") return "expenses"
   if (tab === "budget") return "budget"
+  if (tab === "employees") return "employees"
   if (tab === "payroll" || tab === "babysitting") return "payroll"
   if (section === "expenses") return "expenses"
   if (section === "budget") return "budget"
-  return "payroll"
+  if (section === "employees") return "employees"
+  if (section === "payroll") return "payroll"
+  // Default: staff roster (formerly labeled Payroll).
+  return "employees"
+}
+
+export function parseDepartmentScheduleSection(
+  tab: string | null | undefined,
+  section: string | null | undefined
+): DepartmentScheduleSection {
+  if (tab !== "schedule") return "class-times"
+  if (section === "activity-planner") return "activity-planner"
+  return "class-times"
 }
 
 export function parseDepartmentSettingsSection(

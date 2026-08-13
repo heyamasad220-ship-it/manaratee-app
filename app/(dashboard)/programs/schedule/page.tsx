@@ -1,8 +1,12 @@
 import { redirect } from "next/navigation"
 
-import { ProgramsScheduleClient } from "./schedule-client"
 import { resolveProgramScheduleRedirect } from "@/lib/programs/program-schedule-actions"
 
+/**
+ * Legacy Programs → Schedule route.
+ * - `?program=` → offering Schedule tab (unchanged)
+ * - bare URL → Departments list (Schedule Builder lives on Department → Schedule)
+ */
 export default async function ProgramsSchedulePage({
   searchParams,
 }: {
@@ -19,5 +23,5 @@ export default async function ProgramsSchedulePage({
     }
   }
 
-  return <ProgramsScheduleClient />
+  redirect("/workforce/departments")
 }

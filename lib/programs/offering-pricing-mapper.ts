@@ -10,12 +10,15 @@ import type {
   FeeRecurrence,
   OfferingDiscount,
   OfferingFee,
+  OfferingPaymentOptions,
   PaymentStructure,
   SimpleOfferingPricing,
   SimplePricingDiscountLine,
 } from "@/lib/programs/offering-pricing-simple-types"
 import {
+  DEFAULT_PAYMENT_OPTIONS,
   defaultFeeName,
+  hasMonthlyFeeRecurrence,
   OFFERING_DISCOUNT_NAME_LABELS,
 } from "@/lib/programs/offering-pricing-simple-types"
 import type {
@@ -27,6 +30,8 @@ import type {
 } from "@/lib/programs/program-fee-plan-types"
 
 const OPTIONAL_CHARGE_PREFIX = "opt-charge:"
+/** Embedded in fee-plan notes so payment-option toggles survive save. */
+const PAYMENT_OPTIONS_NOTES_MARKER = "manaratee_payment_options:"
 /** Kinds owned by the Fees-style discount rows UI. */
 const ROW_DISCOUNT_KINDS = new Set([
   "sibling",
@@ -92,7 +97,7 @@ function inferFeeType(component: ProgramOfferingFeePlanComponent): ChargeType {
   if (label.includes("lunch")) return "lunch"
   if (label.includes("material")) return "materials"
   if (label.includes("registration")) return "registration_fee"
-  if (label.includes("tuition")) return "tuition"
+  if (label.includes("tuition") || label.includes("program fee")) return "tuition"
 
   return "custom"
 }
@@ -180,6 +185,71 @@ export function createEmptySimplePricing(): SimpleOfferingPricing {
     legacyTagDiscounts: createEmptyDiscounts(),
     paymentStructure: "one_time",
     installmentCount: null,
+    paymentOptions: { ...DEFAULT_PAYMENT_OPTIONS },
+  }
+}
+
+function stripPaymentOptionsMarker(notes: string | null | undefined): string {
+  if (!notes) return ""
+  return notes
+    .split("\n")
+    .filter((line) => !line.trim().startsWith(PAYMENT_OPTIONS_NOTES_MARKER))
+    .join("\n")
+    .trim()
+}
+
+function parsePaymentOptionsFromNotes(
+  notes: string | null | undefined
+): OfferingPaymentOptions | null {
+  if (!notes) return null
+  const line = notes
+    .split("\n")
+    .map((entry) => entry.trim())
+    .find((entry) => entry.startsWith(PAYMENT_OPTIONS_NOTES_MARKER))
+  if (!line) return null
+  try {
+    const parsed = JSON.parse(
+      line.slice(PAYMENT_OPTIONS_NOTES_MARKER.length)
+    ) as Partial<OfferingPaymentOptions>
+    return {
+      payInFull: parsed.payInFull !== false,
+      twoSemesterPayments: parsed.twoSemesterPayments !== false,
+    }
+  } catch {
+    return null
+  }
+}
+
+export function encodePaymentOptionsInNotes(
+  notes: string | null | undefined,
+  options: OfferingPaymentOptions
+): string {
+  const base = stripPaymentOptionsMarker(notes)
+  const marker = `${PAYMENT_OPTIONS_NOTES_MARKER}${JSON.stringify({
+    payInFull: options.payInFull === true,
+    twoSemesterPayments: options.twoSemesterPayments === true,
+  })}`
+  return base ? `${base}\n${marker}` : marker
+}
+
+function resolvePaymentOptionsFromPlan(
+  plan: Pick<ProgramOfferingFeePlan, "notes" | "plan_type" | "installment_count">,
+  fees: OfferingFee[]
+): OfferingPaymentOptions {
+  const fromNotes = parsePaymentOptionsFromNotes(plan.notes)
+  if (fromNotes) return fromNotes
+
+  if (!hasMonthlyFeeRecurrence(fees)) {
+    return { ...DEFAULT_PAYMENT_OPTIONS }
+  }
+
+  const twoSemester =
+    plan.plan_type === "installments" &&
+    (plan.installment_count == null || plan.installment_count === 2)
+
+  return {
+    payInFull: true,
+    twoSemesterPayments: twoSemester || plan.plan_type === "installments",
   }
 }
 
@@ -354,6 +424,7 @@ export function parseSimplePricingFromWorkspace(
     legacyTagDiscounts: parsedDiscounts.legacyTagDiscounts,
     paymentStructure,
     installmentCount: bundle.plan.installment_count,
+    paymentOptions: resolvePaymentOptionsFromPlan(bundle.plan, fees),
   }
 }
 
@@ -414,13 +485,26 @@ function buildDefaultPlanInput(
 }
 
 function derivePlanType(simple: SimpleOfferingPricing): FeePlanType {
+  const hasMonthly = hasMonthlyFeeRecurrence(simple.fees)
+
+  if (hasMonthly) {
+    const { payInFull, twoSemesterPayments } = simple.paymentOptions
+    if (twoSemesterPayments && !payInFull) {
+      return "installments"
+    }
+    if (payInFull && !twoSemesterPayments) {
+      return "one_time"
+    }
+    if (twoSemesterPayments) {
+      return "installments"
+    }
+    return "monthly"
+  }
+
   if (simple.paymentStructure === "installments") {
     return "installments"
   }
-  if (
-    simple.paymentStructure === "monthly" ||
-    simple.fees.some((fee) => fee.recurrence === "monthly")
-  ) {
+  if (simple.paymentStructure === "monthly") {
     return "monthly"
   }
   return "one_time"
@@ -564,11 +648,22 @@ export function buildFeePlanStateFromSimplePricing(
   updatedDefault.plan_type = planType
   updatedDefault.installment_count =
     planType === "installments"
-      ? Math.max(2, simple.installmentCount ?? 2)
+      ? Math.max(
+          2,
+          simple.paymentOptions.twoSemesterPayments
+            ? 2
+            : (simple.installmentCount ?? 2)
+        )
       : null
   updatedDefault.payment_due_day =
     planType === "monthly" ? simple.paymentDueDay ?? 1 : null
   updatedDefault.components = components
+  updatedDefault.notes = encodePaymentOptionsInNotes(
+    existingDefault?.notes,
+    hasMonthlyFeeRecurrence(simple.fees)
+      ? simple.paymentOptions
+      : DEFAULT_PAYMENT_OPTIONS
+  )
 
   return {
     plans: [updatedDefault, ...otherPlans],

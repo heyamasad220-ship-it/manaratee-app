@@ -12,7 +12,6 @@ import {
 } from "lucide-react"
 
 import { ProgramFlyerField } from "@/components/programs/edit/program-flyer-field"
-import { DepartmentYearConfigureDialog } from "@/components/departments/department-year-configure-dialog"
 import { ProgramCardActions } from "@/components/programs/program-card-actions"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -45,10 +44,14 @@ import { departmentGroupWorkspaceHref } from "@/lib/donations/donation-group-pat
 import {
   YEAR_SEASON_LABEL,
   YEAR_SEASON_LABEL_PLURAL,
+  getHierarchyLabels,
   programCountPhrase,
 } from "@/lib/programs/program-display-labels"
 import { getProgramStatusLabel, type ProgramStatus } from "@/lib/programs/program-status"
 import { formatProgramGenderLabel } from "@/lib/programs/program-eligibility-display"
+import { getOrganizationProgramKindsEntitlement } from "@/lib/programs/organization-program-kinds"
+import { organizationAllowsProgramKind } from "@/lib/programs/program-kind-policy"
+import type { ProgramKind } from "@/lib/programs/program-kind"
 import { cn } from "@/lib/utils"
 
 const FLYER_PLACEHOLDER_COLORS = [
@@ -111,8 +114,6 @@ export function DepartmentProgramsCatalogPanel({
   const [error, setError] = useState<string | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [closeTarget, setCloseTarget] = useState<DepartmentYearProgramRow | null>(null)
-  const [configureTarget, setConfigureTarget] =
-    useState<DepartmentYearProgramRow | null>(null)
   const [isPending, startTransition] = useTransition()
 
   const [newName, setNewName] = useState("")
@@ -122,11 +123,19 @@ export function DepartmentProgramsCatalogPanel({
   const [flyerUrl, setFlyerUrl] = useState("")
   const [confirmName, setConfirmName] = useState("")
   const [formError, setFormError] = useState<string | null>(null)
+  const [allowsAcademicYears, setAllowsAcademicYears] = useState(true)
+  const [allowsSeasonal, setAllowsSeasonal] = useState(true)
+  const [createKind, setCreateKind] = useState<ProgramKind>("academic")
 
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
-    const yearsResult = await fetchDepartmentYearProgramsAction(departmentId)
+    const [yearsResult, entitlement] = await Promise.all([
+      fetchDepartmentYearProgramsAction(departmentId),
+      getOrganizationProgramKindsEntitlement(),
+    ])
+    setAllowsAcademicYears(organizationAllowsProgramKind(entitlement, "academic"))
+    setAllowsSeasonal(organizationAllowsProgramKind(entitlement, "seasonal"))
     if (!yearsResult.success) {
       setError(yearsResult.error)
       setBundle(null)
@@ -140,12 +149,17 @@ export function DepartmentProgramsCatalogPanel({
     void load()
   }, [load])
 
-  function openCreate() {
+  function openCreate(kind: ProgramKind) {
+    setCreateKind(kind)
     setFormError(null)
     setNewName(`${departmentName} `)
     setStartDate("")
     setEndDate("")
-    setCopyFromId(bundle?.openPrograms[0]?.id || bundle?.archivedPrograms[0]?.id || "")
+    setCopyFromId(
+      kind === "academic"
+        ? bundle?.openPrograms[0]?.id || bundle?.archivedPrograms[0]?.id || ""
+        : ""
+    )
     setFlyerUrl("")
     setCreateOpen(true)
   }
@@ -167,8 +181,10 @@ export function DepartmentProgramsCatalogPanel({
         name: newName,
         startDate: startDate || null,
         endDate: endDate || null,
-        copyFromProgramId: copyFromId || null,
+        copyFromProgramId:
+          createKind === "academic" ? copyFromId || null : null,
         flyerUrl: flyerUrl || null,
+        programKind: createKind,
       })
       if (!result.success) {
         setFormError(result.error)
@@ -225,6 +241,9 @@ export function DepartmentProgramsCatalogPanel({
   }
 
   const copySources = [...bundle.openPrograms, ...bundle.archivedPrograms]
+  const createLabels = getHierarchyLabels(createKind)
+  const canCreate =
+    bundle.canManageYears && (allowsAcademicYears || allowsSeasonal)
 
   return (
     <div className="space-y-4">
@@ -234,15 +253,28 @@ export function DepartmentProgramsCatalogPanel({
             {YEAR_SEASON_LABEL_PLURAL}
           </h2>
           <p className="text-sm text-muted-foreground">
-            Open a program to manage offerings, registrations, schedule, and
+            Open a year or season to manage offerings, registrations, and
             finances.
           </p>
         </div>
-        {bundle.canManageYears ? (
-          <Button onClick={openCreate}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add {YEAR_SEASON_LABEL}
-          </Button>
+        {canCreate ? (
+          <div className="flex flex-wrap gap-2">
+            {allowsAcademicYears ? (
+              <Button onClick={() => openCreate("academic")}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Year
+              </Button>
+            ) : null}
+            {allowsSeasonal ? (
+              <Button
+                variant={allowsAcademicYears ? "outline" : "default"}
+                onClick={() => openCreate("seasonal")}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Add Season
+              </Button>
+            ) : null}
+          </div>
         ) : null}
       </div>
 
@@ -251,8 +283,7 @@ export function DepartmentProgramsCatalogPanel({
           <CardHeader>
             <CardTitle>No {YEAR_SEASON_LABEL_PLURAL}</CardTitle>
             <CardDescription>
-              Add a {YEAR_SEASON_LABEL.toLowerCase()} to start offerings and
-              registrations.
+              Add a year or season to start offerings and registrations.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -264,10 +295,6 @@ export function DepartmentProgramsCatalogPanel({
               capacity > 0
                 ? Math.min(100, Math.round((program.enrolled / capacity) * 100))
                 : 0
-            const yearHref = departmentGroupWorkspaceHref(departmentId, {
-              tab: "overview",
-              yearProgramId: program.id,
-            })
             return (
               <Card
                 key={program.id}
@@ -339,14 +366,8 @@ export function DepartmentProgramsCatalogPanel({
                           programId={program.id}
                           programName={program.name}
                           programStatus={program.status}
-                          editLabel={bundle.canManageYears ? "Edit" : "View"}
                           hideDelete
-                          onConfigure={
-                            bundle.canManageYears
-                              ? () => setConfigureTarget(program)
-                              : undefined
-                          }
-                          detailsHref={yearHref}
+                          hideEdit
                           onArchiveYear={
                             bundle.canArchiveYears &&
                             program.status !== "closed" &&
@@ -411,21 +432,25 @@ export function DepartmentProgramsCatalogPanel({
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Add {YEAR_SEASON_LABEL}</DialogTitle>
+            <DialogTitle>Add {createLabels.containerSingular}</DialogTitle>
             <DialogDescription>
-              Creates a {YEAR_SEASON_LABEL.toLowerCase()} under this department.
-              Optionally copy courses and teachers from a previous program (rosters
-              stay empty).
+              {createKind === "seasonal"
+                ? "Creates a seasonal camp or season under this department. Sessions and pricing can be set after create."
+                : "Creates an academic year under this department. Optionally copy courses and teachers from a previous year (rosters stay empty)."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="year-name">{YEAR_SEASON_LABEL} name</Label>
+              <Label htmlFor="year-name">{createLabels.containerSingular} name</Label>
               <Input
                 id="year-name"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
-                placeholder={`${departmentName} 2026-2027`}
+                placeholder={
+                  createKind === "seasonal"
+                    ? `${departmentName} Summer 2026`
+                    : `${departmentName} 2026-2027`
+                }
                 disabled={isPending}
               />
             </div>
@@ -451,27 +476,31 @@ export function DepartmentProgramsCatalogPanel({
                 />
               </div>
             </div>
-            <div className="space-y-2">
-              <Label>Copy structure from</Label>
-              <Select
-                value={copyFromId || "none"}
-                onValueChange={(value) => setCopyFromId(value === "none" ? "" : value)}
-                disabled={isPending || copySources.length === 0}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Optional" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No copy (blank program)</SelectItem>
-                  {copySources.map((program) => (
-                    <SelectItem key={program.id} value={program.id}>
-                      {program.name}
-                      {program.status === "archived" ? " (archived)" : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {createKind === "academic" ? (
+              <div className="space-y-2">
+                <Label>Copy structure from</Label>
+                <Select
+                  value={copyFromId || "none"}
+                  onValueChange={(value) =>
+                    setCopyFromId(value === "none" ? "" : value)
+                  }
+                  disabled={isPending || copySources.length === 0}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Optional" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No copy (blank year)</SelectItem>
+                    {copySources.map((program) => (
+                      <SelectItem key={program.id} value={program.id}>
+                        {program.name}
+                        {program.status === "archived" ? " (archived)" : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
             <div className="space-y-2">
               <Label>Flyer (optional)</Label>
               <ProgramFlyerField
@@ -489,7 +518,7 @@ export function DepartmentProgramsCatalogPanel({
             </Button>
             <Button onClick={handleCreate} disabled={isPending || !newName.trim()}>
               {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Create
+              Create {createLabels.containerSingular}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -543,17 +572,6 @@ export function DepartmentProgramsCatalogPanel({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      <DepartmentYearConfigureDialog
-        departmentId={departmentId}
-        programId={configureTarget?.id ?? null}
-        programName={configureTarget?.name}
-        open={Boolean(configureTarget)}
-        onOpenChange={(nextOpen) => {
-          if (!nextOpen) setConfigureTarget(null)
-        }}
-        onSaved={load}
-      />
     </div>
   )
 }

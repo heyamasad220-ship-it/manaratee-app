@@ -26,6 +26,11 @@ import { getConflictingReservations } from "@/lib/reservations/reservation-queri
 import { fireModuleNotifications } from "@/lib/notifications/dispatch-module-notification"
 
 import { buildCopyName } from "@/lib/programs/program-fee-plan-copy-utils"
+import {
+  calendarStatusFromVisibility,
+  type CommunityCalendarVisibility,
+} from "@/lib/community-calendar/calendar-visibility"
+import { COMMUNITY_CALENDAR_PATH } from "@/lib/community-calendar/routes"
 
 import type { InternalEventStatus } from "./internal-event-status"
 import { INTERNAL_EVENT_STATUSES } from "./internal-event-status"
@@ -419,7 +424,8 @@ async function assertInternalEventSpacesAvailable(input: {
 
 function revalidateInternalEventPaths(eventId?: string) {
   revalidatePath("/event-management")
-  revalidatePath("/workforce/departments/calendar")
+  revalidatePath("/event-management/calendar")
+  revalidatePath(COMMUNITY_CALENDAR_PATH)
   revalidatePath("/facilities/availability")
   revalidatePath("/facilities/calendar")
   revalidatePath("/facilities/reservation-center")
@@ -1424,6 +1430,66 @@ export async function updateInternalEventFlyer(input: {
     return {
       success: false,
       error: error instanceof Error ? error.message : "Failed to update event flyer.",
+    }
+  }
+}
+
+export async function updateInternalEventCommunityCalendar(input: {
+  eventId: string
+  visibility: CommunityCalendarVisibility
+}): Promise<InternalEventCatalogActionResult> {
+  try {
+    const canManage = await hasAnyPermission(
+      PERMISSIONS.EVENTS_MANAGE,
+      PERMISSIONS.PROGRAMS_MANAGE
+    )
+    if (!canManage) {
+      return { success: false, error: "You do not have permission to update events." }
+    }
+
+    const supabase = await createClient()
+    const organizationId = await getSelectedOrganizationId()
+    if (!organizationId) {
+      return { success: false, error: "No organization selected" }
+    }
+
+    const status = calendarStatusFromVisibility(input.visibility)
+    const { error } = await supabase
+      .from("internal_events")
+      .update({
+        community_calendar_status: status,
+      })
+      .eq("id", input.eventId)
+      .eq("organization_id", organizationId)
+
+    if (error) {
+      console.error(error)
+      const message = error.message || ""
+      if (
+        message.includes("community_calendar_status") ||
+        message.includes("schema cache")
+      ) {
+        return {
+          success: false,
+          error:
+            "Community calendar column is missing. Run scripts/247_internal_event_community_calendar.sql in Supabase, then try again.",
+        }
+      }
+      return { success: false, error: "Failed to update community calendar visibility." }
+    }
+
+    revalidateInternalEventPaths(input.eventId)
+    revalidatePath(`/event-management/${input.eventId}`)
+    revalidatePath(COMMUNITY_CALENDAR_PATH)
+    return { success: true, eventId: input.eventId }
+  } catch (error) {
+    console.error(error)
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to update community calendar visibility.",
     }
   }
 }

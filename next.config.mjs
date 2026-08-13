@@ -41,7 +41,11 @@ const nextConfig = {
         destination: "/facilities/calendar?sources=venue_rental",
         permanent: false,
       },
-      // Vendor Hub IA migration
+      {
+        source: "/vendor-hub/community-calendar",
+        destination: "/community-calendar",
+        permanent: false,
+      },
       {
         source: "/vendor-hub/applications",
         destination: "/vendor-hub/events",

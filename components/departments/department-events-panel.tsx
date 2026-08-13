@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { CalendarDays, Loader2, Plus } from "lucide-react"
+import { CalendarDays, Loader2, MapPin, Plus } from "lucide-react"
 
 import { InternalEventCardActions } from "@/components/events/internal-event-card-actions"
 import { Badge } from "@/components/ui/badge"
@@ -15,10 +15,12 @@ import {
 } from "@/lib/donations/donation-group-activity-actions"
 import {
   buildFacilitiesBookSpaceHref,
+  buildFacilitiesCalendarHref,
+  CHECK_SPACE_AVAILABILITY_CTA_LABEL,
   CREATE_EVENT_CTA_LABEL,
   VIEW_MASTER_CALENDAR_CTA_LABEL,
 } from "@/lib/events/facility-event-request-href"
-import { departmentsMasterCalendarHref } from "@/lib/departments/departments-section-path"
+import { eventManagementMasterCalendarHref } from "@/lib/events/event-management-section-path"
 import { getInternalEventDeleteBlockersMap } from "@/lib/events/internal-event-actions"
 import { getInternalEventStatusLabel } from "@/lib/events/internal-event-status"
 
@@ -65,8 +67,14 @@ function bookSpaceHref(departmentId: string) {
   })
 }
 
+function spacesCalendarHref(departmentId: string) {
+  return buildFacilitiesCalendarHref({
+    returnTo: departmentEventsReturnTo(departmentId),
+  })
+}
+
 function collaborationCalendarHref(departmentId: string) {
-  return departmentsMasterCalendarHref({
+  return eventManagementMasterCalendarHref({
     departmentId,
     returnTo: departmentEventsReturnTo(departmentId),
   })
@@ -148,8 +156,9 @@ export function DepartmentEventsPanel({
         <div>
           <h2 className="text-lg font-semibold tracking-tight">Events</h2>
           <p className="text-sm text-muted-foreground">
-            View the Master Calendar for department collaboration, then create events from
-            Facilities (department and requester are prefilled). All submissions go for approval.
+            View the Master Calendar for department events. Check Facilities for room
+            availability, then create events from Facilities (department and requester are
+            prefilled). All submissions go for approval.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -158,6 +167,14 @@ export function DepartmentEventsPanel({
               <Link href={collaborationCalendarHref(departmentId)}>
                 <CalendarDays className="mr-2 h-4 w-4" />
                 {VIEW_MASTER_CALENDAR_CTA_LABEL}
+              </Link>
+            </Button>
+          ) : null}
+          {canRequestEvents || canManageEvents ? (
+            <Button variant="outline" size="sm" asChild>
+              <Link href={spacesCalendarHref(departmentId)}>
+                <MapPin className="mr-2 h-4 w-4" />
+                {CHECK_SPACE_AVAILABILITY_CTA_LABEL}
               </Link>
             </Button>
           ) : null}

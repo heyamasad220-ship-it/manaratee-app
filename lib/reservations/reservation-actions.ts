@@ -34,7 +34,7 @@ const CALENDAR_REVALIDATE_PATHS = [
   "/facilities/calendar",
   "/bookings/calendar",
   "/event-management",
-  "/workforce/departments/calendar",
+  "/event-management/calendar",
 ]
 
 function revalidateCalendars() {

@@ -20,6 +20,7 @@ import { ProgramRegisterParticipantsFields } from "@/components/customer/program
 import { CustomerRegistrationOptionPicker } from "@/components/programs/program-registration-options-editor"
 import { createClient } from "@/lib/supabase/server"
 import { resolveCustomerPortalSession } from "@/lib/auth/customer-portal-session"
+import { resolveSessionEffectiveCapacity } from "@/lib/programs/program-catalog-capacity"
 import { getDefaultOfferingForProgramByOrg, getOfferingByIdForOrg } from "@/lib/programs/program-offering-queries"
 import { registerForProgram } from "@/lib/programs/program-registration-actions"
 import {
@@ -145,21 +146,43 @@ function seatsRemaining(program: Program) {
   return Math.max((program.capacity || 0) - (program.enrolled || 0), 0)
 }
 
-function sessionSeatsRemaining(session: ProgramSession) {
-  return Math.max((session.capacity || 0) - (session.enrolled || 0), 0)
+function sessionSeatsRemaining(
+  session: ProgramSession,
+  offering?: {
+    capacity_mode?: string | null
+    capacity?: number | null
+  } | null
+) {
+  const capacity = resolveSessionEffectiveCapacity(session.capacity, offering)
+  if (capacity <= 0) return Number.POSITIVE_INFINITY
+  return Math.max(capacity - (session.enrolled || 0), 0)
 }
 
 function isFull(program: Program) {
   return program.capacity > 0 && program.enrolled >= program.capacity
 }
 
-function getRegistrationMode(program: Program) {
+function getRegistrationMode(
+  program: Program,
+  sessions: Array<{ remaining: number }>
+) {
   const enrollmentOpen = isEnrollmentOpen(
     program.enrollment_open_date,
     program.enrollment_close_date
   )
 
   if (!enrollmentOpen) return "closed"
+
+  // Multi-session offerings: full only when every session is full.
+  if (sessions.length > 0) {
+    const anyOpen = sessions.some(
+      (session) =>
+        !Number.isFinite(session.remaining) || session.remaining > 0
+    )
+    if (!anyOpen) return program.waitlist > 0 ? "waitlist" : "full"
+    return "enroll"
+  }
+
   if (isFull(program)) return program.waitlist > 0 ? "waitlist" : "full"
   return "enroll"
 }
@@ -459,10 +482,13 @@ export default async function CustomerProgramRegisterPage({
     .order("sort_order", { ascending: true })
     .order("start_date", { ascending: true })
 
-  const sessions = ((sessionData || []) as ProgramSession[]).map((session) => ({
-    ...session,
-    remaining: sessionSeatsRemaining(session),
-  }))
+  const sessions = ((sessionData || []) as ProgramSession[]).map((session) => {
+    const remaining = sessionSeatsRemaining(session, offering)
+    return {
+      ...session,
+      remaining: Number.isFinite(remaining) ? remaining : 9999,
+    }
+  })
 
   const { data: lunchData } = await supabase
     .from("program_lunch_options")
@@ -478,8 +504,18 @@ export default async function CustomerProgramRegisterPage({
     offering.enrollment_close_date ?? program.enrollment_close_date
   )
 
-  const mode = enrollmentOpen ? getRegistrationMode(program) : "closed"
-  const remainingSeats = seatsRemaining(program)
+  const mode = enrollmentOpen
+    ? getRegistrationMode(program, sessions)
+    : "closed"
+  const remainingSeats =
+    sessions.length > 0
+      ? Math.max(
+          ...sessions.map((session) =>
+            Number.isFinite(session.remaining) ? session.remaining : 0
+          ),
+          0
+        )
+      : seatsRemaining(program)
 
   if (mode === "closed" || mode === "full") {
     return (
@@ -516,7 +552,9 @@ export default async function CustomerProgramRegisterPage({
     unauthorized:
       "Your account is not authorized to register for this organization. Make sure you are signed in and linked to a contact record.",
     "capacity-full":
-      "This program is full. No seats are available for new registrations.",
+      "One or more selected weeks are full. Choose different weeks or join the waitlist if available.",
+    "selected-weeks-priority":
+      "Selected weeks are on the waitlist until staff opens remaining seats. Register for all of Camp 1 or Camp 2 to enroll now, or enable waitlist.",
     "missing-fields": "Please complete all required fields before continuing.",
     "invalid-participant": "The selected participant could not be found.",
     "missing-participant-contact":
@@ -581,6 +619,9 @@ export default async function CustomerProgramRegisterPage({
                 <CardDescription>
                   Part of {program.name}. Choose a registration option, then
                   complete the form below.
+                  {offering.selected_sessions_open === false
+                    ? " Full Camp 1 or Camp 2 enrolls now; selected weeks join the waitlist until remaining seats open."
+                    : ""}
                 </CardDescription>
               </CardHeader>
 

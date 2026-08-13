@@ -37,7 +37,7 @@ export async function loadContactsByIds(
       const chunk = uniqueIds.slice(index, index + CONTACT_ID_CHUNK_SIZE)
       const { data, error } = await supabase
         .from("contacts")
-        .select("id, full_name, email, phone")
+        .select("id, full_name, email, phone, person_id")
         .eq("organization_id", organizationId)
         .in("id", chunk)
 

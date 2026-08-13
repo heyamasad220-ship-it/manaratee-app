@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Eye, Link2, MoreHorizontal, Plus, Trash2 } from "lucide-react"
+import { Copy, Eye, GripVertical, Link2, Loader2, MoreHorizontal, Plus, Trash2 } from "lucide-react"
 
 import type { ProgramGender } from "@/components/programs/edit/types"
 import { ADULT_MIN_AGE } from "@/components/programs/edit/utils"
@@ -25,6 +25,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import {
   Table,
   TableBody,
@@ -35,12 +37,14 @@ import {
 } from "@/components/ui/table"
 import { formatOfferingEnrollmentLabel } from "@/lib/programs/program-catalog-capacity"
 import {
+  getHierarchyLabels,
   PROGRAM_LABEL,
-  PROGRAM_LABEL_PLURAL,
   YEAR_SEASON_LABEL,
 } from "@/lib/programs/program-display-labels"
+import { buildCopyName } from "@/lib/programs/program-fee-plan-copy-utils"
 import type { OfferingDeliveryFormat } from "@/lib/programs/program-offering-attributes"
 import { isOfferingEnrollmentOpen } from "@/lib/programs/program-offering-display"
+import { duplicateProgramOffering } from "@/lib/programs/program-offering-duplicate-actions"
 import {
   resolveEffectiveOfferingDates,
   type ProgramDefaultsSource,
@@ -68,6 +72,31 @@ function formatTuitionAmount(amount: number | null | undefined) {
     currency: "USD",
     maximumFractionDigits: amount % 1 === 0 ? 0 : 2,
   })
+}
+
+function moveOfferingRow<T>(items: T[], fromIndex: number, toIndex: number) {
+  if (
+    fromIndex === toIndex ||
+    fromIndex < 0 ||
+    toIndex < 0 ||
+    fromIndex >= items.length ||
+    toIndex >= items.length
+  ) {
+    return items
+  }
+  const next = [...items]
+  const [moved] = next.splice(fromIndex, 1)
+  next.splice(toIndex, 0, moved)
+  return next
+}
+
+function offeringRowsSignature(rows: ProgramDetailOfferingRow[]) {
+  return rows
+    .map(
+      (row) =>
+        `${row.offering.id}:${row.offering.sort_order ?? 0}:${row.offering.name}`
+    )
+    .join("|")
 }
 
 /** Minimal year/season fields needed to list and create programs (offerings). */
@@ -99,6 +128,8 @@ export function ProgramOfferingsListPanel({
   archivedCount,
   showArchived,
   addDisabled = false,
+  onOfferingsChanged,
+  allowedProgramKinds,
 }: {
   program: ProgramOfferingsListProgram
   /** When set, manage links stay under the department workspace. */
@@ -108,13 +139,32 @@ export function ProgramOfferingsListPanel({
   showArchived?: ProgramDetailOfferingRow[]
   /** When true, hide/disable Add (e.g. “All years” filter). */
   addDisabled?: boolean
+  /** Refetch client-held offering rows after mutations (department panel). */
+  onOfferingsChanged?: () => void | Promise<void>
+  /** Org packaging — which modes may be created from Add. */
+  allowedProgramKinds?: ProgramKind[]
 }) {
   const router = useRouter()
   const parentIsSeasonal = isSeasonalProgramKind(program.program_kind)
+  const hierarchy = getHierarchyLabels(program.program_kind)
+  const kindChoices =
+    allowedProgramKinds && allowedProgramKinds.length > 0
+      ? allowedProgramKinds
+      : (["academic", "seasonal"] as ProgramKind[])
+  /** Under an academic year, Add creates an offering — kind is locked. */
+  const lockKindToParent = !parentIsSeasonal
+  const defaultCreateKind: ProgramKind = lockKindToParent
+    ? "academic"
+    : parentIsSeasonal
+      ? kindChoices.includes("seasonal")
+        ? "seasonal"
+        : kindChoices[0] ?? "academic"
+      : kindChoices.includes("academic")
+        ? "academic"
+        : kindChoices[0] ?? "academic"
   const [addOpen, setAddOpen] = React.useState(false)
-  const [createKind, setCreateKind] = React.useState<ProgramKind>(
-    parentIsSeasonal ? "seasonal" : "academic"
-  )
+  const [createKind, setCreateKind] =
+    React.useState<ProgramKind>(defaultCreateKind)
   const [offeringName, setOfferingName] = React.useState("")
   const [deliveryFormat, setDeliveryFormat] =
     React.useState<OfferingDeliveryFormat>("in_person")
@@ -142,12 +192,118 @@ export function ProgramOfferingsListPanel({
   const [deletingOfferingId, setDeletingOfferingId] = React.useState<string | null>(
     null
   )
+  const [duplicateTarget, setDuplicateTarget] =
+    React.useState<ProgramOffering | null>(null)
+  const [duplicateName, setDuplicateName] = React.useState("")
+  const [isDuplicating, setIsDuplicating] = React.useState(false)
+  const [duplicateError, setDuplicateError] = React.useState<string | null>(null)
+  const [orderedRows, setOrderedRows] = React.useState(rows)
+  const [draggedIndex, setDraggedIndex] = React.useState<number | null>(null)
+  const [dropTargetIndex, setDropTargetIndex] = React.useState<number | null>(
+    null
+  )
+  const [isReordering, setIsReordering] = React.useState(false)
+
+  const rowsSignature = offeringRowsSignature(rows)
+  React.useEffect(() => {
+    setOrderedRows(rows)
+  }, [rows, rowsSignature])
 
   const showDetailFields = !(createKind === "academic" && parentIsSeasonal)
 
   function showActionFeedback(message: string) {
     setActionFeedback(message)
     window.setTimeout(() => setActionFeedback(null), 2500)
+  }
+
+  async function refreshOfferingsList() {
+    if (onOfferingsChanged) {
+      await onOfferingsChanged()
+      return
+    }
+    router.refresh()
+  }
+
+  async function persistOfferingOrder(nextRows: ProgramDetailOfferingRow[]) {
+    const previous = orderedRows
+    setOrderedRows(nextRows)
+    setIsReordering(true)
+    try {
+      const { reorderProgramOfferings } = await import(
+        "@/lib/programs/program-offering-actions"
+      )
+      await reorderProgramOfferings({
+        programId: program.id,
+        orderedOfferingIds: nextRows.map((row) => row.offering.id),
+      })
+      showActionFeedback("Order saved.")
+      await refreshOfferingsList()
+    } catch (error) {
+      setOrderedRows(previous)
+      showActionFeedback(
+        error instanceof Error ? error.message : "Could not save order."
+      )
+    } finally {
+      setIsReordering(false)
+    }
+  }
+
+  function handleDropOnIndex(toIndex: number) {
+    if (draggedIndex === null) {
+      setDropTargetIndex(null)
+      return
+    }
+    if (draggedIndex === toIndex) {
+      setDraggedIndex(null)
+      setDropTargetIndex(null)
+      return
+    }
+    const nextRows = moveOfferingRow(orderedRows, draggedIndex, toIndex)
+    setDraggedIndex(null)
+    setDropTargetIndex(null)
+    void persistOfferingOrder(nextRows)
+  }
+
+  function openDuplicateDialog(offering: ProgramOffering) {
+    setDuplicateTarget(offering)
+    setDuplicateName(buildCopyName(offering.name))
+    setDuplicateError(null)
+  }
+
+  function closeDuplicateDialog() {
+    if (isDuplicating) return
+    setDuplicateTarget(null)
+    setDuplicateName("")
+    setDuplicateError(null)
+  }
+
+  async function handleDuplicate() {
+    if (!duplicateTarget) return
+
+    const name = duplicateName.trim()
+    if (!name) {
+      setDuplicateError(`${PROGRAM_LABEL} name is required.`)
+      return
+    }
+
+    setIsDuplicating(true)
+    setDuplicateError(null)
+
+    try {
+      await duplicateProgramOffering(duplicateTarget.id, name)
+      setDuplicateTarget(null)
+      setDuplicateName("")
+      showActionFeedback(`${PROGRAM_LABEL} duplicated.`)
+      await refreshOfferingsList()
+    } catch (error) {
+      setDuplicateError(
+        error instanceof Error
+          ? error.message
+          : `Could not duplicate ${PROGRAM_LABEL.toLowerCase()}.`
+      )
+    } finally {
+      setIsDuplicating(false)
+    }
   }
 
   React.useEffect(() => {
@@ -241,7 +397,7 @@ export function ProgramOfferingsListPanel({
         offeringId: input.offeringId,
         plans: [
           {
-            name: `${input.offeringName} — Tuition`,
+            name: `${input.offeringName} — Program Fee`,
             plan_type: "one_time",
             is_default: true,
             is_active: true,
@@ -251,7 +407,7 @@ export function ProgramOfferingsListPanel({
             components: [
               {
                 component_type: "tuition",
-                label: "Tuition",
+                label: "Program Fee",
                 amount: fee,
                 pricing_model: "flat",
                 quantity_mode: "fixed",
@@ -445,21 +601,21 @@ export function ProgramOfferingsListPanel({
             disabled={addDisabled}
             title={
               addDisabled
-                ? `Select a ${YEAR_SEASON_LABEL.toLowerCase()} to add a ${PROGRAM_LABEL.toLowerCase()}.`
+                ? `Select a ${hierarchy.containerSingular.toLowerCase()} to add a ${hierarchy.offeringSingular.toLowerCase()}.`
                 : undefined
             }
           >
             <Plus className="mr-1.5 h-4 w-4" />
-            Add {PROGRAM_LABEL}
+            Add {hierarchy.offeringSingular}
           </Button>
         </div>
 
-        {rows.length === 0 ? (
+        {orderedRows.length === 0 ? (
           <div className="rounded-md border border-dashed px-4 py-8 text-center">
             <p className="text-sm text-muted-foreground">
-              No {PROGRAM_LABEL_PLURAL.toLowerCase()} yet. Add a{" "}
-              {PROGRAM_LABEL.toLowerCase()} to open registration, fees, and
-              schedule.
+              No {hierarchy.offeringPlural.toLowerCase()} yet. Add a{" "}
+              {hierarchy.offeringSingular.toLowerCase()} to open registration,
+              fees, and schedule.
             </p>
             {!addDisabled ? (
               <Button
@@ -469,7 +625,7 @@ export function ProgramOfferingsListPanel({
                 onClick={() => setAddOpen(true)}
               >
                 <Plus className="mr-1.5 h-4 w-4" />
-                Add first {PROGRAM_LABEL.toLowerCase()}
+                Add first {hierarchy.offeringSingular.toLowerCase()}
               </Button>
             ) : null}
           </div>
@@ -478,9 +634,12 @@ export function ProgramOfferingsListPanel({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>{PROGRAM_LABEL}</TableHead>
+                  <TableHead className="w-10">
+                    <span className="sr-only">Reorder</span>
+                  </TableHead>
+                  <TableHead>{hierarchy.offeringSingular}</TableHead>
                   <TableHead>Delivery</TableHead>
-                  <TableHead>Tuition</TableHead>
+                  <TableHead>Program Fee</TableHead>
                   <TableHead>Primary Instructor</TableHead>
                   <TableHead>Days</TableHead>
                   <TableHead>Times</TableHead>
@@ -491,15 +650,18 @@ export function ProgramOfferingsListPanel({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map(
-                  ({
-                    offering,
-                    enrolled,
-                    primaryInstructor,
-                    tuitionAmount,
-                    daysLabel,
-                    timesLabel,
-                  }) => {
+                {orderedRows.map(
+                  (
+                    {
+                      offering,
+                      enrolled,
+                      primaryInstructor,
+                      tuitionAmount,
+                      daysLabel,
+                      timesLabel,
+                    },
+                    index
+                  ) => {
                   const effectiveDates = resolveEffectiveOfferingDates(
                     offering,
                     program as ProgramDefaultsSource
@@ -521,7 +683,13 @@ export function ProgramOfferingsListPanel({
                   return (
                     <TableRow
                       key={offering.id}
-                      className="cursor-pointer hover:bg-muted/40"
+                      className={cn(
+                        "cursor-pointer hover:bg-muted/40",
+                        draggedIndex === index && "opacity-50",
+                        dropTargetIndex === index &&
+                          draggedIndex !== index &&
+                          "bg-primary/5 ring-1 ring-inset ring-primary/20"
+                      )}
                       tabIndex={0}
                       role="link"
                       aria-label={`Open ${offering.name}`}
@@ -532,7 +700,49 @@ export function ProgramOfferingsListPanel({
                           router.push(manageHref)
                         }
                       }}
+                      onDragOver={(event) => {
+                        event.preventDefault()
+                        event.dataTransfer.dropEffect = "move"
+                        setDropTargetIndex(index)
+                      }}
+                      onDragLeave={() => {
+                        setDropTargetIndex((current) =>
+                          current === index ? null : current
+                        )
+                      }}
+                      onDrop={(event) => {
+                        event.preventDefault()
+                        handleDropOnIndex(index)
+                      }}
                     >
+                      <TableCell
+                        className="w-10 align-middle"
+                        onClick={(event) => event.stopPropagation()}
+                        onKeyDown={(event) => event.stopPropagation()}
+                      >
+                        <button
+                          type="button"
+                          draggable={!isReordering}
+                          aria-label={`Reorder ${offering.name}`}
+                          title="Drag to reorder"
+                          className="flex h-8 w-8 cursor-grab items-center justify-center rounded-md text-muted-foreground hover:bg-muted active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-50"
+                          disabled={isReordering}
+                          onDragStart={(event) => {
+                            event.dataTransfer.effectAllowed = "move"
+                            event.dataTransfer.setData(
+                              "text/plain",
+                              String(index)
+                            )
+                            setDraggedIndex(index)
+                          }}
+                          onDragEnd={() => {
+                            setDraggedIndex(null)
+                            setDropTargetIndex(null)
+                          }}
+                        >
+                          <GripVertical className="h-4 w-4" />
+                        </button>
+                      </TableCell>
                       <TableCell className="font-medium">
                         <button
                           type="button"
@@ -559,7 +769,9 @@ export function ProgramOfferingsListPanel({
                       <TableCell>
                         <div className="space-y-1">
                           <p>
-                            {formatOfferingEnrollmentLabel(enrolled, offering)}
+                            {formatOfferingEnrollmentLabel(enrolled, offering, {
+                              capacityAppliesPerSession: parentIsSeasonal,
+                            })}
                           </p>
                           <p
                             className={cn(
@@ -639,6 +851,12 @@ export function ProgramOfferingsListPanel({
                               <Link2 className="mr-2 h-4 w-4" />
                               Share link
                             </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => openDuplicateDialog(offering)}
+                            >
+                              <Copy className="mr-2 h-4 w-4" />
+                              Duplicate
+                            </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               className="text-destructive focus:text-destructive"
@@ -663,7 +881,7 @@ export function ProgramOfferingsListPanel({
                                       )
                                     await deleteProgramOffering(offering.id)
                                     showActionFeedback("Offering deleted.")
-                                    router.refresh()
+                                    await refreshOfferingsList()
                                   } catch (error) {
                                     showActionFeedback(
                                       error instanceof Error
@@ -713,6 +931,69 @@ export function ProgramOfferingsListPanel({
         ) : null}
 
         <Dialog
+          open={duplicateTarget !== null}
+          onOpenChange={(open) => {
+            if (!open) closeDuplicateDialog()
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Duplicate {PROGRAM_LABEL.toLowerCase()}</DialogTitle>
+              <DialogDescription>
+                Copy registration options, pricing, sessions, and billing
+                schedule from {duplicateTarget?.name}. {YEAR_SEASON_LABEL}-level
+                settings such as eligibility and capacity groups stay shared.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2">
+              <Label htmlFor="list-duplicate-offering-name">
+                New {PROGRAM_LABEL.toLowerCase()} name
+              </Label>
+              <Input
+                id="list-duplicate-offering-name"
+                value={duplicateName}
+                onChange={(event) => setDuplicateName(event.target.value)}
+                placeholder={`${duplicateTarget?.name || PROGRAM_LABEL} (copy)`}
+                disabled={isDuplicating}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault()
+                    void handleDuplicate()
+                  }
+                }}
+              />
+              {duplicateError ? (
+                <p className="text-sm text-destructive">{duplicateError}</p>
+              ) : null}
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={closeDuplicateDialog}
+                disabled={isDuplicating}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={() => void handleDuplicate()}
+                disabled={isDuplicating || !duplicateName.trim()}
+              >
+                {isDuplicating ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Duplicating…
+                  </>
+                ) : (
+                  `Duplicate ${PROGRAM_LABEL.toLowerCase()}`
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog
           open={addOpen}
           onOpenChange={(open) => {
             setAddOpen(open)
@@ -721,13 +1002,20 @@ export function ProgramOfferingsListPanel({
         >
           <DialogContent className="flex max-h-[90vh] max-w-2xl flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
             <DialogHeader className="shrink-0 space-y-1.5 border-b px-6 py-4 text-left">
-              <DialogTitle>Add {PROGRAM_LABEL.toLowerCase()}</DialogTitle>
+              <DialogTitle>
+                Add{" "}
+                {createKind === "seasonal"
+                  ? getHierarchyLabels("seasonal").containerSingular
+                  : parentIsSeasonal
+                    ? getHierarchyLabels("academic").containerSingular
+                    : hierarchy.offeringSingular}
+              </DialogTitle>
               <DialogDescription>
                 {createKind === "seasonal"
                   ? "Create a camp or season product. Schedule sessions can be set after create."
                   : parentIsSeasonal
                     ? "Starts a new academic year for this department. Add classes under it afterward."
-                    : `Create a class or track under this ${YEAR_SEASON_LABEL.toLowerCase()}. Dates default from the year; schedule is set after create.`}
+                    : `Create a class or track under this ${hierarchy.containerSingular.toLowerCase()}. Dates default from the ${hierarchy.containerSingular.toLowerCase()}; schedule is set after create.`}
               </DialogDescription>
             </DialogHeader>
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-4">
@@ -738,6 +1026,10 @@ export function ProgramOfferingsListPanel({
                 departmentId={departmentId}
                 staffOptions={staffOptions}
                 kindRadioName="dept-add-program-kind"
+                allowedKinds={
+                  lockKindToParent ? (["academic"] as ProgramKind[]) : kindChoices
+                }
+                hideKindPicker={lockKindToParent || kindChoices.length <= 1}
                 values={{
                   kind: createKind,
                   name: offeringName,

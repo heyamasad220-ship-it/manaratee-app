@@ -47,6 +47,7 @@ import {
   isRegistrationOptionActive,
   type ProgramRegistrationOption,
 } from "@/lib/programs/program-registration-option-types"
+import { normalizeProgramKind } from "@/lib/programs/program-kind"
 import type { Program } from "@/lib/programs/program-types"
 
 /** Registration form source: effective offering values with program inherit (F1). */
@@ -229,6 +230,9 @@ export function OfferingRegistrationPanel({
   const [enableWaitlist, setEnableWaitlist] = React.useState(
     source.enable_waitlist
   )
+  const [selectedSessionsOpen, setSelectedSessionsOpen] = React.useState(
+    offering.selected_sessions_open !== false
+  )
   const [openEnrollment, setOpenEnrollment] = React.useState(
     !source.application_required
   )
@@ -258,6 +262,7 @@ export function OfferingRegistrationPanel({
     setEnrollmentCloseDate(source.enrollment_close_date ?? "")
     setCapacity(source.capacity)
     setEnableWaitlist(source.enable_waitlist)
+    setSelectedSessionsOpen(offering.selected_sessions_open !== false)
     setOpenEnrollment(!source.application_required)
     setWaitlistCapacity(source.waitlist_capacity?.toString() ?? "")
   }, [source, offering])
@@ -353,6 +358,7 @@ export function OfferingRegistrationPanel({
         capacity: nextCapacity,
         capacityGroups: flushedCapacityGroups,
         enable_waitlist: enableWaitlist,
+        selected_sessions_open: selectedSessionsOpen,
         waitlist_capacity:
           waitlistCapacity.trim() === "" ? null : Number(waitlistCapacity),
         application_required: !nextOpenEnrollment,
@@ -396,6 +402,7 @@ export function OfferingRegistrationPanel({
 
   const windowCard = showWindow ? (
     <OfferingEnrollmentWindowCard
+      programKind={program.program_kind}
       fullProgramEnabled={fullProgramEnabled}
       sessionRegistrationEnabled={sessionRegistrationEnabled}
       singleSessionEnabled={singleSessionEnabled}
@@ -425,6 +432,12 @@ export function OfferingRegistrationPanel({
       enableWaitlist={enableWaitlist}
       onEnableWaitlistChange={(value) => {
         setEnableWaitlist(value)
+        touch()
+      }}
+      selectedSessionsOpen={selectedSessionsOpen}
+      onSelectedSessionsOpenChange={(value) => {
+        setSelectedSessionsOpen(value)
+        if (value) setEnableWaitlist(true)
         touch()
       }}
       openEnrollment={openEnrollment}
@@ -465,6 +478,16 @@ export function OfferingRegistrationPanel({
         setOpenEnrollment(value)
         touch()
       }}
+      selectedSessionsOpen={selectedSessionsOpen}
+      onSelectedSessionsOpenChange={(value) => {
+        setSelectedSessionsOpen(value)
+        if (value) setEnableWaitlist(true)
+        touch()
+      }}
+      showSelectedSessionsPriority={
+        normalizeProgramKind(program.program_kind) === "seasonal" &&
+        sessionRegistrationEnabled
+      }
       disabled={disabled}
       compactLabels
     />

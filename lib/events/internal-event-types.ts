@@ -28,8 +28,8 @@ export interface InternalEvent {
   requires_ticketing?: boolean
   service_requirements?: EventServiceRequirements
   ticketing_config?: EventTicketingConfig
-  /** Public URL for promotional flyer (program-flyers storage). */
-  flyer_url?: string | null
+  /** Community Calendar visibility (private / community_visible / published). */
+  community_calendar_status?: string | null
   submitted_at: string | null
   approved_at: string | null
   declined_at: string | null

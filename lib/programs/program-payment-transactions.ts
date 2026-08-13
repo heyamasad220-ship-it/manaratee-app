@@ -21,6 +21,7 @@ export type ProgramPaymentTransactionRow = {
   enrollmentId: string
   programId: string
   programName: string
+  programKind: "academic" | "seasonal"
   departmentId: string | null
   departmentName: string | null
   offeringId: string | null
@@ -97,6 +98,7 @@ export async function getProgramPaymentTransactions(filters?: {
           payer_contact_id,
           program:program_id (
             name,
+            program_kind,
             department_id,
             start_date,
             end_date,
@@ -196,6 +198,7 @@ export async function getProgramPaymentTransactions(filters?: {
     const programRel = enrollment.program as
       | {
           name?: string
+          program_kind?: string | null
           department_id?: string | null
           start_date?: string | null
           end_date?: string | null
@@ -204,6 +207,7 @@ export async function getProgramPaymentTransactions(filters?: {
         }
       | {
           name?: string
+          program_kind?: string | null
           department_id?: string | null
           start_date?: string | null
           end_date?: string | null
@@ -273,6 +277,7 @@ export async function getProgramPaymentTransactions(filters?: {
         (enrollment.id as string) || (chargeRow?.enrollment_id as string),
       programId,
       programName: program?.name || "Program",
+      programKind: program?.program_kind === "seasonal" ? "seasonal" : "academic",
       departmentId,
       departmentName: departmentId
         ? departmentNameById.get(departmentId) || "Department"

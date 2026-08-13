@@ -23,6 +23,7 @@ export type OrgPaymentTransactionRow = {
   departmentName: string | null
   programId: string | null
   programName: string | null
+  programKind: "academic" | "seasonal" | null
   offeringId: string | null
   offeringName: string | null
   offeringActivity: "active" | "closed" | null
@@ -128,6 +129,7 @@ async function loadDonationPayments(
       departmentName: null,
       programId: null,
       programName: null,
+      programKind: null,
       offeringId: null,
       offeringName: null,
       offeringActivity: null,
@@ -161,6 +163,7 @@ async function loadProgramPayments(
       departmentName: row.departmentName,
       programId: row.programId,
       programName: row.programName,
+      programKind: row.programKind,
       offeringId: row.offeringId,
       offeringName: row.offeringName,
       offeringActivity: row.offeringActivity,

@@ -18,6 +18,9 @@ import {
   YEAR_SEASON_LABEL,
   YEAR_SEASON_LABEL_PLURAL,
 } from "@/lib/programs/program-display-labels"
+import { getOrganizationProgramKindsEntitlement } from "@/lib/programs/organization-program-kinds"
+import { listAllowedProgramKindsForOrganization } from "@/lib/programs/program-kind-policy"
+import type { ProgramKind } from "@/lib/programs/program-kind"
 
 export function DepartmentProgramsPanel({
   departmentId,
@@ -33,11 +36,21 @@ export function DepartmentProgramsPanel({
   const [error, setError] = useState<string | null>(null)
   const [years, setYears] = useState<DepartmentProgramsYear[]>([])
   const [offerings, setOfferings] = useState<DepartmentProgramsOfferingRow[]>([])
+  const [allowedProgramKinds, setAllowedProgramKinds] = useState<ProgramKind[]>([
+    "academic",
+    "seasonal",
+  ])
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  const load = useCallback(async (options?: { silent?: boolean }) => {
+    if (!options?.silent) {
+      setLoading(true)
+    }
     setError(null)
-    const result = await fetchDepartmentProgramsAction(departmentId)
+    const [result, entitlement] = await Promise.all([
+      fetchDepartmentProgramsAction(departmentId),
+      getOrganizationProgramKindsEntitlement(),
+    ])
+    setAllowedProgramKinds(listAllowedProgramKindsForOrganization(entitlement))
     if (!result.success) {
       setError(result.error)
       setYears([])
@@ -53,6 +66,8 @@ export function DepartmentProgramsPanel({
   useEffect(() => {
     void load()
   }, [load])
+
+  const reloadOfferings = useCallback(() => load({ silent: true }), [load])
 
   const selectedYear = useMemo(() => {
     if (
@@ -137,6 +152,8 @@ export function DepartmentProgramsPanel({
       rows={activeRows}
       archivedCount={archivedRows.length}
       showArchived={archivedRows}
+      onOfferingsChanged={reloadOfferings}
+      allowedProgramKinds={allowedProgramKinds}
     />
   )
 }

@@ -23,6 +23,7 @@ export function FeePlansSection({
   onChange,
   draftMode = false,
   showBillingScheduleLink = true,
+  programKind = "academic",
 }: {
   programId: string
   offeringId: string
@@ -34,6 +35,7 @@ export function FeePlansSection({
   onChange: (state: FeePlanEditorState) => void
   draftMode?: boolean
   showBillingScheduleLink?: boolean
+  programKind?: string | null
 }) {
   return (
     <div className="space-y-4">
@@ -64,6 +66,7 @@ export function FeePlansSection({
         onChange={onChange}
         draftMode={draftMode}
         showBillingScheduleLink={showBillingScheduleLink}
+        programKind={programKind}
       />
     </div>
   )

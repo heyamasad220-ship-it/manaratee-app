@@ -46,7 +46,7 @@ const FEE_PRESETS = [
   { id: "before_care", lineType: "extended_care", label: "Before Care" },
   { id: "after_care", lineType: "extended_care", label: "After Care" },
   { id: "materials", lineType: "materials", label: "Materials Fee" },
-  { id: "tuition", lineType: "tuition", label: "Tuition" },
+  { id: "tuition", lineType: "tuition", label: "Program Fee" },
   { id: "custom", lineType: "custom", label: "Custom Fee" },
 ] as const
 

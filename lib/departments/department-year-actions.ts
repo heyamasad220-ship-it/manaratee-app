@@ -31,6 +31,11 @@ import { createProgramOffering } from "@/lib/programs/program-offering-actions"
 import { normalizeProgramAudienceType } from "@/lib/programs/program-offering-attributes"
 import { getProgramById } from "@/lib/programs/program-queries"
 import type { Program } from "@/lib/programs/program-types"
+import { normalizeProgramKind } from "@/lib/programs/program-kind"
+import {
+  getOrganizationProgramKindsEntitlement,
+} from "@/lib/programs/organization-program-kinds"
+import { organizationAllowsProgramKind } from "@/lib/programs/program-kind-policy"
 import { copyOfferingScheduleItems } from "@/lib/programs/program-schedule-actions"
 import { createClient } from "@/lib/supabase/server"
 
@@ -314,6 +319,8 @@ export type CreateDepartmentYearInput = {
   copyFromProgramId?: string | null
   flyerUrl?: string | null
   description?: string | null
+  /** academic (default) or seasonal — catalog Add Year vs Add Season. */
+  programKind?: "academic" | "seasonal"
 }
 
 export async function createDepartmentYearProgramAction(
@@ -329,6 +336,18 @@ export async function createDepartmentYearProgramAction(
 
     const name = input.name.trim()
     if (!name) return { success: false, error: "Program name is required." }
+
+    const programKind = normalizeProgramKind(input.programKind ?? "academic")
+    const entitlement = await getOrganizationProgramKindsEntitlement()
+    if (!organizationAllowsProgramKind(entitlement, programKind)) {
+      return {
+        success: false,
+        error:
+          programKind === "seasonal"
+            ? "This organization is subscribed to Academic Programs only."
+            : "This organization is subscribed to Seasonal Programs only.",
+      }
+    }
 
     const supabase = await createClient()
     const { data: department, error: deptError } = await supabase
@@ -372,26 +391,29 @@ export async function createDepartmentYearProgramAction(
       description:
         input.description?.trim() ||
         source?.description ||
-        "Department academic year program",
+        (programKind === "seasonal"
+          ? "Department seasonal program"
+          : "Department academic year program"),
       department_id: input.departmentId,
-      program_kind: "academic",
+      program_kind: programKind,
       program_type: normalizeProgramAudienceType(source?.program_type) || "adult",
       start_date: input.startDate || null,
       end_date: input.endDate || null,
       enrollment_open_date: input.startDate || null,
       enrollment_close_date: input.endDate || null,
-      gender: source?.gender || "Female",
+      gender: source?.gender || (programKind === "seasonal" ? "All" : "Female"),
       capacity: 0,
       status: "active",
       visibility: (source?.visibility as "public" | "private" | "members_only") || "private",
       full_program_registration_enabled: true,
-      session_registration_enabled: false,
-      require_guardian: false,
+      session_registration_enabled: programKind === "seasonal",
+      require_guardian: programKind === "seasonal",
+      application_required: programKind !== "seasonal",
       flyer_url: flyerUrl,
     })
 
     // Remove auto default offering when we will copy course offerings.
-    if (source) {
+    if (source && programKind === "academic") {
       const { data: sourceOfferings } = await supabase
         .from("program_offerings")
         .select(

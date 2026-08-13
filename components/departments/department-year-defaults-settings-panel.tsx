@@ -22,7 +22,8 @@ import {
 } from "@/components/ui/card"
 import { departmentGroupWorkspaceHref } from "@/lib/donations/donation-group-path"
 import { getSelectedOrganizationIdClient } from "@/lib/organizations/get-selected-organization-id-client"
-import { YEAR_SEASON_LABEL, YEAR_SEASON_LABEL_PLURAL } from "@/lib/programs/program-display-labels"
+import { getHierarchyLabels } from "@/lib/programs/program-display-labels"
+import { normalizeProgramKind } from "@/lib/programs/program-kind"
 import { getProgramStatusLabel, type ProgramStatus } from "@/lib/programs/program-status"
 import type { Program } from "@/lib/programs/program-types"
 import { createClient } from "@/lib/supabase/client"
@@ -31,6 +32,7 @@ type YearOption = {
   id: string
   name: string
   status: string
+  programKind: string
 }
 
 export function DepartmentYearDefaultsSettingsPanel({
@@ -65,7 +67,7 @@ export function DepartmentYearDefaultsSettingsPanel({
 
         const { data, error: yearsError } = await supabase
           .from("programs")
-          .select("id, name, status")
+          .select("id, name, status, program_kind")
           .eq("organization_id", orgId)
           .eq("department_id", departmentId)
           .order("start_date", { ascending: false, nullsFirst: false })
@@ -73,7 +75,17 @@ export function DepartmentYearDefaultsSettingsPanel({
 
         if (yearsError) throw yearsError
 
-        const nextYears = (data ?? []) as YearOption[]
+        const nextYears = ((data ?? []) as Array<{
+          id: string
+          name: string
+          status: string
+          program_kind?: string | null
+        }>).map((row) => ({
+          id: row.id,
+          name: row.name,
+          status: row.status,
+          programKind: normalizeProgramKind(row.program_kind),
+        }))
         setYears(nextYears)
 
         const preferred =
@@ -89,7 +101,7 @@ export function DepartmentYearDefaultsSettingsPanel({
         setError(
           loadError instanceof Error
             ? loadError.message
-            : `Could not load ${YEAR_SEASON_LABEL_PLURAL.toLowerCase()}.`
+            : `Could not load ${getHierarchyLabels(null).containerPlural.toLowerCase()}.`
         )
         setYears([])
       } finally {
@@ -143,7 +155,7 @@ export function DepartmentYearDefaultsSettingsPanel({
         setError(
           loadError instanceof Error
             ? loadError.message
-            : `Could not load ${YEAR_SEASON_LABEL.toLowerCase()} defaults.`
+            : `Could not load ${getHierarchyLabels(null).containerSingular.toLowerCase()} defaults.`
         )
         setProgram(null)
       } finally {
@@ -169,11 +181,16 @@ export function DepartmentYearDefaultsSettingsPanel({
     )
   }
 
+  const selectedYear = years.find((year) => year.id === selectedYearId)
+  const hierarchy = getHierarchyLabels(
+    program?.program_kind ?? selectedYear?.programKind
+  )
+
   if (loading) {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" />
-        Loading {YEAR_SEASON_LABEL_PLURAL.toLowerCase()}…
+        Loading {hierarchy.containerPlural.toLowerCase()}…
       </div>
     )
   }
@@ -190,9 +207,9 @@ export function DepartmentYearDefaultsSettingsPanel({
     return (
       <Card>
         <CardHeader>
-          <CardTitle>{YEAR_SEASON_LABEL} defaults</CardTitle>
+          <CardTitle>{hierarchy.containerSingular} defaults</CardTitle>
           <CardDescription>
-            Create a {YEAR_SEASON_LABEL.toLowerCase()} on Overview first, then configure
+            Create a {hierarchy.containerSingular.toLowerCase()} on Overview first, then configure
             enrollment defaults here.
           </CardDescription>
         </CardHeader>
@@ -204,19 +221,19 @@ export function DepartmentYearDefaultsSettingsPanel({
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>{YEAR_SEASON_LABEL} defaults</CardTitle>
+          <CardTitle>{hierarchy.containerSingular} defaults</CardTitle>
           <CardDescription>
             Enrollment window, audience, and eligibility defaults for a selected{" "}
-            {YEAR_SEASON_LABEL.toLowerCase()}.
+            {hierarchy.containerSingular.toLowerCase()}.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="max-w-md space-y-2">
-            <Label htmlFor="dept-year-defaults-year">{YEAR_SEASON_LABEL}</Label>
+            <Label htmlFor="dept-year-defaults-year">{hierarchy.containerSingular}</Label>
             <Select value={selectedYearId} onValueChange={handleYearChange}>
               <SelectTrigger id="dept-year-defaults-year">
                 <SelectValue
-                  placeholder={`Select a ${YEAR_SEASON_LABEL.toLowerCase()}`}
+                  placeholder={`Select a ${hierarchy.containerSingular.toLowerCase()}`}
                 />
               </SelectTrigger>
               <SelectContent>

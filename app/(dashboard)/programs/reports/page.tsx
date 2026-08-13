@@ -1,7 +1,4 @@
-"use client"
-
-import * as React from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { redirect } from "next/navigation"
 import { Suspense } from "react"
 
 import { Header } from "@/components/layout/header"
@@ -9,70 +6,67 @@ import {
   ProgramsAttendanceReportPanel,
   ProgramsWaitlistReportPanel,
 } from "@/components/programs/programs-attendance-waitlist-report-panels"
-import {
-  ProgramsReportsNav,
-  resolveProgramsReportsTab,
-} from "@/components/programs/programs-reports-nav"
+import { ProgramsReportsNav } from "@/components/programs/programs-reports-nav"
 
-function ProgramsReportsPageContent() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
+export default async function ProgramsReportsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string | string[] }>
+}) {
+  const resolved = await searchParams
+  const tabRaw = Array.isArray(resolved.tab) ? resolved.tab[0] : resolved.tab
+  const tab = (tabRaw || "").trim().toLowerCase()
 
-  const activeTab = resolveProgramsReportsTab("/programs/reports", searchParams)
-
-  React.useEffect(() => {
-    const tab = searchParams.get("tab")
-    if (!tab || tab === "overview" || tab === "enrollment") {
-      router.replace("/programs/registrations")
-      return
-    }
-    if (tab === "transactions") {
-      router.replace("/finance/transactions")
-      return
-    }
-    if (tab === "childcare") {
-      router.replace("/programs/reports/childcare")
-      return
-    }
-    if (tab === "enrollments") {
-      router.replace("/programs/reports/enrollments")
-      return
-    }
-    if (tab === "tuition-plans" || tab === "payment-summary") {
-      router.replace("/programs/reports/tuition-plans")
-      return
-    }
-    if (tab === "addons" || tab === "add-ons") {
-      router.replace("/programs/reports/addons")
-    }
-  }, [router, searchParams])
-
-  if (activeTab === "enrollment" || activeTab === "enrollments") {
-    return null
+  if (!tab || tab === "overview" || tab === "enrollment") {
+    redirect("/programs/registrations")
   }
+  if (tab === "transactions") {
+    redirect("/finance/transactions")
+  }
+  if (tab === "childcare") {
+    redirect("/programs/reports/childcare")
+  }
+  if (tab === "enrollments") {
+    redirect("/programs/reports/enrollments")
+  }
+  if (tab === "tuition-plans" || tab === "payment-summary") {
+    redirect("/programs/reports/tuition-plans")
+  }
+  if (tab === "addons" || tab === "add-ons") {
+    redirect("/programs/reports/addons")
+  }
+  if (tab !== "attendance" && tab !== "waitlist") {
+    redirect("/programs/registrations")
+  }
+
+  const activeTab = tab as "attendance" | "waitlist"
 
   return (
     <>
       <Header title="Reports" />
 
-      <ProgramsReportsNav />
+      <Suspense fallback={null}>
+        <ProgramsReportsNav />
+      </Suspense>
 
       <div className="flex flex-col gap-6 p-6">
         <h1 className="text-2xl font-semibold tracking-tight">
           {activeTab === "attendance" ? "Attendance" : "Waitlist"}
         </h1>
 
-        {activeTab === "attendance" ? <ProgramsAttendanceReportPanel /> : null}
-        {activeTab === "waitlist" ? <ProgramsWaitlistReportPanel /> : null}
+        <Suspense
+          fallback={
+            <div className="rounded-lg border py-16 text-center text-sm text-muted-foreground">
+              Loading…
+            </div>
+          }
+        >
+          {activeTab === "attendance" ? (
+            <ProgramsAttendanceReportPanel />
+          ) : null}
+          {activeTab === "waitlist" ? <ProgramsWaitlistReportPanel /> : null}
+        </Suspense>
       </div>
     </>
-  )
-}
-
-export default function ProgramsReportsPage() {
-  return (
-    <Suspense fallback={null}>
-      <ProgramsReportsPageContent />
-    </Suspense>
   )
 }

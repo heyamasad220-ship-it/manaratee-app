@@ -29,14 +29,15 @@ import {
 import { TableColumnHeaderFilter } from "@/components/ui/table-column-header-filter"
 import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
 import {
-  PROGRAM_LABEL,
-  YEAR_SEASON_LABEL,
+  getReportHierarchyLabels,
 } from "@/lib/programs/program-display-labels"
+import type { ProgramKind } from "@/lib/programs/program-kind"
 import type { AdditionalFeeItem } from "@/lib/programs/registration-report-helpers"
 import {
   DEFAULT_LIST_PAGE_SIZE,
   slicePageItems,
 } from "@/lib/ui/list-pagination"
+import { useProgramKindReportPreset } from "@/hooks/use-program-kind-report-preset"
 
 export type OfferingActivityStatus = "active" | "closed"
 export type FamilyRegistrationStatus = "active" | "cancelled"
@@ -54,6 +55,7 @@ export type ProgramsRegistrationTableRow = {
   departmentName: string
   programId: string | null
   programName: string
+  programKind: ProgramKind
   offeringIds: string[]
   offeringNames: string[]
   offeringActivity: OfferingActivityStatus
@@ -142,10 +144,20 @@ export function ProgramsRegistrationsTable({
   const [participantFilterInput, setParticipantFilterInput] = useState("")
   const [participantFilter, setParticipantFilter] = useState("")
   const [departmentFilter, setDepartmentFilter] = useState(ALL)
+  const { kindFilter, setKindFilter } = useProgramKindReportPreset()
   const [programFilter, setProgramFilter] = useState(ALL)
   const [offeringFilter, setOfferingFilter] = useState(ALL)
   const [statusFilter, setStatusFilter] =
     useState<OfferingActivityFilter>("active")
+
+  useEffect(() => {
+    setProgramFilter(ALL)
+    setOfferingFilter(ALL)
+  }, [kindFilter])
+
+  const reportLabels = getReportHierarchyLabels(
+    kindFilter === "all" ? null : kindFilter
+  )
 
   const departmentOptions = useMemo(
     () =>
@@ -158,21 +170,27 @@ export function ProgramsRegistrationsTable({
   )
 
   const programOptions = useMemo(() => {
-    const scoped =
-      departmentFilter === ALL
-        ? rows
-        : rows.filter((row) => row.departmentId === departmentFilter)
+    let scoped = rows
+    if (departmentFilter !== ALL) {
+      scoped = scoped.filter((row) => row.departmentId === departmentFilter)
+    }
+    if (kindFilter !== "all") {
+      scoped = scoped.filter((row) => row.programKind === kindFilter)
+    }
     return uniqueOptions(
       scoped,
       (row) => [row.programId],
       (row) => row.programName
     )
-  }, [rows, departmentFilter])
+  }, [rows, departmentFilter, kindFilter])
 
   const offeringOptions = useMemo(() => {
     let scoped = rows
     if (departmentFilter !== ALL) {
       scoped = scoped.filter((row) => row.departmentId === departmentFilter)
+    }
+    if (kindFilter !== "all") {
+      scoped = scoped.filter((row) => row.programKind === kindFilter)
     }
     if (programFilter !== ALL) {
       scoped = scoped.filter((row) => row.programId === programFilter)
@@ -181,13 +199,13 @@ export function ProgramsRegistrationsTable({
     for (const row of scoped) {
       row.offeringIds.forEach((id, index) => {
         if (!id || map.has(id)) return
-        map.set(id, row.offeringNames[index] || PROGRAM_LABEL)
+        map.set(id, row.offeringNames[index] || reportLabels.offeringSingular)
       })
     }
     return [...map.entries()]
       .map(([id, label]) => ({ id, label }))
       .sort((a, b) => a.label.localeCompare(b.label))
-  }, [rows, departmentFilter, programFilter])
+  }, [rows, departmentFilter, kindFilter, programFilter, reportLabels.offeringSingular])
 
   useEffect(() => {
     if (
@@ -218,6 +236,9 @@ export function ProgramsRegistrationsTable({
       ) {
         return false
       }
+      if (kindFilter !== "all" && row.programKind !== kindFilter) {
+        return false
+      }
       if (programFilter !== ALL && row.programId !== programFilter) {
         return false
       }
@@ -236,6 +257,7 @@ export function ProgramsRegistrationsTable({
     rows,
     participantFilter,
     departmentFilter,
+    kindFilter,
     programFilter,
     offeringFilter,
     statusFilter,
@@ -258,11 +280,11 @@ export function ProgramsRegistrationsTable({
   )
 
   useEffect(() => {
-    setPage(1)
+    setPage((current) => (current === 1 ? current : 1))
   }, [
-    rows,
     participantFilter,
     departmentFilter,
+    kindFilter,
     programFilter,
     offeringFilter,
     statusFilter,
@@ -276,12 +298,14 @@ export function ProgramsRegistrationsTable({
   const filtersActive =
     Boolean(participantFilter.trim()) ||
     departmentFilter !== ALL ||
+    kindFilter !== "all" ||
     programFilter !== ALL ||
     offeringFilter !== ALL ||
     statusFilter !== ALL
 
   function clearTopFilters() {
     setDepartmentFilter(ALL)
+    setKindFilter("all")
     setProgramFilter(ALL)
     setOfferingFilter(ALL)
     setStatusFilter("active")
@@ -319,7 +343,7 @@ export function ProgramsRegistrationsTable({
       </div>
 
       <div className="space-y-3 px-4 sm:px-6">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <div className="space-y-1.5">
             <Label htmlFor="registrations-department">Department</Label>
             <Select
@@ -345,7 +369,30 @@ export function ProgramsRegistrationsTable({
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="registrations-program">{YEAR_SEASON_LABEL}</Label>
+            <Label htmlFor="registrations-kind">Type</Label>
+            <Select
+              value={kindFilter}
+              onValueChange={(value) => {
+              setKindFilter(value as "all" | "academic" | "seasonal")
+              setProgramFilter(ALL)
+              setOfferingFilter(ALL)
+              }}
+            >
+              <SelectTrigger id="registrations-kind">
+                <SelectValue placeholder="All types" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All types</SelectItem>
+                <SelectItem value="academic">Academic</SelectItem>
+                <SelectItem value="seasonal">Seasonal</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="registrations-program">
+              {reportLabels.containerSingular}
+            </Label>
             <Select
               value={programFilter}
               onValueChange={(value) => {
@@ -355,12 +402,12 @@ export function ProgramsRegistrationsTable({
             >
               <SelectTrigger id="registrations-program">
                 <SelectValue
-                  placeholder={`All ${YEAR_SEASON_LABEL.toLowerCase()}s`}
+                  placeholder={`All ${reportLabels.containerPlural.toLowerCase()}`}
                 />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>
-                  All {YEAR_SEASON_LABEL.toLowerCase()}s
+                  All {reportLabels.containerPlural.toLowerCase()}
                 </SelectItem>
                 {programOptions.map((option) => (
                   <SelectItem key={option.id} value={option.id}>
@@ -372,16 +419,18 @@ export function ProgramsRegistrationsTable({
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="registrations-offering">{PROGRAM_LABEL}</Label>
+            <Label htmlFor="registrations-offering">
+              {reportLabels.offeringSingular}
+            </Label>
             <Select value={offeringFilter} onValueChange={setOfferingFilter}>
               <SelectTrigger id="registrations-offering">
                 <SelectValue
-                  placeholder={`All ${PROGRAM_LABEL.toLowerCase()}s`}
+                  placeholder={`All ${reportLabels.offeringPlural.toLowerCase()}`}
                 />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>
-                  All {PROGRAM_LABEL.toLowerCase()}s
+                  All {reportLabels.offeringPlural.toLowerCase()}
                 </SelectItem>
                 {offeringOptions.map((option) => (
                   <SelectItem key={option.id} value={option.id}>

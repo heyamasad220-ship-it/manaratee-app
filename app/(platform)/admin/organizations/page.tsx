@@ -61,6 +61,8 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { PlatformEnterOrganizationButton } from "@/components/platform/platform-enter-organization-button"
+import { OrganizationProgramKindsSettingsCard } from "@/components/programs/organization-program-kinds-settings-card"
+import type { OrganizationProgramKindsEntitlement } from "@/lib/programs/program-kind-policy"
 import { cn } from "@/lib/utils"
 
 const filterTabs = ["All", "Active", "Suspended", "Pending"] as const
@@ -168,6 +170,10 @@ export default function OrganizationsPage() {
     null
   )
   const [loadingModules, setLoadingModules] = useState(false)
+  const [programKinds, setProgramKinds] = useState<
+    "academic" | "seasonal" | "both"
+  >("both")
+  const [loadingProgramKinds, setLoadingProgramKinds] = useState(false)
 
   const [newOrgName, setNewOrgName] = useState("")
   const [newOrgEmail, setNewOrgEmail] = useState("")
@@ -426,7 +432,31 @@ export default function OrganizationsPage() {
     await Promise.all([
       loadOrganizationMembers(org.id),
       loadBillingTerms(org.id),
+      loadProgramKinds(org.id),
     ])
+  }
+
+  const loadProgramKinds = async (organizationId: string) => {
+    setLoadingProgramKinds(true)
+    try {
+      const response = await fetch(
+        `/api/platform/organizations/${organizationId}/program-kinds`
+      )
+      const result = await response.json()
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || "Failed to load program modes.")
+      }
+      const next =
+        result.programKinds === "academic" || result.programKinds === "seasonal"
+          ? result.programKinds
+          : "both"
+      setProgramKinds(next)
+    } catch (error) {
+      console.error(error)
+      setProgramKinds("both")
+    } finally {
+      setLoadingProgramKinds(false)
+    }
   }
 
   const loadOrganizationMembers = async (organizationId: string) => {
@@ -1279,6 +1309,40 @@ export default function OrganizationsPage() {
                   Enable or disable modules for this organization
                 </p>
               </div>
+
+              {loadingProgramKinds ? (
+                <Card>
+                  <CardContent className="py-6 text-sm text-muted-foreground">
+                    Loading program modes…
+                  </CardContent>
+                </Card>
+              ) : selectedOrg ? (
+                <OrganizationProgramKindsSettingsCard
+                  value={programKinds}
+                  description="SaaS packaging for Programs: which create modes this tenant may use."
+                  onSave={async (next) => {
+                    const response = await fetch(
+                      `/api/platform/organizations/${selectedOrg.id}/program-kinds`,
+                      {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ programKinds: next }),
+                      }
+                    )
+                    const result = await response.json()
+                    if (!response.ok || !result.success) {
+                      return {
+                        success: false as const,
+                        error: result.error || "Failed to save program modes.",
+                      }
+                    }
+                    setProgramKinds(
+                      result.programKinds as OrganizationProgramKindsEntitlement
+                    )
+                    return { success: true as const }
+                  }}
+                />
+              ) : null}
 
               <Card>
                 <CardContent className="space-y-3 p-4">

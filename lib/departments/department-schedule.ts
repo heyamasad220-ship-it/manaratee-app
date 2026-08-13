@@ -14,6 +14,8 @@ export type DepartmentScheduleWeeklyRow = {
   dayOfWeek: string
   startTime: string
   endTime: string
+  /** Booked facility space name when `venue_id` is set. */
+  spaceName: string | null
   location: string | null
   instructorName: string | null
 }
@@ -79,12 +81,12 @@ export async function fetchDepartmentSchedule(
     programRows.map((row) => [row.id as string, (row.name as string) || "Program"])
   )
 
-  const [{ data: scheduleItems }, { data: sessions }, { data: offerings }] =
+  const [{ data: scheduleItems, error: scheduleError }, { data: sessions }, { data: offerings }] =
     await Promise.all([
       supabase
         .from("program_schedule_items")
         .select(
-          "id, program_id, offering_id, title, day_of_week, start_time, end_time, location, instructor_name"
+          "id, program_id, offering_id, title, day_of_week, start_time, end_time, location, instructor_name, venue_id, venues(name)"
         )
         .eq("organization_id", organizationId)
         .in("program_id", programIds),
@@ -104,6 +106,28 @@ export async function fetchDepartmentSchedule(
         .in("program_id", programIds)
         .neq("status", "archived"),
     ])
+
+  let scheduleRows = scheduleItems || []
+  if (
+    scheduleError &&
+    (scheduleError.message?.includes("venue_id") ||
+      scheduleError.code === "42703" ||
+      scheduleError.code === "PGRST200")
+  ) {
+    const { data: fallbackItems, error: fallbackError } = await supabase
+      .from("program_schedule_items")
+      .select(
+        "id, program_id, offering_id, title, day_of_week, start_time, end_time, location, instructor_name"
+      )
+      .eq("organization_id", organizationId)
+      .in("program_id", programIds)
+    if (fallbackError) {
+      throw new Error(fallbackError.message || "Could not load schedule items.")
+    }
+    scheduleRows = fallbackItems || []
+  } else if (scheduleError) {
+    throw new Error(scheduleError.message || "Could not load schedule items.")
+  }
 
   const offeringNameById = new Map(
     (offerings || []).map((row) => [
@@ -125,22 +149,34 @@ export async function fetchDepartmentSchedule(
     }
   }
 
-  const weekly: DepartmentScheduleWeeklyRow[] = (scheduleItems || [])
-    .map((row) => ({
-      id: row.id as string,
-      programId: row.program_id as string,
-      programName: programNameById.get(row.program_id as string) || "Program",
-      offeringId: (row.offering_id as string | null) ?? null,
-      offeringName: row.offering_id
-        ? offeringNameById.get(row.offering_id as string) || null
-        : null,
-      title: (row.title as string) || "Class",
-      dayOfWeek: (row.day_of_week as string) || "",
-      startTime: (row.start_time as string) || "",
-      endTime: (row.end_time as string) || "",
-      location: (row.location as string | null) ?? null,
-      instructorName: (row.instructor_name as string | null) ?? null,
-    }))
+  const weekly: DepartmentScheduleWeeklyRow[] = scheduleRows
+    .map((row) => {
+      const venueEmbed = (row as { venues?: unknown }).venues as
+        | { name?: string | null }
+        | { name?: string | null }[]
+        | null
+        | undefined
+      const venueName = Array.isArray(venueEmbed)
+        ? venueEmbed[0]?.name
+        : venueEmbed?.name
+
+      return {
+        id: row.id as string,
+        programId: row.program_id as string,
+        programName: programNameById.get(row.program_id as string) || "Program",
+        offeringId: (row.offering_id as string | null) ?? null,
+        offeringName: row.offering_id
+          ? offeringNameById.get(row.offering_id as string) || null
+          : null,
+        title: (row.title as string) || "Class",
+        dayOfWeek: (row.day_of_week as string) || "",
+        startTime: (row.start_time as string) || "",
+        endTime: (row.end_time as string) || "",
+        spaceName: (venueName as string | null | undefined) ?? null,
+        location: (row.location as string | null) ?? null,
+        instructorName: (row.instructor_name as string | null) ?? null,
+      }
+    })
     .sort((a, b) => {
       const dayDiff =
         (DAY_ORDER[a.dayOfWeek.toLowerCase()] || 99) -

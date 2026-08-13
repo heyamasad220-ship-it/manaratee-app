@@ -1,8 +1,8 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
+import { useCallback, useEffect, useMemo, useState, useTransition, type ReactNode } from "react"
 import Link from "next/link"
-import { Baby, Loader2, Wallet } from "lucide-react"
+import { Baby, Loader2, Users, Wallet } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -45,7 +45,26 @@ function formatPeriod(row: FinancePayrollQueueRow) {
   return `${fmt(row.periodStart)} – ${fmt(row.periodEnd)}`
 }
 
-export function FinancePayrollQueuePanel() {
+export function FinancePayrollQueuePanel({
+  departmentId,
+  departmentName,
+  stickyStatsTop,
+  employeeCount,
+  compactStats = false,
+  actions,
+}: {
+  /** When set, show only this department's pay entries (department Financial → Payroll). */
+  departmentId?: string
+  departmentName?: string | null
+  /** CSS `top` so KPI cards stick below department workspace tab chrome. */
+  stickyStatsTop?: string
+  /** Department employee count for compact KPI row. */
+  employeeCount?: number
+  /** Department Payroll: only Employees + Amount cards. */
+  compactStats?: boolean
+  /** Optional actions rendered under the KPI cards (e.g. Log hours / Create pay period). */
+  actions?: ReactNode
+} = {}) {
   const [statusTab, setStatusTab] = useState<"approved" | "paid" | "all">("approved")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -54,11 +73,15 @@ export function FinancePayrollQueuePanel() {
   const [migrationRequired, setMigrationRequired] = useState(false)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [isPending, startTransition] = useTransition()
+  const scopedToDepartment = Boolean(departmentId)
 
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
-    const result = await fetchFinancePayrollQueueAction({ status: statusTab })
+    const result = await fetchFinancePayrollQueueAction({
+      status: statusTab,
+      departmentId,
+    })
     if (!result.success) {
       setError(result.error)
       setRows([])
@@ -74,7 +97,7 @@ export function FinancePayrollQueuePanel() {
       )
     }
     setLoading(false)
-  }, [statusTab])
+  }, [statusTab, departmentId])
 
   useEffect(() => {
     void load()
@@ -138,45 +161,79 @@ export function FinancePayrollQueuePanel() {
   return (
     <div className="space-y-6">
       {!loading && !error ? (
-        <StatCardsRow equal columns={4}>
-          <StatCard
-            layout="header"
-            fill
-            tone="blue"
-            label="Rows"
-            value={totals.count}
-            icon={Wallet}
-            hint={statusTab === "approved" ? "Ready to pay" : "In this view"}
-          />
-          <StatCard
-            layout="header"
-            fill
-            tone="emerald"
-            label="Amount"
-            value={formatCurrency(totals.amount)}
-            icon={Wallet}
-            hint="Sum of listed pay entries"
-          />
-          <StatCard
-            layout="header"
-            fill
-            tone="violet"
-            label="Childcare"
-            value={totals.childcare}
-            icon={Baby}
-            hint="Provider pay lines"
-          />
-          <StatCard
-            layout="header"
-            fill
-            tone="amber"
-            label="Ready"
-            value={totals.ready}
-            icon={Wallet}
-            hint="Approved, not yet paid"
-          />
-        </StatCardsRow>
+        <div
+          className={
+            stickyStatsTop
+              ? "sticky z-30 bg-background/95 py-1 backdrop-blur supports-[backdrop-filter]:bg-background/90"
+              : undefined
+          }
+          style={stickyStatsTop ? { top: stickyStatsTop } : undefined}
+        >
+          {compactStats ? (
+            <StatCardsRow equal columns={2}>
+              <StatCard
+                layout="header"
+                fill
+                tone="blue"
+                label="Employees"
+                value={employeeCount ?? 0}
+                icon={Users}
+                hint="Assigned to department"
+              />
+              <StatCard
+                layout="header"
+                fill
+                tone="emerald"
+                label="Amount"
+                value={formatCurrency(totals.amount)}
+                icon={Wallet}
+                hint="Sum of listed pay entries"
+              />
+            </StatCardsRow>
+          ) : (
+            <StatCardsRow equal columns={4}>
+              <StatCard
+                layout="header"
+                fill
+                tone="blue"
+                label="Rows"
+                value={totals.count}
+                icon={Wallet}
+                hint={statusTab === "approved" ? "Ready to pay" : "In this view"}
+              />
+              <StatCard
+                layout="header"
+                fill
+                tone="emerald"
+                label="Amount"
+                value={formatCurrency(totals.amount)}
+                icon={Wallet}
+                hint="Sum of listed pay entries"
+              />
+              <StatCard
+                layout="header"
+                fill
+                tone="violet"
+                label="Childcare"
+                value={totals.childcare}
+                icon={Baby}
+                hint="Provider pay lines"
+              />
+              <StatCard
+                layout="header"
+                fill
+                tone="amber"
+                label="Ready"
+                value={totals.ready}
+                icon={Wallet}
+                hint="Approved, not yet paid"
+              />
+            </StatCardsRow>
+          )}
+        </div>
       ) : null}
+
+      {actions ? <div className="flex flex-col gap-3">{actions}</div> : null}
 
       <Card>
         <CardHeader className="flex flex-col gap-3 space-y-0 sm:flex-row sm:items-start sm:justify-between">
@@ -186,9 +243,9 @@ export function FinancePayrollQueuePanel() {
               Payroll queue
             </CardTitle>
             <CardDescription>
-              Approved department payroll (teachers and childcare providers) ready
-              to mark paid. SaaS subscription Billing stays under Billing in the
-              sidebar footer.
+              {scopedToDepartment
+                ? `Approved payroll for ${departmentName || "this department"} — same queue as Finance → Payroll, filtered here.`
+                : "Approved department payroll (teachers and childcare providers) ready to mark paid. SaaS subscription Billing stays under Billing in the sidebar footer."}
             </CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -255,7 +312,9 @@ export function FinancePayrollQueuePanel() {
                       </TableHead>
                     ) : null}
                     <TableHead>Worker</TableHead>
-                    <TableHead>Department</TableHead>
+                    {!scopedToDepartment ? (
+                      <TableHead>Department</TableHead>
+                    ) : null}
                     <TableHead>Period</TableHead>
                     <TableHead className="text-right">Hours</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
@@ -295,23 +354,21 @@ export function FinancePayrollQueuePanel() {
                             <div className="mt-1 text-xs text-muted-foreground">
                               Events: {row.eventLabels.join(", ")}
                             </div>
-                          ) : row.notes ? (
-                            <div className="mt-1 text-xs text-muted-foreground">
-                              {row.notes}
-                            </div>
                           ) : null}
                         </TableCell>
-                        <TableCell>
-                          <Link
-                            href={departmentGroupWorkspaceHref(row.departmentId, {
-                              tab: "financial",
-                              finance: "payroll",
-                            })}
-                            className="text-primary hover:underline"
-                          >
-                            {row.departmentName}
-                          </Link>
-                        </TableCell>
+                        {!scopedToDepartment ? (
+                          <TableCell>
+                            <Link
+                              href={departmentGroupWorkspaceHref(row.departmentId, {
+                                tab: "financial",
+                                finance: "payroll",
+                              })}
+                              className="text-primary hover:underline"
+                            >
+                              {row.departmentName}
+                            </Link>
+                          </TableCell>
+                        ) : null}
                         <TableCell className="text-sm text-muted-foreground">
                           {formatPeriod(row)}
                         </TableCell>

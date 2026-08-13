@@ -21,7 +21,7 @@ export const VENDOR_HUB_ROUTES = {
     messages: (eventId: string) => `${VENDOR_HUB_BASE}/events/${eventId}/messages`,
     settings: (eventId: string) => `${VENDOR_HUB_BASE}/events/${eventId}/settings`,
   },
-  communityCalendar: `${VENDOR_HUB_BASE}/community-calendar`,
+  communityCalendar: "/community-calendar",
   reports: `${VENDOR_HUB_BASE}/reports`,
   settings: `${VENDOR_HUB_BASE}/settings`,
 } as const

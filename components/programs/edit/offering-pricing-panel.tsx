@@ -11,6 +11,7 @@ import {
   OfferingPricingDiscountsSection,
   OfferingPricingEditorProvider,
   OfferingPricingEditorSections,
+  OfferingPricingPaymentOptionsSection,
   OfferingPricingSaveFooter,
   OfferingSimplePricingEditor,
 } from "@/components/programs/edit/offering-simple-pricing-editor"
@@ -25,6 +26,7 @@ export {
   OfferingPricingBillingSetupSection,
   OfferingPricingChargesSection,
   OfferingPricingDiscountsSection,
+  OfferingPricingPaymentOptionsSection,
   OfferingPricingEditorProvider,
   OfferingPricingSaveFooter,
 }
@@ -34,6 +36,7 @@ type OfferingPricingPanelProps = {
   offering: ProgramOffering
   workspaceData: OfferingWorkspaceData
   registrationOptions: ProgramRegistrationOption[]
+  programKind?: string | null
   showSaveButton?: boolean
   onBeforeSave?: () => Promise<boolean>
   saveHandlerRef?: MutableRefObject<(() => Promise<boolean>) | null>
@@ -54,6 +57,7 @@ export function OfferingPricingPanel({
   offering,
   workspaceData,
   registrationOptions,
+  programKind = null,
   showSaveButton = true,
   onBeforeSave,
   showCharges = true,
@@ -90,6 +94,7 @@ export function OfferingPricingPanel({
       offering={offering}
       workspaceData={workspaceData}
       registrationOptions={registrationOptions}
+      programKind={programKind}
       showSaveButton={showSaveButton}
       onBeforeSave={onBeforeSave}
       showCharges={showCharges}
@@ -112,6 +117,7 @@ export function OfferingPricingProvider({
       offering={providerProps.offering}
       workspaceData={providerProps.workspaceData}
       registrationOptions={providerProps.registrationOptions}
+      programKind={providerProps.programKind}
       onBeforeSave={providerProps.onBeforeSave}
       saveHandlerRef={providerProps.saveHandlerRef}
     >

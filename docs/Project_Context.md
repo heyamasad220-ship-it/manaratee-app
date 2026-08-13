@@ -156,7 +156,7 @@ Staff UI labels: Program (`programs`) → Offering (`program_offerings`); see `l
 **Deferred naming (parked — high blast radius):** (1) DB rename `programs`→`seasons`, `program_offerings`→`programs` (fits years, seasons, camps); (2) align HR sidebar vs `/workforce/*` routes/folders; (3) Donations module → Fund Development in DB/routes (UI label already Fund Development). Do not start without a dedicated migration plan. Details in `docs/Features.md`.
 Registrations
 Financial Assistance
-**Programs flexibility contract** — **F1–F7** (`180`–`181`). See [`docs/programs-flexibility-contract.md`](./programs-flexibility-contract.md).
+**Programs flexibility contract** — **F1–F7** (`180`–`181`). Academic vs Seasonal modes + org `program_kinds` entitlement (SQL **`246`**); packaging UI on Platform Admin + Billing (Phase 6). Report Type filters + URL `?kind=` presets (Phases 3–4); kind-aware staff terminology (Phase 5). See [`docs/programs-flexibility-contract.md`](./programs-flexibility-contract.md).
 **Stripe Connect Express** for org donation payouts (implemented June 2026)
 **Platform subscription billing via Stripe** (orgs paying Manaratee — pending)
 Customer Experience
@@ -168,6 +168,8 @@ User Invitations
 **Contact profile homepage Phase 2** — Overview right rail (Quick Actions, Financial Summary, Activity) in place (July 2026). **Financial** tab redesigned to homepage-style KPIs, chart, sub-tabs, and right rail (July 2026).
 
 **Organization Master Calendar (planning only, July 2026)** — Org-wide collaboration calendar (visibility across departments; external/online/manual items). **Not** the Facilities room calendar. Vision: `docs/organization-master-calendar-vision.md`. Do not implement until explicitly requested.
+
+**Community Calendar (August 2026)** — Shared top-level `/community-calendar` for public/community-visible bazaars + Event Management events. Enabled when Vendor Hub and/or Event Management is on. Distinct from Facilities Calendar and Events Master Calendar.
 
 ---
 
@@ -187,7 +189,7 @@ Routes remain under `/hr/*` / `/workforce/*` for now. Application submissions li
 Sidebar (HR):
 
 * Overview → `/workforce` (drawer + in-page tabs: Employees, Volunteers, Childcare Providers). Path sections: `/workforce/departments`, `/workforce/employees`, `/workforce/volunteers`, `/workforce/childcare`. Employees includes Positions (`?view=positions`). Org payroll queue is **Programs/ Events → Reports → Payroll** (`/finance/payroll`); legacy `/workforce?tab=payroll` redirects there. Sidebar: **Programs/ Events** merges Workforce, Programs, Financial Assistance, Event Management, and Reports. Legacy `/workforce?tab=…` redirects to the matching path. Legacy `/reports` redirects to **Reports → Transactions**.
-* Discount Policies → `/hr/settings` (Membership Benefits redirect path may apply). Department **list** is Overview → Departments (`/workforce?tab=departments`); department **workspace** remains `/workforce/departments/[id]` (Overview, Offerings, **Registrations** [Applications / Approved / Registrations], Schedule, Financial [Payroll / Expenses / Financial Summary — open years], **Reports** [year/season filter], Group giving when a donations group is linked; **Events** = department events not individual gifts, URL `?tab=activity`). **Department Heads** open the workspace from Staff Tools (**My department**) or a sidebar **My department** link when they lack org-wide HR (`staff.view`). SaaS **Billing** stays in the footer.
+* Discount Policies → `/hr/settings` (Membership Benefits redirect path may apply). Department **list** is Overview → Departments (`/workforce?tab=departments`); department **workspace** remains `/workforce/departments/[id]` (**department-level:** Overview, Programs, Schedule [Class times / Activity planner; CTAs to Facilities + Master Calendar], Financial [Employees / Payroll / Expenses / Financial Summary — open years], **Reports** [year/season filter], Group giving when linked, Events `?tab=activity`, Settings; **year-level** `?year=`: Overview, Offerings, Registrations [Applications / Approved / Registrations]). **Department Heads** open the workspace from Staff Tools (**My department**) or a sidebar **My department** link when they lack org-wide HR (`staff.view`). SaaS **Billing** stays in the footer.
 
 **Finance** sidebar module (`finance`): Transactions (`/finance/transactions`), Payroll (`/finance/payroll`), Financial Assistance (`/finance/financial-assistance`). Enable with `scripts/192_finance_module_sidebar_restore.sql`.
 

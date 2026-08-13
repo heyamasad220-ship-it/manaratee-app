@@ -103,7 +103,7 @@ function draftToPayload(draft: SessionDraft) {
     end_date: draft.end_date || null,
     registration_open_date: draft.registration_open_date || null,
     registration_close_date: draft.registration_close_date || null,
-    // Capacity is managed on the program/offering, not per session.
+    // Capacity is managed on the offering (applies per session). Leave 0 to inherit.
     capacity: 0,
     price: Number(draft.price || 0),
     enable_waitlist: draft.enable_waitlist,

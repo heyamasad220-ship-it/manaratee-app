@@ -60,17 +60,51 @@ export function getCatalogEnrollmentPercent(
   )
 }
 
+/**
+ * Enrollment list/overview label.
+ * When the offering has sessions, capacity is per session (not unique headcount).
+ */
 export function formatOfferingEnrollmentLabel(
   enrolled: number,
   offering: {
     capacity_mode?: string | null
     capacity?: number | null
-  }
+  },
+  options?: { capacityAppliesPerSession?: boolean }
 ): string {
   if (offering.capacity_mode === "limited") {
-    return `${enrolled} / ${Math.max(0, Number(offering.capacity || 0))}`
+    const capacity = Math.max(0, Number(offering.capacity || 0))
+    if (options?.capacityAppliesPerSession) {
+      return `${enrolled} enrolled · up to ${capacity}/session`
+    }
+    return `${enrolled} / ${capacity}`
   }
   return `${enrolled} / Unlimited`
+}
+
+export function formatOfferingPerSessionCapacityHint(offering: {
+  capacity_mode?: string | null
+  capacity?: number | null
+}): string | null {
+  if (offering.capacity_mode !== "limited") return null
+  const capacity = Math.max(0, Number(offering.capacity || 0))
+  if (capacity <= 0) return null
+  return `Up to ${capacity} per session`
+}
+
+/** Effective seats for a week: session override, else offering capacity when limited. */
+export function resolveSessionEffectiveCapacity(
+  sessionCapacity: number | null | undefined,
+  offering: {
+    capacity_mode?: string | null
+    capacity?: number | null
+  } | null
+    | undefined
+): number {
+  const own = Math.max(0, Number(sessionCapacity || 0))
+  if (own > 0) return own
+  if (!offering || offering.capacity_mode !== "limited") return 0
+  return Math.max(0, Number(offering.capacity || 0))
 }
 
 export function getOfferingEnrollmentPercent(
@@ -78,10 +112,13 @@ export function getOfferingEnrollmentPercent(
   offering: {
     capacity_mode?: string | null
     capacity?: number | null
-  }
+  },
+  options?: { capacityAppliesPerSession?: boolean }
 ): number {
   if (offering.capacity_mode !== "limited") return 0
   const capacity = Math.max(0, Number(offering.capacity || 0))
   if (capacity <= 0) return 0
+  // Per-session capacity is not comparable to unique offering headcount.
+  if (options?.capacityAppliesPerSession) return 0
   return Math.min(Math.round((enrolled / capacity) * 100), 100)
 }

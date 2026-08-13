@@ -11,6 +11,7 @@ import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-orga
 import { hasPermission } from "@/lib/permissions/permissions"
 import { PERMISSIONS } from "@/lib/permissions/permission-keys"
 import { createClient } from "@/lib/supabase/server"
+import { canViewDepartment } from "@/lib/departments/department-access"
 
 function isChildcareProvider(input: {
   staffType?: string | null
@@ -67,16 +68,24 @@ function isMissingColumnError(message: string | undefined) {
 
 /**
  * Org-wide payroll queue for Finance: approved (ready to pay) and paid rows.
+ * Optional departmentId scopes the queue (department Financial → Payroll).
  */
 export async function fetchFinancePayrollQueue(input?: {
   status?: "approved" | "paid" | "all"
+  departmentId?: string
 }): Promise<{
   rows: FinancePayrollQueueRow[]
   migrationRequired: boolean
   canManage: boolean
 }> {
-  const canView = await hasPermission(PERMISSIONS.FINANCE_VIEW)
-  if (!canView) {
+  const departmentId = input?.departmentId?.trim() || null
+  const canFinanceView = await hasPermission(PERMISSIONS.FINANCE_VIEW)
+  if (departmentId) {
+    const canDept = await canViewDepartment(departmentId)
+    if (!canDept && !canFinanceView) {
+      throw new Error("You do not have permission to view this department payroll.")
+    }
+  } else if (!canFinanceView) {
     throw new Error("You do not have permission to view Finance payroll.")
   }
 
@@ -115,6 +124,10 @@ export async function fetchFinancePayrollQueue(input?: {
     .eq("organization_id", organizationId)
     .order("updated_at", { ascending: false })
 
+  if (departmentId) {
+    query = query.eq("department_id", departmentId)
+  }
+
   if (statusFilter === "all") {
     query = query.in("status", ["approved", "paid"])
   } else {
@@ -126,7 +139,7 @@ export async function fetchFinancePayrollQueue(input?: {
   if (error) {
     if (isMissingColumnError(error.message)) {
       // Pre-migration: paid_at missing — retry without it, approved only.
-      const fallback = await supabase
+      let fallbackQuery = supabase
         .from("department_staff_pay_entries")
         .select(
           `
@@ -151,6 +164,12 @@ export async function fetchFinancePayrollQueue(input?: {
         .eq("organization_id", organizationId)
         .eq("status", "approved")
         .order("updated_at", { ascending: false })
+
+      if (departmentId) {
+        fallbackQuery = fallbackQuery.eq("department_id", departmentId)
+      }
+
+      const fallback = await fallbackQuery
 
       if (fallback.error) {
         throw new Error(fallback.error.message)
@@ -318,6 +337,7 @@ function mapRows(
 
 export async function fetchFinancePayrollQueueAction(input?: {
   status?: "approved" | "paid" | "all"
+  departmentId?: string
 }) {
   try {
     const result = await fetchFinancePayrollQueue(input)

@@ -53,7 +53,8 @@ export async function getEnrollmentRegistrationDetail(
         capacity,
         enrolled,
         waitlist,
-        status
+        status,
+        program_kind
       ),
       program_offerings:offering_id (
         id,
