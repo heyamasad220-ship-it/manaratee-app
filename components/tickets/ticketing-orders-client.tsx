@@ -155,6 +155,7 @@ export function TicketingOrdersClient({
   const [selectedOrder, setSelectedOrder] = useState<TicketOrderListItem | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
   const selectedOrders = useMemo(
@@ -233,11 +234,25 @@ export function TicketingOrdersClient({
 
   function handleCancelRefund() {
     if (!hasSelection) return
+    if (
+      !window.confirm(
+        `Cancel or refund ${selectedIds.length} order${selectedIds.length === 1 ? "" : "s"}? Paid Stripe orders are refunded on the organization’s Stripe account. Pay-at-event orders are marked refunded locally.`
+      )
+    ) {
+      return
+    }
 
+    setActionError(null)
     startTransition(async () => {
-      await bulkCancelRefundOrders(selectedIds)
-      setSelectedIds([])
-      router.refresh()
+      try {
+        await bulkCancelRefundOrders(selectedIds)
+        setSelectedIds([])
+        router.refresh()
+      } catch (error) {
+        setActionError(
+          error instanceof Error ? error.message : "Could not cancel or refund the selected orders."
+        )
+      }
     })
   }
 
@@ -275,6 +290,8 @@ export function TicketingOrdersClient({
           </Button>
         ) : null}
       </div>
+
+      {actionError ? <p className="text-sm text-destructive">{actionError}</p> : null}
 
       <div className="rounded-lg border bg-card p-4">
         <div className="grid gap-4">

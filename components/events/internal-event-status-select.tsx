@@ -10,9 +10,12 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import {
-  getInternalEventStatusLabel,
-  getInternalEventStatusOptions,
+  fromWorkspaceEventStatus,
+  getInternalEventWorkspaceStatusLabel,
+  getInternalEventWorkspaceStatusOptions,
+  toWorkspaceEventStatus,
   type InternalEventStatus,
+  type InternalEventWorkspaceStatus,
 } from "@/lib/events/internal-event-status"
 import { updateInternalEventStatus } from "@/lib/events/internal-event-actions"
 
@@ -24,12 +27,16 @@ export function InternalEventStatusSelect({
   status: InternalEventStatus
 }) {
   const [isPending, startTransition] = useTransition()
-  const options = getInternalEventStatusOptions()
+  const options = getInternalEventWorkspaceStatusOptions()
+  const workspaceStatus = toWorkspaceEventStatus(status)
 
   function handleChange(nextStatus: string) {
     startTransition(async () => {
       try {
-        await updateInternalEventStatus(eventId, nextStatus as InternalEventStatus)
+        await updateInternalEventStatus(
+          eventId,
+          fromWorkspaceEventStatus(nextStatus as InternalEventWorkspaceStatus)
+        )
       } catch (error) {
         console.error(error)
         window.alert(
@@ -40,9 +47,15 @@ export function InternalEventStatusSelect({
   }
 
   return (
-    <Select value={status} onValueChange={handleChange} disabled={isPending}>
+    <Select
+      value={workspaceStatus}
+      onValueChange={handleChange}
+      disabled={isPending}
+    >
       <SelectTrigger className="h-8 w-[130px]">
-        <SelectValue>{getInternalEventStatusLabel(status)}</SelectValue>
+        <SelectValue>
+          {getInternalEventWorkspaceStatusLabel(status)}
+        </SelectValue>
       </SelectTrigger>
       <SelectContent>
         {options.map((option) => (

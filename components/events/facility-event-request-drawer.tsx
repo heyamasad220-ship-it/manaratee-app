@@ -212,6 +212,7 @@ export function FacilityEventRequestDrawer({
 
   const [externalVenueName, setExternalVenueName] = useState("")
   const [externalAddress, setExternalAddress] = useState("")
+  const [meetingUrl, setMeetingUrl] = useState("")
 
   const [isRecurring, setIsRecurring] = useState(false)
   const [frequency, setFrequency] = useState<EventRecurrenceFrequency>("weekly")
@@ -251,6 +252,7 @@ export function FacilityEventRequestDrawer({
     setRoomSetupNotes("")
     setExternalVenueName("")
     setExternalAddress("")
+    setMeetingUrl("")
     setIsRecurring(false)
     setFrequency("weekly")
     setIntervalValue(1)
@@ -289,8 +291,15 @@ export function FacilityEventRequestDrawer({
     setExpectedAttendance(payload.expectedAttendance)
     setSetupStyle(payload.setupStyle)
     setRoomSetupNotes(payload.roomSetupNotes)
-    setExternalVenueName(payload.locationLabel)
-    setExternalAddress(payload.locationAddress)
+    setExternalVenueName(
+      payload.locationType === "external" ? payload.locationLabel : ""
+    )
+    setExternalAddress(
+      payload.locationType === "external" ? payload.locationAddress : ""
+    )
+    setMeetingUrl(
+      payload.locationType === "online" ? payload.locationAddress : ""
+    )
     const recurrence = payload.recurrence
     setIsRecurring(Boolean(recurrence?.enabled))
     if (recurrence?.enabled) {
@@ -350,6 +359,9 @@ export function FacilityEventRequestDrawer({
     if (next !== INTERNAL_EVENT_LOCATION_TYPES.external) {
       setExternalVenueName("")
       setExternalAddress("")
+    }
+    if (next !== INTERNAL_EVENT_LOCATION_TYPES.online) {
+      setMeetingUrl("")
     }
   }
 
@@ -417,6 +429,7 @@ export function FacilityEventRequestDrawer({
 
   const isFacility = locationType === INTERNAL_EVENT_LOCATION_TYPES.facility
   const isExternal = locationType === INTERNAL_EVENT_LOCATION_TYPES.external
+  const isOnline = locationType === INTERNAL_EVENT_LOCATION_TYPES.online
 
   const prefilledDepartment =
     defaults?.departmentId &&
@@ -453,6 +466,16 @@ export function FacilityEventRequestDrawer({
     if (isExternal) {
       if (!externalVenueName.trim()) return "External venue name is required."
       if (!externalAddress.trim()) return "External venue address is required."
+    }
+    if (isOnline && meetingUrl.trim()) {
+      try {
+        const parsed = new URL(meetingUrl.trim())
+        if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+          return "Meeting link must start with http:// or https://."
+        }
+      } catch {
+        return "Meeting link must be a valid URL."
+      }
     }
     if (isRecurring && frequency === "weekly" && weekdays.length === 0) {
       return "Select at least one weekday for weekly recurrence."
@@ -492,7 +515,11 @@ export function FacilityEventRequestDrawer({
           location_type: locationType,
           venue_ids: isFacility ? venueIds : [],
           location_label: isExternal ? externalVenueName : null,
-          location_address: isExternal ? externalAddress : null,
+          location_address: isExternal
+            ? externalAddress
+            : isOnline
+              ? meetingUrl.trim() || null
+              : null,
           operationalSetup: isFacility
             ? {
                 expectedAttendance: expectedAttendance
@@ -546,9 +573,9 @@ export function FacilityEventRequestDrawer({
           <p className="text-sm text-muted-foreground">
             {isEditMode
               ? "Update event details. Changes save to this occurrence."
-              : requestOrigin === "member-staff"
-                ? "Submit an event request for your team. It will need approval before it's confirmed."
-                : "All requests go to facility staff for approval before they're confirmed."}
+              : isFacility
+                ? "Center events are sent to facility staff for approval so space can be coordinated."
+                : "Online and External Venue events are confirmed when you submit — no facility approval needed."}
           </p>
         </SheetHeader>
 
@@ -943,6 +970,27 @@ export function FacilityEventRequestDrawer({
               </div>
             ) : null}
 
+            {isOnline ? (
+              <div className="flex flex-col gap-3 rounded-lg border p-4">
+                <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Online details
+                </Label>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="meeting-url">Meeting link</Label>
+                  <Input
+                    id="meeting-url"
+                    type="url"
+                    value={meetingUrl}
+                    onChange={(e) => setMeetingUrl(e.target.value)}
+                    placeholder="https://zoom.us/j/…"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Optional. Shown on Master Calendar and event details for attendees.
+                  </p>
+                </div>
+              </div>
+            ) : null}
+
             {isExternal ? (
               <div className="flex flex-col gap-3 rounded-lg border p-4">
                 <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -1003,8 +1051,10 @@ export function FacilityEventRequestDrawer({
                 </>
               ) : isEditMode ? (
                 "Save changes"
-              ) : (
+              ) : isFacility ? (
                 "Submit for approval"
+              ) : (
+                "Submit"
               )}
             </Button>
           </div>

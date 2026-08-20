@@ -2,15 +2,13 @@
 
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useTransition } from "react"
+import { useTransition, type ReactNode } from "react"
 import {
-  ClipboardList,
   CalendarCheck,
   Baby,
   Users,
   Truck,
   Ticket,
-  Clock,
   ChevronRight,
   Plus,
   ClipboardCheck,
@@ -19,9 +17,8 @@ import {
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
-import { InternalEventDbStatusBadge } from "@/components/events/internal-event-db-status-badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import {
   Select,
   SelectContent,
@@ -30,14 +27,6 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { CREATE_EVENT_CTA_LABEL } from "@/lib/events/facility-event-request-href"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
 import type {
   DashboardAttentionItem,
   DashboardTimePeriod,
@@ -97,57 +86,49 @@ function AttentionCard({ item }: { item: DashboardAttentionItem }) {
 }
 
 function KpiCard({
-  href,
   icon: Icon,
   iconClassName,
   count,
   label,
 }: {
-  href?: string
   icon: LucideIcon
   iconClassName: string
   count: number
   label: string
 }) {
-  const content = (
-    <CardContent className="p-4">
-      <div className="flex items-center gap-3">
-        <div
-          className={cn(
-            "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
-            iconClassName
-          )}
-        >
-          <Icon className="h-5 w-5" />
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <div className="flex items-center gap-3">
+          <div
+            className={cn(
+              "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
+              iconClassName
+            )}
+          >
+            <Icon className="h-5 w-5" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-2xl font-bold text-foreground">{count}</p>
+            <p className="truncate text-xs text-muted-foreground">{label}</p>
+          </div>
         </div>
-        <div className="min-w-0">
-          <p className="text-2xl font-bold text-foreground">{count}</p>
-          <p className="truncate text-xs text-muted-foreground">{label}</p>
-        </div>
-      </div>
-    </CardContent>
+      </CardContent>
+    </Card>
   )
-
-  if (href && count > 0) {
-    return (
-      <Card className="transition-colors hover:border-primary/40">
-        <Link href={href}>{content}</Link>
-      </Card>
-    )
-  }
-
-  return <Card>{content}</Card>
 }
 
-/** KPI / attention / today's schedule panels (former Dashboard), embedded on Events. */
+/** KPI header + attention panels; `eventsList` renders between them. */
 export function EventManagementDashboardPanels({
   data,
   period,
   canManage,
+  eventsList,
 }: {
   data: EventManagementDashboardData
   period: DashboardTimePeriod
   canManage: boolean
+  eventsList: ReactNode
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -155,11 +136,18 @@ export function EventManagementDashboardPanels({
 
   function setPeriod(nextPeriod: DashboardTimePeriod) {
     const params = new URLSearchParams(searchParams.toString())
-    if (nextPeriod === "this-week") {
+    if (nextPeriod === "all") {
       params.delete("period")
     } else {
       params.set("period", nextPeriod)
     }
+
+    // Drop legacy catalog filter params.
+    params.delete("q")
+    params.delete("status")
+    params.delete("department")
+    params.delete("eventType")
+    params.delete("view")
 
     const query = params.toString()
     startTransition(() => {
@@ -193,63 +181,54 @@ export function EventManagementDashboardPanels({
             onValueChange={(value) => setPeriod(value as DashboardTimePeriod)}
             disabled={isPending}
           >
-            <SelectTrigger className="w-[140px] bg-card">
+            <SelectTrigger className="w-[150px] bg-card">
               <SelectValue placeholder="Period" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="today">Today</SelectItem>
               <SelectItem value="this-week">This Week</SelectItem>
               <SelectItem value="this-month">This Month</SelectItem>
-              <SelectItem value="this-year">This Year</SelectItem>
+              <SelectItem value="all">All Events</SelectItem>
+              <SelectItem value="past">Past Events</SelectItem>
             </SelectContent>
           </Select>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-5">
         <KpiCard
-          href="/event-management?status=draft"
-          icon={ClipboardList}
-          iconClassName="bg-amber-100 text-amber-700"
-          count={kpis.draftCount}
-          label="Draft Events"
-        />
-        <KpiCard
-          href="/event-management?status=scheduled"
           icon={CalendarCheck}
           iconClassName="bg-emerald-100 text-emerald-700"
           count={kpis.scheduledCount}
           label="Scheduled Events"
         />
         <KpiCard
-          href="#attention-required"
           icon={Baby}
           iconClassName="bg-pink-100 text-pink-700"
           count={kpis.childcareRequired}
           label="Need Childcare"
         />
         <KpiCard
-          href="#attention-required"
           icon={Users}
           iconClassName="bg-blue-100 text-blue-700"
           count={kpis.volunteersRequired}
           label="Need Volunteers"
         />
         <KpiCard
-          href="#attention-required"
           icon={Truck}
           iconClassName="bg-orange-100 text-orange-700"
           count={kpis.vendorsRequired}
           label="Need Vendors"
         />
         <KpiCard
-          href="/event-management"
           icon={Ticket}
           iconClassName="bg-violet-100 text-violet-700"
           count={kpis.ticketedEvents}
           label="Ticketed Events"
         />
       </div>
+
+      {eventsList}
 
       <section id="attention-required" className="space-y-3">
         <div>
@@ -273,68 +252,6 @@ export function EventManagementDashboardPanels({
           </div>
         )}
       </section>
-
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base font-semibold">
-              Today&apos;s Schedule
-            </CardTitle>
-            <Button variant="ghost" size="sm" asChild>
-              <Link href="/event-management/calendar" className="text-xs">
-                View Calendar
-                <ChevronRight className="ml-1 h-3 w-3" />
-              </Link>
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          {data.todaysSchedule.length === 0 ? (
-            <div className="px-6 py-10 text-center text-sm text-muted-foreground">
-              No events scheduled for today.
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="text-xs">Event</TableHead>
-                    <TableHead className="text-xs">Time</TableHead>
-                    <TableHead className="text-xs">Location</TableHead>
-                    <TableHead className="text-xs">Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {data.todaysSchedule.map((event) => (
-                    <TableRow key={event.id}>
-                      <TableCell className="py-2.5">
-                        <Link
-                          href={event.href}
-                          className="text-sm font-medium hover:text-amber-700"
-                        >
-                          {event.name}
-                        </Link>
-                      </TableCell>
-                      <TableCell className="py-2.5">
-                        <div className="flex items-center gap-1.5 text-sm">
-                          <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                          {event.timeLabel}
-                        </div>
-                      </TableCell>
-                      <TableCell className="py-2.5 text-sm">
-                        {event.locationLabel || "—"}
-                      </TableCell>
-                      <TableCell className="py-2.5">
-                        <InternalEventDbStatusBadge status={event.status} />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
     </div>
   )
 }

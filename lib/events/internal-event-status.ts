@@ -15,6 +15,9 @@ export type InternalEventStatus =
 
 export type InternalEventCalendarColor = "green" | "yellow" | "orange"
 
+/** Simplified workspace visibility: Draft or Published. */
+export type InternalEventWorkspaceStatus = "draft" | "published"
+
 const STATUS_LABELS: Record<InternalEventStatus, string> = {
   draft: "Draft",
   submitted: "Submitted",
@@ -31,20 +34,45 @@ export function getInternalEventStatusLabel(status: InternalEventStatus | string
   return STATUS_LABELS[status as InternalEventStatus] ?? status
 }
 
-export function getInternalEventStatusOptions(includeWorkflow = true) {
-  const values = includeWorkflow
-    ? Object.values(INTERNAL_EVENT_STATUSES)
-    : [
-        INTERNAL_EVENT_STATUSES.draft,
-        INTERNAL_EVENT_STATUSES.scheduled,
-        INTERNAL_EVENT_STATUSES.completed,
-        INTERNAL_EVENT_STATUSES.cancelled,
-      ]
+/** Map any stored status to the Draft / Published workspace control. */
+export function toWorkspaceEventStatus(
+  status: InternalEventStatus | string
+): InternalEventWorkspaceStatus {
+  return status === INTERNAL_EVENT_STATUSES.draft ? "draft" : "published"
+}
 
-  return values.map((status) => ({
+/** Persist workspace Draft/Published into a stored status value. */
+export function fromWorkspaceEventStatus(
+  workspaceStatus: InternalEventWorkspaceStatus
+): InternalEventStatus {
+  return workspaceStatus === "draft"
+    ? INTERNAL_EVENT_STATUSES.draft
+    : INTERNAL_EVENT_STATUSES.approved
+}
+
+export function getInternalEventWorkspaceStatusLabel(
+  status: InternalEventStatus | string
+): string {
+  return toWorkspaceEventStatus(status) === "draft" ? "Draft" : "Published"
+}
+
+export function getInternalEventStatusOptions(includeWorkflow = true) {
+  if (!includeWorkflow) {
+    return [
+      { value: "draft" as const, label: "Draft" },
+      { value: "published" as const, label: "Published" },
+    ]
+  }
+
+  return Object.values(INTERNAL_EVENT_STATUSES).map((status) => ({
     value: status,
     label: getInternalEventStatusLabel(status),
   }))
+}
+
+/** Options for event workspace: Draft | Published only. */
+export function getInternalEventWorkspaceStatusOptions() {
+  return getInternalEventStatusOptions(false)
 }
 
 export function isInternalEventPendingApproval(status: string): boolean {

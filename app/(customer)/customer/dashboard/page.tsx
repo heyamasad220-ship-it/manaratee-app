@@ -5,6 +5,7 @@ import {
   Gift,
   GraduationCap,
   HandCoins,
+  Ticket,
   User,
 } from "lucide-react"
 
@@ -12,9 +13,11 @@ import { getCustomerPortalSupabase } from "@/lib/auth/customer-portal-session"
 import { getActiveOrganization } from "@/lib/organizations/get-active-organization"
 import {
   isCustomerPortalModuleEnabled,
+  showCustomerTicketsNav,
 } from "@/lib/customer/customer-portal-modules"
 import { loadCustomerPortalEnabledModuleSlugs } from "@/lib/customer/customer-portal-modules-server"
 import { Card, CardContent } from "@/components/ui/card"
+import { getCustomerTicketOrders } from "@/lib/tickets/customer-ticket-queries"
 
 function formatDashboardCurrency(amount: number) {
   return new Intl.NumberFormat("en-US", {
@@ -72,6 +75,10 @@ export default async function CustomerDashboardPage() {
           .eq("registrant_contact_id", contact.id)
       : { count: 0 }
 
+  const ticketsEnabled = showCustomerTicketsNav(enabledModuleSlugs)
+  const ticketOrders = ticketsEnabled ? await getCustomerTicketOrders() : []
+  const ticketCount = ticketOrders.length
+
   const donationsModuleEnabled = isCustomerPortalModuleEnabled(enabledModuleSlugs, "donations")
 
   let openPledgeCount = 0
@@ -120,6 +127,12 @@ export default async function CustomerDashboardPage() {
       iconWrap: "bg-primary/10",
       icon: "text-primary",
     },
+    tickets: {
+      border: "border-l-4 border-l-teal-500",
+      valueClass: "text-teal-700",
+      iconWrap: "bg-teal-100",
+      icon: "text-teal-700",
+    },
     donations: {
       border: "border-l-4 border-l-emerald-500",
       valueClass: "text-emerald-600",
@@ -155,6 +168,16 @@ export default async function CustomerDashboardPage() {
       href: "/customer/profile",
       icon: User,
     },
+    ticketsEnabled
+      ? {
+          key: "tickets",
+          title: "My Tickets",
+          value: ticketCount,
+          description: "Event registrations and QR codes",
+          href: "/customer/tickets",
+          icon: Ticket,
+        }
+      : null,
     isCustomerPortalModuleEnabled(enabledModuleSlugs, "bookings")
       ? {
           key: "bookings",

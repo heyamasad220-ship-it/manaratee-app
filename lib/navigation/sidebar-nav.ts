@@ -16,6 +16,8 @@ export interface SubItem {
   href: string
   matchPrefix: string
   alsoMatchPrefixes?: string[]
+  /** Paths that must not count as a match for this item (more specific siblings). */
+  excludeMatchPrefixes?: string[]
   contactListSegment?: ContactsListSegment
   permissionKey?: string
   permissionKeys?: string[]
@@ -63,6 +65,12 @@ export function subItemMatchesPath(
   pathname: string,
   profileListSegment: ContactsListSegment | null
 ) {
+  const isExcluded = (pathnameToCheck: string) =>
+    child.excludeMatchPrefixes?.some(
+      (prefix) =>
+        pathnameToCheck === prefix || pathnameToCheck.startsWith(`${prefix}/`)
+    ) ?? false
+
   if (child.exact) {
     if (child.href === "/donations/campaigns") {
       return isDonationCampaignsOverviewPath(pathname)
@@ -77,7 +85,10 @@ export function subItemMatchesPath(
     )
   }
 
-  if (pathname === child.href || pathname.startsWith(`${child.matchPrefix}/`)) {
+  if (
+    (pathname === child.href || pathname.startsWith(`${child.matchPrefix}/`)) &&
+    !isExcluded(pathname)
+  ) {
     return true
   }
 

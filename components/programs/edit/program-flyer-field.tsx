@@ -19,6 +19,7 @@ export function ProgramFlyerField({
   hideLabel = false,
   emptyLabel,
   frameClassName,
+  imageClassName,
   /** `contain` shows the full flyer (no crop); `cover` fills a fixed frame. */
   fit = "cover",
 }: {
@@ -35,6 +36,8 @@ export function ProgramFlyerField({
   emptyLabel?: string
   /** Extra classes for the dropzone button (height, layout). */
   frameClassName?: string
+  /** Extra classes for the preview image (e.g. max-height). */
+  imageClassName?: string
   fit?: "cover" | "contain"
 }) {
   const isControlled = value !== undefined
@@ -163,8 +166,11 @@ export function ProgramFlyerField({
               alt="Flyer preview"
               className={
                 fit === "contain"
-                  ? "block h-auto max-h-[36rem] w-auto max-w-full"
-                  : "h-full w-full object-cover"
+                  ? cn(
+                      "block h-auto max-h-[36rem] w-auto max-w-full",
+                      imageClassName
+                    )
+                  : cn("h-full w-full object-cover", imageClassName)
               }
             />
             <div className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition-opacity group-hover:bg-black/40 group-hover:opacity-100">

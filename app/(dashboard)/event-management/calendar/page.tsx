@@ -1,7 +1,4 @@
-import { Suspense } from "react"
-
 import { Header } from "@/components/layout/header"
-import { EventManagementSectionNav } from "@/components/events/event-management-section-nav"
 import { InternalEventsCalendarClient } from "@/components/events/internal-events-calendar-client"
 import { getDepartments } from "@/lib/departments/department-queries"
 import { getInternalEventsForCalendar } from "@/lib/events/internal-event-calendar-queries"
@@ -33,6 +30,16 @@ function monthRangeIso(monthParam: string) {
   }
 }
 
+function upcomingRangeIso() {
+  const now = new Date()
+  const rangeEnd = new Date(now)
+  rangeEnd.setMonth(rangeEnd.getMonth() + 6)
+  return {
+    rangeStart: now.toISOString(),
+    rangeEnd: rangeEnd.toISOString(),
+  }
+}
+
 export default async function EventManagementMasterCalendarPage({
   searchParams,
 }: {
@@ -54,11 +61,17 @@ export default async function EventManagementMasterCalendarPage({
   const departmentId = params.department?.trim() || null
   const returnTo = isSafeReturnToPath(params.returnTo) ? params.returnTo : null
   const { rangeStart, rangeEnd } = monthRangeIso(month)
+  const upcoming = upcomingRangeIso()
 
-  const [events, departments, canBookSpace] = await Promise.all([
+  const [events, upcomingEvents, departments, canBookSpace] = await Promise.all([
     getInternalEventsForCalendar({
       rangeStart,
       rangeEnd,
+      departmentId,
+    }),
+    getInternalEventsForCalendar({
+      rangeStart: upcoming.rangeStart,
+      rangeEnd: upcoming.rangeEnd,
       departmentId,
     }),
     getDepartments(),
@@ -76,12 +89,10 @@ export default async function EventManagementMasterCalendarPage({
 
   return (
     <>
-      <Header title="Events" />
-      <Suspense fallback={null}>
-        <EventManagementSectionNav />
-      </Suspense>
+      <Header title="Master Calendar" />
       <InternalEventsCalendarClient
         events={events}
+        upcomingEvents={upcomingEvents}
         departments={departments.map((department) => ({
           id: department.id,
           name: department.name,

@@ -7,8 +7,12 @@ import { LayoutGrid, List, Search } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import type { Department } from "@/lib/departments/department-types"
 import { cn } from "@/lib/utils"
+
+type CatalogDepartmentOption = {
+  id: string
+  name: string
+}
 
 export type CatalogFilters = {
   q: string
@@ -37,7 +41,7 @@ export function ProgramCatalogFilters({
   /** Controlled mode: call instead of pushing catalog URL (department embed). */
   onFiltersChange,
 }: {
-  departments: Department[]
+  departments: CatalogDepartmentOption[]
   initialFilters: CatalogFilters
   basePath?: string
   hideDepartmentFilter?: boolean
@@ -45,7 +49,7 @@ export function ProgramCatalogFilters({
   hideStatusFilter?: boolean
   /** Cards-only catalog — hide grid/list switcher. */
   hideViewToggle?: boolean
-  /** Gender, youth/adult, and participant age filters (family browse). */
+  /** Gender, youth/adult audience, and age (when youth) filters (family browse). */
   showFamilyFilters?: boolean
   onFiltersChange?: (next: CatalogFilters) => void
 }) {
@@ -116,7 +120,11 @@ export function ProgramCatalogFilters({
         params.delete("audience")
       }
 
-      if (showFamilyFilters && merged.age.trim()) {
+      if (
+        showFamilyFilters &&
+        merged.audience === "youth" &&
+        merged.age.trim()
+      ) {
         params.set("age", merged.age.trim())
       } else {
         params.delete("age")
@@ -277,57 +285,78 @@ export function ProgramCatalogFilters({
           {showFamilyFilters ? (
             <>
               <select
-                value={initialFilters.gender || "all"}
+                value={
+                  initialFilters.gender === "Male" ||
+                  initialFilters.gender === "Female"
+                    ? initialFilters.gender
+                    : "all"
+                }
                 onChange={(event) =>
                   pushFilters({ gender: event.target.value, q: query })
                 }
                 className="h-10 rounded-md border bg-background px-3 text-sm"
-                aria-label="Filter by gender"
+                aria-label="Gender"
               >
-                <option value="all">All genders</option>
-                <option value="All">Both / co-ed</option>
+                <option value="all">All</option>
                 <option value="Male">Male</option>
                 <option value="Female">Female</option>
               </select>
 
               <select
-                value={initialFilters.audience || "all"}
-                onChange={(event) =>
-                  pushFilters({ audience: event.target.value, q: query })
+                value={
+                  initialFilters.audience === "youth" ||
+                  initialFilters.audience === "adult"
+                    ? initialFilters.audience
+                    : "all"
                 }
+                onChange={(event) => {
+                  const nextAudience = event.target.value
+                  if (nextAudience !== "youth") {
+                    setAge("")
+                    pushFilters({
+                      audience: nextAudience,
+                      age: "",
+                      q: query,
+                    })
+                    return
+                  }
+                  pushFilters({ audience: nextAudience, q: query })
+                }}
                 className="h-10 rounded-md border bg-background px-3 text-sm"
-                aria-label="Filter by youth or adult"
+                aria-label="Audience"
               >
-                <option value="all">Youth &amp; adult</option>
+                <option value="all">All</option>
                 <option value="youth">Youth</option>
                 <option value="adult">Adult</option>
               </select>
 
-              <Input
-                type="number"
-                min={0}
-                max={120}
-                inputMode="numeric"
-                value={age}
-                onChange={(event) => {
-                  const next = event.target.value
-                  setAge(next)
-                  if (onFiltersChange) {
-                    onFiltersChange({
-                      q: query,
-                      status: initialFilters.status,
-                      department: initialFilters.department,
-                      gender: initialFilters.gender || EMPTY_FAMILY.gender,
-                      audience: initialFilters.audience || EMPTY_FAMILY.audience,
-                      age: next,
-                      view: initialFilters.view,
-                    })
-                  }
-                }}
-                placeholder="Age"
-                className="h-10 w-full bg-background sm:w-24"
-                aria-label="Filter by participant age"
-              />
+              {initialFilters.audience === "youth" ? (
+                <Input
+                  type="number"
+                  min={0}
+                  max={120}
+                  inputMode="numeric"
+                  value={age}
+                  onChange={(event) => {
+                    const next = event.target.value
+                    setAge(next)
+                    if (onFiltersChange) {
+                      onFiltersChange({
+                        q: query,
+                        status: initialFilters.status,
+                        department: initialFilters.department,
+                        gender: initialFilters.gender || EMPTY_FAMILY.gender,
+                        audience: "youth",
+                        age: next,
+                        view: initialFilters.view,
+                      })
+                    }
+                  }}
+                  placeholder="Age"
+                  className="h-10 w-full bg-background sm:w-24"
+                  aria-label="Participant age"
+                />
+              ) : null}
             </>
           ) : null}
         </div>

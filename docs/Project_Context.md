@@ -171,6 +171,12 @@ User Invitations
 
 **Community Calendar (August 2026)** — Shared top-level `/community-calendar` for public/community-visible bazaars + Event Management events. Enabled when Vendor Hub and/or Event Management is on. Distinct from Facilities Calendar and Events Master Calendar.
 
+**Public Program Catalog (August 2026)** — No-login browse at `/o/[orgSlug]/programs` (programs with `visibility = public` only). Same offering cards/filters as staff/customer catalog; register via `/join/[orgSlug]?next=…`.
+
+**Public Community Calendar (August 2026)** — No-login browse at `/o/[orgSlug]/community-calendar` (events/bazaars with calendar status `published` only). Featured upcoming event, event-type category circles, All/Today/This weekend tabs, 4-up cards; ticketed events open `/o/[orgSlug]/events/[id]`.
+
+**Event Workspace redesign (August 2026)** — Progressive event tabs (registration / staff / youth / vendors / finance / reports) driven by `workspace_features` + attendance mode. Expenses ledger (`event_expenses`). Public event checkout (Stripe Connect when ready) + customer **My Tickets** + event documents + staff Stripe ticket refunds (including partials) + youth forms/waivers + `events.checkin` door-staff permission. Run SQL **`252_event_workspace_redesign.sql`**, **`253_event_youth_checkin_waitlist.sql`**, **`254_event_documents.sql`**, **`255_ticket_order_stripe.sql`**, **`256_customer_ticket_order_rls.sql`**, **`257_events_checkin_permission.sql`**, **`258_ticket_order_refunded_amount.sql`**, **`259_youth_waiver_forms.sql`**.
+
 ---
 
 ## People Management Module

@@ -16,6 +16,13 @@ function isAllowedCustomerPathname(pathname: string) {
   )
 }
 
+/** Public org pages under `/o/[orgSlug]/…` (community calendar, event tickets). */
+function isAllowedPublicOrgPathname(pathname: string) {
+  return /^\/o\/[a-z0-9-]+\/(community-calendar|events(?:\/[a-zA-Z0-9-]+)?)$/.test(
+    pathname
+  )
+}
+
 function sanitizeCustomerSearch(pathname: string, search: string) {
   if (!search) return ""
 
@@ -33,7 +40,8 @@ function sanitizeCustomerSearch(pathname: string, search: string) {
 }
 
 /**
- * Restrict post-join / post-auth redirects to same-origin customer portal paths.
+ * Restrict post-join / post-auth redirects to same-origin customer portal paths
+ * or public organization community pages.
  */
 export function sanitizeCustomerPortalRedirectPath(
   path: string | null | undefined
@@ -54,7 +62,12 @@ export function sanitizeCustomerPortalRedirectPath(
     return null
   }
 
-  if (!isAllowedCustomerPathname(pathname)) return null
+  if (
+    !isAllowedCustomerPathname(pathname) &&
+    !isAllowedPublicOrgPathname(pathname)
+  ) {
+    return null
+  }
 
   return `${pathname}${sanitizeCustomerSearch(pathname, search)}`
 }

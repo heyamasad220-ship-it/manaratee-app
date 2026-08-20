@@ -3,26 +3,8 @@ import { MASTER_CALENDAR_LABEL } from "@/lib/events/facility-event-request-href"
 export const EVENT_MANAGEMENT_PATH = "/event-management"
 export const EVENT_MANAGEMENT_CALENDAR_PATH = `${EVENT_MANAGEMENT_PATH}/calendar`
 
+/** @deprecated Section tabs removed — Events and Master Calendar are sidebar items. */
 export type EventManagementSectionTabId = "overview" | "calendar"
-
-export type EventManagementSectionTab = {
-  id: EventManagementSectionTabId
-  label: string
-  href: string
-}
-
-export const EVENT_MANAGEMENT_SECTION_TABS: EventManagementSectionTab[] = [
-  {
-    id: "overview",
-    label: "Overview",
-    href: EVENT_MANAGEMENT_PATH,
-  },
-  {
-    id: "calendar",
-    label: MASTER_CALENDAR_LABEL,
-    href: EVENT_MANAGEMENT_CALENDAR_PATH,
-  },
-]
 
 export function resolveEventManagementSectionTab(
   pathname: string
@@ -50,3 +32,5 @@ export function eventManagementMasterCalendarHref(options?: {
     ? `${EVENT_MANAGEMENT_CALENDAR_PATH}?${query}`
     : EVENT_MANAGEMENT_CALENDAR_PATH
 }
+
+export { MASTER_CALENDAR_LABEL }

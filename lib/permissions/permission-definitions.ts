@@ -129,6 +129,14 @@ export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
     moduleSlugs: ["event-management"],
   },
   {
+    key: "events.checkin",
+    label: "Check in attendees",
+    description:
+      "Can scan tickets and check attendees (and youth) in or out. Does not allow editing events, refunds, or registration settings.",
+    group: "Events",
+    moduleSlugs: ["event-management"],
+  },
+  {
     key: "events.manage",
     label: "Manage Events",
     description: "Can create and edit internal events and event types.",

@@ -306,7 +306,12 @@ export function InternalEventForm(props: InternalEventFormProps) {
             : ""
           : "",
       location_address:
-        next === INTERNAL_EVENT_LOCATION_TYPES.external ? current.location_address : "",
+        next === INTERNAL_EVENT_LOCATION_TYPES.external ||
+        next === INTERNAL_EVENT_LOCATION_TYPES.online
+          ? current.location_type === next
+            ? current.location_address
+            : ""
+          : "",
     }))
   }
 
@@ -316,6 +321,9 @@ export function InternalEventForm(props: InternalEventFormProps) {
   const showExternalLocation =
     props.mode !== "request" &&
     form.location_type === INTERNAL_EVENT_LOCATION_TYPES.external
+  const showOnlineLocation =
+    props.mode !== "request" &&
+    form.location_type === INTERNAL_EVENT_LOCATION_TYPES.online
   const showFacilitySetup = showFacilityLocation
 
   function locationPayload() {
@@ -346,8 +354,9 @@ export function InternalEventForm(props: InternalEventFormProps) {
             ? "Online"
             : form.location_label || null,
       location_address:
-        form.location_type === INTERNAL_EVENT_LOCATION_TYPES.external
-          ? form.location_address
+        form.location_type === INTERNAL_EVENT_LOCATION_TYPES.external ||
+        form.location_type === INTERNAL_EVENT_LOCATION_TYPES.online
+          ? form.location_address || null
           : null,
     }
   }
@@ -645,6 +654,24 @@ export function InternalEventForm(props: InternalEventFormProps) {
             required
             onChange={(venueIds) => updateField("venue_ids", venueIds)}
           />
+        ) : null}
+
+        {showOnlineLocation ? (
+          <div className="space-y-1.5">
+            <Label htmlFor="meeting_url">Meeting link</Label>
+            <Input
+              id="meeting_url"
+              type="url"
+              value={form.location_address}
+              onChange={(event) =>
+                updateField("location_address", event.target.value)
+              }
+              placeholder="https://zoom.us/j/…"
+            />
+            <p className="text-xs text-muted-foreground">
+              Optional. Shown on Master Calendar for attendees.
+            </p>
+          </div>
         ) : null}
 
         {showExternalLocation ? (

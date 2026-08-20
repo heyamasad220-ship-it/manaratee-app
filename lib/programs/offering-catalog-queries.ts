@@ -46,11 +46,11 @@ export type OfferingCatalogCard = {
 export type OfferingCatalogFilters = {
   q?: string
   department?: string
-  /** all | Male | Female | All (both/co-ed) */
+  /** all | Male | Female */
   gender?: string
-  /** all | youth | adult */
+  /** all | youth | adult — age filter applies only when audience is youth */
   audience?: string
-  /** Participant age (number as string) — matches offerings whose age range includes it. */
+  /** Participant age (number as string); used when audience is youth. */
   age?: string
 }
 
@@ -97,7 +97,6 @@ function matchesGenderFilter(
   const selected = filterGender || "all"
   if (selected === "all") return true
   const normalized = !gender || gender === "All" ? "All" : gender
-  if (selected === "All") return normalized === "All"
   // Male/Female offerings + co-ed "All" both match a gendered filter.
   return normalized === selected || normalized === "All"
 }
@@ -131,7 +130,10 @@ function matchesOfferingCatalogFilters(
     return false
   }
 
-  if (!matchesAgeFilter(row.display_min_age, row.display_max_age, filters.age)) {
+  if (
+    (filters.audience || "all") === "youth" &&
+    !matchesAgeFilter(row.display_min_age, row.display_max_age, filters.age)
+  ) {
     return false
   }
 

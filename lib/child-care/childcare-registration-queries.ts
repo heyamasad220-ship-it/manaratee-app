@@ -22,12 +22,68 @@ function mapRegistration(row: Record<string, unknown>): ChildcareRegistration {
     status: row.status as ChildcareRegistrationStatus,
     allergies: (row.allergies as string | null) ?? null,
     notes: (row.notes as string | null) ?? null,
+    checked_in_at: (row.checked_in_at as string | null) ?? null,
+    checked_out_at: (row.checked_out_at as string | null) ?? null,
+    pickup_authorization: (row.pickup_authorization as string | null) ?? null,
+    waiverSignedAt: (row.waiver_signed_at as string | null) ?? null,
+    waiverSignedBy: (row.waiver_signed_by as string | null) ?? null,
+    photoConsent:
+      typeof row.photo_consent === "boolean" ? (row.photo_consent as boolean) : null,
     event_name: (event?.name as string) || "Event",
     event_date: (event?.event_date as string) || "",
     start_time: (event?.start_time as string | null) ?? null,
     end_time: (event?.end_time as string | null) ?? null,
   }
 }
+
+const REGISTRATION_SELECT = `
+  id,
+  organization_id,
+  childcare_event_id,
+  child_name,
+  child_age,
+  parent_name,
+  parent_email,
+  parent_phone,
+  status,
+  allergies,
+  notes,
+  checked_in_at,
+  checked_out_at,
+  pickup_authorization,
+  waiver_signed_at,
+  waiver_signed_by,
+  photo_consent,
+  childcare_event:childcare_event_id (
+    name,
+    event_date,
+    start_time,
+    end_time
+  )
+`
+
+const REGISTRATION_SELECT_FALLBACK = `
+  id,
+  organization_id,
+  childcare_event_id,
+  child_name,
+  child_age,
+  parent_name,
+  parent_email,
+  parent_phone,
+  status,
+  allergies,
+  notes,
+  checked_in_at,
+  checked_out_at,
+  pickup_authorization,
+  childcare_event:childcare_event_id (
+    name,
+    event_date,
+    start_time,
+    end_time
+  )
+`
 
 export async function getChildcareRegistrationsBundle(
   organizationId?: string
@@ -62,27 +118,7 @@ export async function getChildcareRegistrationsBundle(
       .order("name", { ascending: true }),
     supabase
       .from("childcare_registrations")
-      .select(
-        `
-        id,
-        organization_id,
-        childcare_event_id,
-        child_name,
-        child_age,
-        parent_name,
-        parent_email,
-        parent_phone,
-        status,
-        allergies,
-        notes,
-        childcare_event:childcare_event_id (
-          name,
-          event_date,
-          start_time,
-          end_time
-        )
-      `
-      )
+      .select(REGISTRATION_SELECT)
       .eq("organization_id", orgId)
       .neq("status", "cancelled")
       .order("created_at", { ascending: false }),
@@ -93,7 +129,23 @@ export async function getChildcareRegistrationsBundle(
     throw new Error("Failed to load childcare events")
   }
 
-  if (registrationsResult.error) {
+  let registrationRows: unknown[] | null = registrationsResult.data
+  if (registrationsResult.error?.code === "42703") {
+    const fallback = await supabase
+      .from("childcare_registrations")
+      .select(REGISTRATION_SELECT_FALLBACK)
+      .eq("organization_id", orgId)
+      .neq("status", "cancelled")
+      .order("created_at", { ascending: false })
+    if (fallback.error) {
+      console.error(
+        "getChildcareRegistrationsBundle registrations:",
+        fallback.error.message
+      )
+      throw new Error("Failed to load childcare registrations")
+    }
+    registrationRows = fallback.data
+  } else if (registrationsResult.error) {
     console.error(
       "getChildcareRegistrationsBundle registrations:",
       registrationsResult.error.message
@@ -101,7 +153,7 @@ export async function getChildcareRegistrationsBundle(
     throw new Error("Failed to load childcare registrations")
   }
 
-  const registrations = (registrationsResult.data || []).map((row) =>
+  const registrations = (registrationRows || []).map((row) =>
     mapRegistration(row as Record<string, unknown>)
   )
 
@@ -249,38 +301,32 @@ export async function getChildcareForInternalEvent(internalEventId: string): Pro
 
   const { data: registrationsResult, error: registrationsError } = await supabase
     .from("childcare_registrations")
-    .select(
-      `
-      id,
-      organization_id,
-      childcare_event_id,
-      child_name,
-      child_age,
-      parent_name,
-      parent_email,
-      parent_phone,
-      status,
-      allergies,
-      notes,
-      childcare_event:childcare_event_id (
-        name,
-        event_date,
-        start_time,
-        end_time
-      )
-    `
-    )
+    .select(REGISTRATION_SELECT)
     .eq("organization_id", orgId)
     .eq("childcare_event_id", childcareEventId)
     .neq("status", "cancelled")
     .order("created_at", { ascending: false })
 
-  if (registrationsError) {
+  let registrationRows: unknown[] | null = registrationsResult
+  if (registrationsError?.code === "42703") {
+    const fallback = await supabase
+      .from("childcare_registrations")
+      .select(REGISTRATION_SELECT_FALLBACK)
+      .eq("organization_id", orgId)
+      .eq("childcare_event_id", childcareEventId)
+      .neq("status", "cancelled")
+      .order("created_at", { ascending: false })
+    if (fallback.error) {
+      console.error("getChildcareForInternalEvent registrations:", fallback.error.message)
+      return { childcareEvent: null, registrations: [] }
+    }
+    registrationRows = fallback.data
+  } else if (registrationsError) {
     console.error("getChildcareForInternalEvent registrations:", registrationsError.message)
     return { childcareEvent: null, registrations: [] }
   }
 
-  const registrations = (registrationsResult || []).map((row) =>
+  const registrations = (registrationRows || []).map((row) =>
     mapRegistration(row as Record<string, unknown>)
   )
 

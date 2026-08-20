@@ -19,6 +19,7 @@ export const PERMISSIONS = {
   REPORTS_VIEW: "reports.view",
 
   EVENTS_VIEW: "events.view",
+  EVENTS_CHECKIN: "events.checkin",
   EVENTS_MANAGE: "events.manage",
 
   TICKETING_VIEW: "ticketing.view",

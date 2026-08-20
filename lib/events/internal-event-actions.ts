@@ -48,6 +48,13 @@ import {
   normalizeEventRecurrenceConfig,
   type EventRecurrenceConfig,
 } from "./event-recurrence"
+import {
+  parseAttendanceMode,
+  parseEventWorkspaceFeatures,
+  resolveAttendanceMode,
+  type EventAttendanceMode,
+  type EventWorkspaceFeatures,
+} from "./event-workspace-features"
 
 export type InternalEventCatalogActionResult =
   | { success: true; eventId?: string }
@@ -167,7 +174,25 @@ function validateEventInput(input: CreateInternalEventInput) {
     venueId = null
     venueIds = []
     locationLabel = "Online"
-    locationAddress = null
+    // Meeting link is stored in location_address for online events.
+    const rawLink =
+      locationAddress ||
+      (input.location_label && /^https?:\/\//i.test(input.location_label.trim())
+        ? input.location_label.trim()
+        : null)
+    if (rawLink) {
+      try {
+        const parsed = new URL(rawLink)
+        if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+          throw new Error("invalid")
+        }
+        locationAddress = parsed.toString()
+      } catch {
+        throw new Error("Meeting link must be a valid http(s) URL.")
+      }
+    } else {
+      locationAddress = null
+    }
   } else if (locationType === INTERNAL_EVENT_LOCATION_TYPES.external) {
     venueId = null
     venueIds = []
@@ -540,9 +565,17 @@ export async function submitInternalEventRequest(input: CreateInternalEventInput
     throw new Error("Select Center, Online, or External Venue.")
   }
 
+  // Center (facility) needs approval to coordinate spaces. Online / External Venue
+  // do not use the building, so they confirm on submit.
+  const isFacility =
+    input.location_type === INTERNAL_EVENT_LOCATION_TYPES.facility
+  const submitStatus = isFacility
+    ? INTERNAL_EVENT_STATUSES.awaitingApproval
+    : INTERNAL_EVENT_STATUSES.confirmed
+
   const payload = validateEventInput({
     ...input,
-    status: INTERNAL_EVENT_STATUSES.awaitingApproval,
+    status: submitStatus,
   })
   validateTicketingInput(input)
 
@@ -555,9 +588,6 @@ export async function submitInternalEventRequest(input: CreateInternalEventInput
   if (!eventPayload.start_at || !eventPayload.end_at) {
     throw new Error("Start and end times are required to submit an event request.")
   }
-
-  const isFacility =
-    eventPayload.location_type === INTERNAL_EVENT_LOCATION_TYPES.facility
 
   if (isFacility && venueIds.length === 0) {
     throw new Error("Select at least one venue to submit an event request.")
@@ -613,8 +643,9 @@ export async function submitInternalEventRequest(input: CreateInternalEventInput
         ...eventPayload,
         start_at: occurrence.startAt.toISOString(),
         end_at: occurrence.endAt.toISOString(),
-        status: INTERNAL_EVENT_STATUSES.awaitingApproval,
+        status: submitStatus,
         submitted_at: nowIso,
+        approved_at: isFacility ? null : nowIso,
         created_by: user.id,
         recurrence_config: storedRecurrence,
       })
@@ -668,34 +699,78 @@ export async function submitInternalEventRequest(input: CreateInternalEventInput
 
   const primaryId = createdIds[0]
 
-  fireModuleNotifications([
-    {
-      organizationId,
-      moduleKey: "event_management",
-      audience: "staff",
-      eventKey: "request_submitted",
-      subject: "New internal event request",
-      summary:
-        createdIds.length > 1
-          ? `A staff member submitted a recurring event request (${createdIds.length} occurrences).`
-          : "A staff member submitted a new internal event request.",
-      metadata: {
-        eventId: primaryId,
-        eventIds: createdIds,
-        seriesId,
-        submittedBy: user.id,
+  if (isFacility) {
+    fireModuleNotifications([
+      {
+        organizationId,
+        moduleKey: "event_management",
+        audience: "staff",
+        eventKey: "request_submitted",
+        subject: "New internal event request",
+        summary:
+          createdIds.length > 1
+            ? `A staff member submitted a recurring Center event request (${createdIds.length} occurrences).`
+            : "A staff member submitted a new Center event request for facility approval.",
+        metadata: {
+          eventId: primaryId,
+          eventIds: createdIds,
+          seriesId,
+          submittedBy: user.id,
+        },
       },
-    },
-    {
-      organizationId,
-      moduleKey: "event_management",
-      audience: "customer",
-      eventKey: "request_received",
-      subject: "Event request received",
-      summary: "Your internal event request was received and is awaiting review.",
-      metadata: { eventId: primaryId, eventIds: createdIds, seriesId, submittedBy: user.id },
-    },
-  ])
+      {
+        organizationId,
+        moduleKey: "event_management",
+        audience: "customer",
+        eventKey: "request_received",
+        subject: "Event request received",
+        summary:
+          "Your Center event request was received and is awaiting facility review.",
+        metadata: {
+          eventId: primaryId,
+          eventIds: createdIds,
+          seriesId,
+          submittedBy: user.id,
+        },
+      },
+    ])
+  } else {
+    fireModuleNotifications([
+      {
+        organizationId,
+        moduleKey: "event_management",
+        audience: "staff",
+        eventKey: "request_submitted",
+        subject: "New event created",
+        summary:
+          createdIds.length > 1
+            ? `A staff member created a recurring Online/External event (${createdIds.length} occurrences).`
+            : "A staff member created an Online or External Venue event (no facility approval required).",
+        metadata: {
+          eventId: primaryId,
+          eventIds: createdIds,
+          seriesId,
+          submittedBy: user.id,
+          autoConfirmed: true,
+        },
+      },
+      {
+        organizationId,
+        moduleKey: "event_management",
+        audience: "customer",
+        eventKey: "request_approved",
+        subject: "Event confirmed",
+        summary: "Your Online or External Venue event is confirmed.",
+        metadata: {
+          eventId: primaryId,
+          eventIds: createdIds,
+          seriesId,
+          submittedBy: user.id,
+          autoConfirmed: true,
+        },
+      },
+    ])
+  }
 
   for (const id of createdIds) {
     revalidateInternalEventPaths(id)
@@ -1120,7 +1195,8 @@ export async function deleteInternalEvent(
 
 /**
  * Returns a human-readable reason when an event must not be deleted, else null.
- * Blocks on ticket orders or active childcare/volunteer/vendor registrations.
+ * Blocks on any ticket orders / tickets (financial activity) or any registrations
+ * (volunteer, vendor, childcare provider, or childcare child sign-ups).
  */
 export async function getInternalEventDeleteBlockers(
   eventId: string,
@@ -1131,10 +1207,15 @@ export async function getInternalEventDeleteBlockers(
 
   const supabase = await createClient()
 
-  const [ordersResult, participationsResult, childcareEventResult] =
+  const [ordersResult, ticketsResult, participationsResult, childcareEventResult] =
     await Promise.all([
       supabase
         .from("ticket_orders")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", orgId)
+        .eq("internal_event_id", eventId),
+      supabase
+        .from("tickets")
         .select("id", { count: "exact", head: true })
         .eq("organization_id", orgId)
         .eq("internal_event_id", eventId),
@@ -1143,8 +1224,7 @@ export async function getInternalEventDeleteBlockers(
         .select("id", { count: "exact", head: true })
         .eq("organization_id", orgId)
         .eq("source_type", "internal_event")
-        .eq("source_id", eventId)
-        .in("status", ["pending", "confirmed"]),
+        .eq("source_id", eventId),
       supabase
         .from("childcare_events")
         .select("id")
@@ -1157,14 +1237,16 @@ export async function getInternalEventDeleteBlockers(
   const reasons: string[] = []
 
   if (!ordersResult.error && (ordersResult.count || 0) > 0) {
-    reasons.push("ticket orders")
+    reasons.push("ticket orders or payments")
+  } else if (!ticketsResult.error && (ticketsResult.count || 0) > 0) {
+    reasons.push("ticket registrations")
   }
 
   if (
     !participationsResult.error &&
     (participationsResult.count || 0) > 0
   ) {
-    reasons.push("volunteer, childcare provider, or vendor sign-ups")
+    reasons.push("volunteer, childcare provider, or vendor registrations")
   }
 
   if (!childcareEventResult.error && childcareEventResult.data?.id) {
@@ -1173,10 +1255,9 @@ export async function getInternalEventDeleteBlockers(
       .select("id", { count: "exact", head: true })
       .eq("organization_id", orgId)
       .eq("childcare_event_id", childcareEventResult.data.id as string)
-      .neq("status", "cancelled")
 
     if (!error && (count || 0) > 0) {
-      reasons.push("childcare registrations")
+      reasons.push("youth / childcare registrations")
     }
   }
 
@@ -1293,6 +1374,10 @@ export async function updateInternalEventModules(input: {
   eventId: string
   serviceForm?: EventServiceRequirementsFormState
   ticketingForm?: EventTicketingFormState
+  checkoutConfig?: EventTicketingConfig["checkout"] | null
+  communicationsConfig?: EventTicketingConfig["communications"] | null
+  /** Writes ticketing_config.attendanceMode; sets requires_ticketing = mode !== open_public. */
+  attendanceMode?: EventAttendanceMode
 }): Promise<InternalEventCatalogActionResult> {
   try {
     const canManage = await hasAnyPermission(
@@ -1316,6 +1401,8 @@ export async function updateInternalEventModules(input: {
 
     const updatePayload: Record<string, unknown> = {}
     let ticketSyncInput: CreateInternalEventInput | null = null
+    const existingConfig =
+      ((existingEvent.ticketing_config as Record<string, unknown>) || {})
 
     if (input.serviceForm) {
       const servicePayload = buildServiceRequirementsPayload(input.serviceForm)
@@ -1338,7 +1425,7 @@ export async function updateInternalEventModules(input: {
       }
       updatePayload.requires_ticketing = ticketingPayload.requires_ticketing
       updatePayload.ticketing_config = {
-        ...((existingEvent.ticketing_config as Record<string, unknown>) || {}),
+        ...existingConfig,
         ...(ticketingPayload.ticketing_config as Record<string, unknown>),
       }
       ticketSyncInput = {
@@ -1348,6 +1435,52 @@ export async function updateInternalEventModules(input: {
         requires_ticketing: ticketingPayload.requires_ticketing,
         ticketTypes: ticketingPayload.ticketTypes,
         ticketing_config: ticketingPayload.ticketing_config,
+      }
+    }
+
+    if (input.checkoutConfig !== undefined) {
+      const baseConfig =
+        (updatePayload.ticketing_config as Record<string, unknown> | undefined) ||
+        existingConfig
+      updatePayload.ticketing_config = {
+        ...baseConfig,
+        checkout: input.checkoutConfig,
+      }
+    }
+
+    if (input.communicationsConfig !== undefined) {
+      const baseConfig =
+        (updatePayload.ticketing_config as Record<string, unknown> | undefined) ||
+        existingConfig
+      updatePayload.ticketing_config = {
+        ...baseConfig,
+        communications: input.communicationsConfig,
+      }
+    }
+
+    if (input.attendanceMode !== undefined) {
+      const mode = parseAttendanceMode(input.attendanceMode)
+      if (!mode) {
+        return { success: false, error: "Invalid attendance mode." }
+      }
+      const requiresTicketing = mode !== "open_public"
+      const baseConfig =
+        (updatePayload.ticketing_config as Record<string, unknown> | undefined) ||
+        existingConfig
+      updatePayload.ticketing_config = {
+        ...baseConfig,
+        attendanceMode: mode,
+      }
+      updatePayload.requires_ticketing = requiresTicketing
+      if (ticketSyncInput) {
+        ticketSyncInput = {
+          ...ticketSyncInput,
+          requires_ticketing: requiresTicketing,
+          ticketing_config: {
+            ...(ticketSyncInput.ticketing_config || {}),
+            attendanceMode: mode,
+          },
+        }
       }
     }
 
@@ -1378,6 +1511,272 @@ export async function updateInternalEventModules(input: {
     return {
       success: false,
       error: error instanceof Error ? error.message : "Failed to update event modules.",
+    }
+  }
+}
+
+export async function updateEventWorkspaceFeatures(input: {
+  eventId: string
+  features: EventWorkspaceFeatures
+}): Promise<InternalEventCatalogActionResult> {
+  try {
+    const canManage = await hasAnyPermission(
+      PERMISSIONS.EVENTS_MANAGE,
+      PERMISSIONS.PROGRAMS_MANAGE
+    )
+    if (!canManage) {
+      return { success: false, error: "You do not have permission to update events." }
+    }
+
+    const supabase = await createClient()
+    const organizationId = await getSelectedOrganizationId()
+    if (!organizationId) {
+      return { success: false, error: "No organization selected" }
+    }
+
+    const existingEvent = await getInternalEventRecordById(input.eventId)
+    if (!existingEvent) {
+      return { success: false, error: "Event not found." }
+    }
+
+    const parsed = parseEventWorkspaceFeatures(input.features)
+    const features: EventWorkspaceFeatures = {
+      registration: parsed.registration ?? false,
+      staff: parsed.staff ?? false,
+      youth: parsed.youth ?? false,
+      vendors: parsed.vendors ?? false,
+      finance: parsed.finance ?? false,
+      waitlist: parsed.waitlist ?? false,
+    }
+
+    const { error } = await supabase
+      .from("internal_events")
+      .update({
+        workspace_features: features,
+        // Keep legacy module flags in sync for Youth/Vendors eligibility.
+        // Do NOT map staff → requires_volunteers (that flag means open volunteer sign-ups).
+        requires_childcare: features.youth,
+        requires_vendors: features.vendors,
+        requires_ticketing:
+          features.registration &&
+          resolveAttendanceMode({
+            requires_ticketing: existingEvent.requires_ticketing,
+            ticketing_config: existingEvent.ticketing_config as {
+              attendanceMode?: unknown
+            } | null,
+          }) !== "open_public",
+      })
+      .eq("id", input.eventId)
+      .eq("organization_id", organizationId)
+
+    if (error) {
+      console.error(error)
+      const message = error.message || ""
+      if (message.includes("workspace_features") || message.includes("schema cache")) {
+        return {
+          success: false,
+          error:
+            "Workspace features column is missing. Run scripts/252_event_workspace_redesign.sql in Supabase, then try again.",
+        }
+      }
+      return { success: false, error: "Failed to update workspace features." }
+    }
+
+    revalidateInternalEventPaths(input.eventId)
+    revalidatePath(`/event-management/${input.eventId}`)
+    return { success: true, eventId: input.eventId }
+  } catch (error) {
+    console.error(error)
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to update workspace features.",
+    }
+  }
+}
+
+function isMissingEventMetaColumnError(message: string) {
+  return (
+    message.includes("coordinator_contact_id") ||
+    message.includes("audience") ||
+    message.includes("event_tags") ||
+    message.includes("estimated_attendance") ||
+    message.includes("internal_notes") ||
+    message.includes("schema cache")
+  )
+}
+
+export async function updateEventWorkspaceMeta(input: {
+  eventId: string
+  coordinatorContactId?: string | null
+  audience?: string[]
+  eventTags?: string[]
+  estimatedAttendance?: number | null
+  internalNotes?: string | null
+}): Promise<InternalEventCatalogActionResult> {
+  try {
+    const canManage = await hasAnyPermission(
+      PERMISSIONS.EVENTS_MANAGE,
+      PERMISSIONS.PROGRAMS_MANAGE
+    )
+    if (!canManage) {
+      return { success: false, error: "You do not have permission to update events." }
+    }
+
+    const supabase = await createClient()
+    const organizationId = await getSelectedOrganizationId()
+    if (!organizationId) {
+      return { success: false, error: "No organization selected" }
+    }
+
+    const existingEvent = await getInternalEventRecordById(input.eventId)
+    if (!existingEvent) {
+      return { success: false, error: "Event not found." }
+    }
+
+    const audience = Array.isArray(input.audience)
+      ? input.audience
+          .map((value) => value.trim())
+          .filter(Boolean)
+      : []
+    const eventTags = Array.isArray(input.eventTags)
+      ? input.eventTags
+          .map((value) => value.trim())
+          .filter(Boolean)
+      : []
+
+    let estimatedAttendance: number | null = null
+    if (input.estimatedAttendance != null) {
+      if (
+        !Number.isFinite(input.estimatedAttendance) ||
+        input.estimatedAttendance < 0
+      ) {
+        return {
+          success: false,
+          error: "Estimated attendance must be a non-negative number.",
+        }
+      }
+      estimatedAttendance = Math.floor(input.estimatedAttendance)
+    }
+
+    const coordinatorContactId =
+      typeof input.coordinatorContactId === "string" &&
+      input.coordinatorContactId.trim()
+        ? input.coordinatorContactId.trim()
+        : null
+
+    const { error } = await supabase
+      .from("internal_events")
+      .update({
+        coordinator_contact_id: coordinatorContactId,
+        audience,
+        event_tags: eventTags,
+        estimated_attendance: estimatedAttendance,
+        internal_notes:
+          typeof input.internalNotes === "string"
+            ? input.internalNotes.trim() || null
+            : null,
+      })
+      .eq("id", input.eventId)
+      .eq("organization_id", organizationId)
+
+    if (error) {
+      console.error(error)
+      const message = error.message || ""
+      if (isMissingEventMetaColumnError(message)) {
+        return {
+          success: false,
+          error:
+            "Event metadata columns are missing. Run scripts/252_event_workspace_redesign.sql in Supabase, then try again.",
+        }
+      }
+      return { success: false, error: "Failed to update event metadata." }
+    }
+
+    revalidateInternalEventPaths(input.eventId)
+    revalidatePath(`/event-management/${input.eventId}`)
+    return { success: true, eventId: input.eventId }
+  } catch (error) {
+    console.error(error)
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to update event metadata.",
+    }
+  }
+}
+
+export async function updateEventLinkedCampaign(input: {
+  eventId: string
+  linkedCampaignId: string | null
+}): Promise<InternalEventCatalogActionResult> {
+  try {
+    const canManage = await hasAnyPermission(
+      PERMISSIONS.EVENTS_MANAGE,
+      PERMISSIONS.PROGRAMS_MANAGE
+    )
+    if (!canManage) {
+      return { success: false, error: "You do not have permission to update events." }
+    }
+
+    const supabase = await createClient()
+    const organizationId = await getSelectedOrganizationId()
+    if (!organizationId) {
+      return { success: false, error: "No organization selected" }
+    }
+
+    const existingEvent = await getInternalEventRecordById(input.eventId)
+    if (!existingEvent) {
+      return { success: false, error: "Event not found." }
+    }
+
+    const linkedCampaignId =
+      typeof input.linkedCampaignId === "string" && input.linkedCampaignId.trim()
+        ? input.linkedCampaignId.trim()
+        : null
+
+    if (linkedCampaignId) {
+      const { data: campaign, error: campaignError } = await supabase
+        .from("campaigns")
+        .select("id")
+        .eq("organization_id", organizationId)
+        .eq("id", linkedCampaignId)
+        .maybeSingle()
+
+      if (campaignError || !campaign) {
+        return { success: false, error: "Campaign not found." }
+      }
+    }
+
+    const ticketingConfig =
+      (existingEvent.ticketing_config as Record<string, unknown>) || {}
+
+    const { error } = await supabase
+      .from("internal_events")
+      .update({
+        ticketing_config: {
+          ...ticketingConfig,
+          linkedCampaignId,
+        },
+      })
+      .eq("id", input.eventId)
+      .eq("organization_id", organizationId)
+
+    if (error) {
+      return { success: false, error: error.message || "Failed to link campaign." }
+    }
+
+    revalidateInternalEventPaths(input.eventId)
+    revalidatePath(`/event-management/${input.eventId}`)
+    return { success: true, eventId: input.eventId }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to link campaign.",
     }
   }
 }
@@ -1490,6 +1889,120 @@ export async function updateInternalEventCommunityCalendar(input: {
         error instanceof Error
           ? error.message
           : "Failed to update community calendar visibility.",
+    }
+  }
+}
+
+export async function updateInternalEventDescription(input: {
+  eventId: string
+  description: string | null
+}): Promise<InternalEventCatalogActionResult> {
+  try {
+    const canManage = await hasAnyPermission(
+      PERMISSIONS.EVENTS_MANAGE,
+      PERMISSIONS.PROGRAMS_MANAGE
+    )
+    if (!canManage) {
+      return { success: false, error: "You do not have permission to update events." }
+    }
+
+    const supabase = await createClient()
+    const organizationId = await getSelectedOrganizationId()
+    if (!organizationId) {
+      return { success: false, error: "No organization selected" }
+    }
+
+    const { error } = await supabase
+      .from("internal_events")
+      .update({
+        description: input.description?.trim() || null,
+      })
+      .eq("id", input.eventId)
+      .eq("organization_id", organizationId)
+
+    if (error) {
+      console.error(error)
+      return { success: false, error: "Failed to update event description." }
+    }
+
+    revalidateInternalEventPaths(input.eventId)
+    revalidatePath(`/event-management/${input.eventId}`)
+    return { success: true, eventId: input.eventId }
+  } catch (error) {
+    console.error(error)
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to update event description.",
+    }
+  }
+}
+
+function clampFocalPercent(value: number) {
+  if (!Number.isFinite(value)) return 50
+  return Math.min(100, Math.max(0, Math.round(value * 10) / 10))
+}
+
+export async function updateInternalEventFlyerFocal(input: {
+  eventId: string
+  focalX: number
+  focalY: number
+}): Promise<InternalEventCatalogActionResult> {
+  try {
+    const canManage = await hasAnyPermission(
+      PERMISSIONS.EVENTS_MANAGE,
+      PERMISSIONS.PROGRAMS_MANAGE
+    )
+    if (!canManage) {
+      return { success: false, error: "You do not have permission to update events." }
+    }
+
+    const supabase = await createClient()
+    const organizationId = await getSelectedOrganizationId()
+    if (!organizationId) {
+      return { success: false, error: "No organization selected" }
+    }
+
+    const focalX = clampFocalPercent(input.focalX)
+    const focalY = clampFocalPercent(input.focalY)
+
+    const { error } = await supabase
+      .from("internal_events")
+      .update({
+        flyer_focal_x: focalX,
+        flyer_focal_y: focalY,
+      })
+      .eq("id", input.eventId)
+      .eq("organization_id", organizationId)
+
+    if (error) {
+      console.error(error)
+      const message = error.message || ""
+      if (
+        message.includes("flyer_focal") ||
+        message.includes("schema cache")
+      ) {
+        return {
+          success: false,
+          error:
+            "Flyer crop columns are missing. Run scripts/249_internal_event_flyer_focal.sql in Supabase, then try again.",
+        }
+      }
+      return { success: false, error: "Failed to update flyer crop." }
+    }
+
+    revalidateInternalEventPaths(input.eventId)
+    revalidatePath(`/event-management/${input.eventId}`)
+    revalidatePath(COMMUNITY_CALENDAR_PATH)
+    return { success: true, eventId: input.eventId }
+  } catch (error) {
+    console.error(error)
+    return {
+      success: false,
+      error:
+        error instanceof Error ? error.message : "Failed to update flyer crop.",
     }
   }
 }

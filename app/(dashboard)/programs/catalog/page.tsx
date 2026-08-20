@@ -1,7 +1,10 @@
 import { Header } from "@/components/layout/header"
+import { CopyPublicCatalogLinkButton } from "@/components/programs/copy-public-catalog-link-button"
 import { OfferingCatalogView } from "@/components/programs/offering-catalog-view"
 import { ProgramCatalogFilters } from "@/components/programs/program-catalog-filters"
 import { getDepartments } from "@/lib/departments/department-queries"
+import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
+import { getServiceRoleClient } from "@/lib/platform/require-platform-admin"
 import { getActiveOfferingsForCatalog } from "@/lib/programs/offering-catalog-queries"
 import {
   buildProgramCatalogHref,
@@ -9,6 +12,7 @@ import {
 } from "@/lib/programs/program-catalog-helpers"
 import { PROGRAM_LABEL_PLURAL } from "@/lib/programs/program-display-labels"
 import { programOfferingManageHref } from "@/lib/programs/program-offering-paths"
+import { buildPublicProgramCatalogUrl } from "@/lib/programs/public-offering-catalog-queries"
 
 function getValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value
@@ -28,6 +32,20 @@ export default async function ProgramsPage({
     audience: getValue(resolvedSearchParams?.audience) || "all",
     age: getValue(resolvedSearchParams?.age) || "",
     page: getValue(resolvedSearchParams?.page) || "1",
+  }
+
+  const organizationId = await getSelectedOrganizationId()
+  let publicCatalogUrl: string | null = null
+  if (organizationId) {
+    const admin = getServiceRoleClient()
+    const { data } = await admin
+      .from("organizations")
+      .select("slug")
+      .eq("id", organizationId)
+      .maybeSingle()
+    if (data?.slug) {
+      publicCatalogUrl = buildPublicProgramCatalogUrl(data.slug as string)
+    }
   }
 
   const [offerings, departments] = await Promise.all([
@@ -60,7 +78,21 @@ export default async function ProgramsPage({
     <>
       <Header title="Program Catalog" />
 
-      <div className="p-6">
+      <div className="space-y-4 p-6">
+        {publicCatalogUrl ? (
+          <div className="flex flex-col gap-2 rounded-lg border bg-muted/30 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-sm font-medium">Public catalog link</p>
+              <p className="truncate text-xs text-muted-foreground">
+                Share with families (no login required to browse). Only programs marked{" "}
+                <span className="font-medium">public</span> appear.{" "}
+                <span className="break-all">{publicCatalogUrl}</span>
+              </p>
+            </div>
+            <CopyPublicCatalogLinkButton url={publicCatalogUrl} />
+          </div>
+        ) : null}
+
         <OfferingCatalogView
           offerings={pageOfferings}
           page={page}

@@ -67,8 +67,9 @@ export function TicketingSettingsClient() {
       <div>
         <h2 className="text-lg font-semibold tracking-tight">Ticketing settings</h2>
         <p className="text-sm text-muted-foreground">
-          Organization defaults for checkout, promo codes, and check-in access. Customize
-          checkout and event promos inside each event&apos;s Ticketing tab.
+          Organization defaults for buyer checkout fields, promo codes, and check-in access.
+          Per-ticket attendee questions (e.g. kids age / allergies) are configured on each
+          event&apos;s Ticketing tab.
         </p>
       </div>
 

@@ -124,6 +124,14 @@ export function TicketOrderDetailPanel({
                   {formatTicketPrice(order.totalCents, order.currency)}
                 </span>
               </div>
+              {order.refundedAmountCents > 0 ? (
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-muted-foreground">Refunded</span>
+                  <span className="font-medium">
+                    {formatTicketPrice(order.refundedAmountCents, order.currency)}
+                  </span>
+                </div>
+              ) : null}
               <div className="flex items-center justify-between gap-4">
                 <span className="text-muted-foreground">Order date</span>
                 <span>{new Date(order.createdAt).toLocaleString()}</span>

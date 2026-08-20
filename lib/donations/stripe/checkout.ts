@@ -24,6 +24,7 @@ import {
 } from "@/lib/stripe/stripe-connect-queries"
 import { syncOrganizationStripeConnectFromAccount } from "@/lib/stripe/stripe-connect-sync"
 import { getAppBaseUrl, getStripeServerClient } from "@/lib/stripe/stripe-server"
+import { completeTicketOrderFromStripeCheckout, completeTicketOrderRefundFromStripeCharge } from "@/lib/tickets/ticket-stripe"
 
 export async function createOneTimeDonationCheckout(
   supabase: SupabaseClient,
@@ -190,21 +191,35 @@ export async function processStripeDonationWebhookEvent(
   try {
     switch (event.type) {
       case "checkout.session.completed": {
-        const result = await handleCheckoutSessionCompleted(
-          supabase,
-          event.data.object as Stripe.Checkout.Session
-        )
+        const session = event.data.object as Stripe.Checkout.Session
+        if (session.metadata?.manaratee_module === "ticketing") {
+          const result = await completeTicketOrderFromStripeCheckout(supabase, session)
+          return { ok: true as const, duplicate: false as const, result }
+        }
+        const result = await handleCheckoutSessionCompleted(supabase, session)
         return { ok: true as const, duplicate: false as const, result }
       }
       case "payment_intent.succeeded": {
-        const result = await handlePaymentIntentSucceeded(
-          supabase,
-          event.data.object as Stripe.PaymentIntent
-        )
+        const paymentIntent = event.data.object as Stripe.PaymentIntent
+        if (paymentIntent.metadata?.manaratee_module === "ticketing") {
+          return {
+            ok: true as const,
+            duplicate: false as const,
+            result: { handled: true, skipped: "ticketing" },
+          }
+        }
+        const result = await handlePaymentIntentSucceeded(supabase, paymentIntent)
         return { ok: true as const, duplicate: false as const, result }
       }
       case "payment_intent.payment_failed": {
         const paymentIntent = event.data.object as Stripe.PaymentIntent
+        if (paymentIntent.metadata?.manaratee_module === "ticketing") {
+          return {
+            ok: true as const,
+            duplicate: false as const,
+            result: { handled: true, skipped: "ticketing" },
+          }
+        }
         const manarateeCheckoutId = paymentIntent.metadata?.manaratee_checkout_id
         const checkoutSessionId = await markCheckoutSessionStatus(supabase, {
           manarateeCheckoutId,
@@ -219,6 +234,13 @@ export async function processStripeDonationWebhookEvent(
       case "checkout.session.expired": {
         const session = event.data.object as Stripe.Checkout.Session
         const metadata = session.metadata ?? {}
+        if (metadata.manaratee_module === "ticketing") {
+          return {
+            ok: true as const,
+            duplicate: false as const,
+            result: { handled: true, skipped: "ticketing" },
+          }
+        }
         if (metadata.checkout_type === "recurring_setup") {
           const checkoutSessionId = await handleRecurringCheckoutExpiredOrFailed(supabase, {
             manarateeCheckoutId: metadata.manaratee_checkout_id,
@@ -272,10 +294,12 @@ export async function processStripeDonationWebhookEvent(
         return { ok: true as const, duplicate: false as const, result }
       }
       case "charge.refunded": {
-        const result = await syncPaymentRefundFromStripeCharge(
-          supabase,
-          event.data.object as Stripe.Charge
-        )
+        const charge = event.data.object as Stripe.Charge
+        const ticketResult = await completeTicketOrderRefundFromStripeCharge(supabase, charge)
+        if (ticketResult.handled) {
+          return { ok: true as const, duplicate: false as const, result: ticketResult }
+        }
+        const result = await syncPaymentRefundFromStripeCharge(supabase, charge)
         return { ok: true as const, duplicate: false as const, result }
       }
       case "account.updated": {

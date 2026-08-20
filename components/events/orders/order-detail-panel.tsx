@@ -79,6 +79,14 @@ export function OrderDetailPanel({ order, open, onOpenChange }: OrderDetailPanel
                   {formatTicketPrice(order.totalCents, order.currency)}
                 </span>
               </div>
+              {order.refundedAmountCents > 0 ? (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Refunded</span>
+                  <span className="text-sm font-medium text-foreground">
+                    {formatTicketPrice(order.refundedAmountCents, order.currency)}
+                  </span>
+                </div>
+              ) : null}
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Status</span>
                 <Badge variant="outline">{ticketOrderStatusLabel(order.status)}</Badge>
@@ -115,7 +123,7 @@ export function OrderDetailPanel({ order, open, onOpenChange }: OrderDetailPanel
           <Separator />
 
           <div className="py-4 text-sm text-muted-foreground">
-            Refunds and manual order edits will be available in a future update.
+            Staff can issue full or partial refunds from the event Attendees tab.
           </div>
         </div>
 

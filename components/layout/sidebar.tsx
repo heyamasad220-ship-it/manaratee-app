@@ -407,8 +407,8 @@ function buildProgramsAndEventsChildren(availableSlugs: Set<string>): SubItem[] 
 
   const items: SubItem[] = []
 
-  // Drawer order: Departments, Programs, Events, Ticketing, Financial Assistance,
-  // Workforce, Reports, Settings.
+  // Drawer order: Departments, Program Catalog, Event Management (Events +
+  // Master Calendar), Ticketing, Financial Assistance, Workforce, Reports, Settings.
   if (hasWorkforce) {
     items.push({
       label: "Departments",
@@ -429,10 +429,33 @@ function buildProgramsAndEventsChildren(availableSlugs: Set<string>): SubItem[] 
 
   if (availableSlugs.has("event-management")) {
     items.push({
-      label: "Events",
+      label: "Event Management",
       href: "/event-management",
       matchPrefix: "/event-management",
+      excludeMatchPrefixes: [
+        "/event-management/ticketing",
+        "/event-management/settings",
+      ],
       permissionKey: "events.view",
+      children: [
+        {
+          label: "Events",
+          href: "/event-management",
+          matchPrefix: "/event-management",
+          excludeMatchPrefixes: [
+            "/event-management/calendar",
+            "/event-management/ticketing",
+            "/event-management/settings",
+          ],
+          permissionKey: "events.view",
+        },
+        {
+          label: "Master Calendar",
+          href: "/event-management/calendar",
+          matchPrefix: "/event-management/calendar",
+          permissionKey: "events.view",
+        },
+      ],
     })
     items.push({
       label: "Ticketing",

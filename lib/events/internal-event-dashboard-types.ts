@@ -1,9 +1,13 @@
 import type { InternalEventStatus } from "./internal-event-status"
 
-export type DashboardTimePeriod = "today" | "this-week" | "this-month" | "this-year"
+export type DashboardTimePeriod =
+  | "today"
+  | "this-week"
+  | "this-month"
+  | "all"
+  | "past"
 
 export interface EventManagementDashboardKpis {
-  draftCount: number
   scheduledCount: number
   childcareRequired: number
   volunteersRequired: number
@@ -21,15 +25,6 @@ export interface DashboardEventRow {
   href: string
 }
 
-export interface DashboardScheduleRow {
-  id: string
-  name: string
-  timeLabel: string
-  locationLabel: string | null
-  status: InternalEventStatus
-  href: string
-}
-
 export interface DashboardAttentionItem {
   id: string
   title: string
@@ -42,7 +37,5 @@ export interface DashboardAttentionItem {
 
 export interface EventManagementDashboardData {
   kpis: EventManagementDashboardKpis
-  recentEvents: DashboardEventRow[]
-  todaysSchedule: DashboardScheduleRow[]
   attentionItems: DashboardAttentionItem[]
 }

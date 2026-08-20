@@ -1,7 +1,4 @@
-export type CommunityCalendarVisibility =
-  | "private"
-  | "community_visible"
-  | "published"
+export type CommunityCalendarVisibility = "private" | "published"
 
 export const COMMUNITY_CALENDAR_VISIBILITY_OPTIONS: {
   value: CommunityCalendarVisibility
@@ -14,14 +11,9 @@ export const COMMUNITY_CALENDAR_VISIBILITY_OPTIONS: {
     description: "Staff only — not shown on the community calendar.",
   },
   {
-    value: "community_visible",
-    label: "Community Visible",
-    description: "Visible to organization members on the community calendar.",
-  },
-  {
     value: "published",
     label: "Public",
-    description: "Publicly listed on the community calendar.",
+    description: "Listed on the community calendar (staff and public page).",
   },
 ]
 
@@ -29,7 +21,8 @@ export const CALENDAR_VISIBILITY_LABELS: Record<string, string> = {
   private: "Private",
   not_published: "Private",
   ready_to_publish: "Private",
-  community_visible: "Community Visible",
+  /** Legacy middle tier — treated as Public in the UI. */
+  community_visible: "Public",
   published: "Public",
 }
 
@@ -40,17 +33,15 @@ export function calendarStatusFromVisibility(
   if (visibility === "private") {
     return "not_published"
   }
-  return visibility
+  return "published"
 }
 
 /** Map stored status back to UI visibility. */
 export function visibilityFromCalendarStatus(
   status: string | null | undefined
 ): CommunityCalendarVisibility {
-  if (status === "community_visible") {
-    return "community_visible"
-  }
-  if (status === "published") {
+  // Legacy `community_visible` maps to Public so existing listings stay editable as Public.
+  if (status === "published" || status === "community_visible") {
     return "published"
   }
   return "private"

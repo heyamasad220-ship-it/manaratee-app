@@ -15,6 +15,7 @@ import {
   LogOut,
   Receipt,
   Store,
+  Ticket,
   User,
 } from "lucide-react"
 
@@ -46,6 +47,7 @@ type CustomerNavProps = {
 
 const memberNavIcons = {
   "/customer/dashboard": Home,
+  "/customer/tickets": Ticket,
   "/customer/rentals": CalendarDays,
   "/customer/donation": Gift,
   "/customer/transactions": Receipt,

@@ -32,6 +32,23 @@ export async function requireCustomerPortalModule(moduleSlug: string) {
   return context
 }
 
+export async function requireCustomerPortalAnyModule(moduleSlugs: string[]) {
+  const context = await requireCustomerPortalPageContext()
+  const enabledSlugs = await loadCustomerPortalEnabledModuleSlugs(
+    context.organizationId
+  )
+
+  if (
+    !moduleSlugs.some((slug) =>
+      isCustomerPortalModuleEnabled(enabledSlugs, slug)
+    )
+  ) {
+    redirect("/customer/dashboard")
+  }
+
+  return context
+}
+
 export async function guardCustomerPortalPath(pathname: string) {
   const requiredModule = resolveRequiredModuleForCustomerPath(pathname)
   if (!requiredModule) return null

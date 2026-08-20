@@ -10,8 +10,50 @@ const EVENT_SELECT = `
   *,
   departments:department_id ( id, name, color ),
   event_types:event_type_id ( id, name ),
+  venues:venue_id ( id, name ),
+  internal_event_venues ( venue_id, venues:venue_id ( id, name ) )
+`
+
+const EVENT_SELECT_FALLBACK = `
+  *,
+  departments:department_id ( id, name, color ),
+  event_types:event_type_id ( id, name ),
   venues:venue_id ( id, name )
 `
+
+export function mapInternalEventWithVenues(
+  row: Record<string, unknown> | InternalEventWithRelations
+): InternalEventWithRelations {
+  const event = row as InternalEventWithRelations
+  const junction = Array.isArray(event.internal_event_venues)
+    ? event.internal_event_venues
+    : []
+  const venueNames = junction
+    .map((item) => item.venues?.name?.trim() || "")
+    .filter(Boolean)
+  if (venueNames.length === 0 && event.venues?.name) {
+    venueNames.push(event.venues.name)
+  }
+
+  return {
+    ...event,
+    venueNames,
+    venue_ids:
+      junction.length > 0
+        ? junction.map((item) => item.venue_id).filter(Boolean)
+        : event.venue_id
+          ? [event.venue_id]
+          : [],
+  }
+}
+
+function isMissingVenueJunctionError(error: { message?: string; code?: string }) {
+  return (
+    error.message?.includes("internal_event_venues") ||
+    error.code === "42703" ||
+    error.code === "PGRST200"
+  )
+}
 
 export async function getInternalEventVenueIds(eventId: string): Promise<string[]> {
   const supabase = await createClient()
@@ -44,19 +86,39 @@ export async function getInternalEvents() {
     return []
   }
 
-  const { data, error } = await supabase
+  const primary = await supabase
     .from("internal_events")
     .select(EVENT_SELECT)
     .eq("organization_id", organizationId)
     .order("start_at", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false })
 
-  if (error) {
-    console.error(error)
+  if (primary.error && isMissingVenueJunctionError(primary.error)) {
+    const fallback = await supabase
+      .from("internal_events")
+      .select(EVENT_SELECT_FALLBACK)
+      .eq("organization_id", organizationId)
+      .order("start_at", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false })
+
+    if (fallback.error) {
+      console.error(fallback.error)
+      throw new Error("Failed to load events")
+    }
+
+    return (fallback.data || []).map((row) =>
+      mapInternalEventWithVenues(row as Record<string, unknown>)
+    )
+  }
+
+  if (primary.error) {
+    console.error(primary.error)
     throw new Error("Failed to load events")
   }
 
-  return (data || []) as InternalEventWithRelations[]
+  return (primary.data || []).map((row) =>
+    mapInternalEventWithVenues(row as Record<string, unknown>)
+  )
 }
 
 export async function getInternalEventById(id: string) {

@@ -1,5 +1,9 @@
 import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
+import {
+  ticketOrderNetRevenueCents,
+  ticketOrderRefundedCents,
+} from "@/lib/tickets/ticket-refund-math"
 
 export type TicketingReportRangeKey = "7d" | "30d" | "90d" | "1y"
 
@@ -58,13 +62,14 @@ export type TicketingReportsData = {
 }
 
 const REVENUE_STATUSES = ["completed", "partially_refunded"] as const
-const REFUND_STATUSES = ["refunded"] as const
+const COLLECTED_STATUSES = ["completed", "partially_refunded", "refunded"] as const
 const TICKET_STATUSES = ["valid", "checked_in"] as const
 
 type OrderRow = {
   id: string
   status: string
   total_cents: number | null
+  refunded_amount_cents?: number | null
   currency: string | null
   purchaser_name: string | null
   purchaser_email: string
@@ -171,6 +176,7 @@ async function loadOrdersInWindow(
       id,
       status,
       total_cents,
+      refunded_amount_cents,
       currency,
       purchaser_name,
       purchaser_email,
@@ -190,6 +196,37 @@ async function loadOrdersInWindow(
 
   if (error) {
     if (error.code === "42P01") return []
+    if (error.code === "42703") {
+      const fallback = await supabase
+        .from("ticket_orders")
+        .select(
+          `
+          id,
+          status,
+          total_cents,
+          currency,
+          purchaser_name,
+          purchaser_email,
+          contact_id,
+          created_at,
+          internal_event_id,
+          internal_events:internal_event_id (
+            name,
+            start_at
+          )
+        `
+        )
+        .eq("organization_id", organizationId)
+        .gte("created_at", start.toISOString())
+        .lte("created_at", end.toISOString())
+        .order("created_at", { ascending: true })
+      if (fallback.error) {
+        if (fallback.error.code === "42P01") return []
+        console.error(fallback.error)
+        throw new Error("Failed to load ticket orders for reports")
+      }
+      return (fallback.data || []) as OrderRow[]
+    }
     console.error(error)
     throw new Error("Failed to load ticket orders for reports")
   }
@@ -266,6 +303,22 @@ async function loadEventCapacity(
   return capacityByEvent
 }
 
+function orderRefundInput(order: OrderRow) {
+  return {
+    status: order.status,
+    totalCents: Number(order.total_cents || 0),
+    refundedAmountCents: Number(order.refunded_amount_cents || 0),
+  }
+}
+
+function isCollectedStatus(status: string) {
+  return COLLECTED_STATUSES.includes(status as (typeof COLLECTED_STATUSES)[number])
+}
+
+function isRevenueStatus(status: string) {
+  return REVENUE_STATUSES.includes(status as (typeof REVENUE_STATUSES)[number])
+}
+
 function summarizeWindow(
   orders: OrderRow[],
   ticketCounts: Map<string, number>
@@ -278,11 +331,15 @@ function summarizeWindow(
   let currency = "USD"
 
   for (const order of orders) {
-    const cents = Number(order.total_cents || 0)
+    const money = orderRefundInput(order)
     currency = order.currency || currency
 
-    if (REVENUE_STATUSES.includes(order.status as (typeof REVENUE_STATUSES)[number])) {
-      grossSalesCents += cents
+    if (isCollectedStatus(order.status)) {
+      grossSalesCents += money.totalCents
+      refundsCents += ticketOrderRefundedCents(money)
+    }
+
+    if (isRevenueStatus(order.status)) {
       revenueOrders += 1
       ticketsSold += ticketCounts.get(order.id) || 0
       const customerKey =
@@ -291,15 +348,11 @@ function summarizeWindow(
         order.id
       customers.add(customerKey)
     }
-
-    if (REFUND_STATUSES.includes(order.status as (typeof REFUND_STATUSES)[number])) {
-      refundsCents += cents
-    }
   }
 
   const netSalesCents = Math.max(grossSalesCents - refundsCents, 0)
   const avgOrderValueCents =
-    revenueOrders > 0 ? Math.round(grossSalesCents / revenueOrders) : 0
+    revenueOrders > 0 ? Math.round(netSalesCents / revenueOrders) : 0
 
   return {
     grossSalesCents,
@@ -347,14 +400,14 @@ function buildSalesByDay(
     const bucket = byDay.get(key)
     if (!bucket) continue
 
-    const cents = Number(order.total_cents || 0)
-    if (REVENUE_STATUSES.includes(order.status as (typeof REVENUE_STATUSES)[number])) {
+    const money = orderRefundInput(order)
+    if (isRevenueStatus(order.status)) {
       bucket.orders += 1
       bucket.tickets += ticketCounts.get(order.id) || 0
-      bucket.grossSalesCents += cents
     }
-    if (REFUND_STATUSES.includes(order.status as (typeof REFUND_STATUSES)[number])) {
-      bucket.refundsCents += cents
+    if (isCollectedStatus(order.status)) {
+      bucket.grossSalesCents += money.totalCents
+      bucket.refundsCents += ticketOrderRefundedCents(money)
     }
   }
 
@@ -388,7 +441,7 @@ function buildEventRows(
   >()
 
   for (const order of orders) {
-    if (!REVENUE_STATUSES.includes(order.status as (typeof REVENUE_STATUSES)[number])) {
+    if (!isRevenueStatus(order.status)) {
       continue
     }
 
@@ -402,7 +455,7 @@ function buildEventRows(
     }
 
     current.ticketsSold += ticketCounts.get(order.id) || 0
-    current.revenueCents += Number(order.total_cents || 0)
+    current.revenueCents += ticketOrderNetRevenueCents(orderRefundInput(order))
     current.currency = order.currency || current.currency
     byEvent.set(order.internal_event_id, current)
   }
@@ -446,7 +499,7 @@ function buildCustomerRows(
   >()
 
   for (const order of orders) {
-    if (!REVENUE_STATUSES.includes(order.status as (typeof REVENUE_STATUSES)[number])) {
+    if (!isRevenueStatus(order.status)) {
       continue
     }
 
@@ -463,7 +516,7 @@ function buildCustomerRows(
 
     current.orders += 1
     current.tickets += ticketCounts.get(order.id) || 0
-    current.totalSpentCents += Number(order.total_cents || 0)
+    current.totalSpentCents += ticketOrderNetRevenueCents(orderRefundInput(order))
     current.currency = order.currency || current.currency
     if (order.purchaser_name?.trim()) {
       current.name = order.purchaser_name.trim()

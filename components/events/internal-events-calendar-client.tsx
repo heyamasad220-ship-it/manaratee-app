@@ -27,6 +27,8 @@ import { eventManagementMasterCalendarHref } from "@/lib/events/event-management
 import { getInternalEventStatusLabel } from "@/lib/events/internal-event-status"
 import {
   formatInternalEventLocation,
+  getInternalEventMeetingLink,
+  INTERNAL_EVENT_LOCATION_TYPE_LABELS,
   INTERNAL_EVENT_LOCATION_TYPES,
   inferInternalEventLocationType,
 } from "@/lib/events/internal-event-location"
@@ -45,6 +47,8 @@ type DepartmentOption = {
 
 type InternalEventsCalendarClientProps = {
   events: InternalEventWithRelations[]
+  /** Upcoming list (may span beyond the visible month). */
+  upcomingEvents?: InternalEventWithRelations[]
   departments: DepartmentOption[]
   initialMonth: string
   initialDepartmentId: string | null
@@ -113,8 +117,34 @@ function locationTone(event: InternalEventWithRelations) {
   return "border-border bg-muted/40 text-foreground"
 }
 
+function formatEventDate(value: string | null) {
+  if (!value) return "Date TBD"
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return "Date TBD"
+  return date.toLocaleDateString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  })
+}
+
+function formatEventTimeRange(startAt: string | null, endAt: string | null) {
+  const start = formatTime(startAt)
+  const end = formatTime(endAt)
+  if (start && end) return `${start} – ${end}`
+  return start || end || "Time TBD"
+}
+
+function locationTypeBadgeLabel(event: InternalEventWithRelations) {
+  const type = inferInternalEventLocationType(event)
+  if (!type) return "Location"
+  return INTERNAL_EVENT_LOCATION_TYPE_LABELS[type]
+}
+
 export function InternalEventsCalendarClient({
   events,
+  upcomingEvents,
   departments,
   initialMonth,
   initialDepartmentId,
@@ -169,7 +199,20 @@ export function InternalEventsCalendarClient({
     return cells
   }, [monthAnchor])
 
-  const selectedEvents = eventsByDay.get(selectedDateKey) || []
+  const upcomingList = useMemo(() => {
+    const source = upcomingEvents ?? events
+    const now = Date.now()
+    return [...source]
+      .filter((event) => {
+        if (!event.start_at) return false
+        return new Date(event.start_at).getTime() >= now - 60_000
+      })
+      .sort((a, b) => {
+        const aTime = a.start_at ? new Date(a.start_at).getTime() : 0
+        const bTime = b.start_at ? new Date(b.start_at).getTime() : 0
+        return aTime - bTime
+      })
+  }, [events, upcomingEvents])
 
   function pushQuery(next: { month?: string; department?: string | null }) {
     const department =
@@ -208,11 +251,6 @@ export function InternalEventsCalendarClient({
     year: "numeric",
   })
 
-  const selectedLabel = new Date(`${selectedDateKey}T12:00:00`).toLocaleDateString(
-    undefined,
-    { weekday: "long", month: "long", day: "numeric", year: "numeric" }
-  )
-
   return (
     <>
       {hideHeader ? null : <Header title="Events" />}
@@ -235,7 +273,7 @@ export function InternalEventsCalendarClient({
             </Button>
             {canBookSpace ? (
               <Button size="sm" asChild>
-                <Link href={buildBookSpaceHref(selectedDateKey)}>{CREATE_EVENT_CTA_LABEL}</Link>
+                <Link href={buildBookSpaceHref()}>{CREATE_EVENT_CTA_LABEL}</Link>
               </Button>
             ) : null}
           </div>
@@ -363,52 +401,94 @@ export function InternalEventsCalendarClient({
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 text-base">
                 <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                {selectedLabel}
+                Upcoming events
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {selectedEvents.length === 0 ? (
+              {upcomingList.length === 0 ? (
                 <div className="space-y-3 py-6 text-center">
-                  <p className="text-sm text-muted-foreground">No events on this day.</p>
+                  <p className="text-sm text-muted-foreground">No upcoming events.</p>
                   {canBookSpace ? (
                     <Button size="sm" asChild>
-                      <Link href={buildBookSpaceHref(selectedDateKey)}>
-                        {CREATE_EVENT_CTA_LABEL}
-                      </Link>
+                      <Link href={buildBookSpaceHref()}>{CREATE_EVENT_CTA_LABEL}</Link>
                     </Button>
                   ) : null}
                 </div>
               ) : (
-                <ul className="space-y-3">
-                  {selectedEvents.map((event) => {
+                <ul className="max-h-[34rem] space-y-3 overflow-y-auto pr-1">
+                  {upcomingList.map((event) => {
                     const Icon = locationIcon(event)
+                    const locationType = inferInternalEventLocationType(event)
+                    const meetingLink = getInternalEventMeetingLink(event)
+                    const locationDetail = formatInternalEventLocation(event)
+
                     return (
                       <li key={event.id}>
                         <Link
                           href={`/event-management/${event.id}`}
-                          className="block rounded-md border px-3 py-2.5 transition-colors hover:bg-muted/40"
+                          className="block rounded-md border px-3 py-3 transition-colors hover:bg-muted/40"
                         >
                           <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <p className="truncate text-sm font-medium">{event.name}</p>
-                              <p className="mt-0.5 text-xs text-muted-foreground">
-                                {formatTime(event.start_at)}
-                                {event.end_at ? ` – ${formatTime(event.end_at)}` : ""}
-                                {event.departments?.name
-                                  ? ` · ${event.departments.name}`
-                                  : ""}
-                              </p>
-                              <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
-                                <Icon className="h-3.5 w-3.5 shrink-0" />
-                                <span className="truncate">
-                                  {formatInternalEventLocation(event)}
-                                </span>
-                              </p>
-                            </div>
+                            <p className="min-w-0 text-sm font-semibold leading-snug">
+                              {event.name}
+                            </p>
                             <Badge variant="outline" className="shrink-0">
                               {getInternalEventStatusLabel(event.status)}
                             </Badge>
                           </div>
+
+                          <dl className="mt-2 space-y-1.5 text-xs text-muted-foreground">
+                            <div className="flex gap-2">
+                              <dt className="w-16 shrink-0 font-medium text-foreground/70">
+                                Date
+                              </dt>
+                              <dd>{formatEventDate(event.start_at)}</dd>
+                            </div>
+                            <div className="flex gap-2">
+                              <dt className="w-16 shrink-0 font-medium text-foreground/70">
+                                Time
+                              </dt>
+                              <dd>
+                                {formatEventTimeRange(event.start_at, event.end_at)}
+                              </dd>
+                            </div>
+                            <div className="flex gap-2">
+                              <dt className="w-16 shrink-0 font-medium text-foreground/70">
+                                Type
+                              </dt>
+                              <dd className="flex items-center gap-1.5">
+                                <Icon className="h-3.5 w-3.5 shrink-0" />
+                                {locationTypeBadgeLabel(event)}
+                              </dd>
+                            </div>
+                            {locationType === INTERNAL_EVENT_LOCATION_TYPES.online ? (
+                              <div className="flex gap-2">
+                                <dt className="w-16 shrink-0 font-medium text-foreground/70">
+                                  Link
+                                </dt>
+                                <dd className="min-w-0 break-all">
+                                  {meetingLink || "Meeting link not set"}
+                                </dd>
+                              </div>
+                            ) : (
+                              <div className="flex gap-2">
+                                <dt className="w-16 shrink-0 font-medium text-foreground/70">
+                                  {locationType === INTERNAL_EVENT_LOCATION_TYPES.facility
+                                    ? "Space"
+                                    : "Location"}
+                                </dt>
+                                <dd className="min-w-0">{locationDetail}</dd>
+                              </div>
+                            )}
+                            {event.event_types?.name ? (
+                              <div className="flex gap-2">
+                                <dt className="w-16 shrink-0 font-medium text-foreground/70">
+                                  Category
+                                </dt>
+                                <dd>{event.event_types.name}</dd>
+                              </div>
+                            ) : null}
+                          </dl>
                         </Link>
                       </li>
                     )

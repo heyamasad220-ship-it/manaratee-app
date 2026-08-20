@@ -17,6 +17,8 @@ import {
   type CampaignAnalyticsEntry,
   type CampaignRow,
 } from "@/lib/donations/campaign-analytics"
+import { ensureCampaignDonationFund } from "@/lib/donations/ensure-campaign-donation-fund"
+import { createServiceRoleClient } from "@/lib/supabase/service-role"
 import {
   normalizeCampaignOverviewMetricKeys,
   parseCampaignOverviewMetricKeys,
@@ -35,6 +37,46 @@ const CAMPAIGN_SELECT =
 
 const CAMPAIGN_SELECT_LEGACY =
   "id, organization_id, name, code, description, goal_amount, start_date, end_date, status, created_at"
+
+type CampaignWriteInput = {
+  name: string
+  description?: string | null
+  goal_amount?: number | null
+  start_date?: string | null
+  end_date?: string | null
+  status?: string | null
+}
+
+function generateCampaignCode(campaignName: string) {
+  const words = campaignName.trim().split(/\s+/)
+  const codePrefix = words
+    .map((word) => word.charAt(0).toUpperCase())
+    .join("")
+    .replace(/[^A-Z0-9]/g, "")
+  const randomSuffix = Math.random().toString(36).substring(2, 8).toUpperCase()
+  return `${codePrefix || "C"}${randomSuffix}`.slice(0, 24)
+}
+
+function formatCampaignWriteError(
+  error: { message?: string; code?: string; details?: string | null } | null,
+  fallback: string
+) {
+  const parts = [error?.message, error?.details].filter(
+    (part): part is string => Boolean(part && part.trim())
+  )
+  if (parts.length > 0) return parts.join(" — ")
+  if (error?.code) return `${fallback} (${error.code})`
+  return fallback
+}
+
+function revalidateCampaignPaths(campaignId?: string) {
+  revalidatePath("/donations/campaigns")
+  revalidatePath("/donations/settings")
+  revalidatePath("/donations")
+  if (campaignId) {
+    revalidatePath(`/donations/campaigns/${campaignId}`)
+  }
+}
 
 async function fetchCampaignRow(
   supabase: SupabaseClient,
@@ -155,17 +197,7 @@ export async function getCampaignDetailAction(campaignId: string) {
   }
 }
 
-export async function updateCampaignAction(
-  campaignId: string,
-  input: {
-    name: string
-    description?: string | null
-    goal_amount?: number | null
-    start_date?: string | null
-    end_date?: string | null
-    status?: string | null
-  }
-) {
+export async function createCampaignAction(input: CampaignWriteInput) {
   const access = await requireDonationStaffAccess("manage")
   if (!access.ok) return { success: false as const, error: access.error }
 
@@ -173,7 +205,70 @@ export async function updateCampaignAction(
   if (!name) return { success: false as const, error: "Campaign name is required" }
 
   try {
-    const { data: existing, error: existingError } = await access.supabase
+    const writeClient = createServiceRoleClient()
+    const { data: existing, error: existingError } = await writeClient
+      .from("campaigns")
+      .select("id")
+      .eq("organization_id", access.orgId)
+      .ilike("name", name)
+      .maybeSingle()
+
+    if (existingError) {
+      return { success: false as const, error: existingError.message }
+    }
+    if (existing) {
+      return { success: false as const, error: "A campaign with this name already exists" }
+    }
+
+    const { data: campaign, error } = await writeClient
+      .from("campaigns")
+      .insert({
+        organization_id: access.orgId,
+        name,
+        description: input.description?.trim() || null,
+        goal_amount: input.goal_amount ?? null,
+        start_date: input.start_date || null,
+        end_date: input.end_date || null,
+        status: input.status?.toLowerCase() || "draft",
+        code: generateCampaignCode(name),
+      })
+      .select(CAMPAIGN_SELECT)
+      .single()
+
+    if (error || !campaign) {
+      return {
+        success: false as const,
+        error: formatCampaignWriteError(error, "Failed to create campaign"),
+      }
+    }
+
+    const fundResult = await ensureCampaignDonationFund(writeClient, access.orgId, name)
+    revalidateCampaignPaths(campaign.id)
+
+    if (!fundResult.success) {
+      return {
+        success: true as const,
+        campaign: campaign as CampaignRow,
+        fundError: fundResult.error,
+      }
+    }
+
+    return { success: true as const, campaign: campaign as CampaignRow }
+  } catch (error) {
+    return { success: false as const, error: (error as Error).message }
+  }
+}
+
+export async function updateCampaignAction(campaignId: string, input: CampaignWriteInput) {
+  const access = await requireDonationStaffAccess("manage")
+  if (!access.ok) return { success: false as const, error: access.error }
+
+  const name = input.name.trim()
+  if (!name) return { success: false as const, error: "Campaign name is required" }
+
+  try {
+    const writeClient = createServiceRoleClient()
+    const { data: existing, error: existingError } = await writeClient
       .from("campaigns")
       .select("id")
       .eq("organization_id", access.orgId)
@@ -188,7 +283,7 @@ export async function updateCampaignAction(
       return { success: false as const, error: "A campaign with this name already exists" }
     }
 
-    const { data: campaign, error } = await access.supabase
+    const { data: campaign, error } = await writeClient
       .from("campaigns")
       .update({
         name,
@@ -204,14 +299,59 @@ export async function updateCampaignAction(
       .maybeSingle()
 
     if (error || !campaign) {
-      return { success: false as const, error: error?.message || "Failed to update campaign" }
+      return {
+        success: false as const,
+        error: formatCampaignWriteError(error, "Failed to update campaign"),
+      }
     }
 
-    revalidatePath("/donations/campaigns")
-    revalidatePath(`/donations/campaigns/${campaignId}`)
-    revalidatePath("/donations/settings")
+    revalidateCampaignPaths(campaignId)
 
     return { success: true as const, campaign: campaign as CampaignRow }
+  } catch (error) {
+    return { success: false as const, error: (error as Error).message }
+  }
+}
+
+export async function deleteCampaignAction(campaignId: string) {
+  const access = await requireDonationStaffAccess("manage")
+  if (!access.ok) return { success: false as const, error: access.error }
+
+  if (!campaignId.trim()) {
+    return { success: false as const, error: "Campaign is required" }
+  }
+
+  try {
+    const writeClient = createServiceRoleClient()
+    const { data: existing, error: existingError } = await writeClient
+      .from("campaigns")
+      .select("id")
+      .eq("organization_id", access.orgId)
+      .eq("id", campaignId)
+      .maybeSingle()
+
+    if (existingError) {
+      return { success: false as const, error: existingError.message }
+    }
+    if (!existing) {
+      return { success: false as const, error: "Campaign not found" }
+    }
+
+    const { error } = await writeClient
+      .from("campaigns")
+      .delete()
+      .eq("organization_id", access.orgId)
+      .eq("id", campaignId)
+
+    if (error) {
+      return {
+        success: false as const,
+        error: formatCampaignWriteError(error, "Failed to delete campaign"),
+      }
+    }
+
+    revalidateCampaignPaths(campaignId)
+    return { success: true as const }
   } catch (error) {
     return { success: false as const, error: (error as Error).message }
   }
@@ -232,7 +372,8 @@ export async function updateCampaignOverviewMetricsAction(
   }
 
   try {
-    const { data: campaign, error } = await access.supabase
+    const writeClient = createServiceRoleClient()
+    const { data: campaign, error } = await writeClient
       .from("campaigns")
       .update({ overview_metric_keys: normalized })
       .eq("organization_id", access.orgId)
@@ -243,12 +384,11 @@ export async function updateCampaignOverviewMetricsAction(
     if (error || !campaign) {
       return {
         success: false as const,
-        error: error?.message || "Failed to update campaign overview metrics",
+        error: formatCampaignWriteError(error, "Failed to update campaign overview metrics"),
       }
     }
 
-    revalidatePath("/donations/campaigns")
-    revalidatePath(`/donations/campaigns/${campaignId}`)
+    revalidateCampaignPaths(campaignId)
 
     return {
       success: true as const,

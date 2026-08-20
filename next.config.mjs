@@ -1,5 +1,15 @@
+import path from "node:path"
+import { fileURLToPath } from "node:url"
+
+const projectRoot = path.dirname(fileURLToPath(import.meta.url))
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Turbopack sometimes mis-infers the App Router `app/` folder as the project
+  // root and then fails to resolve `next/package.json`. Pin the real repo root.
+  turbopack: {
+    root: projectRoot,
+  },
   serverActions: {
     bodySizeLimit: "4mb",
   },

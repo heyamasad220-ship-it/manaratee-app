@@ -18,6 +18,7 @@ import { PERMISSIONS } from "@/lib/permissions/permission-keys"
 const MODULE_ENABLE_PERMISSION_SEEDS: Record<string, string[]> = {
   "event-management": [
     PERMISSIONS.EVENTS_VIEW,
+    PERMISSIONS.EVENTS_CHECKIN,
     PERMISSIONS.EVENTS_MANAGE,
     PERMISSIONS.TICKETING_VIEW,
     PERMISSIONS.TICKETING_MANAGE,

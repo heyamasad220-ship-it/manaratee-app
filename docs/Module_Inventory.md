@@ -67,6 +67,7 @@ Features:
 * **Quick Create** + program detail inline edit + offering manage (see `docs/programs-staff-setup-ui.md`)
 * Organization filtering
 * Program details
+* **Program Catalog** — staff `/programs/catalog`, customer `/customer/programs`, public `/o/[orgSlug]/programs` (public visibility; join to register)
 * Eligibility rules (ages, grades, gender, capacity groups)
 * Registration model, eligibility, capacity, and fee plans (offering overview + edit dialog Advanced; unified fees + discounts save with dialog Save; run `scripts/200_program_pricing_billing_scope.sql`)
 * Program detail **Reports** — enrollments across offerings (filter + CSV)
@@ -450,8 +451,25 @@ Key file: `components/hr/hr-reports-client.tsx` (`HrOverviewDashboard`)
 
 Status: Working (shared)
 
-* Route: `/community-calendar` (top-level sidebar when Vendor Hub and/or Event Management is enabled)
+* Staff route: `/community-calendar` (top-level sidebar when Vendor Hub and/or Event Management is enabled)
+* Public (no-login): `/o/[orgSlug]/community-calendar` — featured event, event-type circles, All/Today/This weekend, 4-column cards; ticketed → `/o/[orgSlug]/events/[id]`
 * Sources: Vendor Hub bazaars (`vendor_hub_events.calendar_status`) + Event Management (`internal_events.community_calendar_status`; SQL `247`)
+* Public page and staff UI use **Private** / **Public** (`published`); legacy `community_visible` rows still appear on the staff calendar until re-saved as Public
 * Legacy: `/vendor-hub/community-calendar` redirects
 * Publish: bazaar create/edit; Event workspace Overview → Community Calendar card
-* Key files: `lib/community-calendar/*`, `components/community-calendar/community-calendar-client.tsx`
+* Key files: `lib/community-calendar/*`, `public-community-calendar-view.tsx`, `community-calendar-client.tsx`
+
+## Event Management (workspace)
+
+Status: In progress
+
+* Progressive tabs via `workspace_features` + `ticketing_config.attendanceMode` (SQL `252`)
+* Expenses ledger: `event_expenses` / `event-expense-actions.ts`
+* UI: overview dashboard, registration workspace, finance, reports (attendee CSV), feature switches
+* Public registration on `/o/[orgSlug]/events/[eventId]` with sale-window enforcement (`createPublicEventRegistration`)
+* Paid public tickets: Stripe Checkout on org Connect (`ticket-stripe.ts`); same donations webhook `POST /api/webhooks/stripe/donations` when `manaratee_module=ticketing`. Fallback: pay at event + staff **Mark paid**. SQL `255`
+* Staff **Refund** / Ticketing **Cancel/refund** refund Stripe Connect charges (`refundEventTicketOrder`). Full remaining voids tickets; partial keeps seats valid (`partially_refunded`, SQL `258` `refunded_amount_cents`). Dashboard `charge.refunded` is idempotent and applies Stripe’s refunded total.
+* Door staff: `events.checkin` (SQL `257`) — scan/check-in without event manage. Pair with `events.view`.
+* Customer portal **My Tickets** `/customer/tickets` (codes + QR + resume checkout). SQL `256`
+* Youth forms / liability waiver on Opportunities + Youth tab Forms dialog (SQL `259`)
+* Event documents on Settings (`event_documents`, SQL `254`)

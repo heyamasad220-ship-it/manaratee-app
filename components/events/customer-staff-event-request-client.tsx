@@ -37,8 +37,8 @@ export function CustomerStaffEventRequestClient({
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Request an event</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Submit Center, Online, or External Venue events for approval. Your name is recorded
-          as the requester.
+          Center events need facility approval. Online and External Venue events are confirmed when
+          you submit. Your name is recorded as the requester.
         </p>
       </div>
       {!open ? (

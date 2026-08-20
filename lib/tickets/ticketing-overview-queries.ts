@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import type { TicketingSalesStatus } from "./ticket-types"
 import type { TicketedEventOverviewRow } from "./ticketing-overview-types"
+import { ticketOrderNetRevenueCents } from "@/lib/tickets/ticket-refund-math"
 
 function resolveSalesStatus(config: Record<string, unknown> | null | undefined): TicketingSalesStatus {
   const status = config?.salesStatus
@@ -56,11 +57,28 @@ export async function getTicketedEventsOverview(): Promise<TicketedEventOverview
       .in("internal_event_id", eventIds),
     supabase
       .from("ticket_orders")
-      .select("internal_event_id, total_cents, currency, status")
+      .select("internal_event_id, total_cents, refunded_amount_cents, currency, status")
       .eq("organization_id", organizationId)
       .in("internal_event_id", eventIds)
       .in("status", ["completed", "partially_refunded"]),
   ])
+
+  let orderRows: Array<{
+    internal_event_id?: string
+    total_cents?: number | null
+    refunded_amount_cents?: number | null
+    currency?: string | null
+    status?: string | null
+  }> = ordersResult.data || []
+  if (ordersResult.error?.code === "42703") {
+    const fallback = await supabase
+      .from("ticket_orders")
+      .select("internal_event_id, total_cents, currency, status")
+      .eq("organization_id", organizationId)
+      .in("internal_event_id", eventIds)
+      .in("status", ["completed", "partially_refunded"])
+    orderRows = fallback.data || []
+  }
 
   const typesByEvent = new Map<string, { issued: number; capacity: number | null }>()
 
@@ -84,10 +102,16 @@ export async function getTicketedEventsOverview(): Promise<TicketedEventOverview
   }
 
   const revenueByEvent = new Map<string, { cents: number; currency: string }>()
-  for (const row of ordersResult.data || []) {
+  for (const row of orderRows) {
     const eventId = row.internal_event_id as string
     const existing = revenueByEvent.get(eventId) || { cents: 0, currency: "USD" }
-    existing.cents += Number(row.total_cents || 0)
+    existing.cents += ticketOrderNetRevenueCents({
+      status: row.status as string,
+      totalCents: Number(row.total_cents || 0),
+      refundedAmountCents: Number(
+        (row as { refunded_amount_cents?: number }).refunded_amount_cents || 0
+      ),
+    })
     existing.currency = (row.currency as string) || existing.currency
     revenueByEvent.set(eventId, existing)
   }

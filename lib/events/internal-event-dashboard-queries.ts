@@ -4,8 +4,6 @@ import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-orga
 import {
   daysUntil,
   formatEventDate,
-  formatEventTimeRange,
-  isSameLocalDay,
 } from "./internal-event-format"
 import type {
   DashboardTimePeriod,
@@ -14,16 +12,12 @@ import type {
 } from "./internal-event-dashboard-types"
 import type { InternalEventWithRelations } from "./internal-event-types"
 import { INTERNAL_EVENT_STATUSES } from "./internal-event-status"
-import { getPendingInternalEventRequests } from "./internal-event-queries"
+import {
+  getInternalEvents,
+  getPendingInternalEventRequests,
+} from "./internal-event-queries"
 
-const EVENT_SELECT = `
-  *,
-  departments:department_id ( id, name, color ),
-  event_types:event_type_id ( id, name ),
-  venues:venue_id ( id, name )
-`
-
-function getPeriodRange(period: DashboardTimePeriod) {
+function getPeriodRange(period: Exclude<DashboardTimePeriod, "all" | "past">) {
   const now = new Date()
   const start = new Date(now)
   start.setHours(0, 0, 0, 0)
@@ -45,15 +39,9 @@ function getPeriodRange(period: DashboardTimePeriod) {
     return { start, end }
   }
 
-  if (period === "this-month") {
-    start.setDate(1)
-    end.setMonth(start.getMonth() + 1, 0)
-    end.setHours(23, 59, 59, 999)
-    return { start, end }
-  }
-
-  start.setMonth(0, 1)
-  end.setMonth(11, 31)
+  // this-month
+  start.setDate(1)
+  end.setMonth(start.getMonth() + 1, 0)
   end.setHours(23, 59, 59, 999)
   return { start, end }
 }
@@ -78,6 +66,62 @@ function eventOverlapsPeriod(
   return createdAt >= start && createdAt <= end
 }
 
+export function eventHasEnded(
+  event: InternalEventWithRelations,
+  now = new Date()
+) {
+  if (event.end_at) {
+    return new Date(event.end_at) < now
+  }
+  if (event.start_at) {
+    return new Date(event.start_at) < now
+  }
+  return false
+}
+
+function isListableStatus(status: string) {
+  return (
+    status !== INTERNAL_EVENT_STATUSES.cancelled &&
+    status !== INTERNAL_EVENT_STATUSES.declined
+  )
+}
+
+function sortByStartAsc(a: InternalEventWithRelations, b: InternalEventWithRelations) {
+  const aTime = a.start_at ? new Date(a.start_at).getTime() : Number.MAX_SAFE_INTEGER
+  const bTime = b.start_at ? new Date(b.start_at).getTime() : Number.MAX_SAFE_INTEGER
+  return aTime - bTime
+}
+
+function sortByStartDesc(a: InternalEventWithRelations, b: InternalEventWithRelations) {
+  const aTime = a.start_at ? new Date(a.start_at).getTime() : 0
+  const bTime = b.start_at ? new Date(b.start_at).getTime() : 0
+  return bTime - aTime
+}
+
+/** Period-scoped event list for Overview (upcoming, or past when period is past). */
+export function filterEventsForDashboardPeriod(
+  events: InternalEventWithRelations[],
+  period: DashboardTimePeriod,
+  now = new Date()
+): InternalEventWithRelations[] {
+  const active = events.filter((event) => isListableStatus(event.status))
+
+  if (period === "past") {
+    return active.filter((event) => eventHasEnded(event, now)).sort(sortByStartDesc)
+  }
+
+  const upcoming = active.filter((event) => !eventHasEnded(event, now))
+
+  if (period === "all") {
+    return upcoming.sort(sortByStartAsc)
+  }
+
+  const { start, end } = getPeriodRange(period)
+  return upcoming
+    .filter((event) => eventOverlapsPeriod(event, start, end))
+    .sort(sortByStartAsc)
+}
+
 function getActionPriority(days: number): "high" | "medium" | "low" {
   if (days <= 7) return "high"
   if (days <= 21) return "medium"
@@ -97,8 +141,7 @@ function buildAttentionItems(
   pendingRequests: InternalEventWithRelations[],
   period: DashboardTimePeriod
 ): DashboardAttentionItem[] {
-  const { start, end } = getPeriodRange(period)
-  const inPeriod = events.filter((event) => eventOverlapsPeriod(event, start, end))
+  const inPeriod = filterEventsForDashboardPeriod(events, period)
   const items: DashboardAttentionItem[] = []
   const seen = new Set<string>()
 
@@ -188,7 +231,7 @@ function buildAttentionItems(
         title: event.name,
         description: "Assign childcare providers and registrations",
         meta: eventDateLabel,
-        href: `${href}?tab=childcare`,
+        href: `${href}?tab=youth`,
         priority,
         kind: "childcare",
       })
@@ -198,9 +241,9 @@ function buildAttentionItems(
       add({
         id: `${event.id}-volunteers`,
         title: event.name,
-        description: "Review volunteer sign-ups and roles",
+        description: "Assign staff or volunteers to tasks",
         meta: eventDateLabel,
-        href: `${href}?tab=volunteers`,
+        href: `${href}?tab=staff`,
         priority,
         kind: "volunteers",
       })
@@ -230,115 +273,53 @@ function buildDashboardFromEvents(
   pendingRequests: InternalEventWithRelations[],
   period: DashboardTimePeriod
 ): EventManagementDashboardData {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-
-  const activeEvents = events.filter(
-    (event) => event.status !== INTERNAL_EVENT_STATUSES.cancelled
-  )
+  const periodEvents = filterEventsForDashboardPeriod(events, period)
 
   const kpis = {
-    draftCount: activeEvents.filter(
-      (event) => event.status === INTERNAL_EVENT_STATUSES.draft
-    ).length,
-    scheduledCount: activeEvents.filter(
+    scheduledCount: periodEvents.filter(
       (event) => event.status === INTERNAL_EVENT_STATUSES.scheduled
     ).length,
-    childcareRequired: activeEvents.filter(
+    childcareRequired: periodEvents.filter(
       (event) =>
         event.requires_childcare === true && isOperationalEvent(event.status)
     ).length,
-    volunteersRequired: activeEvents.filter(
+    volunteersRequired: periodEvents.filter(
       (event) =>
         event.requires_volunteers === true && isOperationalEvent(event.status)
     ).length,
-    vendorsRequired: activeEvents.filter(
+    vendorsRequired: periodEvents.filter(
       (event) =>
         event.requires_vendors === true && isOperationalEvent(event.status)
     ).length,
-    ticketedEvents: activeEvents.filter(
+    ticketedEvents: periodEvents.filter(
       (event) => event.requires_ticketing === true && isOperationalEvent(event.status)
     ).length,
   }
 
-  const recentEvents = [...activeEvents]
-    .sort((a, b) => {
-      const aTime = a.start_at ? new Date(a.start_at).getTime() : Number.MAX_SAFE_INTEGER
-      const bTime = b.start_at ? new Date(b.start_at).getTime() : Number.MAX_SAFE_INTEGER
-      return aTime - bTime
-    })
-    .slice(0, 8)
-    .map((event) => ({
-      id: event.id,
-      name: event.name,
-      departmentName: event.departments?.name || "No department",
-      locationLabel: event.venues?.name || event.location_label,
-      eventDate: event.start_at,
-      status: event.status,
-      href: `/event-management/${event.id}`,
-    }))
-
-  const todaysSchedule = events
-    .filter((event) => {
-      if (!event.start_at) return false
-      if (event.status === INTERNAL_EVENT_STATUSES.cancelled) return false
-      return isSameLocalDay(new Date(event.start_at), today)
-    })
-    .sort(
-      (a, b) =>
-        new Date(a.start_at!).getTime() - new Date(b.start_at!).getTime()
-    )
-    .map((event) => ({
-      id: event.id,
-      name: event.name,
-      timeLabel: formatEventTimeRange(event.start_at, event.end_at),
-      locationLabel: event.venues?.name || event.location_label,
-      status: event.status,
-      href: `/event-management/${event.id}`,
-    }))
-
-  const attentionItems = buildAttentionItems(events, pendingRequests, period)
-
   return {
     kpis,
-    recentEvents,
-    todaysSchedule,
-    attentionItems,
+    attentionItems: buildAttentionItems(events, pendingRequests, period),
   }
 }
 
 export async function getEventManagementDashboard(
-  period: DashboardTimePeriod = "this-week"
+  period: DashboardTimePeriod = "all",
+  preloadedEvents?: InternalEventWithRelations[]
 ): Promise<EventManagementDashboardData> {
-  const supabase = await createClient()
   const organizationId = await getSelectedOrganizationId()
 
   if (!organizationId) {
     return buildDashboardFromEvents([], [], period)
   }
 
-  const [eventsResult, pendingRequests] = await Promise.all([
-    supabase
-      .from("internal_events")
-      .select(EVENT_SELECT)
-      .eq("organization_id", organizationId)
-      .order("start_at", { ascending: true, nullsFirst: false })
-      .order("created_at", { ascending: false }),
+  const [events, pendingRequests] = await Promise.all([
+    preloadedEvents
+      ? Promise.resolve(preloadedEvents)
+      : getInternalEvents(),
     getPendingInternalEventRequests(),
   ])
 
-  const { data, error } = eventsResult
-
-  if (error) {
-    console.error(error)
-    throw new Error("Failed to load event dashboard")
-  }
-
-  return buildDashboardFromEvents(
-    (data || []) as InternalEventWithRelations[],
-    pendingRequests,
-    period
-  )
+  return buildDashboardFromEvents(events, pendingRequests, period)
 }
 
 export function parseDashboardTimePeriod(
@@ -348,10 +329,16 @@ export function parseDashboardTimePeriod(
     value === "today" ||
     value === "this-week" ||
     value === "this-month" ||
-    value === "this-year"
+    value === "all" ||
+    value === "past"
   ) {
     return value
   }
 
-  return "this-week"
+  // Legacy bookmark
+  if (value === "this-year") {
+    return "all"
+  }
+
+  return "all"
 }

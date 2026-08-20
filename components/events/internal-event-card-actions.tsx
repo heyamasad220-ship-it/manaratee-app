@@ -82,12 +82,15 @@ export function InternalEventCardActions({
   eventId,
   eventName,
   compact = false,
+  showEdit = true,
   deleteBlockedReason = null,
   redirectAfterDelete = "/event-management",
 }: {
   eventId: string
   eventName: string
   compact?: boolean
+  /** When false, hide the edit pencil (e.g. workspace edits via Event details). */
+  showEdit?: boolean
   /** When set, delete is disabled and this reason is shown. */
   deleteBlockedReason?: string | null
   /** Where to go after a successful delete (workspace should leave the event page). */
@@ -152,12 +155,14 @@ export function InternalEventCardActions({
   return (
     <div className={compact ? "" : "space-y-2"}>
       <div className="flex flex-wrap items-center justify-end gap-1.5">
-        <ActionIconButton
-          label="Edit event"
-          href={`/event-management/${eventId}/edit`}
-        >
-          <Pencil className="h-4 w-4" />
-        </ActionIconButton>
+        {showEdit ? (
+          <ActionIconButton
+            label="Edit event"
+            href={`/event-management/${eventId}/edit`}
+          >
+            <Pencil className="h-4 w-4" />
+          </ActionIconButton>
+        ) : null}
 
         {deleteDisabled ? (
           <Tooltip>
@@ -208,8 +213,8 @@ export function InternalEventCardActions({
                 <AlertDialogTitle>Delete {eventName}?</AlertDialogTitle>
                 <AlertDialogDescription>
                   This permanently removes the event and its calendar
-                  reservation. Events with ticket orders or registrations cannot
-                  be deleted.
+                  reservation. Events with financial activity or registrations
+                  cannot be deleted.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>

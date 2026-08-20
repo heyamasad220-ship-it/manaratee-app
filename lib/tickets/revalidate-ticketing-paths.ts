@@ -8,6 +8,7 @@ const TICKETING_PATHS = [
   "/events/tickets",
   "/tickets",
   "/tickets/orders",
+  "/customer/tickets",
 ] as const
 
 export function revalidateTicketingPaths() {

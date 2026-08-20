@@ -109,6 +109,12 @@ export async function syncEventTicketTypes(
       quantity_total: type.quantityTotal ?? null,
       sort_order: type.sortOrder ?? index,
       is_active: true,
+      offering_kind: type.offeringKind || "standard",
+      visibility: type.visibility || "public",
+      min_per_order: type.minPerOrder ?? 1,
+      max_per_order: type.maxPerOrder ?? null,
+      sales_start_at: type.salesStartAt ?? null,
+      sales_end_at: type.salesEndAt ?? null,
     }
 
     if (type.id) {
@@ -120,13 +126,63 @@ export async function syncEventTicketTypes(
         .eq("internal_event_id", internalEventId)
 
       if (error) {
-        throw new Error(error.message || "Failed to update ticket type")
+        // Pre-migration: optional columns missing
+        if (
+          error.message?.includes("offering_kind") ||
+          error.message?.includes("visibility") ||
+          error.message?.includes("min_per_order") ||
+          error.code === "PGRST204"
+        ) {
+          const {
+            offering_kind: _kind,
+            visibility: _visibility,
+            min_per_order: _min,
+            max_per_order: _max,
+            sales_start_at: _start,
+            sales_end_at: _end,
+            ...legacyPayload
+          } = payload
+          const { error: retryError } = await supabase
+            .from("event_ticket_types")
+            .update(legacyPayload)
+            .eq("id", type.id)
+            .eq("organization_id", organizationId)
+            .eq("internal_event_id", internalEventId)
+          if (retryError) {
+            throw new Error(retryError.message || "Failed to update ticket type")
+          }
+        } else {
+          throw new Error(error.message || "Failed to update ticket type")
+        }
       }
     } else {
       const { error } = await supabase.from("event_ticket_types").insert(payload)
 
       if (error) {
-        throw new Error(error.message || "Failed to create ticket type")
+        if (
+          error.message?.includes("offering_kind") ||
+          error.message?.includes("visibility") ||
+          error.message?.includes("min_per_order") ||
+          error.code === "PGRST204"
+        ) {
+          const {
+            offering_kind: _kind,
+            visibility: _visibility,
+            min_per_order: _min,
+            max_per_order: _max,
+            sales_start_at: _start,
+            sales_end_at: _end,
+            ...legacyPayload
+          } = payload
+          const { error: retryError } = await supabase
+            .from("event_ticket_types")
+            .insert(legacyPayload)
+          if (retryError) {
+            throw new Error(retryError.message || "Failed to create ticket type")
+          }
+        } else {
+          throw new Error(error.message || "Failed to create ticket type")
+        }
       }
     }
   }

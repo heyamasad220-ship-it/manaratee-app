@@ -118,7 +118,10 @@ export async function getFacilityEventEditPayload(
     venueIds: resolvedVenueIds,
     locationLabel:
       locationType === "external" ? event.location_label || "" : "",
-    locationAddress: event.location_address || "",
+    locationAddress:
+      locationType === "external" || locationType === "online"
+        ? event.location_address || ""
+        : "",
     startAt: event.start_at,
     endAt: event.end_at,
     status: event.status,

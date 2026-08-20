@@ -43,7 +43,8 @@ export function InternalEventFlyerCard({
       <CardHeader>
         <CardTitle className="text-base">Flyer</CardTitle>
         <p className="text-sm text-muted-foreground">
-          Optional promotional image for this event.
+          Optional promotional image for this event. The full flyer is shown
+          without cropping.
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -52,15 +53,18 @@ export function InternalEventFlyerCard({
             programId={eventId}
             value={value}
             onValueChange={persistFlyer}
-            uploadOnly
             hideHiddenInput
+            hideLabel
+            fit="contain"
+            frameClassName="max-w-full"
+            imageClassName="max-h-72"
           />
         ) : value ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={value}
             alt="Event flyer"
-            className="max-h-64 w-full rounded-md object-contain"
+            className="block h-auto max-h-72 w-auto max-w-full rounded-md object-contain"
           />
         ) : (
           <p className="text-sm text-muted-foreground">No flyer uploaded.</p>

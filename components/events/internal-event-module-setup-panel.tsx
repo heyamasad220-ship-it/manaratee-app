@@ -31,6 +31,8 @@ type InternalEventModuleSetupPanelProps = {
   vendorTypes?: VendorHubVendorType[]
   title: string
   description: string
+  /** Staff tab: task-oriented volunteer/staff settings. */
+  staffMode?: boolean
 }
 
 function seedTicketingForm(
@@ -58,6 +60,7 @@ export function InternalEventModuleSetupPanel({
   vendorTypes = [],
   title,
   description,
+  staffMode = false,
 }: InternalEventModuleSetupPanelProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -102,6 +105,7 @@ export function InternalEventModuleSetupPanel({
             vendorTypes={vendorTypes}
             visibleModules={[module]}
             hideHeader
+            staffMode={staffMode}
           />
         ) : null}
         {error ? <p className="text-sm text-destructive">{error}</p> : null}

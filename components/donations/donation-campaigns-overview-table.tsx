@@ -37,13 +37,16 @@ import {
   PledgeSummaryMetricCards,
   type PledgeSummaryMetrics,
 } from "@/components/donations/pledge-summary-metric-cards"
-import { ensureCampaignDonationFundAction } from "@/lib/donations/ensure-campaign-donation-fund-actions"
 import {
   formatDonationCurrency,
 } from "@/lib/donations/campaign-analytics"
 import { fetchPledgeSummaryMetricsAction } from "@/lib/donations/donation-list-actions"
-import { getCampaignAnalyticsAction } from "@/lib/donations/donation-reports-actions"
-import { createClient } from "@/lib/supabase/client"
+import {
+  createCampaignAction,
+  deleteCampaignAction,
+  getCampaignAnalyticsAction,
+  updateCampaignAction,
+} from "@/lib/donations/donation-reports-actions"
 
 type CampaignStatus = "Active" | "Completed" | "Draft" | "Paused"
 
@@ -100,13 +103,6 @@ function CampaignStatusBadge({ status }: { status: CampaignStatus }) {
   }
 }
 
-function generateCampaignCode(campaignName: string) {
-  const words = campaignName.trim().split(/\s+/)
-  const codePrefix = words.map((word) => word.charAt(0).toUpperCase()).join("")
-  const randomSuffix = Math.random().toString(36).substring(2, 5).toUpperCase()
-  return `${codePrefix}${randomSuffix}`
-}
-
 function sortCampaignsByStartDate(campaigns: CampaignRow[]) {
   return [...campaigns].sort((a, b) => {
     const aTime = a.startDate ? new Date(a.startDate).getTime() : 0
@@ -133,7 +129,6 @@ function getDefaultVisibleCampaigns(campaigns: CampaignRow[]) {
 }
 
 export function DonationCampaignsOverviewTable({ canManage }: { canManage: boolean }) {
-  const supabase = createClient()
   const [campaigns, setCampaigns] = useState<CampaignRow[]>([])
   const [loading, setLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -156,27 +151,6 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
   })
   const [metricsLoading, setMetricsLoading] = useState(true)
   const [showAllCampaigns, setShowAllCampaigns] = useState(false)
-
-  async function getOrganizationId() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) return null
-
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("organization_id")
-      .eq("id", user.id)
-      .single()
-
-    if (error) {
-      console.error("Error loading organization:", error)
-      return null
-    }
-
-    return data?.organization_id || null
-  }
 
   async function loadSummaryMetrics() {
     setMetricsLoading(true)
@@ -257,67 +231,36 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
   const hiddenCampaignCount = Math.max(sortedCampaigns.length - defaultVisibleCampaigns.length, 0)
 
   async function handleSaveCampaign() {
-    const orgId = await getOrganizationId()
-
-    if (!orgId) {
-      alert("No organization selected")
-      return
-    }
-
     if (!campaignForm.name.trim()) {
       alert("Campaign name is required")
       return
     }
 
-    const existingCampaign = campaigns.find(
-      (campaign) =>
-        campaign.name.toLowerCase() === campaignForm.name.trim().toLowerCase() &&
-        (!editingCampaign || campaign.id !== editingCampaign.id)
-    )
-
-    if (existingCampaign) {
-      alert("A campaign with this name already exists")
-      return
-    }
-
-    const campaignData = {
-      organization_id: orgId,
-      name: campaignForm.name.trim(),
+    const payload = {
+      name: campaignForm.name,
       description: campaignForm.description.trim() || null,
       goal_amount: campaignForm.goalAmount ? Number(campaignForm.goalAmount) : null,
       start_date: campaignForm.startDate || null,
       end_date: campaignForm.endDate || null,
-      status: campaignForm.status.toLowerCase(),
+      status: campaignForm.status,
     }
 
     if (editingCampaign) {
-      const { error } = await supabase
-        .from("campaigns")
-        .update(campaignData)
-        .eq("id", editingCampaign.id)
-
-      if (error) {
-        console.error("Error updating campaign:", error)
-        alert(error.message)
+      const result = await updateCampaignAction(editingCampaign.id, payload)
+      if (!result.success) {
+        alert(result.error)
         return
       }
     } else {
-      const { error } = await supabase.from("campaigns").insert({
-        ...campaignData,
-        code: generateCampaignCode(campaignForm.name.trim()),
-      })
-
-      if (error) {
-        console.error("Error saving campaign:", error)
-        alert(error.message)
+      const result = await createCampaignAction(payload)
+      if (!result.success) {
+        alert(result.error)
         return
       }
 
-      const fundResult = await ensureCampaignDonationFundAction(campaignForm.name.trim())
-      if (!fundResult.success) {
-        console.error("Error creating campaign fund:", fundResult.error)
+      if (result.fundError) {
         alert(
-          `Campaign created, but the fund under General Donation could not be created: ${fundResult.error}`
+          `Campaign created, but the fund under General Donation could not be created: ${result.fundError}`
         )
       }
     }
@@ -333,11 +276,9 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
       return
     }
 
-    const { error } = await supabase.from("campaigns").delete().eq("id", campaignId)
-
-    if (error) {
-      console.error("Error deleting campaign:", error)
-      alert(error.message)
+    const result = await deleteCampaignAction(campaignId)
+    if (!result.success) {
+      alert(result.error)
       return
     }
 

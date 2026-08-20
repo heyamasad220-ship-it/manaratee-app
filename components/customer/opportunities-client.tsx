@@ -31,7 +31,12 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { Checkbox } from "@/components/ui/checkbox"
 import { formatChildcareAgeGroupLabel } from "@/lib/events/event-service-requirements"
+import {
+  eventYouthQuestionsEnabled,
+  eventYouthWaiverRequired,
+} from "@/lib/child-care/youth-forms"
 import {
   registerChildForOpportunityChildcare,
   submitServiceParticipation,
@@ -90,6 +95,8 @@ function typeIcon(type: ServiceParticipationType) {
       return Baby
     case "vendor":
       return Store
+    default:
+      return CalendarDays
   }
 }
 
@@ -107,6 +114,8 @@ export function OpportunitiesClient({
   const [childAge, setChildAge] = useState("")
   const [allergies, setAllergies] = useState("")
   const [childNotes, setChildNotes] = useState("")
+  const [photoConsent, setPhotoConsent] = useState(false)
+  const [waiverSigned, setWaiverSigned] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
@@ -124,6 +133,8 @@ export function OpportunitiesClient({
     setChildAge("")
     setAllergies("")
     setChildNotes("")
+    setPhotoConsent(false)
+    setWaiverSigned(false)
     setError(null)
   }
 
@@ -185,6 +196,9 @@ export function OpportunitiesClient({
           childAge: childAge ? Number.parseInt(childAge, 10) : null,
           allergies: allergies || null,
           notes: childNotes || null,
+          photoConsent,
+          waiverSigned,
+          waiverSignedBy: null,
         })
         setSelected(null)
       } catch (submitError) {
@@ -439,13 +453,44 @@ export function OpportunitiesClient({
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="child-allergies">Allergies</Label>
+                    <Label htmlFor="child-allergies">Allergies or medical notes</Label>
                     <Input
                       id="child-allergies"
                       value={allergies}
                       onChange={(event) => setAllergies(event.target.value)}
+                      placeholder={
+                        eventYouthQuestionsEnabled(selected.serviceRequirements.childcare)
+                          ? "Required — write None if none"
+                          : "Optional"
+                      }
                     />
                   </div>
+                  {eventYouthQuestionsEnabled(selected.serviceRequirements.childcare) ? (
+                    <div className="flex items-start gap-2 rounded-md border px-3 py-2">
+                      <Checkbox
+                        id="child-photo-consent"
+                        checked={photoConsent}
+                        onCheckedChange={(checked) => setPhotoConsent(checked === true)}
+                      />
+                      <Label htmlFor="child-photo-consent" className="font-normal leading-snug">
+                        I consent to photos/videos of my child being used for this event and
+                        organization communications.
+                      </Label>
+                    </div>
+                  ) : null}
+                  {eventYouthWaiverRequired(selected.serviceRequirements.childcare) ? (
+                    <div className="flex items-start gap-2 rounded-md border px-3 py-2">
+                      <Checkbox
+                        id="child-waiver"
+                        checked={waiverSigned}
+                        onCheckedChange={(checked) => setWaiverSigned(checked === true)}
+                      />
+                      <Label htmlFor="child-waiver" className="font-normal leading-snug">
+                        I have read and agree to the liability waiver for youth participation
+                        at this event.
+                      </Label>
+                    </div>
+                  ) : null}
                   <div className="space-y-2">
                     <Label htmlFor="child-reg-notes">Notes</Label>
                     <Textarea

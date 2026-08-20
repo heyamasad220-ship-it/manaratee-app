@@ -15,6 +15,7 @@ import type {
   ServiceParticipationType,
   ServiceParticipationWithContact,
 } from "./service-participation-types"
+import { parseEventStaffAssignmentMeta } from "./service-participation-types"
 
 function isMissingColumnError(error: { message?: string; code?: string } | null) {
   const message = (error?.message || "").toLowerCase()
@@ -222,7 +223,7 @@ export async function getParticipationsForSource(input: {
   const { data, error } = await supabase
     .from("service_participations")
     .select(
-      "id, organization_id, source_type, source_id, contact_id, participation_type, volunteer_role, notes, status, created_at, updated_at, contacts ( full_name, email )"
+      "id, organization_id, source_type, source_id, contact_id, participation_type, volunteer_role, notes, assignment_meta, status, created_at, updated_at, contacts ( full_name, email )"
     )
     .eq("organization_id", organizationId)
     .eq("source_type", input.sourceType)
@@ -233,25 +234,49 @@ export async function getParticipationsForSource(input: {
     if (error.code === "42P01" || error.code === "PGRST205") {
       return []
     }
+    // Pre-migration: assignment_meta column missing
+    if (isMissingColumnError(error)) {
+      const legacy = await supabase
+        .from("service_participations")
+        .select(
+          "id, organization_id, source_type, source_id, contact_id, participation_type, volunteer_role, notes, status, created_at, updated_at, contacts ( full_name, email )"
+        )
+        .eq("organization_id", organizationId)
+        .eq("source_type", input.sourceType)
+        .eq("source_id", input.sourceId)
+        .order("created_at", { ascending: false })
+
+      if (legacy.error) {
+        if (legacy.error.code === "42P01" || legacy.error.code === "PGRST205") {
+          return []
+        }
+        throw new Error(legacy.error.message)
+      }
+
+      return (legacy.data || []).map((row) => mapParticipationRow(row))
+    }
     throw new Error(error.message)
   }
 
-  return (data || []).map((row) => {
-    const contact = row.contacts as { full_name?: string; email?: string | null } | null
-    return {
-      id: row.id as string,
-      organization_id: row.organization_id as string,
-      source_type: row.source_type as ServiceParticipationSourceType,
-      source_id: row.source_id as string,
-      contact_id: row.contact_id as string,
-      participation_type: row.participation_type as ServiceParticipationType,
-      volunteer_role: (row.volunteer_role as string | null) ?? null,
-      notes: (row.notes as string | null) ?? null,
-      status: row.status as ServiceParticipationWithContact["status"],
-      created_at: row.created_at as string,
-      updated_at: row.updated_at as string,
-      contact_name: contact?.full_name || "Unknown",
-      contact_email: contact?.email ?? null,
-    }
-  })
+  return (data || []).map((row) => mapParticipationRow(row))
+}
+
+function mapParticipationRow(row: Record<string, unknown>): ServiceParticipationWithContact {
+  const contact = row.contacts as { full_name?: string; email?: string | null } | null
+  return {
+    id: row.id as string,
+    organization_id: row.organization_id as string,
+    source_type: row.source_type as ServiceParticipationSourceType,
+    source_id: row.source_id as string,
+    contact_id: row.contact_id as string,
+    participation_type: row.participation_type as ServiceParticipationType,
+    volunteer_role: (row.volunteer_role as string | null) ?? null,
+    notes: (row.notes as string | null) ?? null,
+    assignment_meta: parseEventStaffAssignmentMeta(row.assignment_meta),
+    status: row.status as ServiceParticipationWithContact["status"],
+    created_at: row.created_at as string,
+    updated_at: row.updated_at as string,
+    contact_name: contact?.full_name || "Unknown",
+    contact_email: contact?.email ?? null,
+  }
 }

@@ -37,7 +37,7 @@ export function CommunityCalendarClient({
     if (includeBazaar && includeEvents) {
       return (
         <>
-          Mark a bazaar as Community Visible or Public from{" "}
+          Mark a bazaar as Public from{" "}
           <Link href={VENDOR_HUB_ROUTES.events.list} className="text-primary hover:underline">
             Bazaar Events
           </Link>
@@ -48,7 +48,7 @@ export function CommunityCalendarClient({
     if (includeBazaar) {
       return (
         <>
-          Mark an event as Community Visible or Public from{" "}
+          Mark an event as Public from{" "}
           <Link href={VENDOR_HUB_ROUTES.events.list} className="text-primary hover:underline">
             Bazaar Events
           </Link>
@@ -73,7 +73,7 @@ export function CommunityCalendarClient({
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Community Calendar</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Public and community-visible events for your organization
+            Public events for your organization
             {includeBazaar && includeEvents
               ? " — bazaars and Event Management events."
               : includeBazaar

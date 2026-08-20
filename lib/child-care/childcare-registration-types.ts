@@ -39,6 +39,12 @@ export interface ChildcareRegistration {
   status: ChildcareRegistrationStatus
   allergies: string | null
   notes: string | null
+  checked_in_at: string | null
+  checked_out_at: string | null
+  pickup_authorization: string | null
+  waiverSignedAt: string | null
+  waiverSignedBy: string | null
+  photoConsent: boolean | null
   event_name: string
   event_date: string
   start_time: string | null
@@ -72,6 +78,9 @@ export type ChildcareRegistrationInput = {
   status?: ChildcareRegistrationStatus
   allergies?: string | null
   notes?: string | null
+  photoConsent?: boolean | null
+  waiverSigned?: boolean
+  waiverSignedBy?: string | null
 }
 
 export type ChildcareEventInput = {

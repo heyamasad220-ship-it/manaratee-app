@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { isTicketedEventPast } from "@/lib/tickets/ticketing-overview-types"
+import { ticketOrderNetRevenueCents } from "@/lib/tickets/ticket-refund-math"
 
 export type TicketOrderStatus =
   | "pending"
@@ -16,6 +17,7 @@ export type TicketOrderListItem = {
   orderNumber: string
   status: TicketOrderStatus
   totalCents: number
+  refundedAmountCents: number
   currency: string
   purchaserName: string | null
   purchaserEmail: string
@@ -68,7 +70,7 @@ export async function getTicketOverviewStats(): Promise<TicketOverviewStats> {
   const [ordersResult, ticketsResult] = await Promise.all([
     supabase
       .from("ticket_orders")
-      .select("total_cents, currency, status")
+      .select("total_cents, refunded_amount_cents, currency, status")
       .eq("organization_id", organizationId)
       .in("status", ["completed", "partially_refunded"]),
     supabase
@@ -78,13 +80,30 @@ export async function getTicketOverviewStats(): Promise<TicketOverviewStats> {
       .in("status", ["valid", "checked_in"]),
   ])
 
-  if (ordersResult.error?.code === "42P01" || ticketsResult.error?.code === "42P01") {
+  const ordersQuery =
+    ordersResult.error?.code === "42703"
+      ? await supabase
+          .from("ticket_orders")
+          .select("total_cents, currency, status")
+          .eq("organization_id", organizationId)
+          .in("status", ["completed", "partially_refunded"])
+      : ordersResult
+
+  if (ordersQuery.error?.code === "42P01" || ticketsResult.error?.code === "42P01") {
     return { ordersCount: 0, ticketsIssued: 0, totalRevenueCents: 0, currency: "USD" }
   }
 
-  const orders = ordersResult.data || []
+  const orders = ordersQuery.data || []
   const totalRevenueCents = orders.reduce(
-    (sum, row) => sum + Number(row.total_cents || 0),
+    (sum, row) =>
+      sum +
+      ticketOrderNetRevenueCents({
+        status: row.status as string,
+        totalCents: Number(row.total_cents || 0),
+        refundedAmountCents: Number(
+          (row as { refunded_amount_cents?: number }).refunded_amount_cents || 0
+        ),
+      }),
     0
   )
 
@@ -117,6 +136,7 @@ export async function getTicketOrders(input?: {
       order_number,
       status,
       total_cents,
+      refunded_amount_cents,
       currency,
       purchaser_name,
       purchaser_email,
@@ -152,13 +172,73 @@ export async function getTicketOrders(input?: {
 
   const { data, error } = await query
 
+  if (error?.code === "42703") {
+    let fallbackQuery = supabase
+      .from("ticket_orders")
+      .select(`
+        id,
+        order_number,
+        status,
+        total_cents,
+        currency,
+        purchaser_name,
+        purchaser_email,
+        payment_method,
+        payment_reference,
+        created_at,
+        internal_event_id,
+        internal_events:internal_event_id (
+          name,
+          start_at,
+          location_label,
+          venues:venue_id ( name )
+        )
+      `)
+      .eq("organization_id", organizationId)
+      .order("created_at", { ascending: false })
+
+    if (input?.eventId && input.eventId !== "all") {
+      fallbackQuery = fallbackQuery.eq("internal_event_id", input.eventId)
+    }
+    if (input?.status && input.status !== "all") {
+      fallbackQuery = fallbackQuery.eq("status", input.status)
+    }
+    if (input?.dateFrom) {
+      fallbackQuery = fallbackQuery.gte("created_at", `${input.dateFrom}T00:00:00.000Z`)
+    }
+    if (input?.dateTo) {
+      fallbackQuery = fallbackQuery.lte("created_at", `${input.dateTo}T23:59:59.999Z`)
+    }
+
+    const fallback = await fallbackQuery
+    return mapTicketOrderListItems(fallback.data, fallback.error, organizationId, input, supabase)
+  }
+
+  return mapTicketOrderListItems(data, error, organizationId, input, supabase)
+}
+
+async function mapTicketOrderListItems(
+  data: unknown[] | null,
+  error: { message?: string; code?: string } | null,
+  organizationId: string,
+  input:
+    | {
+        eventId?: string
+        status?: TicketOrderStatus | "all"
+        dateFrom?: string
+        dateTo?: string
+        search?: string
+      }
+    | undefined,
+  supabase: Awaited<ReturnType<typeof createClient>>
+): Promise<TicketOrderListItem[]> {
   if (error) {
     if (error.code === "42P01") return []
     console.error(error)
     throw new Error("Failed to load ticket orders")
   }
 
-  const orderIds = (data || []).map((row) => row.id as string)
+  const orderIds = (data || []).map((row) => (row as { id: string }).id)
   const ticketCounts = new Map<string, number>()
   const ticketCodesByOrder = new Map<string, string[]>()
 
@@ -203,6 +283,7 @@ export async function getTicketOrders(input?: {
       orderNumber: row.order_number as string,
       status: mapOrderStatus(row.status as string),
       totalCents: Number(row.total_cents || 0),
+      refundedAmountCents: Number(row.refunded_amount_cents || 0),
       currency: (row.currency as string) || "USD",
       purchaserName: (row.purchaser_name as string | null) ?? null,
       purchaserEmail: row.purchaser_email as string,
@@ -278,3 +359,162 @@ export async function getTicketedEvents(): Promise<TicketedEventOption[]> {
 
   return [...active, ...past]
 }
+
+export type EventAttendeeTicketStatus =
+  | "valid"
+  | "checked_in"
+  | "waitlisted"
+  | "canceled"
+  | "refunded"
+
+export type EventAttendeeListItem = {
+  id: string
+  ticketCode: string
+  attendeeName: string | null
+  attendeeEmail: string | null
+  status: EventAttendeeTicketStatus
+  checkedInAt: string | null
+  createdAt: string
+  ticketTypeName: string
+  ticketTypePriceCents: number
+  orderId: string
+  orderNumber: string
+  orderStatus: TicketOrderStatus
+  orderTotalCents: number
+  orderRefundedCents: number
+  currency: string
+  purchaserName: string | null
+  purchaserEmail: string | null
+}
+
+function mapTicketStatus(status: string): EventAttendeeTicketStatus {
+  if (
+    status === "valid" ||
+    status === "checked_in" ||
+    status === "waitlisted" ||
+    status === "canceled" ||
+    status === "refunded"
+  ) {
+    return status
+  }
+  return "valid"
+}
+
+/** One row per ticket/attendee seat for an event (paid or free). */
+export async function getEventAttendees(
+  eventId: string
+): Promise<EventAttendeeListItem[]> {
+  const supabase = await createClient()
+  const organizationId = await getSelectedOrganizationId()
+
+  if (!organizationId || !eventId) {
+    return []
+  }
+
+  const { data, error } = await supabase
+    .from("tickets")
+    .select(
+      `
+      id,
+      ticket_code,
+      attendee_name,
+      attendee_email,
+      status,
+      checked_in_at,
+      created_at,
+      ticket_order_id,
+      event_ticket_types:ticket_type_id (
+        name,
+        price_cents
+      ),
+      ticket_orders:ticket_order_id (
+        order_number,
+        status,
+        total_cents,
+        refunded_amount_cents,
+        currency,
+        purchaser_name,
+        purchaser_email
+      )
+    `
+    )
+    .eq("organization_id", organizationId)
+    .eq("internal_event_id", eventId)
+    .order("created_at", { ascending: false })
+
+  if (error?.code === "42703") {
+    const fallback = await supabase
+      .from("tickets")
+      .select(
+        `
+        id,
+        ticket_code,
+        attendee_name,
+        attendee_email,
+        status,
+        checked_in_at,
+        created_at,
+        ticket_order_id,
+        event_ticket_types:ticket_type_id (
+          name,
+          price_cents
+        ),
+        ticket_orders:ticket_order_id (
+          order_number,
+          status,
+          total_cents,
+          currency,
+          purchaser_name,
+          purchaser_email
+        )
+      `
+      )
+      .eq("organization_id", organizationId)
+      .eq("internal_event_id", eventId)
+      .order("created_at", { ascending: false })
+    return mapEventAttendeeRows(fallback.data, fallback.error)
+  }
+
+  return mapEventAttendeeRows(data, error)
+}
+
+function mapEventAttendeeRows(
+  data: unknown[] | null,
+  error: { message?: string; code?: string } | null
+): EventAttendeeListItem[] {
+  if (error) {
+    if (error.code === "42P01" || error.code === "42703") return []
+    console.error(error)
+    throw new Error("Failed to load event attendees")
+  }
+
+  return (data || []).map((row: any) => {
+    const ticketType = Array.isArray(row.event_ticket_types)
+      ? row.event_ticket_types[0]
+      : row.event_ticket_types
+    const order = Array.isArray(row.ticket_orders)
+      ? row.ticket_orders[0]
+      : row.ticket_orders
+
+    return {
+      id: row.id as string,
+      ticketCode: (row.ticket_code as string) || "",
+      attendeeName: (row.attendee_name as string | null) ?? null,
+      attendeeEmail: (row.attendee_email as string | null) ?? null,
+      status: mapTicketStatus(row.status as string),
+      checkedInAt: (row.checked_in_at as string | null) ?? null,
+      createdAt: row.created_at as string,
+      ticketTypeName: (ticketType?.name as string) || "Ticket",
+      ticketTypePriceCents: Number(ticketType?.price_cents || 0),
+      orderId: (row.ticket_order_id as string) || "",
+      orderNumber: (order?.order_number as string) || "—",
+      orderStatus: mapOrderStatus((order?.status as string) || "pending"),
+      orderTotalCents: Number(order?.total_cents || 0),
+      orderRefundedCents: Number(order?.refunded_amount_cents || 0),
+      currency: (order?.currency as string) || "USD",
+      purchaserName: (order?.purchaser_name as string | null) ?? null,
+      purchaserEmail: (order?.purchaser_email as string | null) ?? null,
+    }
+  })
+}
+
