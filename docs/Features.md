@@ -452,13 +452,15 @@ Removed **255** legacy imported rows from `public.vendors` (May 2026 CSV import)
 
 **Public group donate checkout (August 2026 — Phase F):** `/donate/g/{token}` collects amount + name/email → Stripe Checkout (Connect) → webhook inserts **one** `payments` row with `campaign_id`, `campaign_group_id`, and optional `attributed_group_contact_id` (when the campaign group links an org group; membership ensured). Reuses `createOneTimeDonationCheckout` / `insertProcessorPaymentFromCheckout`. Checkout session columns: migration `264`. Key files: `campaign-group-public-actions.ts`, `campaign-group-donate-form.tsx`.
 
+**Public group recurring + pledge emails (August 2026):** Group links support **Give monthly / recurring** (monthly, quarterly, annually) via `createRecurringDonationCheckout` with `campaign_group_id` on the plan, checkout session, and each `invoice.paid` payment. Pledge modes send a **group pledge confirmation** email (`group_pledge_confirmation`). Daily cron `/api/cron/prospect-follow-up-reminders` emails assignees with overdue prospect follow-ups (deduped via `prospect_follow_up_reminder_log`). Migration `266_group_recurring_and_fd_emails.sql`.
+
 **Campaign overview insights (August 2026 — Phase G):** Campaign → Overview adds **Action Required** (overdue/upcoming follow-ups, unassigned, asked-without-pledge, groups below goal), **Team Summary** (by assignee), and **Campaign Groups** rollup. Deep-links into Prospects filters (`followUp`, `assignee`, `stage`, `pledged`). Contact Financial panel shows **Fund Development** history (prospects, assignments, group gifts) gated by `donations.view`. Key files: `campaign-overview-insights.tsx`, `contact-fund-development-history.tsx`.
 
 **Granular Fund Development permissions (August 2026):** Added `donations.campaigns.manage`, `donations.prospects.manage`, `donations.reports.manage`. `donations.manage` still implies full access. Seed: `scripts/265_donations_granular_permissions.sql`. Import/Match accept reports.manage; campaign writes use campaigns.manage; prospect writes use prospects.manage.
 
 **Org-wide Campaign Groups report (August 2026):** Reports → **Campaign Groups** at `/donations/reports/campaign-groups` (separate from Donors → Group Giving). Reuses `computeCampaignGroupMetrics`.
 
-**Public group pledge attribution (August 2026):** `/donate/g/{token}` supports Donate now, Pledge and pay now, or Pledge only. Pledge+pay creates a `pledges` row with `campaign_group_id` and links Stripe payment via `pledge_id` (`allocated`).
+**Public group pledge attribution (August 2026):** `/donate/g/{token}` supports Donate now, Give monthly/recurring, Pledge and pay now, or Pledge only. Pledge+pay creates a `pledges` row with `campaign_group_id` and links Stripe payment via `pledge_id` (`allocated`). Pledge-only and pledge+pay send confirmation email to the donor.
 
 **Donations payment methods (June 2026):** Removed **Payment Methods** tab from Donations → Settings; org cards on file are managed under **Billing** (`/billing`). Existing `payment_methods` rows remain for donation source labels where referenced.
 

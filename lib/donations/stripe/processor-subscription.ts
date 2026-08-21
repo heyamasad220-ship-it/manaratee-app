@@ -26,6 +26,8 @@ type RecurringPlanRow = {
   donor_id: string
   contact_id: string | null
   campaign_id: string | null
+  campaign_group_id: string | null
+  attributed_group_contact_id: string | null
   category_id: string | null
   subcategory_id: string | null
   amount: number
@@ -36,6 +38,9 @@ type RecurringPlanRow = {
   external_processor_id: string | null
 }
 
+const RECURRING_PLAN_SELECT =
+  "id, organization_id, donor_id, contact_id, campaign_id, campaign_group_id, attributed_group_contact_id, category_id, subcategory_id, amount, frequency, status, next_payment_date, external_processor, external_processor_id"
+
 async function loadRecurringPlan(
   supabase: SupabaseClient,
   input: { planId?: string | null; stripeSubscriptionId?: string | null }
@@ -43,27 +48,43 @@ async function loadRecurringPlan(
   if (input.planId) {
     const { data } = await supabase
       .from("recurring_donation_plans")
-      .select(
-        "id, organization_id, donor_id, contact_id, campaign_id, category_id, subcategory_id, amount, frequency, status, next_payment_date, external_processor, external_processor_id"
-      )
+      .select(RECURRING_PLAN_SELECT)
       .eq("id", input.planId)
       .maybeSingle()
-    if (data) return data as RecurringPlanRow
+    if (data) return normalizeRecurringPlanRow(data)
   }
 
   if (input.stripeSubscriptionId) {
     const { data } = await supabase
       .from("recurring_donation_plans")
-      .select(
-        "id, organization_id, donor_id, contact_id, campaign_id, category_id, subcategory_id, amount, frequency, status, next_payment_date, external_processor, external_processor_id"
-      )
+      .select(RECURRING_PLAN_SELECT)
       .eq("external_processor", "stripe")
       .eq("external_processor_id", input.stripeSubscriptionId)
       .maybeSingle()
-    if (data) return data as RecurringPlanRow
+    if (data) return normalizeRecurringPlanRow(data)
   }
 
   return null
+}
+
+function normalizeRecurringPlanRow(data: Record<string, unknown>): RecurringPlanRow {
+  return {
+    id: data.id as string,
+    organization_id: data.organization_id as string,
+    donor_id: data.donor_id as string,
+    contact_id: (data.contact_id as string | null) ?? null,
+    campaign_id: (data.campaign_id as string | null) ?? null,
+    campaign_group_id: (data.campaign_group_id as string | null) ?? null,
+    attributed_group_contact_id: (data.attributed_group_contact_id as string | null) ?? null,
+    category_id: (data.category_id as string | null) ?? null,
+    subcategory_id: (data.subcategory_id as string | null) ?? null,
+    amount: Number(data.amount || 0),
+    frequency: data.frequency as string,
+    status: data.status as string,
+    next_payment_date: data.next_payment_date as string,
+    external_processor: (data.external_processor as string | null) ?? null,
+    external_processor_id: (data.external_processor_id as string | null) ?? null,
+  }
 }
 
 async function completeRecurringCheckoutSession(
@@ -307,6 +328,8 @@ export async function insertProcessorPaymentFromInvoice(
       status: "unallocated",
       is_verified: true,
       campaign_id: plan.campaign_id,
+      campaign_group_id: plan.campaign_group_id,
+      attributed_group_contact_id: plan.attributed_group_contact_id,
       category_id: plan.category_id,
       subcategory_id: plan.subcategory_id,
       stripe_invoice_id: invoice.id,

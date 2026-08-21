@@ -193,6 +193,8 @@ User Invitations
 
 **Fund Development follow-ups (August 2026)** — Granular permissions (`265_donations_granular_permissions.sql`); Reports → Campaign Groups; public group pledge modes with `pledge_id` on checkout/payment.
 
+**Fund Development group recurring + FD emails (August 2026)** — Recurring gifts on `/donate/g/{token}`; group pledge confirmation emails; daily prospect follow-up assignee digests. Migration **`266_group_recurring_and_fd_emails.sql`**. Cron: `/api/cron/prospect-follow-up-reminders`.
+
 ---
 
 ## People Management Module

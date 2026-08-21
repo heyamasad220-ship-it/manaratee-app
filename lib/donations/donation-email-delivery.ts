@@ -1,7 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 
 import {
+  renderGroupPledgeConfirmationEmail,
   renderPledgeReminderEmail,
+  renderProspectFollowUpReminderEmail,
   renderReceiptEmail,
   renderYearEndStatementEmail,
 } from "@/lib/donations/donation-email-templates"
@@ -19,7 +21,12 @@ import type { PledgeReminderMessage } from "@/lib/donations/pledge-reminder-type
 import { getTransactionalEmailReplyTo } from "@/lib/email/get-email-provider"
 import { sendTransactionalEmail } from "@/lib/email/transactional-email"
 
-export type DonationEmailTemplate = "receipt" | "year_end_statement" | "pledge_reminder"
+export type DonationEmailTemplate =
+  | "receipt"
+  | "year_end_statement"
+  | "pledge_reminder"
+  | "group_pledge_confirmation"
+  | "prospect_follow_up_reminder"
 
 export type DonationEmailDeliveryResult = {
   sent: boolean
@@ -84,7 +91,7 @@ async function logTransactionalEmail(
     status: "sent" | "failed"
     provider: "resend" | "console"
     providerMessageId?: string | null
-    relatedEntityType?: "donation_receipt" | "pledge_reminder"
+    relatedEntityType?: "donation_receipt" | "pledge_reminder" | "pledge" | "campaign_prospect"
     relatedEntityId?: string | null
     errorMessage?: string | null
   }
@@ -122,7 +129,7 @@ async function sendDonationEmail(input: {
   html: string
   text: string
   attachments?: Array<{ filename: string; content: string; contentType?: string }>
-  relatedEntityType?: "donation_receipt" | "pledge_reminder"
+  relatedEntityType?: "donation_receipt" | "pledge_reminder" | "pledge" | "campaign_prospect"
   relatedEntityId?: string | null
   supabase: SupabaseClient
 }): Promise<DonationEmailDeliveryResult> {
@@ -332,6 +339,85 @@ export async function sendPledgeReminderEmail(
     .eq("organization_id", input.organizationId)
 
   return delivery
+}
+
+export async function sendGroupPledgeConfirmationEmail(
+  supabase: SupabaseClient,
+  input: {
+    organizationId: string
+    pledgeId: string
+    donorId?: string | null
+    contactId?: string | null
+    fallbackEmail?: string | null
+    organizationName: string
+    donorName: string
+    groupName: string
+    campaignName: string
+    amount: number
+    payLater: boolean
+  }
+): Promise<DonationEmailDeliveryResult> {
+  const recipient = await resolveDonorEmail(supabase, {
+    donorId: input.donorId,
+    contactId: input.contactId,
+    fallbackEmail: input.fallbackEmail,
+  })
+  const rendered = renderGroupPledgeConfirmationEmail({
+    organizationName: input.organizationName,
+    donorName: input.donorName,
+    groupName: input.groupName,
+    campaignName: input.campaignName,
+    amount: input.amount,
+    payLater: input.payLater,
+  })
+
+  return sendDonationEmail({
+    supabase,
+    organizationId: input.organizationId,
+    recipient,
+    template: "group_pledge_confirmation",
+    subject: rendered.subject,
+    html: rendered.html,
+    text: rendered.text,
+    relatedEntityType: "pledge",
+    relatedEntityId: input.pledgeId,
+  })
+}
+
+export async function sendProspectFollowUpReminderEmail(
+  supabase: SupabaseClient,
+  input: {
+    organizationId: string
+    recipient: string
+    organizationName: string
+    assigneeName: string
+    overdueCount: number
+    items: Array<{
+      prospectName: string
+      campaignName: string
+      followUpDate: string
+      href: string
+    }>
+  }
+): Promise<DonationEmailDeliveryResult> {
+  const rendered = renderProspectFollowUpReminderEmail({
+    organizationName: input.organizationName,
+    assigneeName: input.assigneeName,
+    overdueCount: input.overdueCount,
+    items: input.items,
+  })
+
+  return sendDonationEmail({
+    supabase,
+    organizationId: input.organizationId,
+    recipient: input.recipient,
+    template: "prospect_follow_up_reminder",
+    subject: rendered.subject,
+    html: rendered.html,
+    text: rendered.text,
+    relatedEntityType: "campaign_prospect",
+    relatedEntityId: null,
+  })
 }
 
 export async function deliverPaymentReceiptById(

@@ -2,7 +2,10 @@
 
 import { properCasePersonNameIfNeeded } from "@/lib/contacts/contact-constants"
 import { ensureDonorExtensionForContact } from "@/lib/donations/donor-contact-bridge"
+import { sendGroupPledgeConfirmationEmail } from "@/lib/donations/donation-email-delivery"
 import { createOneTimeDonationCheckout } from "@/lib/donations/stripe/checkout"
+import { createRecurringDonationCheckout } from "@/lib/donations/stripe/recurring-checkout"
+import type { RecurringStripeFrequency } from "@/lib/donations/stripe/types"
 import { buildCampaignGroupDonationPath } from "@/lib/donations/campaign-group-types"
 import { campaignPaymentNetAmount } from "@/lib/donations/campaign-analytics"
 import { isStripeConfigured, getAppBaseUrl } from "@/lib/stripe/stripe-server"
@@ -206,14 +209,24 @@ export async function createPublicCampaignGroupDonationCheckoutAction(input: {
   amount: number
   donorName: string
   donorEmail: string
-  /** one_time = gift only; pledge_pay = create pledge then pay toward it; pledge_only = pledge without card. */
-  mode?: "one_time" | "pledge_pay" | "pledge_only"
+  /**
+   * one_time = gift only;
+   * recurring = Stripe subscription attributed to the group;
+   * pledge_pay = create pledge then pay toward it;
+   * pledge_only = pledge without card.
+   */
+  mode?: "one_time" | "recurring" | "pledge_pay" | "pledge_only"
+  frequency?: RecurringStripeFrequency
 }) {
   const loaded = await loadActiveGroupByToken(input.token)
   if (!loaded.ok) return { success: false as const, error: loaded.error }
 
   const { supabase, group } = loaded
   const mode = input.mode || "one_time"
+  const frequency: RecurringStripeFrequency =
+    input.frequency === "quarterly" || input.frequency === "annually"
+      ? input.frequency
+      : "monthly"
 
   const amount = Number(input.amount)
   if (!Number.isFinite(amount) || amount <= 0) {
@@ -250,6 +263,23 @@ export async function createPublicCampaignGroupDonationCheckoutAction(input: {
       })
     }
 
+    const { data: campaign } = await supabase
+      .from("campaigns")
+      .select("name")
+      .eq("id", group.campaign_id)
+      .maybeSingle()
+
+    const { data: organization } = await supabase
+      .from("organizations")
+      .select("name")
+      .eq("id", group.organization_id)
+      .maybeSingle()
+
+    const campaignName = campaign?.name || "Campaign"
+    const organizationName = organization?.name || "Organization"
+    const baseUrl = getAppBaseUrl()
+    const path = buildCampaignGroupDonationPath(group.public_token)
+
     let pledgeId: string | null = null
     if (mode === "pledge_pay" || mode === "pledge_only") {
       const pledgeDate = new Date().toISOString().slice(0, 10)
@@ -283,6 +313,27 @@ export async function createPublicCampaignGroupDonationCheckoutAction(input: {
         }
       }
       pledgeId = pledge.id as string
+
+      try {
+        await sendGroupPledgeConfirmationEmail(supabase, {
+          organizationId: group.organization_id,
+          pledgeId,
+          donorId: donor.donorId,
+          contactId: donor.contactId,
+          fallbackEmail: donor.email,
+          organizationName,
+          donorName: donor.fullName,
+          groupName: group.name,
+          campaignName,
+          amount,
+          payLater: mode === "pledge_only",
+        })
+      } catch (emailError) {
+        console.warn(
+          "[campaign-group-donate] pledge confirmation email failed:",
+          emailError instanceof Error ? emailError.message : emailError
+        )
+      }
     }
 
     if (mode === "pledge_only") {
@@ -294,14 +345,32 @@ export async function createPublicCampaignGroupDonationCheckoutAction(input: {
       }
     }
 
-    const { data: campaign } = await supabase
-      .from("campaigns")
-      .select("name")
-      .eq("id", group.campaign_id)
-      .maybeSingle()
+    if (mode === "recurring") {
+      const checkout = await createRecurringDonationCheckout(supabase, {
+        organizationId: group.organization_id,
+        donorId: donor.donorId,
+        contactId: donor.contactId,
+        amount,
+        frequency,
+        campaignId: group.campaign_id,
+        campaignGroupId: group.id,
+        attributedGroupContactId,
+        donorEmail: donor.email,
+        donorName: donor.fullName,
+        productName: `Recurring gift — ${group.name}`,
+        productDescription: `${campaignName} · supporting ${group.name} (${frequency})`,
+        successUrl: `${baseUrl}${path}?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+        cancelUrl: `${baseUrl}${path}?checkout=cancelled`,
+      })
 
-    const baseUrl = getAppBaseUrl()
-    const path = buildCampaignGroupDonationPath(group.public_token)
+      return {
+        success: true as const,
+        mode: "recurring" as const,
+        pledgeId: null,
+        checkoutUrl: checkout.checkoutUrl,
+      }
+    }
+
     const isPledgePay = mode === "pledge_pay"
     const checkout = await createOneTimeDonationCheckout(supabase, {
       organizationId: group.organization_id,
@@ -317,9 +386,7 @@ export async function createPublicCampaignGroupDonationCheckoutAction(input: {
       productName: isPledgePay
         ? `Pledge payment — ${group.name}`
         : `Donation — ${group.name}`,
-      productDescription: campaign?.name
-        ? `${campaign.name} · supporting ${group.name}`
-        : `Supporting ${group.name}`,
+      productDescription: `${campaignName} · supporting ${group.name}`,
       successUrl: `${baseUrl}${path}?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
       cancelUrl: `${baseUrl}${path}?checkout=cancelled`,
     })
@@ -336,7 +403,7 @@ export async function createPublicCampaignGroupDonationCheckoutAction(input: {
       return {
         success: false as const,
         error:
-          "Campaign group checkout is not available yet. Run scripts/264_campaign_group_checkout.sql in Supabase.",
+          "Campaign group checkout is not available yet. Run scripts/264_campaign_group_checkout.sql and scripts/266_group_recurring_and_fd_emails.sql in Supabase.",
       }
     }
     return { success: false as const, error: message }

@@ -32,7 +32,10 @@ export function CampaignGroupDonateForm({ info }: CampaignGroupDonateFormProps) 
   const [amount, setAmount] = useState("")
   const [donorName, setDonorName] = useState("")
   const [donorEmail, setDonorEmail] = useState("")
-  const [mode, setMode] = useState<"one_time" | "pledge_pay" | "pledge_only">("one_time")
+  const [mode, setMode] = useState<"one_time" | "recurring" | "pledge_pay" | "pledge_only">(
+    "one_time"
+  )
+  const [frequency, setFrequency] = useState<"monthly" | "quarterly" | "annually">("monthly")
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
   const [successAmount, setSuccessAmount] = useState<number | null>(null)
@@ -94,6 +97,7 @@ export function CampaignGroupDonateForm({ info }: CampaignGroupDonateFormProps) 
         donorName,
         donorEmail,
         mode,
+        frequency: mode === "recurring" ? frequency : undefined,
       })
       if (!result.success) {
         setErrorMessage(result.error)
@@ -184,18 +188,42 @@ export function CampaignGroupDonateForm({ info }: CampaignGroupDonateFormProps) 
             <Label>Gift type</Label>
             <Select
               value={mode}
-              onValueChange={(value: "one_time" | "pledge_pay" | "pledge_only") => setMode(value)}
+              onValueChange={(value: "one_time" | "recurring" | "pledge_pay" | "pledge_only") =>
+                setMode(value)
+              }
             >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="one_time">Donate now</SelectItem>
+                <SelectItem value="recurring">Give monthly / recurring</SelectItem>
                 <SelectItem value="pledge_pay">Pledge and pay now</SelectItem>
                 <SelectItem value="pledge_only">Pledge only (pay later)</SelectItem>
               </SelectContent>
             </Select>
           </div>
+
+          {mode === "recurring" ? (
+            <div className="flex flex-col gap-2">
+              <Label>Frequency</Label>
+              <Select
+                value={frequency}
+                onValueChange={(value: "monthly" | "quarterly" | "annually") =>
+                  setFrequency(value)
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="monthly">Monthly</SelectItem>
+                  <SelectItem value="quarterly">Quarterly</SelectItem>
+                  <SelectItem value="annually">Annually</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
 
           <div className="flex flex-col gap-2">
             <Label htmlFor="donate-amount">Amount</Label>
@@ -249,12 +277,16 @@ export function CampaignGroupDonateForm({ info }: CampaignGroupDonateFormProps) 
                 ? "Record pledge"
                 : mode === "pledge_pay"
                   ? "Pledge and pay with card"
-                  : "Donate with card"}
+                  : mode === "recurring"
+                    ? `Start ${frequency} gift`
+                    : "Donate with card"}
           </Button>
           <p className="text-center text-xs text-muted-foreground">
             {mode === "pledge_only"
-              ? `Your pledge will be attributed to ${info.groupName}. Staff can collect payment later.`
-              : `You will complete payment securely on Stripe. Your gift is attributed to ${info.groupName}.`}
+              ? `Your pledge will be attributed to ${info.groupName}. Staff can collect payment later. A confirmation email will be sent.`
+              : mode === "recurring"
+                ? `You will set up a ${frequency} gift on Stripe. Renewals are attributed to ${info.groupName}.`
+                : `You will complete payment securely on Stripe. Your gift is attributed to ${info.groupName}.`}
           </p>
         </form>
       ) : null}

@@ -51,12 +51,16 @@ export type CreateRecurringDonationCheckoutInput = {
   amount: number
   frequency: RecurringStripeFrequency
   campaignId?: string | null
+  campaignGroupId?: string | null
+  attributedGroupContactId?: string | null
   categoryId?: string | null
   subcategoryId?: string | null
   successUrl?: string
   cancelUrl?: string
   donorEmail?: string | null
   donorName?: string | null
+  productName?: string | null
+  productDescription?: string | null
 }
 
 export type RecurringSubscriptionLinkResult = {

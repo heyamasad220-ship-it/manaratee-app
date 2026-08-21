@@ -124,3 +124,83 @@ export function renderPledgeReminderEmail(message: PledgeReminderMessage) {
 
   return { subject, html, text: message.body }
 }
+
+export function renderGroupPledgeConfirmationEmail(input: {
+  organizationName: string
+  donorName: string
+  groupName: string
+  campaignName: string
+  amount: number
+  payLater: boolean
+}) {
+  const amountLabel = formatMoney(input.amount)
+  const subject = `Thank you for your pledge — ${input.groupName}`
+  const text = [
+    `Dear ${input.donorName},`,
+    "",
+    `Thank you for pledging ${amountLabel} to ${input.campaignName} in support of ${input.groupName}.`,
+    input.payLater
+      ? "Your pledge has been recorded. The organization may contact you about payment."
+      : "Your pledge has been recorded along with your payment.",
+    "",
+    `With gratitude,`,
+    input.organizationName,
+  ].join("\n")
+
+  const html = wrapDonationBrandedEmailHtml({
+    organizationName: input.organizationName,
+    title: "Pledge confirmation",
+    bodyHtml: `<p>${escapeHtml(text).replaceAll("\n", "<br />")}</p>`,
+  })
+
+  return { subject, html, text }
+}
+
+export function renderProspectFollowUpReminderEmail(input: {
+  organizationName: string
+  assigneeName: string
+  overdueCount: number
+  items: Array<{
+    prospectName: string
+    campaignName: string
+    followUpDate: string
+    href: string
+  }>
+}) {
+  const subject = `${input.overdueCount} overdue prospect follow-up${input.overdueCount === 1 ? "" : "s"}`
+  const lines = input.items
+    .slice(0, 20)
+    .map(
+      (item) =>
+        `• ${item.prospectName} (${item.campaignName}) — due ${item.followUpDate}\n  ${item.href}`
+    )
+    .join("\n")
+  const text = [
+    `Hi ${input.assigneeName},`,
+    "",
+    `You have ${input.overdueCount} overdue prospect follow-up${input.overdueCount === 1 ? "" : "s"} in Fund Development:`,
+    "",
+    lines,
+    input.items.length > 20 ? `\n…and ${input.items.length - 20} more.` : "",
+    "",
+    `— ${input.organizationName}`,
+  ]
+    .filter(Boolean)
+    .join("\n")
+
+  const listHtml = input.items
+    .slice(0, 20)
+    .map(
+      (item) =>
+        `<li style="margin-bottom:8px;"><strong>${escapeHtml(item.prospectName)}</strong> · ${escapeHtml(item.campaignName)} · due ${escapeHtml(item.followUpDate)}<br /><a href="${escapeHtml(item.href)}">Open campaign prospects</a></li>`
+    )
+    .join("")
+
+  const html = wrapDonationBrandedEmailHtml({
+    organizationName: input.organizationName,
+    title: "Prospect follow-ups due",
+    bodyHtml: `<p>Hi ${escapeHtml(input.assigneeName)},</p><p>You have <strong>${input.overdueCount}</strong> overdue prospect follow-up${input.overdueCount === 1 ? "" : "s"}:</p><ul>${listHtml}</ul>`,
+  })
+
+  return { subject, html, text }
+}

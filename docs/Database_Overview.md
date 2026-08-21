@@ -377,7 +377,7 @@ Import CSV flow writes directly to `payments` + `payment_import_batches` (no row
 
 **Square plan metadata (migration `156_recurring_plan_payment_counts.sql`):** `recurring_donation_plans.total_payments` (expected count from processor export) and `payments_made` (completed count). Populated by `scripts/import-madina-recurring-plans.mjs` from Square recurring plans CSV. **`157_recurring_plan_contact_payment_method.sql`** adds `contact_payment_method_id` (FK to `contact_payment_methods`) for on-file cards on recurring plans.
 
-**Transactional email (migration `094`):** `transactional_email_log` tracks receipt, year-end statement, and pledge reminder sends. `donation_receipts.status` includes `failed`. `donation_settings.year_end_statement_email_template` for statement email body.
+**Transactional email (migration `094`):** `transactional_email_log` tracks receipt, year-end statement, and pledge reminder sends. Extended in **`266`** with `group_pledge_confirmation` and `prospect_follow_up_reminder`. `donation_receipts.status` includes `failed`. `donation_settings.year_end_statement_email_template` for statement email body.
 
 **RLS hardening (migration `095_donations_rls_hardening.sql`):** Row-level security on canonical ledger tables (`payments`, `pledges`, `donors`) plus donation operational tables (`recurring_donation_plans`, `donation_receipts`, `pledge_reminders`, `donation_checkout_sessions`, `payment_processor_events`, `donation_settings`). Staff policies require `donations.view` / `donations.manage` via `auth_user_can_view_donations` / `auth_user_can_manage_donations` (owner bypass included). Customers may SELECT/INSERT own rows through `auth_user_contact_ids` / `auth_user_donor_ids`. Service role bypass unchanged for webhooks and checkout creation.
 
@@ -393,6 +393,8 @@ Import CSV flow writes directly to `payments` + `payment_import_batches` (no row
 
 **Campaign group checkout (migration `264_campaign_group_checkout.sql`):** `donation_checkout_sessions.campaign_group_id` + `attributed_group_contact_id`. Stripe metadata + webhook payment insert carry the same fields.
 
+**Group recurring + FD emails (migration `266_group_recurring_and_fd_emails.sql`):** `recurring_donation_plans.campaign_group_id` + `attributed_group_contact_id`; invoice payments copy group attribution from the plan. `prospect_follow_up_reminder_log` dedupes daily assignee digests. Transactional email template CHECK expanded.
+
 Run after `094_transactional_email.sql`:
 
 ```bash
@@ -404,6 +406,7 @@ npx supabase db query --linked -f scripts/262_campaign_prospects.sql
 npx supabase db query --linked -f scripts/263_campaign_groups.sql
 npx supabase db query --linked -f scripts/264_campaign_group_checkout.sql
 npx supabase db query --linked -f scripts/265_donations_granular_permissions.sql
+npx supabase db query --linked -f scripts/266_group_recurring_and_fd_emails.sql
 npm run validate:donations-security
 ```
 
@@ -494,6 +497,7 @@ recurring_donation_plans.organization_id → organizations.id
 recurring_donation_plans.donor_id → donors.id
 recurring_donation_plans.contact_id → contacts.id
 recurring_donation_plans.campaign_id → campaigns.id
+recurring_donation_plans.campaign_group_id → campaign_groups.id
 recurring_donation_plans.category_id → donation_categories.id
 recurring_donation_plans.subcategory_id → donation_subcategories.id
 recurring_donation_plans.payment_method_id → payment_methods.id

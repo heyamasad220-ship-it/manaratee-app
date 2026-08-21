@@ -44,6 +44,8 @@ export async function createRecurringDonationCheckout(
       donor_id: input.donorId,
       contact_id: input.contactId,
       campaign_id: input.campaignId ?? null,
+      campaign_group_id: input.campaignGroupId ?? null,
+      attributed_group_contact_id: input.attributedGroupContactId ?? null,
       category_id: input.categoryId ?? null,
       subcategory_id: input.subcategoryId ?? null,
       amount: input.amount,
@@ -75,6 +77,8 @@ export async function createRecurringDonationCheckout(
       donor_id: input.donorId,
       contact_id: input.contactId,
       campaign_id: input.campaignId ?? null,
+      campaign_group_id: input.campaignGroupId ?? null,
+      attributed_group_contact_id: input.attributedGroupContactId ?? null,
       category_id: input.categoryId ?? null,
       subcategory_id: input.subcategoryId ?? null,
       recurring_donation_plan_id: planRow.id,
@@ -85,6 +89,8 @@ export async function createRecurringDonationCheckout(
         donor_email: input.donorEmail ?? null,
         donor_name: input.donorName ?? null,
         frequency: input.frequency,
+        campaign_group_id: input.campaignGroupId ?? null,
+        attributed_group_contact_id: input.attributedGroupContactId ?? null,
       },
     })
     .select("id")
@@ -100,6 +106,8 @@ export async function createRecurringDonationCheckout(
     donorId: input.donorId,
     contactId: input.contactId,
     campaignId: input.campaignId,
+    campaignGroupId: input.campaignGroupId,
+    attributedGroupContactId: input.attributedGroupContactId,
     categoryId: input.categoryId,
     subcategoryId: input.subcategoryId,
     recurringDonationPlanId: planRow.id,
@@ -126,8 +134,10 @@ export async function createRecurringDonationCheckout(
             unit_amount: amountCents,
             recurring,
             product_data: {
-              name: "Recurring Donation",
-              description: `${input.frequency} online donation`,
+              name: input.productName?.trim() || "Recurring Donation",
+              description:
+                input.productDescription?.trim() ||
+                `${input.frequency} online donation`,
             },
           },
           quantity: 1,
