@@ -177,6 +177,20 @@ User Invitations
 
 **Event Workspace redesign (August 2026)** — Progressive event tabs (registration / staff / youth / vendors / finance / reports) driven by `workspace_features` + attendance mode. Expenses ledger (`event_expenses`). Public event checkout (Stripe Connect when ready) + customer **My Tickets** + event documents + staff Stripe ticket refunds (including partials) + youth forms/waivers + `events.checkin` door-staff permission. Run SQL **`252_event_workspace_redesign.sql`**, **`253_event_youth_checkin_waitlist.sql`**, **`254_event_documents.sql`**, **`255_ticket_order_stripe.sql`**, **`256_customer_ticket_order_rls.sql`**, **`257_events_checkin_permission.sql`**, **`258_ticket_order_refunded_amount.sql`**, **`259_youth_waiver_forms.sql`**.
 
+**Fund Development campaign workspace Phase A (August 2026)** — Campaign detail is a tabbed workspace (Overview / Strategy / Prospects / Pledges / Donations / Groups). Optional campaign phases + Committed/Collected/Outstanding overview. Migration **`260_campaign_phases.sql`**. Strategy, Prospects, and Groups UI come in later phases.
+
+**Fund Development strategy ask levels Phase B (August 2026)** — Campaign → Strategy gift chart (`campaign_ask_levels`). Migration **`261_campaign_ask_levels.sql`**. Prospects tab still pending.
+
+**Fund Development prospects Phase C (August 2026)** — Campaign → Prospects pipeline/assignments (`campaign_prospects`). Migration **`262_campaign_prospects.sql`**. Prospect→pledge conversion linking is Phase D.
+
+**Fund Development prospect conversion Phase D (August 2026)** — Record Pledge from prospect creates one ledger pledge and links `converted_pledge_id` / `campaign_prospect_id`; suggested ask preserved.
+
+**Fund Development campaign groups Phase E (August 2026)** — Campaign → Groups with optional goals, donation tokens (`/donate/g/{token}`), QR copy/download. Migration **`263_campaign_groups.sql`**.
+
+**Fund Development public group checkout Phase F (August 2026)** — Guest Stripe Checkout on group links; webhook writes payment with `campaign_id` + `campaign_group_id`. Migration **`264_campaign_group_checkout.sql`**.
+
+**Fund Development overview insights Phase G (August 2026)** — Campaign Overview Action Required + team summary + groups rollup; Contact Financial Fund Development history (`donations.view`). No new migration.
+
 ---
 
 ## People Management Module

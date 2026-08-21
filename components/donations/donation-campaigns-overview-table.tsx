@@ -32,6 +32,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
+import { CampaignPhaseEditor } from "@/components/donations/campaign-phase-editor"
 import { CampaignProgressBar } from "@/components/donations/campaign-progress-bar"
 import {
   PledgeSummaryMetricCards,
@@ -40,6 +41,13 @@ import {
 import {
   formatDonationCurrency,
 } from "@/lib/donations/campaign-analytics"
+import {
+  draftsToPhaseWriteInputs,
+  emptyPhaseDraft,
+  phaseGoalsMatchCampaignGoal,
+  sumPhaseGoalAmounts,
+  type CampaignPhaseDraft,
+} from "@/lib/donations/campaign-phase-types"
 import { fetchPledgeSummaryMetricsAction } from "@/lib/donations/donation-list-actions"
 import {
   createCampaignAction,
@@ -141,7 +149,9 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
     startDate: "",
     endDate: "",
     status: "Draft" as CampaignStatus,
+    goalBreakdownEnabled: false,
   })
+  const [phaseDrafts, setPhaseDrafts] = useState<CampaignPhaseDraft[]>([])
   const [summaryMetrics, setSummaryMetrics] = useState<PledgeSummaryMetrics>({
     totalPledged: 0,
     totalCollected: 0,
@@ -206,7 +216,9 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
         startDate: editingCampaign.startDate,
         endDate: editingCampaign.endDate,
         status: editingCampaign.status,
+        goalBreakdownEnabled: false,
       })
+      setPhaseDrafts([])
       return
     }
 
@@ -217,7 +229,9 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
       startDate: "",
       endDate: "",
       status: "Draft",
+      goalBreakdownEnabled: false,
     })
+    setPhaseDrafts([])
   }, [editingCampaign])
 
   const sortedCampaigns = useMemo(() => sortCampaignsByStartDate(campaigns), [campaigns])
@@ -230,10 +244,33 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
   const displayedCampaigns = showAllCampaigns ? sortedCampaigns : defaultVisibleCampaigns
   const hiddenCampaignCount = Math.max(sortedCampaigns.length - defaultVisibleCampaigns.length, 0)
 
-  async function handleSaveCampaign() {
+  async function handleSaveCampaign(allowPhaseGoalMismatch = false) {
     if (!campaignForm.name.trim()) {
       alert("Campaign name is required")
       return
+    }
+
+    const goalBreakdownEnabled = campaignForm.goalBreakdownEnabled
+    const phaseInputs = goalBreakdownEnabled ? draftsToPhaseWriteInputs(phaseDrafts) : []
+
+    if (goalBreakdownEnabled && phaseInputs.length === 0) {
+      alert("Add at least one phase, or turn off Goal Breakdown.")
+      return
+    }
+
+    if (
+      goalBreakdownEnabled &&
+      !allowPhaseGoalMismatch &&
+      !phaseGoalsMatchCampaignGoal(
+        campaignForm.goalAmount ? Number(campaignForm.goalAmount) : null,
+        sumPhaseGoalAmounts(phaseDrafts)
+      )
+    ) {
+      const confirmed = window.confirm(
+        "Phase goals do not equal the overall campaign goal. Save anyway?"
+      )
+      if (!confirmed) return
+      return handleSaveCampaign(true)
     }
 
     const payload = {
@@ -243,17 +280,30 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
       start_date: campaignForm.startDate || null,
       end_date: campaignForm.endDate || null,
       status: campaignForm.status,
+      goal_breakdown_enabled: goalBreakdownEnabled,
+      phases: phaseInputs,
+      allow_phase_goal_mismatch: allowPhaseGoalMismatch,
     }
 
     if (editingCampaign) {
       const result = await updateCampaignAction(editingCampaign.id, payload)
       if (!result.success) {
+        if ("code" in result && result.code === "phase_goal_mismatch") {
+          const confirmed = window.confirm(`${result.error}\n\nSave anyway?`)
+          if (confirmed) return handleSaveCampaign(true)
+          return
+        }
         alert(result.error)
         return
       }
     } else {
       const result = await createCampaignAction(payload)
       if (!result.success) {
+        if ("code" in result && result.code === "phase_goal_mismatch") {
+          const confirmed = window.confirm(`${result.error}\n\nSave anyway?`)
+          if (confirmed) return handleSaveCampaign(true)
+          return
+        }
         alert(result.error)
         return
       }
@@ -325,7 +375,7 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
                 <TableRow>
                   <TableHead>Campaign</TableHead>
                   <TableHead>Goal</TableHead>
-                  <TableHead>Raised</TableHead>
+                  <TableHead>Collected</TableHead>
                   <TableHead>Progress</TableHead>
                   <TableHead>Status</TableHead>
                   {canManage ? <TableHead className="w-[100px]" /> : null}
@@ -426,11 +476,13 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
 
       {canManage ? (
         <Dialog open={showCampaignDialog} onOpenChange={setShowCampaignDialog}>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{editingCampaign ? "Edit Campaign" : "Add Campaign"}</DialogTitle>
               <DialogDescription>
-                {editingCampaign ? "Update campaign details" : "Create a new fundraising campaign"}
+                {editingCampaign
+                  ? "Update campaign details"
+                  : "Create a new fundraising campaign"}
               </DialogDescription>
             </DialogHeader>
             <div className="flex flex-col gap-4 py-4">
@@ -458,7 +510,7 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
                 />
               </div>
               <div className="flex flex-col gap-2">
-                <Label htmlFor="camp-goal">Goal Amount</Label>
+                <Label htmlFor="camp-goal">Overall Goal</Label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
                     $
@@ -488,7 +540,7 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
                   />
                 </div>
                 <div className="flex flex-col gap-2">
-                  <Label htmlFor="camp-end">End Date</Label>
+                  <Label htmlFor="camp-end">End Date / Event Date</Label>
                   <Input
                     id="camp-end"
                     type="date"
@@ -518,6 +570,26 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
                   </SelectContent>
                 </Select>
               </div>
+
+              {!editingCampaign ? (
+                <CampaignPhaseEditor
+                  enabled={campaignForm.goalBreakdownEnabled}
+                  onEnabledChange={(enabled) => {
+                    setCampaignForm((prev) => ({ ...prev, goalBreakdownEnabled: enabled }))
+                    if (enabled && phaseDrafts.length === 0) {
+                      setPhaseDrafts([emptyPhaseDraft(0), emptyPhaseDraft(1)])
+                    }
+                  }}
+                  phases={phaseDrafts}
+                  onPhasesChange={setPhaseDrafts}
+                  campaignGoalAmount={campaignForm.goalAmount}
+                  idPrefix="create-phase"
+                />
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Open the campaign workspace to edit goal phases for an existing campaign.
+                </p>
+              )}
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowCampaignDialog(false)}>

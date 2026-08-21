@@ -25,6 +25,7 @@ import {
   DonationMetricCardGrid,
 } from "@/components/donations/donation-metric-card"
 import { ContactPaymentMethodsPanel } from "@/components/contacts/contact-payment-methods-panel"
+import { ContactFundDevelopmentHistory } from "@/components/contacts/contact-fund-development-history"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -846,6 +847,13 @@ export function ContactFinancialPanel({
                 </CardContent>
               </Card>
             </div>
+          ) : null}
+
+          {showHomepage && !isCustomer ? (
+            <ContactFundDevelopmentHistory
+              contactId={contactId}
+              enabled={Boolean(modules.donations)}
+            />
           ) : null}
 
           {showHomepage && isGroup ? (

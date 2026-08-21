@@ -5,6 +5,9 @@ import {
   emptyPledgeDonorContext,
   type PledgeDonorContextFields,
 } from "@/lib/donations/pledge-donor-context"
+import type { CampaignPhaseMetrics } from "@/lib/donations/campaign-phase-types"
+import type { CampaignAskLevelMetrics } from "@/lib/donations/campaign-ask-level-types"
+import { askLevelTargetValue } from "@/lib/donations/campaign-ask-level-types"
 import { countsTowardGivingTotals, paymentNetAmount } from "@/lib/donations/payment-net-amount"
 import { normalizePaymentSourceChannel } from "@/lib/donations/payment-source-channel"
 
@@ -20,11 +23,15 @@ export type CampaignRow = {
   status?: string | null
   created_at?: string | null
   overview_metric_keys?: string[] | null
+  goal_breakdown_enabled?: boolean | null
 }
 
 export type CampaignPledgeRow = {
   id: string
   campaign_id?: string | null
+  campaign_phase_id?: string | null
+  campaign_group_id?: string | null
+  ask_level_id?: string | null
   donor_id?: string | null
   donor_name?: string | null
   amount_pledged?: number | null
@@ -49,6 +56,8 @@ export type CampaignOutstandingPledgeRow = {
 export type CampaignPaymentRow = {
   id: string
   campaign_id?: string | null
+  campaign_phase_id?: string | null
+  campaign_group_id?: string | null
   pledge_id?: string | null
   donor_id?: string | null
   contact_id?: string | null
@@ -146,7 +155,11 @@ export function campaignPaymentNetAmount(payment: CampaignPaymentRow): number {
 }
 
 export function isCountableCampaignPayment(payment: CampaignPaymentRow): boolean {
-  return countsTowardGivingTotals(payment)
+  return countsTowardGivingTotals({
+    amount: payment.amount,
+    refunded_amount: payment.refunded_amount,
+    status: payment.status,
+  })
 }
 
 export function buildPledgeCampaignMap(
@@ -285,6 +298,179 @@ export function classifyCampaignPaymentSource(payment: CampaignPaymentRow): Camp
   }
 
   return "other"
+}
+
+/**
+ * Resolve which campaign phase a payment belongs to without double-counting:
+ * payment.campaign_phase_id first, else the linked pledge's phase.
+ */
+export function resolvePaymentCampaignPhaseId(
+  payment: CampaignPaymentRow,
+  pledgePhaseById: Map<string, string | null | undefined>
+): string | null {
+  if (payment.campaign_phase_id) return payment.campaign_phase_id
+  if (payment.pledge_id) {
+    return pledgePhaseById.get(payment.pledge_id) ?? null
+  }
+  return null
+}
+
+export function computeCampaignPhaseMetrics(input: {
+  phases: Array<{
+    id: string
+    name: string
+    goal_amount?: number | null
+    start_date?: string | null
+    deadline?: string | null
+    sort_order?: number | null
+  }>
+  campaignId: string
+  pledges: CampaignPledgeRow[]
+  payments: CampaignPaymentRow[]
+  pledgeCampaignById: Map<string, string | null | undefined>
+}): CampaignPhaseMetrics[] {
+  const campaignPledges = filterPledgesForCampaign(input.campaignId, input.pledges)
+  const campaignPayments = filterPaymentsForCampaign(
+    input.campaignId,
+    input.payments,
+    input.pledgeCampaignById
+  )
+  const pledgePhaseById = new Map(
+    campaignPledges.map((pledge) => [pledge.id, pledge.campaign_phase_id ?? null])
+  )
+
+  const sortedPhases = [...input.phases].sort(
+    (a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0)
+  )
+
+  return sortedPhases.map((phase) => {
+    const phasePledges = campaignPledges.filter(
+      (pledge) => pledge.campaign_phase_id === phase.id
+    )
+
+    const committed = phasePledges.reduce(
+      (sum, pledge) => sum + Number(pledge.amount_pledged || 0),
+      0
+    )
+    const outstanding = phasePledges.reduce(
+      (sum, pledge) => sum + Math.max(Number(pledge.balance_remaining || 0), 0),
+      0
+    )
+
+    const collected = campaignPayments
+      .filter(
+        (payment) => resolvePaymentCampaignPhaseId(payment, pledgePhaseById) === phase.id
+      )
+      .reduce((sum, payment) => sum + campaignPaymentNetAmount(payment), 0)
+
+    const goalAmount =
+      phase.goal_amount == null ? null : Number(phase.goal_amount) || null
+    const remainingToGoal =
+      goalAmount != null && goalAmount > 0
+        ? Math.max(goalAmount - committed, 0)
+        : null
+
+    return {
+      phaseId: phase.id,
+      name: phase.name,
+      goalAmount,
+      deadline: phase.deadline ?? null,
+      startDate: phase.start_date ?? null,
+      sortOrder: Number(phase.sort_order || 0),
+      committed,
+      collected,
+      outstanding,
+      remainingToGoal,
+    }
+  })
+}
+
+/**
+ * Strategy gift-chart metrics.
+ * Prospects/Asked stay 0 until campaign_prospects exist.
+ * Secured uses ask_level_id when set; otherwise soft-matches amount_pledged ≈ ask_amount
+ * within the same campaign (and phase when the ask level has a phase).
+ */
+export function computeCampaignAskLevelMetrics(input: {
+  askLevels: Array<{
+    id: string
+    ask_amount: number
+    target_count: number
+    campaign_phase_id?: string | null
+    sort_order?: number | null
+  }>
+  phases: Array<{ id: string; name: string }>
+  campaignId: string
+  pledges: CampaignPledgeRow[]
+  /** Optional prospect stats keyed by ask_level_id (Phase C+). */
+  prospectStatsByAskLevelId?: Map<
+    string,
+    { prospects: number; asked: number }
+  >
+}): CampaignAskLevelMetrics[] {
+  const campaignPledges = filterPledgesForCampaign(input.campaignId, input.pledges)
+  const phaseNameById = new Map(input.phases.map((phase) => [phase.id, phase.name]))
+  const usedPledgeIds = new Set<string>()
+
+  const sortedLevels = [...input.askLevels].sort(
+    (a, b) =>
+      Number(a.sort_order || 0) - Number(b.sort_order || 0) ||
+      Number(b.ask_amount || 0) - Number(a.ask_amount || 0)
+  )
+
+  return sortedLevels.map((level) => {
+    const askAmount = Number(level.ask_amount || 0)
+    const targetCount = Number(level.target_count || 0)
+    const targetValue = askLevelTargetValue(askAmount, targetCount)
+    const phaseId = level.campaign_phase_id ?? null
+
+    const linked = campaignPledges.filter(
+      (pledge) =>
+        pledge.ask_level_id === level.id && !usedPledgeIds.has(pledge.id)
+    )
+
+    const softMatched =
+      linked.length > 0
+        ? []
+        : campaignPledges.filter((pledge) => {
+            if (usedPledgeIds.has(pledge.id)) return false
+            if (pledge.ask_level_id) return false
+            if (Math.abs(Number(pledge.amount_pledged || 0) - askAmount) > 0.01) {
+              return false
+            }
+            if (phaseId && pledge.campaign_phase_id && pledge.campaign_phase_id !== phaseId) {
+              return false
+            }
+            return true
+          })
+
+    const securedPledges = linked.length > 0 ? linked : softMatched
+    for (const pledge of securedPledges) {
+      usedPledgeIds.add(pledge.id)
+    }
+
+    const securedCount = securedPledges.length
+    const amountSecured = securedPledges.reduce(
+      (sum, pledge) => sum + Number(pledge.amount_pledged || 0),
+      0
+    )
+    const prospectStats = input.prospectStatsByAskLevelId?.get(level.id)
+
+    return {
+      askLevelId: level.id,
+      askAmount,
+      targetCount,
+      targetValue,
+      campaignPhaseId: phaseId,
+      campaignPhaseName: phaseId ? phaseNameById.get(phaseId) ?? null : null,
+      sortOrder: Number(level.sort_order || 0),
+      prospects: prospectStats?.prospects ?? 0,
+      asked: prospectStats?.asked ?? 0,
+      securedCount,
+      amountSecured,
+      gap: Math.max(targetValue - amountSecured, 0),
+    }
+  })
 }
 
 export function computeCampaignSourceBreakdown(
@@ -956,28 +1142,85 @@ export async function fetchCampaignAnalyticsData(
     supabase
       .from("pledge_status_view")
       .select(
-        "id, campaign_id, donor_id, donor_name, amount_pledged, amount_paid, balance_remaining, calculated_status, pledge_date"
+        "id, campaign_id, campaign_phase_id, donor_id, donor_name, amount_pledged, amount_paid, balance_remaining, calculated_status, pledge_date"
       )
       .eq("organization_id", organizationId),
     supabase
       .from("payments")
       .select(
-        "id, campaign_id, pledge_id, donor_id, contact_id, sender_name, amount, refunded_amount, payment_date, source, status, memo, recurring_donation_plan_id"
+        "id, campaign_id, campaign_phase_id, pledge_id, donor_id, contact_id, sender_name, amount, refunded_amount, payment_date, source, status, memo, recurring_donation_plan_id"
       )
       .eq("organization_id", organizationId)
       .order("payment_date", { ascending: false }),
   ])
 
+  let pledges = (pledgesResult.data || []) as CampaignPledgeRow[]
+  let payments = (paymentsResult.data || []) as CampaignPaymentRow[]
+  let pledgesError = pledgesResult.error?.message || null
+  let paymentsError = paymentsResult.error?.message || null
+
+  // Graceful fallback before migration 260 / view refresh.
+  if (
+    pledgesResult.error &&
+    (pledgesResult.error.code === "42703" ||
+      /campaign_phase_id/i.test(pledgesResult.error.message || ""))
+  ) {
+    const legacyPledges = await supabase
+      .from("pledge_status_view")
+      .select(
+        "id, campaign_id, donor_id, donor_name, amount_pledged, amount_paid, balance_remaining, calculated_status, pledge_date"
+      )
+      .eq("organization_id", organizationId)
+    pledges = (legacyPledges.data || []) as CampaignPledgeRow[]
+    pledgesError = legacyPledges.error?.message || null
+  }
+
+  // ask_level_id is on pledges (migration 261), not pledge_status_view yet.
+  if (!pledgesError && pledges.length > 0) {
+    const ids = pledges.map((pledge) => pledge.id)
+    const askLevelResult = await supabase
+      .from("pledges")
+      .select("id, ask_level_id")
+      .eq("organization_id", organizationId)
+      .in("id", ids)
+
+    if (!askLevelResult.error && askLevelResult.data) {
+      const askById = new Map(
+        askLevelResult.data.map((row) => [
+          row.id as string,
+          (row.ask_level_id as string | null) ?? null,
+        ])
+      )
+      pledges = pledges.map((pledge) => ({
+        ...pledge,
+        ask_level_id: askById.get(pledge.id) ?? null,
+      }))
+    }
+  }
+
+  if (
+    paymentsResult.error &&
+    (paymentsResult.error.code === "42703" ||
+      /campaign_phase_id/i.test(paymentsResult.error.message || ""))
+  ) {
+    const legacyPayments = await supabase
+      .from("payments")
+      .select(
+        "id, campaign_id, pledge_id, donor_id, contact_id, sender_name, amount, refunded_amount, payment_date, source, status, memo, recurring_donation_plan_id"
+      )
+      .eq("organization_id", organizationId)
+      .order("payment_date", { ascending: false })
+    payments = (legacyPayments.data || []) as CampaignPaymentRow[]
+    paymentsError = legacyPayments.error?.message || null
+  }
+
   const error =
-    campaignsResult.error?.message ||
-    pledgesResult.error?.message ||
-    paymentsResult.error?.message ||
-    null
+    campaignsResult.error?.message || pledgesError || paymentsError || null
 
   return {
     campaigns: (campaignsResult.data || []) as CampaignRow[],
-    pledges: (pledgesResult.data || []) as CampaignPledgeRow[],
-    payments: (paymentsResult.data || []) as CampaignPaymentRow[],
+    pledges,
+    payments,
     error,
   }
 }

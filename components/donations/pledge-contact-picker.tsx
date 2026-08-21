@@ -15,6 +15,8 @@ type PledgeContactPickerProps = {
   contactLabel?: string
   onChange: (contactId: string, label: string) => void
   disabled?: boolean
+  label?: string
+  inputId?: string
 }
 
 export function PledgeContactPicker({
@@ -23,6 +25,8 @@ export function PledgeContactPicker({
   contactLabel,
   onChange,
   disabled = false,
+  label = "Assigned to",
+  inputId = "pledge-contact-picker",
 }: PledgeContactPickerProps) {
   const [search, setSearch] = useState(contactLabel || "")
   const [searching, setSearching] = useState(false)
@@ -74,11 +78,11 @@ export function PledgeContactPicker({
 
   return (
     <div className="space-y-2">
-      <Label htmlFor="pledge-contact-picker">Assigned to</Label>
+      <Label htmlFor={inputId}>{label}</Label>
       <div className="relative">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
-          id="pledge-contact-picker"
+          id={inputId}
           value={search}
           disabled={disabled}
           placeholder="Search person, organization, or group"

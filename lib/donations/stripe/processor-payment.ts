@@ -57,6 +57,14 @@ function resolveAttribution(
   return {
     campaign_id:
       optionalUuid(metadata.campaign_id) ?? optionalUuid(checkoutSession?.campaign_id) ?? null,
+    campaign_group_id:
+      optionalUuid(metadata.campaign_group_id) ??
+      optionalUuid(checkoutSession?.campaign_group_id) ??
+      null,
+    attributed_group_contact_id:
+      optionalUuid(metadata.attributed_group_contact_id) ??
+      optionalUuid(checkoutSession?.attributed_group_contact_id) ??
+      null,
     category_id:
       optionalUuid(metadata.category_id) ?? optionalUuid(checkoutSession?.category_id) ?? null,
     subcategory_id:
@@ -150,6 +158,8 @@ export async function insertProcessorPaymentFromCheckout(
       status: "unallocated",
       is_verified: true,
       campaign_id: attribution.campaign_id,
+      campaign_group_id: attribution.campaign_group_id,
+      attributed_group_contact_id: attribution.attributed_group_contact_id,
       category_id: attribution.category_id,
       subcategory_id: attribution.subcategory_id,
       stripe_checkout_session_id: input.stripeCheckoutSessionId,

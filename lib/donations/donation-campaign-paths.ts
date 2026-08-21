@@ -12,3 +12,10 @@ export function isDonationCampaignsSectionPath(pathname: string) {
     isDonationCampaignsDetailPath(pathname)
   )
 }
+
+export {
+  donationCampaignWorkspaceHref,
+  parseCampaignWorkspaceTab,
+  type CampaignWorkspaceTab,
+} from "@/lib/donations/campaign-workspace-paths"
+

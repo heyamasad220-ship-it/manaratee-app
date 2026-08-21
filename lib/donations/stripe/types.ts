@@ -7,6 +7,8 @@ export type DonationCheckoutMetadata = {
   donor_id: string
   contact_id: string
   campaign_id?: string
+  campaign_group_id?: string
+  attributed_group_contact_id?: string
   category_id?: string
   subcategory_id?: string
   recurring_donation_plan_id?: string
@@ -20,12 +22,16 @@ export type CreateOneTimeDonationCheckoutInput = {
   contactId: string
   amount: number
   campaignId?: string | null
+  campaignGroupId?: string | null
+  attributedGroupContactId?: string | null
   categoryId?: string | null
   subcategoryId?: string | null
   successUrl?: string
   cancelUrl?: string
   donorEmail?: string | null
   donorName?: string | null
+  productName?: string | null
+  productDescription?: string | null
 }
 
 export type ProcessorPaymentInsertResult = {

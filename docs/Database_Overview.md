@@ -350,20 +350,24 @@ Import CSV flow writes directly to `payments` + `payment_import_batches` (no row
 
 **`payments.source` constraint (patch `131_payments_source_square.sql`):** lowercase channel keys (`cash`, `check`, **`square`**, `zelle`, `venmo`, `paypal`, `stripe`, `import`, `manual`). **`square`** = Square terminal batch deposit on a campaign (no donor/contact). Campaign overview classifies via memo `|batch|square|` or `source = square`. Customer portal normalizes configured payment method display names via `lib/donations/payment-source-channel.ts` before insert.
 
-* campaigns (`goal_amount`, `description`, `start_date`, `end_date`, `status`, `code`, `overview_metric_keys` — migration `134`; `flyer_url` — migration `160` for customer portal campaign cards)
+* campaigns (`goal_amount`, `description`, `start_date`, `end_date`, `status`, `code`, `overview_metric_keys` — migration `134`; `flyer_url` — migration `160` for customer portal campaign cards; `goal_breakdown_enabled` — migration `260`)
+* campaign_phases (optional goal phases per campaign — migration `260`; RLS via donations view/manage helpers)
+* campaign_ask_levels (strategy gift chart — migration `261`; optional `campaign_phase_id`; RLS via donations helpers)
+* campaign_prospects (pre-pledge pipeline — migration `262`; contact + optional ask level / assignee / converted pledge; unique contact per campaign; RLS via donations helpers)
+* campaign_groups (campaign fundraising teams — migration `263`; optional org group contact + lead; opaque `public_token`; staff RLS; public pages resolve via service role)
 * donors
 * donation_categories
 * donation_subcategories (`is_active` — migration `161`; when false the fund is closed and hidden from new donation pickers; migration `162` blocks customer portal `payments` inserts to closed funds)
-* pledges (`installment_amount`, `total_payments`, `first_payment_date`, `next_payment_date` added in migration `158` for customer portal installment pledges)
-* payments
+* pledges (`installment_amount`, `total_payments`, `first_payment_date`, `next_payment_date` added in migration `158` for customer portal installment pledges; `campaign_phase_id` — migration `260`; `ask_level_id` — migration `261`; `campaign_prospect_id` — migration `262`; `campaign_group_id` — migration `263`)
+* payments (`campaign_phase_id` — migration `260`; `campaign_group_id` — migration `263`)
 * payment_methods
 * donor_summary_view
-* pledge_status_view
+* pledge_status_view (includes `campaign_phase_id` after migration `260`)
 * donation_settings (receipt + pledge reminder config per org — migrations `090`, `091`)
 * donation_receipts (payment receipts + annual statements — canonical payments only)
 * pledge_reminders (pledge collection reminder activity log — migration `091`)
 * recurring_donation_plans (ongoing giving schedules — migration `092`; not pledges; `daily` frequency added in migration `155`; `total_payments` / `payments_made` added in migration `156`)
-* donation_checkout_sessions (in-flight Stripe Checkout — migration `093`; not a payment ledger)
+* donation_checkout_sessions (in-flight Stripe Checkout — migration `093`; campaign group attribution — `264`; not a payment ledger)
 * payment_processor_events (Stripe webhook audit + idempotency — migration `093`)
 * transactional_email_log (operational donation email audit — migration `094`)
 
@@ -379,11 +383,26 @@ Import CSV flow writes directly to `payments` + `payment_import_batches` (no row
 
 **Campaigns RLS (migration `258_campaigns_rls_policies.sql`):** Same permission helpers on `campaigns` (staff SELECT/INSERT/UPDATE/DELETE). Active org members may SELECT `status = active` rows for customer portal campaign pickers. Staff campaign create/edit/delete on `/donations/campaigns` goes through server actions that write with the service role after `donations.manage` checks (selected org cookie).
 
+**Campaign phases (migration `260_campaign_phases.sql`):** `campaign_phases` table (org + campaign scoped) with RLS using `auth_user_can_view_donations` / `auth_user_can_manage_donations`. Nullable `campaign_phase_id` on `pledges` and `payments`. `campaigns.goal_breakdown_enabled`. Recreates `pledge_status_view` / `donor_summary_view` to expose `campaign_phase_id`. Phase metrics are computed in `computeCampaignPhaseMetrics` (Committed / Collected / Outstanding; payments inherit pledge phase when payment phase is null — no double count).
+
+**Campaign ask levels (migration `261_campaign_ask_levels.sql`):** `campaign_ask_levels` (org + campaign scoped, optional phase FK). Nullable `pledges.ask_level_id`. Strategy metrics via `computeCampaignAskLevelMetrics` (target value = ask × count; secured from linked pledges or soft amount match; prospects/asked filled when prospects exist).
+
+**Campaign prospects (migration `262_campaign_prospects.sql`):** `campaign_prospects` (org + campaign scoped; FK to contacts, optional ask level / assignee contact / converted pledge). Unique `(campaign_id, contact_id)`. Nullable `pledges.campaign_prospect_id`. RLS via donations view/manage helpers.
+
+**Campaign groups (migration `263_campaign_groups.sql`):** `campaign_groups` with opaque `public_token`, optional `organizational_group_id` / `lead_contact_id`, optional `goal_amount`. Nullable `campaign_group_id` on `pledges` and `payments`. Staff RLS; public `/donate/g/{token}` resolves via service role (no anon table dump).
+
+**Campaign group checkout (migration `264_campaign_group_checkout.sql`):** `donation_checkout_sessions.campaign_group_id` + `attributed_group_contact_id`. Stripe metadata + webhook payment insert carry the same fields.
+
 Run after `094_transactional_email.sql`:
 
 ```bash
 npx supabase db query --linked -f scripts/095_donations_rls_hardening.sql
 npx supabase db query --linked -f scripts/258_campaigns_rls_policies.sql
+npx supabase db query --linked -f scripts/260_campaign_phases.sql
+npx supabase db query --linked -f scripts/261_campaign_ask_levels.sql
+npx supabase db query --linked -f scripts/262_campaign_prospects.sql
+npx supabase db query --linked -f scripts/263_campaign_groups.sql
+npx supabase db query --linked -f scripts/264_campaign_group_checkout.sql
 npm run validate:donations-security
 ```
 
@@ -416,6 +435,21 @@ Key relationships:
 
 ```text
 campaigns.organization_id → organizations.id
+campaign_phases.organization_id → organizations.id
+campaign_phases.campaign_id → campaigns.id
+campaign_ask_levels.organization_id → organizations.id
+campaign_ask_levels.campaign_id → campaigns.id
+campaign_ask_levels.campaign_phase_id → campaign_phases.id
+campaign_prospects.organization_id → organizations.id
+campaign_prospects.campaign_id → campaigns.id
+campaign_prospects.contact_id → contacts.id
+campaign_prospects.ask_level_id → campaign_ask_levels.id
+campaign_prospects.assigned_to_contact_id → contacts.id
+campaign_prospects.converted_pledge_id → pledges.id
+campaign_groups.organization_id → organizations.id
+campaign_groups.campaign_id → campaigns.id
+campaign_groups.organizational_group_id → contacts.id
+campaign_groups.lead_contact_id → contacts.id
 donors.organization_id → organizations.id
 donors.contact_id → contacts.id
 
@@ -424,6 +458,10 @@ donation_subcategories.category_id → donation_categories.id
 pledges.organization_id → organizations.id
 pledges.donor_id → donors.id
 pledges.campaign_id → campaigns.id
+pledges.campaign_phase_id → campaign_phases.id
+pledges.ask_level_id → campaign_ask_levels.id
+pledges.campaign_prospect_id → campaign_prospects.id
+pledges.campaign_group_id → campaign_groups.id
 pledges.category_id → donation_categories.id
 pledges.subcategory_id → donation_subcategories.id
 
@@ -432,6 +470,8 @@ payments.donor_id → donors.id
 payments.contact_id → contacts.id
 payments.pledge_id → pledges.id
 payments.campaign_id → campaigns.id
+payments.campaign_phase_id → campaign_phases.id
+payments.campaign_group_id → campaign_groups.id
 payments.category_id → donation_categories.id
 payments.subcategory_id → donation_subcategories.id
 payments.payment_method_id → payment_methods.id
@@ -462,6 +502,8 @@ donation_checkout_sessions.organization_id → organizations.id
 donation_checkout_sessions.donor_id → donors.id
 donation_checkout_sessions.contact_id → contacts.id
 donation_checkout_sessions.campaign_id → campaigns.id
+donation_checkout_sessions.campaign_group_id → campaign_groups.id
+donation_checkout_sessions.attributed_group_contact_id → contacts.id
 donation_checkout_sessions.category_id → donation_categories.id
 donation_checkout_sessions.subcategory_id → donation_subcategories.id
 donation_checkout_sessions.payment_id → payments.id

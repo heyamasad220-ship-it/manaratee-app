@@ -62,6 +62,8 @@ export async function createOneTimeDonationCheckout(
       donor_id: input.donorId,
       contact_id: input.contactId,
       campaign_id: input.campaignId ?? null,
+      campaign_group_id: input.campaignGroupId ?? null,
+      attributed_group_contact_id: input.attributedGroupContactId ?? null,
       category_id: input.categoryId ?? null,
       subcategory_id: input.subcategoryId ?? null,
       amount: input.amount,
@@ -70,6 +72,8 @@ export async function createOneTimeDonationCheckout(
       metadata: {
         donor_email: input.donorEmail ?? null,
         donor_name: input.donorName ?? null,
+        campaign_group_id: input.campaignGroupId ?? null,
+        attributed_group_contact_id: input.attributedGroupContactId ?? null,
       },
     })
     .select("id")
@@ -84,6 +88,8 @@ export async function createOneTimeDonationCheckout(
     donorId: input.donorId,
     contactId: input.contactId,
     campaignId: input.campaignId,
+    campaignGroupId: input.campaignGroupId,
+    attributedGroupContactId: input.attributedGroupContactId,
     categoryId: input.categoryId,
     subcategoryId: input.subcategoryId,
     checkoutType: "one_time",
@@ -107,8 +113,9 @@ export async function createOneTimeDonationCheckout(
             currency: "usd",
             unit_amount: amountCents,
             product_data: {
-              name: "Donation",
-              description: "One-time online donation",
+              name: input.productName?.trim() || "Donation",
+              description:
+                input.productDescription?.trim() || "One-time online donation",
             },
           },
           quantity: 1,

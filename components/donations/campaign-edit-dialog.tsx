@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 
+import { CampaignPhaseEditor } from "@/components/donations/campaign-phase-editor"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -24,6 +25,15 @@ import {
 import { updateCampaignAction } from "@/lib/donations/donation-reports-actions"
 import type { CampaignRow } from "@/lib/donations/campaign-analytics"
 import { formatCampaignStatusLabel } from "@/lib/donations/campaign-analytics"
+import {
+  draftsToPhaseWriteInputs,
+  emptyPhaseDraft,
+  phaseDraftsFromRows,
+  phaseGoalsMatchCampaignGoal,
+  sumPhaseGoalAmounts,
+  type CampaignPhaseDraft,
+  type CampaignPhaseRow,
+} from "@/lib/donations/campaign-phase-types"
 
 type CampaignStatus = "Active" | "Completed" | "Draft" | "Paused"
 
@@ -37,6 +47,7 @@ function statusToForm(status: string | null | undefined): CampaignStatus {
 
 type CampaignEditDialogProps = {
   campaign: CampaignRow
+  phases?: CampaignPhaseRow[]
   open: boolean
   onOpenChange: (open: boolean) => void
   onSaved: (campaign: CampaignRow) => void
@@ -44,6 +55,7 @@ type CampaignEditDialogProps = {
 
 export function CampaignEditDialog({
   campaign,
+  phases = [],
   open,
   onOpenChange,
   onSaved,
@@ -56,7 +68,11 @@ export function CampaignEditDialog({
     startDate: campaign.start_date || "",
     endDate: campaign.end_date || "",
     status: statusToForm(campaign.status),
+    goalBreakdownEnabled: Boolean(campaign.goal_breakdown_enabled || phases.length > 0),
   })
+  const [phaseDrafts, setPhaseDrafts] = useState<CampaignPhaseDraft[]>(
+    phases.length > 0 ? phaseDraftsFromRows(phases) : []
+  )
 
   useEffect(() => {
     if (!open) return
@@ -67,10 +83,35 @@ export function CampaignEditDialog({
       startDate: campaign.start_date || "",
       endDate: campaign.end_date || "",
       status: statusToForm(campaign.status),
+      goalBreakdownEnabled: Boolean(campaign.goal_breakdown_enabled || phases.length > 0),
     })
-  }, [campaign, open])
+    setPhaseDrafts(phases.length > 0 ? phaseDraftsFromRows(phases) : [])
+  }, [campaign, open, phases])
 
-  async function handleSave() {
+  async function handleSave(allowPhaseGoalMismatch = false) {
+    const goalBreakdownEnabled = form.goalBreakdownEnabled
+    const phaseInputs = goalBreakdownEnabled ? draftsToPhaseWriteInputs(phaseDrafts) : []
+
+    if (goalBreakdownEnabled && phaseInputs.length === 0) {
+      alert("Add at least one phase, or turn off Goal Breakdown.")
+      return
+    }
+
+    if (
+      goalBreakdownEnabled &&
+      !allowPhaseGoalMismatch &&
+      !phaseGoalsMatchCampaignGoal(
+        form.goalAmount ? Number(form.goalAmount) : null,
+        sumPhaseGoalAmounts(phaseDrafts)
+      )
+    ) {
+      const confirmed = window.confirm(
+        "Phase goals do not equal the overall campaign goal. Save anyway?"
+      )
+      if (!confirmed) return
+      return handleSave(true)
+    }
+
     setSaving(true)
     const result = await updateCampaignAction(campaign.id, {
       name: form.name,
@@ -79,10 +120,20 @@ export function CampaignEditDialog({
       start_date: form.startDate || null,
       end_date: form.endDate || null,
       status: form.status,
+      goal_breakdown_enabled: goalBreakdownEnabled,
+      phases: phaseInputs,
+      allow_phase_goal_mismatch: allowPhaseGoalMismatch,
     })
     setSaving(false)
 
     if (!result.success) {
+      if ("code" in result && result.code === "phase_goal_mismatch") {
+        const confirmed = window.confirm(`${result.error}\n\nSave anyway?`)
+        if (confirmed) {
+          void handleSave(true)
+        }
+        return
+      }
       alert(result.error || "Failed to update campaign")
       return
     }
@@ -93,10 +144,10 @@ export function CampaignEditDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit Campaign</DialogTitle>
-          <DialogDescription>Update campaign details</DialogDescription>
+          <DialogDescription>Update campaign details and optional goal phases</DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col gap-4 py-4">
@@ -127,7 +178,7 @@ export function CampaignEditDialog({
           </div>
 
           <div className="flex flex-col gap-2">
-            <Label htmlFor="camp-goal">Goal Amount</Label>
+            <Label htmlFor="camp-goal">Overall Goal</Label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
                 $
@@ -153,7 +204,7 @@ export function CampaignEditDialog({
               />
             </div>
             <div className="flex flex-col gap-2">
-              <Label htmlFor="camp-end">End Date</Label>
+              <Label htmlFor="camp-end">End Date / Event Date</Label>
               <Input
                 id="camp-end"
                 type="date"
@@ -182,13 +233,27 @@ export function CampaignEditDialog({
               </SelectContent>
             </Select>
           </div>
+
+          <CampaignPhaseEditor
+            enabled={form.goalBreakdownEnabled}
+            onEnabledChange={(enabled) => {
+              setForm((prev) => ({ ...prev, goalBreakdownEnabled: enabled }))
+              if (enabled && phaseDrafts.length === 0) {
+                setPhaseDrafts([emptyPhaseDraft(0), emptyPhaseDraft(1)])
+              }
+            }}
+            phases={phaseDrafts}
+            onPhasesChange={setPhaseDrafts}
+            campaignGoalAmount={form.goalAmount}
+            idPrefix="edit-phase"
+          />
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={saving}>
+          <Button onClick={() => void handleSave()} disabled={saving}>
             {saving ? "Saving..." : "Save Changes"}
           </Button>
         </DialogFooter>

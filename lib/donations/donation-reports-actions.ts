@@ -6,6 +6,8 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { requireDonationStaffAccess } from "@/lib/donations/donation-action-auth"
 import {
   buildPledgeCampaignMap,
+  computeCampaignAskLevelMetrics,
+  computeCampaignPhaseMetrics,
   computeCampaignSourceBreakdown,
   fetchCampaignAnalyticsData,
   fetchCampaignAnalyticsEntries,
@@ -17,6 +19,15 @@ import {
   type CampaignAnalyticsEntry,
   type CampaignRow,
 } from "@/lib/donations/campaign-analytics"
+import {
+  fetchCampaignAskLevels,
+} from "@/lib/donations/campaign-ask-level-actions"
+import { fetchCampaignProspectAskLevelStats } from "@/lib/donations/campaign-prospect-actions"
+import {
+  fetchCampaignPhases,
+  syncCampaignPhases,
+} from "@/lib/donations/campaign-phase-actions"
+import type { CampaignPhaseWriteInput } from "@/lib/donations/campaign-phase-types"
 import { ensureCampaignDonationFund } from "@/lib/donations/ensure-campaign-donation-fund"
 import { createServiceRoleClient } from "@/lib/supabase/service-role"
 import {
@@ -33,6 +44,9 @@ import { getPledgeCollectionReportAction } from "@/lib/donations/pledge-reminder
 import { getReceiptReportingSummaryAction } from "@/lib/donations/receipt-actions"
 
 const CAMPAIGN_SELECT =
+  "id, organization_id, name, code, description, goal_amount, start_date, end_date, status, created_at, overview_metric_keys, goal_breakdown_enabled"
+
+const CAMPAIGN_SELECT_WITH_METRICS =
   "id, organization_id, name, code, description, goal_amount, start_date, end_date, status, created_at, overview_metric_keys"
 
 const CAMPAIGN_SELECT_LEGACY =
@@ -45,6 +59,10 @@ type CampaignWriteInput = {
   start_date?: string | null
   end_date?: string | null
   status?: string | null
+  goal_breakdown_enabled?: boolean
+  phases?: CampaignPhaseWriteInput[]
+  /** When true, skip phase goal ≠ campaign goal validation (admin acknowledged warning). */
+  allow_phase_goal_mismatch?: boolean
 }
 
 function generateCampaignCode(campaignName: string) {
@@ -83,20 +101,50 @@ async function fetchCampaignRow(
   orgId: string,
   campaignId: string
 ) {
-  const withMetrics = await supabase
+  const withBreakdown = await supabase
     .from("campaigns")
     .select(CAMPAIGN_SELECT)
     .eq("organization_id", orgId)
     .eq("id", campaignId)
     .maybeSingle()
 
-  if (!withMetrics.error) {
+  if (!withBreakdown.error) {
+    return withBreakdown
+  }
+
+  if (
+    withBreakdown.error.code === "42703" ||
+    /goal_breakdown_enabled/i.test(withBreakdown.error.message || "")
+  ) {
+    const withMetrics = await supabase
+      .from("campaigns")
+      .select(CAMPAIGN_SELECT_WITH_METRICS)
+      .eq("organization_id", orgId)
+      .eq("id", campaignId)
+      .maybeSingle()
+
+    if (!withMetrics.error) {
+      return withMetrics
+    }
+
+    if (
+      withMetrics.error.code === "42703" ||
+      /overview_metric_keys/i.test(withMetrics.error.message || "")
+    ) {
+      return supabase
+        .from("campaigns")
+        .select(CAMPAIGN_SELECT_LEGACY)
+        .eq("organization_id", orgId)
+        .eq("id", campaignId)
+        .maybeSingle()
+    }
+
     return withMetrics
   }
 
   if (
-    withMetrics.error.code === "42703" ||
-    /overview_metric_keys/i.test(withMetrics.error.message || "")
+    withBreakdown.error.code === "42703" ||
+    /overview_metric_keys/i.test(withBreakdown.error.message || "")
   ) {
     return supabase
       .from("campaigns")
@@ -106,7 +154,76 @@ async function fetchCampaignRow(
       .maybeSingle()
   }
 
-  return withMetrics
+  return withBreakdown
+}
+
+function validatePhaseGoalsAgainstCampaign(input: {
+  goalAmount: number | null | undefined
+  goalBreakdownEnabled: boolean
+  phases: CampaignPhaseWriteInput[]
+  allowMismatch?: boolean
+}): { ok: true } | { ok: false; error: string; code?: "phase_goal_mismatch" } {
+  if (!input.goalBreakdownEnabled || input.phases.length === 0) {
+    return { ok: true }
+  }
+
+  const phaseSum = input.phases.reduce(
+    (sum, phase) => sum + Number(phase.goal_amount || 0),
+    0
+  )
+  const campaignGoal = Number(input.goalAmount || 0)
+  if (!(campaignGoal > 0)) return { ok: true }
+
+  if (Math.abs(campaignGoal - phaseSum) < 0.01) {
+    return { ok: true }
+  }
+
+  if (input.allowMismatch) {
+    return { ok: true }
+  }
+
+  return {
+    ok: false,
+    code: "phase_goal_mismatch",
+    error: `Phase goals total ${phaseSum.toLocaleString("en-US", {
+      style: "currency",
+      currency: "USD",
+    })} but the campaign goal is ${campaignGoal.toLocaleString("en-US", {
+      style: "currency",
+      currency: "USD",
+    })}. Confirm to save anyway, or adjust the phase amounts.`,
+  }
+}
+
+async function selectCampaignAfterWrite(
+  writeClient: SupabaseClient,
+  orgId: string,
+  campaignId: string
+) {
+  const full = await writeClient
+    .from("campaigns")
+    .select(CAMPAIGN_SELECT)
+    .eq("organization_id", orgId)
+    .eq("id", campaignId)
+    .maybeSingle()
+
+  if (!full.error && full.data) return full
+
+  const withMetrics = await writeClient
+    .from("campaigns")
+    .select(CAMPAIGN_SELECT_WITH_METRICS)
+    .eq("organization_id", orgId)
+    .eq("id", campaignId)
+    .maybeSingle()
+
+  if (!withMetrics.error && withMetrics.data) return withMetrics
+
+  return writeClient
+    .from("campaigns")
+    .select(CAMPAIGN_SELECT_LEGACY)
+    .eq("organization_id", orgId)
+    .eq("id", campaignId)
+    .maybeSingle()
 }
 
 export async function getCampaignAnalyticsAction() {
@@ -180,9 +297,51 @@ export async function getCampaignDetailAction(campaignId: string) {
       campaignId
     )
 
+    let phases: Awaited<ReturnType<typeof fetchCampaignPhases>> = []
+    try {
+      phases = await fetchCampaignPhases(access.supabase, access.orgId, campaignId)
+    } catch {
+      phases = []
+    }
+
+    const phaseMetrics = computeCampaignPhaseMetrics({
+      phases,
+      campaignId,
+      pledges: analyticsData.pledges,
+      payments: analyticsData.payments,
+      pledgeCampaignById: buildPledgeCampaignMap(analyticsData.pledges),
+    })
+
+    let askLevels: Awaited<ReturnType<typeof fetchCampaignAskLevels>> = []
+    try {
+      askLevels = await fetchCampaignAskLevels(access.supabase, access.orgId, campaignId)
+    } catch {
+      askLevels = []
+    }
+
+    const askLevelMetrics = computeCampaignAskLevelMetrics({
+      askLevels,
+      phases,
+      campaignId,
+      pledges: analyticsData.pledges,
+      prospectStatsByAskLevelId: await fetchCampaignProspectAskLevelStats(
+        access.orgId,
+        campaignId
+      ),
+    })
+
+    const goalBreakdownEnabled = Boolean(
+      "goal_breakdown_enabled" in campaign
+        ? campaign.goal_breakdown_enabled
+        : phases.length > 0
+    )
+
     return {
       success: true as const,
-      campaign: campaign as CampaignRow,
+      campaign: {
+        ...(campaign as CampaignRow),
+        goal_breakdown_enabled: goalBreakdownEnabled,
+      },
       overviewMetricKeys: parseCampaignOverviewMetricKeys(
         "overview_metric_keys" in campaign ? campaign.overview_metric_keys : null
       ),
@@ -190,6 +349,10 @@ export async function getCampaignDetailAction(campaignId: string) {
       insights,
       sourceBreakdown,
       outstandingPledges,
+      phases,
+      phaseMetrics,
+      askLevels,
+      askLevelMetrics,
       canManage: access.canManage,
     }
   } catch (error) {
@@ -203,6 +366,23 @@ export async function createCampaignAction(input: CampaignWriteInput) {
 
   const name = input.name.trim()
   if (!name) return { success: false as const, error: "Campaign name is required" }
+
+  const goalBreakdownEnabled = Boolean(input.goal_breakdown_enabled)
+  const phases = goalBreakdownEnabled ? input.phases || [] : []
+
+  const phaseValidation = validatePhaseGoalsAgainstCampaign({
+    goalAmount: input.goal_amount,
+    goalBreakdownEnabled,
+    phases,
+    allowMismatch: input.allow_phase_goal_mismatch,
+  })
+  if (!phaseValidation.ok) {
+    return {
+      success: false as const,
+      error: phaseValidation.error,
+      code: phaseValidation.code,
+    }
+  }
 
   try {
     const writeClient = createServiceRoleClient()
@@ -220,25 +400,74 @@ export async function createCampaignAction(input: CampaignWriteInput) {
       return { success: false as const, error: "A campaign with this name already exists" }
     }
 
-    const { data: campaign, error } = await writeClient
-      .from("campaigns")
-      .insert({
-        organization_id: access.orgId,
-        name,
-        description: input.description?.trim() || null,
-        goal_amount: input.goal_amount ?? null,
-        start_date: input.start_date || null,
-        end_date: input.end_date || null,
-        status: input.status?.toLowerCase() || "draft",
-        code: generateCampaignCode(name),
-      })
-      .select(CAMPAIGN_SELECT)
-      .single()
+    const insertPayload: Record<string, unknown> = {
+      organization_id: access.orgId,
+      name,
+      description: input.description?.trim() || null,
+      goal_amount: input.goal_amount ?? null,
+      start_date: input.start_date || null,
+      end_date: input.end_date || null,
+      status: input.status?.toLowerCase() || "draft",
+      code: generateCampaignCode(name),
+      goal_breakdown_enabled: goalBreakdownEnabled,
+    }
+
+    let campaign: CampaignRow | null = null
+    let error: { message?: string; code?: string; details?: string | null } | null = null
+
+    {
+      const inserted = await writeClient
+        .from("campaigns")
+        .insert(insertPayload)
+        .select(CAMPAIGN_SELECT)
+        .single()
+      campaign = (inserted.data as CampaignRow | null) ?? null
+      error = inserted.error
+    }
+
+    if (
+      error &&
+      (error.code === "42703" || /goal_breakdown_enabled/i.test(error.message || ""))
+    ) {
+      delete insertPayload.goal_breakdown_enabled
+      const retry = await writeClient
+        .from("campaigns")
+        .insert(insertPayload)
+        .select(CAMPAIGN_SELECT_WITH_METRICS)
+        .single()
+      campaign = (retry.data as CampaignRow | null) ?? null
+      error = retry.error
+    }
+
+    if (
+      error &&
+      (error.code === "42703" || /overview_metric_keys/i.test(error.message || ""))
+    ) {
+      const retry = await writeClient
+        .from("campaigns")
+        .insert(insertPayload)
+        .select(CAMPAIGN_SELECT_LEGACY)
+        .single()
+      campaign = (retry.data as CampaignRow | null) ?? null
+      error = retry.error
+    }
 
     if (error || !campaign) {
       return {
         success: false as const,
         error: formatCampaignWriteError(error, "Failed to create campaign"),
+      }
+    }
+
+    if (goalBreakdownEnabled && phases.length > 0) {
+      const syncResult = await syncCampaignPhases(
+        access.orgId,
+        campaign.id,
+        phases,
+        { goalBreakdownEnabled: true }
+      )
+      if (!syncResult.success) {
+        return { success: false as const, error: syncResult.error }
       }
     }
 
@@ -266,6 +495,23 @@ export async function updateCampaignAction(campaignId: string, input: CampaignWr
   const name = input.name.trim()
   if (!name) return { success: false as const, error: "Campaign name is required" }
 
+  const goalBreakdownEnabled = Boolean(input.goal_breakdown_enabled)
+  const phases = goalBreakdownEnabled ? input.phases || [] : []
+
+  const phaseValidation = validatePhaseGoalsAgainstCampaign({
+    goalAmount: input.goal_amount,
+    goalBreakdownEnabled,
+    phases,
+    allowMismatch: input.allow_phase_goal_mismatch,
+  })
+  if (!phaseValidation.ok) {
+    return {
+      success: false as const,
+      error: phaseValidation.error,
+      code: phaseValidation.code,
+    }
+  }
+
   try {
     const writeClient = createServiceRoleClient()
     const { data: existing, error: existingError } = await writeClient
@@ -283,25 +529,67 @@ export async function updateCampaignAction(campaignId: string, input: CampaignWr
       return { success: false as const, error: "A campaign with this name already exists" }
     }
 
-    const { data: campaign, error } = await writeClient
-      .from("campaigns")
-      .update({
-        name,
-        description: input.description?.trim() || null,
-        goal_amount: input.goal_amount ?? null,
-        start_date: input.start_date || null,
-        end_date: input.end_date || null,
-        status: input.status?.toLowerCase() || "draft",
-      })
-      .eq("organization_id", access.orgId)
-      .eq("id", campaignId)
-      .select(CAMPAIGN_SELECT)
-      .maybeSingle()
+    const updatePayload: Record<string, unknown> = {
+      name,
+      description: input.description?.trim() || null,
+      goal_amount: input.goal_amount ?? null,
+      start_date: input.start_date || null,
+      end_date: input.end_date || null,
+      status: input.status?.toLowerCase() || "draft",
+      goal_breakdown_enabled: goalBreakdownEnabled,
+    }
+
+    let campaign: CampaignRow | null = null
+    let error: { message?: string; code?: string; details?: string | null } | null = null
+
+    {
+      const updated = await writeClient
+        .from("campaigns")
+        .update(updatePayload)
+        .eq("organization_id", access.orgId)
+        .eq("id", campaignId)
+        .select(CAMPAIGN_SELECT)
+        .maybeSingle()
+      campaign = (updated.data as CampaignRow | null) ?? null
+      error = updated.error
+    }
+
+    if (
+      error &&
+      (error.code === "42703" || /goal_breakdown_enabled/i.test(error.message || ""))
+    ) {
+      delete updatePayload.goal_breakdown_enabled
+      const retry = await writeClient
+        .from("campaigns")
+        .update(updatePayload)
+        .eq("organization_id", access.orgId)
+        .eq("id", campaignId)
+        .select(CAMPAIGN_SELECT_WITH_METRICS)
+        .maybeSingle()
+      campaign = (retry.data as CampaignRow | null) ?? null
+      error = retry.error
+    }
 
     if (error || !campaign) {
-      return {
-        success: false as const,
-        error: formatCampaignWriteError(error, "Failed to update campaign"),
+      const fallback = await selectCampaignAfterWrite(writeClient, access.orgId, campaignId)
+      if (fallback.error || !fallback.data) {
+        return {
+          success: false as const,
+          error: formatCampaignWriteError(error || fallback.error, "Failed to update campaign"),
+        }
+      }
+      campaign = fallback.data as CampaignRow
+    }
+
+    if (input.goal_breakdown_enabled != null || input.phases) {
+      const syncResult = await syncCampaignPhases(
+        access.orgId,
+        campaignId,
+        phases,
+        { goalBreakdownEnabled }
+      )
+      if (!syncResult.success) {
+        return { success: false as const, error: syncResult.error }
       }
     }
 

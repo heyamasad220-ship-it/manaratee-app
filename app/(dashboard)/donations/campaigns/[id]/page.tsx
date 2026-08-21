@@ -2,46 +2,245 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { useParams } from "next/navigation"
-import { ArrowLeft, Pencil, Plus, Target } from "lucide-react"
+import { useParams, useSearchParams } from "next/navigation"
+import { ArrowLeft, Pencil, Plus } from "lucide-react"
 
 import { ContactProfileDialog } from "@/components/contacts/contact-profile-dialog"
 import { Button } from "@/components/ui/button"
 import { CampaignEditDialog } from "@/components/donations/campaign-edit-dialog"
-import { CampaignDonorsDialog } from "@/components/donations/campaign-donors-dialog"
-import { CampaignOverviewMetricsEditor } from "@/components/donations/campaign-overview-metrics-editor"
-import { CampaignOutstandingPledgesTable } from "@/components/donations/campaign-outstanding-pledges-table"
-import { CampaignProgressBar } from "@/components/donations/campaign-progress-bar"
-import { CampaignProgressGauge } from "@/components/donations/campaign-progress-gauge"
-import { CampaignOverviewMetricsTable } from "@/components/donations/campaign-source-breakdown-cards"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { CampaignGroupsTab } from "@/components/donations/campaign-groups-tab"
+import { CampaignOverviewTab } from "@/components/donations/campaign-overview-tab"
+import { CampaignProspectsTab } from "@/components/donations/campaign-prospects-tab"
+import { CampaignStrategyTab } from "@/components/donations/campaign-strategy-tab"
+import { CampaignWorkspaceNav } from "@/components/donations/campaign-workspace-nav"
+import { Card, CardContent } from "@/components/ui/card"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 import {
   formatDonationCurrency,
   type CampaignAnalyticsEntry,
   type CampaignDonorInsights,
   type CampaignOutstandingPledgeRow,
+  type CampaignPaymentRow,
   type CampaignRow,
   type CampaignSourceBreakdown,
 } from "@/lib/donations/campaign-analytics"
 import { getCampaignDetailAction } from "@/lib/donations/donation-reports-actions"
 import type { CampaignOverviewMetricKey } from "@/lib/donations/campaign-overview-metrics"
-import { createClient } from "@/lib/supabase/client"
+import type { CampaignPhaseMetrics, CampaignPhaseRow } from "@/lib/donations/campaign-phase-types"
+import type {
+  CampaignAskLevelMetrics,
+  CampaignAskLevelRow,
+} from "@/lib/donations/campaign-ask-level-types"
+import {
+  parseCampaignWorkspaceTab,
+} from "@/lib/donations/campaign-workspace-paths"
 import { donationPledgesHref } from "@/lib/donations/donation-pledge-paths"
+import { createClient } from "@/lib/supabase/client"
 
 type ContactProfileTarget = {
   contactId?: string | null
   donorId?: string | null
 }
 
+function formatShortDate(value: string | null | undefined) {
+  if (!value) return "—"
+  const date = new Date(`${value}T00:00:00`)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  })
+}
+
+function CampaignPledgesTab({
+  campaignId,
+  pledges,
+  canManage,
+  onDonorClick,
+}: {
+  campaignId: string
+  pledges: CampaignOutstandingPledgeRow[]
+  canManage: boolean
+  onDonorClick: (pledge: CampaignOutstandingPledgeRow) => void
+}) {
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="text-base font-semibold text-foreground">Campaign Pledges</h2>
+          <p className="text-sm text-muted-foreground">
+            Same pledge records as the global Pledges page, filtered to this campaign.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" asChild>
+            <Link href={donationPledgesHref({ campaignId })}>Open full pledges view</Link>
+          </Button>
+          {canManage ? (
+            <Button asChild>
+              <Link href={donationPledgesHref({ action: "add", campaignId })}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Pledge
+              </Link>
+            </Button>
+          ) : null}
+        </div>
+      </div>
+
+      <Card className="border border-border shadow-sm">
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Donor</TableHead>
+                <TableHead>Pledge Date</TableHead>
+                <TableHead className="text-right">Amount Pledged</TableHead>
+                <TableHead className="text-right">Amount Paid</TableHead>
+                <TableHead className="text-right">Balance</TableHead>
+                <TableHead>Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {pledges.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                    No pledges for this campaign yet.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                pledges.map((pledge) => (
+                  <TableRow key={pledge.id}>
+                    <TableCell>
+                      <button
+                        type="button"
+                        className="font-medium text-primary hover:underline"
+                        onClick={() => onDonorClick(pledge)}
+                      >
+                        {pledge.donorName}
+                      </button>
+                    </TableCell>
+                    <TableCell>{formatShortDate(pledge.pledgeDate)}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatDonationCurrency(pledge.amountPledged)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatDonationCurrency(pledge.amountPaid)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-red-600">
+                      {formatDonationCurrency(pledge.balanceRemaining)}
+                    </TableCell>
+                    <TableCell className="capitalize">{pledge.status}</TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function CampaignDonationsTab({
+  payments,
+  onDonorClick,
+}: {
+  payments: CampaignPaymentRow[]
+  onDonorClick: (payment: CampaignPaymentRow) => void
+}) {
+  return (
+    <div className="flex flex-col gap-4">
+      <div>
+        <h2 className="text-base font-semibold text-foreground">Campaign Donations</h2>
+        <p className="text-sm text-muted-foreground">
+          Actual payments attributed to this campaign (one ledger — no duplicate records).
+        </p>
+      </div>
+
+      <Card className="border border-border shadow-sm">
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Date</TableHead>
+                <TableHead>Donor</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
+                <TableHead>Payment Method</TableHead>
+                <TableHead>Pledge Applied To</TableHead>
+                <TableHead>Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {payments.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                    No donations for this campaign yet.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                payments.map((payment) => (
+                  <TableRow key={payment.id}>
+                    <TableCell>{formatShortDate(payment.payment_date)}</TableCell>
+                    <TableCell>
+                      <button
+                        type="button"
+                        className="font-medium text-primary hover:underline"
+                        onClick={() => onDonorClick(payment)}
+                      >
+                        {payment.sender_name || "Donor"}
+                      </button>
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatDonationCurrency(Number(payment.amount || 0))}
+                    </TableCell>
+                    <TableCell className="capitalize">
+                      {payment.source || "—"}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">
+                      {payment.pledge_id ? `${payment.pledge_id.slice(0, 8)}…` : "—"}
+                    </TableCell>
+                    <TableCell className="capitalize">{payment.status || "—"}</TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 export default function CampaignDetailPage() {
   const params = useParams()
+  const searchParams = useSearchParams()
   const campaignId = params.id as string
+  const activeTab = parseCampaignWorkspaceTab(searchParams.get("tab"))
+  const selectedGroupId = searchParams.get("group")
+  const prospectFollowUp = searchParams.get("followUp")
+  const prospectAssignee = searchParams.get("assignee")
+  const prospectStage = searchParams.get("stage")
+  const prospectPledged = searchParams.get("pledged")
 
   const [campaign, setCampaign] = useState<CampaignRow | null>(null)
   const [entry, setEntry] = useState<CampaignAnalyticsEntry | null>(null)
   const [insights, setInsights] = useState<CampaignDonorInsights | null>(null)
   const [sourceBreakdown, setSourceBreakdown] = useState<CampaignSourceBreakdown | null>(null)
   const [outstandingPledges, setOutstandingPledges] = useState<CampaignOutstandingPledgeRow[]>([])
+  const [campaignPledges, setCampaignPledges] = useState<CampaignOutstandingPledgeRow[]>([])
+  const [phaseMetrics, setPhaseMetrics] = useState<CampaignPhaseMetrics[]>([])
+  const [phases, setPhases] = useState<CampaignPhaseRow[]>([])
+  const [askLevels, setAskLevels] = useState<CampaignAskLevelRow[]>([])
+  const [askLevelMetrics, setAskLevelMetrics] = useState<CampaignAskLevelMetrics[]>([])
+  const [campaignPayments, setCampaignPayments] = useState<CampaignPaymentRow[]>([])
   const [canManage, setCanManage] = useState(false)
   const [loading, setLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -93,6 +292,12 @@ export default function CampaignDetailPage() {
       setInsights(null)
       setSourceBreakdown(null)
       setOutstandingPledges([])
+      setCampaignPledges([])
+      setPhaseMetrics([])
+      setPhases([])
+      setAskLevels([])
+      setAskLevelMetrics([])
+      setCampaignPayments([])
       setLoading(false)
       return
     }
@@ -102,13 +307,91 @@ export default function CampaignDetailPage() {
     setInsights(result.insights)
     setSourceBreakdown(result.sourceBreakdown)
     setOutstandingPledges(result.outstandingPledges)
+    setCampaignPledges(result.outstandingPledges)
+    setPhaseMetrics(result.phaseMetrics || [])
+    setPhases(result.phases || [])
+    setAskLevels(result.askLevels || [])
+    setAskLevelMetrics(result.askLevelMetrics || [])
     setOverviewMetricKeys(result.overviewMetricKeys)
     setCanManage(result.canManage)
+
+    // Prefer full campaign pledge list for the Pledges tab (not only outstanding).
+    const pledgesQuery = await supabase
+      .from("pledge_status_view")
+      .select(
+        "id, donor_id, donor_name, amount_pledged, amount_paid, balance_remaining, calculated_status, pledge_date"
+      )
+      .eq("organization_id", result.campaign.organization_id)
+      .eq("campaign_id", campaignId)
+      .order("pledge_date", { ascending: false })
+
+    if (!pledgesQuery.error && pledgesQuery.data) {
+      const donorIds = pledgesQuery.data
+        .map((row) => row.donor_id as string | null)
+        .filter((id): id is string => Boolean(id))
+      const contactByDonor = new Map<string, string | null>()
+      if (donorIds.length > 0) {
+        const { data: donors } = await supabase
+          .from("donors")
+          .select("id, contact_id")
+          .eq("organization_id", result.campaign.organization_id)
+          .in("id", donorIds)
+        for (const donor of donors || []) {
+          contactByDonor.set(donor.id as string, (donor.contact_id as string | null) ?? null)
+        }
+      }
+
+      setCampaignPledges(
+        pledgesQuery.data.map((row) => ({
+          id: row.id as string,
+          donorId: (row.donor_id as string | null) ?? null,
+          contactId: row.donor_id
+            ? contactByDonor.get(row.donor_id as string) ?? null
+            : null,
+          donorName: (row.donor_name as string) || "Donor",
+          amountPledged: Number(row.amount_pledged || 0),
+          amountPaid: Number(row.amount_paid || 0),
+          balanceRemaining: Number(row.balance_remaining || 0),
+          status: String(row.calculated_status || "open"),
+          pledgeDate: (row.pledge_date as string | null) ?? null,
+          contactType: null,
+          primaryContactName: null,
+          memberGroups: [],
+        }))
+      )
+    }
+
+    // Load recent campaign payments for Donations tab (reuse payments table).
+    const { data: payments } = await supabase
+      .from("payments")
+      .select(
+        "id, campaign_id, campaign_phase_id, pledge_id, donor_id, contact_id, sender_name, amount, refunded_amount, payment_date, source, status, memo, recurring_donation_plan_id"
+      )
+      .eq("organization_id", result.campaign.organization_id)
+      .eq("campaign_id", campaignId)
+      .order("payment_date", { ascending: false })
+      .limit(100)
+
+    if (payments) {
+      setCampaignPayments(payments as CampaignPaymentRow[])
+    } else {
+      const legacy = await supabase
+        .from("payments")
+        .select(
+          "id, campaign_id, pledge_id, donor_id, contact_id, sender_name, amount, refunded_amount, payment_date, source, status, memo, recurring_donation_plan_id"
+        )
+        .eq("organization_id", result.campaign.organization_id)
+        .eq("campaign_id", campaignId)
+        .order("payment_date", { ascending: false })
+        .limit(100)
+      setCampaignPayments((legacy.data || []) as CampaignPaymentRow[])
+    }
+
     setLoading(false)
-  }, [campaignId])
+  }, [campaignId, supabase])
 
   useEffect(() => {
-    if (campaignId) loadCampaign()
+    if (campaignId) void loadCampaign()
   }, [campaignId, loadCampaign])
 
   if (loading) {
@@ -126,12 +409,7 @@ export default function CampaignDetailPage() {
     )
   }
 
-  const { metrics } = entry
-  const goalAmount = Number(campaign.goal_amount || 0) || null
-  const progressPercent =
-    goalAmount && goalAmount > 0
-      ? Math.min((sourceBreakdown.totalRaised / goalAmount) * 100, 100)
-      : null
+  const endLabel = campaign.end_date ? formatShortDate(campaign.end_date) : null
 
   return (
     <>
@@ -146,18 +424,23 @@ export default function CampaignDetailPage() {
                 </Link>
               </Button>
 
-              {canManage ? (
-                <button
-                  type="button"
-                  onClick={() => setShowEditDialog(true)}
-                  className="group inline-flex items-center gap-2 text-2xl font-semibold text-foreground transition hover:text-primary"
-                >
-                  {campaign.name}
-                  <Pencil className="h-4 w-4 text-muted-foreground opacity-0 transition group-hover:opacity-100" />
-                </button>
-              ) : (
-                <h1 className="text-2xl font-semibold text-foreground">{campaign.name}</h1>
-              )}
+              <div className="min-w-0">
+                {canManage ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowEditDialog(true)}
+                    className="group inline-flex max-w-full items-center gap-2 text-left text-2xl font-semibold text-foreground transition hover:text-primary"
+                  >
+                    <span className="truncate">{campaign.name}</span>
+                    <Pencil className="h-4 w-4 shrink-0 text-muted-foreground opacity-0 transition group-hover:opacity-100" />
+                  </button>
+                ) : (
+                  <h1 className="text-2xl font-semibold text-foreground">{campaign.name}</h1>
+                )}
+                {endLabel ? (
+                  <p className="text-sm text-muted-foreground">{endLabel}</p>
+                ) : null}
+              </div>
             </div>
 
             {canManage ? (
@@ -170,111 +453,111 @@ export default function CampaignDetailPage() {
             ) : null}
           </div>
 
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,0.9fr)] xl:items-start">
-            <CampaignOverviewMetricsTable
-              breakdown={sourceBreakdown}
-              metrics={metrics}
+          <CampaignWorkspaceNav campaignId={campaign.id} activeTab={activeTab} />
+
+          {activeTab === "overview" ? (
+            <CampaignOverviewTab
+              campaign={campaign}
+              entry={entry}
               insights={insights}
-              visibleMetricKeys={overviewMetricKeys}
-              canCustomize={canManage}
-              onCustomizeClick={() => setShowMetricsEditor(true)}
-              onDonorsClick={() => setShowDonorsDialog(true)}
-              onLargestGiftClick={
-                insights?.largestGift?.contactId || insights?.largestGift?.donorId
-                  ? () =>
-                      void openContactProfile({
-                        contactId: insights?.largestGift?.contactId,
-                        donorId: insights?.largestGift?.donorId,
-                      })
-                  : undefined
+              sourceBreakdown={sourceBreakdown}
+              outstandingPledges={outstandingPledges}
+              phaseMetrics={phaseMetrics}
+              overviewMetricKeys={overviewMetricKeys}
+              canManage={canManage}
+              showMetricsEditor={showMetricsEditor}
+              onShowMetricsEditorChange={setShowMetricsEditor}
+              showDonorsDialog={showDonorsDialog}
+              onShowDonorsDialogChange={setShowDonorsDialog}
+              onOverviewMetricKeysSaved={setOverviewMetricKeys}
+              onOpenContactProfile={(target) => void openContactProfile(target)}
+              onReload={() => void loadCampaign()}
+            />
+          ) : null}
+
+          {activeTab === "strategy" ? (
+            <CampaignStrategyTab
+              campaignId={campaign.id}
+              askLevels={askLevels}
+              askLevelMetrics={askLevelMetrics}
+              phases={phases}
+              canManage={canManage}
+              onSaved={() => void loadCampaign()}
+            />
+          ) : null}
+
+          {activeTab === "prospects" ? (
+            <CampaignProspectsTab
+              campaignId={campaign.id}
+              organizationId={campaign.organization_id}
+              askLevels={askLevels}
+              canManage={canManage}
+              onChanged={() => void loadCampaign()}
+              initialFollowUp={
+                prospectFollowUp === "overdue" || prospectFollowUp === "upcoming"
+                  ? prospectFollowUp
+                  : null
+              }
+              initialAssignee={prospectAssignee}
+              initialStage={prospectStage}
+              initialPledged={
+                prospectPledged === "pledged" || prospectPledged === "not_pledged"
+                  ? prospectPledged
+                  : null
               }
             />
+          ) : null}
 
-            <Card className="flex w-full flex-col gap-2 py-4">
-              <CardHeader className="px-4 py-0">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Target className="h-4 w-4" />
-                  Goal Progress
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="flex flex-col items-center gap-3 px-4 pb-2 pt-0">
-                <CampaignProgressGauge
-                  raised={sourceBreakdown.totalRaised}
-                  goal={goalAmount}
-                  size="lg"
-                  fluid
-                  className="max-w-none"
-                />
-                {progressPercent != null ? (
-                  <>
-                    <CampaignProgressBar progressPercent={progressPercent} className="w-full" />
-                    <p className="text-center text-sm text-muted-foreground">
-                      {formatDonationCurrency(sourceBreakdown.totalRaised)} total raised of{" "}
-                      {formatDonationCurrency(goalAmount ?? 0)} goal ({Math.round(progressPercent)}%)
-                    </p>
-                    <p className="text-center text-xs text-muted-foreground">
-                      {formatDonationCurrency(sourceBreakdown.collected)} collected
-                    </p>
-                  </>
-                ) : (
-                  <p className="text-center text-sm text-muted-foreground">
-                    Set a goal when editing this campaign to track progress on the gauge.
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+          {activeTab === "pledges" ? (
+            <CampaignPledgesTab
+              campaignId={campaign.id}
+              pledges={campaignPledges}
+              canManage={canManage}
+              onDonorClick={(pledge) =>
+                void openContactProfile({
+                  contactId: pledge.contactId,
+                  donorId: pledge.donorId,
+                })
+              }
+            />
+          ) : null}
 
-          <CampaignOutstandingPledgesTable
-            pledges={outstandingPledges}
-            pledgesPageHref={donationPledgesHref({ campaignId: campaign.id })}
-            onDonorClick={(pledge) =>
-              void openContactProfile({
-                contactId: pledge.contactId,
-                donorId: pledge.donorId,
-              })
-            }
-          />
+          {activeTab === "donations" ? (
+            <CampaignDonationsTab
+              payments={campaignPayments}
+              onDonorClick={(payment) =>
+                void openContactProfile({
+                  contactId: payment.contact_id,
+                  donorId: payment.donor_id,
+                })
+              }
+            />
+          ) : null}
+
+          {activeTab === "groups" ? (
+            <CampaignGroupsTab
+              campaignId={campaign.id}
+              campaignName={campaign.name}
+              organizationId={campaign.organization_id}
+              canManage={canManage}
+              selectedGroupId={selectedGroupId}
+              onChanged={() => void loadCampaign()}
+            />
+          ) : null}
         </div>
       </div>
 
       {canManage ? (
         <CampaignEditDialog
           campaign={campaign}
+          phases={phases}
           open={showEditDialog}
           onOpenChange={setShowEditDialog}
-          onSaved={(updated) => {
-            setCampaign(updated)
+          onSaved={() => {
             void loadCampaign()
           }}
         />
       ) : null}
-
-      {canManage ? (
-        <CampaignOverviewMetricsEditor
-          campaignId={campaign.id}
-          savedKeys={overviewMetricKeys}
-          open={showMetricsEditor}
-          onOpenChange={setShowMetricsEditor}
-          onSaved={(keys) => {
-            setOverviewMetricKeys(keys)
-            void loadCampaign()
-          }}
-        />
-      ) : null}
-
-      <CampaignDonorsDialog
-        campaignName={campaign.name}
-        donors={insights?.donors || []}
-        open={showDonorsDialog}
-        onOpenChange={setShowDonorsDialog}
-        onDonorClick={(donor) =>
-          void openContactProfile({
-            contactId: donor.contactId,
-            donorId: donor.donorId,
-          })
-        }
-      />
 
       <ContactProfileDialog
         contactId={contactProfileId}

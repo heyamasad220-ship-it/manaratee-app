@@ -68,6 +68,11 @@ import {
 import { PledgeContactPicker } from "@/components/donations/pledge-contact-picker";
 import { getPledgeForEditAction, recordPledgePaymentAction, updatePledgeAction, updatePledgePaymentPlanAction } from "@/lib/donations/pledge-admin-actions";
 import {
+  convertCampaignProspectToPledgeAction,
+  getCampaignProspectForConversionAction,
+} from "@/lib/donations/campaign-prospect-actions";
+import { formatDonationCurrency } from "@/lib/donations/campaign-analytics";
+import {
   fetchPledgeAttribution,
   toPaymentAttributionColumns,
 } from "@/lib/donations/payment-attribution";
@@ -420,6 +425,9 @@ export default function PledgesPage() {
   const [showContactProfile, setShowContactProfile] = useState(false);
   const [handledPledgeQuery, setHandledPledgeQuery] = useState<string | null>(null);
   const [handledAddQuery, setHandledAddQuery] = useState(false);
+  const [convertProspectId, setConvertProspectId] = useState<string | null>(null);
+  const [suggestedAskAmount, setSuggestedAskAmount] = useState<number | null>(null);
+  const [convertPhaseName, setConvertPhaseName] = useState<string | null>(null);
 
   async function openContactProfile(pledge: Pledge) {
     let contactId = pledge.contactId;
@@ -735,7 +743,38 @@ export default function PledgesPage() {
     }
 
     const contactId = searchParams.get("contactId");
-    if (contactId) {
+    const prospectId = searchParams.get("prospectId");
+
+    if (prospectId) {
+      void (async () => {
+        const result = await getCampaignProspectForConversionAction(prospectId);
+        if (!result.success) {
+          alert(result.error);
+          return;
+        }
+
+        setConvertProspectId(result.prospect.id);
+        setSuggestedAskAmount(result.prospect.suggested_ask_amount);
+        setConvertPhaseName(result.phaseName);
+        setAddAttribution((current) => ({
+          ...current,
+          campaignId: result.prospect.campaign_id,
+        }));
+        setSelectedContactId(result.prospect.contact_id);
+        setContactOptions([
+          {
+            contactId: result.prospect.contact_id,
+            full_name: result.prospect.contactName,
+            email: result.prospect.contactEmail,
+            phone: null,
+          },
+        ]);
+        setDonorSearch(result.prospect.contactName);
+        if (result.prospect.suggested_ask_amount != null) {
+          setAmount(String(result.prospect.suggested_ask_amount));
+        }
+      })();
+    } else if (contactId) {
       void (async () => {
         const { data: contactRow } = await supabase
           .from("contacts")
@@ -834,6 +873,9 @@ export default function PledgesPage() {
     setDonorSearch("");
     setShowDonorList(false);
     setShowQuickAddContact(false);
+    setConvertProspectId(null);
+    setSuggestedAskAmount(null);
+    setConvertPhaseName(null);
   };
 
   const handleQuickAddContactCreated = (contact: QuickAddContactResult) => {
@@ -873,13 +915,6 @@ export default function PledgesPage() {
   };
 
   const handleAddPledge = async () => {
-    const orgId = organizationId || (await getOrgIdForCurrentUser());
-
-    if (!orgId) {
-      alert("No organization found for this admin user.");
-      return;
-    }
-
     if (!selectedContactId) {
       alert("Please select a contact.");
       return;
@@ -891,6 +926,38 @@ export default function PledgesPage() {
     }
 
     setSaving(true);
+
+    if (convertProspectId) {
+      const result = await convertCampaignProspectToPledgeAction({
+        prospectId: convertProspectId,
+        amountPledged: Number(amount),
+        pledgeDate: normalizeDateInput(pledgeDate) || getTodayPlainDate(),
+        frequency,
+        notes: notes || null,
+        categoryId: addAttribution.categoryId || null,
+        subcategoryId: addAttribution.subcategoryId || null,
+      });
+
+      setSaving(false);
+
+      if (!result.success) {
+        alert(result.error);
+        return;
+      }
+
+      resetAddPledgeForm();
+      setShowAddDialog(false);
+      await fetchPledges();
+      return;
+    }
+
+    const orgId = organizationId || (await getOrgIdForCurrentUser());
+
+    if (!orgId) {
+      setSaving(false);
+      alert("No organization found for this admin user.");
+      return;
+    }
 
     const donorId = await ensureDonorExtensionForContact(orgId, selectedContactId);
 
@@ -1346,11 +1413,39 @@ export default function PledgesPage() {
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Add Pledge</DialogTitle>
-            <DialogDescription>Create a new donation pledge commitment.</DialogDescription>
+            <DialogTitle>
+              {convertProspectId ? "Record Pledge from Prospect" : "Add Pledge"}
+            </DialogTitle>
+            <DialogDescription>
+              {convertProspectId
+                ? "Creates one pledge and marks the prospect as Pledged. Suggested ask is preserved."
+                : "Create a new donation pledge commitment."}
+            </DialogDescription>
           </DialogHeader>
 
           <div className="flex flex-col gap-4 py-4">
+            {convertProspectId ? (
+              <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
+                <p>
+                  <span className="text-muted-foreground">Suggested Ask: </span>
+                  <span className="font-medium tabular-nums">
+                    {suggestedAskAmount != null
+                      ? formatDonationCurrency(suggestedAskAmount)
+                      : "—"}
+                  </span>
+                </p>
+                {convertPhaseName ? (
+                  <p>
+                    <span className="text-muted-foreground">Campaign Phase: </span>
+                    <span className="font-medium">{convertPhaseName}</span>
+                  </p>
+                ) : null}
+                <p className="text-xs text-muted-foreground">
+                  Enter the actual pledge amount below. Suggested ask will not be overwritten.
+                </p>
+              </div>
+            ) : null}
+
             <div className="flex flex-col gap-2">
               <Label htmlFor="contact">Contact</Label>
               <Input
@@ -1419,7 +1514,9 @@ export default function PledgesPage() {
             </div>
 
             <div className="flex flex-col gap-2">
-              <Label htmlFor="total-amount">Total Amount</Label>
+              <Label htmlFor="total-amount">
+                {convertProspectId ? "Actual Pledge Amount" : "Total Amount"}
+              </Label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
                   $
