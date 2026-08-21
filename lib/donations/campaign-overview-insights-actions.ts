@@ -11,7 +11,7 @@ import {
 import {
   computeCampaignGroupMetrics,
   fetchCampaignGroups,
-} from "@/lib/donations/campaign-group-actions"
+} from "@/lib/donations/campaign-group-helpers"
 import {
   type CampaignPaymentRow,
   type CampaignPledgeRow,
