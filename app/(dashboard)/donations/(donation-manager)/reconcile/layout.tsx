@@ -1,11 +1,14 @@
-import { PERMISSIONS, requirePermission } from "@/lib/permissions/permissions"
+import { PERMISSIONS, requireAnyPermission } from "@/lib/permissions/permissions"
 
 export default async function DonationsReconcileLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  await requirePermission(PERMISSIONS.DONATIONS_MANAGE)
+  await requireAnyPermission(
+    PERMISSIONS.DONATIONS_MANAGE,
+    PERMISSIONS.DONATIONS_REPORTS_MANAGE
+  )
 
   return <>{children}</>
 }

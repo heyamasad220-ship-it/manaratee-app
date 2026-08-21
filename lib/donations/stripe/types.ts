@@ -9,6 +9,7 @@ export type DonationCheckoutMetadata = {
   campaign_id?: string
   campaign_group_id?: string
   attributed_group_contact_id?: string
+  pledge_id?: string
   category_id?: string
   subcategory_id?: string
   recurring_donation_plan_id?: string
@@ -24,6 +25,7 @@ export type CreateOneTimeDonationCheckoutInput = {
   campaignId?: string | null
   campaignGroupId?: string | null
   attributedGroupContactId?: string | null
+  pledgeId?: string | null
   categoryId?: string | null
   subcategoryId?: string | null
   successUrl?: string

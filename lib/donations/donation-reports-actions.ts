@@ -354,6 +354,8 @@ export async function getCampaignDetailAction(campaignId: string) {
       askLevels,
       askLevelMetrics,
       canManage: access.canManage,
+      canManageCampaigns: access.canManageCampaigns,
+      canManageProspects: access.canManageProspects,
     }
   } catch (error) {
     return { success: false as const, error: (error as Error).message }
@@ -361,7 +363,7 @@ export async function getCampaignDetailAction(campaignId: string) {
 }
 
 export async function createCampaignAction(input: CampaignWriteInput) {
-  const access = await requireDonationStaffAccess("manage")
+  const access = await requireDonationStaffAccess("campaigns")
   if (!access.ok) return { success: false as const, error: access.error }
 
   const name = input.name.trim()
@@ -489,7 +491,7 @@ export async function createCampaignAction(input: CampaignWriteInput) {
 }
 
 export async function updateCampaignAction(campaignId: string, input: CampaignWriteInput) {
-  const access = await requireDonationStaffAccess("manage")
+  const access = await requireDonationStaffAccess("campaigns")
   if (!access.ok) return { success: false as const, error: access.error }
 
   const name = input.name.trim()
@@ -602,7 +604,7 @@ export async function updateCampaignAction(campaignId: string, input: CampaignWr
 }
 
 export async function deleteCampaignAction(campaignId: string) {
-  const access = await requireDonationStaffAccess("manage")
+  const access = await requireDonationStaffAccess("campaigns")
   if (!access.ok) return { success: false as const, error: access.error }
 
   if (!campaignId.trim()) {
@@ -649,7 +651,7 @@ export async function updateCampaignOverviewMetricsAction(
   campaignId: string,
   overviewMetricKeys: CampaignOverviewMetricKey[] | null
 ) {
-  const access = await requireDonationStaffAccess("manage")
+  const access = await requireDonationStaffAccess("campaigns")
   if (!access.ok) return { success: false as const, error: access.error }
 
   const normalized =

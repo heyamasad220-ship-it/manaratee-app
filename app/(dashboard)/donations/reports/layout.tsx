@@ -13,5 +13,11 @@ export default async function DonationsReportsLayout({
     redirect("/dashboard")
   }
 
-  return <DonationReportsChrome canManage={access.canManage}>{children}</DonationReportsChrome>
+  return (
+    <DonationReportsChrome
+      canManage={access.canManage || access.canManageReports}
+    >
+      {children}
+    </DonationReportsChrome>
+  )
 }

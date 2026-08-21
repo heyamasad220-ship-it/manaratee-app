@@ -300,7 +300,7 @@ export async function createCampaignProspectAction(
   campaignId: string,
   input: CampaignProspectWriteInput
 ) {
-  const access = await requireDonationStaffAccess("manage")
+  const access = await requireDonationStaffAccess("prospects")
   if (!access.ok) return { success: false as const, error: access.error }
 
   const contactId = input.contact_id?.trim()
@@ -382,7 +382,7 @@ export async function updateCampaignProspectAction(
   prospectId: string,
   input: Partial<CampaignProspectWriteInput> & { stage?: string; priority?: string }
 ) {
-  const access = await requireDonationStaffAccess("manage")
+  const access = await requireDonationStaffAccess("prospects")
   if (!access.ok) return { success: false as const, error: access.error }
 
   if (!prospectId.trim()) return { success: false as const, error: "Prospect is required" }
@@ -461,7 +461,7 @@ export async function bulkAssignCampaignProspectsAction(input: {
   prospectIds: string[]
   assignedToContactId: string | null
 }) {
-  const access = await requireDonationStaffAccess("manage")
+  const access = await requireDonationStaffAccess("prospects")
   if (!access.ok) return { success: false as const, error: access.error }
 
   const ids = (input.prospectIds || []).filter(Boolean)
@@ -513,7 +513,7 @@ export async function bulkAssignCampaignProspectsAction(input: {
 }
 
 export async function deleteCampaignProspectAction(prospectId: string) {
-  const access = await requireDonationStaffAccess("manage")
+  const access = await requireDonationStaffAccess("prospects")
   if (!access.ok) return { success: false as const, error: access.error }
 
   try {
@@ -647,7 +647,7 @@ export async function convertCampaignProspectToPledgeAction(input: {
   categoryId?: string | null
   subcategoryId?: string | null
 }) {
-  const access = await requireDonationStaffAccess("manage")
+  const access = await requireDonationStaffAccess("prospects")
   if (!access.ok) return { success: false as const, error: access.error }
 
   const amount = Number(input.amountPledged)

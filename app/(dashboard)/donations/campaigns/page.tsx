@@ -11,7 +11,7 @@ export default async function DonationsCampaignsOverviewPage() {
 
   return (
     <div className="p-6">
-      <DonationCampaignsOverviewTable canManage={access.canManage} />
+      <DonationCampaignsOverviewTable canManage={access.canManageCampaigns} />
     </div>
   )
 }

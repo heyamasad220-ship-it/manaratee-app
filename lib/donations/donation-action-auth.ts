@@ -7,14 +7,26 @@ import { isPlatformAdminOrgSupportSession } from "@/lib/platform/platform-org-ac
 import { PERMISSIONS } from "@/lib/permissions/permission-keys"
 import { createClient } from "@/lib/supabase/server"
 
-export type DonationStaffAccessLevel = "view" | "manage"
+export type DonationStaffAccessLevel =
+  | "view"
+  | "manage"
+  | "campaigns"
+  | "prospects"
+  | "reports"
 
 export type DonationStaffContext = {
   supabase: SupabaseClient
   orgId: string
   userId: string
   userEmail: string | null
+  /** Full ledger / settings admin (`donations.manage`). */
   canManage: boolean
+  /** Campaign workspace writes (`donations.manage` or `donations.campaigns.manage`). */
+  canManageCampaigns: boolean
+  /** Prospect pipeline writes (`donations.manage` or `donations.prospects.manage`). */
+  canManageProspects: boolean
+  /** Import / match ops (`donations.manage` or `donations.reports.manage`). */
+  canManageReports: boolean
 }
 
 export type DonationStaffAccessResult =
@@ -55,8 +67,33 @@ async function membershipHasPermission(
   return data?.enabled === true
 }
 
+function levelAllowed(
+  level: DonationStaffAccessLevel,
+  flags: {
+    canManage: boolean
+    canManageCampaigns: boolean
+    canManageProspects: boolean
+    canManageReports: boolean
+    canView: boolean
+  }
+) {
+  switch (level) {
+    case "manage":
+      return flags.canManage
+    case "campaigns":
+      return flags.canManageCampaigns
+    case "prospects":
+      return flags.canManageProspects
+    case "reports":
+      return flags.canManageReports
+    case "view":
+    default:
+      return flags.canView
+  }
+}
+
 export async function requireDonationStaffAccess(
-  level: DonationStaffAccessLevel
+  level: DonationStaffAccessLevel = "view"
 ): Promise<DonationStaffAccessResult> {
   const supabase = await createClient()
   const {
@@ -99,7 +136,40 @@ export async function requireDonationStaffAccess(
       PERMISSIONS.DONATIONS_VIEW
     ))
 
-  const allowed = level === "manage" ? canManage : canView
+  const canManageCampaigns =
+    canManage ||
+    (await membershipHasPermission(
+      supabase,
+      organizationId,
+      membership,
+      PERMISSIONS.DONATIONS_CAMPAIGNS_MANAGE
+    ))
+
+  const canManageProspects =
+    canManage ||
+    (await membershipHasPermission(
+      supabase,
+      organizationId,
+      membership,
+      PERMISSIONS.DONATIONS_PROSPECTS_MANAGE
+    ))
+
+  const canManageReports =
+    canManage ||
+    (await membershipHasPermission(
+      supabase,
+      organizationId,
+      membership,
+      PERMISSIONS.DONATIONS_REPORTS_MANAGE
+    ))
+
+  const allowed = levelAllowed(level, {
+    canManage,
+    canManageCampaigns,
+    canManageProspects,
+    canManageReports,
+    canView,
+  })
 
   if (!allowed) {
     return { ok: false, error: "Unauthorized" }
@@ -112,5 +182,8 @@ export async function requireDonationStaffAccess(
     userId: user.id,
     userEmail: user.email ?? null,
     canManage,
+    canManageCampaigns,
+    canManageProspects,
+    canManageReports,
   }
 }

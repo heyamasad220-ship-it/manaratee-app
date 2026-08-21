@@ -105,7 +105,7 @@ export async function beginPaymentCsvImportAction(input: {
   fileName: string
   totalRows: number
 }) {
-  const access = await requireDonationStaffAccess("manage")
+  const access = await requireDonationStaffAccess("reports")
   if (!access.ok) return { success: false as const, error: access.error }
 
   try {
@@ -143,7 +143,7 @@ export async function importPaymentCsvChunkAction(input: {
   isLastChunk: boolean
   totalRows: number
 }) {
-  const access = await requireDonationStaffAccess("manage")
+  const access = await requireDonationStaffAccess("reports")
   if (!access.ok) return { success: false as const, error: access.error }
 
   const validRows = input.rows.filter((row) => {
@@ -315,7 +315,7 @@ export async function importPaymentCsvAction(input: {
 }
 
 export async function fetchPaymentMatchQueueAction() {
-  const access = await requireDonationStaffAccess("manage")
+  const access = await requireDonationStaffAccess("reports")
   if (!access.ok) return { success: false as const, error: access.error }
 
   const { data, error } = await access.supabase
@@ -468,7 +468,7 @@ export async function findContactMatchesForPaymentAction(input: {
   importEmail?: string | null
   importPhone?: string | null
 }) {
-  const access = await requireDonationStaffAccess("manage")
+  const access = await requireDonationStaffAccess("reports")
   if (!access.ok) return { success: false as const, error: access.error }
 
   const contacts = await findCandidateContacts(access.supabase, access.orgId, {
@@ -489,7 +489,7 @@ export async function findContactMatchesForPaymentAction(input: {
 }
 
 export async function searchContactsForPaymentMatchAction(search: string, limit = 20) {
-  const access = await requireDonationStaffAccess("manage")
+  const access = await requireDonationStaffAccess("reports")
   if (!access.ok) return { success: false as const, error: access.error }
 
   const trimmed = search.trim()
@@ -664,7 +664,7 @@ export async function matchPaymentToContactAction(input: {
   contactId: string
   mode?: "match_only" | "allocate_best_pledge"
 }) {
-  const access = await requireDonationStaffAccess("manage")
+  const access = await requireDonationStaffAccess("reports")
   if (!access.ok) return { success: false as const, error: access.error }
 
   const resolved = await resolveDonorForContact(access.orgId, input.contactId)
@@ -751,7 +751,7 @@ export async function allocatePaymentToPledgeAction(input: {
   contactId: string
   pledgeId: string
 }) {
-  const access = await requireDonationStaffAccess("manage")
+  const access = await requireDonationStaffAccess("reports")
   if (!access.ok) return { success: false as const, error: access.error }
 
   const resolved = await resolveDonorForContact(access.orgId, input.contactId)
@@ -790,7 +790,7 @@ export async function allocatePaymentToPledgeAction(input: {
 }
 
 export async function markPaymentUnresolvedAction(paymentId: string) {
-  const access = await requireDonationStaffAccess("manage")
+  const access = await requireDonationStaffAccess("reports")
   if (!access.ok) return { success: false as const, error: access.error }
 
   const { error } = await access.supabase
@@ -933,7 +933,7 @@ export type BulkAutoMatchInput = {
 }
 
 export async function bulkAutoMatchImportPaymentsAction(input: BulkAutoMatchInput = {}) {
-  const access = await requireDonationStaffAccess("manage")
+  const access = await requireDonationStaffAccess("reports")
   if (!access.ok) return { success: false as const, error: access.error }
 
   const minScore = input.minScore ?? 85
@@ -1186,7 +1186,7 @@ async function countRemainingPendingPayments(
 }
 
 export async function fetchPaymentImportHistoryAction() {
-  const access = await requireDonationStaffAccess("manage")
+  const access = await requireDonationStaffAccess("reports")
   if (!access.ok) return { success: false as const, error: access.error }
 
   const { data, error } = await access.supabase
@@ -1230,7 +1230,7 @@ export async function fetchPaymentImportHistoryAction() {
 }
 
 export async function fetchOpenPledgesForDonorAction(donorId: string) {
-  const access = await requireDonationStaffAccess("manage")
+  const access = await requireDonationStaffAccess("reports")
   if (!access.ok) return { success: false as const, error: access.error }
 
   const { data, error } = await access.supabase
@@ -1261,7 +1261,7 @@ export async function fetchOpenPledgesForDonorAction(donorId: string) {
 }
 
 export async function fetchAllOpenPledgesAction() {
-  const access = await requireDonationStaffAccess("manage")
+  const access = await requireDonationStaffAccess("reports")
   if (!access.ok) return { success: false as const, error: access.error }
 
   const { data, error } = await access.supabase

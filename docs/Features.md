@@ -452,7 +452,13 @@ Removed **255** legacy imported rows from `public.vendors` (May 2026 CSV import)
 
 **Public group donate checkout (August 2026 — Phase F):** `/donate/g/{token}` collects amount + name/email → Stripe Checkout (Connect) → webhook inserts **one** `payments` row with `campaign_id`, `campaign_group_id`, and optional `attributed_group_contact_id` (when the campaign group links an org group; membership ensured). Reuses `createOneTimeDonationCheckout` / `insertProcessorPaymentFromCheckout`. Checkout session columns: migration `264`. Key files: `campaign-group-public-actions.ts`, `campaign-group-donate-form.tsx`.
 
-**Campaign overview insights (August 2026 — Phase G):** Campaign → Overview adds **Action Required** (overdue/upcoming follow-ups, unassigned, asked-without-pledge, groups below goal), **Team Summary** (by assignee), and **Campaign Groups** rollup. Deep-links into Prospects filters (`followUp`, `assignee`, `stage`, `pledged`). Contact Financial panel shows **Fund Development** history (prospects, assignments, group gifts) gated by `donations.view`. Key files: `campaign-overview-insights.tsx`, `contact-fund-development-history.tsx`. No new permissions.
+**Campaign overview insights (August 2026 — Phase G):** Campaign → Overview adds **Action Required** (overdue/upcoming follow-ups, unassigned, asked-without-pledge, groups below goal), **Team Summary** (by assignee), and **Campaign Groups** rollup. Deep-links into Prospects filters (`followUp`, `assignee`, `stage`, `pledged`). Contact Financial panel shows **Fund Development** history (prospects, assignments, group gifts) gated by `donations.view`. Key files: `campaign-overview-insights.tsx`, `contact-fund-development-history.tsx`.
+
+**Granular Fund Development permissions (August 2026):** Added `donations.campaigns.manage`, `donations.prospects.manage`, `donations.reports.manage`. `donations.manage` still implies full access. Seed: `scripts/265_donations_granular_permissions.sql`. Import/Match accept reports.manage; campaign writes use campaigns.manage; prospect writes use prospects.manage.
+
+**Org-wide Campaign Groups report (August 2026):** Reports → **Campaign Groups** at `/donations/reports/campaign-groups` (separate from Donors → Group Giving). Reuses `computeCampaignGroupMetrics`.
+
+**Public group pledge attribution (August 2026):** `/donate/g/{token}` supports Donate now, Pledge and pay now, or Pledge only. Pledge+pay creates a `pledges` row with `campaign_group_id` and links Stripe payment via `pledge_id` (`allocated`).
 
 **Donations payment methods (June 2026):** Removed **Payment Methods** tab from Donations → Settings; org cards on file are managed under **Billing** (`/billing`). Existing `payment_methods` rows remain for donation source labels where referenced.
 
@@ -1503,7 +1509,8 @@ Status: Implemented (June 2026)
 |-------|---------|
 | `/donations/campaigns` | Campaigns Overview — org-wide pledge summary cards; fundraising campaigns table (active + two most recent by default; **View all** expands full list, most recent first) |
 | `/donations/campaigns/[id]` | Campaign workspace — Overview, Strategy, Prospects, Pledges, Donations, Groups; `?tab=` / `?group=` |
-| `/donate/g/[token]` | Public campaign group donation + Stripe Checkout; payment attributed to campaign + group |
+| `/donate/g/[token]` | Public campaign group donation + optional pledge; Stripe Checkout attributes campaign + group (+ pledge when selected) |
+| `/donations/reports/campaign-groups` | Org-wide campaign fundraising groups report |
 | `/donations` | Donations executive dashboard — KPI cards, action required, active campaigns snapshot, recent activity, quick actions |
 | `/donations/settings` | Categories, **Funds** (subcategories under categories), Online Payments (Stripe Connect), receipt and pledge reminder settings. Campaign CRUD is under **Campaigns → Overview**. Org legal name/address/EIN: **Settings → General** (`/settings/general`). Org billing cards: **Billing** (`/billing`). |
 

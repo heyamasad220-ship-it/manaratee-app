@@ -65,6 +65,8 @@ function resolveAttribution(
       optionalUuid(metadata.attributed_group_contact_id) ??
       optionalUuid(checkoutSession?.attributed_group_contact_id) ??
       null,
+    pledge_id:
+      optionalUuid(metadata.pledge_id) ?? optionalUuid(checkoutSession?.pledge_id) ?? null,
     category_id:
       optionalUuid(metadata.category_id) ?? optionalUuid(checkoutSession?.category_id) ?? null,
     subcategory_id:
@@ -148,14 +150,14 @@ export async function insertProcessorPaymentFromCheckout(
       organization_id: input.metadata.organization_id,
       donor_id: input.metadata.donor_id,
       contact_id: input.metadata.contact_id,
-      pledge_id: null,
+      pledge_id: attribution.pledge_id,
       recurring_donation_plan_id: null,
       sender_name: input.senderName ?? null,
       amount,
       payment_date: input.paymentDate ?? new Date().toISOString(),
       source: "stripe",
       source_type: "processor",
-      status: "unallocated",
+      status: attribution.pledge_id ? "allocated" : "unallocated",
       is_verified: true,
       campaign_id: attribution.campaign_id,
       campaign_group_id: attribution.campaign_group_id,

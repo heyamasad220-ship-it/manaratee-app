@@ -403,6 +403,7 @@ npx supabase db query --linked -f scripts/261_campaign_ask_levels.sql
 npx supabase db query --linked -f scripts/262_campaign_prospects.sql
 npx supabase db query --linked -f scripts/263_campaign_groups.sql
 npx supabase db query --linked -f scripts/264_campaign_group_checkout.sql
+npx supabase db query --linked -f scripts/265_donations_granular_permissions.sql
 npm run validate:donations-security
 ```
 

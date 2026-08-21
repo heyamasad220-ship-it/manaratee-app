@@ -206,27 +206,32 @@ export async function createPublicCampaignGroupDonationCheckoutAction(input: {
   amount: number
   donorName: string
   donorEmail: string
+  /** one_time = gift only; pledge_pay = create pledge then pay toward it; pledge_only = pledge without card. */
+  mode?: "one_time" | "pledge_pay" | "pledge_only"
 }) {
   const loaded = await loadActiveGroupByToken(input.token)
   if (!loaded.ok) return { success: false as const, error: loaded.error }
 
   const { supabase, group } = loaded
-
-  if (!isStripeConfigured()) {
-    return { success: false as const, error: "Online payments are not configured" }
-  }
-
-  const connectStatus = await loadOrganizationStripeConnect(supabase, group.organization_id)
-  if (!isOrganizationStripeConnectReady(connectStatus)) {
-    return {
-      success: false as const,
-      error: "Online donations are not enabled for this organization yet.",
-    }
-  }
+  const mode = input.mode || "one_time"
 
   const amount = Number(input.amount)
   if (!Number.isFinite(amount) || amount <= 0) {
-    return { success: false as const, error: "Enter a donation amount greater than zero" }
+    return { success: false as const, error: "Enter an amount greater than zero" }
+  }
+
+  if (mode !== "pledge_only") {
+    if (!isStripeConfigured()) {
+      return { success: false as const, error: "Online payments are not configured" }
+    }
+
+    const connectStatus = await loadOrganizationStripeConnect(supabase, group.organization_id)
+    if (!isOrganizationStripeConnectReady(connectStatus)) {
+      return {
+        success: false as const,
+        error: "Online donations are not enabled for this organization yet.",
+      }
+    }
   }
 
   try {
@@ -245,6 +250,50 @@ export async function createPublicCampaignGroupDonationCheckoutAction(input: {
       })
     }
 
+    let pledgeId: string | null = null
+    if (mode === "pledge_pay" || mode === "pledge_only") {
+      const pledgeDate = new Date().toISOString().slice(0, 10)
+      const { data: pledge, error: pledgeError } = await supabase
+        .from("pledges")
+        .insert({
+          organization_id: group.organization_id,
+          donor_id: donor.donorId,
+          campaign_id: group.campaign_id,
+          campaign_group_id: group.id,
+          category_id: null,
+          subcategory_id: null,
+          amount_pledged: amount,
+          installment_amount: null,
+          total_payments: null,
+          pledge_date: pledgeDate,
+          first_payment_date: null,
+          next_payment_date: null,
+          pledge_type: "one_time",
+          frequency: "one_time",
+          status: "open",
+          notes: `Public group pledge · ${group.name}`,
+        })
+        .select("id")
+        .single()
+
+      if (pledgeError || !pledge?.id) {
+        return {
+          success: false as const,
+          error: pledgeError?.message || "Could not create pledge",
+        }
+      }
+      pledgeId = pledge.id as string
+    }
+
+    if (mode === "pledge_only") {
+      return {
+        success: true as const,
+        mode: "pledge_only" as const,
+        pledgeId,
+        checkoutUrl: null,
+      }
+    }
+
     const { data: campaign } = await supabase
       .from("campaigns")
       .select("name")
@@ -253,6 +302,7 @@ export async function createPublicCampaignGroupDonationCheckoutAction(input: {
 
     const baseUrl = getAppBaseUrl()
     const path = buildCampaignGroupDonationPath(group.public_token)
+    const isPledgePay = mode === "pledge_pay"
     const checkout = await createOneTimeDonationCheckout(supabase, {
       organizationId: group.organization_id,
       donorId: donor.donorId,
@@ -261,9 +311,12 @@ export async function createPublicCampaignGroupDonationCheckoutAction(input: {
       campaignId: group.campaign_id,
       campaignGroupId: group.id,
       attributedGroupContactId,
+      pledgeId,
       donorEmail: donor.email,
       donorName: donor.fullName,
-      productName: `Donation — ${group.name}`,
+      productName: isPledgePay
+        ? `Pledge payment — ${group.name}`
+        : `Donation — ${group.name}`,
       productDescription: campaign?.name
         ? `${campaign.name} · supporting ${group.name}`
         : `Supporting ${group.name}`,
@@ -271,7 +324,12 @@ export async function createPublicCampaignGroupDonationCheckoutAction(input: {
       cancelUrl: `${baseUrl}${path}?checkout=cancelled`,
     })
 
-    return { success: true as const, checkoutUrl: checkout.checkoutUrl }
+    return {
+      success: true as const,
+      mode: mode as "one_time" | "pledge_pay",
+      pledgeId,
+      checkoutUrl: checkout.checkoutUrl,
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not start checkout"
     if (/campaign_group_id|attributed_group_contact_id/i.test(message)) {

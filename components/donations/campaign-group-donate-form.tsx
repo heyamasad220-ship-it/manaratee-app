@@ -8,6 +8,13 @@ import { CampaignProgressBar } from "@/components/donations/campaign-progress-ba
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { formatDonationCurrency } from "@/lib/donations/campaign-analytics"
 import {
   createPublicCampaignGroupDonationCheckoutAction,
@@ -25,9 +32,11 @@ export function CampaignGroupDonateForm({ info }: CampaignGroupDonateFormProps) 
   const [amount, setAmount] = useState("")
   const [donorName, setDonorName] = useState("")
   const [donorEmail, setDonorEmail] = useState("")
+  const [mode, setMode] = useState<"one_time" | "pledge_pay" | "pledge_only">("one_time")
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
   const [successAmount, setSuccessAmount] = useState<number | null>(null)
+  const [pledgeOnlySuccess, setPledgeOnlySuccess] = useState(false)
   const [polling, setPolling] = useState(false)
 
   const checkoutFlag = searchParams.get("checkout")
@@ -84,16 +93,26 @@ export function CampaignGroupDonateForm({ info }: CampaignGroupDonateFormProps) 
         amount: Number(amount),
         donorName,
         donorEmail,
+        mode,
       })
       if (!result.success) {
         setErrorMessage(result.error)
+        return
+      }
+      if (result.mode === "pledge_only") {
+        setPledgeOnlySuccess(true)
+        setSuccessAmount(Number(amount))
+        return
+      }
+      if (!result.checkoutUrl) {
+        setErrorMessage("Checkout URL was not returned")
         return
       }
       window.location.href = result.checkoutUrl
     })
   }
 
-  if (checkoutFlag === "success" || successAmount != null) {
+  if (checkoutFlag === "success" || successAmount != null || pledgeOnlySuccess) {
     return (
       <div className="rounded-lg border border-border bg-card p-6 text-center shadow-sm">
         {polling && successAmount == null ? (
@@ -106,10 +125,10 @@ export function CampaignGroupDonateForm({ info }: CampaignGroupDonateFormProps) 
             <CheckCircle2 className="h-10 w-10 text-emerald-600" />
             <h2 className="text-xl font-semibold">Thank you</h2>
             <p className="text-sm text-muted-foreground">
-              Your gift
-              {successAmount != null ? ` of ${formatDonationCurrency(successAmount)}` : ""}{" "}
-              supporting <span className="font-medium text-foreground">{info.groupName}</span> is
-              recorded.
+              {pledgeOnlySuccess
+                ? `Your pledge${successAmount != null ? ` of ${formatDonationCurrency(successAmount)}` : ""} supporting `
+                : `Your gift${successAmount != null ? ` of ${formatDonationCurrency(successAmount)}` : ""} supporting `}
+              <span className="font-medium text-foreground">{info.groupName}</span> is recorded.
             </p>
           </div>
         )}
@@ -142,18 +161,42 @@ export function CampaignGroupDonateForm({ info }: CampaignGroupDonateFormProps) 
         </div>
       ) : null}
 
-      {!info.onlineDonationsReady ? (
+      {!info.onlineDonationsReady && mode !== "pledge_only" ? (
         <div className="rounded-lg border border-border bg-card p-5 text-center shadow-sm">
           <p className="text-sm text-muted-foreground">
-            Online giving is not available for this organization yet. Please contact them to donate
-            another way.
+            Online card payments are not available for this organization yet. You can still record a
+            pledge below, or contact them to donate another way.
           </p>
+          <div className="mt-4">
+            <Button type="button" variant="outline" onClick={() => setMode("pledge_only")}>
+              Record a pledge instead
+            </Button>
+          </div>
         </div>
-      ) : (
+      ) : null}
+
+      {info.onlineDonationsReady || mode === "pledge_only" ? (
         <form
           onSubmit={handleSubmit}
           className="flex flex-col gap-4 rounded-lg border border-border bg-card p-5 shadow-sm"
         >
+          <div className="flex flex-col gap-2">
+            <Label>Gift type</Label>
+            <Select
+              value={mode}
+              onValueChange={(value: "one_time" | "pledge_pay" | "pledge_only") => setMode(value)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="one_time">Donate now</SelectItem>
+                <SelectItem value="pledge_pay">Pledge and pay now</SelectItem>
+                <SelectItem value="pledge_only">Pledge only (pay later)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="flex flex-col gap-2">
             <Label htmlFor="donate-amount">Amount</Label>
             <div className="relative">
@@ -198,14 +241,23 @@ export function CampaignGroupDonateForm({ info }: CampaignGroupDonateFormProps) 
           {errorMessage ? <p className="text-sm text-red-600">{errorMessage}</p> : null}
 
           <Button type="submit" disabled={pending} className="w-full">
-            {pending ? "Starting checkout…" : "Donate with card"}
+            {pending
+              ? mode === "pledge_only"
+                ? "Recording pledge…"
+                : "Starting checkout…"
+              : mode === "pledge_only"
+                ? "Record pledge"
+                : mode === "pledge_pay"
+                  ? "Pledge and pay with card"
+                  : "Donate with card"}
           </Button>
           <p className="text-center text-xs text-muted-foreground">
-            You will complete payment securely on Stripe. Your gift is attributed to{" "}
-            {info.groupName}.
+            {mode === "pledge_only"
+              ? `Your pledge will be attributed to ${info.groupName}. Staff can collect payment later.`
+              : `You will complete payment securely on Stripe. Your gift is attributed to ${info.groupName}.`}
           </p>
         </form>
-      )}
+      ) : null}
     </div>
   )
 }

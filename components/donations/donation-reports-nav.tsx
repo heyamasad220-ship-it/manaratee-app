@@ -33,6 +33,11 @@ export const DONATION_REPORTS_TABS: DonationReportsTab[] = [
     extraMatchPrefixes: ["/donations/donors/individuals", "/donations/donors/organizations"],
   },
   {
+    label: "Campaign Groups",
+    href: "/donations/reports/campaign-groups",
+    matchPrefix: "/donations/reports/campaign-groups",
+  },
+  {
     label: "Import",
     href: "/donations/reports/import",
     matchPrefix: "/donations/reports/import",

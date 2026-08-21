@@ -146,7 +146,7 @@ export async function saveCampaignAskLevelsAction(
   campaignId: string,
   levels: CampaignAskLevelWriteInput[]
 ) {
-  const access = await requireDonationStaffAccess("manage")
+  const access = await requireDonationStaffAccess("campaigns")
   if (!access.ok) return { success: false as const, error: access.error }
 
   if (!campaignId.trim()) {

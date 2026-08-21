@@ -15,6 +15,9 @@ export const PERMISSIONS = {
 
   DONATIONS_VIEW: "donations.view",
   DONATIONS_MANAGE: "donations.manage",
+  DONATIONS_CAMPAIGNS_MANAGE: "donations.campaigns.manage",
+  DONATIONS_PROSPECTS_MANAGE: "donations.prospects.manage",
+  DONATIONS_REPORTS_MANAGE: "donations.reports.manage",
 
   REPORTS_VIEW: "reports.view",
 

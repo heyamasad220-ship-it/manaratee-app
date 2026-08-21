@@ -191,6 +191,8 @@ User Invitations
 
 **Fund Development overview insights Phase G (August 2026)** — Campaign Overview Action Required + team summary + groups rollup; Contact Financial Fund Development history (`donations.view`). No new migration.
 
+**Fund Development follow-ups (August 2026)** — Granular permissions (`265_donations_granular_permissions.sql`); Reports → Campaign Groups; public group pledge modes with `pledge_id` on checkout/payment.
+
 ---
 
 ## People Management Module

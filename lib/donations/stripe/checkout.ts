@@ -64,6 +64,7 @@ export async function createOneTimeDonationCheckout(
       campaign_id: input.campaignId ?? null,
       campaign_group_id: input.campaignGroupId ?? null,
       attributed_group_contact_id: input.attributedGroupContactId ?? null,
+      pledge_id: input.pledgeId ?? null,
       category_id: input.categoryId ?? null,
       subcategory_id: input.subcategoryId ?? null,
       amount: input.amount,
@@ -74,6 +75,7 @@ export async function createOneTimeDonationCheckout(
         donor_name: input.donorName ?? null,
         campaign_group_id: input.campaignGroupId ?? null,
         attributed_group_contact_id: input.attributedGroupContactId ?? null,
+        pledge_id: input.pledgeId ?? null,
       },
     })
     .select("id")
@@ -90,6 +92,7 @@ export async function createOneTimeDonationCheckout(
     campaignId: input.campaignId,
     campaignGroupId: input.campaignGroupId,
     attributedGroupContactId: input.attributedGroupContactId,
+    pledgeId: input.pledgeId,
     categoryId: input.categoryId,
     subcategoryId: input.subcategoryId,
     checkoutType: "one_time",

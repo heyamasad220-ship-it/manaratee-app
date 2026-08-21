@@ -242,6 +242,8 @@ export default function CampaignDetailPage() {
   const [askLevelMetrics, setAskLevelMetrics] = useState<CampaignAskLevelMetrics[]>([])
   const [campaignPayments, setCampaignPayments] = useState<CampaignPaymentRow[]>([])
   const [canManage, setCanManage] = useState(false)
+  const [canManageCampaigns, setCanManageCampaigns] = useState(false)
+  const [canManageProspects, setCanManageProspects] = useState(false)
   const [loading, setLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [showEditDialog, setShowEditDialog] = useState(false)
@@ -314,6 +316,8 @@ export default function CampaignDetailPage() {
     setAskLevelMetrics(result.askLevelMetrics || [])
     setOverviewMetricKeys(result.overviewMetricKeys)
     setCanManage(result.canManage)
+    setCanManageCampaigns(result.canManageCampaigns)
+    setCanManageProspects(result.canManageProspects)
 
     // Prefer full campaign pledge list for the Pledges tab (not only outstanding).
     const pledgesQuery = await supabase
@@ -425,7 +429,7 @@ export default function CampaignDetailPage() {
               </Button>
 
               <div className="min-w-0">
-                {canManage ? (
+                {canManageCampaigns ? (
                   <button
                     type="button"
                     onClick={() => setShowEditDialog(true)}
@@ -464,7 +468,7 @@ export default function CampaignDetailPage() {
               outstandingPledges={outstandingPledges}
               phaseMetrics={phaseMetrics}
               overviewMetricKeys={overviewMetricKeys}
-              canManage={canManage}
+              canManage={canManageCampaigns}
               showMetricsEditor={showMetricsEditor}
               onShowMetricsEditorChange={setShowMetricsEditor}
               showDonorsDialog={showDonorsDialog}
@@ -481,7 +485,7 @@ export default function CampaignDetailPage() {
               askLevels={askLevels}
               askLevelMetrics={askLevelMetrics}
               phases={phases}
-              canManage={canManage}
+              canManage={canManageCampaigns}
               onSaved={() => void loadCampaign()}
             />
           ) : null}
@@ -491,7 +495,7 @@ export default function CampaignDetailPage() {
               campaignId={campaign.id}
               organizationId={campaign.organization_id}
               askLevels={askLevels}
-              canManage={canManage}
+              canManage={canManageProspects}
               onChanged={() => void loadCampaign()}
               initialFollowUp={
                 prospectFollowUp === "overdue" || prospectFollowUp === "upcoming"
@@ -539,7 +543,7 @@ export default function CampaignDetailPage() {
               campaignId={campaign.id}
               campaignName={campaign.name}
               organizationId={campaign.organization_id}
-              canManage={canManage}
+              canManage={canManageCampaigns}
               selectedGroupId={selectedGroupId}
               onChanged={() => void loadCampaign()}
             />
@@ -547,7 +551,7 @@ export default function CampaignDetailPage() {
         </div>
       </div>
 
-      {canManage ? (
+      {canManageCampaigns ? (
         <CampaignEditDialog
           campaign={campaign}
           phases={phases}

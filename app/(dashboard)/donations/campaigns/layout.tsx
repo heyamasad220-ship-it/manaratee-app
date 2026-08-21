@@ -14,6 +14,6 @@ export default async function DonationsCampaignsLayout({
   }
 
   return (
-    <DonationCampaignsShell canManage={access.canManage}>{children}</DonationCampaignsShell>
+    <DonationCampaignsShell canManage={access.canManageCampaigns}>{children}</DonationCampaignsShell>
   )
 }
