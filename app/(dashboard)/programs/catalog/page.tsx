@@ -12,7 +12,7 @@ import {
 } from "@/lib/programs/program-catalog-helpers"
 import { PROGRAM_LABEL_PLURAL } from "@/lib/programs/program-display-labels"
 import { programOfferingManageHref } from "@/lib/programs/program-offering-paths"
-import { buildPublicProgramCatalogUrl } from "@/lib/programs/public-offering-catalog-queries"
+import { buildPublicProgramCatalogUrl } from "@/lib/programs/public-paths"
 
 function getValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value

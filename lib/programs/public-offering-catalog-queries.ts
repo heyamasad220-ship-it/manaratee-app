@@ -1,11 +1,9 @@
-import { DEPARTMENT_OPEN_PROGRAM_STATUSES } from "@/lib/departments/department-active-programs"
-import { getShareableAppBaseUrl } from "@/lib/app/get-app-base-url"
+import { DEPARTMENT_OPEN_PROGRAM_STATUSES } from "@/lib/departments/department-program-statuses"
 import { getServiceRoleClient } from "@/lib/platform/require-platform-admin"
 import {
   resolveEffectiveOfferingDates,
   resolveEffectiveOfferingEligibility,
 } from "@/lib/programs/program-offering-inherit"
-import { sanitizeCustomerPortalRedirectPath } from "@/lib/auth/sanitize-customer-redirect-path"
 import { getJoinOrganizationBySlug } from "@/lib/organizations/join-organization-actions"
 // Types only — offering-catalog-queries is a "use server" module.
 import type {
@@ -106,28 +104,6 @@ function matchesPublicFilters(
   }
 
   return true
-}
-
-export function buildPublicProgramCatalogPath(orgSlug: string) {
-  return `/o/${encodeURIComponent(orgSlug.trim().toLowerCase())}/programs`
-}
-
-export function buildPublicProgramCatalogUrl(orgSlug: string, baseUrl?: string) {
-  const base = baseUrl ?? getShareableAppBaseUrl()
-  return `${base}${buildPublicProgramCatalogPath(orgSlug)}`
-}
-
-export function buildPublicOfferingJoinHref(
-  orgSlug: string,
-  programId: string,
-  offeringId: string
-) {
-  const next =
-    sanitizeCustomerPortalRedirectPath(
-      `/customer/programs/${programId}?offering=${offeringId}`
-    ) || `/customer/programs/${programId}`
-  const params = new URLSearchParams({ next })
-  return `/join/${encodeURIComponent(orgSlug.trim().toLowerCase())}?${params.toString()}`
 }
 
 async function countOfferingEnrollments(

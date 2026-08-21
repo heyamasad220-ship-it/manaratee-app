@@ -11,7 +11,7 @@ import {
   buildOrganizationJoinUrl,
 } from "@/lib/organizations/join-organization-url"
 import { buildPublicCommunityCalendarUrl } from "@/lib/community-calendar/public-paths"
-import { buildPublicProgramCatalogUrl } from "@/lib/programs/public-offering-catalog-queries"
+import { buildPublicProgramCatalogUrl } from "@/lib/programs/public-paths"
 
 function CopyLinkButton({ url, label }: { url: string; label: string }) {
   const [copied, setCopied] = useState(false)

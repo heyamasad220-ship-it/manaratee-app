@@ -7,11 +7,11 @@ import {
   buildProgramCatalogHref,
   PROGRAM_CATALOG_PAGE_SIZE,
 } from "@/lib/programs/program-catalog-helpers"
+import { getPublicProgramCatalogBySlug } from "@/lib/programs/public-offering-catalog-queries"
 import {
   buildPublicOfferingJoinHref,
   buildPublicProgramCatalogPath,
-  getPublicProgramCatalogBySlug,
-} from "@/lib/programs/public-offering-catalog-queries"
+} from "@/lib/programs/public-paths"
 
 function getValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value
