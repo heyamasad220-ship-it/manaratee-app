@@ -137,7 +137,7 @@ discount_tags.organization_id → organizations.id
 
 **Participation roles (superseded by `137`):** Migration `101_contact_participation_roles.sql` originally added separate participation roles; `137` consolidates them into `customer`.
 
-**Contact record types (migration `132_contact_type_group.sql`):** `contacts.contact_type` CHECK — `individual` (person), `organization` (external entity), `group` (internal collective: halaqa, committee) with optional `primary_contact_name`. Group donor rows use `donors.donor_type = 'organization'`. Patch `sync_contact_affiliations` for groups: migration `133_sync_contact_affiliations_group.sql`.
+**Contact record types (migration `132_contact_type_group.sql`):** `contacts.contact_type` CHECK — `individual` (person), `organization` (external entity), `group` (Fund Development giving collective — department/committee rollup, not a Directory identity) with optional `primary_contact_name`. Group donor rows use `donors.donor_type = 'organization'`. Patch `sync_contact_affiliations` for groups: migration `133_sync_contact_affiliations_group.sql`.
 
 **Giving group category (migration `167_giving_group_category.sql`):** On `contacts` when `contact_type = group`: `giving_group_kind` (`membership_group` | `department` | `group_donation`), optional `linked_hr_team_id` → `hr_teams`, optional `linked_department_id` → `departments`. Drives workspace badge and Events tab (department events; URL `?tab=activity`).
 
@@ -161,7 +161,7 @@ discount_tags.organization_id → organizations.id
 
 **Group giving report (migration `166_group_giving_report.sql`):** RPC `donation_group_giving_report` powers **Donations → Reports → Donors → Group Giving**. Returns only groups with at least one non-voided gift in the date range (direct gift on the group contact or attributed member gift). Columns include group/member gift split, combined total, gift count, last gift, and group-contact pledge status.
 
-**Family households (migration `148_families_and_family_members.sql` + `196_family_members_person.sql`):** `families` + `family_members` are household containers — **not** a separate contact type or parallel profile. The **contact** is canonical (phone/email/address, donations, rentals, events). Family is an extension managed on the contact Family card (name, head, members). Members are adults (**contacts**) and minors (**people** only, no CRM profile). `family_members.contact_id` is optional; `person_id` identifies minors. One active household per person; first adult is head/primary (changeable). **UI:** `/contacts/reports/directory?tab=families` household directory (sidebar Families removed); `/contacts/families` redirects there; `/contacts/families/[id]` redirects to primary contact. Auto-sync when kids are added under a parent Contact (`syncHouseholdFromParentContact`). Backfill camp parents: `node scripts/sync-summer-camp-households.mjs --execute` after **196**. `person_relationships` remains the Contact profile Family panel source.
+**Family households (migration `148_families_and_family_members.sql` + `196_family_members_person.sql`):** `families` + `family_members` are household containers — **not** a separate contact type or parallel profile. The **contact** is canonical (phone/email/address, donations, rentals, events). Family is an extension managed on the contact Family card (name, head, members). Members are adults (**contacts**) and minors (**people** only, no CRM profile). `family_members.contact_id` is optional; `person_id` identifies minors. One active household per person; first adult is head/primary (changeable). **UI:** `/directory/families` household directory; `/directory/families/[id]` household detail; legacy `/contacts/families` redirects there. Auto-sync when kids are added under a parent Contact (`syncHouseholdFromParentContact`). Backfill camp parents: `node scripts/sync-summer-camp-households.mjs --execute` after **196**. `person_relationships` remains the Contact profile Family panel source.
 
 **Contact payment methods (migration `138_contact_payment_methods.sql`):** `contact_payment_methods` stores cards on file for a contact (brand, last4, expiry, cardholder, default flag). **Staff** add cards from contact profile **Financial → Payment Methods**; **contacts** add cards from the customer portal **Profile → Payment Methods**. Both paths use the same `contact_payment_methods` rows (full PAN and CVV collected at save only; only last 4 + MM/YYYY expiration persist). Server: `lib/contacts/contact-payment-method-actions.ts`, `lib/contacts/contact-payment-method-validation.ts`, `components/contacts/contact-payment-methods-panel.tsx`. Run after `137_customer_role_merge.sql`.
 
@@ -178,7 +178,7 @@ discount_tags.organization_id → organizations.id
 | `donors.contact_id` | Donor extension (pledges/payments FK); `donor` affiliation requires a payment |
 | `volunteers.contact_id` | Volunteer roster + `volunteer` derivation |
 
-Affiliation writes use `sync_contact_affiliations` RPC via `syncContactAffiliations` / `handleDonationAffiliationSync` — not manual `contact_roles` inserts on activity write paths. Profile open may call `refreshContactAffiliations` for reconciliation only; Phase 1 modules do not depend on it.
+Affiliation writes use `sync_contact_affiliations` RPC via `syncContactAffiliations` / `handleDonationAffiliationSync` — not manual `contact_roles` inserts on activity write paths. Profile open may call `refreshContactAffiliations` for reconciliation only; Phase 1 modules do not depend on it. **Sponsor** is a manual `contact_roles` value (not derived); run `scripts/269_directory_sponsor_role.sql` to extend the role CHECK.
 
 **RLS hardening (migrations `102`–`111`, June 2026):**
 
@@ -351,15 +351,16 @@ Import CSV flow writes directly to `payments` + `payment_import_batches` (no row
 **`payments.source` constraint (patch `131_payments_source_square.sql`):** lowercase channel keys (`cash`, `check`, **`square`**, `zelle`, `venmo`, `paypal`, `stripe`, `import`, `manual`). **`square`** = Square terminal batch deposit on a campaign (no donor/contact). Campaign overview classifies via memo `|batch|square|` or `source = square`. Customer portal normalizes configured payment method display names via `lib/donations/payment-source-channel.ts` before insert.
 
 * campaigns (`goal_amount`, `description`, `start_date`, `end_date`, `status`, `code`, `overview_metric_keys` — migration `134`; `flyer_url` — migration `160` for customer portal campaign cards; `goal_breakdown_enabled` — migration `260`)
-* campaign_phases (optional goal phases per campaign — migration `260`; RLS via donations view/manage helpers)
-* campaign_ask_levels (strategy gift chart — migration `261`; optional `campaign_phase_id`; RLS via donations helpers)
+* campaign_phases (unused — Goal Breakdown retired; table kept; clear with `270_disable_campaign_goal_phases.sql`)
+* campaign_ask_levels (strategy gift chart — migration `261`; `campaign_phase_id` unused)
 * campaign_prospects (pre-pledge pipeline — migration `262`; contact + optional ask level / assignee / converted pledge; unique contact per campaign; RLS via donations helpers)
 * campaign_groups (campaign fundraising teams — migration `263`; optional org group contact + lead; opaque `public_token`; staff RLS; public pages resolve via service role)
+* campaign_wishlist_items (campaign funding priorities — migration `267`; optional fund/department; `campaign_phase_id` unused; opaque `public_token`; staff RLS; public `/donate/w/{token}` via service role)
 * donors
 * donation_categories
 * donation_subcategories (`is_active` — migration `161`; when false the fund is closed and hidden from new donation pickers; migration `162` blocks customer portal `payments` inserts to closed funds)
-* pledges (`installment_amount`, `total_payments`, `first_payment_date`, `next_payment_date` added in migration `158` for customer portal installment pledges; `campaign_phase_id` — migration `260`; `ask_level_id` — migration `261`; `campaign_prospect_id` — migration `262`; `campaign_group_id` — migration `263`)
-* payments (`campaign_phase_id` — migration `260`; `campaign_group_id` — migration `263`)
+* pledges (`installment_amount`, `total_payments`, `first_payment_date`, `next_payment_date` added in migration `158` for customer portal installment pledges; `campaign_phase_id` — migration `260`; `ask_level_id` — migration `261`; `campaign_prospect_id` — migration `262`; `campaign_group_id` — migration `263`; `wishlist_item_id` — migration `267`)
+* payments (`campaign_phase_id` — migration `260`; `campaign_group_id` — migration `263`; `wishlist_item_id` — migration `267`)
 * payment_methods
 * donor_summary_view
 * pledge_status_view (includes `campaign_phase_id` after migration `260`)
@@ -389,7 +390,9 @@ Import CSV flow writes directly to `payments` + `payment_import_batches` (no row
 
 **Campaign prospects (migration `262_campaign_prospects.sql`):** `campaign_prospects` (org + campaign scoped; FK to contacts, optional ask level / assignee contact / converted pledge). Unique `(campaign_id, contact_id)`. Nullable `pledges.campaign_prospect_id`. RLS via donations view/manage helpers.
 
-**Campaign groups (migration `263_campaign_groups.sql`):** `campaign_groups` with opaque `public_token`, optional `organizational_group_id` / `lead_contact_id`, optional `goal_amount`. Nullable `campaign_group_id` on `pledges` and `payments`. Staff RLS; public `/donate/g/{token}` resolves via service role (no anon table dump).
+**Campaign groups (migration `263_campaign_groups.sql`):** `campaign_groups` with opaque `public_token`, optional `organizational_group_id` / `lead_contact_id`. `goal_amount` exists but is unused in the UI. Nullable `campaign_group_id` on `pledges` and `payments`. Staff RLS; public `/donate/g/{token}` resolves via service role (no anon table dump).
+
+**Campaign wishlist (migration `267_campaign_wishlist.sql`):** `campaign_wishlist_items` (org + campaign scoped). Optional `fund_id` (donation_subcategories), `department_id`, `campaign_phase_id`. Carry-forward via `carried_from_item_id` / `carried_to_item_id` + `previous_funding_amount` (historical snapshot — not current-campaign collected). Nullable `wishlist_item_id` on `pledges`, `payments`, `recurring_donation_plans`, `donation_checkout_sessions`. Staff RLS via donations view/manage helpers. Public donate `/donate/w/{token}` uses service role. Wishlist targets do not increase `campaigns.goal_amount`.
 
 **Campaign group checkout (migration `264_campaign_group_checkout.sql`):** `donation_checkout_sessions.campaign_group_id` + `attributed_group_contact_id`. Stripe metadata + webhook payment insert carry the same fields.
 
@@ -407,6 +410,7 @@ npx supabase db query --linked -f scripts/263_campaign_groups.sql
 npx supabase db query --linked -f scripts/264_campaign_group_checkout.sql
 npx supabase db query --linked -f scripts/265_donations_granular_permissions.sql
 npx supabase db query --linked -f scripts/266_group_recurring_and_fd_emails.sql
+npx supabase db query --linked -f scripts/267_campaign_wishlist.sql
 npm run validate:donations-security
 ```
 
@@ -454,6 +458,13 @@ campaign_groups.organization_id → organizations.id
 campaign_groups.campaign_id → campaigns.id
 campaign_groups.organizational_group_id → contacts.id
 campaign_groups.lead_contact_id → contacts.id
+campaign_wishlist_items.organization_id → organizations.id
+campaign_wishlist_items.campaign_id → campaigns.id
+campaign_wishlist_items.fund_id → donation_subcategories.id
+campaign_wishlist_items.department_id → departments.id
+campaign_wishlist_items.campaign_phase_id → campaign_phases.id
+campaign_wishlist_items.carried_from_item_id → campaign_wishlist_items.id
+campaign_wishlist_items.carried_to_item_id → campaign_wishlist_items.id
 donors.organization_id → organizations.id
 donors.contact_id → contacts.id
 
@@ -466,6 +477,7 @@ pledges.campaign_phase_id → campaign_phases.id
 pledges.ask_level_id → campaign_ask_levels.id
 pledges.campaign_prospect_id → campaign_prospects.id
 pledges.campaign_group_id → campaign_groups.id
+pledges.wishlist_item_id → campaign_wishlist_items.id
 pledges.category_id → donation_categories.id
 pledges.subcategory_id → donation_subcategories.id
 
@@ -476,6 +488,7 @@ payments.pledge_id → pledges.id
 payments.campaign_id → campaigns.id
 payments.campaign_phase_id → campaign_phases.id
 payments.campaign_group_id → campaign_groups.id
+payments.wishlist_item_id → campaign_wishlist_items.id
 payments.category_id → donation_categories.id
 payments.subcategory_id → donation_subcategories.id
 payments.payment_method_id → payment_methods.id
@@ -498,6 +511,7 @@ recurring_donation_plans.donor_id → donors.id
 recurring_donation_plans.contact_id → contacts.id
 recurring_donation_plans.campaign_id → campaigns.id
 recurring_donation_plans.campaign_group_id → campaign_groups.id
+recurring_donation_plans.wishlist_item_id → campaign_wishlist_items.id
 recurring_donation_plans.category_id → donation_categories.id
 recurring_donation_plans.subcategory_id → donation_subcategories.id
 recurring_donation_plans.payment_method_id → payment_methods.id
@@ -508,6 +522,7 @@ donation_checkout_sessions.donor_id → donors.id
 donation_checkout_sessions.contact_id → contacts.id
 donation_checkout_sessions.campaign_id → campaigns.id
 donation_checkout_sessions.campaign_group_id → campaign_groups.id
+donation_checkout_sessions.wishlist_item_id → campaign_wishlist_items.id
 donation_checkout_sessions.attributed_group_contact_id → contacts.id
 donation_checkout_sessions.category_id → donation_categories.id
 donation_checkout_sessions.subcategory_id → donation_subcategories.id

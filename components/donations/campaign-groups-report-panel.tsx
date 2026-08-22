@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 
 import { CampaignProgressBar } from "@/components/donations/campaign-progress-bar"
-import { DonationReportsTabs } from "@/components/donations/donation-reports-chrome"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Select,
@@ -31,7 +30,7 @@ import { donationCampaignWorkspaceHref } from "@/lib/donations/campaign-workspac
 
 const ALL = "all"
 
-export function CampaignGroupsReportPanel() {
+export function CampaignGroupsReportPanel({ embedded = false }: { embedded?: boolean }) {
   const [rows, setRows] = useState<OrgCampaignGroupReportRow[]>([])
   const [campaigns, setCampaigns] = useState<Array<{ id: string; name: string }>>([])
   const [totals, setTotals] = useState({ groups: 0, pledged: 0, collected: 0, donors: 0 })
@@ -64,15 +63,16 @@ export function CampaignGroupsReportPanel() {
   }, [load])
 
   return (
-    <div className="flex flex-col gap-6 p-6">
-      <div>
-        <h2 className="text-xl font-semibold">Campaign Groups</h2>
-        <p className="text-sm text-muted-foreground">
-          Fundraising teams across campaigns. Separate from CRM Group Giving on the Donors report.
-        </p>
-      </div>
-
-      <DonationReportsTabs />
+    <div className={embedded ? "flex flex-col gap-6" : "flex flex-col gap-6 p-6"}>
+      {embedded ? null : (
+        <div>
+          <h2 className="text-xl font-semibold">Campaign Groups</h2>
+          <p className="text-sm text-muted-foreground">
+            Fundraising teams across campaigns. Separate from CRM Group Giving on the Donors
+            report.
+          </p>
+        </div>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="border border-border shadow-sm">

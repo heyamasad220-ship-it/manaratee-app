@@ -1,6 +1,5 @@
 "use client"
 
-import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import Image from "next/image"
@@ -30,69 +29,37 @@ const navItems = [
 
 export function PlatformSidebar() {
   const pathname = usePathname()
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  if (!mounted) {
-    return (
-      <aside className="flex h-screen w-[220px] shrink-0 flex-col border-r border-zinc-200 bg-white text-zinc-900">
-        <div className="flex items-center gap-3 px-4 py-4">
-  <Image
-    src="/logo.png"
-    alt="Manaratee"
-    width={42}
-    height={42}
-    className="h-10 w-10 object-contain"
-  />
-
-  <div className="flex flex-col leading-none">
-    <span className="text-sm font-semibold tracking-[0.18em] text-white">
-      MANARATEE
-    </span>
-
-    <span className="text-[9px] text-zinc-400">
-      Guiding Every Part
-    </span>
-  </div>
-</div>
-        <nav className="flex flex-1 flex-col gap-2 px-3 pt-2">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="h-9 animate-pulse rounded-md bg-zinc-800/50" />
-          ))}
-        </nav>
-      </aside>
-    )
-  }
 
   return (
     <aside className="flex h-screen w-[220px] shrink-0 flex-col border-r border-zinc-200 bg-white text-zinc-900">
       <div className="flex items-center justify-center px-4 py-5">
-  <Image
-    src="/logo.png"
-    alt="Manaratee"
-    width={180}
-    height={60}
-    className="h-auto w-auto object-contain"
-    priority
-  />
-</div>
+        <Image
+          src="/logo.png"
+          alt="Manaratee"
+          width={180}
+          height={60}
+          className="h-auto w-auto object-contain"
+          priority
+        />
+      </div>
 
       <nav className="flex flex-1 flex-col gap-0.5 px-3 pt-2">
         {navItems.map((item) => {
           const isActive = pathname.startsWith(item.matchPrefix)
+          const className = cn(
+            "relative flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+            isActive
+              ? "bg-amber-50 text-amber-700"
+              : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
+          )
+
           return (
             <Link
               key={item.label}
               href={item.href}
-              className={cn(
-                "relative flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                isActive
-                ? "bg-amber-50 text-amber-700"
-                : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
-              )}
+              prefetch={false}
+              aria-current={isActive ? "page" : undefined}
+              className={className}
             >
               {isActive && (
                 <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-r-full bg-black" />
@@ -104,16 +71,20 @@ export function PlatformSidebar() {
         })}
       </nav>
 
-      <div className="border-t border-zinc-800 px-3 py-3">
+      <div className="border-t border-zinc-200 px-3 py-3">
         <div className="flex items-center gap-3 rounded-md px-3 py-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-800 text-xs font-bold text-zinc-300">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-200 text-xs font-bold text-zinc-700">
             SA
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="truncate text-sm font-medium text-zinc-200">Super Admin</p>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium text-zinc-800">Super Admin</p>
             <p className="truncate text-xs text-zinc-500">admin@manaratee.com</p>
           </div>
-          <Link href="/admin/login" className="text-zinc-500 hover:text-zinc-300 transition-colors">
+          <Link
+            href="/admin/login"
+            prefetch={false}
+            className="text-zinc-500 transition-colors hover:text-zinc-800"
+          >
             <LogOut className="h-4 w-4" />
             <span className="sr-only">Logout</span>
           </Link>

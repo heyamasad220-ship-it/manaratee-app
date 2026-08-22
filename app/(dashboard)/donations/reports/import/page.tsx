@@ -1,17 +1,7 @@
-import { Suspense } from "react"
+import { redirect } from "next/navigation"
 
-import { DonationReportsTabs } from "@/components/donations/donation-reports-chrome"
-import { PaymentImportMatchWorkspace } from "@/components/donations/payment-import-match-workspace"
+import { donationImportMatchHref } from "@/lib/donations/donation-payment-paths"
 
-export default function DonationReportsImportPage() {
-  return (
-    <div className="flex flex-col gap-6 p-6">
-      <DonationReportsTabs />
-      <Suspense
-        fallback={<div className="text-sm text-muted-foreground">Loading import workspace...</div>}
-      >
-        <PaymentImportMatchWorkspace mode="import" />
-      </Suspense>
-    </div>
-  )
+export default function DonationReportsImportRedirectPage() {
+  redirect(donationImportMatchHref())
 }

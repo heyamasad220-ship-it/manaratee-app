@@ -9,7 +9,9 @@ import {
   Search,
   User,
 } from "lucide-react"
-import { addMemberWithMembership } from "@/lib/memberships/membership-actions"
+import { addMemberWithMembership, createMembership } from "@/lib/memberships/membership-actions"
+import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
+import { HrContactPicker } from "@/components/hr/hr-contact-picker"
 import {
   fetchMembershipsList,
   fetchMembershipTypes,
@@ -87,6 +89,9 @@ export function MembersList() {
   const [membershipTypes, setMembershipTypes] = useState<MembershipType[]>([])
   const [teams, setTeams] = useState<{ id: string; name: string }[]>([])
   const [addOpen, setAddOpen] = useState(false)
+  const [createNewPerson, setCreateNewPerson] = useState(false)
+  const [selectedContactId, setSelectedContactId] = useState<string | null>(null)
+  const [selectedContactLabel, setSelectedContactLabel] = useState("")
   const [form, setForm] = useState({
     fullName: "",
     email: "",
@@ -95,6 +100,20 @@ export function MembersList() {
     startDate: new Date().toISOString().slice(0, 10),
     notes: "",
   })
+
+  function resetAddForm() {
+    setCreateNewPerson(false)
+    setSelectedContactId(null)
+    setSelectedContactLabel("")
+    setForm({
+      fullName: "",
+      email: "",
+      phone: "",
+      membershipTypeId: "",
+      startDate: new Date().toISOString().slice(0, 10),
+      notes: "",
+    })
+  }
 
   const loadRows = useCallback(async () => {
     setLoading(true)
@@ -143,32 +162,37 @@ export function MembersList() {
   )
 
   async function handleAddMember() {
-    if (!form.fullName.trim()) {
-      alert("Name is required")
+    if (!selectedContactId && !form.fullName.trim()) {
+      alert("Search Directory for an existing person, or create a new person.")
       return
     }
 
     setSaving(true)
     try {
-      const result = await addMemberWithMembership({
-        fullName: form.fullName.trim(),
-        email: form.email.trim() || undefined,
-        phone: form.phone.trim() || undefined,
-        membershipTypeId: form.membershipTypeId || null,
-        startDate: form.startDate,
-        notes: form.notes.trim() || undefined,
-      })
+      let contactId = selectedContactId
+      if (contactId) {
+        await createMembership({
+          contactId,
+          membershipTypeId: form.membershipTypeId || null,
+          status: "active",
+          startDate: form.startDate,
+          notes: form.notes.trim() || undefined,
+        })
+      } else {
+        const result = await addMemberWithMembership({
+          fullName: form.fullName.trim(),
+          email: form.email.trim() || undefined,
+          phone: form.phone.trim() || undefined,
+          membershipTypeId: form.membershipTypeId || null,
+          startDate: form.startDate,
+          notes: form.notes.trim() || undefined,
+        })
+        contactId = result.contactId
+      }
       setAddOpen(false)
-      setForm({
-        fullName: "",
-        email: "",
-        phone: "",
-        membershipTypeId: "",
-        startDate: new Date().toISOString().slice(0, 10),
-        notes: "",
-      })
+      resetAddForm()
       await loadRows()
-      router.push(`/contacts/${result.contactId}`)
+      if (contactId) router.push(contactProfileHref(contactId))
     } catch (error: any) {
       alert(error?.message || "Could not add member")
     } finally {
@@ -352,49 +376,87 @@ export function MembersList() {
         }}
       />
 
-      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+      <Dialog
+        open={addOpen}
+        onOpenChange={(open) => {
+          setAddOpen(open)
+          if (!open) resetAddForm()
+        }}
+      >
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Add member</DialogTitle>
             <DialogDescription>
-              Creates or finds the contact and opens an active membership record. This does not
-              enroll them in any program.
+              Search Directory first. Membership is a role on the existing person — it does not
+              create a second record, and it does not enroll them in a program.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4">
-            <div className="grid gap-2">
-              <Label htmlFor="member-name">Full name</Label>
-              <Input
-                id="member-name"
-                value={form.fullName}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, fullName: event.target.value }))
-                }
+            {!createNewPerson ? (
+              <HrContactPicker
+                label="Search Directory"
+                selectedContactId={selectedContactId}
+                selectedLabel={selectedContactLabel}
+                onChange={(contact) => {
+                  setSelectedContactId(contact.contactId)
+                  const name = contact.full_name?.trim() || "Unnamed"
+                  const detail = contact.email || contact.phone
+                  setSelectedContactLabel(detail ? `${name} (${detail})` : name)
+                }}
+                onClear={() => {
+                  setSelectedContactId(null)
+                  setSelectedContactLabel("")
+                }}
               />
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="grid gap-2">
-                <Label htmlFor="member-email">Email</Label>
-                <Input
-                  id="member-email"
-                  type="email"
-                  value={form.email}
-                  onChange={(event) =>
-                    setForm((current) => ({ ...current, email: event.target.value }))
-                  }
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="member-phone">Phone</Label>
-                <Input
-                  id="member-phone"
-                  value={form.phone}
-                  onChange={(event) =>
-                    setForm((current) => ({ ...current, phone: event.target.value }))
-                  }
-                />
-              </div>
-            </div>
+            ) : null}
+            <button
+              type="button"
+              className="text-left text-sm font-medium text-primary hover:underline"
+              onClick={() => {
+                setCreateNewPerson((current) => !current)
+                setSelectedContactId(null)
+                setSelectedContactLabel("")
+              }}
+            >
+              {createNewPerson ? "Search an existing person instead" : "Person is not in Directory yet"}
+            </button>
+            {createNewPerson ? (
+              <>
+                <div className="grid gap-2">
+                  <Label htmlFor="member-name">Full name</Label>
+                  <Input
+                    id="member-name"
+                    value={form.fullName}
+                    onChange={(event) =>
+                      setForm((current) => ({ ...current, fullName: event.target.value }))
+                    }
+                  />
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="grid gap-2">
+                    <Label htmlFor="member-email">Email</Label>
+                    <Input
+                      id="member-email"
+                      type="email"
+                      value={form.email}
+                      onChange={(event) =>
+                        setForm((current) => ({ ...current, email: event.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="member-phone">Phone</Label>
+                    <Input
+                      id="member-phone"
+                      value={form.phone}
+                      onChange={(event) =>
+                        setForm((current) => ({ ...current, phone: event.target.value }))
+                      }
+                    />
+                  </div>
+                </div>
+              </>
+            ) : null}
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
                 <Label>Membership type</Label>

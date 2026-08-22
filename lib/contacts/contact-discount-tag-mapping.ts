@@ -25,6 +25,7 @@ const ROLE_DISCOUNT_TAG_ALIASES: Record<ContactRoleValue, string[]> = {
   vendor: ["vendor"],
   childcare_provider: ["child care provider", "childcare provider", "childcare"],
   service_provider: ["service provider"],
+  sponsor: ["sponsor"],
 }
 
 function aliasesForRole(role: ContactRoleValue): Set<string> {

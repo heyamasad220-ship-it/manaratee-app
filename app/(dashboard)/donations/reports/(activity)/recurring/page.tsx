@@ -1,10 +1,7 @@
-import { DonationRecurringPanel } from "@/components/donations/donation-recurring-panel"
-import { DonationReportsTabs } from "@/components/donations/donation-reports-chrome"
+import { redirect } from "next/navigation"
 
-export default function DonationReportsRecurringPage() {
-  return (
-    <div className="p-6">
-      <DonationRecurringPanel embedded showReportsTabs />
-    </div>
-  )
+import { DONATION_RECURRING_OPS_PATH } from "@/lib/donations/donation-payment-paths"
+
+export default function DonationReportsRecurringRedirectPage() {
+  redirect(DONATION_RECURRING_OPS_PATH)
 }

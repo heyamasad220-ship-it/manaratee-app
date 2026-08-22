@@ -146,3 +146,56 @@ export async function updateGivingGroupAction(input: {
   revalidatePath(DONATIONS_GROUP_GIVING_REPORT_PATH)
   return { success: true as const }
 }
+
+export async function createGivingGroupAction(input: { fullName: string }) {
+  const access = await requireContactsManageAccess()
+  if (!access.ok) return { success: false as const, error: access.error }
+
+  const cleanName = input.fullName.trim()
+  if (!cleanName) {
+    return { success: false as const, error: "Group name is required." }
+  }
+
+  const payload = {
+    organization_id: access.organizationId,
+    full_name: cleanName,
+    contact_type: "group",
+    status: "active",
+    giving_group_kind: "group_donation",
+    updated_at: new Date().toISOString(),
+  }
+
+  let inserted: { id: string } | null = null
+  const withCategory = await access.supabase
+    .from("contacts")
+    .insert(payload)
+    .select("id")
+    .single()
+
+  if (withCategory.error && isMissingGivingGroupColumn(withCategory.error)) {
+    const { giving_group_kind: _kind, ...basePayload } = payload
+    const retry = await access.supabase
+      .from("contacts")
+      .insert(basePayload)
+      .select("id")
+      .single()
+    if (retry.error || !retry.data) {
+      return {
+        success: false as const,
+        error: retry.error?.message || "Could not create group.",
+      }
+    }
+    inserted = retry.data
+  } else if (withCategory.error || !withCategory.data) {
+    return {
+      success: false as const,
+      error: withCategory.error?.message || "Could not create group.",
+    }
+  } else {
+    inserted = withCategory.data
+  }
+
+  revalidatePath(DONATIONS_GROUP_GIVING_REPORT_PATH)
+  revalidatePath(donationGroupHref(inserted.id))
+  return { success: true as const, groupContactId: inserted.id }
+}

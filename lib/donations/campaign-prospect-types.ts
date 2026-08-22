@@ -22,6 +22,43 @@ export const CAMPAIGN_PROSPECT_STAGE_LABELS: Record<CampaignProspectStage, strin
   no_response: "No Response",
 }
 
+/** Stages staff can set or filter by in the Prospects UI. */
+export const CAMPAIGN_PROSPECT_SELECTABLE_STAGES: CampaignProspectStage[] = [
+  "identified",
+  "contacted",
+  "pledged",
+  "declined",
+  "no_response",
+]
+
+/** Legacy stage `assigned` is shown and edited as Identified. */
+export function displayCampaignProspectStage(
+  stage: string | null | undefined
+): CampaignProspectStage {
+  const normalized = normalizeProspectStage(stage)
+  if (normalized === "assigned") return "identified"
+  return normalized
+}
+
+export function campaignProspectStagesForSelect(
+  current?: string | null
+): CampaignProspectStage[] {
+  const display =
+    current && current !== "all" ? displayCampaignProspectStage(current) : null
+  if (
+    display &&
+    !CAMPAIGN_PROSPECT_SELECTABLE_STAGES.includes(display)
+  ) {
+    return [display, ...CAMPAIGN_PROSPECT_SELECTABLE_STAGES]
+  }
+  return [...CAMPAIGN_PROSPECT_SELECTABLE_STAGES]
+}
+
+export function campaignProspectStageFilterValues(stage: string): string[] {
+  if (stage === "identified") return ["identified", "assigned"]
+  return [stage]
+}
+
 /** Stages that count as "Asked" for strategy metrics. */
 export const CAMPAIGN_PROSPECT_ASKED_STAGES: CampaignProspectStage[] = [
   "asked",

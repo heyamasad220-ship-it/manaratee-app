@@ -28,6 +28,7 @@ type RecurringPlanRow = {
   campaign_id: string | null
   campaign_group_id: string | null
   attributed_group_contact_id: string | null
+  wishlist_item_id: string | null
   category_id: string | null
   subcategory_id: string | null
   amount: number
@@ -39,7 +40,7 @@ type RecurringPlanRow = {
 }
 
 const RECURRING_PLAN_SELECT =
-  "id, organization_id, donor_id, contact_id, campaign_id, campaign_group_id, attributed_group_contact_id, category_id, subcategory_id, amount, frequency, status, next_payment_date, external_processor, external_processor_id"
+  "id, organization_id, donor_id, contact_id, campaign_id, campaign_group_id, attributed_group_contact_id, wishlist_item_id, category_id, subcategory_id, amount, frequency, status, next_payment_date, external_processor, external_processor_id"
 
 async function loadRecurringPlan(
   supabase: SupabaseClient,
@@ -76,6 +77,7 @@ function normalizeRecurringPlanRow(data: Record<string, unknown>): RecurringPlan
     campaign_id: (data.campaign_id as string | null) ?? null,
     campaign_group_id: (data.campaign_group_id as string | null) ?? null,
     attributed_group_contact_id: (data.attributed_group_contact_id as string | null) ?? null,
+    wishlist_item_id: (data.wishlist_item_id as string | null) ?? null,
     category_id: (data.category_id as string | null) ?? null,
     subcategory_id: (data.subcategory_id as string | null) ?? null,
     amount: Number(data.amount || 0),
@@ -332,6 +334,7 @@ export async function insertProcessorPaymentFromInvoice(
       attributed_group_contact_id: plan.attributed_group_contact_id,
       category_id: plan.category_id,
       subcategory_id: plan.subcategory_id,
+      wishlist_item_id: plan.wishlist_item_id,
       stripe_invoice_id: invoice.id,
       stripe_payment_intent_id: paymentIntentId,
       memo: `Recurring donation — ${plan.frequency}`,

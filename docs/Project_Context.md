@@ -163,6 +163,8 @@ Customer Experience
 User Invitations
 **Contacts Phase 1 — identity linkage + affiliation sync** — **Complete** (S-01–S-13, June 2026). Validation gate: `npm run validate:contacts-phase1`. Deferred: merge UI, historical backfill, venue rental derivation, segmentation.
 
+**Directory module (August 2026)** — User-facing Contacts sidebar is now **Directory**. Canonical table remains `contacts`. Overview, People, Families, Organizations, Reports, and Settings are always visible. Giving groups are not a Directory section — they live under Fund Development (Group Giving). Most role views (Employees, Volunteers, Members, Donors, Sponsors, Parents, Vendors, Childcare Providers, Rental Customers) appear only when the current tenant has records. **Service Providers** is always listed (contractors such as plumbers and pest control, distinct from Vendor Hub). Role views show lightweight lookup columns; operational work stays in Workforce / Fund Development / Membership / Vendor Hub / Venue Rentals. Membership add searches Directory first. Sponsor is a manual role on the same contact (`269`). Routes: `/directory/*` with redirects from `/contacts/*` and `/resources/service-providers`.
+
 **Contacts security remediation (RLS wave 1)** — **G6 complete** (June 2026). M6b gate alignment + CR-8 harness shipped. M4 (`111`) **authorized for staging** after `109`–`110` applied. Validation: `npm run validate:contacts-g6`.
 
 **Contact profile homepage Phase 2** — Overview right rail (Quick Actions, Financial Summary, Activity) in place (July 2026). **Financial** tab redesigned to homepage-style KPIs, chart, sub-tabs, and right rail (July 2026).
@@ -177,23 +179,27 @@ User Invitations
 
 **Event Workspace redesign (August 2026)** — Progressive event tabs (registration / staff / youth / vendors / finance / reports) driven by `workspace_features` + attendance mode. Expenses ledger (`event_expenses`). Public event checkout (Stripe Connect when ready) + customer **My Tickets** + event documents + staff Stripe ticket refunds (including partials) + youth forms/waivers + `events.checkin` door-staff permission. Run SQL **`252_event_workspace_redesign.sql`**, **`253_event_youth_checkin_waitlist.sql`**, **`254_event_documents.sql`**, **`255_ticket_order_stripe.sql`**, **`256_customer_ticket_order_rls.sql`**, **`257_events_checkin_permission.sql`**, **`258_ticket_order_refunded_amount.sql`**, **`259_youth_waiver_forms.sql`**.
 
-**Fund Development campaign workspace Phase A (August 2026)** — Campaign detail is a tabbed workspace (Overview / Strategy / Prospects / Pledges / Donations / Groups). Optional campaign phases + Committed/Collected/Outstanding overview. Migration **`260_campaign_phases.sql`**. Strategy, Prospects, and Groups UI come in later phases.
+**Fund Development campaign workspace Phase A (August 2026)** — Campaign detail is a tabbed workspace (Overview / Strategy / Prospects / Pledges / Donations / Groups). One campaign goal (`goal_amount`); Goal Breakdown phases retired (`scripts/270_disable_campaign_goal_phases.sql`). Committed/Collected/Outstanding overview. Migration **`260_campaign_phases.sql`** is historical.
 
 **Fund Development strategy ask levels Phase B (August 2026)** — Campaign → Strategy gift chart (`campaign_ask_levels`). Migration **`261_campaign_ask_levels.sql`**. Prospects tab still pending.
 
-**Fund Development prospects Phase C (August 2026)** — Campaign → Prospects pipeline/assignments (`campaign_prospects`). Migration **`262_campaign_prospects.sql`**. Prospect→pledge conversion linking is Phase D.
+**Fund Development prospects Phase C (August 2026)** — Campaign → Prospects pipeline/assignments (`campaign_prospects`). Staff stage options: Identified (default), Contacted, Pledged, Declined, No Response. Migration **`262_campaign_prospects.sql`**. Prospect→pledge conversion linking is Phase D.
 
-**Fund Development prospect conversion Phase D (August 2026)** — Record Pledge from prospect creates one ledger pledge and links `converted_pledge_id` / `campaign_prospect_id`; suggested ask preserved.
+**Fund Development prospect conversion Phase D (August 2026)** — Record Pledge from prospect fully creates one ledger pledge (including wishlist item) on the Prospects tab; links `converted_pledge_id` / `campaign_prospect_id`; suggested ask preserved.
 
-**Fund Development campaign groups Phase E (August 2026)** — Campaign → Groups with optional goals, donation tokens (`/donate/g/{token}`), QR copy/download. Migration **`263_campaign_groups.sql`**.
+**Fund Development campaign groups Phase E (August 2026)** — Campaign → Groups with donation tokens (`/donate/g/{token}`), copy-link and copy-QR icons. Group goals are not set in the UI. Migration **`263_campaign_groups.sql`**.
 
 **Fund Development public group checkout Phase F (August 2026)** — Guest Stripe Checkout on group links; webhook writes payment with `campaign_id` + `campaign_group_id`. Migration **`264_campaign_group_checkout.sql`**.
 
 **Fund Development overview insights Phase G (August 2026)** — Campaign Overview Action Required + team summary + groups rollup; Contact Financial Fund Development history (`donations.view`). No new migration.
 
-**Fund Development follow-ups (August 2026)** — Granular permissions (`265_donations_granular_permissions.sql`); Reports → Campaign Groups; public group pledge modes with `pledge_id` on checkout/payment.
+**Fund Development follow-ups (August 2026)** — Granular permissions (`265_donations_granular_permissions.sql`); Campaign Performance includes campaign groups reporting; public group pledge modes with `pledge_id` on checkout/payment.
 
 **Fund Development group recurring + FD emails (August 2026)** — Recurring gifts on `/donate/g/{token}`; group pledge confirmation emails; daily prospect follow-up assignee digests. Migration **`266_group_recurring_and_fd_emails.sql`**. Cron: `/api/cron/prospect-follow-up-reminders`.
+
+**Fund Development IA redesign (August 2026)** — Sidebar: Overview / Campaigns / Pledges / **Donations** / Reports / Settings. Operations under `/donations/payments/*`; analytics landing at `/donations/reports`. Transactions/Giving Summary date range + export; receipts Missing queue; year-end KPIs from annual statements. No schema change.
+
+**Fund Development campaign wishlist (August 2026)** — Campaign → Wishlist tab. Sub-goals linked to existing pledges/payments via nullable `wishlist_item_id`. Public donate `/donate/w/{token}`. Carry-forward without duplicating money. Migration **`267_campaign_wishlist.sql`**.
 
 ---
 

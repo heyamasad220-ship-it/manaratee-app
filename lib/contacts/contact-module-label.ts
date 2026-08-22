@@ -1,8 +1,11 @@
-/** User-facing name for the contacts module. */
-export const CONTACTS_MODULE_LABEL = "Contacts"
+import { DONATIONS_GROUP_GIVING_REPORT_PATH } from "@/lib/donations/donor-giving-report"
 
-export const CONTACTS_BASE_PATH = "/contacts/people"
-export const CONTACTS_SETTINGS_PATH = "/contacts/settings"
+/** User-facing name for the contacts / Directory module. */
+export const CONTACTS_MODULE_LABEL = "Directory"
+export const DIRECTORY_MODULE_LABEL = CONTACTS_MODULE_LABEL
+
+export const CONTACTS_BASE_PATH = "/directory"
+export const CONTACTS_SETTINGS_PATH = "/directory/settings"
 
 export type ContactsListSegment = "people" | "organizations" | "groups" | "families"
 
@@ -15,9 +18,8 @@ export function contactsListSegmentForRecordType(
 }
 
 export function getContactsListPathForSegment(segment: ContactsListSegment): string {
-  // Giving collectives are not a Contacts sidebar list — they surface on Group Giving.
-  if (segment === "groups") return "/donations/reports/donors?view=group"
-  return `/contacts/${segment}`
+  if (segment === "groups") return DONATIONS_GROUP_GIVING_REPORT_PATH
+  return `/directory/${segment}`
 }
 
 export function getContactsListPathForRecordType(
@@ -28,7 +30,7 @@ export function getContactsListPathForRecordType(
 
 export function getContactsListLabelForSegment(segment: ContactsListSegment): string {
   if (segment === "organizations") return "Organizations"
-  if (segment === "groups") return "Groups"
+  if (segment === "groups") return "Group Giving"
   if (segment === "families") return "Families"
   return "People"
 }

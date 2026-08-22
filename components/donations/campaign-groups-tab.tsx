@@ -1,9 +1,8 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
 import { Copy, ExternalLink, Plus, QrCode } from "lucide-react"
 
-import { CampaignProgressBar } from "@/components/donations/campaign-progress-bar"
 import { PledgeContactPicker } from "@/components/donations/pledge-contact-picker"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -34,6 +33,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { formatDonationCurrency } from "@/lib/donations/campaign-analytics"
 import {
   createCampaignGroupAction,
@@ -67,7 +71,6 @@ type CampaignGroupsTabProps = {
 
 type GroupFormState = {
   name: string
-  goalAmount: string
   description: string
   status: CampaignGroupStatus
   leadContactId: string
@@ -81,7 +84,6 @@ type GroupFormState = {
 function emptyForm(): GroupFormState {
   return {
     name: "",
-    goalAmount: "",
     description: "",
     status: "active",
     leadContactId: "",
@@ -91,6 +93,34 @@ function emptyForm(): GroupFormState {
     publicProgressEnabled: false,
     linkActive: true,
   }
+}
+
+function GroupLinkIconButton({
+  label,
+  onClick,
+  children,
+}: {
+  label: string
+  onClick: () => void
+  children: ReactNode
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={onClick}
+          aria-label={label}
+        >
+          {children}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
+  )
 }
 
 export function CampaignGroupsTab({
@@ -165,7 +195,6 @@ export function CampaignGroupsTab({
     setEditingGroupId(row.groupId)
     setForm({
       name: row.name,
-      goalAmount: row.goalAmount != null ? String(row.goalAmount) : "",
       description: row.description || "",
       status: row.status,
       leadContactId: row.leadContactId || "",
@@ -187,7 +216,7 @@ export function CampaignGroupsTab({
     setSaving(true)
     const payload = {
       name: form.name,
-      goal_amount: form.goalAmount ? Number(form.goalAmount) : null,
+      goal_amount: null,
       description: form.description || null,
       status: form.status,
       lead_contact_id: form.leadContactId || null,
@@ -215,9 +244,24 @@ export function CampaignGroupsTab({
     const url = buildCampaignGroupDonationUrl(token)
     try {
       await navigator.clipboard.writeText(url)
-      alert("Donation link copied")
     } catch {
       prompt("Copy this donation link:", url)
+    }
+  }
+
+  async function copyQrCode(row: CampaignGroupMetrics) {
+    const imageUrl = buildCampaignGroupQrImageUrl(
+      buildCampaignGroupDonationUrl(row.publicToken),
+      512
+    )
+    try {
+      const response = await fetch(imageUrl)
+      if (!response.ok) throw new Error("Could not load QR code")
+      const blob = await response.blob()
+      const pngBlob = blob.type === "image/png" ? blob : new Blob([blob], { type: "image/png" })
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": pngBlob })])
+    } catch {
+      setQrGroupId(row.groupId)
     }
   }
 
@@ -285,17 +329,7 @@ export function CampaignGroupsTab({
             ) : null}
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Card className="border border-border shadow-sm">
-              <CardHeader className="pb-1 pt-4">
-                <CardTitle className="text-xs uppercase text-muted-foreground">Goal</CardTitle>
-              </CardHeader>
-              <CardContent className="pb-4 text-xl font-semibold tabular-nums">
-                {selectedMetric.goalAmount != null
-                  ? formatDonationCurrency(selectedMetric.goalAmount)
-                  : "Optional"}
-              </CardContent>
-            </Card>
+          <div className="grid gap-3 sm:grid-cols-3">
             <Card className="border border-border shadow-sm">
               <CardHeader className="pb-1 pt-4">
                 <CardTitle className="text-xs uppercase text-muted-foreground">Pledged</CardTitle>
@@ -321,10 +355,6 @@ export function CampaignGroupsTab({
               </CardContent>
             </Card>
           </div>
-
-          {selectedMetric.progressPercent != null ? (
-            <CampaignProgressBar progressPercent={selectedMetric.progressPercent} />
-          ) : null}
 
           <Card className="border border-border shadow-sm">
             <CardHeader>
@@ -428,8 +458,7 @@ export function CampaignGroupsTab({
             <div>
               <h2 className="text-base font-semibold">Groups</h2>
               <p className="text-sm text-muted-foreground">
-                Campaign fundraising teams with optional goals and unique donation links. Group goals
-                are tracking only — they do not increase the campaign goal.
+                Campaign fundraising teams with unique donation links.
               </p>
             </div>
             {canManage ? (
@@ -449,11 +478,9 @@ export function CampaignGroupsTab({
                   <TableRow>
                     <TableHead>Group</TableHead>
                     <TableHead>Lead</TableHead>
-                    <TableHead className="text-right">Goal</TableHead>
                     <TableHead className="text-right">Donors</TableHead>
                     <TableHead className="text-right">Pledged</TableHead>
                     <TableHead className="text-right">Collected</TableHead>
-                    <TableHead>Progress</TableHead>
                     <TableHead>Link</TableHead>
                     {canManage ? <TableHead>Actions</TableHead> : null}
                   </TableRow>
@@ -462,7 +489,7 @@ export function CampaignGroupsTab({
                   {loading ? (
                     <TableRow>
                       <TableCell
-                        colSpan={canManage ? 9 : 8}
+                        colSpan={canManage ? 7 : 6}
                         className="py-8 text-center text-muted-foreground"
                       >
                         Loading groups…
@@ -471,7 +498,7 @@ export function CampaignGroupsTab({
                   ) : metrics.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={canManage ? 9 : 8}
+                        colSpan={canManage ? 7 : 6}
                         className="py-8 text-center text-muted-foreground"
                       >
                         No campaign groups yet.
@@ -497,9 +524,6 @@ export function CampaignGroupsTab({
                           </button>
                         </TableCell>
                         <TableCell>{row.leadName || "—"}</TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {row.goalAmount != null ? formatDonationCurrency(row.goalAmount) : "—"}
-                        </TableCell>
                         <TableCell className="text-right tabular-nums">{row.donorCount}</TableCell>
                         <TableCell className="text-right tabular-nums">
                           {formatDonationCurrency(row.pledged)}
@@ -507,29 +531,20 @@ export function CampaignGroupsTab({
                         <TableCell className="text-right tabular-nums">
                           {formatDonationCurrency(row.collected)}
                         </TableCell>
-                        <TableCell className="min-w-[100px]">
-                          {row.progressPercent != null ? (
-                            <CampaignProgressBar progressPercent={row.progressPercent} />
-                          ) : (
-                            "—"
-                          )}
-                        </TableCell>
                         <TableCell>
-                          <div className="flex flex-wrap gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
+                          <div className="flex items-center gap-0.5">
+                            <GroupLinkIconButton
+                              label="Copy link"
                               onClick={() => void copyLink(row.publicToken)}
                             >
-                              Copy
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setQrGroupId(row.groupId)}
+                              <Copy className="h-4 w-4" />
+                            </GroupLinkIconButton>
+                            <GroupLinkIconButton
+                              label="Copy QR code"
+                              onClick={() => void copyQrCode(row)}
                             >
-                              QR
-                            </Button>
+                              <QrCode className="h-4 w-4" />
+                            </GroupLinkIconButton>
                           </div>
                         </TableCell>
                         {canManage ? (
@@ -576,27 +591,6 @@ export function CampaignGroupsTab({
                 value={form.name}
                 onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
               />
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="group-goal">Optional Group Goal</Label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                  $
-                </span>
-                <Input
-                  id="group-goal"
-                  type="number"
-                  className="pl-7"
-                  value={form.goalAmount}
-                  onChange={(event) =>
-                    setForm((prev) => ({ ...prev, goalAmount: event.target.value }))
-                  }
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Tracking only — not added on top of the campaign goal.
-              </p>
             </div>
 
             <PledgeContactPicker

@@ -107,8 +107,8 @@ export function CreateVendorDialog({
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
             <DialogDescription>
-              Search Contacts for the person or business. If they are not found, create a contact
-              first — then we add the vendor role and vendor profile.
+              Search Directory for the person or business. If they are not found, create a Directory
+              record first — then we add the vendor role and vendor profile.
             </DialogDescription>
           </DialogHeader>
 

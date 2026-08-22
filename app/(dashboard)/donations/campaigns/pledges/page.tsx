@@ -66,6 +66,7 @@ import {
   type DonationAttributionValue,
 } from "@/components/donations/donation-attribution-fields";
 import { PledgeContactPicker } from "@/components/donations/pledge-contact-picker";
+import { WishlistItemPicker } from "@/components/donations/wishlist-item-picker";
 import { getPledgeForEditAction, recordPledgePaymentAction, updatePledgeAction, updatePledgePaymentPlanAction } from "@/lib/donations/pledge-admin-actions";
 import {
   convertCampaignProspectToPledgeAction,
@@ -134,6 +135,7 @@ interface Pledge {
   campaignId: string | null;
   categoryId: string | null;
   subcategoryId: string | null;
+  wishlistItemId: string | null;
   notes?: string;
   lastReminderAt: string | null;
   lastReminderStatus: string | null;
@@ -269,6 +271,7 @@ function pledgeFromRow(row: any): Pledge {
     campaignId: row.campaign_id || null,
     categoryId: null,
     subcategoryId: null,
+    wishlistItemId: null,
     notes: row.notes || undefined,
     lastReminderAt: null,
     lastReminderStatus: null,
@@ -343,6 +346,7 @@ function pledgeFromEditResult(
     campaignId: pledge.campaignId || null,
     categoryId: pledge.categoryId || null,
     subcategoryId: pledge.subcategoryId || null,
+    wishlistItemId: pledge.wishlistItemId || null,
     notes: pledge.notes || undefined,
     lastReminderAt: null,
     lastReminderStatus: null,
@@ -396,6 +400,7 @@ export default function PledgesPage() {
   const [addAttribution, setAddAttribution] = useState<DonationAttributionValue>(
     EMPTY_DONATION_ATTRIBUTION_VALUE
   );
+  const [addWishlistItemId, setAddWishlistItemId] = useState<string | null>(null);
   const [amount, setAmount] = useState("");
   const [pledgeDate, setPledgeDate] = useState("");
   const [frequency, setFrequency] = useState("One-Time");
@@ -407,6 +412,7 @@ export default function PledgesPage() {
   const [editAttribution, setEditAttribution] = useState<DonationAttributionValue>(
     EMPTY_DONATION_ATTRIBUTION_VALUE
   );
+  const [editWishlistItemId, setEditWishlistItemId] = useState<string | null>(null);
   const [editPledgeDate, setEditPledgeDate] = useState("");
   const [editFrequency, setEditFrequency] = useState("One-Time");
   const [editStatus, setEditStatus] = useState<PledgeDisplayStatus>("Open");
@@ -427,7 +433,6 @@ export default function PledgesPage() {
   const [handledAddQuery, setHandledAddQuery] = useState(false);
   const [convertProspectId, setConvertProspectId] = useState<string | null>(null);
   const [suggestedAskAmount, setSuggestedAskAmount] = useState<number | null>(null);
-  const [convertPhaseName, setConvertPhaseName] = useState<string | null>(null);
 
   async function openContactProfile(pledge: Pledge) {
     let contactId = pledge.contactId;
@@ -755,7 +760,6 @@ export default function PledgesPage() {
 
         setConvertProspectId(result.prospect.id);
         setSuggestedAskAmount(result.prospect.suggested_ask_amount);
-        setConvertPhaseName(result.phaseName);
         setAddAttribution((current) => ({
           ...current,
           campaignId: result.prospect.campaign_id,
@@ -843,6 +847,7 @@ export default function PledgesPage() {
           categoryId: pledge.categoryId || "",
           subcategoryId: pledge.subcategoryId || "",
         });
+        setEditWishlistItemId(result.pledge.wishlistItemId || null);
         setEditPledgeDate(pledge.startDate || "");
         setEditFrequency(pledge.frequency || "One-Time");
         setEditStatus(pledge.status || "Open");
@@ -866,6 +871,7 @@ export default function PledgesPage() {
   const resetAddPledgeForm = () => {
     setSelectedContactId("");
     setAddAttribution(EMPTY_DONATION_ATTRIBUTION_VALUE);
+    setAddWishlistItemId(null);
     setAmount("");
     setPledgeDate("");
     setFrequency("One-Time");
@@ -875,7 +881,6 @@ export default function PledgesPage() {
     setShowQuickAddContact(false);
     setConvertProspectId(null);
     setSuggestedAskAmount(null);
-    setConvertPhaseName(null);
   };
 
   const handleQuickAddContactCreated = (contact: QuickAddContactResult) => {
@@ -907,6 +912,7 @@ export default function PledgesPage() {
       categoryId: pledge.categoryId || "",
       subcategoryId: pledge.subcategoryId || "",
     });
+    setEditWishlistItemId(pledge.wishlistItemId || null);
     setEditPledgeDate(pledge.startDate || "");
     setEditFrequency(pledge.frequency || "One-Time");
     setEditStatus(pledge.status || "Open");
@@ -936,6 +942,7 @@ export default function PledgesPage() {
         notes: notes || null,
         categoryId: addAttribution.categoryId || null,
         subcategoryId: addAttribution.subcategoryId || null,
+        wishlistItemId: addWishlistItemId,
       });
 
       setSaving(false);
@@ -971,6 +978,7 @@ export default function PledgesPage() {
       organization_id: orgId,
       donor_id: donorId,
       ...toAttributionIds(addAttribution),
+      wishlist_item_id: addAttribution.campaignId ? addWishlistItemId : null,
       amount_pledged: Number(amount),
       pledge_date: normalizeDateInput(pledgeDate) || getTodayPlainDate(),
       pledge_type: frequency.toLowerCase().replace("-", "_"),
@@ -1035,6 +1043,7 @@ export default function PledgesPage() {
       campaignId: editAttribution.campaignId || null,
       categoryId: editAttribution.categoryId || null,
       subcategoryId: editAttribution.subcategoryId || null,
+      wishlistItemId: editWishlistItemId,
       contactId: editContactId,
     });
 
@@ -1434,12 +1443,6 @@ export default function PledgesPage() {
                       : "—"}
                   </span>
                 </p>
-                {convertPhaseName ? (
-                  <p>
-                    <span className="text-muted-foreground">Campaign Phase: </span>
-                    <span className="font-medium">{convertPhaseName}</span>
-                  </p>
-                ) : null}
                 <p className="text-xs text-muted-foreground">
                   Enter the actual pledge amount below. Suggested ask will not be overwritten.
                 </p>
@@ -1535,7 +1538,15 @@ export default function PledgesPage() {
             <DonationAttributionFields
               organizationId={organizationId}
               value={addAttribution}
-              onChange={setAddAttribution}
+              onChange={(value) => {
+                setAddAttribution(value)
+                if (!value.campaignId) setAddWishlistItemId(null)
+              }}
+            />
+            <WishlistItemPicker
+              campaignId={addAttribution.campaignId || null}
+              value={addWishlistItemId}
+              onChange={setAddWishlistItemId}
             />
 
             <div className="grid gap-4 sm:grid-cols-2">
@@ -1646,7 +1657,15 @@ export default function PledgesPage() {
                   <DonationAttributionFields
                     organizationId={organizationId}
                     value={editAttribution}
-                    onChange={setEditAttribution}
+                    onChange={(value) => {
+                      setEditAttribution(value)
+                      if (!value.campaignId) setEditWishlistItemId(null)
+                    }}
+                  />
+                  <WishlistItemPicker
+                    campaignId={editAttribution.campaignId || null}
+                    value={editWishlistItemId}
+                    onChange={setEditWishlistItemId}
                   />
                 </div>
               </div>

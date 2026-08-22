@@ -251,6 +251,7 @@ export async function getPledgeForEditAction(pledgeId: string) {
       campaignId: attribution.campaign_id || "",
       categoryId: attribution.category_id || "",
       subcategoryId: attribution.subcategory_id || "",
+      wishlistItemId: attribution.wishlist_item_id || "",
       notes: pledge.notes || "",
       calculatedStatus: pledge.calculated_status,
       installmentAmount:
@@ -271,6 +272,7 @@ export async function updatePledgeAction(input: {
   campaignId?: string | null
   categoryId?: string | null
   subcategoryId?: string | null
+  wishlistItemId?: string | null
   notes?: string | null
   contactId?: string | null
 }) {
@@ -323,6 +325,7 @@ export async function updatePledgeAction(input: {
       campaign_id: input.campaignId || null,
       category_id: input.categoryId || null,
       subcategory_id: input.subcategoryId || null,
+      wishlist_item_id: input.campaignId ? input.wishlistItemId || null : null,
       pledge_date: normalizeDateInput(input.pledgeDate) || getTodayPlainDate(),
       frequency: frequencyToStorage(input.frequency),
       pledge_type: frequencyToStorage(input.frequency),

@@ -133,11 +133,11 @@ export function HrContactPicker({
                   <p className="text-muted-foreground">
                     Create the person in{" "}
                     <Link
-                      href="/contacts/people"
+                      href="/directory/people"
                       className="font-medium text-primary underline-offset-4 hover:underline"
                       onClick={() => setOpen(false)}
                     >
-                      Contacts
+                      Directory
                     </Link>{" "}
                     first, then return here to add them.
                   </p>
@@ -181,8 +181,8 @@ export function HrContactPicker({
       ) : (
         <p className="text-xs text-muted-foreground">
           People must exist in{" "}
-          <Link href="/contacts/people" className="text-primary underline-offset-4 hover:underline">
-            Contacts
+          <Link href="/directory/people" className="text-primary underline-offset-4 hover:underline">
+            Directory
           </Link>{" "}
           before they can be added here.
         </p>

@@ -549,3 +549,61 @@ export async function removeHouseholdMemberAction(input: {
     }
   }
 }
+
+export async function createDirectoryFamilyAction(input: {
+  name: string
+  primaryContactId?: string
+}) {
+  const access = await requireContactsManageAccess()
+  if (!access.ok) return { success: false as const, error: access.error }
+
+  const name = input.name.trim()
+  if (!name) {
+    return { success: false as const, error: "Family name is required." }
+  }
+
+  try {
+    let primaryContactId = input.primaryContactId?.trim() || null
+    if (primaryContactId) {
+      await getIndividualContact(access.supabase, access.organizationId, primaryContactId)
+    }
+
+    const { data, error } = await access.supabase
+      .from("families")
+      .insert({
+        organization_id: access.organizationId,
+        name,
+        status: "active",
+        primary_contact_id: primaryContactId,
+      })
+      .select("id")
+      .single()
+
+    if (error || !data) {
+      throw new Error(error?.message || "Could not create family.")
+    }
+
+    const familyId = data.id as string
+
+    if (primaryContactId) {
+      await upsertActiveFamilyMember(access.supabase, {
+        organizationId: access.organizationId,
+        familyId,
+        contactId: primaryContactId,
+        role: "head",
+      })
+      revalidatePath(`/contacts/${primaryContactId}`)
+      revalidatePath(`/directory/${primaryContactId}`)
+    }
+
+    revalidatePath("/directory/families")
+    revalidatePath("/contacts/families")
+
+    return { success: true as const, familyId }
+  } catch (error) {
+    return {
+      success: false as const,
+      error: error instanceof Error ? error.message : "Could not create family.",
+    }
+  }
+}

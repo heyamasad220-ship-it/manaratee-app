@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react"
 
-import { CampaignPhaseEditor } from "@/components/donations/campaign-phase-editor"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -22,18 +21,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { updateCampaignAction } from "@/lib/donations/donation-reports-actions"
+import { updateCampaignAction, deleteCampaignAction } from "@/lib/donations/donation-reports-actions"
 import type { CampaignRow } from "@/lib/donations/campaign-analytics"
 import { formatCampaignStatusLabel } from "@/lib/donations/campaign-analytics"
-import {
-  draftsToPhaseWriteInputs,
-  emptyPhaseDraft,
-  phaseDraftsFromRows,
-  phaseGoalsMatchCampaignGoal,
-  sumPhaseGoalAmounts,
-  type CampaignPhaseDraft,
-  type CampaignPhaseRow,
-} from "@/lib/donations/campaign-phase-types"
 
 type CampaignStatus = "Active" | "Completed" | "Draft" | "Paused"
 
@@ -47,20 +37,21 @@ function statusToForm(status: string | null | undefined): CampaignStatus {
 
 type CampaignEditDialogProps = {
   campaign: CampaignRow
-  phases?: CampaignPhaseRow[]
   open: boolean
   onOpenChange: (open: boolean) => void
   onSaved: (campaign: CampaignRow) => void
+  onDeleted?: () => void
 }
 
 export function CampaignEditDialog({
   campaign,
-  phases = [],
   open,
   onOpenChange,
   onSaved,
+  onDeleted,
 }: CampaignEditDialogProps) {
   const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [form, setForm] = useState({
     name: campaign.name,
     description: campaign.description || "",
@@ -68,11 +59,7 @@ export function CampaignEditDialog({
     startDate: campaign.start_date || "",
     endDate: campaign.end_date || "",
     status: statusToForm(campaign.status),
-    goalBreakdownEnabled: Boolean(campaign.goal_breakdown_enabled || phases.length > 0),
   })
-  const [phaseDrafts, setPhaseDrafts] = useState<CampaignPhaseDraft[]>(
-    phases.length > 0 ? phaseDraftsFromRows(phases) : []
-  )
 
   useEffect(() => {
     if (!open) return
@@ -83,35 +70,10 @@ export function CampaignEditDialog({
       startDate: campaign.start_date || "",
       endDate: campaign.end_date || "",
       status: statusToForm(campaign.status),
-      goalBreakdownEnabled: Boolean(campaign.goal_breakdown_enabled || phases.length > 0),
     })
-    setPhaseDrafts(phases.length > 0 ? phaseDraftsFromRows(phases) : [])
-  }, [campaign, open, phases])
+  }, [campaign, open])
 
-  async function handleSave(allowPhaseGoalMismatch = false) {
-    const goalBreakdownEnabled = form.goalBreakdownEnabled
-    const phaseInputs = goalBreakdownEnabled ? draftsToPhaseWriteInputs(phaseDrafts) : []
-
-    if (goalBreakdownEnabled && phaseInputs.length === 0) {
-      alert("Add at least one phase, or turn off Goal Breakdown.")
-      return
-    }
-
-    if (
-      goalBreakdownEnabled &&
-      !allowPhaseGoalMismatch &&
-      !phaseGoalsMatchCampaignGoal(
-        form.goalAmount ? Number(form.goalAmount) : null,
-        sumPhaseGoalAmounts(phaseDrafts)
-      )
-    ) {
-      const confirmed = window.confirm(
-        "Phase goals do not equal the overall campaign goal. Save anyway?"
-      )
-      if (!confirmed) return
-      return handleSave(true)
-    }
-
+  async function handleSave() {
     setSaving(true)
     const result = await updateCampaignAction(campaign.id, {
       name: form.name,
@@ -120,20 +82,10 @@ export function CampaignEditDialog({
       start_date: form.startDate || null,
       end_date: form.endDate || null,
       status: form.status,
-      goal_breakdown_enabled: goalBreakdownEnabled,
-      phases: phaseInputs,
-      allow_phase_goal_mismatch: allowPhaseGoalMismatch,
     })
     setSaving(false)
 
     if (!result.success) {
-      if ("code" in result && result.code === "phase_goal_mismatch") {
-        const confirmed = window.confirm(`${result.error}\n\nSave anyway?`)
-        if (confirmed) {
-          void handleSave(true)
-        }
-        return
-      }
       alert(result.error || "Failed to update campaign")
       return
     }
@@ -142,12 +94,36 @@ export function CampaignEditDialog({
     onOpenChange(false)
   }
 
+  async function handleDelete() {
+    if (
+      !confirm(
+        `Delete ${campaign.name}? This cannot be undone. Campaigns with pledges, donations, or recurring plans cannot be deleted.`
+      )
+    ) {
+      return
+    }
+
+    setDeleting(true)
+    const result = await deleteCampaignAction(campaign.id)
+    setDeleting(false)
+
+    if (!result.success) {
+      alert(result.error || "Failed to delete campaign")
+      return
+    }
+
+    onOpenChange(false)
+    onDeleted?.()
+  }
+
+  const busy = saving || deleting
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit Campaign</DialogTitle>
-          <DialogDescription>Update campaign details and optional goal phases</DialogDescription>
+          <DialogDescription>Update campaign details and goal</DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col gap-4 py-4">
@@ -178,7 +154,7 @@ export function CampaignEditDialog({
           </div>
 
           <div className="flex flex-col gap-2">
-            <Label htmlFor="camp-goal">Overall Goal</Label>
+            <Label htmlFor="camp-goal">Goal</Label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
                 $
@@ -233,28 +209,25 @@ export function CampaignEditDialog({
               </SelectContent>
             </Select>
           </div>
-
-          <CampaignPhaseEditor
-            enabled={form.goalBreakdownEnabled}
-            onEnabledChange={(enabled) => {
-              setForm((prev) => ({ ...prev, goalBreakdownEnabled: enabled }))
-              if (enabled && phaseDrafts.length === 0) {
-                setPhaseDrafts([emptyPhaseDraft(0), emptyPhaseDraft(1)])
-              }
-            }}
-            phases={phaseDrafts}
-            onPhasesChange={setPhaseDrafts}
-            campaignGoalAmount={form.goalAmount}
-            idPrefix="edit-phase"
-          />
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
-            Cancel
-          </Button>
-          <Button onClick={() => void handleSave()} disabled={saving}>
-            {saving ? "Saving..." : "Save Changes"}
+        <DialogFooter className="flex-col gap-3 sm:flex-col sm:space-x-0">
+          <div className="flex w-full flex-wrap justify-end gap-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>
+              Cancel
+            </Button>
+            <Button onClick={() => void handleSave()} disabled={busy}>
+              {saving ? "Saving..." : "Save Changes"}
+            </Button>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            className="w-full text-red-600 hover:bg-red-50 hover:text-red-700"
+            disabled={busy}
+            onClick={() => void handleDelete()}
+          >
+            {deleting ? "Deleting..." : "Delete"}
           </Button>
         </DialogFooter>
       </DialogContent>

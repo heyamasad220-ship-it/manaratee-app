@@ -86,7 +86,7 @@ export function draftsToAskLevelWriteInputs(
       id: draft.id || null,
       ask_amount: Number(draft.askAmount),
       target_count: Math.max(0, Math.floor(Number(draft.targetCount) || 0)),
-      campaign_phase_id: draft.campaignPhaseId || null,
+      campaign_phase_id: null,
       sort_order: draft.sortOrder ?? index,
     }))
     .filter((row) => Number.isFinite(row.ask_amount) && row.ask_amount > 0)

@@ -1,19 +1,28 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
-import { useRouter } from "next/navigation"
+import { useCallback, useEffect, useMemo, useState, type ReactNode, Suspense } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import {
   fetchContactListStats,
   fetchContactsList,
-  type ContactListRow,
-  type ContactListSortBy,
-  type ContactListStats,
 } from "@/lib/contacts/contact-list-actions"
+import type {
+  ContactListRow,
+  ContactListSortBy,
+  ContactListStats,
+} from "@/lib/contacts/contact-list-types"
 import {
   addContactWithRoles,
 } from "@/lib/contacts/contact-actions"
 import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
-import { donationGroupHref } from "@/lib/donations/donation-group-path"
+import { DirectoryAddMenu } from "@/components/directory/directory-add-menu"
+import { fetchDirectoryRoleListAction } from "@/lib/directory/directory-role-list"
+import { directoryGroupPath } from "@/lib/directory/directory-paths"
+import {
+  directoryRoleExtraColumns,
+  getDirectoryAssignableRoles,
+  type DirectoryDynamicRoleKey,
+} from "@/lib/directory/directory-roles"
 import {
   contactsListSegmentForRecordType,
   type ContactsListSegment,
@@ -22,6 +31,7 @@ import {
   type ContactRecordType,
   type ContactRoleValue,
   getContactRecordTypeLabel,
+  ROLE_COLORS,
   STATUS_COLORS,
   usesPrimaryContactField,
 } from "@/lib/contacts/contact-constants"
@@ -41,6 +51,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Select,
   SelectContent,
@@ -101,12 +112,18 @@ function parseEntitySortKey(value: string): {
 export type ContactsCrmListProps = {
   /** Lock the list to people or organizations. */
   lockedRecordType?: ContactRecordType
+  /** Directory role view — filters canonical records, does not duplicate them. */
+  lockedRoleKey?: DirectoryDynamicRoleKey
   /** Show dashboard metric cards. Defaults to true. */
   showStats?: boolean
   /** Pre-selected roles when adding a contact. */
   defaultAddRoles?: ContactRoleValue[]
   /** Optional intro copy above filters. */
   intro?: ReactNode
+  /** Show the Directory + Add menu instead of a single-entity add button. */
+  showUniversalAdd?: boolean
+  emptyTitle?: string
+  emptyDescription?: string
 }
 
 function getInitials(name: string) {
@@ -130,13 +147,30 @@ function formatDateTime(value?: string | null) {
   })
 }
 
-export function ContactsCrmList({
+export function ContactsCrmList(props: ContactsCrmListProps = {}) {
+  return (
+    <Suspense
+      fallback={
+        <div className="p-6 text-sm text-muted-foreground">Loading directory...</div>
+      }
+    >
+      <ContactsCrmListInner {...props} />
+    </Suspense>
+  )
+}
+
+function ContactsCrmListInner({
   lockedRecordType,
+  lockedRoleKey,
   showStats = true,
   defaultAddRoles = [],
   intro,
+  showUniversalAdd = true,
+  emptyTitle,
+  emptyDescription,
 }: ContactsCrmListProps = {}) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = useMemo(() => createClient(), [])
 
   const entityLabel =
@@ -223,6 +257,14 @@ export function ContactsCrmList({
     setPage(1)
   }, [debouncedSearch, recordTypeFilter, entityNameFilter, entitySortKey])
 
+  useEffect(() => {
+    if (searchParams.get("add") === "1") {
+      resetAddForm()
+      setShowAddDialog(true)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- open once from query
+  }, [searchParams])
+
   const loadStats = useCallback(async () => {
     try {
       const nextStats = await fetchContactListStats(
@@ -239,7 +281,14 @@ export function ContactsCrmList({
     setErrorMessage("")
     try {
       const sort = parseEntitySortKey(entitySortKey)
-      const result = await fetchContactsList({
+      const result = lockedRoleKey
+        ? await fetchDirectoryRoleListAction({
+            roleKey: lockedRoleKey,
+            search: usesEntityColumnControls ? undefined : debouncedSearch || undefined,
+            page,
+            pageSize,
+          })
+        : await fetchContactsList({
         search: usesEntityColumnControls ? undefined : debouncedSearch || undefined,
         nameFilter: usesEntityColumnControls ? entityNameFilter || undefined : undefined,
         recordType: lockedRecordType ? "all" : recordTypeFilter,
@@ -263,6 +312,7 @@ export function ContactsCrmList({
   }, [
     debouncedSearch,
     lockedRecordType,
+    lockedRoleKey,
     entityNameFilter,
     entitySortKey,
     page,
@@ -357,9 +407,7 @@ export function ContactsCrmList({
 
   function profileHrefForContact(contact: ContactListRow, options?: { edit?: boolean }) {
     if (contact.recordType === "group") {
-      return donationGroupHref(contact.id, {
-        tab: options?.edit ? "members" : undefined,
-      })
+      return directoryGroupPath(contact.id)
     }
     return contactProfileHref(contact.id, {
       list: profileListSegmentForContact(contact),
@@ -412,11 +460,14 @@ export function ContactsCrmList({
         { label: "Organizations", value: stats.organizations, icon: Building2 },
       ]
 
-  const tableColumnCount = !lockedRecordType
-    ? 7
-    : lockedRecordType === "organization" || lockedRecordType === "group"
+  const extraColumns = lockedRoleKey ? directoryRoleExtraColumns(lockedRoleKey) : []
+
+  const tableColumnCount =
+    (!lockedRecordType
       ? 7
-      : 6
+      : lockedRecordType === "organization" || lockedRecordType === "group"
+        ? 7
+        : 6) + extraColumns.length
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -454,6 +505,11 @@ export function ContactsCrmList({
           </Button>
         )}
 
+        {showUniversalAdd ? (
+          <div className="ml-auto shrink-0">
+            <DirectoryAddMenu />
+          </div>
+        ) : (
         <Button
           size="sm"
           className="ml-auto shrink-0"
@@ -465,6 +521,7 @@ export function ContactsCrmList({
           <Plus className="mr-1.5 h-4 w-4" />
           {addButtonLabel}
         </Button>
+        )}
       </div>
 
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
@@ -531,8 +588,13 @@ export function ContactsCrmList({
                 ) : null}
                 <TableHead className="hidden md:table-cell">Email</TableHead>
                 <TableHead className="hidden md:table-cell">Phone</TableHead>
-                <TableHead className="hidden lg:table-cell">Created by</TableHead>
-                <TableHead className="hidden sm:table-cell">Last modified</TableHead>
+                <TableHead className="hidden lg:table-cell">Roles</TableHead>
+                {extraColumns.map((column) => (
+                  <TableHead key={column.key} className="hidden lg:table-cell">
+                    {column.label}
+                  </TableHead>
+                ))}
+                <TableHead className="hidden sm:table-cell">Last activity</TableHead>
                 {!lockedRecordType && (
                   <TableHead className="hidden xl:table-cell">Type</TableHead>
                 )}
@@ -560,7 +622,12 @@ export function ContactsCrmList({
                         </Button>
                       </div>
                     ) : (
-                      `No recent ${entityLabel.toLowerCase()} yet.`
+                      <div className="flex flex-col items-center gap-1">
+                        <span>{emptyTitle || `No ${entityLabel.toLowerCase()} yet`}</span>
+                        {emptyDescription ? (
+                          <span className="max-w-md">{emptyDescription}</span>
+                        ) : null}
+                      </div>
                     )}
                   </TableCell>
                 </TableRow>
@@ -603,12 +670,35 @@ export function ContactsCrmList({
                       {contact.phone || "—"}
                     </TableCell>
 
-                    <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
-                      —
+                    <TableCell className="hidden lg:table-cell">
+                      {contact.roles.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {contact.roles.map((role) => (
+                            <Badge
+                              key={role}
+                              variant="secondary"
+                              className={ROLE_COLORS[role]}
+                            >
+                              {role}
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">—</span>
+                      )}
                     </TableCell>
 
+                    {extraColumns.map((column) => (
+                      <TableCell
+                        key={column.key}
+                        className="hidden lg:table-cell text-sm text-muted-foreground"
+                      >
+                        {contact.roleSummary?.cells[column.key] || "—"}
+                      </TableCell>
+                    ))}
+
                     <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">
-                      {formatDateTime(contact.updatedAt || contact.createdAt)}
+                      {formatDateTime(contact.lastActivity || contact.updatedAt || contact.createdAt)}
                     </TableCell>
 
                     {!lockedRecordType && (
@@ -648,11 +738,20 @@ export function ContactsCrmList({
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Add New {entitySingular === "contact" ? "Contact" : entitySingular === "person" ? "Person" : "Organization"}</DialogTitle>
+            <DialogTitle>
+              Add New{" "}
+              {entitySingular === "person"
+                ? "Person"
+                : entitySingular === "organization"
+                  ? "Organization"
+                  : entitySingular === "group"
+                    ? "Group"
+                    : "Contact"}
+            </DialogTitle>
             <DialogDescription>
-              Create a {entitySingular} with basic details. Roles such as Donor are added automatically
-              from activity; you can edit roles later on the contact profile. Existing records are
-              matched by email, phone, or name — never duplicated.
+              Existing records are matched by email, phone, or name of the same type — never
+              duplicated. Assign roles now if you know how this record participates; operational
+              setup stays in the related module.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-4 py-4">
@@ -718,10 +817,39 @@ export function ContactsCrmList({
                   <SelectContent>
                     <SelectItem value="individual">Person</SelectItem>
                     <SelectItem value="organization">Organization</SelectItem>
+                    <SelectItem value="group">Group</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             )}
+            {contactType !== "group" ? (
+              <div className="flex flex-col gap-2">
+                <Label>Roles</Label>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {getDirectoryAssignableRoles(contactType).map((role) => {
+                    const checked = contactRoles.includes(role.value)
+                    return (
+                      <label
+                        key={role.value}
+                        className="flex items-center gap-2 text-sm"
+                      >
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={(value) => {
+                            setContactRoles((current) =>
+                              value === true
+                                ? Array.from(new Set([...current, role.value]))
+                                : current.filter((item) => item !== role.value)
+                            )
+                          }}
+                        />
+                        {role.label}
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
+            ) : null}
             <div className="flex flex-col gap-2">
               <Label htmlFor="crm-notes">Notes</Label>
               <Textarea

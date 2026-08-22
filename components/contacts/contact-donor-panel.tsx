@@ -35,7 +35,7 @@ export function ContactDonorPanel({
             <h2 className="text-lg font-semibold">{title}</h2>
           </div>
           <Button variant="outline" size="sm" asChild>
-            <Link href="/donations/reports/one-time">View giving history</Link>
+            <Link href="/donations/payments/transactions">View giving history</Link>
           </Button>
         </div>
 

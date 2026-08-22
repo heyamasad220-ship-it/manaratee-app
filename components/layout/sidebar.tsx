@@ -31,6 +31,11 @@ import {
 import type { LucideIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { isContactsListSegment, type ContactsListSegment } from "@/lib/contacts/contact-module-label"
+import {
+  DIRECTORY_DYNAMIC_ROLE_DEFS,
+  directoryRolePath,
+  type DirectoryRoleCountMap,
+} from "@/lib/directory/directory-roles"
 import { DONATIONS_SIDEBAR_CHILDREN } from "@/lib/navigation/donations-sidebar-children"
 import { normalizeModuleSlug } from "@/lib/modules/module-catalog"
 import {
@@ -255,6 +260,7 @@ const subItemPermissionFallbacks: Record<string, string[]> = {
 }
 
 const moduleDisplayNameMap: Record<string, string> = {
+  contacts: "Directory",
   workforce: WORKFORCE_MODULE_LABEL,
   hr: WORKFORCE_MODULE_LABEL,
   donations: FUND_DEVELOPMENT_MODULE_LABEL,
@@ -272,7 +278,7 @@ const moduleGroupOverride: Record<string, string> = {
 }
 
 const moduleDefaultRouteOverride: Record<string, string> = {
-  contacts: "/contacts/people",
+  contacts: "/directory",
   spaces: "/facilities/overview",
   programs: "/programs/catalog",
   workforce: "/workforce/employees",
@@ -285,7 +291,7 @@ const moduleDefaultRouteOverride: Record<string, string> = {
 const moduleMatchPrefixOverride: Record<string, string> = {
   programs: "/programs",
   finance: "/finance",
-  contacts: "/contacts",
+  contacts: "/directory",
   donations: "/donations",
   workforce: "/workforce",
   hr: "/workforce",
@@ -349,12 +355,7 @@ const moduleChildren: Record<string, SubItem[]> = {
     { label: "Reports", href: "/vendor-hub/reports", matchPrefix: "/vendor-hub/reports", permissionKey: "reports.view" },
     { label: "Settings", href: "/vendor-hub/settings", matchPrefix: "/vendor-hub/settings", permissionKey: "vendor_hub.manage" },
   ],
-  contacts: [
-    { label: "People", href: "/contacts/people", matchPrefix: "/contacts/people", contactListSegment: "people", permissionKey: "contacts.view" },
-    { label: "Organizations", href: "/contacts/organizations", matchPrefix: "/contacts/organizations", contactListSegment: "organizations", permissionKey: "contacts.view" },
-    { label: "Reports", href: "/contacts/reports/directory", matchPrefix: "/contacts/reports", permissionKey: "contacts.view" },
-    { label: "Settings", href: "/contacts/settings", matchPrefix: "/contacts/settings", permissionKey: "contacts.view" },
-  ],
+  contacts: [],
   membership: [
     { label: "Overview", href: "/membership", matchPrefix: "/membership", exact: true, permissionKey: "membership.view" },
     { label: "Members", href: "/membership/members", matchPrefix: "/membership/members", permissionKey: "membership.view" },
@@ -513,6 +514,75 @@ function buildProgramsAndEventsChildren(availableSlugs: Set<string>): SubItem[] 
   }
 
   return items
+}
+
+function buildDirectoryChildren(roleCounts: DirectoryRoleCountMap = {}): SubItem[] {
+  const core: SubItem[] = [
+    {
+      label: "Overview",
+      href: "/directory",
+      matchPrefix: "/directory",
+      exact: true,
+      permissionKey: "contacts.view",
+    },
+    {
+      label: "People",
+      href: "/directory/people",
+      matchPrefix: "/directory/people",
+      alsoMatchPrefixes: ["/contacts/people"],
+      contactListSegment: "people",
+      permissionKey: "contacts.view",
+    },
+    {
+      label: "Families",
+      href: "/directory/families",
+      matchPrefix: "/directory/families",
+      alsoMatchPrefixes: ["/contacts/families"],
+      contactListSegment: "families",
+      permissionKey: "contacts.view",
+    },
+    {
+      label: "Organizations",
+      href: "/directory/organizations",
+      matchPrefix: "/directory/organizations",
+      alsoMatchPrefixes: ["/contacts/organizations"],
+      contactListSegment: "organizations",
+      permissionKey: "contacts.view",
+    },
+  ]
+
+  const roleItems: SubItem[] = []
+  for (const role of DIRECTORY_DYNAMIC_ROLE_DEFS) {
+    const alwaysShow = role.key === "service-providers"
+    if (!alwaysShow && (roleCounts[role.key] ?? 0) <= 0) continue
+    roleItems.push({
+      label: role.label,
+      href: directoryRolePath(role.key),
+      matchPrefix: directoryRolePath(role.key),
+      permissionKey: "contacts.view",
+      dividerBefore: roleItems.length === 0,
+    })
+  }
+
+  const footer: SubItem[] = [
+    {
+      label: "Reports",
+      href: "/directory/reports",
+      matchPrefix: "/directory/reports",
+      alsoMatchPrefixes: ["/contacts/reports"],
+      permissionKey: "contacts.view",
+      dividerBefore: true,
+    },
+    {
+      label: "Settings",
+      href: "/directory/settings",
+      matchPrefix: "/directory/settings",
+      alsoMatchPrefixes: ["/contacts/settings"],
+      permissionKey: "contacts.view",
+    },
+  ]
+
+  return [...core, ...roleItems, ...footer]
 }
 
 function collapseProgramsAndEventsNavItems(items: NavItem[]): NavItem[] {
@@ -734,7 +804,8 @@ function filterNavItemsByPermissions(items: NavItem[], permissionContext: UserPe
 function buildNavItems(
   rows: SidebarModuleRow[],
   permissionContext: UserPermissionContext,
-  myDepartment?: { id: string; name: string } | null
+  myDepartment?: { id: string; name: string } | null,
+  directoryRoleCounts: DirectoryRoleCountMap = {}
 ): NavItem[] {
   const dynamicItems: NavItem[] = rows
     .filter((row) => row.route && row.slug !== "applications")
@@ -755,16 +826,18 @@ function buildNavItems(
       const iconName = row.icon_name || "Boxes"
       const Icon = iconMap[iconName] || Boxes
       const rawChildren =
-        moduleChildren[navSlug] ||
-        moduleChildren[slug] ||
-        [
-          {
-            label: "Overview",
-            href,
-            matchPrefix: href,
-            permissionKey: modulePermissionMap[navSlug] ?? modulePermissionMap[slug],
-          },
-        ]
+        navSlug === "contacts" || slug === "contacts"
+          ? buildDirectoryChildren(directoryRoleCounts)
+          : moduleChildren[navSlug] ||
+            moduleChildren[slug] ||
+            [
+              {
+                label: "Overview",
+                href,
+                matchPrefix: href,
+                permissionKey: modulePermissionMap[navSlug] ?? modulePermissionMap[slug],
+              },
+            ]
       const children =
         navSlug === "spaces" && !hasVenueRentals
           ? rawChildren.filter((child) => !child.advancedFacilities)
@@ -774,6 +847,7 @@ function buildNavItems(
         href,
         icon: Icon,
         matchPrefix,
+        alsoMatchPrefixes: navSlug === "contacts" ? ["/contacts"] : undefined,
         group: moduleGroupOverride[navSlug] ?? row.group_name,
         permissionKey: modulePermissionMap[navSlug] ?? modulePermissionMap[slug],
         moduleSlug: slug,
@@ -934,11 +1008,15 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
               }
             : null
 
+        const directoryRoleCounts = (modulesPayload.directoryRoleCounts ||
+          {}) as DirectoryRoleCountMap
+
         setNavItems(
           buildNavItems(
             mergeSidebarModules(moduleRows),
             permissionContext,
-            myDepartment
+            myDepartment,
+            directoryRoleCounts
           )
         )
       } catch (error) {
@@ -1090,7 +1168,7 @@ function PrimaryNavLink({
   }
 
   return (
-    <Link href={item.href} onClick={onNavigate} className={className}>
+    <Link href={item.href} prefetch={false} onClick={onNavigate} className={className}>
       {highlighted ? (
         <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-r-full bg-amber-600" />
       ) : null}
@@ -1189,6 +1267,9 @@ function SidebarSubNavItem({
   if (hasChildren) {
     return (
       <div className="flex flex-col gap-0.5">
+        {item.dividerBefore ? (
+          <div className="mx-3 my-1.5 border-t border-zinc-200" />
+        ) : null}
         <button
           type="button"
           onClick={() => toggleSubExpanded(expandKey)}
@@ -1226,8 +1307,13 @@ function SidebarSubNavItem({
   }
 
   return (
-    <Link
+    <div className="flex flex-col">
+      {item.dividerBefore ? (
+        <div className="mx-3 my-1.5 border-t border-zinc-200" />
+      ) : null}
+      <Link
       href={item.href}
+      prefetch={false}
       onClick={onNavigate}
       className={cn(
         "relative flex min-h-[40px] items-center rounded-md px-3 py-2 text-sm font-medium transition-colors",
@@ -1238,6 +1324,7 @@ function SidebarSubNavItem({
       {active ? <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-r-full bg-amber-600" /> : null}
       {item.label}
     </Link>
+    </div>
   )
 }
 
@@ -1321,6 +1408,7 @@ function SidebarLogoBand() {
     >
       <Link
         href="/dashboard"
+        prefetch={false}
         className="absolute inset-0 flex items-center justify-center px-2 py-3"
         aria-label="Manaratee home"
       >
@@ -1538,6 +1626,7 @@ function MobileSidebarContent() {
                     <Link
                       key={item.label}
                       href={item.href}
+                      prefetch={false}
                       onClick={closeMobile}
                       className={cn(
                         "relative flex min-h-[44px] items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
@@ -1589,6 +1678,7 @@ function MobileSidebarContent() {
                     <Link
                       key={item.label}
                       href={item.href}
+                      prefetch={false}
                       onClick={closeMobile}
                       className={cn(
                         "relative flex min-h-[44px] items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",

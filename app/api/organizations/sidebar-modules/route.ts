@@ -94,11 +94,23 @@ export async function GET() {
         }
       : null
 
+    let directoryRoleCounts = {}
+    try {
+      const { fetchDirectoryNavSummary } = await import(
+        "@/lib/directory/directory-nav-summary"
+      )
+      const summary = await fetchDirectoryNavSummary(organizationId)
+      directoryRoleCounts = summary.roles
+    } catch (error) {
+      console.warn("directory role counts unavailable:", error)
+    }
+
     return NextResponse.json({
       modules,
       platformSupportMode,
       myDepartment,
       permissionContext,
+      directoryRoleCounts,
     })
   } catch (error) {
     console.error("sidebar-modules GET failed:", error)

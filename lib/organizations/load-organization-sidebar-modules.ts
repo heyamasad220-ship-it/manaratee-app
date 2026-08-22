@@ -21,8 +21,8 @@ const SIDEBAR_MODULE_DEFAULTS: Record<
   Omit<SidebarModuleRow, "slug">
 > = {
   contacts: {
-    name: "Contacts",
-    route: "/contacts/people",
+    name: "Directory",
+    route: "/directory",
     icon_name: "Users",
     group_name: "People",
     sort_order: 10,

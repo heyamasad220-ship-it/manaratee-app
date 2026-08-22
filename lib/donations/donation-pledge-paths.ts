@@ -1,6 +1,6 @@
 export const DONATION_PLEDGES_PATH = "/donations/campaigns/pledges"
 
-/** @deprecated Legacy reports route — redirects to {@link DONATION_PLEDGES_PATH}. */
+/** Pledge Performance analytics report (not the operational pledges ledger). */
 export const DONATION_REPORTS_PLEDGES_PATH = "/donations/reports/pledges"
 
 export function donationPledgesHref(input?: {
@@ -45,8 +45,6 @@ export function isDonationPledgesPath(pathname: string) {
   return (
     pathname === DONATION_PLEDGES_PATH ||
     pathname.startsWith(`${DONATION_PLEDGES_PATH}/`) ||
-    pathname === DONATION_REPORTS_PLEDGES_PATH ||
-    pathname.startsWith(`${DONATION_REPORTS_PLEDGES_PATH}/`) ||
     pathname === "/donations/pledges" ||
     pathname.startsWith("/donations/pledges/")
   )

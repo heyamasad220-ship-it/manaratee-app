@@ -8,13 +8,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
   Table,
   TableBody,
   TableCell,
@@ -33,15 +26,11 @@ import {
   type CampaignAskLevelRow,
 } from "@/lib/donations/campaign-ask-level-types"
 import { formatDonationCurrency } from "@/lib/donations/campaign-analytics"
-import type { CampaignPhaseRow } from "@/lib/donations/campaign-phase-types"
-
-const NO_PHASE_VALUE = "__none__"
 
 type CampaignStrategyTabProps = {
   campaignId: string
   askLevels: CampaignAskLevelRow[]
   askLevelMetrics: CampaignAskLevelMetrics[]
-  phases: CampaignPhaseRow[]
   canManage: boolean
   onSaved: () => void
 }
@@ -50,7 +39,6 @@ export function CampaignStrategyTab({
   campaignId,
   askLevels,
   askLevelMetrics,
-  phases,
   canManage,
   onSaved,
 }: CampaignStrategyTabProps) {
@@ -214,7 +202,7 @@ export function CampaignStrategyTab({
               return (
                 <div
                   key={draft.clientKey}
-                  className="grid gap-3 rounded-md border border-dashed border-border p-3 lg:grid-cols-[1fr_1fr_1fr_auto_auto]"
+                  className="grid gap-3 rounded-md border border-dashed border-border p-3 lg:grid-cols-[1fr_1fr_auto_auto]"
                 >
                   <div className="flex flex-col gap-2">
                     <Label htmlFor={`ask-amount-${draft.clientKey}`}>Ask Amount</Label>
@@ -245,30 +233,6 @@ export function CampaignStrategyTab({
                         updateDraft(draft.clientKey, { targetCount: event.target.value })
                       }
                     />
-                  </div>
-
-                  <div className="flex flex-col gap-2">
-                    <Label>Campaign Phase</Label>
-                    <Select
-                      value={draft.campaignPhaseId || NO_PHASE_VALUE}
-                      onValueChange={(value) =>
-                        updateDraft(draft.clientKey, {
-                          campaignPhaseId: value === NO_PHASE_VALUE ? "" : value,
-                        })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Optional phase" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={NO_PHASE_VALUE}>No phase</SelectItem>
-                        {phases.map((phase) => (
-                          <SelectItem key={phase.id} value={phase.id}>
-                            {phase.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
                   </div>
 
                   <div className="flex flex-col gap-2">
@@ -310,7 +274,6 @@ export function CampaignStrategyTab({
                   <TableHead>Ask Level</TableHead>
                   <TableHead className="text-right">Target #</TableHead>
                   <TableHead className="text-right">Target Value</TableHead>
-                  <TableHead>Phase</TableHead>
                   <TableHead className="text-right">Prospects</TableHead>
                   <TableHead className="text-right">Asked</TableHead>
                   <TableHead className="text-right">Secured</TableHead>
@@ -321,7 +284,7 @@ export function CampaignStrategyTab({
               <TableBody>
                 {askLevelMetrics.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="py-8 text-center text-muted-foreground">
+                    <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
                       {canManage
                         ? "No ask levels yet. Click Edit Strategy to build your gift chart."
                         : "No ask levels configured for this campaign."}
@@ -336,9 +299,6 @@ export function CampaignStrategyTab({
                       <TableCell className="text-right tabular-nums">{row.targetCount}</TableCell>
                       <TableCell className="text-right tabular-nums">
                         {formatDonationCurrency(row.targetValue)}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {row.campaignPhaseName || "—"}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">{row.prospects}</TableCell>
                       <TableCell className="text-right tabular-nums">{row.asked}</TableCell>
@@ -361,7 +321,6 @@ export function CampaignStrategyTab({
                     <TableCell className="text-right tabular-nums">
                       {formatDonationCurrency(totals.targetValue)}
                     </TableCell>
-                    <TableCell />
                     <TableCell className="text-right tabular-nums">
                       {askLevelMetrics.reduce((sum, row) => sum + row.prospects, 0)}
                     </TableCell>

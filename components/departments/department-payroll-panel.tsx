@@ -791,7 +791,7 @@ export function DepartmentPayrollPanel({
               <DialogDescription>
                 Choose an existing contact. If they are already an employee, they are assigned to{" "}
                 {departmentName}. Otherwise a new employee record is created for this department.
-                Create the person in Contacts first if they are missing.
+                Create the person in Directory first if they are missing.
               </DialogDescription>
             </DialogHeader>
 

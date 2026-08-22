@@ -13,59 +13,14 @@ import {
   mapStatus,
   normalizeContactRecordType,
 } from "@/lib/contacts/contact-constants"
-
-export type ContactListTeamSummary = {
-  id: string
-  name: string
-}
-
-export type ContactListRow = {
-  id: string
-  name: string
-  email: string
-  phone: string
-  primaryContactName: string
-  recordType: ContactRecordType
-  roles: ContactRoleLabel[]
-  roleValues: ContactRoleValue[]
-  status: ContactStatus
-  createdAt: string
-  updatedAt: string | null
-  lastActivity: string | null
-  teams: ContactListTeamSummary[]
-}
-
-export type ContactListStats = {
-  total: number
-  people: number
-  organizations: number
-  groups: number
-}
-
-export type ContactListSortBy = "full_name" | "updated_at" | "created_at"
-
-export type FetchContactsListInput = {
-  search?: string
-  nameFilter?: string
-  role?: ContactRoleValue | "all"
-  recordType?: ContactRecordType | "all"
-  status?: ContactStatus | "all"
-  teamId?: string | "all"
-  sortBy?: ContactListSortBy
-  sortAsc?: boolean
-  page?: number
-  pageSize?: number
-  /** Page-scoped record type (e.g. People) — not treated as an active user filter. */
-  lockedRecordType?: ContactRecordType
-}
-
-export type FetchContactsListResult = {
-  contacts: ContactListRow[]
-  total: number
-  page: number
-  pageSize: number
-  isRecentView: boolean
-}
+import type {
+  ContactListRow,
+  ContactListSortBy,
+  ContactListStats,
+  ContactListTeamSummary,
+  FetchContactsListInput,
+  FetchContactsListResult,
+} from "@/lib/contacts/contact-list-types"
 
 const DEFAULT_PAGE_SIZE = 50
 
@@ -423,6 +378,10 @@ async function runContactsQuery(
   const contactTypeFilter = resolveContactTypeFilter(input)
   if (contactTypeFilter) {
     query = query.eq("contact_type", contactTypeFilter)
+  }
+
+  if (input.contactIds?.length) {
+    query = query.in("id", input.contactIds)
   }
 
   const statusValue = input.status ? statusToFilterValue(input.status) : null

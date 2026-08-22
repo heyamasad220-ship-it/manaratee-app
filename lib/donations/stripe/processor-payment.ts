@@ -67,6 +67,10 @@ function resolveAttribution(
       null,
     pledge_id:
       optionalUuid(metadata.pledge_id) ?? optionalUuid(checkoutSession?.pledge_id) ?? null,
+    wishlist_item_id:
+      optionalUuid(metadata.wishlist_item_id) ??
+      optionalUuid(checkoutSession?.wishlist_item_id) ??
+      null,
     category_id:
       optionalUuid(metadata.category_id) ?? optionalUuid(checkoutSession?.category_id) ?? null,
     subcategory_id:
@@ -164,6 +168,7 @@ export async function insertProcessorPaymentFromCheckout(
       attributed_group_contact_id: attribution.attributed_group_contact_id,
       category_id: attribution.category_id,
       subcategory_id: attribution.subcategory_id,
+      wishlist_item_id: attribution.wishlist_item_id,
       stripe_checkout_session_id: input.stripeCheckoutSessionId,
       stripe_payment_intent_id: input.stripePaymentIntentId,
       stripe_charge_id: input.stripeChargeId ?? null,

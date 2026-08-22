@@ -22,8 +22,6 @@ export function buildDonorGivingReportCsvRows(donors: DonorSummaryReportRow[]) {
     Gifts: donor.donation_count ?? 0,
     "Last Gift": formatReportDate(donor.last_donation_date),
     "Lifetime Last Gift": formatReportDate(donor.lifetime_last_donation_date),
-    Pledge: donor.pledge_status ?? "",
-    "Outstanding Balance": Number(donor.outstanding_pledge_balance || 0).toFixed(2),
   }))
 }
 

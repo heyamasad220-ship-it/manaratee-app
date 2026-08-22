@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Loader2, Search } from "lucide-react"
 
 import { Input } from "@/components/ui/input"
@@ -41,6 +41,7 @@ export function PledgeContactPicker({
     }>
   >([])
   const [showResults, setShowResults] = useState(false)
+  const suppressBlurCloseRef = useRef(false)
 
   useEffect(() => {
     if (contactLabel) {
@@ -70,11 +71,15 @@ export function PledgeContactPicker({
     return () => window.clearTimeout(timer)
   }, [search, showResults])
 
-  const selectedLabel = useMemo(() => {
-    if (contactLabel) return contactLabel
-    const match = results.find((row) => row.contactId === contactId)
-    return match?.full_name || match?.email || match?.phone || ""
-  }, [contactId, contactLabel, results])
+  function closeResultsUnlessInteracting() {
+    window.setTimeout(() => {
+      if (suppressBlurCloseRef.current) {
+        suppressBlurCloseRef.current = false
+        return
+      }
+      setShowResults(false)
+    }, 0)
+  }
 
   return (
     <div className="space-y-2">
@@ -92,16 +97,9 @@ export function PledgeContactPicker({
             setSearch(event.target.value)
             setShowResults(true)
           }}
-          onBlur={() => {
-            window.setTimeout(() => setShowResults(false), 150)
-          }}
+          onBlur={closeResultsUnlessInteracting}
         />
       </div>
-      {contactId && selectedLabel ? (
-        <p className="text-xs text-muted-foreground">
-          Current: <span className="font-medium text-foreground">{selectedLabel}</span>
-        </p>
-      ) : null}
       {showResults && searching ? (
         <p className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
@@ -109,7 +107,14 @@ export function PledgeContactPicker({
         </p>
       ) : null}
       {showResults && results.length > 0 ? (
-        <div className="max-h-44 space-y-1 overflow-y-auto rounded-lg border p-1">
+        <div
+          className="max-h-44 space-y-1 overflow-y-auto rounded-lg border p-1"
+          // Keep the input focused while scrolling/clicking results (incl. scrollbar).
+          onMouseDown={(event) => {
+            suppressBlurCloseRef.current = true
+            event.preventDefault()
+          }}
+        >
           {results.map((contact) => (
             <button
               key={contact.contactId}
@@ -118,7 +123,10 @@ export function PledgeContactPicker({
                 "w-full rounded-md px-3 py-2 text-left text-sm hover:bg-muted",
                 contactId === contact.contactId && "bg-muted ring-1 ring-primary/30"
               )}
-              onMouseDown={(event) => event.preventDefault()}
+              onMouseDown={(event) => {
+                suppressBlurCloseRef.current = true
+                event.preventDefault()
+              }}
               onClick={() => {
                 const label = contact.full_name || contact.email || contact.phone || "Unnamed contact"
                 onChange(contact.contactId, label)

@@ -61,7 +61,7 @@ export async function syncCampaignAskLevels(
       id: level.id?.trim() || null,
       ask_amount: Number(level.ask_amount),
       target_count: Math.max(0, Math.floor(Number(level.target_count) || 0)),
-      campaign_phase_id: level.campaign_phase_id || null,
+      campaign_phase_id: null,
       sort_order: level.sort_order ?? index,
     }))
     .filter((level) => Number.isFinite(level.ask_amount) && level.ask_amount > 0)

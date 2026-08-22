@@ -50,7 +50,6 @@ import {
   isContactsListSegment,
 } from "@/lib/contacts/contact-module-label"
 import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
-import { donationGroupHref } from "@/lib/donations/donation-group-path"
 import {
   isSafeReturnToPath,
   RETURN_TO_QUERY_PARAM,
@@ -402,21 +401,7 @@ export default function ContactDetailPage() {
     }
 
     if (data.contact_type === "group") {
-      const returnTo = searchParams.get(RETURN_TO_QUERY_PARAM)
-      const tabParam = searchParams.get("tab")
-      const tab =
-        tabParam === "financial"
-          ? "financial"
-          : tabParam === "activity"
-            ? "activity"
-            : "members"
-      router.replace(
-        donationGroupHref(contactId, {
-          tab,
-          returnTo:
-            returnTo && isSafeReturnToPath(returnTo) ? returnTo : undefined,
-        })
-      )
+      router.replace(`/donations/groups/${contactId}`)
       return
     }
 
@@ -619,7 +604,7 @@ export default function ContactDetailPage() {
 
                 <ArrowLeft className="mr-2 h-4 w-4" />
 
-                Back to Contacts
+                Back to Directory
 
               </Button>
 

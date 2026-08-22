@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation"
 
 export default function ContactsPage() {
-  redirect("/contacts/people")
+  redirect("/directory")
 }

@@ -18,7 +18,7 @@ import {
   type ContactRecordType,
   type ContactRoleValue,
 } from "@/lib/contacts/contact-constants"
-import type { ContactListRow } from "@/lib/contacts/contact-list-actions"
+import type { ContactListRow } from "@/lib/contacts/contact-list-types"
 import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
 import { fetchFamilyListSummariesAction } from "@/lib/contacts/family-actions"
 import { clearSelectedOrganizationIdCache } from "@/lib/current-organization"

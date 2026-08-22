@@ -5,6 +5,7 @@ export type CampaignWorkspaceTab =
   | "pledges"
   | "donations"
   | "groups"
+  | "wishlist"
 
 export const CAMPAIGN_WORKSPACE_TABS = [
   { id: "overview", label: "Overview" },
@@ -13,6 +14,7 @@ export const CAMPAIGN_WORKSPACE_TABS = [
   { id: "pledges", label: "Pledges" },
   { id: "donations", label: "Donations" },
   { id: "groups", label: "Groups" },
+  { id: "wishlist", label: "Wishlist" },
 ] as const satisfies readonly { id: CampaignWorkspaceTab; label: string }[]
 
 export function parseCampaignWorkspaceTab(
@@ -24,7 +26,8 @@ export function parseCampaignWorkspaceTab(
     tab === "prospects" ||
     tab === "pledges" ||
     tab === "donations" ||
-    tab === "groups"
+    tab === "groups" ||
+    tab === "wishlist"
   ) {
     return tab
   }

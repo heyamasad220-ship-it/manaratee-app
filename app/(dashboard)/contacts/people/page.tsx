@@ -1,11 +1,5 @@
-import { Header } from "@/components/layout/header"
-import { ContactsCrmList } from "@/components/contacts/contacts-crm-list"
+import { redirect } from "next/navigation"
 
-export default function ContactsPeoplePage() {
-  return (
-    <>
-      <Header title="People" />
-      <ContactsCrmList lockedRecordType="individual" showStats={false} />
-    </>
-  )
+export default function ContactsPeopleRedirectPage() {
+  redirect("/directory/people")
 }

@@ -34,7 +34,7 @@ export async function routeUserByRole(
   if (platformError) throw platformError
 
   if (platformAdmin) {
-    router.push("/admin")
+    router.push("/admin/organizations")
     return
   }
 

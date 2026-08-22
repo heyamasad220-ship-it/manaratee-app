@@ -31,7 +31,7 @@ import { donationPledgesHref } from "@/lib/donations/donation-pledge-paths"
 const QUICK_ACTIONS = [
   {
     label: "Receive Payment",
-    href: "/donations/reports/one-time",
+    href: "/donations/payments/transactions",
     icon: DollarSign,
   },
   {
@@ -41,7 +41,7 @@ const QUICK_ACTIONS = [
   },
   {
     label: "Import Payments",
-    href: "/donations/reports/import",
+    href: "/donations/payments/import-match",
     icon: FileUp,
   },
   {
@@ -95,7 +95,7 @@ export function DonationsOverviewDashboard() {
   const outstandingBalance = summary.outstandingBalance
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
       <div>
         <h2 className="text-xl font-semibold text-foreground">Dashboard Overview</h2>
         <p className="text-sm text-muted-foreground">
@@ -103,145 +103,157 @@ export function DonationsOverviewDashboard() {
         </p>
       </div>
 
-      <DonationMetricCardGrid colorful className="lg:grid-cols-4">
-        <DonationMetricCard
-          title="Active Campaigns"
-          value={summary.activeCampaignCount}
-          icon={Target}
-          accent="blue"
-          description="Fundraising campaigns in progress"
-        />
-        <DonationMetricCard
-          title="Total Collected"
-          value={formatDonationCurrency(summary.totalCollected)}
-          icon={DollarSign}
-          accent="emerald"
-          description={
-            <span className="inline-flex items-center">
-              <ArrowUpRight className="mr-1 h-3 w-3" />
-              {summary.paymentCount} transactions
-            </span>
-          }
-        />
-        <DonationMetricCard
-          title="Outstanding Balance"
-          value={formatDonationCurrency(outstandingBalance)}
-          icon={AlertCircle}
-          accent="amber"
-          description={
-            totalPledged > 0
-              ? `${((outstandingBalance / totalPledged) * 100).toFixed(0)}% of pledges unpaid`
-              : "No pledges yet"
-          }
-        />
-        <DonationMetricCard
-          title="Payments This Month"
-          value={formatDonationCurrency(summary.thisMonthCollected)}
-          icon={Wallet}
-          accent="purple"
-          description="Current calendar month"
-        />
-      </DonationMetricCardGrid>
+      <div className="grid items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_13.5rem]">
+        <div className="flex min-w-0 flex-col gap-4">
+          <DonationMetricCardGrid colorful compact className="lg:grid-cols-4">
+            <DonationMetricCard
+              compact
+              title="Active Campaigns"
+              value={summary.activeCampaignCount}
+              icon={Target}
+              accent="blue"
+              description="Fundraising campaigns in progress"
+            />
+            <DonationMetricCard
+              compact
+              title="Total Collected"
+              value={formatDonationCurrency(summary.totalCollected)}
+              icon={DollarSign}
+              accent="emerald"
+              description={
+                <span className="inline-flex items-center">
+                  <ArrowUpRight className="mr-1 h-3 w-3" />
+                  {summary.paymentCount} transactions
+                </span>
+              }
+            />
+            <DonationMetricCard
+              compact
+              title="Outstanding Balance"
+              value={formatDonationCurrency(outstandingBalance)}
+              icon={AlertCircle}
+              accent="amber"
+              description={
+                totalPledged > 0
+                  ? `${((outstandingBalance / totalPledged) * 100).toFixed(0)}% of pledges unpaid`
+                  : "No pledges yet"
+              }
+            />
+            <DonationMetricCard
+              compact
+              title="Payments This Month"
+              value={formatDonationCurrency(summary.thisMonthCollected)}
+              icon={Wallet}
+              accent="purple"
+              description="Current calendar month"
+            />
+          </DonationMetricCardGrid>
 
-      <div className="grid gap-6 xl:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Action Required</CardTitle>
-            <CardDescription>Operational items that need staff attention</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {actionItems.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No donation actions need attention right now.
-              </p>
-            ) : (
-              <ul className="space-y-2">
-                {actionItems.map((item) => (
-                  <li key={item.id}>
-                    <Link
-                      href={item.href}
-                      className="flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-sm transition hover:bg-muted/50"
-                    >
-                      <span>{item.label}</span>
-                      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
+          <div className="grid flex-1 gap-4 md:grid-cols-2">
+            <Card className="h-full">
+              <CardHeader className="p-4 pb-2">
+                <CardTitle className="text-sm">Action Required</CardTitle>
+                <CardDescription className="text-xs">
+                  Operational items that need staff attention
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-4 pt-2">
+                {actionItems.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No donation actions need attention right now.
+                  </p>
+                ) : (
+                  <ul className="space-y-1.5">
+                    {actionItems.map((item) => (
+                      <li key={item.id}>
+                        <Link
+                          href={item.href}
+                          className="flex items-center justify-between gap-3 rounded-md border px-2.5 py-1.5 text-sm transition hover:bg-muted/50"
+                        >
+                          <span>{item.label}</span>
+                          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </CardContent>
+            </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
-            <div>
-              <CardTitle className="text-base">Active Campaigns</CardTitle>
-              <CardDescription>Live fundraising progress</CardDescription>
-            </div>
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/donations/campaigns">View all</Link>
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {activeCampaigns.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No active campaigns.</p>
-            ) : (
-              <ul className="space-y-4">
-                {activeCampaigns.slice(0, 6).map((campaign) => (
-                  <li key={campaign.id} className="space-y-2 rounded-md border p-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <Link
-                        href={`/donations/campaigns/${campaign.id}`}
-                        className="font-medium text-primary hover:underline"
-                      >
-                        {campaign.name}
-                      </Link>
-                      <span className="whitespace-nowrap text-sm font-medium">
-                        {formatDonationCurrency(campaign.raised)} raised
-                      </span>
-                    </div>
-                    <div className="grid gap-1 text-xs text-muted-foreground sm:grid-cols-2">
-                      <span>
-                        Goal:{" "}
-                        {campaign.goalAmount != null
-                          ? formatDonationCurrency(campaign.goalAmount)
-                          : "—"}
-                      </span>
-                      <span>
-                        Outstanding pledges: {formatDonationCurrency(campaign.outstandingPledgeBalance)}
-                      </span>
-                    </div>
-                    <CampaignProgressBar progressPercent={campaign.progressPercent} />
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
+            <Card className="h-full">
+              <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 p-4 pb-2">
+                <div>
+                  <CardTitle className="text-sm">Active Campaigns</CardTitle>
+                  <CardDescription className="text-xs">Live fundraising progress</CardDescription>
+                </div>
+                <Button variant="outline" size="sm" className="h-7 px-2 text-xs" asChild>
+                  <Link href="/donations/campaigns">View all</Link>
+                </Button>
+              </CardHeader>
+              <CardContent className="p-4 pt-2">
+                {activeCampaigns.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No active campaigns.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {activeCampaigns.slice(0, 4).map((campaign) => (
+                      <li key={campaign.id} className="space-y-1.5 rounded-md border p-2.5">
+                        <div className="flex items-start justify-between gap-3">
+                          <Link
+                            href={`/donations/campaigns/${campaign.id}`}
+                            className="text-sm font-medium text-primary hover:underline"
+                          >
+                            {campaign.name}
+                          </Link>
+                          <span className="whitespace-nowrap text-xs font-medium">
+                            {formatDonationCurrency(campaign.raised)} raised
+                          </span>
+                        </div>
+                        <div className="grid gap-0.5 text-xs text-muted-foreground sm:grid-cols-2">
+                          <span>
+                            Goal:{" "}
+                            {campaign.goalAmount != null
+                              ? formatDonationCurrency(campaign.goalAmount)
+                              : "—"}
+                          </span>
+                          <span>
+                            Outstanding pledges:{" "}
+                            {formatDonationCurrency(campaign.outstandingPledgeBalance)}
+                          </span>
+                        </div>
+                        <CampaignProgressBar progressPercent={campaign.progressPercent} />
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Quick Actions</CardTitle>
-            <CardDescription>Jump to common donation workflows</CardDescription>
+        <Card className="h-full">
+          <CardHeader className="p-4 pb-2">
+            <CardTitle className="text-sm">Quick Actions</CardTitle>
+            <CardDescription className="text-xs">
+              Jump to common donation workflows
+            </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="grid w-fit grid-cols-2 gap-2">
+          <CardContent className="p-4 pt-2">
+            <ul className="space-y-2">
               {QUICK_ACTIONS.map((action) => {
                 const Icon = action.icon
                 return (
-                  <Button
-                    key={action.href}
-                    className="h-auto w-[11.75rem] justify-start bg-primary px-4 py-3 text-primary-foreground hover:bg-primary/90"
-                    asChild
-                  >
-                    <Link href={action.href}>
-                      <Icon className="mr-2 h-4 w-4 shrink-0" />
+                  <li key={action.href}>
+                    <Link
+                      href={action.href}
+                      className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+                    >
+                      <Icon className="h-4 w-4 shrink-0" />
                       {action.label}
                     </Link>
-                  </Button>
+                  </li>
                 )
               })}
-            </div>
+            </ul>
           </CardContent>
         </Card>
       </div>

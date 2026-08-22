@@ -132,7 +132,13 @@ function formatDate(value: string | null) {
   return date.toLocaleDateString()
 }
 
-export function PaymentImportMatchWorkspace({ mode }: { mode: "import" | "match" }) {
+export function PaymentImportMatchWorkspace({
+  mode,
+  onImported,
+}: {
+  mode: "import" | "match"
+  onImported?: () => void
+}) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [importSubTab, setImportSubTab] = useState<"upload" | "history">("upload")
@@ -569,7 +575,11 @@ export function PaymentImportMatchWorkspace({ mode }: { mode: "import" | "match"
     setParsedRows([])
     setFileName("")
     await loadHistory()
-    router.push("/donations/reports/match")
+    if (onImported) {
+      onImported()
+    } else {
+      router.push("/donations/payments/import-match?view=match")
+    }
   }
 
   async function handleBulkAutoMatch() {

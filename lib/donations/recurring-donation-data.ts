@@ -21,7 +21,7 @@ export async function fetchRecurringPlans(
   let query = supabase
     .from("recurring_donation_plans")
     .select(
-      "*, donors(full_name, email), contacts(phone), donation_categories(name), donation_subcategories(name), campaigns(name), contact_payment_methods(card_brand, last4, exp_month, exp_year)"
+      "*, donors(full_name, email), contacts!recurring_donation_plans_contact_id_fkey(phone), donation_categories(name), donation_subcategories(name), campaigns(name), contact_payment_methods(card_brand, last4, exp_month, exp_year)"
     )
     .eq("organization_id", organizationId)
     .order("next_payment_date", { ascending: true })

@@ -56,8 +56,9 @@ export async function findOrCreateContact(input: FindOrCreateContactInput) {
     const { data: matches, error: matchError } = await supabase
       .from("contacts")
       .select("id")
-      .eq("organization_id", input.organizationId)
-      .or(duplicateChecks)
+    .eq("organization_id", input.organizationId)
+    .eq("contact_type", contactType)
+    .or(duplicateChecks)
       .limit(1)
 
     if (matchError) {
@@ -72,6 +73,7 @@ export async function findOrCreateContact(input: FindOrCreateContactInput) {
       .from("contacts")
       .select("id")
       .eq("organization_id", input.organizationId)
+      .eq("contact_type", contactType)
       .ilike("full_name", cleanName)
       .limit(1)
 
@@ -449,12 +451,6 @@ export async function addContactWithRoles(input: {
     input.contactType || "individual"
   )
 
-  if (input.contactType === "group") {
-    throw new Error(
-      "Giving groups are managed under Donations, not as Contacts. Use Group Giving or a donation import."
-    )
-  }
-
   const { contactId, created } = await findOrCreateContact({
     organizationId,
     fullName: input.fullName,
@@ -481,6 +477,11 @@ export async function addContactWithRoles(input: {
 }
 
 function revalidateContactPaths() {
+  revalidatePath("/directory")
+  revalidatePath("/directory/people")
+  revalidatePath("/directory/organizations")
+  revalidatePath("/directory/families")
+  revalidatePath("/directory/reports")
   revalidatePath("/contacts")
   revalidatePath("/contacts/people")
   revalidatePath("/contacts/organizations")

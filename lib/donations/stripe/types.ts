@@ -10,6 +10,7 @@ export type DonationCheckoutMetadata = {
   campaign_group_id?: string
   attributed_group_contact_id?: string
   pledge_id?: string
+  wishlist_item_id?: string
   category_id?: string
   subcategory_id?: string
   recurring_donation_plan_id?: string
@@ -26,6 +27,7 @@ export type CreateOneTimeDonationCheckoutInput = {
   campaignGroupId?: string | null
   attributedGroupContactId?: string | null
   pledgeId?: string | null
+  wishlistItemId?: string | null
   categoryId?: string | null
   subcategoryId?: string | null
   successUrl?: string
@@ -53,6 +55,7 @@ export type CreateRecurringDonationCheckoutInput = {
   campaignId?: string | null
   campaignGroupId?: string | null
   attributedGroupContactId?: string | null
+  wishlistItemId?: string | null
   categoryId?: string | null
   subcategoryId?: string | null
   successUrl?: string

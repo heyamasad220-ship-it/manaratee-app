@@ -9,6 +9,7 @@ export type CheckoutSessionRow = {
   campaign_group_id: string | null
   attributed_group_contact_id: string | null
   pledge_id: string | null
+  wishlist_item_id: string | null
   category_id: string | null
   subcategory_id: string | null
   payment_id: string | null
@@ -16,7 +17,7 @@ export type CheckoutSessionRow = {
 }
 
 const CHECKOUT_SESSION_SELECT =
-  "id, organization_id, donor_id, contact_id, campaign_id, campaign_group_id, attributed_group_contact_id, pledge_id, category_id, subcategory_id, payment_id, status"
+  "id, organization_id, donor_id, contact_id, campaign_id, campaign_group_id, attributed_group_contact_id, pledge_id, wishlist_item_id, category_id, subcategory_id, payment_id, status"
 
 export async function loadCheckoutSession(
   supabase: SupabaseClient,
@@ -56,6 +57,7 @@ function normalizeCheckoutSessionRow(data: Record<string, unknown>): CheckoutSes
     campaign_group_id: (data.campaign_group_id as string | null) ?? null,
     attributed_group_contact_id: (data.attributed_group_contact_id as string | null) ?? null,
     pledge_id: (data.pledge_id as string | null) ?? null,
+    wishlist_item_id: (data.wishlist_item_id as string | null) ?? null,
     category_id: (data.category_id as string | null) ?? null,
     subcategory_id: (data.subcategory_id as string | null) ?? null,
     payment_id: (data.payment_id as string | null) ?? null,

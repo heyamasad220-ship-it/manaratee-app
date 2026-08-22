@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation"
 import { fetchFamilyListSummariesAction } from "@/lib/contacts/family-actions"
 import type { FamilyListSummary } from "@/lib/contacts/family-types"
 import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
+import { directoryFamilyPath } from "@/lib/directory/directory-paths"
 import { Card, CardContent } from "@/components/ui/card"
 import { ListPagination } from "@/components/ui/list-pagination"
 import {
@@ -23,7 +24,7 @@ import {
 } from "@/lib/ui/list-pagination"
 
 export function ContactsFamiliesDirectoryPanel({
-  returnTo = "/contacts/reports/directory?tab=families",
+  returnTo = "/directory/families",
 }: {
   returnTo?: string
 }) {
@@ -103,16 +104,14 @@ export function ContactsFamiliesDirectoryPanel({
                       })
                     : null
 
+                  const familyHref = directoryFamilyPath(household.id)
+
                   return (
                     <TableRow key={household.id}>
                       <TableCell className="font-medium">
-                        {primaryHref ? (
-                          <Link href={primaryHref} className="text-primary hover:underline">
-                            {household.name}
-                          </Link>
-                        ) : (
-                          household.name
-                        )}
+                        <Link href={familyHref} className="text-primary hover:underline">
+                          {household.name}
+                        </Link>
                       </TableCell>
                       <TableCell>
                         {primaryHref && household.primaryName ? (

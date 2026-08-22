@@ -46,16 +46,16 @@ export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
   },
   {
     key: "contacts.view",
-    label: "View Contacts",
-    description: "Can open Contacts pages and view contact records.",
-    group: "Contacts",
+    label: "View Directory",
+    description: "Can open Directory pages and view people, families, organizations, and groups.",
+    group: "Directory",
     moduleSlugs: ["contacts"],
   },
   {
     key: "contacts.manage",
-    label: "Manage Contacts",
-    description: "Can create, edit, and delete contacts and affiliations.",
-    group: "Contacts",
+    label: "Manage Directory",
+    description: "Can create, edit, and archive directory records and assign roles.",
+    group: "Directory",
     moduleSlugs: ["contacts"],
   },
   {

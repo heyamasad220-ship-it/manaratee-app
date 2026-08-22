@@ -1,14 +1,18 @@
 "use client"
 
-import { Target } from "lucide-react"
+import { AlertCircle, DollarSign, Gift, Heart, Target, Users } from "lucide-react"
 
 import { CampaignDonorsDialog } from "@/components/donations/campaign-donors-dialog"
 import { CampaignOutstandingPledgesTable } from "@/components/donations/campaign-outstanding-pledges-table"
-import { CampaignOverviewInsightsPanel } from "@/components/donations/campaign-overview-insights"
+import { CampaignOverviewInsightsPanel, CampaignOverviewGroupsCard } from "@/components/donations/campaign-overview-insights"
 import { CampaignOverviewMetricsEditor } from "@/components/donations/campaign-overview-metrics-editor"
 import { CampaignProgressBar } from "@/components/donations/campaign-progress-bar"
 import { CampaignProgressGauge } from "@/components/donations/campaign-progress-gauge"
 import { CampaignOverviewMetricsTable } from "@/components/donations/campaign-source-breakdown-cards"
+import {
+  DonationMetricCard,
+  DonationMetricCardGrid,
+} from "@/components/donations/donation-metric-card"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   formatDonationCurrency,
@@ -19,7 +23,6 @@ import {
   type CampaignSourceBreakdown,
 } from "@/lib/donations/campaign-analytics"
 import type { CampaignOverviewMetricKey } from "@/lib/donations/campaign-overview-metrics"
-import type { CampaignPhaseMetrics } from "@/lib/donations/campaign-phase-types"
 import { donationPledgesHref } from "@/lib/donations/donation-pledge-paths"
 
 type ContactProfileTarget = {
@@ -33,7 +36,6 @@ type CampaignOverviewTabProps = {
   insights: CampaignDonorInsights | null
   sourceBreakdown: CampaignSourceBreakdown
   outstandingPledges: CampaignOutstandingPledgeRow[]
-  phaseMetrics: CampaignPhaseMetrics[]
   overviewMetricKeys: CampaignOverviewMetricKey[] | null
   canManage: boolean
   showMetricsEditor: boolean
@@ -45,42 +47,12 @@ type CampaignOverviewTabProps = {
   onReload: () => void
 }
 
-function MetricStat({
-  label,
-  value,
-  hint,
-}: {
-  label: string
-  value: string
-  hint?: string
-}) {
-  return (
-    <div className="rounded-lg border border-border bg-card px-4 py-3">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className="mt-1 text-xl font-semibold tabular-nums text-foreground">{value}</p>
-      {hint ? <p className="mt-1 text-xs text-muted-foreground">{hint}</p> : null}
-    </div>
-  )
-}
-
-function formatShortDate(value: string | null | undefined) {
-  if (!value) return null
-  const date = new Date(`${value}T00:00:00`)
-  if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  })
-}
-
 export function CampaignOverviewTab({
   campaign,
   entry,
   insights,
   sourceBreakdown,
   outstandingPledges,
-  phaseMetrics,
   overviewMetricKeys,
   canManage,
   showMetricsEditor,
@@ -96,8 +68,6 @@ export function CampaignOverviewTab({
   const committed = metrics.pledged
   const collected = metrics.raised
   const outstanding = metrics.outstanding
-  const remainingToGoal =
-    goalAmount != null && goalAmount > 0 ? Math.max(goalAmount - committed, 0) : null
   const committedProgressPercent =
     goalAmount != null && goalAmount > 0
       ? Math.min((committed / goalAmount) * 100, 100)
@@ -107,127 +77,63 @@ export function CampaignOverviewTab({
     <>
       <div className="flex flex-col gap-6">
         <Card className="border border-border shadow-sm">
-          <CardHeader className="pb-2">
+          <CardHeader className="flex flex-row items-center gap-3 space-y-0 pb-2">
             <CardTitle className="flex items-center gap-2 text-base">
               <Target className="h-4 w-4" />
               Campaign Goal
             </CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
-            <p className="text-3xl font-semibold tabular-nums text-foreground">
+            <p className="text-2xl font-semibold tabular-nums text-foreground">
               {goalAmount != null ? formatDonationCurrency(goalAmount) : "No goal set"}
             </p>
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-              <MetricStat
-                label="Total Committed"
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <DonationMetricCardGrid colorful columns={5}>
+              <DonationMetricCard
+                title="Total Committed"
                 value={formatDonationCurrency(committed)}
-                hint="Valid pledge commitments"
+                icon={Heart}
+                accent="blue"
+                description="Valid pledge commitments"
               />
-              <MetricStat
-                label="Total Collected"
+              <DonationMetricCard
+                title="Total Collected"
                 value={formatDonationCurrency(collected)}
-                hint="Payments received"
+                icon={DollarSign}
+                accent="emerald"
+                description="Payments received"
               />
-              <MetricStat
-                label="Outstanding"
+              <DonationMetricCard
+                title="Outstanding"
                 value={formatDonationCurrency(outstanding)}
-                hint="Committed, not yet collected"
+                icon={AlertCircle}
+                accent="amber"
+                description="Committed, not yet collected"
               />
-              <MetricStat
-                label="Donors"
+              <DonationMetricCard
+                title="Donors"
                 value={String(metrics.donorCount)}
+                icon={Users}
+                accent="purple"
+                onValueClick={() => onShowDonorsDialogChange(true)}
               />
-              <MetricStat
-                label="Largest Gift"
+              <DonationMetricCard
+                title="Largest Gift"
                 value={formatDonationCurrency(metrics.largestGift)}
+                icon={Gift}
+                accent="rose"
+                onValueClick={
+                  insights?.largestGift?.contactId || insights?.largestGift?.donorId
+                    ? () =>
+                        onOpenContactProfile({
+                          contactId: insights?.largestGift?.contactId,
+                          donorId: insights?.largestGift?.donorId,
+                        })
+                    : undefined
+                }
               />
-            </div>
-            {remainingToGoal != null ? (
-              <p className="text-sm text-muted-foreground">
-                Remaining to goal (by committed): {formatDonationCurrency(remainingToGoal)}
-              </p>
-            ) : null}
+            </DonationMetricCardGrid>
           </CardContent>
         </Card>
-
-        <CampaignOverviewInsightsPanel campaignId={campaign.id} />
-
-        {phaseMetrics.length > 0 ? (
-          <div className="flex flex-col gap-4">
-            <h2 className="text-base font-semibold text-foreground">Goal Breakdown</h2>
-            <div className="grid gap-4 lg:grid-cols-2">
-              {phaseMetrics.map((phase) => {
-                const phaseProgress =
-                  phase.goalAmount != null && phase.goalAmount > 0
-                    ? Math.min((phase.committed / phase.goalAmount) * 100, 100)
-                    : null
-                return (
-                  <Card key={phase.phaseId} className="border border-border shadow-sm">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-base">{phase.name}</CardTitle>
-                      {phase.deadline ? (
-                        <p className="text-xs text-muted-foreground">
-                          Deadline: {formatShortDate(phase.deadline)}
-                        </p>
-                      ) : null}
-                    </CardHeader>
-                    <CardContent className="flex flex-col gap-3">
-                      <div className="grid gap-2 sm:grid-cols-2">
-                        <MetricStat
-                          label="Goal"
-                          value={
-                            phase.goalAmount != null
-                              ? formatDonationCurrency(phase.goalAmount)
-                              : "—"
-                          }
-                        />
-                        <MetricStat
-                          label="Committed"
-                          value={formatDonationCurrency(phase.committed)}
-                        />
-                        <MetricStat
-                          label="Collected"
-                          value={formatDonationCurrency(phase.collected)}
-                        />
-                        <MetricStat
-                          label="Remaining to Goal"
-                          value={
-                            phase.remainingToGoal != null
-                              ? formatDonationCurrency(phase.remainingToGoal)
-                              : "—"
-                          }
-                        />
-                      </div>
-                      {phaseProgress != null ? (
-                        <CampaignProgressBar progressPercent={phaseProgress} />
-                      ) : null}
-                    </CardContent>
-                  </Card>
-                )
-              })}
-            </div>
-
-            <Card className="border border-border shadow-sm">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Overall Campaign</CardTitle>
-              </CardHeader>
-              <CardContent className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                <MetricStat
-                  label="Goal"
-                  value={goalAmount != null ? formatDonationCurrency(goalAmount) : "—"}
-                />
-                <MetricStat label="Total Committed" value={formatDonationCurrency(committed)} />
-                <MetricStat label="Total Collected" value={formatDonationCurrency(collected)} />
-                <MetricStat
-                  label="Remaining"
-                  value={
-                    remainingToGoal != null ? formatDonationCurrency(remainingToGoal) : "—"
-                  }
-                />
-              </CardContent>
-            </Card>
-          </div>
-        ) : null}
 
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,0.9fr)] xl:items-start">
           <CampaignOverviewMetricsTable
@@ -289,6 +195,8 @@ export function CampaignOverviewTab({
           </Card>
         </div>
 
+        <CampaignOverviewInsightsPanel campaignId={campaign.id} />
+
         <CampaignOutstandingPledgesTable
           pledges={outstandingPledges}
           pledgesPageHref={donationPledgesHref({ campaignId: campaign.id })}
@@ -299,6 +207,8 @@ export function CampaignOverviewTab({
             })
           }
         />
+
+        <CampaignOverviewGroupsCard campaignId={campaign.id} />
       </div>
 
       {canManage ? (

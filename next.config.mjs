@@ -22,6 +22,61 @@ const nextConfig = {
   async redirects() {
     return [
       {
+        source: "/contacts",
+        destination: "/directory",
+        permanent: false,
+      },
+      {
+        source: "/contacts/people",
+        destination: "/directory/people",
+        permanent: false,
+      },
+      {
+        source: "/contacts/organizations",
+        destination: "/directory/organizations",
+        permanent: false,
+      },
+      {
+        source: "/contacts/families",
+        destination: "/directory/families",
+        permanent: false,
+      },
+      {
+        source: "/contacts/families/:id",
+        destination: "/directory/families/:id",
+        permanent: false,
+      },
+      {
+        source: "/contacts/groups",
+        destination: "/donations/reports/donors?view=group",
+        permanent: false,
+      },
+      {
+        source: "/directory/groups",
+        destination: "/donations/reports/donors?view=group",
+        permanent: false,
+      },
+      {
+        source: "/directory/groups/:id",
+        destination: "/donations/groups/:id",
+        permanent: false,
+      },
+      {
+        source: "/contacts/reports",
+        destination: "/directory/reports",
+        permanent: false,
+      },
+      {
+        source: "/contacts/reports/directory",
+        destination: "/directory/reports",
+        permanent: false,
+      },
+      {
+        source: "/contacts/settings",
+        destination: "/directory/settings",
+        permanent: false,
+      },
+      {
         source: "/hr",
         destination: "/workforce",
         permanent: false,

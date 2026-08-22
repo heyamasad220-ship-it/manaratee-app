@@ -41,9 +41,14 @@ function formatDate(value: string | null) {
 type FamilyGivingDetailProps = {
   rollup: FamilyGivingRollup
   canManage?: boolean
+  showGiving?: boolean
 }
 
-export function FamilyGivingDetail({ rollup, canManage = false }: FamilyGivingDetailProps) {
+export function FamilyGivingDetail({
+  rollup,
+  canManage = false,
+  showGiving = true,
+}: FamilyGivingDetailProps) {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -71,6 +76,7 @@ export function FamilyGivingDetail({ rollup, canManage = false }: FamilyGivingDe
         </div>
       </div>
 
+      {showGiving ? (
       <DonationMetricCardGrid colorful columns={4}>
         <DonationMetricCard
           title="Lifetime Giving"
@@ -97,6 +103,7 @@ export function FamilyGivingDetail({ rollup, canManage = false }: FamilyGivingDe
           accent="amber"
         />
       </DonationMetricCardGrid>
+      ) : null}
 
       <FamilySettingsPanel familyId={rollup.familyId} canManage={canManage} />
 
@@ -107,12 +114,13 @@ export function FamilyGivingDetail({ rollup, canManage = false }: FamilyGivingDe
         canManage={canManage}
       />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Family Giving</CardTitle>
-          <CardDescription>Latest gifts from all active household members</CardDescription>
-        </CardHeader>
-        <CardContent className="p-0">
+      {showGiving ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Family Giving</CardTitle>
+            <CardDescription>Latest gifts from all active household members</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
           {rollup.recentGifts.length === 0 ? (
             <p className="p-6 text-sm text-muted-foreground">No gifts recorded yet.</p>
           ) : (
@@ -148,6 +156,7 @@ export function FamilyGivingDetail({ rollup, canManage = false }: FamilyGivingDe
           )}
         </CardContent>
       </Card>
+      ) : null}
     </div>
   )
 }

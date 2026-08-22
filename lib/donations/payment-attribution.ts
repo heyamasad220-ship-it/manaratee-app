@@ -4,12 +4,14 @@ export type PaymentAttribution = {
   campaign_id: string | null
   category_id: string | null
   subcategory_id: string | null
+  wishlist_item_id: string | null
 }
 
 export const EMPTY_PAYMENT_ATTRIBUTION: PaymentAttribution = {
   campaign_id: null,
   category_id: null,
   subcategory_id: null,
+  wishlist_item_id: null,
 }
 
 export function mergePaymentAttribution(
@@ -20,6 +22,7 @@ export function mergePaymentAttribution(
     campaign_id: primary?.campaign_id ?? fallback?.campaign_id ?? null,
     category_id: primary?.category_id ?? fallback?.category_id ?? null,
     subcategory_id: primary?.subcategory_id ?? fallback?.subcategory_id ?? null,
+    wishlist_item_id: primary?.wishlist_item_id ?? fallback?.wishlist_item_id ?? null,
   }
 }
 
@@ -28,6 +31,7 @@ export function toPaymentAttributionColumns(attribution: PaymentAttribution) {
     campaign_id: attribution.campaign_id,
     category_id: attribution.category_id,
     subcategory_id: attribution.subcategory_id,
+    wishlist_item_id: attribution.wishlist_item_id,
   }
 }
 
@@ -110,7 +114,7 @@ export function resolveAttributionFromNames(
     }
   }
 
-  return { campaign_id, category_id, subcategory_id }
+  return { campaign_id, category_id, subcategory_id, wishlist_item_id: null }
 }
 
 export async function fetchPledgeAttribution(
@@ -119,7 +123,7 @@ export async function fetchPledgeAttribution(
 ): Promise<PaymentAttribution> {
   const { data, error } = await supabase
     .from("pledges")
-    .select("campaign_id, category_id, subcategory_id")
+    .select("campaign_id, category_id, subcategory_id, wishlist_item_id")
     .eq("id", pledgeId)
     .maybeSingle()
 
@@ -129,6 +133,7 @@ export async function fetchPledgeAttribution(
     campaign_id: (data.campaign_id as string | null) ?? null,
     category_id: (data.category_id as string | null) ?? null,
     subcategory_id: (data.subcategory_id as string | null) ?? null,
+    wishlist_item_id: (data.wishlist_item_id as string | null) ?? null,
   }
 }
 
@@ -138,7 +143,7 @@ export async function fetchRecurringPlanAttribution(
 ): Promise<PaymentAttribution> {
   const { data, error } = await supabase
     .from("recurring_donation_plans")
-    .select("campaign_id, category_id, subcategory_id")
+    .select("campaign_id, category_id, subcategory_id, wishlist_item_id")
     .eq("id", planId)
     .maybeSingle()
 
@@ -148,6 +153,7 @@ export async function fetchRecurringPlanAttribution(
     campaign_id: (data.campaign_id as string | null) ?? null,
     category_id: (data.category_id as string | null) ?? null,
     subcategory_id: (data.subcategory_id as string | null) ?? null,
+    wishlist_item_id: (data.wishlist_item_id as string | null) ?? null,
   }
 }
 

@@ -401,7 +401,7 @@ export function VenueRentalCreateDialog({
 
         <div className="space-y-4 py-1">
           <div className="space-y-2">
-            <Label htmlFor="booking-contact-search">Contact</Label>
+            <Label htmlFor="booking-contact-search">Directory contact</Label>
             {selectedContact ? (
               <div className="flex items-start justify-between gap-3 rounded-md border px-3 py-2">
                 <div className="min-w-0">
@@ -433,7 +433,7 @@ export function VenueRentalCreateDialog({
                     id="booking-contact-search"
                     value={contactSearch}
                     onChange={(event) => setContactSearch(event.target.value)}
-                    placeholder="Search by name, email, or phone"
+                    placeholder="Search Directory by name, email, or phone"
                     className="pl-9"
                     disabled={isPending}
                     autoComplete="off"

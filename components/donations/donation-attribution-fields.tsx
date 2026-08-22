@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
+import {
+  findGeneralDonationCategory,
+  findGeneralFund,
+} from "@/lib/donations/donation-default-attribution"
 import { isDonationFundActive } from "@/lib/donations/donation-fund-status"
 import { Label } from "@/components/ui/label"
 import {
@@ -125,40 +129,71 @@ export function DonationAttributionFields({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [organizationId, value.subcategoryId])
 
-  const selectableFunds = allFunds.filter(
-    (fund) => fund.isActive || fund.id === value.subcategoryId
-  )
+  useEffect(() => {
+    if (categories.length === 0 && allFunds.length === 0) return
 
-  const usesFundFirstAttribution = selectableFunds.length > 0
+    const generalCategory = findGeneralDonationCategory(categories)
+    const generalFund = findGeneralFund(allFunds, value.categoryId || generalCategory?.id)
+
+    let nextCategoryId = value.categoryId
+    let nextFundId = value.subcategoryId
+    let changed = false
+
+    if (!nextCategoryId && generalCategory) {
+      nextCategoryId = generalCategory.id
+      changed = true
+    }
+    if (
+      !nextFundId &&
+      generalFund &&
+      (!nextCategoryId || generalFund.categoryId === nextCategoryId)
+    ) {
+      nextFundId = generalFund.id
+      if (!nextCategoryId) nextCategoryId = generalFund.categoryId
+      changed = true
+    }
+
+    if (!changed) return
+
+    onChange({
+      ...value,
+      categoryId: nextCategoryId,
+      subcategoryId: nextFundId,
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allFunds, categories, value.categoryId, value.subcategoryId])
+
+  const selectableFunds = allFunds.filter(
+    (fund) =>
+      (fund.isActive || fund.id === value.subcategoryId) &&
+      (!value.categoryId || fund.categoryId === value.categoryId)
+  )
 
   function update(patch: Partial<DonationAttributionValue>) {
     onChange({ ...value, ...patch })
   }
 
   function handleFundChange(next: string) {
-    if (next === NONE) {
-      update({ subcategoryId: "", categoryId: "" })
-      return
-    }
-
     const selectedFund = allFunds.find((fund) => fund.id === next)
     update({
       subcategoryId: next,
-      categoryId: selectedFund?.categoryId ?? "",
+      categoryId: selectedFund?.categoryId || value.categoryId,
     })
   }
 
   function handleCategoryChange(next: string) {
+    const currentFund = allFunds.find((fund) => fund.id === value.subcategoryId)
+    const keepFund = currentFund?.categoryId === next
     update({
-      categoryId: next === NONE ? "" : next,
-      subcategoryId: "",
+      categoryId: next,
+      subcategoryId: keepFund ? value.subcategoryId : "",
     })
   }
 
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       {showCampaign ? (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2 sm:col-span-2">
           <Label>Campaign</Label>
           <Select
             value={value.campaignId || NONE}
@@ -180,23 +215,21 @@ export function DonationAttributionFields({
         </div>
       ) : null}
 
-      {showFund ? (
+      {showCategory ? (
         <div className="flex flex-col gap-2">
-          <Label>Fund</Label>
+          <Label>Category</Label>
           <Select
-            value={value.subcategoryId || NONE}
-            onValueChange={handleFundChange}
+            value={value.categoryId || undefined}
+            onValueChange={handleCategoryChange}
             disabled={disabled}
           >
             <SelectTrigger>
-              <SelectValue placeholder="Select fund" />
+              <SelectValue placeholder="General Donation" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={NONE}>No fund</SelectItem>
-              {selectableFunds.map((fund) => (
-                <SelectItem key={fund.id} value={fund.id}>
-                  {fund.name}
-                  {!fund.isActive ? " (Closed)" : ""}
+              {categories.map((category) => (
+                <SelectItem key={category.id} value={category.id}>
+                  {category.name}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -204,22 +237,22 @@ export function DonationAttributionFields({
         </div>
       ) : null}
 
-      {showCategory ? (
-        <div className="flex flex-col gap-2 sm:col-span-2">
-          <Label>Category</Label>
+      {showFund ? (
+        <div className="flex flex-col gap-2">
+          <Label>Fund</Label>
           <Select
-            value={value.categoryId || NONE}
-            onValueChange={handleCategoryChange}
-            disabled={disabled || usesFundFirstAttribution}
+            value={value.subcategoryId || undefined}
+            onValueChange={handleFundChange}
+            disabled={disabled}
           >
             <SelectTrigger>
-              <SelectValue placeholder="Select category" />
+              <SelectValue placeholder="General Fund" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={NONE}>No category</SelectItem>
-              {categories.map((category) => (
-                <SelectItem key={category.id} value={category.id}>
-                  {category.name}
+              {selectableFunds.map((fund) => (
+                <SelectItem key={fund.id} value={fund.id}>
+                  {fund.name}
+                  {!fund.isActive ? " (Closed)" : ""}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -235,6 +268,7 @@ export function toAttributionIds(value: DonationAttributionValue) {
     campaign_id: value.campaignId || null,
     category_id: value.categoryId || null,
     subcategory_id: value.subcategoryId || null,
+    wishlist_item_id: null as string | null,
   }
 }
 

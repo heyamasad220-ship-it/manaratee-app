@@ -37,6 +37,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { TableColumnHeaderFilter } from "@/components/ui/table-column-header-filter"
 import { formatDonationCurrency } from "@/lib/donations/campaign-analytics"
 import type { CampaignAskLevelRow } from "@/lib/donations/campaign-ask-level-types"
 import {
@@ -44,17 +45,15 @@ import {
   createCampaignProspectAction,
   deleteCampaignProspectAction,
   fetchCampaignProspectsPageAction,
+  listCampaignProspectAssigneesAction,
   updateCampaignProspectAction,
-  updateCampaignProspectStageAction,
 } from "@/lib/donations/campaign-prospect-actions"
 import {
-  CAMPAIGN_PROSPECT_PRIORITIES,
-  CAMPAIGN_PROSPECT_PRIORITY_LABELS,
-  CAMPAIGN_PROSPECT_STAGES,
   CAMPAIGN_PROSPECT_STAGE_LABELS,
+  campaignProspectStagesForSelect,
+  displayCampaignProspectStage,
   isProspectFollowUpOverdue,
   type CampaignProspectListItem,
-  type CampaignProspectPriority,
   type CampaignProspectStage,
 } from "@/lib/donations/campaign-prospect-types"
 import { donationPledgesHref } from "@/lib/donations/donation-pledge-paths"
@@ -63,6 +62,14 @@ import { cn } from "@/lib/utils"
 
 const ALL = "all"
 const NO_ASK_LEVEL = "__none__"
+const UNASSIGNED = "__unassigned__"
+const ASSIGNED = "__assigned__"
+
+function initialAssigneeFilter(value: string | null) {
+  if (!value) return ALL
+  if (value === "unassigned") return UNASSIGNED
+  return value
+}
 
 type CampaignProspectsTabProps = {
   campaignId: string
@@ -84,7 +91,6 @@ type ProspectFormState = {
   assignedToContactId: string
   assignedToLabel: string
   stage: CampaignProspectStage
-  priority: CampaignProspectPriority
   lastContactedAt: string
   nextFollowUpAt: string
   notes: string
@@ -100,7 +106,6 @@ function emptyForm(askLevels: CampaignAskLevelRow[]): ProspectFormState {
     assignedToContactId: "",
     assignedToLabel: "",
     stage: "identified",
-    priority: "medium",
     lastContactedAt: "",
     nextFollowUpAt: "",
     notes: "",
@@ -137,13 +142,10 @@ export function CampaignProspectsTab({
   const [search, setSearch] = useState("")
   const [debouncedSearch, setDebouncedSearch] = useState("")
   const [stageFilter, setStageFilter] = useState(initialStage || ALL)
-  const [priorityFilter, setPriorityFilter] = useState(ALL)
-  const [askLevelFilter, setAskLevelFilter] = useState(ALL)
-  const [followUpFilter, setFollowUpFilter] = useState(initialFollowUp || ALL)
-  const [pledgedFilter, setPledgedFilter] = useState(initialPledged || ALL)
-  const [assigneeFilter, setAssigneeFilter] = useState(
-    initialAssignee === "unassigned" ? "__unassigned__" : ALL
-  )
+  const [followUpFilter] = useState(initialFollowUp || ALL)
+  const [pledgedFilter] = useState(initialPledged || ALL)
+  const [assigneeFilter, setAssigneeFilter] = useState(initialAssigneeFilter(initialAssignee))
+  const [assignees, setAssignees] = useState<Array<{ id: string; name: string }>>([])
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [showDialog, setShowDialog] = useState(false)
   const [editing, setEditing] = useState<CampaignProspectListItem | null>(null)
@@ -169,8 +171,6 @@ export function CampaignProspectsTab({
       pageSize: DONATIONS_PAGE_SIZE,
       search: debouncedSearch || undefined,
       stage: stageFilter === ALL ? null : stageFilter,
-      priority: priorityFilter === ALL ? null : priorityFilter,
-      askLevelId: askLevelFilter === ALL ? null : askLevelFilter,
       followUp:
         followUpFilter === "overdue" || followUpFilter === "upcoming"
           ? followUpFilter
@@ -200,29 +200,28 @@ export function CampaignProspectsTab({
     page,
     debouncedSearch,
     stageFilter,
-    priorityFilter,
-    askLevelFilter,
     followUpFilter,
     pledgedFilter,
     assigneeFilter,
   ])
+
+  const loadAssignees = useCallback(async () => {
+    const result = await listCampaignProspectAssigneesAction(campaignId)
+    if (result.success) setAssignees(result.assignees)
+  }, [campaignId])
 
   useEffect(() => {
     void loadProspects()
   }, [loadProspects])
 
   useEffect(() => {
+    void loadAssignees()
+  }, [loadAssignees])
+
+  useEffect(() => {
     setPage(1)
     setSelectedIds([])
-  }, [
-    debouncedSearch,
-    stageFilter,
-    priorityFilter,
-    askLevelFilter,
-    followUpFilter,
-    pledgedFilter,
-    assigneeFilter,
-  ])
+  }, [debouncedSearch, stageFilter, followUpFilter, pledgedFilter, assigneeFilter])
 
   const totalPages = Math.max(1, Math.ceil(total / DONATIONS_PAGE_SIZE))
 
@@ -250,8 +249,7 @@ export function CampaignProspectsTab({
         prospect.suggested_ask_amount != null ? String(prospect.suggested_ask_amount) : "",
       assignedToContactId: prospect.assigned_to_contact_id || "",
       assignedToLabel: prospect.assignedToName || "",
-      stage: prospect.stage,
-      priority: prospect.priority,
+      stage: displayCampaignProspectStage(prospect.stage),
       lastContactedAt: prospect.last_contacted_at || "",
       nextFollowUpAt: prospect.next_follow_up_at || "",
       notes: prospect.notes || "",
@@ -274,7 +272,6 @@ export function CampaignProspectsTab({
         : null,
       assigned_to_contact_id: form.assignedToContactId || null,
       stage: form.stage,
-      priority: form.priority,
       last_contacted_at: form.lastContactedAt || null,
       next_follow_up_at: form.nextFollowUpAt || null,
       notes: form.notes || null,
@@ -293,16 +290,7 @@ export function CampaignProspectsTab({
 
     setShowDialog(false)
     await loadProspects()
-    onChanged()
-  }
-
-  async function handleStageChange(prospectId: string, stage: string) {
-    const result = await updateCampaignProspectStageAction(prospectId, stage)
-    if (!result.success) {
-      alert(result.error)
-      return
-    }
-    await loadProspects()
+    await loadAssignees()
     onChanged()
   }
 
@@ -313,7 +301,10 @@ export function CampaignProspectsTab({
       alert(result.error)
       return
     }
+    setShowDialog(false)
+    setEditing(null)
     await loadProspects()
+    await loadAssignees()
     onChanged()
   }
 
@@ -334,6 +325,7 @@ export function CampaignProspectsTab({
     setBulkAssigneeId("")
     setBulkAssigneeLabel("")
     await loadProspects()
+    await loadAssignees()
     onChanged()
   }
 
@@ -363,92 +355,20 @@ export function CampaignProspectsTab({
             </Button>
             <Button onClick={openCreate}>
               <Plus className="mr-2 h-4 w-4" />
-              Add Prospect
+              Assign Donor
             </Button>
           </div>
         ) : null}
       </div>
 
-      <div className="flex flex-col gap-3 rounded-lg border border-border p-3">
-        <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            className="pl-9"
-            placeholder="Search prospect, assignee, notes…"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-          />
-        </div>
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-          <Select value={stageFilter} onValueChange={setStageFilter}>
-            <SelectTrigger>
-              <SelectValue placeholder="Stage" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL}>All stages</SelectItem>
-              {CAMPAIGN_PROSPECT_STAGES.map((stage) => (
-                <SelectItem key={stage} value={stage}>
-                  {CAMPAIGN_PROSPECT_STAGE_LABELS[stage]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-            <SelectTrigger>
-              <SelectValue placeholder="Priority" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL}>All priorities</SelectItem>
-              {CAMPAIGN_PROSPECT_PRIORITIES.map((priority) => (
-                <SelectItem key={priority} value={priority}>
-                  {CAMPAIGN_PROSPECT_PRIORITY_LABELS[priority]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={askLevelFilter} onValueChange={setAskLevelFilter}>
-            <SelectTrigger>
-              <SelectValue placeholder="Ask level" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL}>All ask levels</SelectItem>
-              {askLevelOptions.map((level) => (
-                <SelectItem key={level.id} value={level.id}>
-                  {formatDonationCurrency(level.ask_amount)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={followUpFilter} onValueChange={setFollowUpFilter}>
-            <SelectTrigger>
-              <SelectValue placeholder="Follow-up" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL}>Any follow-up</SelectItem>
-              <SelectItem value="overdue">Overdue</SelectItem>
-              <SelectItem value="upcoming">Upcoming</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={assigneeFilter} onValueChange={setAssigneeFilter}>
-            <SelectTrigger>
-              <SelectValue placeholder="Assignee" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL}>Any assignee</SelectItem>
-              <SelectItem value="__unassigned__">Unassigned</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={pledgedFilter} onValueChange={setPledgedFilter}>
-            <SelectTrigger>
-              <SelectValue placeholder="Pledged" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL}>Pledged / not</SelectItem>
-              <SelectItem value="pledged">Pledged</SelectItem>
-              <SelectItem value="not_pledged">Not pledged</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          className="pl-9"
+          placeholder="Search prospect, assignee, notes…"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+        />
       </div>
 
       {canManage && selectedIds.length > 0 ? (
@@ -491,19 +411,99 @@ export function CampaignProspectsTab({
                 ) : null}
                 <TableHead>Prospect</TableHead>
                 <TableHead className="text-right">Suggested Ask</TableHead>
-                <TableHead>Assigned To</TableHead>
-                <TableHead>Stage</TableHead>
+                <TableHead>
+                  <TableColumnHeaderFilter
+                    label="Assigned"
+                    active={assigneeFilter !== ALL}
+                  >
+                    {({ close }) => {
+                      const assignedMode =
+                        assigneeFilter === UNASSIGNED
+                          ? UNASSIGNED
+                          : assigneeFilter === ALL
+                            ? ALL
+                            : ASSIGNED
+                      return (
+                        <div className="flex flex-col gap-2">
+                          <Select
+                            value={assignedMode}
+                            onValueChange={(value) => {
+                              setAssigneeFilter(value)
+                              if (value !== ASSIGNED) close()
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Assigned" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value={ALL}>All</SelectItem>
+                              <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
+                              <SelectItem value={ASSIGNED}>Assigned</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          {assignedMode === ASSIGNED ? (
+                            <Select
+                              value={
+                                assigneeFilter === ASSIGNED ? ASSIGNED : assigneeFilter
+                              }
+                              onValueChange={(value) => {
+                                setAssigneeFilter(value)
+                                close()
+                              }}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Assigned person" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value={ASSIGNED}>All assigned</SelectItem>
+                                {assignees.map((assignee) => (
+                                  <SelectItem key={assignee.id} value={assignee.id}>
+                                    {assignee.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : null}
+                        </div>
+                      )
+                    }}
+                  </TableColumnHeaderFilter>
+                </TableHead>
+                <TableHead>
+                  <TableColumnHeaderFilter label="Stage" active={stageFilter !== ALL}>
+                    {({ close }) => (
+                      <Select
+                        value={stageFilter}
+                        onValueChange={(value) => {
+                          setStageFilter(value)
+                          close()
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Stage" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={ALL}>All</SelectItem>
+                          {campaignProspectStagesForSelect(stageFilter).map((stage) => (
+                            <SelectItem key={stage} value={stage}>
+                              {CAMPAIGN_PROSPECT_STAGE_LABELS[stage]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </TableColumnHeaderFilter>
+                </TableHead>
                 <TableHead>Last Contact</TableHead>
                 <TableHead>Next Follow-up</TableHead>
                 <TableHead className="text-right">Actual Pledge</TableHead>
-                {canManage ? <TableHead className="w-[160px]">Actions</TableHead> : null}
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
                   <TableCell
-                    colSpan={canManage ? 9 : 7}
+                        colSpan={canManage ? 8 : 7}
                     className="py-8 text-center text-muted-foreground"
                   >
                     Loading prospects…
@@ -512,7 +512,7 @@ export function CampaignProspectsTab({
               ) : prospects.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={canManage ? 9 : 7}
+                        colSpan={canManage ? 8 : 7}
                     className="py-8 text-center text-muted-foreground"
                   >
                     No prospects match these filters.
@@ -527,10 +527,14 @@ export function CampaignProspectsTab({
                   return (
                     <TableRow
                       key={prospect.id}
-                      className={cn(overdue && "bg-amber-50/80 dark:bg-amber-950/20")}
+                      className={cn(
+                        overdue && "bg-amber-50/80 dark:bg-amber-950/20",
+                        canManage && "cursor-pointer"
+                      )}
+                      onClick={canManage ? () => openEdit(prospect) : undefined}
                     >
                       {canManage ? (
-                        <TableCell>
+                        <TableCell onClick={(event) => event.stopPropagation()}>
                           <Checkbox
                             checked={selectedIds.includes(prospect.id)}
                             onCheckedChange={(checked) =>
@@ -559,27 +563,7 @@ export function CampaignProspectsTab({
                         )}
                       </TableCell>
                       <TableCell>
-                        {canManage ? (
-                          <Select
-                            value={prospect.stage}
-                            onValueChange={(value) =>
-                              void handleStageChange(prospect.id, value)
-                            }
-                          >
-                            <SelectTrigger className="h-8 w-[160px]">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {CAMPAIGN_PROSPECT_STAGES.map((stage) => (
-                                <SelectItem key={stage} value={stage}>
-                                  {CAMPAIGN_PROSPECT_STAGE_LABELS[stage]}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <CampaignProspectStageBadge stage={prospect.stage} />
-                        )}
+                        <CampaignProspectStageBadge stage={prospect.stage} />
                       </TableCell>
                       <TableCell>{formatShortDate(prospect.last_contacted_at)}</TableCell>
                       <TableCell
@@ -595,52 +579,6 @@ export function CampaignProspectsTab({
                           ? formatDonationCurrency(prospect.pledgeAmount)
                           : "—"}
                       </TableCell>
-                      {canManage ? (
-                        <TableCell>
-                          <div className="flex flex-wrap gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => openEdit(prospect)}
-                            >
-                              Edit
-                            </Button>
-                            {prospect.stage !== "pledged" && !prospect.converted_pledge_id ? (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                  setConvertProspectId(prospect.id)
-                                  setShowConvertDialog(true)
-                                }}
-                              >
-                                Record Pledge
-                              </Button>
-                            ) : prospect.converted_pledge_id ? (
-                              <Button variant="ghost" size="sm" asChild>
-                                <Link
-                                  href={donationPledgesHref({
-                                    pledgeId: prospect.converted_pledge_id,
-                                    action: "view",
-                                  })}
-                                >
-                                  View Pledge
-                                </Link>
-                              </Button>
-                            ) : null}
-                            {!prospect.converted_pledge_id ? (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-red-600"
-                                onClick={() => void handleDelete(prospect)}
-                              >
-                                Delete
-                              </Button>
-                            ) : null}
-                          </div>
-                        </TableCell>
-                      ) : null}
                     </TableRow>
                   )
                 })
@@ -679,7 +617,7 @@ export function CampaignProspectsTab({
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editing ? "Edit Prospect" : "Add Prospect"}</DialogTitle>
+            <DialogTitle>Assign Donor</DialogTitle>
             <DialogDescription>
               Link a Contact, set the suggested ask, and assign outreach ownership.
             </DialogDescription>
@@ -695,18 +633,15 @@ export function CampaignProspectsTab({
               onChange={(contactId, label) =>
                 setForm((prev) => ({ ...prev, contactId, contactLabel: label }))
               }
-              disabled={Boolean(editing)}
             />
-            {!editing ? (
-              <Button
-                type="button"
-                variant="link"
-                className="h-auto justify-start px-0"
-                onClick={() => setShowQuickAdd(true)}
-              >
-                Contact not found? Create one
-              </Button>
-            ) : null}
+            <Button
+              type="button"
+              variant="link"
+              className="h-auto justify-start px-0"
+              onClick={() => setShowQuickAdd(true)}
+            >
+              Contact not found? Create one
+            </Button>
 
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="flex flex-col gap-2">
@@ -772,54 +707,30 @@ export function CampaignProspectsTab({
                     ...prev,
                     assignedToContactId: contactId,
                     assignedToLabel: label,
-                    stage:
-                      prev.stage === "identified" && contactId ? "assigned" : prev.stage,
                   }))
                 }
               />
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="flex flex-col gap-2">
-                <Label>Stage</Label>
-                <Select
-                  value={form.stage}
-                  onValueChange={(value: CampaignProspectStage) =>
-                    setForm((prev) => ({ ...prev, stage: value }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {CAMPAIGN_PROSPECT_STAGES.map((stage) => (
-                      <SelectItem key={stage} value={stage}>
-                        {CAMPAIGN_PROSPECT_STAGE_LABELS[stage]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label>Priority</Label>
-                <Select
-                  value={form.priority}
-                  onValueChange={(value: CampaignProspectPriority) =>
-                    setForm((prev) => ({ ...prev, priority: value }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {CAMPAIGN_PROSPECT_PRIORITIES.map((priority) => (
-                      <SelectItem key={priority} value={priority}>
-                        {CAMPAIGN_PROSPECT_PRIORITY_LABELS[priority]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="flex flex-col gap-2">
+              <Label>Stage</Label>
+              <Select
+                value={form.stage}
+                onValueChange={(value: CampaignProspectStage) =>
+                  setForm((prev) => ({ ...prev, stage: value }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {campaignProspectStagesForSelect(form.stage).map((stage) => (
+                    <SelectItem key={stage} value={stage}>
+                      {CAMPAIGN_PROSPECT_STAGE_LABELS[stage]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
@@ -860,13 +771,55 @@ export function CampaignProspectsTab({
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDialog(false)} disabled={saving}>
-              Cancel
-            </Button>
-            <Button onClick={() => void handleSave()} disabled={saving}>
-              {saving ? "Saving..." : editing ? "Save Changes" : "Add Prospect"}
-            </Button>
+          <DialogFooter className="flex-col gap-3 sm:flex-col sm:space-x-0">
+            {editing ? (
+              <div className="flex w-full flex-wrap gap-2">
+                {editing.stage !== "pledged" && !editing.converted_pledge_id ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={saving}
+                    onClick={() => {
+                      setShowDialog(false)
+                      setConvertProspectId(editing.id)
+                      setShowConvertDialog(true)
+                    }}
+                  >
+                    Record Pledge
+                  </Button>
+                ) : editing.converted_pledge_id ? (
+                  <Button type="button" variant="outline" asChild>
+                    <Link
+                      href={donationPledgesHref({
+                        pledgeId: editing.converted_pledge_id,
+                        action: "view",
+                      })}
+                    >
+                      View Pledge
+                    </Link>
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
+            <div className="flex w-full flex-wrap justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowDialog(false)} disabled={saving}>
+                Cancel
+              </Button>
+              <Button onClick={() => void handleSave()} disabled={saving}>
+                {saving ? "Saving..." : editing ? "Save Changes" : "Assign Donor"}
+              </Button>
+            </div>
+            {editing && !editing.converted_pledge_id ? (
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full text-red-600 hover:bg-red-50 hover:text-red-700"
+                disabled={saving}
+                onClick={() => void handleDelete(editing)}
+              >
+                Delete
+              </Button>
+            ) : null}
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -894,6 +847,7 @@ export function CampaignProspectsTab({
         organizationId={organizationId}
         onConverted={() => {
           void loadProspects()
+          void loadAssignees()
           onChanged()
         }}
       />

@@ -36,7 +36,7 @@ export async function createVolunteer(input: SaveVolunteerInput) {
 
   const contactId = input.contactId?.trim()
   if (!contactId) {
-    throw new Error("Select a contact first. Create the person in Contacts if they do not exist yet.")
+    throw new Error("Select a contact first. Create the person in Directory if they do not exist yet.")
   }
 
   const { data: contact, error: contactError } = await supabase

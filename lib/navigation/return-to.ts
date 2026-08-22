@@ -2,7 +2,7 @@ export const RETURN_TO_QUERY_PARAM = "returnTo"
 export const LAST_DASHBOARD_PATH_KEY = "app.lastDashboardPath"
 
 const CONTACT_PROFILE_PATH =
-  /^\/contacts\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?:\/|\?|$)/i
+  /^\/(?:contacts|directory)\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?:\/|\?|$)/i
 
 export function isContactProfilePath(pathname: string): boolean {
   return CONTACT_PROFILE_PATH.test(pathname)
@@ -34,12 +34,21 @@ export function getReturnToLabel(path: string): string {
   if (pathname.startsWith("/donations/payments")) return "Reports"
   if (pathname.startsWith("/donations/donors")) return "Donors"
   if (pathname.startsWith("/donations")) return "Fund Development"
-  if (pathname.startsWith("/contacts/people")) return "People"
-  if (pathname.startsWith("/contacts/organizations")) return "Organizations"
+  if (pathname.startsWith("/directory/people") || pathname.startsWith("/contacts/people")) return "People"
+  if (pathname.startsWith("/directory/organizations") || pathname.startsWith("/contacts/organizations")) {
+    return "Organizations"
+  }
+  if (pathname.startsWith("/donations/groups")) return "Group Giving"
+  if (pathname.startsWith("/directory/groups")) return "Group Giving"
   if (pathname.startsWith("/contacts/groups")) return "Group Giving"
   if (pathname.startsWith("/membership/groups")) return "Groups"
-  if (pathname.startsWith("/contacts/families")) return "Families"
-  if (pathname.startsWith("/contacts/settings")) return "Contact Settings"
+  if (pathname.startsWith("/directory/families") || pathname.startsWith("/contacts/families")) return "Families"
+  if (pathname.startsWith("/directory/reports")) return "Reports"
+  if (pathname.startsWith("/directory/settings") || pathname.startsWith("/contacts/settings")) {
+    return "Directory Settings"
+  }
+  if (pathname.startsWith("/directory/role/")) return "Directory"
+  if (pathname === "/directory" || pathname.startsWith("/directory/")) return "Directory"
   if (pathname.startsWith("/bookings")) return "Bookings"
   if (pathname.startsWith("/programs")) return "Programs"
   if (pathname.startsWith("/workforce")) return "Workforce"

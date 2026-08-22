@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation"
 
+import { donationImportMatchHref } from "@/lib/donations/donation-payment-paths"
+
 export default function DonationsReconcileRedirectPage() {
-  redirect("/donations/reports/match")
+  redirect(donationImportMatchHref({ view: "match" }))
 }

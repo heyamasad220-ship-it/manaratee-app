@@ -17,6 +17,10 @@ import {
   type CampaignPledgeRow,
 } from "@/lib/donations/campaign-analytics"
 import { donationCampaignWorkspaceHref } from "@/lib/donations/campaign-workspace-paths"
+import {
+  attachWishlistFundingMetrics,
+  fetchCampaignWishlistItems,
+} from "@/lib/donations/campaign-wishlist-helpers"
 import { createServiceRoleClient } from "@/lib/supabase/service-role"
 
 export type CampaignOverviewActionItem = {
@@ -47,11 +51,19 @@ export type CampaignGroupOverviewRow = {
   donorCount: number
 }
 
+export type CampaignWishlistOverviewSummary = {
+  itemCount: number
+  targetTotal: number
+  collectedTotal: number
+  completedCount: number
+}
+
 export type CampaignOverviewInsights = {
   actionItems: CampaignOverviewActionItem[]
   teamMetrics: CampaignTeamMetricRow[]
   groups: CampaignGroupOverviewRow[]
   groupsCollectedTotal: number
+  wishlist: CampaignWishlistOverviewSummary | null
 }
 
 function todayIsoDate() {
@@ -100,6 +112,7 @@ export async function getCampaignOverviewInsightsAction(campaignId: string) {
             teamMetrics: [],
             groups: [],
             groupsCollectedTotal: 0,
+            wishlist: null,
           } satisfies CampaignOverviewInsights,
         }
       }
@@ -316,19 +329,72 @@ export async function getCampaignOverviewInsightsAction(campaignId: string) {
       }))
       .sort((a, b) => b.collected - a.collected)
 
-    const groupsBelowGoal = groupRows.filter(
-      (row) =>
-        row.goalAmount != null &&
-        row.goalAmount > 0 &&
-        row.collected < row.goalAmount
-    )
-    if (groupsBelowGoal.length > 0 && groupRows.length > 0) {
-      actionItems.push({
-        id: "groups-below-goal",
-        label: `${groupsBelowGoal.length} campaign group${groupsBelowGoal.length === 1 ? "" : "s"} below goal`,
-        href: donationCampaignWorkspaceHref(campaignId, { tab: "groups" }),
-        severity: "info",
-      })
+    let wishlist: CampaignWishlistOverviewSummary | null = null
+    try {
+      const wishlistItems = await fetchCampaignWishlistItems(
+        writeClient,
+        access.orgId,
+        campaignId
+      )
+      if (wishlistItems.length > 0) {
+        const metrics = await attachWishlistFundingMetrics(
+          writeClient,
+          access.orgId,
+          wishlistItems
+        )
+        wishlist = {
+          itemCount: metrics.length,
+          targetTotal: metrics.reduce((sum, item) => sum + item.target_amount, 0),
+          collectedTotal: metrics.reduce((sum, item) => sum + item.collected, 0),
+          completedCount: metrics.filter((item) => item.project_status === "completed").length,
+        }
+        const fundedNotStarted = metrics.filter(
+          (item) =>
+            (item.fundingStatus === "fully_funded" || item.fundingStatus === "overfunded") &&
+            (item.project_status === "planned" || item.project_status === "approved")
+        )
+        if (fundedNotStarted.length > 0) {
+          actionItems.push({
+            id: "wishlist-funded-not-started",
+            label: `${fundedNotStarted.length} wishlist item${fundedNotStarted.length === 1 ? "" : "s"} fully funded but not started`,
+            href: donationCampaignWorkspaceHref(campaignId, { tab: "wishlist" }),
+            severity: "attention",
+          })
+        }
+        const today = todayIsoDate()
+        const overdue = metrics.filter(
+          (item) =>
+            item.target_completion_date &&
+            item.target_completion_date < today &&
+            item.project_status !== "completed" &&
+            item.project_status !== "cancelled"
+        )
+        if (overdue.length > 0) {
+          actionItems.push({
+            id: "wishlist-past-completion",
+            label: `${overdue.length} wishlist item${overdue.length === 1 ? "" : "s"} past target completion date`,
+            href: donationCampaignWorkspaceHref(campaignId, { tab: "wishlist" }),
+            severity: "urgent",
+          })
+        }
+        const highPriorityLow = metrics.filter(
+          (item) =>
+            item.priority === "high" &&
+            item.fundingPercent != null &&
+            item.fundingPercent < 25 &&
+            item.project_status !== "cancelled"
+        )
+        if (highPriorityLow.length > 0) {
+          actionItems.push({
+            id: "wishlist-high-priority-low",
+            label: `${highPriorityLow.length} high-priority wishlist item${highPriorityLow.length === 1 ? "" : "s"} under 25% funded`,
+            href: donationCampaignWorkspaceHref(campaignId, { tab: "wishlist" }),
+            severity: "attention",
+          })
+        }
+      }
+    } catch {
+      wishlist = null
     }
 
     return {
@@ -338,6 +404,7 @@ export async function getCampaignOverviewInsightsAction(campaignId: string) {
         teamMetrics,
         groups: groupRows,
         groupsCollectedTotal: groupRows.reduce((sum, row) => sum + row.collected, 0),
+        wishlist,
       } satisfies CampaignOverviewInsights,
     }
   } catch (error) {

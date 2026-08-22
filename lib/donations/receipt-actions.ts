@@ -363,3 +363,110 @@ export async function getReceiptReportingSummaryAction() {
     },
   }
 }
+
+export type PaymentReceiptListRow = {
+  id: string
+  receiptNumber: string
+  amount: number
+  status: string
+  sentAt: string | null
+  createdAt: string | null
+  paymentId: string | null
+  paymentDate: string | null
+  paymentSource: string | null
+  donorId: string | null
+  donorName: string
+}
+
+export async function listPaymentReceiptsAction() {
+  const access = await requireDonationStaffAccess("view")
+  if (!access.ok) return { success: false as const, error: access.error }
+
+  const { data, error } = await access.supabase
+    .from("donation_receipts")
+    .select(
+      "id, receipt_number, amount, status, sent_at, created_at, payment_id, donor_id, donors(full_name), payments(payment_date, source)"
+    )
+    .eq("organization_id", access.orgId)
+    .eq("receipt_type", "payment")
+    .order("created_at", { ascending: false })
+    .limit(200)
+
+  if (error) return { success: false as const, error: error.message }
+
+  const rows: PaymentReceiptListRow[] = (data || []).map((row) => {
+    const donor = Array.isArray(row.donors) ? row.donors[0] : row.donors
+    const payment = Array.isArray(row.payments) ? row.payments[0] : row.payments
+    return {
+      id: row.id as string,
+      receiptNumber: String(row.receipt_number || ""),
+      amount: Number(row.amount || 0),
+      status: String(row.status || "not_sent"),
+      sentAt: (row.sent_at as string | null) ?? null,
+      createdAt: (row.created_at as string | null) ?? null,
+      paymentId: (row.payment_id as string | null) ?? null,
+      paymentDate: (payment?.payment_date as string | null) ?? null,
+      paymentSource: (payment?.source as string | null) ?? null,
+      donorId: (row.donor_id as string | null) ?? null,
+      donorName: String(donor?.full_name || "Unknown"),
+    }
+  })
+
+  return { success: true as const, rows }
+}
+
+export async function listMissingPaymentReceiptsAction() {
+  const access = await requireDonationStaffAccess("view")
+  if (!access.ok) return { success: false as const, error: access.error }
+
+  const { data: receiptPayments, error: receiptError } = await access.supabase
+    .from("donation_receipts")
+    .select("payment_id")
+    .eq("organization_id", access.orgId)
+    .eq("receipt_type", "payment")
+    .not("payment_id", "is", null)
+
+  if (receiptError) return { success: false as const, error: receiptError.message }
+
+  const withReceipt = new Set((receiptPayments || []).map((row) => String(row.payment_id)))
+  const rows: PaymentReceiptListRow[] = []
+  const pageSize = 200
+  let from = 0
+
+  while (rows.length < 200) {
+    const { data, error } = await access.supabase
+      .from("payments")
+      .select("id, amount, refunded_amount, status, payment_date, source, donor_id, sender_name, donors(full_name)")
+      .eq("organization_id", access.orgId)
+      .neq("status", "voided")
+      .order("payment_date", { ascending: false })
+      .range(from, from + pageSize - 1)
+
+    if (error) return { success: false as const, error: error.message }
+
+    const batch = data || []
+    for (const row of batch) {
+      if (withReceipt.has(String(row.id))) continue
+      const donor = Array.isArray(row.donors) ? row.donors[0] : row.donors
+      rows.push({
+        id: `missing:${row.id}`,
+        receiptNumber: "",
+        amount: Number(row.amount || 0),
+        status: "missing",
+        sentAt: null,
+        createdAt: null,
+        paymentId: String(row.id),
+        paymentDate: (row.payment_date as string | null) ?? null,
+        paymentSource: (row.source as string | null) ?? null,
+        donorId: (row.donor_id as string | null) ?? null,
+        donorName: String(donor?.full_name || row.sender_name || "Unknown"),
+      })
+      if (rows.length >= 200) break
+    }
+
+    if (batch.length < pageSize) break
+    from += pageSize
+  }
+
+  return { success: true as const, rows }
+}

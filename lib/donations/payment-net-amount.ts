@@ -77,3 +77,27 @@ export function remainingRefundableAmount(input: {
   if (isVoidedPaymentStatus(input.status)) return 0
   return paymentNetAmount(input.amount, input.refunded_amount)
 }
+
+/**
+ * Pledge ledger: pledged is the commitment; collected is net allocated payments.
+ * Org giving is the payment total — never pledged + collected.
+ */
+export function computePledgeLedgerTotals(input: {
+  amountPledged: number
+  allocatedPayments: Array<{
+    amount: number | null | undefined
+    refunded_amount?: number | null | undefined
+    status?: string | null | undefined
+  }>
+}) {
+  const collected = input.allocatedPayments
+    .filter((payment) => countsTowardGivingTotals(payment))
+    .reduce((sum, payment) => sum + paymentNetAmount(payment.amount, payment.refunded_amount), 0)
+
+  return {
+    pledged: input.amountPledged,
+    collected,
+    outstanding: Math.max(input.amountPledged - collected, 0),
+    orgGiving: collected,
+  }
+}

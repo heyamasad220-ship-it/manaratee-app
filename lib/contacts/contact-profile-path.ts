@@ -83,7 +83,7 @@ export function contactProfileHref(
   }
 
   const query = params.toString()
-  return query ? `/contacts/${contactId}?${query}` : `/contacts/${contactId}`
+  return query ? `/directory/${contactId}?${query}` : `/directory/${contactId}`
 }
 
 export function staffMemberProfileHref(input: {

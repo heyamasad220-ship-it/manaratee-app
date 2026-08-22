@@ -234,6 +234,7 @@ function parseOptionalCountInput(value: string) {
 export function DonationRecurringPanel({
   embedded = false,
   showReportsTabs = false,
+  readOnly = false,
   donorId: scopedDonorId = null,
   onPlansCountChange,
   onUpdated,
@@ -241,6 +242,8 @@ export function DonationRecurringPanel({
   embedded?: boolean
   /** Show Fund Development report tabs below KPI cards (Reports → Recurring). */
   showReportsTabs?: boolean
+  /** Analytics view: hide plan create/pause/cancel/receive payment. */
+  readOnly?: boolean
   /** When set, show only this donor’s plans (contact profile Payment Plans). */
   donorId?: string | null
   onPlansCountChange?: (count: number) => void
@@ -648,10 +651,13 @@ export function DonationRecurringPanel({
         ) : (
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-lg font-semibold">Recurring Donation Plans</h2>
+              <h2 className="text-lg font-semibold">
+                {readOnly ? "Recurring Giving" : "Recurring Donations"}
+              </h2>
               <p className="text-sm text-muted-foreground">
-                Ongoing giving commitments — not pledges. Stripe-linked plans bill automatically;
-                manual plans can still record payments here.
+                {readOnly
+                  ? "Analyze recurring donors, revenue, and plan status. Pause, resume, and new plans live under Donations → Recurring."
+                  : "Manage ongoing recurring giving plans and recurring payment activity."}
               </p>
             </div>
             <div className="flex shrink-0 gap-2">
@@ -659,6 +665,7 @@ export function DonationRecurringPanel({
                 <RefreshCw className="mr-2 h-4 w-4" />
                 Refresh
               </Button>
+              {readOnly ? null : (
               <Button
                 onClick={() => {
                   if (scopedDonorId) setDonorId(scopedDonorId)
@@ -668,6 +675,7 @@ export function DonationRecurringPanel({
                 <Plus className="mr-2 h-4 w-4" />
                 New Plan
               </Button>
+              )}
             </div>
           </div>
         )}
@@ -960,7 +968,7 @@ export function DonationRecurringPanel({
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            {isCompletedRecurringPlan(plan) ? (
+                            {readOnly || isCompletedRecurringPlan(plan) ? (
                               <DropdownMenuItem onClick={() => openViewPlan(plan)}>
                                 <Eye className="mr-2 h-4 w-4" />
                                 View Details

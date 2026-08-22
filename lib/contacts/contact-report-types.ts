@@ -3,7 +3,7 @@ import type {
   ContactRoleValue,
   ContactStatus,
 } from "@/lib/contacts/contact-constants"
-import type { ContactListRow } from "@/lib/contacts/contact-list-actions"
+import type { ContactListRow } from "@/lib/contacts/contact-list-types"
 
 export type ContactDirectoryReportFilters = {
   search?: string

@@ -12,7 +12,9 @@ function escapeIlike(value: string) {
 export async function searchContactsForHrPickerAction(search: string, limit = 30) {
   const canView =
     (await hasPermission(PERMISSIONS.CONTACTS_VIEW)) ||
-    (await hasPermission(PERMISSIONS.STAFF_VIEW))
+    (await hasPermission(PERMISSIONS.STAFF_VIEW)) ||
+    (await hasPermission(PERMISSIONS.MEMBERSHIP_VIEW)) ||
+    (await hasPermission(PERMISSIONS.MEMBERSHIP_MANAGE))
 
   if (!canView) {
     return { success: false as const, error: "You do not have permission to search contacts." }

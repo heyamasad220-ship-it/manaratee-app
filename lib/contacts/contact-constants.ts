@@ -5,6 +5,7 @@ import {
   Briefcase,
   Building2,
   Calendar,
+  Handshake,
   Heart,
   Store,
   UserCheck,
@@ -15,6 +16,7 @@ import {
 export const CONTACT_MANUAL_AFFILIATION_ROLES = [
   "donor",
   "service_provider",
+  "sponsor",
 ] as const
 
 /** All stored affiliation roles for individual contacts (manual + activity-derived). */
@@ -35,6 +37,8 @@ export const CONTACT_ORGANIZATION_AFFILIATION_ROLES = [
   "donor",
   "customer",
   "service_provider",
+  "vendor",
+  "sponsor",
 ] as const
 
 /** Affiliations for group contacts (community collectives). */
@@ -76,6 +80,7 @@ export type ContactRoleLabel =
   | "Vendor"
   | "Child Care Provider"
   | "Service Provider"
+  | "Sponsor"
 
 export type ContactRecordType = "individual" | "organization" | "group"
 
@@ -118,6 +123,7 @@ export const ROLE_VALUE_TO_LABEL: Record<ContactRoleValue, ContactRoleLabel> = {
   vendor: "Vendor",
   childcare_provider: "Child Care Provider",
   service_provider: "Service Provider",
+  sponsor: "Sponsor",
 }
 
 export const ROLE_LABEL_TO_VALUE: Record<ContactRoleLabel, ContactRoleValue> = {
@@ -130,6 +136,7 @@ export const ROLE_LABEL_TO_VALUE: Record<ContactRoleLabel, ContactRoleValue> = {
   Vendor: "vendor",
   "Child Care Provider": "childcare_provider",
   "Service Provider": "service_provider",
+  Sponsor: "sponsor",
 }
 
 const INDIVIDUAL_AFFILIATION_OPTIONS: { label: ContactRoleLabel; value: ContactRoleValue }[] =
@@ -270,6 +277,7 @@ export const ROLE_COLORS: Record<ContactRoleLabel, string> = {
   Vendor: "bg-amber-100 text-amber-700",
   "Child Care Provider": "bg-teal-100 text-teal-700",
   "Service Provider": "bg-purple-100 text-purple-700",
+  Sponsor: "bg-fuchsia-100 text-fuchsia-700",
 }
 
 export const ROLE_ICONS: Record<ContactRoleLabel, LucideIcon> = {
@@ -282,6 +290,7 @@ export const ROLE_ICONS: Record<ContactRoleLabel, LucideIcon> = {
   Vendor: Store,
   "Child Care Provider": Baby,
   "Service Provider": Wrench,
+  Sponsor: Handshake,
 }
 
 export const STATUS_COLORS: Record<ContactStatus, string> = {

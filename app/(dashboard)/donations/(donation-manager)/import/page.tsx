@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation"
 
+import { donationImportMatchHref } from "@/lib/donations/donation-payment-paths"
+
 export default async function DonationsImportRedirectPage({
   searchParams,
 }: {
@@ -8,9 +10,8 @@ export default async function DonationsImportRedirectPage({
   const params = await searchParams
 
   if (params.tab === "match") {
-    redirect("/donations/reports/match")
+    redirect(donationImportMatchHref({ view: "match" }))
   }
 
-  const query = params.tab === "history" ? "?tab=history" : ""
-  redirect(`/donations/reports/import${query}`)
+  redirect(donationImportMatchHref({ tab: params.tab }))
 }

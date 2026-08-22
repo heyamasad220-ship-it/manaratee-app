@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import { AlertTriangle, ChevronRight, Users } from "lucide-react"
 
-import { CampaignProgressBar } from "@/components/donations/campaign-progress-bar"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Table,
@@ -158,70 +157,105 @@ export function CampaignOverviewInsightsPanel({
         </CardContent>
       </Card>
 
-      {insights.groups.length > 0 ? (
+      {insights.wishlist && insights.wishlist.itemCount > 0 ? (
         <Card className="border border-border shadow-sm xl:col-span-2">
           <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 pb-2">
             <div>
-              <CardTitle className="text-base">Campaign Groups</CardTitle>
+              <CardTitle className="text-base">Wishlist</CardTitle>
               <CardDescription>
-                Collected via group links: {formatDonationCurrency(insights.groupsCollectedTotal)}
+                {insights.wishlist.itemCount} items · {formatDonationCurrency(insights.wishlist.targetTotal)} target ·{" "}
+                {formatDonationCurrency(insights.wishlist.collectedTotal)} collected · {insights.wishlist.completedCount} completed
               </CardDescription>
             </div>
             <Link
-              href={donationCampaignWorkspaceHref(campaignId, { tab: "groups" })}
+              href={donationCampaignWorkspaceHref(campaignId, { tab: "wishlist" })}
               className="text-sm text-primary hover:underline"
             >
-              View Groups
+              View Wishlist
             </Link>
           </CardHeader>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Group</TableHead>
-                  <TableHead className="text-right">Donors</TableHead>
-                  <TableHead className="text-right">Pledged</TableHead>
-                  <TableHead className="text-right">Collected</TableHead>
-                  <TableHead>Progress</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {insights.groups.slice(0, 8).map((row) => (
-                  <TableRow key={row.groupId}>
-                    <TableCell>
-                      <Link
-                        href={donationCampaignWorkspaceHref(campaignId, {
-                          tab: "groups",
-                          groupId: row.groupId,
-                        })}
-                        className="font-medium text-primary hover:underline"
-                      >
-                        {row.name}
-                      </Link>
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">{row.donorCount}</TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatDonationCurrency(row.pledged)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatDonationCurrency(row.collected)}
-                    </TableCell>
-                    <TableCell className="min-w-[120px]">
-                      {row.progressPercent != null ? (
-                        <CampaignProgressBar progressPercent={row.progressPercent} />
-                      ) : row.goalAmount != null ? (
-                        "—"
-                      ) : (
-                        <span className="text-xs text-muted-foreground">No goal</span>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
         </Card>
       ) : null}
     </div>
+  )
+}
+
+export function CampaignOverviewGroupsCard({
+  campaignId,
+}: CampaignOverviewInsightsPanelProps) {
+  const [insights, setInsights] = useState<CampaignOverviewInsights | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    const result = await getCampaignOverviewInsightsAction(campaignId)
+    if (!result.success) {
+      setInsights(null)
+      setLoading(false)
+      return
+    }
+    setInsights(result.insights)
+    setLoading(false)
+  }, [campaignId])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  if (loading || !insights || insights.groups.length === 0) return null
+
+  return (
+    <Card className="border border-border shadow-sm">
+      <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 pb-2">
+        <div>
+          <CardTitle className="text-base">Campaign Groups</CardTitle>
+          <CardDescription>
+            Collected via group links: {formatDonationCurrency(insights.groupsCollectedTotal)}
+          </CardDescription>
+        </div>
+        <Link
+          href={donationCampaignWorkspaceHref(campaignId, { tab: "groups" })}
+          className="text-sm text-primary hover:underline"
+        >
+          View Groups
+        </Link>
+      </CardHeader>
+      <CardContent className="p-0">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Group</TableHead>
+              <TableHead className="text-right">Donors</TableHead>
+              <TableHead className="text-right">Pledged</TableHead>
+              <TableHead className="text-right">Collected</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {insights.groups.slice(0, 8).map((row) => (
+              <TableRow key={row.groupId}>
+                <TableCell>
+                  <Link
+                    href={donationCampaignWorkspaceHref(campaignId, {
+                      tab: "groups",
+                      groupId: row.groupId,
+                    })}
+                    className="font-medium text-primary hover:underline"
+                  >
+                    {row.name}
+                  </Link>
+                </TableCell>
+                <TableCell className="text-right tabular-nums">{row.donorCount}</TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {formatDonationCurrency(row.pledged)}
+                </TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {formatDonationCurrency(row.collected)}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
   )
 }

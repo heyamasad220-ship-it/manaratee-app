@@ -9,6 +9,8 @@ import { handleDonationAffiliationSync } from "@/lib/contacts/contact-affiliatio
 import {
   CAMPAIGN_PROSPECT_ASKED_STAGES,
   CAMPAIGN_PROSPECT_SELECT,
+  campaignProspectStageFilterValues,
+  displayCampaignProspectStage,
   normalizeProspectPriority,
   normalizeProspectStage,
   type CampaignProspectListItem,
@@ -34,7 +36,7 @@ function mapProspectRow(row: Record<string, unknown>): CampaignProspectRow {
     suggested_ask_amount:
       row.suggested_ask_amount == null ? null : Number(row.suggested_ask_amount),
     assigned_to_contact_id: (row.assigned_to_contact_id as string | null) ?? null,
-    stage: normalizeProspectStage(row.stage as string),
+    stage: displayCampaignProspectStage(row.stage as string),
     priority: normalizeProspectPriority(row.priority as string),
     last_contacted_at: (row.last_contacted_at as string | null) ?? null,
     next_follow_up_at: (row.next_follow_up_at as string | null) ?? null,
@@ -193,6 +195,8 @@ export async function fetchCampaignProspectsPageAction(input: CampaignProspectsP
 
     if (input.assignedToContactId === "__unassigned__") {
       query = query.is("assigned_to_contact_id", null)
+    } else if (input.assignedToContactId === "__assigned__") {
+      query = query.not("assigned_to_contact_id", "is", null)
     } else if (input.assignedToContactId) {
       query = query.eq("assigned_to_contact_id", input.assignedToContactId)
     }
@@ -200,7 +204,7 @@ export async function fetchCampaignProspectsPageAction(input: CampaignProspectsP
       query = query.eq("ask_level_id", input.askLevelId)
     }
     if (input.stage && input.stage !== "all") {
-      query = query.eq("stage", input.stage)
+      query = query.in("stage", campaignProspectStageFilterValues(input.stage))
     }
     if (input.priority && input.priority !== "all") {
       query = query.eq("priority", input.priority)
@@ -296,6 +300,49 @@ export async function fetchCampaignProspectsPageAction(input: CampaignProspectsP
   }
 }
 
+export async function listCampaignProspectAssigneesAction(campaignId: string) {
+  const access = await requireDonationStaffAccess("view")
+  if (!access.ok) return { success: false as const, error: access.error }
+
+  const id = campaignId.trim()
+  if (!id) return { success: false as const, error: "Campaign is required" }
+
+  try {
+    const { data, error } = await access.supabase
+      .from("campaign_prospects")
+      .select("assigned_to_contact_id")
+      .eq("organization_id", access.orgId)
+      .eq("campaign_id", id)
+      .not("assigned_to_contact_id", "is", null)
+
+    if (error) {
+      if (error.code === "42P01" || /campaign_prospects/i.test(error.message || "")) {
+        return { success: true as const, assignees: [] as Array<{ id: string; name: string }> }
+      }
+      return { success: false as const, error: error.message }
+    }
+
+    const assigneeIds = [
+      ...new Set(
+        (data || [])
+          .map((row) => row.assigned_to_contact_id as string | null)
+          .filter((value): value is string => Boolean(value))
+      ),
+    ]
+    const names = await loadContactNames(access.orgId, assigneeIds)
+    const assignees = assigneeIds
+      .map((assigneeId) => ({
+        id: assigneeId,
+        name: names.get(assigneeId)?.name || "Unknown",
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+
+    return { success: true as const, assignees }
+  } catch (error) {
+    return { success: false as const, error: (error as Error).message }
+  }
+}
+
 export async function createCampaignProspectAction(
   campaignId: string,
   input: CampaignProspectWriteInput
@@ -331,9 +378,6 @@ export async function createCampaignProspectAction(
     if (!contact) return { success: false as const, error: "Contact not found" }
 
     let stage = normalizeProspectStage(input.stage)
-    if (input.assigned_to_contact_id && stage === "identified") {
-      stage = "assigned"
-    }
 
     const { data, error } = await writeClient
       .from("campaign_prospects")
@@ -420,14 +464,6 @@ export async function updateCampaignProspectAction(
     }
     if (input.notes !== undefined) patch.notes = input.notes?.trim() || null
 
-    if (
-      patch.assigned_to_contact_id &&
-      !patch.stage &&
-      normalizeProspectStage(existing.stage as string) === "identified"
-    ) {
-      patch.stage = "assigned"
-    }
-
     const { data, error } = await writeClient
       .from("campaign_prospects")
       .update(patch)
@@ -437,6 +473,12 @@ export async function updateCampaignProspectAction(
       .maybeSingle()
 
     if (error || !data) {
+      if (error?.code === "23505") {
+        return {
+          success: false as const,
+          error: "This contact is already a prospect for this campaign",
+        }
+      }
       return { success: false as const, error: error?.message || "Failed to update prospect" }
     }
 
@@ -488,20 +530,6 @@ export async function bulkAssignCampaignProspectsAction(input: {
       .in("id", ids)
 
     if (error) return { success: false as const, error: error.message }
-
-    // Promote identified → assigned when assigning.
-    if (input.assignedToContactId) {
-      const identifiedIds = (existing || [])
-        .filter((row) => normalizeProspectStage(row.stage as string) === "identified")
-        .map((row) => row.id as string)
-      if (identifiedIds.length > 0) {
-        await writeClient
-          .from("campaign_prospects")
-          .update({ stage: "assigned" })
-          .eq("organization_id", access.orgId)
-          .in("id", identifiedIds)
-      }
-    }
 
     const campaignId = (existing?.[0]?.campaign_id as string) || ""
     if (campaignId) revalidateProspectPaths(campaignId)
@@ -590,43 +618,20 @@ export async function getCampaignProspectForConversionAction(prospectId: string)
 
     const [enriched] = await enrichProspects(access.orgId, [prospect])
 
-    let campaignPhaseId: string | null = null
-    let campaignName: string | null = null
-    if (prospect.ask_level_id) {
-      const { data: askLevel } = await writeClient
-        .from("campaign_ask_levels")
-        .select("campaign_phase_id")
-        .eq("organization_id", access.orgId)
-        .eq("id", prospect.ask_level_id)
-        .maybeSingle()
-      campaignPhaseId = (askLevel?.campaign_phase_id as string | null) ?? null
-    }
-
     const { data: campaign } = await writeClient
       .from("campaigns")
       .select("id, name")
       .eq("organization_id", access.orgId)
       .eq("id", prospect.campaign_id)
       .maybeSingle()
-    campaignName = (campaign?.name as string | null) ?? null
-
-    let phaseName: string | null = null
-    if (campaignPhaseId) {
-      const { data: phase } = await writeClient
-        .from("campaign_phases")
-        .select("name")
-        .eq("organization_id", access.orgId)
-        .eq("id", campaignPhaseId)
-        .maybeSingle()
-      phaseName = (phase?.name as string | null) ?? null
-    }
+    const campaignName = (campaign?.name as string | null) ?? null
 
     return {
       success: true as const,
       prospect: enriched,
       campaignName,
-      campaignPhaseId,
-      phaseName,
+      campaignPhaseId: null,
+      phaseName: null,
       canManage: access.canManage,
     }
   } catch (error) {
@@ -646,6 +651,7 @@ export async function convertCampaignProspectToPledgeAction(input: {
   notes?: string | null
   categoryId?: string | null
   subcategoryId?: string | null
+  wishlistItemId?: string | null
 }) {
   const access = await requireDonationStaffAccess("prospects")
   if (!access.ok) return { success: false as const, error: access.error }
@@ -688,17 +694,6 @@ export async function convertCampaignProspectToPledgeAction(input: {
       }
     }
 
-    let campaignPhaseId: string | null = null
-    if (prospect.ask_level_id) {
-      const { data: askLevel } = await writeClient
-        .from("campaign_ask_levels")
-        .select("campaign_phase_id")
-        .eq("organization_id", access.orgId)
-        .eq("id", prospect.ask_level_id)
-        .maybeSingle()
-      campaignPhaseId = (askLevel?.campaign_phase_id as string | null) ?? null
-    }
-
     const frequency = String(input.frequency || "one_time")
       .toLowerCase()
       .replace(/-/g, "_")
@@ -722,13 +717,14 @@ export async function convertCampaignProspectToPledgeAction(input: {
       campaign_id: prospect.campaign_id,
       category_id: input.categoryId || null,
       subcategory_id: input.subcategoryId || null,
+      wishlist_item_id: input.wishlistItemId || null,
       amount_pledged: amount,
       pledge_date: pledgeDate,
       pledge_type: frequency,
       frequency,
       status: "open",
       notes: combinedNotes,
-      campaign_phase_id: campaignPhaseId,
+      campaign_phase_id: null,
       ask_level_id: prospect.ask_level_id,
       campaign_prospect_id: prospect.id,
     }
@@ -743,13 +739,14 @@ export async function convertCampaignProspectToPledgeAction(input: {
     if (
       pledgeError &&
       (pledgeError.code === "42703" ||
-        /campaign_phase_id|ask_level_id|campaign_prospect_id/i.test(
+        /campaign_phase_id|ask_level_id|campaign_prospect_id|wishlist_item_id/i.test(
           pledgeError.message || ""
         ))
     ) {
       delete insertPayload.campaign_phase_id
       delete insertPayload.ask_level_id
       delete insertPayload.campaign_prospect_id
+      delete insertPayload.wishlist_item_id
       const retry = await writeClient
         .from("pledges")
         .insert(insertPayload)

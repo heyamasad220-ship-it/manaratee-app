@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import { useRouter, usePathname, useSearchParams } from "next/navigation"
 
 import {
   fetchDonorGivingReportExportContextAction,
@@ -11,7 +11,6 @@ import {
   fetchDonorSummaryReportSummaryAction,
   fetchGroupGivingReportPageAction,
   fetchHouseholdGivingReportPageAction,
-  type DonorReportPledgeStatusFilter,
   type DonorReportLastGiftFilter,
   type DonorSummaryReportRow,
   type GroupGivingReportRow,
@@ -23,18 +22,27 @@ import {
   formatDonorReportPeriodLabel,
   resolveDonorReportDateRange,
   type DonorDateRangeMode,
+  type DonorReportSortBy,
 } from "@/lib/donations/donor-giving-report"
 import { getDonorProfilePath } from "@/lib/donations/donor-profile-path"
 import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
 import { donationGroupHref } from "@/lib/donations/donation-group-path"
+import { createGivingGroupAction } from "@/lib/donations/giving-group-actions"
 import { formatDonationCurrency } from "@/lib/donations/campaign-analytics"
 import { DONATIONS_PAGE_SIZE } from "@/lib/donations/donation-pagination"
 import { ListPagination } from "@/components/ui/list-pagination"
-import { clearSelectedOrganizationIdCache } from "@/lib/current-organization"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import {
   Select,
   SelectContent,
@@ -54,9 +62,20 @@ import {
   DonationMetricCard,
   DonationMetricCardGrid,
 } from "@/components/donations/donation-metric-card"
-import { DonationReportsTabs } from "@/components/donations/donation-reports-chrome"
 import { TableColumnHeaderFilter } from "@/components/ui/table-column-header-filter"
-import { Download, DollarSign, FileText, Gift, Home, Users, UsersRound } from "lucide-react"
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  Download,
+  DollarSign,
+  FileText,
+  Gift,
+  Home,
+  Plus,
+  Users,
+  UsersRound,
+} from "lucide-react"
 
 const TAX_YEAR_OPTIONS = [0, 1, 2, 3, 4].map((offset) => new Date().getFullYear() - offset)
 
@@ -74,9 +93,9 @@ function formatContactField(value: string | null | undefined) {
   return trimmed || "—"
 }
 
-const INDIVIDUAL_TABLE_COLSPAN = 8
-const HOUSEHOLD_TABLE_COLSPAN = 10
-const GROUP_TABLE_COLSPAN = 10
+const INDIVIDUAL_TABLE_COLSPAN = 6
+const HOUSEHOLD_TABLE_COLSPAN = 8
+const GROUP_TABLE_COLSPAN = 8
 
 type DonorsReportView = "individual" | "household" | "group"
 
@@ -86,38 +105,31 @@ function tableColSpan(view: DonorsReportView) {
   return INDIVIDUAL_TABLE_COLSPAN
 }
 
-function formatOutstandingBalance(value: number) {
-  if (value <= 0) return "—"
-  return formatDonationCurrency(value)
-}
-
-function PledgeStatusBadge({ status }: { status: string | null | undefined }) {
-  if (!status) {
-    return <span className="text-muted-foreground">—</span>
-  }
-
-  switch (status) {
-    case "Fulfilled":
-      return (
-        <Badge className="border-transparent bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
-          Fulfilled
-        </Badge>
-      )
-    case "Partial":
-      return (
-        <Badge className="border-transparent bg-amber-100 text-amber-800 hover:bg-amber-100">
-          Partial
-        </Badge>
-      )
-    case "Open":
-      return (
-        <Badge className="border-transparent bg-orange-100 text-orange-700 hover:bg-orange-100">
-          Open
-        </Badge>
-      )
-    default:
-      return <span>{status}</span>
-  }
+function SortableReportHeader({
+  label,
+  column,
+  sortBy,
+  sortAsc,
+  onToggle,
+}: {
+  label: string
+  column: DonorReportSortBy
+  sortBy: DonorReportSortBy
+  sortAsc: boolean
+  onToggle: (column: DonorReportSortBy) => void
+}) {
+  const active = sortBy === column
+  const Icon = !active ? ArrowUpDown : sortAsc ? ArrowUp : ArrowDown
+  return (
+    <button
+      type="button"
+      onClick={() => onToggle(column)}
+      className="inline-flex items-center gap-1 font-medium hover:text-foreground"
+    >
+      {label}
+      <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+    </button>
+  )
 }
 
 const LAST_GIFT_FILTER_OPTIONS: { value: DonorReportLastGiftFilter; label: string }[] = [
@@ -136,7 +148,6 @@ function buildFilterSummary(input: {
   donorName?: string
   email?: string
   phone?: string
-  pledgeStatus?: DonorReportPledgeStatusFilter
   lastGiftFilter?: DonorReportLastGiftFilter
   search?: string
   minTotalGiven?: number
@@ -163,10 +174,6 @@ function buildFilterSummary(input: {
     parts.push(`Min total given: $${input.minTotalGiven.toLocaleString()}`)
   }
 
-  if (input.pledgeStatus && input.pledgeStatus !== "all") {
-    parts.push(`Pledge: ${input.pledgeStatus}`)
-  }
-
   if (input.lastGiftFilter && input.lastGiftFilter !== "all") {
     parts.push(`Last gift: ${formatLastGiftFilterLabel(input.lastGiftFilter)}`)
   }
@@ -174,9 +181,20 @@ function buildFilterSummary(input: {
   return parts.length > 0 ? parts.join("; ") : "None"
 }
 
+function replaceQueryWithoutRefresh(pathname: string, params: URLSearchParams) {
+  const query = params.toString()
+  const nextUrl = query ? `${pathname}?${query}` : pathname
+  const current =
+    typeof window === "undefined"
+      ? nextUrl
+      : `${window.location.pathname}${window.location.search}`
+  if (current === nextUrl) return
+  window.history.replaceState(window.history.state, "", nextUrl)
+}
+
 export function DonorsReportPanel() {
-  const pathname = usePathname()
   const router = useRouter()
+  const pathname = usePathname()
   const searchParams = useSearchParams()
   const initialView = searchParams.get("view")
   const [reportView, setReportView] = useState<DonorsReportView>(
@@ -198,8 +216,6 @@ export function DonorsReportPanel() {
   const [emailFilterInput, setEmailFilterInput] = useState("")
   const [phoneFilter, setPhoneFilter] = useState("")
   const [phoneFilterInput, setPhoneFilterInput] = useState("")
-  const [pledgeStatusFilter, setPledgeStatusFilter] =
-    useState<DonorReportPledgeStatusFilter>("all")
   const [minTotalGivenFilterInput, setMinTotalGivenFilterInput] = useState("")
   const [debouncedMinTotalGiven, setDebouncedMinTotalGiven] = useState<number | undefined>(
     undefined
@@ -209,8 +225,8 @@ export function DonorsReportPanel() {
   const [taxYear, setTaxYear] = useState(String(new Date().getFullYear()))
   const [customDateFrom, setCustomDateFrom] = useState("")
   const [customDateTo, setCustomDateTo] = useState("")
-  const sortBy = "total_donations" as const
-  const sortAsc = false
+  const [sortBy, setSortBy] = useState<DonorReportSortBy>("total_donations")
+  const [sortAsc, setSortAsc] = useState(false)
   const [loading, setLoading] = useState(true)
   const [summaryLoading, setSummaryLoading] = useState(true)
   const [exportingCsv, setExportingCsv] = useState(false)
@@ -221,24 +237,67 @@ export function DonorsReportPanel() {
     totalGiven: 0,
     giftCount: 0,
   })
+  const [addGroupOpen, setAddGroupOpen] = useState(false)
+  const [addGroupName, setAddGroupName] = useState("")
+  const [addGroupSaving, setAddGroupSaving] = useState(false)
+  const [addGroupError, setAddGroupError] = useState("")
 
   useEffect(() => {
     const view = searchParams.get("view")
     if (view === "group" || view === "household" || view === "individual") {
       setReportView(view)
     }
+    if (view === "group" && searchParams.get("add") === "1") {
+      setAddGroupOpen(true)
+    }
   }, [searchParams])
 
   function setReportViewAndUrl(view: DonorsReportView) {
     setReportView(view)
+    setPage(1)
+    setLoading(true)
+    setError("")
+    setDonors([])
+    setHouseholds([])
+    setGroups([])
+    setTotal(0)
+    setSummary({ donorCount: 0, totalGiven: 0, giftCount: 0 })
     const params = new URLSearchParams(searchParams.toString())
     if (view === "individual") {
       params.delete("view")
     } else {
       params.set("view", view)
     }
-    const query = params.toString()
-    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false })
+    replaceQueryWithoutRefresh(pathname, params)
+  }
+
+  function toggleReportSort(column: DonorReportSortBy) {
+    setPage(1)
+    if (sortBy === column) {
+      setSortAsc((current) => !current)
+      return
+    }
+    setSortBy(column)
+    setSortAsc(column === "full_name")
+  }
+
+  async function handleCreateGroup() {
+    const name = addGroupName.trim()
+    if (!name) {
+      setAddGroupError("Group name is required.")
+      return
+    }
+    setAddGroupSaving(true)
+    setAddGroupError("")
+    const result = await createGivingGroupAction({ fullName: name })
+    setAddGroupSaving(false)
+    if (!result.success) {
+      setAddGroupError(result.error)
+      return
+    }
+    setAddGroupOpen(false)
+    setAddGroupName("")
+    router.push(donationGroupHref(result.groupContactId))
   }
 
   const dateRange = useMemo(
@@ -265,17 +324,10 @@ export function DonorsReportPanel() {
 
   const filterInput = useMemo(
     () => ({
-      search:
-        reportView === "household" || reportView === "group"
-          ? debouncedRollupSearch || undefined
-          : undefined,
+      search: reportView === "household" ? debouncedRollupSearch || undefined : undefined,
       donorName: reportView === "individual" ? donorNameFilter || undefined : undefined,
       email: reportView === "individual" ? emailFilter || undefined : undefined,
       phone: reportView === "individual" ? phoneFilter || undefined : undefined,
-      pledgeStatus:
-        reportView === "individual" && pledgeStatusFilter !== "all"
-          ? pledgeStatusFilter
-          : undefined,
       lastGiftFilter: lastGiftFilter !== "all" ? lastGiftFilter : undefined,
       minTotalGiven: debouncedMinTotalGiven,
       dateFrom: dateRange.dateFrom,
@@ -287,7 +339,6 @@ export function DonorsReportPanel() {
       donorNameFilter,
       emailFilter,
       phoneFilter,
-      pledgeStatusFilter,
       lastGiftFilter,
       debouncedMinTotalGiven,
       dateRange,
@@ -336,7 +387,6 @@ export function DonorsReportPanel() {
     donorNameFilter,
     emailFilter,
     phoneFilter,
-    pledgeStatusFilter,
     lastGiftFilter,
     debouncedMinTotalGiven,
     dateRangeMode,
@@ -347,112 +397,114 @@ export function DonorsReportPanel() {
   ])
 
   const loadDonors = useCallback(async () => {
-    clearSelectedOrganizationIdCache()
     setLoading(true)
     setError("")
 
-    if (reportView === "household") {
-      const result = await fetchHouseholdGivingReportPageAction({
+    try {
+      if (reportView === "household") {
+        const result = await fetchHouseholdGivingReportPageAction({
+          page,
+          pageSize,
+          search: filterInput.search,
+          dateFrom: filterInput.dateFrom,
+          dateTo: filterInput.dateTo,
+          sortBy,
+          sortAsc,
+        })
+
+        if (!result.success) {
+          setError(result.error)
+          setHouseholds([])
+          setGroups([])
+          setTotal(0)
+          setSummary({ donorCount: 0, totalGiven: 0, giftCount: 0 })
+        } else {
+          setHouseholds(result.households)
+          setGroups([])
+          setDonors([])
+          setTotal(result.total)
+          setSummary({
+            donorCount: result.total,
+            totalGiven: result.households.reduce(
+              (sum, row) => sum + Number(row.total_donations || 0),
+              0
+            ),
+            giftCount: result.households.reduce(
+              (sum, row) => sum + Number(row.donation_count || 0),
+              0
+            ),
+          })
+        }
+        return
+      }
+
+      if (reportView === "group") {
+        const result = await fetchGroupGivingReportPageAction({
+          page,
+          pageSize,
+          search: filterInput.search,
+          dateFrom: filterInput.dateFrom,
+          dateTo: filterInput.dateTo,
+          sortBy,
+          sortAsc,
+        })
+
+        if (!result.success) {
+          setError(result.error)
+          setGroups([])
+          setHouseholds([])
+          setTotal(0)
+          setSummary({ donorCount: 0, totalGiven: 0, giftCount: 0 })
+        } else {
+          setGroups(result.groups)
+          setHouseholds([])
+          setDonors([])
+          setTotal(result.total)
+          setSummary({
+            donorCount: result.total,
+            totalGiven: result.groups.reduce(
+              (sum, row) => sum + Number(row.total_donations || 0),
+              0
+            ),
+            giftCount: result.groups.reduce(
+              (sum, row) => sum + Number(row.donation_count || 0),
+              0
+            ),
+          })
+        }
+        return
+      }
+
+      const result = await fetchDonorSummaryPageAction({
         page,
         pageSize,
-        search: filterInput.search,
-        dateFrom: filterInput.dateFrom,
-        dateTo: filterInput.dateTo,
+        ...filterInput,
         sortBy,
         sortAsc,
       })
 
       if (!result.success) {
         setError(result.error)
+        setDonors([])
         setHouseholds([])
         setGroups([])
         setTotal(0)
-        setSummary({ donorCount: 0, totalGiven: 0, giftCount: 0 })
       } else {
-        setHouseholds(result.households)
+        setDonors(result.donors)
+        setHouseholds([])
         setGroups([])
-        setDonors([])
         setTotal(result.total)
-        setSummary({
-          donorCount: result.total,
-          totalGiven: result.households.reduce(
-            (sum, row) => sum + Number(row.total_donations || 0),
-            0
-          ),
-          giftCount: result.households.reduce(
-            (sum, row) => sum + Number(row.donation_count || 0),
-            0
-          ),
-        })
       }
-
+    } catch (loadError) {
+      const message =
+        loadError instanceof Error ? loadError.message : "Failed to load report."
+      if (!/abort/i.test(message)) {
+        setError(message)
+      }
+    } finally {
       setSummaryLoading(false)
       setLoading(false)
-      return
     }
-
-    if (reportView === "group") {
-      const result = await fetchGroupGivingReportPageAction({
-        page,
-        pageSize,
-        search: filterInput.search,
-        dateFrom: filterInput.dateFrom,
-        dateTo: filterInput.dateTo,
-        sortBy,
-        sortAsc,
-      })
-
-      if (!result.success) {
-        setError(result.error)
-        setGroups([])
-        setHouseholds([])
-        setTotal(0)
-        setSummary({ donorCount: 0, totalGiven: 0, giftCount: 0 })
-      } else {
-        setGroups(result.groups)
-        setHouseholds([])
-        setDonors([])
-        setTotal(result.total)
-        setSummary({
-          donorCount: result.total,
-          totalGiven: result.groups.reduce(
-            (sum, row) => sum + Number(row.total_donations || 0),
-            0
-          ),
-          giftCount: result.groups.reduce(
-            (sum, row) => sum + Number(row.donation_count || 0),
-            0
-          ),
-        })
-      }
-
-      setSummaryLoading(false)
-      setLoading(false)
-      return
-    }
-
-    const result = await fetchDonorSummaryPageAction({
-      page,
-      pageSize,
-      ...filterInput,
-      sortBy,
-      sortAsc,
-    })
-
-    if (!result.success) {
-      setError(result.error)
-      setDonors([])
-      setHouseholds([])
-      setGroups([])
-      setTotal(0)
-    } else {
-      setDonors(result.donors)
-      setHouseholds([])
-      setGroups([])
-      setTotal(result.total)
-    }
-
-    setLoading(false)
   }, [page, pageSize, filterInput, sortBy, sortAsc, reportView])
 
   const loadSummary = useCallback(async () => {
@@ -461,19 +513,26 @@ export function DonorsReportPanel() {
       return
     }
 
-    clearSelectedOrganizationIdCache()
     setSummaryLoading(true)
 
-    const result = await fetchDonorSummaryReportSummaryAction(filterInput)
+    try {
+      const result = await fetchDonorSummaryReportSummaryAction(filterInput)
 
-    if (!result.success) {
-      setError((current) => current || result.error)
-      setSummary({ donorCount: 0, totalGiven: 0, giftCount: 0 })
-    } else {
-      setSummary(result.summary)
+      if (!result.success) {
+        setError((current) => current || result.error)
+        setSummary({ donorCount: 0, totalGiven: 0, giftCount: 0 })
+      } else {
+        setSummary(result.summary)
+      }
+    } catch (loadError) {
+      const message =
+        loadError instanceof Error ? loadError.message : "Failed to load summary."
+      if (!/abort/i.test(message)) {
+        setError((current) => current || message)
+      }
+    } finally {
+      setSummaryLoading(false)
     }
-
-    setSummaryLoading(false)
   }, [filterInput, reportView])
 
   useEffect(() => {
@@ -562,7 +621,6 @@ export function DonorsReportPanel() {
       periodLabel,
       generatedAt: exportResult.generatedAt,
       filterSummary: buildFilterSummary({
-        pledgeStatus: pledgeStatusFilter,
         lastGiftFilter,
         donorName: donorNameFilter,
         email: emailFilter,
@@ -584,9 +642,13 @@ export function DonorsReportPanel() {
     <div className="flex flex-col gap-6 p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-sm text-muted-foreground">
-            {periodLabel}. Summary totals and table rows reflect current filters.
-          </p>
+          <h2 className="text-xl font-semibold">Donor Giving</h2>
+          {reportView === "group" ? null : (
+            <p className="text-sm text-muted-foreground">
+              Individual, household, and CRM group giving. Household and group totals are aggregations,
+              not extra transactions. {periodLabel}.
+            </p>
+          )}
         </div>
         <div className="flex flex-wrap gap-2">
           <Button
@@ -668,25 +730,88 @@ export function DonorsReportPanel() {
         </DonationMetricCardGrid>
       )}
 
-      <DonationReportsTabs />
-
       <Card>
-        <CardHeader>
-          <CardTitle>
-            {reportView === "household"
-              ? "Household Giving"
-              : reportView === "group"
-                ? "Group Giving"
-                : "Donor Giving"}
-          </CardTitle>
-          <CardDescription>
-            {reportView === "household"
-              ? "Aggregates gifts from active household members. Donations remain on individual contacts."
-              : reportView === "group"
-                ? "Only groups with gifts or attributed member gifts in the selected period. Combined total = group gifts + attributed member gifts."
-                : "Click a donor name to open their profile. Outstanding pledge balances are current, not limited to the selected gift period."}
-          </CardDescription>
-          <div className="flex flex-col gap-3 pt-2">
+        <CardHeader className="space-y-3">
+          {reportView === "group" || reportView === "household" ? (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <CardTitle>
+                  {reportView === "group" ? "Group Giving" : "Household Giving"}
+                </CardTitle>
+                {reportView === "group" ? (
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setAddGroupError("")
+                      setAddGroupOpen(true)
+                    }}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Group
+                  </Button>
+                ) : null}
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <Select
+                  value={dateRangeMode}
+                  onValueChange={(value) => setDateRangeMode(value as DonorDateRangeMode)}
+                >
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Period" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="lifetime">Lifetime</SelectItem>
+                    <SelectItem value="year">Calendar year</SelectItem>
+                    <SelectItem value="custom">Custom range</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {dateRangeMode === "year" ? (
+                  <Select value={taxYear} onValueChange={setTaxYear}>
+                    <SelectTrigger className="w-[120px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TAX_YEAR_OPTIONS.map((year) => (
+                        <SelectItem key={year} value={String(year)}>
+                          {year}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : null}
+
+                {dateRangeMode === "custom" ? (
+                  <>
+                    <Input
+                      type="date"
+                      value={customDateFrom}
+                      onChange={(event) => setCustomDateFrom(event.target.value)}
+                      className="w-[160px]"
+                      aria-label="From date"
+                    />
+                    <span className="text-sm text-muted-foreground">to</span>
+                    <Input
+                      type="date"
+                      value={customDateTo}
+                      onChange={(event) => setCustomDateTo(event.target.value)}
+                      className="w-[160px]"
+                      aria-label="To date"
+                    />
+                  </>
+                ) : null}
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              <CardTitle>Donor Giving</CardTitle>
+              <CardDescription>
+                Click a donor name to open their profile. Pledge details live under Pledges.
+              </CardDescription>
+            </div>
+          )}
+
+          {reportView === "individual" ? (
             <div className="flex flex-wrap items-center gap-3">
               <Select
                 value={dateRangeMode}
@@ -736,32 +861,27 @@ export function DonorsReportPanel() {
                   />
                 </>
               ) : null}
-
-              {reportView === "household" || reportView === "group" ? (
-                <Input
-                  placeholder={
-                    reportView === "group"
-                      ? "Search group or member name..."
-                      : "Search household or member name..."
-                  }
-                  value={rollupSearch}
-                  onChange={(event) => setRollupSearch(event.target.value)}
-                  className="max-w-sm"
-                />
-              ) : null}
             </div>
+          ) : null}
 
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="text-sm text-muted-foreground">
-                {total > 0
-                  ? `${rangeStart}–${rangeEnd} of ${total}`
-                  : reportView === "household"
-                    ? "No households"
-                    : reportView === "group"
-                      ? "No groups with gifts in this period"
-                      : "No donors"}
-              </span>
-            </div>
+          <div className="flex flex-wrap items-center gap-3">
+            {reportView === "household" ? (
+              <Input
+                placeholder="Search household or member name..."
+                value={rollupSearch}
+                onChange={(event) => setRollupSearch(event.target.value)}
+                className="max-w-sm"
+              />
+            ) : null}
+            <span className="text-sm text-muted-foreground">
+              {total > 0
+                ? `${rangeStart}–${rangeEnd} of ${total}`
+                : reportView === "household"
+                  ? "No households"
+                  : reportView === "group"
+                    ? "No groups with gifts in this period"
+                    : "No donors"}
+            </span>
           </div>
         </CardHeader>
 
@@ -778,22 +898,42 @@ export function DonorsReportPanel() {
                     <TableHead>Members</TableHead>
                     <TableHead>Total Given</TableHead>
                     <TableHead>Gifts</TableHead>
-                    <TableHead>{lastGiftHeader}</TableHead>
-                    <TableHead>Pledge</TableHead>
-                    <TableHead>Outstanding Balance</TableHead>
+                    <TableHead>
+                      <SortableReportHeader
+                        label={lastGiftHeader}
+                        column="last_donation_date"
+                        sortBy={sortBy}
+                        sortAsc={sortAsc}
+                        onToggle={toggleReportSort}
+                      />
+                    </TableHead>
                   </>
                 ) : reportView === "group" ? (
                   <>
-                    <TableHead>Group</TableHead>
+                    <TableHead>
+                      <SortableReportHeader
+                        label="Group"
+                        column="full_name"
+                        sortBy={sortBy}
+                        sortAsc={sortAsc}
+                        onToggle={toggleReportSort}
+                      />
+                    </TableHead>
                     <TableHead>Primary Contact</TableHead>
                     <TableHead>Members</TableHead>
                     <TableHead>Group Gifts</TableHead>
                     <TableHead>Member Gifts</TableHead>
                     <TableHead>Combined Total</TableHead>
                     <TableHead>Gifts</TableHead>
-                    <TableHead>{lastGiftHeader}</TableHead>
-                    <TableHead>Pledge</TableHead>
-                    <TableHead>Outstanding Balance</TableHead>
+                    <TableHead>
+                      <SortableReportHeader
+                        label={lastGiftHeader}
+                        column="last_donation_date"
+                        sortBy={sortBy}
+                        sortAsc={sortAsc}
+                        onToggle={toggleReportSort}
+                      />
+                    </TableHead>
                   </>
                 ) : (
                   <>
@@ -918,34 +1058,6 @@ export function DonorsReportPanel() {
                         )}
                       </TableColumnHeaderFilter>
                     </TableHead>
-                    <TableHead>
-                      <TableColumnHeaderFilter
-                        label="Pledge"
-                        active={pledgeStatusFilter !== "all"}
-                      >
-                        {({ close }) => (
-                          <Select
-                            value={pledgeStatusFilter}
-                            onValueChange={(value) => {
-                              setPledgeStatusFilter(value as DonorReportPledgeStatusFilter)
-                              close()
-                            }}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="all">All</SelectItem>
-                              <SelectItem value="open">Open</SelectItem>
-                              <SelectItem value="partial">Partial</SelectItem>
-                              <SelectItem value="fulfilled">Fulfilled</SelectItem>
-                              <SelectItem value="none">No pledge</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        )}
-                      </TableColumnHeaderFilter>
-                    </TableHead>
-                    <TableHead>Outstanding Balance</TableHead>
                   </>
                 )}
               </TableRow>
@@ -1034,12 +1146,6 @@ export function DonorsReportPanel() {
                     </TableCell>
                     <TableCell>{donor.donation_count ?? 0}</TableCell>
                     <TableCell>{formatDate(donor.last_donation_date)}</TableCell>
-                    <TableCell>
-                      <PledgeStatusBadge status={donor.pledge_status} />
-                    </TableCell>
-                    <TableCell>
-                      {formatOutstandingBalance(Number(donor.outstanding_pledge_balance || 0))}
-                    </TableCell>
                   </TableRow>
                 ))}
               {!loading &&
@@ -1084,12 +1190,6 @@ export function DonorsReportPanel() {
                     </TableCell>
                     <TableCell>{household.donation_count ?? 0}</TableCell>
                     <TableCell>{formatDate(household.last_donation_date)}</TableCell>
-                    <TableCell>
-                      <PledgeStatusBadge status={household.pledge_status} />
-                    </TableCell>
-                    <TableCell>
-                      {formatOutstandingBalance(Number(household.outstanding_pledge_balance || 0))}
-                    </TableCell>
                   </TableRow>
                 ))}
               {!loading &&
@@ -1121,12 +1221,6 @@ export function DonorsReportPanel() {
                     </TableCell>
                     <TableCell>{group.donation_count ?? 0}</TableCell>
                     <TableCell>{formatDate(group.last_donation_date)}</TableCell>
-                    <TableCell>
-                      <PledgeStatusBadge status={group.pledge_status} />
-                    </TableCell>
-                    <TableCell>
-                      {formatOutstandingBalance(Number(group.outstanding_pledge_balance || 0))}
-                    </TableCell>
                   </TableRow>
                 ))}
             </TableBody>
@@ -1152,6 +1246,58 @@ export function DonorsReportPanel() {
           setPage(1)
         }}
       />
+
+      <Dialog
+        open={addGroupOpen}
+        onOpenChange={(open) => {
+          setAddGroupOpen(open)
+          if (!open) {
+            setAddGroupName("")
+            setAddGroupError("")
+          }
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Group</DialogTitle>
+            <DialogDescription>
+              Create a giving group to track donations attributed to a department, committee, or
+              other collective. You can set status and category after it opens.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="new-giving-group-name">Group name</Label>
+            <Input
+              id="new-giving-group-name"
+              value={addGroupName}
+              onChange={(event) => setAddGroupName(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault()
+                  void handleCreateGroup()
+                }
+              }}
+              placeholder="Qur'an Institute for Ladies"
+            />
+            {addGroupError ? (
+              <p className="text-sm text-red-600">{addGroupError}</p>
+            ) : null}
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setAddGroupOpen(false)}
+              disabled={addGroupSaving}
+            >
+              Cancel
+            </Button>
+            <Button type="button" onClick={() => void handleCreateGroup()} disabled={addGroupSaving}>
+              {addGroupSaving ? "Creating..." : "Create group"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

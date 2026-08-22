@@ -1080,8 +1080,11 @@ export default function OrganizationsPage() {
 
       <Sheet
         open={!!selectedOrg}
-        onOpenChange={(open) => !open && setSelectedOrg(null)}
+        onOpenChange={(open) => {
+          if (!open) setSelectedOrg(null)
+        }}
       >
+        {selectedOrg ? (
         <SheetContent className="w-[95vw] max-w-none overflow-y-auto sm:max-w-none lg:w-[1100px]">
           <SheetHeader className="border-b pb-4">
             <div className="flex items-center justify-between">
@@ -1091,27 +1094,25 @@ export default function OrganizationsPage() {
                 </div>
 
                 <div>
-                  <SheetTitle className="text-lg">{selectedOrg?.name}</SheetTitle>
+                  <SheetTitle className="text-lg">{selectedOrg.name}</SheetTitle>
                   <p className="text-sm text-muted-foreground">
-                    {selectedOrg?.contactEmail || "—"}
+                    {selectedOrg.contactEmail || "—"}
                   </p>
                 </div>
               </div>
 
-              {selectedOrg && (
-                <div className="flex items-center gap-2">
-                  <PlatformEnterOrganizationButton
-                    organizationId={selectedOrg.id}
-                    organizationName={selectedOrg.name}
-                  />
-                  <Badge
-                    variant="secondary"
-                    className={statusStyles[selectedOrg.status]}
-                  >
-                    {selectedOrg.status}
-                  </Badge>
-                </div>
-              )}
+              <div className="flex items-center gap-2">
+                <PlatformEnterOrganizationButton
+                  organizationId={selectedOrg.id}
+                  organizationName={selectedOrg.name}
+                />
+                <Badge
+                  variant="secondary"
+                  className={statusStyles[selectedOrg.status]}
+                >
+                  {selectedOrg.status}
+                </Badge>
+              </div>
             </div>
           </SheetHeader>
 
@@ -1355,7 +1356,7 @@ export default function OrganizationsPage() {
 
                   <div className="flex flex-col gap-3 sm:flex-row">
                     <Select
-                      value={selectedPlanId}
+                      value={selectedPlanId || undefined}
                       onValueChange={setSelectedPlanId}
                     >
                       <SelectTrigger className="w-full">
@@ -1690,7 +1691,7 @@ export default function OrganizationsPage() {
 
                   <div className="flex flex-col gap-2">
                     <Label>Status</Label>
-                    <Select defaultValue={selectedOrg?.status.toLowerCase()}>
+                    <Select defaultValue={selectedOrg.status.toLowerCase()}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -1706,6 +1707,7 @@ export default function OrganizationsPage() {
             </TabsContent>
           </Tabs>
         </SheetContent>
+        ) : null}
       </Sheet>
 
       <Dialog open={addOrgOpen} onOpenChange={setAddOrgOpen}>
@@ -1830,7 +1832,7 @@ export default function OrganizationsPage() {
             <div className="space-y-2">
               <Label htmlFor="invite-role">Organization Role</Label>
               {orgRoles.length > 0 ? (
-                <Select value={inviteRoleId} onValueChange={setInviteRoleId}>
+                <Select value={inviteRoleId || undefined} onValueChange={setInviteRoleId}>
                   <SelectTrigger id="invite-role">
                     <SelectValue placeholder="Select a role" />
                   </SelectTrigger>

@@ -226,7 +226,7 @@ Routes: `/membership`, `/membership/members`, `/membership/applications`, `/memb
 
 **Groups:** Member groups (formerly HR Teams) at `/membership/groups` — overview, groups list, group positions. Legacy `/membership/teams` redirects here. Permission: `membership.view`.
 
-**Giving collectives** (CRM `contact_type = group`) are not Contacts. Detail workspace: `/donations/groups/[id]` (Members, Group giving = campaign totals, Activity = events only — not individual gifts). Badge: Membership Group / Department / Group Donation via `giving_group_kind` (`scripts/167_giving_group_category.sql`). They appear on **Donations → Reports → Donors → Group Giving** (`/donations/reports/donors?view=group`). Legacy `/contacts/groups` and `/contacts/[id]` for groups redirect into Donations.
+**Giving collectives** (CRM `contact_type = group`) are not Contacts. Detail workspace: `/donations/groups/[id]` (Members, Group giving = campaign totals, Activity = events only — not individual gifts). Badge: Membership Group / Department / Group Donation via `giving_group_kind` (`scripts/167_giving_group_category.sql`). They appear on **Fund Development → Reports → Donor Giving** (`/donations/reports/donors?view=group`). Legacy `/contacts/groups` and `/contacts/[id]` for groups redirect into Donations.
 
 Enable for orgs: Platform Admin modules toggle, or repair SQL `scripts/165_ensure_membership_sidebar.sql` (also `scripts/058_membership_module.sql`). Permissions: `membership.view` / `membership.manage` (sidebar falls back to contacts permissions).
 
@@ -242,7 +242,7 @@ No active implementation yet.
 
 ## Contacts / CRM
 
-Status: **Phase 1 complete** (identity integrity + affiliation sync, June 2026)
+Status: **Directory IA (August 2026)** — user-facing module renamed Contacts → Directory; canonical `contacts` table unchanged.
 
 North star: **One Contact · Many Roles · Many Activities · No Duplicate Identities**
 
@@ -253,6 +253,8 @@ North star: **One Contact · Many Roles · Many Activities · No Duplicate Ident
 | `lib/contacts/contact-affiliation-sync.ts` | `computeDerivedAffiliations`, `syncContactAffiliations` (RPC), webhook helpers |
 | `lib/contacts/contact-affiliation-rules.ts` | Sticky vs auto-removable policy, terminal enrollment statuses |
 | `lib/contacts/contact-constants.ts` | Role labels; participation roles excluded from manual CRM picks |
+| `lib/directory/directory-roles.ts` | Dynamic role catalog, assignable roles, populated-nav helper |
+| `lib/directory/directory-nav-summary.ts` | Tenant-scoped entity + role counts for Overview and sidebar |
 | `lib/permissions/permission-keys.ts` | `contacts.view`, `contacts.manage` |
 
 **Write-path rules (Phase 1):**
@@ -273,15 +275,21 @@ North star: **One Contact · Many Roles · Many Activities · No Duplicate Ident
 | Ticketing / Venue | ticket order / rental billing contact | → **Customer** only (events + bookings; `175`) |
 | Volunteers | `volunteers.contact_id` | `createVolunteer`, `ensureVolunteerForContact` (S-11) |
 
-Routes: `/contacts/people` (default; `/contacts` redirects here), `/contacts/[id]`, `/contacts/families` (redirects to Reports → Families), `/contacts/families/[id]` (redirects to primary contact), `/contacts/organizations`, `/contacts/reports`, `/contacts/reports/directory`, `/contacts/settings`
+Routes: `/directory` (Overview), `/directory/people`, `/directory/families`, `/directory/families/[id]`, `/directory/organizations`, `/directory/role/[role]`, `/directory/reports`, `/directory/settings`, `/directory/[id]` (contact profile). Legacy `/directory/groups` and `/contacts/groups` redirect to Fund Development Group Giving. Legacy `/contacts/...` list URLs redirect into Directory. Permissions remain `contacts.view` / `contacts.manage` (UI labels: View/Manage Directory).
+
+**People / Organizations lists:** `components/contacts/contacts-crm-list.tsx` loads via `fetchContactsList`. Shared list types (`ContactListRow`, filters, stats) are in `lib/contacts/contact-list-types.ts` — not the `"use server"` actions file — so the client does not hit a `ContactListRow is not defined` runtime error.
 
 **Contact profile Overview:** Module-gated right rail with Quick Actions, Financial Summary, and Activity (`components/contacts/contact-profile-overview-rail.tsx`).
 
-**Groups** list is not under Contacts. Giving collectives use `/donations/groups/[id]` and roll up on **Donations → Reports → Donors → Group Giving**; `/contacts/groups` and group `/contacts/[id]` redirect into Donations. Member groups live under **Membership → Groups**.
+**Groups:** Giving groups (`contact_type = group`) are Fund Development only — **Reports → Donor Giving → Group Giving** (`/donations/reports/donors?view=group`) and workspace `/donations/groups/[id]`. They exist to roll up donations from a department or collective (for example Qur'an Institute for Ladies), not as Directory identities. Campaign groups (`campaign_groups`) stay on Campaign → Groups. Membership Groups remain `/membership/groups`. Legacy Directory Groups URLs redirect into Fund Development.
 
-**Reports (Phase 1):** Contact Directory report with Individuals / Organizations / Families tabs, Roles filter + CSV export (`lib/contacts/contact-report-actions.ts`, `components/contacts/contacts-directory-report-panel.tsx`). Families removed from Contacts sidebar (July 2026). Donor giving reports stay under Donations.
+**Reports:** Directory → Reports is analytics (growth, role distribution with overlap, completeness, possible duplicates). People / Organizations / Families are first-class Directory sections, not report tabs. Donor giving reports stay under Fund Development.
 
-**Contact record types:** `individual`, `organization`, `group` (migration `132`). Groups = internal collectives (halaqas, committees); Organizations = external entities.
+**Dynamic role navigation:** Most role views (Employees, Volunteers, Members, Donors, Sponsors, Parents, Vendors, Childcare Providers, Rental Customers) appear in the Directory flyout only when the current tenant has matching records. **Service Providers** is always shown (`alwaysVisible` in `lib/directory/directory-roles.ts`) so staff can add contractors (plumbers, pest control, etc.) even before any exist. `/resources/service-providers` redirects to `/directory/role/service-providers`. Counts load with sidebar modules (`fetchDirectoryNavSummary`). These are filtered views of canonical contacts — not duplicate identity tables. Role-view tables add lookup columns from Workforce / Membership / Fund Development / Vendor Hub / Rentals (summaries only). Donor giving columns are gated by `donations.view`. **Sponsor** is a manual `contact_roles` value (`scripts/269_directory_sponsor_role.sql`).
+
+**Search Directory first:** Workforce, Vendor Hub, Venue Rentals, Fund Development, and Membership add flows search existing Directory people/organizations before creating a new canonical record.
+
+**Contact record types:** `individual`, `organization`, `group` (migration `132`). Groups = Fund Development giving collectives (not Directory identities); Organizations = external entities.
 
 Validation:
 
@@ -291,7 +299,31 @@ npm run validate:contacts-phase1
 
 Deferred (Phase 2+): participant merge UI, historical backfill, venue rental customer derivation, segmentation.
 
+**Directory SQL (optional):** `scripts/268_directory_module_label.sql` updates `modules.name` / `route` for the contacts slug to Directory / `/directory`. The app already overrides the sidebar label without this script. **Sponsor role:** run `scripts/269_directory_sponsor_role.sql` so `contact_roles` accepts `sponsor`.
+
 **RLS wave 1 (June 2026):** Migrations `102`–`111`. M6b aligns ticketing/membership RPC gates. CR-8: `npm run validate:contacts-g6`. M4 authorized for staging after G6 GREEN.
+
+---
+
+## Fund Development
+
+Status: Working (IA: Overview / Campaigns / Pledges / Donations / Reports / Settings)
+
+Routes stay `/donations/*`. Operations: `/donations/payments/transactions`, `/recurring`, `/import-match`, `/receipts`. Analytics: `/donations/reports` (Giving Summary, Donor Giving, Campaign Performance, Pledge Performance, Recurring Giving). Donor Giving (Individual / Household / Group) lists gifts only — pledge status and outstanding balance stay on **Pledges**.
+
+Transactions and Giving Summary share a date range (`?range=`) that filters KPIs, charts, the table, and CSV export. Receipts Missing queue: `/donations/payments/receipts?status=missing`. Year-end statement KPIs read `donation_receipts` where `receipt_type = annual_statement`.
+
+Permissions: `donations.view`, `donations.manage`, `donations.campaigns.manage`, `donations.prospects.manage`, `donations.reports.manage`.
+
+Campaign workspace tabs: Overview, Strategy, Prospects, Pledges, Donations, Groups, **Wishlist**. Each campaign has one goal (`campaigns.goal_amount`); Goal Breakdown phases are retired (`scripts/270_disable_campaign_goal_phases.sql`). Wishlist items are campaign priorities (`campaign_wishlist_items`); pledged/collected come from `pledges`/`payments.wishlist_item_id`. Public donate: `/donate/w/{token}`. SQL: `scripts/267_campaign_wishlist.sql`.
+
+---
+
+## Reports
+
+Status: Planned
+
+No active implementation yet.
 
 ---
 

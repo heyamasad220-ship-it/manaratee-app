@@ -1,9 +1,7 @@
 "use server"
 
-import {
-  fetchContactsList,
-  type FetchContactsListInput,
-} from "@/lib/contacts/contact-list-actions"
+import { fetchContactsList } from "@/lib/contacts/contact-list-actions"
+import type { FetchContactsListInput } from "@/lib/contacts/contact-list-types"
 import type {
   ContactDirectoryExportRow,
   ContactDirectoryReportFilters,

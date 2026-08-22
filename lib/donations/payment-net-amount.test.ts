@@ -4,6 +4,7 @@ import { describe, it } from "node:test"
 import { buildPaymentAdminCapabilities } from "./payment-admin-capabilities"
 import {
   canAllocatePayment,
+  computePledgeLedgerTotals,
   paymentNetAmount,
   remainingRefundableAmount,
   resolvePaymentStatusAfterRefund,
@@ -72,5 +73,29 @@ describe("payment net amount helpers", () => {
     assert.equal(capabilities.canRecordRefund, false)
     assert.equal(capabilities.canAllocate, false)
     assert.equal(remainingRefundableAmount({ amount: 50, refunded_amount: 10 }), 40)
+  })
+
+  it("does not double-count an imported payment against a pledge", () => {
+    const totals = computePledgeLedgerTotals({
+      amountPledged: 10000,
+      allocatedPayments: [{ amount: 2000, refunded_amount: 0, status: "allocated" }],
+    })
+
+    assert.equal(totals.pledged, 10000)
+    assert.equal(totals.collected, 2000)
+    assert.equal(totals.outstanding, 8000)
+    assert.equal(totals.orgGiving, 2000)
+    assert.notEqual(totals.pledged + totals.collected, totals.orgGiving)
+  })
+
+  it("counts a standalone gift only as collected giving", () => {
+    const totals = computePledgeLedgerTotals({
+      amountPledged: 0,
+      allocatedPayments: [{ amount: 500, refunded_amount: 0, status: "unallocated" }],
+    })
+
+    assert.equal(totals.collected, 500)
+    assert.equal(totals.orgGiving, 500)
+    assert.equal(totals.outstanding, 0)
   })
 })

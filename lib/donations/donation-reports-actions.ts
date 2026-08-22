@@ -7,7 +7,6 @@ import { requireDonationStaffAccess } from "@/lib/donations/donation-action-auth
 import {
   buildPledgeCampaignMap,
   computeCampaignAskLevelMetrics,
-  computeCampaignPhaseMetrics,
   computeCampaignSourceBreakdown,
   fetchCampaignAnalyticsData,
   fetchCampaignAnalyticsEntries,
@@ -23,11 +22,7 @@ import {
   fetchCampaignAskLevels,
 } from "@/lib/donations/campaign-ask-level-actions"
 import { fetchCampaignProspectAskLevelStats } from "@/lib/donations/campaign-prospect-actions"
-import {
-  fetchCampaignPhases,
-  syncCampaignPhases,
-} from "@/lib/donations/campaign-phase-actions"
-import type { CampaignPhaseWriteInput } from "@/lib/donations/campaign-phase-types"
+import { syncCampaignPhases } from "@/lib/donations/campaign-phase-actions"
 import { ensureCampaignDonationFund } from "@/lib/donations/ensure-campaign-donation-fund"
 import { createServiceRoleClient } from "@/lib/supabase/service-role"
 import {
@@ -59,10 +54,6 @@ type CampaignWriteInput = {
   start_date?: string | null
   end_date?: string | null
   status?: string | null
-  goal_breakdown_enabled?: boolean
-  phases?: CampaignPhaseWriteInput[]
-  /** When true, skip phase goal ≠ campaign goal validation (admin acknowledged warning). */
-  allow_phase_goal_mismatch?: boolean
 }
 
 function generateCampaignCode(campaignName: string) {
@@ -155,44 +146,6 @@ async function fetchCampaignRow(
   }
 
   return withBreakdown
-}
-
-function validatePhaseGoalsAgainstCampaign(input: {
-  goalAmount: number | null | undefined
-  goalBreakdownEnabled: boolean
-  phases: CampaignPhaseWriteInput[]
-  allowMismatch?: boolean
-}): { ok: true } | { ok: false; error: string; code?: "phase_goal_mismatch" } {
-  if (!input.goalBreakdownEnabled || input.phases.length === 0) {
-    return { ok: true }
-  }
-
-  const phaseSum = input.phases.reduce(
-    (sum, phase) => sum + Number(phase.goal_amount || 0),
-    0
-  )
-  const campaignGoal = Number(input.goalAmount || 0)
-  if (!(campaignGoal > 0)) return { ok: true }
-
-  if (Math.abs(campaignGoal - phaseSum) < 0.01) {
-    return { ok: true }
-  }
-
-  if (input.allowMismatch) {
-    return { ok: true }
-  }
-
-  return {
-    ok: false,
-    code: "phase_goal_mismatch",
-    error: `Phase goals total ${phaseSum.toLocaleString("en-US", {
-      style: "currency",
-      currency: "USD",
-    })} but the campaign goal is ${campaignGoal.toLocaleString("en-US", {
-      style: "currency",
-      currency: "USD",
-    })}. Confirm to save anyway, or adjust the phase amounts.`,
-  }
 }
 
 async function selectCampaignAfterWrite(
@@ -297,21 +250,6 @@ export async function getCampaignDetailAction(campaignId: string) {
       campaignId
     )
 
-    let phases: Awaited<ReturnType<typeof fetchCampaignPhases>> = []
-    try {
-      phases = await fetchCampaignPhases(access.supabase, access.orgId, campaignId)
-    } catch {
-      phases = []
-    }
-
-    const phaseMetrics = computeCampaignPhaseMetrics({
-      phases,
-      campaignId,
-      pledges: analyticsData.pledges,
-      payments: analyticsData.payments,
-      pledgeCampaignById: buildPledgeCampaignMap(analyticsData.pledges),
-    })
-
     let askLevels: Awaited<ReturnType<typeof fetchCampaignAskLevels>> = []
     try {
       askLevels = await fetchCampaignAskLevels(access.supabase, access.orgId, campaignId)
@@ -321,7 +259,7 @@ export async function getCampaignDetailAction(campaignId: string) {
 
     const askLevelMetrics = computeCampaignAskLevelMetrics({
       askLevels,
-      phases,
+      phases: [],
       campaignId,
       pledges: analyticsData.pledges,
       prospectStatsByAskLevelId: await fetchCampaignProspectAskLevelStats(
@@ -330,17 +268,11 @@ export async function getCampaignDetailAction(campaignId: string) {
       ),
     })
 
-    const goalBreakdownEnabled = Boolean(
-      "goal_breakdown_enabled" in campaign
-        ? campaign.goal_breakdown_enabled
-        : phases.length > 0
-    )
-
     return {
       success: true as const,
       campaign: {
         ...(campaign as CampaignRow),
-        goal_breakdown_enabled: goalBreakdownEnabled,
+        goal_breakdown_enabled: false,
       },
       overviewMetricKeys: parseCampaignOverviewMetricKeys(
         "overview_metric_keys" in campaign ? campaign.overview_metric_keys : null
@@ -349,8 +281,6 @@ export async function getCampaignDetailAction(campaignId: string) {
       insights,
       sourceBreakdown,
       outstandingPledges,
-      phases,
-      phaseMetrics,
       askLevels,
       askLevelMetrics,
       canManage: access.canManage,
@@ -368,23 +298,6 @@ export async function createCampaignAction(input: CampaignWriteInput) {
 
   const name = input.name.trim()
   if (!name) return { success: false as const, error: "Campaign name is required" }
-
-  const goalBreakdownEnabled = Boolean(input.goal_breakdown_enabled)
-  const phases = goalBreakdownEnabled ? input.phases || [] : []
-
-  const phaseValidation = validatePhaseGoalsAgainstCampaign({
-    goalAmount: input.goal_amount,
-    goalBreakdownEnabled,
-    phases,
-    allowMismatch: input.allow_phase_goal_mismatch,
-  })
-  if (!phaseValidation.ok) {
-    return {
-      success: false as const,
-      error: phaseValidation.error,
-      code: phaseValidation.code,
-    }
-  }
 
   try {
     const writeClient = createServiceRoleClient()
@@ -411,7 +324,7 @@ export async function createCampaignAction(input: CampaignWriteInput) {
       end_date: input.end_date || null,
       status: input.status?.toLowerCase() || "draft",
       code: generateCampaignCode(name),
-      goal_breakdown_enabled: goalBreakdownEnabled,
+      goal_breakdown_enabled: false,
     }
 
     let campaign: CampaignRow | null = null
@@ -461,18 +374,6 @@ export async function createCampaignAction(input: CampaignWriteInput) {
       }
     }
 
-    if (goalBreakdownEnabled && phases.length > 0) {
-      const syncResult = await syncCampaignPhases(
-        access.orgId,
-        campaign.id,
-        phases,
-        { goalBreakdownEnabled: true }
-      )
-      if (!syncResult.success) {
-        return { success: false as const, error: syncResult.error }
-      }
-    }
-
     const fundResult = await ensureCampaignDonationFund(writeClient, access.orgId, name)
     revalidateCampaignPaths(campaign.id)
 
@@ -496,23 +397,6 @@ export async function updateCampaignAction(campaignId: string, input: CampaignWr
 
   const name = input.name.trim()
   if (!name) return { success: false as const, error: "Campaign name is required" }
-
-  const goalBreakdownEnabled = Boolean(input.goal_breakdown_enabled)
-  const phases = goalBreakdownEnabled ? input.phases || [] : []
-
-  const phaseValidation = validatePhaseGoalsAgainstCampaign({
-    goalAmount: input.goal_amount,
-    goalBreakdownEnabled,
-    phases,
-    allowMismatch: input.allow_phase_goal_mismatch,
-  })
-  if (!phaseValidation.ok) {
-    return {
-      success: false as const,
-      error: phaseValidation.error,
-      code: phaseValidation.code,
-    }
-  }
 
   try {
     const writeClient = createServiceRoleClient()
@@ -538,7 +422,7 @@ export async function updateCampaignAction(campaignId: string, input: CampaignWr
       start_date: input.start_date || null,
       end_date: input.end_date || null,
       status: input.status?.toLowerCase() || "draft",
-      goal_breakdown_enabled: goalBreakdownEnabled,
+      goal_breakdown_enabled: false,
     }
 
     let campaign: CampaignRow | null = null
@@ -583,16 +467,11 @@ export async function updateCampaignAction(campaignId: string, input: CampaignWr
       campaign = fallback.data as CampaignRow
     }
 
-    if (input.goal_breakdown_enabled != null || input.phases) {
-      const syncResult = await syncCampaignPhases(
-        access.orgId,
-        campaignId,
-        phases,
-        { goalBreakdownEnabled }
-      )
-      if (!syncResult.success) {
-        return { success: false as const, error: syncResult.error }
-      }
+    const syncResult = await syncCampaignPhases(access.orgId, campaignId, [], {
+      goalBreakdownEnabled: false,
+    })
+    if (!syncResult.success) {
+      return { success: false as const, error: syncResult.error }
     }
 
     revalidateCampaignPaths(campaignId)
@@ -601,6 +480,38 @@ export async function updateCampaignAction(campaignId: string, input: CampaignWr
   } catch (error) {
     return { success: false as const, error: (error as Error).message }
   }
+}
+
+async function getCampaignFinancialActivityError(
+  supabase: SupabaseClient,
+  organizationId: string,
+  campaignId: string
+): Promise<string | null> {
+  const [pledgesResult, paymentsResult, plansResult] = await Promise.all([
+    supabase
+      .from("pledges")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .eq("campaign_id", campaignId),
+    supabase
+      .from("payments")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .eq("campaign_id", campaignId),
+    supabase
+      .from("recurring_donation_plans")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .eq("campaign_id", campaignId),
+  ])
+
+  const hasPledges = !pledgesResult.error && (pledgesResult.count || 0) > 0
+  const hasPayments = !paymentsResult.error && (paymentsResult.count || 0) > 0
+  const hasPlans = !plansResult.error && (plansResult.count || 0) > 0
+
+  if (!hasPledges && !hasPayments && !hasPlans) return null
+
+  return "This campaign cannot be deleted because it has financial activity. Mark it Completed instead."
 }
 
 export async function deleteCampaignAction(campaignId: string) {
@@ -625,6 +536,15 @@ export async function deleteCampaignAction(campaignId: string) {
     }
     if (!existing) {
       return { success: false as const, error: "Campaign not found" }
+    }
+
+    const activityError = await getCampaignFinancialActivityError(
+      writeClient,
+      access.orgId,
+      campaignId
+    )
+    if (activityError) {
+      return { success: false as const, error: activityError }
     }
 
     const { error } = await writeClient
@@ -694,6 +614,7 @@ export type DonationReportsOverview = {
   paymentCount: number
   averageDonation: number
   donorCount: number
+  needsAttentionCount: number
 }
 
 export async function getDonationReportsOverviewAction() {
@@ -701,8 +622,21 @@ export async function getDonationReportsOverviewAction() {
   if (!access.ok) return { success: false as const, error: access.error }
 
   try {
-    const overview = await fetchOrgReportsOverview(access.supabase, access.orgId)
-    return { success: true as const, overview }
+    const [overview, attentionResult] = await Promise.all([
+      fetchOrgReportsOverview(access.supabase, access.orgId),
+      access.supabase
+        .from("payments")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", access.orgId)
+        .in("status", ["pending_review", "unresolved", "voided"]),
+    ])
+    return {
+      success: true as const,
+      overview: {
+        ...overview,
+        needsAttentionCount: attentionResult.count ?? 0,
+      },
+    }
   } catch (error) {
     return { success: false as const, error: (error as Error).message }
   }
@@ -743,6 +677,44 @@ export async function getDonationTaxYearTotalsAction(taxYear: number) {
   try {
     const donors = await fetchDonorTaxYearTotals(access.supabase, access.orgId, taxYear)
     return { success: true as const, donors }
+  } catch (error) {
+    return { success: false as const, error: (error as Error).message }
+  }
+}
+
+export async function getAnnualStatementKpisAction(taxYear: number) {
+  const access = await requireDonationStaffAccess("view")
+  if (!access.ok) return { success: false as const, error: access.error }
+
+  try {
+    const [donors, receiptsResult] = await Promise.all([
+      fetchDonorTaxYearTotals(access.supabase, access.orgId, taxYear),
+      access.supabase
+        .from("donation_receipts")
+        .select("id, status, donor_id")
+        .eq("organization_id", access.orgId)
+        .eq("receipt_type", "annual_statement")
+        .eq("tax_year", taxYear),
+    ])
+
+    if (receiptsResult.error) throw new Error(receiptsResult.error.message)
+
+    const statements = receiptsResult.data || []
+    const donorsWithStatement = new Set(
+      statements.map((row) => String(row.donor_id || "")).filter(Boolean)
+    )
+
+    return {
+      success: true as const,
+      kpis: {
+        eligibleDonors: donors.length,
+        statementsGenerated: statements.length,
+        statementsSent: statements.filter(
+          (row) => row.status === "sent" || row.status === "resent"
+        ).length,
+        needAttention: donors.filter((donor) => !donorsWithStatement.has(donor.donorId)).length,
+      },
+    }
   } catch (error) {
     return { success: false as const, error: (error as Error).message }
   }

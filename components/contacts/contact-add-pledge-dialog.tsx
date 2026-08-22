@@ -28,6 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { WishlistItemPicker } from "@/components/donations/wishlist-item-picker"
 import { ensureDonorExtensionForContact } from "@/lib/donations/donor-contact-bridge"
 import { getSelectedOrganizationIdClient } from "@/lib/organizations/get-selected-organization-id-client"
 
@@ -69,6 +70,7 @@ export function ContactAddPledgeDialog({
   const [attribution, setAttribution] = useState<DonationAttributionValue>(
     EMPTY_DONATION_ATTRIBUTION_VALUE
   )
+  const [wishlistItemId, setWishlistItemId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!open) return
@@ -77,6 +79,7 @@ export function ContactAddPledgeDialog({
     setFrequency("One-Time")
     setNotes("")
     setAttribution(EMPTY_DONATION_ATTRIBUTION_VALUE)
+    setWishlistItemId(null)
 
     if (!organizationIdProp) {
       void (async () => {
@@ -113,6 +116,7 @@ export function ContactAddPledgeDialog({
       organization_id: orgId,
       donor_id: donorId,
       ...toAttributionIds(attribution),
+      wishlist_item_id: attribution.campaignId ? wishlistItemId : null,
       amount_pledged: Number(amount),
       pledge_date: normalizeDateInput(pledgeDate) || getTodayPlainDate(),
       pledge_type: frequency.toLowerCase().replace("-", "_"),
@@ -168,7 +172,15 @@ export function ContactAddPledgeDialog({
           <DonationAttributionFields
             organizationId={organizationId}
             value={attribution}
-            onChange={setAttribution}
+            onChange={(value) => {
+              setAttribution(value)
+              if (!value.campaignId) setWishlistItemId(null)
+            }}
+          />
+          <WishlistItemPicker
+            campaignId={attribution.campaignId || null}
+            value={wishlistItemId}
+            onChange={setWishlistItemId}
           />
 
           <div className="grid gap-4 sm:grid-cols-2">

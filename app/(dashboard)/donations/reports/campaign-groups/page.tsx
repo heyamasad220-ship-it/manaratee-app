@@ -1,11 +1,7 @@
-import { Suspense } from "react"
+import { redirect } from "next/navigation"
 
-import { CampaignGroupsReportPanel } from "@/components/donations/campaign-groups-report-panel"
+import { DONATION_REPORTS_CAMPAIGNS_PATH } from "@/lib/donations/donation-payment-paths"
 
-export default function DonationsCampaignGroupsReportPage() {
-  return (
-    <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading report...</div>}>
-      <CampaignGroupsReportPanel />
-    </Suspense>
-  )
+export default function DonationReportsCampaignGroupsRedirectPage() {
+  redirect(`${DONATION_REPORTS_CAMPAIGNS_PATH}?view=groups`)
 }

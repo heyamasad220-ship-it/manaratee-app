@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 
-export const GENERAL_DONATION_CATEGORY_NAME = "General Donation"
+import { GENERAL_DONATION_CATEGORY_NAME } from "@/lib/donations/donation-default-attribution"
+
+export { GENERAL_DONATION_CATEGORY_NAME }
 
 function normalizeName(value: string) {
   return value.trim().toLowerCase()

@@ -126,7 +126,7 @@ export function ContactSearchPicker({
                 <div className="space-y-2 px-2 py-3 text-sm">
                   <p>No contact found.</p>
                   <p className="text-muted-foreground">
-                    Create a contact first, then finish adding the vendor.
+                    Create a Directory record first, then finish adding the vendor.
                   </p>
                   {onCreateNew ? (
                     <Button

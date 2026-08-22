@@ -5,6 +5,8 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { requireDonationStaffAccess } from "@/lib/donations/donation-action-auth"
 import { DONATIONS_PAGE_SIZE } from "@/lib/donations/donation-pagination"
 import { formatFinancialActivityPaymentStatus } from "@/lib/donations/donation-status"
+import { formatPaymentSourceLabel } from "@/lib/donations/payment-source-channel"
+import { countsTowardGivingTotals, paymentNetAmount } from "@/lib/donations/payment-net-amount"
 import { attachPaymentDonorDisplayNames } from "@/lib/donations/payment-donor-display"
 import { attachPaymentMethodDisplayLabels } from "@/lib/donations/payment-method-display"
 
@@ -18,6 +20,8 @@ export type PaymentStatusDisplayFilter =
   | "Refunded"
   | "Partially Refunded"
 
+export type PaymentTransactionTypeFilter = "all" | "one_time" | "pledge" | "recurring"
+
 export type PaymentsPageInput = {
   page?: number
   pageSize?: number
@@ -27,6 +31,59 @@ export type PaymentsPageInput = {
   statusDisplay?: PaymentStatusDisplayFilter | "all"
   dateFrom?: string
   dateTo?: string
+  transactionType?: PaymentTransactionTypeFilter
+  source?: string
+  campaignId?: string
+  fundId?: string
+  campaignGroupId?: string
+}
+
+const PAYMENTS_LIST_SELECT = [
+  "id",
+  "amount",
+  "refunded_amount",
+  "payment_date",
+  "source",
+  "source_type",
+  "memo",
+  "pledge_id",
+  "donor_id",
+  "contact_id",
+  "status",
+  "sender_name",
+  "import_batch_id",
+  "stripe_payment_intent_id",
+  "stripe_charge_id",
+  "recurring_donation_plan_id",
+  "campaign_id",
+  "category_id",
+  "subcategory_id",
+  "campaign_group_id",
+  "donors ( donor_type )",
+  "campaigns ( name )",
+  "donation_categories ( name )",
+  "donation_subcategories ( name )",
+  "campaign_groups ( name )",
+  "donation_receipts ( status, receipt_type )",
+].join(", ")
+
+function firstRelated<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null
+  return Array.isArray(value) ? value[0] ?? null : value
+}
+
+function paymentReceiptStatusLabel(
+  receipts: Array<{ status?: string | null; receipt_type?: string | null }> | null
+): string {
+  const paymentReceipt = (receipts || []).find(
+    (row) => !row.receipt_type || row.receipt_type === "payment"
+  )
+  if (!paymentReceipt) return "Missing"
+  const status = String(paymentReceipt.status || "").toLowerCase()
+  if (status === "sent" || status === "resent") return "Sent"
+  if (status === "not_sent") return "Generated"
+  if (status === "failed") return "Failed"
+  return paymentReceipt.status || "Generated"
 }
 
 function applyPaymentStatusDisplayFilter<
@@ -54,27 +111,150 @@ function applyPaymentStatusDisplayFilter<
   }
 }
 
-async function applyDonorNameFilter<
-  T extends { or: (filters: string) => T },
->(supabase: SupabaseClient, orgId: string, query: T, donorName: string): Promise<T> {
-  const term = `%${escapeIlike(donorName.trim())}%`
-  const searchParts = [`sender_name.ilike.${term}`]
-
+async function findDonorIdsByName(
+  supabase: SupabaseClient,
+  orgId: string,
+  name: string
+): Promise<string[]> {
+  const term = `%${escapeIlike(name.trim())}%`
   const { data: matchingDonors } = await supabase
     .from("donor_summary_view")
     .select("id")
     .eq("organization_id", orgId)
     .ilike("full_name", term)
 
-  const matchingDonorIds = (matchingDonors || [])
-    .map((row) => row.id as string)
-    .filter(Boolean)
+  return (matchingDonors || []).map((row) => row.id as string).filter(Boolean)
+}
 
-  if (matchingDonorIds.length > 0) {
-    searchParts.push(`donor_id.in.(${matchingDonorIds.join(",")})`)
+function applyPaymentAttributeFilters<
+  T extends {
+    eq: (column: string, value: string) => T
+    is: (column: string, value: null) => T
+    not: (column: string, operator: string, value: null) => T
+  },
+>(query: T, input: PaymentsPageInput): T {
+  if (input.transactionType === "pledge") {
+    query = query.not("pledge_id", "is", null)
+  } else if (input.transactionType === "recurring") {
+    query = query.not("recurring_donation_plan_id", "is", null)
+  } else if (input.transactionType === "one_time") {
+    query = query.is("pledge_id", null).is("recurring_donation_plan_id", null)
   }
 
-  return query.or(searchParts.join(","))
+  if (input.source && input.source !== "all") {
+    query = query.eq("source", input.source)
+  }
+  if (input.campaignId && input.campaignId !== "all") {
+    query = query.eq("campaign_id", input.campaignId)
+  }
+  if (input.fundId && input.fundId !== "all") {
+    query = query.eq("subcategory_id", input.fundId)
+  }
+  if (input.campaignGroupId && input.campaignGroupId !== "all") {
+    query = query.eq("campaign_group_id", input.campaignGroupId)
+  }
+
+  return query
+}
+
+function mapPaymentListRow(row: Record<string, unknown>) {
+  const donor = firstRelated(row.donors as { donor_type?: string | null } | { donor_type?: string | null }[] | null)
+  const campaign = firstRelated(row.campaigns as { name?: string | null } | { name?: string | null }[] | null)
+  const category = firstRelated(
+    row.donation_categories as { name?: string | null } | { name?: string | null }[] | null
+  )
+  const fund = firstRelated(
+    row.donation_subcategories as { name?: string | null } | { name?: string | null }[] | null
+  )
+  const campaignGroup = firstRelated(
+    row.campaign_groups as { name?: string | null } | { name?: string | null }[] | null
+  )
+  const receiptsRaw = row.donation_receipts as
+    | Array<{ status?: string | null; receipt_type?: string | null }>
+    | { status?: string | null; receipt_type?: string | null }
+    | null
+  const receipts = receiptsRaw ? (Array.isArray(receiptsRaw) ? receiptsRaw : [receiptsRaw]) : []
+
+  const {
+    donors: _donors,
+    campaigns: _campaigns,
+    donation_categories: _categories,
+    donation_subcategories: _funds,
+    campaign_groups: _groups,
+    donation_receipts: _receipts,
+    ...payment
+  } = row
+
+  return {
+    ...payment,
+    donor_type: donor?.donor_type ?? null,
+    campaign_name: campaign?.name ?? null,
+    category_name: category?.name ?? null,
+    fund_name: fund?.name ?? null,
+    campaign_group_name: campaignGroup?.name ?? null,
+    receipt_status: paymentReceiptStatusLabel(receipts),
+  } as Record<string, unknown> & {
+    id?: string
+    amount?: number | string | null
+    refunded_amount?: number | null
+    status?: string | null
+    donor_type: string | null
+    campaign_name: string | null
+    category_name: string | null
+    fund_name: string | null
+    campaign_group_name: string | null
+    receipt_status: string
+    source?: string | null
+    stripe_payment_intent_id?: string | null
+    sender_name?: string | null
+    donor_id?: string | null
+  }
+}
+
+function applyPaymentsListFilters(
+  query: any,
+  input: PaymentsPageInput,
+  matchingDonorIds: string[] = []
+) {
+  let next = applyPaymentAttributeFilters(query, input)
+
+  if (input.statusDisplay && input.statusDisplay !== "all") {
+    next = applyPaymentStatusDisplayFilter(next, input.statusDisplay)
+  } else if (input.status && input.status !== "all") {
+    next = next.eq("status", input.status)
+  }
+  if (input.dateFrom) {
+    next = next.gte("payment_date", input.dateFrom)
+  }
+  if (input.dateTo) {
+    next = next.lte("payment_date", input.dateTo)
+  }
+
+  const nameTerm = input.donorName?.trim() || input.search?.trim() || ""
+  if (nameTerm) {
+    const term = `%${escapeIlike(nameTerm)}%`
+    const searchParts = input.donorName?.trim()
+      ? [`sender_name.ilike.${term}`]
+      : [`sender_name.ilike.${term}`, `memo.ilike.${term}`, `source.ilike.${term}`]
+
+    if (matchingDonorIds.length > 0) {
+      searchParts.push(`donor_id.in.(${matchingDonorIds.join(",")})`)
+    }
+
+    next = next.or(searchParts.join(","))
+  }
+
+  return next
+}
+
+async function matchingDonorIdsForPaymentFilters(
+  supabase: SupabaseClient,
+  orgId: string,
+  input: PaymentsPageInput
+) {
+  const name = input.donorName?.trim() || input.search?.trim()
+  if (!name) return [] as string[]
+  return findDonorIdsByName(supabase, orgId, name)
 }
 
 export async function fetchPaymentsPageAction(input: PaymentsPageInput = {}) {
@@ -87,63 +267,24 @@ export async function fetchPaymentsPageAction(input: PaymentsPageInput = {}) {
     const from = (page - 1) * pageSize
     const to = from + pageSize - 1
 
-    let query = access.supabase
+    let query: any = access.supabase
       .from("payments")
-      .select(
-        "id, amount, refunded_amount, payment_date, source, source_type, memo, pledge_id, donor_id, contact_id, status, sender_name, import_batch_id, stripe_payment_intent_id, stripe_charge_id, donors ( donor_type )",
-        { count: "exact" }
-      )
+      .select(PAYMENTS_LIST_SELECT, { count: "exact" })
       .eq("organization_id", access.orgId)
       .order("payment_date", { ascending: false })
 
-    if (input.statusDisplay && input.statusDisplay !== "all") {
-      query = applyPaymentStatusDisplayFilter(query, input.statusDisplay)
-    } else if (input.status && input.status !== "all") {
-      query = query.eq("status", input.status)
-    }
-    if (input.dateFrom) {
-      query = query.gte("payment_date", input.dateFrom)
-    }
-    if (input.dateTo) {
-      query = query.lte("payment_date", input.dateTo)
-    }
-    if (input.donorName?.trim()) {
-      query = await applyDonorNameFilter(access.supabase, access.orgId, query, input.donorName)
-    } else if (input.search?.trim()) {
-      const term = `%${escapeIlike(input.search.trim())}%`
-      const searchParts = [`sender_name.ilike.${term}`, `memo.ilike.${term}`, `source.ilike.${term}`]
-
-      const { data: matchingDonors } = await access.supabase
-        .from("donor_summary_view")
-        .select("id")
-        .eq("organization_id", access.orgId)
-        .ilike("full_name", term)
-
-      const matchingDonorIds = (matchingDonors || [])
-        .map((row) => row.id as string)
-        .filter(Boolean)
-
-      if (matchingDonorIds.length > 0) {
-        searchParts.push(`donor_id.in.(${matchingDonorIds.join(",")})`)
-      }
-
-      query = query.or(searchParts.join(","))
-    }
+    const matchingDonorIds = await matchingDonorIdsForPaymentFilters(
+      access.supabase,
+      access.orgId,
+      input
+    )
+    query = applyPaymentsListFilters(query, input, matchingDonorIds)
 
     const { data, error, count } = await query.range(from, to)
 
     if (error) return { success: false as const, error: error.message }
 
-    const payments = (data || []).map((row) => {
-      const donor = Array.isArray(row.donors) ? row.donors[0] : row.donors
-      const { donors: _donors, ...payment } = row as Record<string, unknown> & {
-        donors?: { donor_type?: string | null } | { donor_type?: string | null }[] | null
-      }
-      return {
-        ...payment,
-        donor_type: (donor?.donor_type as string | null) ?? null,
-      }
-    })
+    const payments = ((data || []) as Record<string, unknown>[]).map((row) => mapPaymentListRow(row))
 
     await attachPaymentDonorDisplayNames(access.supabase, access.orgId, payments)
     await attachPaymentMethodDisplayLabels(access.supabase, access.orgId, payments)
@@ -169,6 +310,284 @@ export async function fetchPaymentsPageAction(input: PaymentsPageInput = {}) {
     return {
       success: false as const,
       error: error instanceof Error ? error.message : "Could not load payments",
+    }
+  }
+}
+
+export type DonationPaymentFilterOptions = {
+  sources: Array<{ value: string; label: string }>
+  campaigns: Array<{ id: string; name: string }>
+  funds: Array<{ id: string; name: string }>
+  campaignGroups: Array<{ id: string; name: string }>
+}
+
+export async function getDonationPaymentFilterOptionsAction() {
+  const access = await requireDonationStaffAccess("view")
+  if (!access.ok) return { success: false as const, error: access.error }
+
+  try {
+    const [sourcesResult, campaignsResult, fundsResult, groupsResult] = await Promise.all([
+      access.supabase
+        .from("payments")
+        .select("source")
+        .eq("organization_id", access.orgId)
+        .not("source", "is", null)
+        .limit(2000),
+      access.supabase
+        .from("campaigns")
+        .select("id, name")
+        .eq("organization_id", access.orgId)
+        .order("name"),
+      access.supabase
+        .from("donation_subcategories")
+        .select("id, name")
+        .eq("organization_id", access.orgId)
+        .order("name"),
+      access.supabase
+        .from("campaign_groups")
+        .select("id, name")
+        .eq("organization_id", access.orgId)
+        .order("name"),
+    ])
+
+    const sourceValues = [
+      ...new Set(
+        (sourcesResult.data || [])
+          .map((row) => String(row.source || "").trim())
+          .filter(Boolean)
+      ),
+    ].sort((a, b) => formatPaymentSourceLabel(a).localeCompare(formatPaymentSourceLabel(b)))
+
+    return {
+      success: true as const,
+      options: {
+        sources: sourceValues.map((value) => ({
+          value,
+          label: formatPaymentSourceLabel(value),
+        })),
+        campaigns: (campaignsResult.data || []).map((row) => ({
+          id: row.id as string,
+          name: String(row.name || "Untitled campaign"),
+        })),
+        funds: (fundsResult.data || []).map((row) => ({
+          id: row.id as string,
+          name: String(row.name || "Untitled fund"),
+        })),
+        campaignGroups: (groupsResult.data || []).map((row) => ({
+          id: row.id as string,
+          name: String(row.name || "Untitled group"),
+        })),
+      } satisfies DonationPaymentFilterOptions,
+    }
+  } catch (error) {
+    return {
+      success: false as const,
+      error: error instanceof Error ? error.message : "Could not load filters",
+    }
+  }
+}
+
+export type DonationTransactionsSummary = {
+  totalCollected: number
+  paymentCount: number
+  averageGift: number
+  largestGift: number
+  donorCount: number
+  needsAttentionCount: number
+}
+
+const PAYMENTS_SUMMARY_SELECT =
+  "id, amount, refunded_amount, status, donor_id, contact_id, sender_name, payment_date, source, pledge_id, recurring_donation_plan_id"
+
+async function fetchFilteredPaymentRows(
+  supabase: SupabaseClient,
+  orgId: string,
+  input: PaymentsPageInput,
+  select: string,
+  pageSize = 1000
+) {
+  const rows: Record<string, unknown>[] = []
+  let from = 0
+  const matchingDonorIds = await matchingDonorIdsForPaymentFilters(supabase, orgId, input)
+
+  while (true) {
+    let query: any = supabase
+      .from("payments")
+      .select(select)
+      .eq("organization_id", orgId)
+      .order("payment_date", { ascending: false })
+      .range(from, from + pageSize - 1)
+
+    query = applyPaymentsListFilters(query, input, matchingDonorIds)
+    const { data, error } = await query
+    if (error) throw new Error(error.message)
+
+    const batch = (data || []) as Record<string, unknown>[]
+    rows.push(...batch)
+    if (batch.length < pageSize) break
+    from += pageSize
+    if (from > 50000) break
+  }
+
+  return rows
+}
+
+export async function getDonationTransactionsSummaryAction(input: PaymentsPageInput = {}) {
+  const access = await requireDonationStaffAccess("view")
+  if (!access.ok) return { success: false as const, error: access.error }
+
+  try {
+    const rows = await fetchFilteredPaymentRows(
+      access.supabase,
+      access.orgId,
+      input,
+      PAYMENTS_SUMMARY_SELECT
+    )
+
+    let totalCollected = 0
+    let paymentCount = 0
+    let largestGift = 0
+    let needsAttentionCount = 0
+    const donors = new Set<string>()
+
+    for (const row of rows) {
+      const status = String(row.status || "")
+      const net = paymentNetAmount(Number(row.amount || 0), Number(row.refunded_amount || 0))
+      if (["pending_review", "unresolved", "voided"].includes(status)) {
+        needsAttentionCount += 1
+      }
+      if (!countsTowardGivingTotals({ amount: Number(row.amount || 0), refunded_amount: Number(row.refunded_amount || 0), status })) {
+        continue
+      }
+      totalCollected += net
+      paymentCount += 1
+      if (net > largestGift) largestGift = net
+      if (row.donor_id) donors.add(`donor:${row.donor_id}`)
+      else if (row.contact_id) donors.add(`contact:${row.contact_id}`)
+      else if (row.sender_name) donors.add(`sender:${String(row.sender_name)}`)
+    }
+
+    return {
+      success: true as const,
+      summary: {
+        totalCollected,
+        paymentCount,
+        averageGift: paymentCount > 0 ? totalCollected / paymentCount : 0,
+        largestGift,
+        donorCount: donors.size,
+        needsAttentionCount,
+      } satisfies DonationTransactionsSummary,
+    }
+  } catch (error) {
+    return {
+      success: false as const,
+      error: error instanceof Error ? error.message : "Could not load summary",
+    }
+  }
+}
+
+export type DonationGivingBreakdown = {
+  byMonth: Array<{ month: string; amount: number; count: number }>
+  byMethod: Array<{ method: string; amount: number; count: number }>
+}
+
+export async function getDonationGivingBreakdownAction(input: PaymentsPageInput = {}) {
+  const access = await requireDonationStaffAccess("view")
+  if (!access.ok) return { success: false as const, error: access.error }
+
+  try {
+    const rows = await fetchFilteredPaymentRows(
+      access.supabase,
+      access.orgId,
+      input,
+      PAYMENTS_SUMMARY_SELECT
+    )
+
+    const monthMap = new Map<string, { amount: number; count: number }>()
+    const methodMap = new Map<string, { amount: number; count: number }>()
+
+    for (const row of rows) {
+      if (
+        !countsTowardGivingTotals({
+          amount: Number(row.amount || 0),
+          refunded_amount: Number(row.refunded_amount || 0),
+          status: String(row.status || ""),
+        })
+      ) {
+        continue
+      }
+
+      const net = paymentNetAmount(Number(row.amount || 0), Number(row.refunded_amount || 0))
+      const date = String(row.payment_date || "").slice(0, 7)
+      const monthKey = date.length === 7 ? date : "Unknown"
+      const monthEntry = monthMap.get(monthKey) || { amount: 0, count: 0 }
+      monthEntry.amount += net
+      monthEntry.count += 1
+      monthMap.set(monthKey, monthEntry)
+
+      const method = formatPaymentSourceLabel(String(row.source || "manual"))
+      const methodEntry = methodMap.get(method) || { amount: 0, count: 0 }
+      methodEntry.amount += net
+      methodEntry.count += 1
+      methodMap.set(method, methodEntry)
+    }
+
+    const byMonth = [...monthMap.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([month, value]) => ({
+        month,
+        amount: value.amount,
+        count: value.count,
+      }))
+
+    const byMethod = [...methodMap.entries()]
+      .sort((a, b) => b[1].amount - a[1].amount)
+      .map(([method, value]) => ({
+        method,
+        amount: value.amount,
+        count: value.count,
+      }))
+
+    return { success: true as const, breakdown: { byMonth, byMethod } satisfies DonationGivingBreakdown }
+  } catch (error) {
+    return {
+      success: false as const,
+      error: error instanceof Error ? error.message : "Could not load giving charts",
+    }
+  }
+}
+
+export async function fetchPaymentsExportAction(input: PaymentsPageInput = {}) {
+  const access = await requireDonationStaffAccess("view")
+  if (!access.ok) return { success: false as const, error: access.error }
+
+  try {
+    const rows = await fetchFilteredPaymentRows(
+      access.supabase,
+      access.orgId,
+      input,
+      PAYMENTS_LIST_SELECT,
+      500
+    )
+    const payments = rows.map((row) => mapPaymentListRow(row))
+    await attachPaymentDonorDisplayNames(access.supabase, access.orgId, payments)
+    await attachPaymentMethodDisplayLabels(access.supabase, access.orgId, payments)
+
+    for (const payment of payments) {
+      ;(payment as Record<string, unknown>).status_display = formatFinancialActivityPaymentStatus(
+        payment as {
+          status?: string | null
+          amount?: number | null
+          refunded_amount?: number | null
+        }
+      )
+    }
+
+    return { success: true as const, payments }
+  } catch (error) {
+    return {
+      success: false as const,
+      error: error instanceof Error ? error.message : "Could not export payments",
     }
   }
 }
@@ -260,6 +679,35 @@ export async function fetchPledgesPageAction(input: PledgesPageInput = {}) {
     page,
     pageSize,
   }
+}
+
+export async function fetchPledgeLastPaymentDatesAction(pledgeIds: string[]) {
+  const access = await requireDonationStaffAccess("view")
+  if (!access.ok) return { success: false as const, error: access.error }
+
+  const uniqueIds = [...new Set(pledgeIds.filter(Boolean))]
+  if (uniqueIds.length === 0) {
+    return { success: true as const, lastPaymentByPledgeId: {} as Record<string, string> }
+  }
+
+  const { data, error } = await access.supabase
+    .from("payments")
+    .select("pledge_id, payment_date, amount, refunded_amount, status")
+    .eq("organization_id", access.orgId)
+    .in("pledge_id", uniqueIds)
+    .order("payment_date", { ascending: false })
+
+  if (error) return { success: false as const, error: error.message }
+
+  const lastPaymentByPledgeId: Record<string, string> = {}
+  for (const row of data || []) {
+    const pledgeId = String(row.pledge_id || "")
+    if (!pledgeId || lastPaymentByPledgeId[pledgeId]) continue
+    if (!countsTowardGivingTotals(row)) continue
+    if (row.payment_date) lastPaymentByPledgeId[pledgeId] = String(row.payment_date)
+  }
+
+  return { success: true as const, lastPaymentByPledgeId }
 }
 
 export type PledgeSummaryMetricsInput = PledgeListFilters

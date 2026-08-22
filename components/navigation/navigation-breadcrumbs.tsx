@@ -22,7 +22,7 @@ function resolveContactProfileListSegment(
   pathname: string,
   searchParams: Pick<URLSearchParams, "get">
 ) {
-  const match = pathname.match(/^\/contacts\/([^/]+)$/)
+  const match = pathname.match(/^\/(?:contacts|directory)\/([^/]+)$/)
   if (!match) return null
   const list = searchParams.get("list")
   return isContactsListSegment(list) ? list : null

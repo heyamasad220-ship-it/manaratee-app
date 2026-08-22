@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation"
 
+import { DonationOpsChrome } from "@/components/donations/donation-ops-chrome"
 import { requireDonationStaffAccess } from "@/lib/donations/donation-action-auth"
 
 export default async function DonationsPaymentsLayout({
@@ -12,5 +13,9 @@ export default async function DonationsPaymentsLayout({
     redirect("/dashboard")
   }
 
-  return <>{children}</>
+  return (
+    <DonationOpsChrome canManage={access.canManage || access.canManageReports}>
+      {children}
+    </DonationOpsChrome>
+  )
 }

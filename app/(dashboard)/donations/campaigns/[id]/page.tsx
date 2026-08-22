@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { useParams, useSearchParams } from "next/navigation"
-import { ArrowLeft, Pencil, Plus } from "lucide-react"
+import { useParams, useRouter, useSearchParams } from "next/navigation"
+import { ArrowLeft, Plus } from "lucide-react"
 
 import { ContactProfileDialog } from "@/components/contacts/contact-profile-dialog"
 import { Button } from "@/components/ui/button"
@@ -13,6 +13,7 @@ import { CampaignOverviewTab } from "@/components/donations/campaign-overview-ta
 import { CampaignProspectsTab } from "@/components/donations/campaign-prospects-tab"
 import { CampaignStrategyTab } from "@/components/donations/campaign-strategy-tab"
 import { CampaignWorkspaceNav } from "@/components/donations/campaign-workspace-nav"
+import { CampaignWishlistTab } from "@/components/donations/campaign-wishlist-tab"
 import { Card, CardContent } from "@/components/ui/card"
 import {
   Table,
@@ -33,7 +34,6 @@ import {
 } from "@/lib/donations/campaign-analytics"
 import { getCampaignDetailAction } from "@/lib/donations/donation-reports-actions"
 import type { CampaignOverviewMetricKey } from "@/lib/donations/campaign-overview-metrics"
-import type { CampaignPhaseMetrics, CampaignPhaseRow } from "@/lib/donations/campaign-phase-types"
 import type {
   CampaignAskLevelMetrics,
   CampaignAskLevelRow,
@@ -221,6 +221,7 @@ function CampaignDonationsTab({
 
 export default function CampaignDetailPage() {
   const params = useParams()
+  const router = useRouter()
   const searchParams = useSearchParams()
   const campaignId = params.id as string
   const activeTab = parseCampaignWorkspaceTab(searchParams.get("tab"))
@@ -236,8 +237,6 @@ export default function CampaignDetailPage() {
   const [sourceBreakdown, setSourceBreakdown] = useState<CampaignSourceBreakdown | null>(null)
   const [outstandingPledges, setOutstandingPledges] = useState<CampaignOutstandingPledgeRow[]>([])
   const [campaignPledges, setCampaignPledges] = useState<CampaignOutstandingPledgeRow[]>([])
-  const [phaseMetrics, setPhaseMetrics] = useState<CampaignPhaseMetrics[]>([])
-  const [phases, setPhases] = useState<CampaignPhaseRow[]>([])
   const [askLevels, setAskLevels] = useState<CampaignAskLevelRow[]>([])
   const [askLevelMetrics, setAskLevelMetrics] = useState<CampaignAskLevelMetrics[]>([])
   const [campaignPayments, setCampaignPayments] = useState<CampaignPaymentRow[]>([])
@@ -295,8 +294,6 @@ export default function CampaignDetailPage() {
       setSourceBreakdown(null)
       setOutstandingPledges([])
       setCampaignPledges([])
-      setPhaseMetrics([])
-      setPhases([])
       setAskLevels([])
       setAskLevelMetrics([])
       setCampaignPayments([])
@@ -310,8 +307,6 @@ export default function CampaignDetailPage() {
     setSourceBreakdown(result.sourceBreakdown)
     setOutstandingPledges(result.outstandingPledges)
     setCampaignPledges(result.outstandingPledges)
-    setPhaseMetrics(result.phaseMetrics || [])
-    setPhases(result.phases || [])
     setAskLevels(result.askLevels || [])
     setAskLevelMetrics(result.askLevelMetrics || [])
     setOverviewMetricKeys(result.overviewMetricKeys)
@@ -419,42 +414,30 @@ export default function CampaignDetailPage() {
     <>
       <div className="p-6">
         <div className="flex flex-col gap-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-3">
-              <Button variant="outline" size="sm" asChild>
-                <Link href="/donations/campaigns">
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Campaigns
-                </Link>
-              </Button>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/donations/campaigns">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Campaigns
+              </Link>
+            </Button>
 
-              <div className="min-w-0">
-                {canManageCampaigns ? (
-                  <button
-                    type="button"
-                    onClick={() => setShowEditDialog(true)}
-                    className="group inline-flex max-w-full items-center gap-2 text-left text-2xl font-semibold text-foreground transition hover:text-primary"
-                  >
-                    <span className="truncate">{campaign.name}</span>
-                    <Pencil className="h-4 w-4 shrink-0 text-muted-foreground opacity-0 transition group-hover:opacity-100" />
-                  </button>
-                ) : (
-                  <h1 className="text-2xl font-semibold text-foreground">{campaign.name}</h1>
-                )}
-                {endLabel ? (
-                  <p className="text-sm text-muted-foreground">{endLabel}</p>
-                ) : null}
-              </div>
+            <div className="min-w-0">
+              {canManageCampaigns ? (
+                <button
+                  type="button"
+                  onClick={() => setShowEditDialog(true)}
+                  className="max-w-full truncate text-left text-2xl font-semibold text-primary hover:underline"
+                >
+                  {campaign.name}
+                </button>
+              ) : (
+                <h1 className="text-2xl font-semibold text-primary">{campaign.name}</h1>
+              )}
+              {endLabel ? (
+                <p className="text-sm text-muted-foreground">{endLabel}</p>
+              ) : null}
             </div>
-
-            {canManage ? (
-              <Button asChild>
-                <Link href={donationPledgesHref({ action: "add", campaignId: campaign.id })}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Pledge
-                </Link>
-              </Button>
-            ) : null}
           </div>
 
           <CampaignWorkspaceNav campaignId={campaign.id} activeTab={activeTab} />
@@ -466,7 +449,6 @@ export default function CampaignDetailPage() {
               insights={insights}
               sourceBreakdown={sourceBreakdown}
               outstandingPledges={outstandingPledges}
-              phaseMetrics={phaseMetrics}
               overviewMetricKeys={overviewMetricKeys}
               canManage={canManageCampaigns}
               showMetricsEditor={showMetricsEditor}
@@ -484,7 +466,6 @@ export default function CampaignDetailPage() {
               campaignId={campaign.id}
               askLevels={askLevels}
               askLevelMetrics={askLevelMetrics}
-              phases={phases}
               canManage={canManageCampaigns}
               onSaved={() => void loadCampaign()}
             />
@@ -548,17 +529,27 @@ export default function CampaignDetailPage() {
               onChanged={() => void loadCampaign()}
             />
           ) : null}
+
+          {activeTab === "wishlist" ? (
+            <CampaignWishlistTab
+              campaignId={campaign.id}
+              organizationId={campaign.organization_id}
+              canManage={canManageCampaigns}
+            />
+          ) : null}
         </div>
       </div>
 
       {canManageCampaigns ? (
         <CampaignEditDialog
           campaign={campaign}
-          phases={phases}
           open={showEditDialog}
           onOpenChange={setShowEditDialog}
           onSaved={() => {
             void loadCampaign()
+          }}
+          onDeleted={() => {
+            router.push("/donations/campaigns")
           }}
         />
       ) : null}

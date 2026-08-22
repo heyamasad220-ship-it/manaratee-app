@@ -1,13 +1,13 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import Link from "next/link"
 
 import {
   DonationAttributionFields,
   EMPTY_DONATION_ATTRIBUTION_VALUE,
   type DonationAttributionValue,
 } from "@/components/donations/donation-attribution-fields"
+import { WishlistItemPicker } from "@/components/donations/wishlist-item-picker"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -33,7 +33,6 @@ import {
   getCampaignProspectForConversionAction,
 } from "@/lib/donations/campaign-prospect-actions"
 import type { CampaignProspectListItem } from "@/lib/donations/campaign-prospect-types"
-import { donationPledgesHref } from "@/lib/donations/donation-pledge-paths"
 
 function getTodayPlainDate() {
   const today = new Date()
@@ -65,11 +64,11 @@ export function CampaignProspectRecordPledgeDialog({
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [prospect, setProspect] = useState<CampaignProspectListItem | null>(null)
   const [campaignName, setCampaignName] = useState<string | null>(null)
-  const [phaseName, setPhaseName] = useState<string | null>(null)
   const [amount, setAmount] = useState("")
   const [pledgeDate, setPledgeDate] = useState(getTodayPlainDate())
   const [frequency, setFrequency] = useState("One-Time")
   const [notes, setNotes] = useState("")
+  const [wishlistItemId, setWishlistItemId] = useState<string | null>(null)
   const [attribution, setAttribution] = useState<DonationAttributionValue>(
     EMPTY_DONATION_ATTRIBUTION_VALUE
   )
@@ -94,7 +93,6 @@ export function CampaignProspectRecordPledgeDialog({
 
       setProspect(result.prospect)
       setCampaignName(result.campaignName)
-      setPhaseName(result.phaseName)
       setAmount(
         result.prospect.suggested_ask_amount != null
           ? String(result.prospect.suggested_ask_amount)
@@ -103,6 +101,7 @@ export function CampaignProspectRecordPledgeDialog({
       setPledgeDate(getTodayPlainDate())
       setFrequency("One-Time")
       setNotes("")
+      setWishlistItemId(null)
       setAttribution({
         ...EMPTY_DONATION_ATTRIBUTION_VALUE,
         campaignId: result.prospect.campaign_id,
@@ -131,6 +130,7 @@ export function CampaignProspectRecordPledgeDialog({
       notes,
       categoryId: attribution.categoryId || null,
       subcategoryId: attribution.subcategoryId || null,
+      wishlistItemId,
     })
     setSaving(false)
 
@@ -173,12 +173,6 @@ export function CampaignProspectRecordPledgeDialog({
                 <span className="text-muted-foreground">Campaign: </span>
                 <span className="font-medium">{campaignName || "—"}</span>
               </p>
-              {phaseName ? (
-                <p>
-                  <span className="text-muted-foreground">Phase: </span>
-                  <span className="font-medium">{phaseName}</span>
-                </p>
-              ) : null}
               <p>
                 <span className="text-muted-foreground">Suggested Ask: </span>
                 <span className="font-medium tabular-nums">
@@ -208,18 +202,6 @@ export function CampaignProspectRecordPledgeDialog({
               </p>
             </div>
 
-            <DonationAttributionFields
-              organizationId={organizationId}
-              value={attribution}
-              onChange={(next) =>
-                setAttribution({
-                  ...next,
-                  // Keep campaign locked to the prospect campaign.
-                  campaignId: prospect.campaign_id,
-                })
-              }
-            />
-
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="flex flex-col gap-2">
                 <Label htmlFor="convert-pledge-date">Pledge Date</Label>
@@ -246,6 +228,24 @@ export function CampaignProspectRecordPledgeDialog({
               </div>
             </div>
 
+            <DonationAttributionFields
+              organizationId={organizationId}
+              value={attribution}
+              showCampaign={false}
+              onChange={(next) =>
+                setAttribution({
+                  ...next,
+                  campaignId: prospect.campaign_id,
+                })
+              }
+            />
+
+            <WishlistItemPicker
+              campaignId={prospect.campaign_id}
+              value={wishlistItemId}
+              onChange={setWishlistItemId}
+            />
+
             <div className="flex flex-col gap-2">
               <Label htmlFor="convert-notes">Notes</Label>
               <Textarea
@@ -258,34 +258,16 @@ export function CampaignProspectRecordPledgeDialog({
           </div>
         ) : null}
 
-        <DialogFooter className="gap-2 sm:justify-between">
-          {prospect ? (
-            <Button variant="link" className="h-auto px-0" asChild>
-              <Link
-                href={donationPledgesHref({
-                  action: "add",
-                  campaignId: prospect.campaign_id,
-                  contactId: prospect.contact_id,
-                  prospectId: prospect.id,
-                })}
-              >
-                Open full Add Pledge page
-              </Link>
-            </Button>
-          ) : (
-            <span />
-          )}
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
-              Cancel
-            </Button>
-            <Button
-              onClick={() => void handleSave()}
-              disabled={saving || loading || !prospect}
-            >
-              {saving ? "Saving..." : "Create Pledge"}
-            </Button>
-          </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+            Cancel
+          </Button>
+          <Button
+            onClick={() => void handleSave()}
+            disabled={saving || loading || !prospect}
+          >
+            {saving ? "Saving..." : "Create Pledge"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

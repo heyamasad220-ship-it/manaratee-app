@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation"
 
+import { DONATION_TRANSACTIONS_PATH } from "@/lib/donations/donation-payment-paths"
+
 export default function DonationPaymentsOneTimeRedirectPage() {
-  redirect("/donations/reports/one-time")
+  redirect(DONATION_TRANSACTIONS_PATH)
 }

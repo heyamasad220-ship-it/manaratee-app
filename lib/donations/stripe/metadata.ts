@@ -13,6 +13,7 @@ export function buildDonationCheckoutMetadata(input: {
   campaignGroupId?: string | null
   attributedGroupContactId?: string | null
   pledgeId?: string | null
+  wishlistItemId?: string | null
   categoryId?: string | null
   subcategoryId?: string | null
   recurringDonationPlanId?: string | null
@@ -31,6 +32,7 @@ export function buildDonationCheckoutMetadata(input: {
   const campaignGroupId = cleanMetadataValue(input.campaignGroupId)
   const attributedGroupContactId = cleanMetadataValue(input.attributedGroupContactId)
   const pledgeId = cleanMetadataValue(input.pledgeId)
+  const wishlistItemId = cleanMetadataValue(input.wishlistItemId)
   const categoryId = cleanMetadataValue(input.categoryId)
   const subcategoryId = cleanMetadataValue(input.subcategoryId)
   const recurringDonationPlanId = cleanMetadataValue(input.recurringDonationPlanId)
@@ -41,6 +43,7 @@ export function buildDonationCheckoutMetadata(input: {
     metadata.attributed_group_contact_id = attributedGroupContactId
   }
   if (pledgeId) metadata.pledge_id = pledgeId
+  if (wishlistItemId) metadata.wishlist_item_id = wishlistItemId
   if (categoryId) metadata.category_id = categoryId
   if (subcategoryId) metadata.subcategory_id = subcategoryId
   if (recurringDonationPlanId) metadata.recurring_donation_plan_id = recurringDonationPlanId
@@ -77,6 +80,7 @@ export function parseDonationCheckoutMetadata(
     campaign_group_id: cleanMetadataValue(metadata.campaign_group_id),
     attributed_group_contact_id: cleanMetadataValue(metadata.attributed_group_contact_id),
     pledge_id: cleanMetadataValue(metadata.pledge_id),
+    wishlist_item_id: cleanMetadataValue(metadata.wishlist_item_id),
     category_id: cleanMetadataValue(metadata.category_id),
     subcategory_id: cleanMetadataValue(metadata.subcategory_id),
     recurring_donation_plan_id: cleanMetadataValue(metadata.recurring_donation_plan_id),

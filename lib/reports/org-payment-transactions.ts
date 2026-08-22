@@ -141,7 +141,7 @@ async function loadDonationPayments(
       status,
       detailHref: contactId
         ? `/contacts/${contactId}?tab=financial`
-        : "/donations/reports/one-time",
+        : "/donations/payments/transactions",
       failureHint:
         status === "Failed" ? "Card or payment method declined" : null,
     }

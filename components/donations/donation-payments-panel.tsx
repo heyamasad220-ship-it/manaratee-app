@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Header } from "@/components/layout/header";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -38,15 +38,36 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { Check, ChevronsUpDown, Plus } from "lucide-react";
+import { Check, ChevronsUpDown, Download, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { TableColumnHeaderFilter } from "@/components/ui/table-column-header-filter";
 import { DonationPaymentRowActions } from "@/components/donations/donation-payment-row-actions";
+import { DonationOneTimeOverviewCards } from "@/components/donations/donation-one-time-overview-cards";
+import { DonationGivingCharts } from "@/components/donations/donation-giving-charts";
 import {
   fetchOpenPledgesForAllocationAction,
+  fetchPaymentsExportAction,
   fetchPaymentsPageAction,
+  getDonationGivingBreakdownAction,
+  getDonationPaymentFilterOptionsAction,
+  getDonationTransactionsSummaryAction,
   searchContactsForDonationPickerAction,
+  type DonationGivingBreakdown,
+  type DonationPaymentFilterOptions,
+  type DonationTransactionsSummary,
+  type PaymentStatusDisplayFilter,
+  type PaymentTransactionTypeFilter,
+  type PaymentsPageInput,
 } from "@/lib/donations/donation-list-actions";
+import {
+  DONATION_RANGE_LABELS,
+  DONATION_RANGE_PRESETS,
+  donationRangeSearchParams,
+  parseDonationRangeParam,
+  resolveDonationRangeBounds,
+  type DonationRangePreset,
+} from "@/lib/donations/donation-date-range";
+import { downloadPaymentsReportCsv } from "@/lib/donations/payment-report-csv";
 import { ensureDonorExtensionForContact } from "@/lib/donations/donor-contact-bridge";
 import { ensureGroupMembershipForDonationAction } from "@/lib/contacts/group-giving-actions";
 import { DonationGroupPicker } from "@/components/donations/donation-group-picker";
@@ -65,6 +86,7 @@ import {
   toAttributionIds,
   type DonationAttributionValue,
 } from "@/components/donations/donation-attribution-fields";
+import { WishlistItemPicker } from "@/components/donations/wishlist-item-picker";
 import {
   fetchPledgeAttribution,
   toPaymentAttributionColumns,
@@ -84,6 +106,7 @@ type Payment = {
   source_type?: string | null;
   memo: string | null;
   pledge_id: string | null;
+  recurring_donation_plan_id?: string | null;
   donor_id: string | null;
   contact_id: string | null;
   donor_type: string | null;
@@ -96,6 +119,10 @@ type Payment = {
   donor_contact_id?: string | null;
   method_display?: string | null;
   status_display?: string | null;
+  campaign_name?: string | null;
+  fund_name?: string | null;
+  campaign_group_name?: string | null;
+  receipt_status?: string | null;
 };
 
 type ContactPickerOption = {
@@ -123,9 +150,14 @@ function formatCurrency(value: number) {
   }).format(value);
 }
 
+function paymentTypeLabel(payment: Payment) {
+  if (payment.recurring_donation_plan_id) return "Recurring Donation";
+  if (payment.pledge_id) return "Pledge Payment";
+  return "One-Time Donation";
+}
+
 function formatDate(date: string | null) {
   if (!date) return "—";
-
   return new Date(date).toLocaleDateString("en-US", {
     year: "numeric",
     month: "short",
@@ -177,11 +209,27 @@ function toPaymentHistoryRow(payment: Payment) {
   });
 }
 
-export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean }) {
+export function DonationPaymentsPanel({
+  embedded = false,
+  readOnly = false,
+  showCharts = false,
+  defaultRange = "all",
+  defaultStatusDisplay = "all",
+}: {
+  embedded?: boolean
+  readOnly?: boolean
+  showCharts?: boolean
+  defaultRange?: DonationRangePreset
+  defaultStatusDisplay?: PaymentStatusDisplayFilter | "all"
+}) {
   const supabase = createClient();
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const [handledAddQuery, setHandledAddQuery] = useState(false);
+
+  const range = parseDonationRangeParam(searchParams.get("range"), defaultRange);
+  const { dateFrom, dateTo, label: rangeLabel } = resolveDonationRangeBounds(range);
 
   const [organizationId, setOrganizationId] = useState<string | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -189,7 +237,24 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
   const [page, setPage] = useState(1);
   const [donorNameFilter, setDonorNameFilter] = useState("");
   const [donorNameFilterInput, setDonorNameFilterInput] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState<PaymentStatusDisplayFilter | "all">(
+    defaultStatusDisplay
+  );
+  const [typeFilter, setTypeFilter] = useState<PaymentTransactionTypeFilter>("all");
+  const [sourceFilter, setSourceFilter] = useState("all");
+  const [campaignFilter, setCampaignFilter] = useState("all");
+  const [fundFilter, setFundFilter] = useState("all");
+  const [groupFilter, setGroupFilter] = useState("all");
+  const [filterOptions, setFilterOptions] = useState<DonationPaymentFilterOptions>({
+    sources: [],
+    campaigns: [],
+    funds: [],
+    campaignGroups: [],
+  });
+  const [summary, setSummary] = useState<DonationTransactionsSummary | null>(null);
+  const [breakdown, setBreakdown] = useState<DonationGivingBreakdown | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -210,6 +275,7 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
   const [attribution, setAttribution] = useState<DonationAttributionValue>(
     EMPTY_DONATION_ATTRIBUTION_VALUE
   );
+  const [wishlistItemId, setWishlistItemId] = useState<string | null>(null);
   const [selectedGroupContactId, setSelectedGroupContactId] = useState<string | null>(null);
   const [selectedGroupLabel, setSelectedGroupLabel] = useState("");
 
@@ -231,6 +297,31 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
   const allocationPledges = selectedPayment?.donor_id
     ? pledges.filter((pledge) => pledge.donor_id === selectedPayment.donor_id)
     : pledges;
+
+  const listFilters: PaymentsPageInput = useMemo(
+    () => ({
+      donorName: donorNameFilter || undefined,
+      statusDisplay: statusFilter === "all" ? undefined : statusFilter,
+      dateFrom: dateFrom || undefined,
+      dateTo: dateTo || undefined,
+      transactionType: typeFilter === "all" ? undefined : typeFilter,
+      source: sourceFilter === "all" ? undefined : sourceFilter,
+      campaignId: campaignFilter === "all" ? undefined : campaignFilter,
+      fundId: fundFilter === "all" ? undefined : fundFilter,
+      campaignGroupId: groupFilter === "all" ? undefined : groupFilter,
+    }),
+    [
+      donorNameFilter,
+      statusFilter,
+      dateFrom,
+      dateTo,
+      typeFilter,
+      sourceFilter,
+      campaignFilter,
+      fundFilter,
+      groupFilter,
+    ]
+  );
 
   async function getOrgIdForCurrentUser() {
     const {
@@ -258,13 +349,9 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
 
     try {
       const result = await fetchPaymentsPageAction({
+        ...listFilters,
         page: nextPage,
         pageSize: DONATIONS_PAGE_SIZE,
-        donorName: donorNameFilter || undefined,
-        statusDisplay:
-          statusFilter === "all"
-            ? undefined
-            : (statusFilter as "Succeeded" | "Failed" | "Refunded" | "Partially Refunded"),
       });
 
       if (!result.success) {
@@ -274,7 +361,7 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
         return;
       }
 
-      setPayments(result.payments as Payment[]);
+      setPayments(result.payments as unknown as Payment[]);
       setTotalPayments(result.total);
       setPage(result.page);
 
@@ -313,7 +400,7 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
 
   useEffect(() => {
     setPage(1);
-  }, [donorNameFilter, statusFilter]);
+  }, [donorNameFilter, statusFilter, range, typeFilter, sourceFilter, campaignFilter, fundFilter, groupFilter]);
 
   useEffect(() => {
     void (async () => {
@@ -321,6 +408,10 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
       if (orgId) {
         setOrganizationId(orgId);
         await loadContactsForPicker("");
+      }
+      const optionsResult = await getDonationPaymentFilterOptionsAction();
+      if (optionsResult.success) {
+        setFilterOptions(optionsResult.options);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -370,7 +461,7 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
       setPaymentDate(new Date().toISOString().slice(0, 10));
       setShowAddDialog(true);
       setHandledAddQuery(true);
-      router.replace("/donations/reports/one-time", { scroll: false });
+      router.replace("/donations/payments/transactions", { scroll: false });
     })();
   }, [handledAddQuery, router, searchParams, supabase]);
 
@@ -383,13 +474,9 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
 
       try {
         const result = await fetchPaymentsPageAction({
+          ...listFilters,
           page,
           pageSize: DONATIONS_PAGE_SIZE,
-          donorName: donorNameFilter || undefined,
-          statusDisplay:
-            statusFilter === "all"
-              ? undefined
-              : (statusFilter as "Succeeded" | "Failed" | "Refunded" | "Partially Refunded"),
         });
 
         if (cancelled) return;
@@ -401,16 +488,28 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
           return;
         }
 
-        setPayments(result.payments as Payment[]);
+        setPayments(result.payments as unknown as Payment[]);
         setTotalPayments(result.total);
         setPage(result.page);
+
+        setSummaryLoading(true);
+        const [summaryResult, breakdownResult] = await Promise.all([
+          getDonationTransactionsSummaryAction(listFilters),
+          showCharts
+            ? getDonationGivingBreakdownAction(listFilters)
+            : Promise.resolve({ success: false as const, error: "" }),
+        ]);
+        if (cancelled) return;
+        if (summaryResult.success) setSummary(summaryResult.summary);
+        if (breakdownResult.success) setBreakdown(breakdownResult.breakdown);
+        setSummaryLoading(false);
 
         const effectiveOrgId = organizationId || (await getOrgIdForCurrentUser());
         if (effectiveOrgId && !organizationId) {
           setOrganizationId(effectiveOrgId);
         }
 
-        if (effectiveOrgId) {
+        if (effectiveOrgId && !readOnly) {
           const pledgeResult = await fetchOpenPledgesForAllocationAction();
           if (cancelled) return;
 
@@ -434,12 +533,33 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [donorNameFilter, statusFilter, page]);
+  }, [listFilters, page]);
 
   useEffect(() => {
     if (!showAddDialog) return;
     void loadContactsForPicker(donorSearch);
   }, [donorSearch, showAddDialog]);
+
+  function handleRangeChange(next: DonationRangePreset) {
+    const params = donationRangeSearchParams(searchParams, next, defaultRange);
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }
+
+  async function handleExport() {
+    setExporting(true);
+    const result = await fetchPaymentsExportAction(listFilters);
+    setExporting(false);
+    if (!result.success) {
+      alert(result.error || "Could not export payments.");
+      return;
+    }
+    if (result.payments.length === 0) {
+      alert("No payments to export for the current filters.");
+      return;
+    }
+    downloadPaymentsReportCsv(result.payments, new Date().toISOString(), rangeLabel);
+  }
 
   function resetForm() {
     setSelectedContactId(null);
@@ -450,6 +570,7 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
     setSource("cash");
     setMemo("");
     setAttribution(EMPTY_DONATION_ATTRIBUTION_VALUE);
+    setWishlistItemId(null);
     setSelectedGroupContactId(null);
     setSelectedGroupLabel("");
   }
@@ -518,6 +639,7 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
       status: resolvedDonorId ? "unallocated" : "pending_review",
       is_verified: false,
       ...toAttributionIds(attribution),
+      wishlist_item_id: attribution.campaignId ? wishlistItemId : null,
     });
 
     setSaving(false);
@@ -595,19 +717,47 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
       {!embedded ? <Header title="Payments" /> : null}
 
       <div className={embedded ? "space-y-6" : "p-6 space-y-6"}>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-lg font-semibold">All Payments</h2>
+            <h2 className="text-lg font-semibold">
+              {readOnly ? "Gifts" : "Donation Transactions"}
+            </h2>
             <p className="text-sm text-muted-foreground">
-              All recorded payments for this organization
+              {readOnly
+                ? "Read-only payment register for this report. Drill into a transaction for details."
+                : "View and manage recorded fundraising payments for this organization."}
             </p>
           </div>
 
-          <Button onClick={() => setShowAddDialog(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Receive Payment
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Select value={range} onValueChange={(value) => handleRangeChange(value as DonationRangePreset)}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {DONATION_RANGE_PRESETS.map((preset) => (
+                  <SelectItem key={preset} value={preset}>
+                    {DONATION_RANGE_LABELS[preset]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button variant="outline" onClick={() => void handleExport()} disabled={exporting}>
+              <Download className="mr-2 h-4 w-4" />
+              {exporting ? "Exporting..." : "Export"}
+            </Button>
+            {readOnly ? null : (
+              <Button onClick={() => setShowAddDialog(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Receive Payment
+              </Button>
+            )}
+          </div>
         </div>
+
+        <DonationOneTimeOverviewCards loading={summaryLoading} summary={summary} />
+
+        {showCharts ? <DonationGivingCharts loading={summaryLoading} breakdown={breakdown} /> : null}
 
         <div className="flex flex-wrap items-center gap-3">
           <span className="text-sm text-muted-foreground">
@@ -655,7 +805,145 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
                       </TableColumnHeaderFilter>
                     </th>
                     <th className="text-left p-3">Amount</th>
-                    <th className="text-left p-3">Method</th>
+                    <th className="text-left p-3">
+                      <TableColumnHeaderFilter
+                        label="Type"
+                        active={typeFilter !== "all"}
+                      >
+                        {({ close }) => (
+                          <Select
+                            value={typeFilter}
+                            onValueChange={(value) => {
+                              setTypeFilter(value as PaymentTransactionTypeFilter);
+                              close();
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All types</SelectItem>
+                              <SelectItem value="one_time">One-Time Donation</SelectItem>
+                              <SelectItem value="pledge">Pledge Payment</SelectItem>
+                              <SelectItem value="recurring">Recurring Donation</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </TableColumnHeaderFilter>
+                    </th>
+                    <th className="text-left p-3">
+                      <TableColumnHeaderFilter
+                        label="Method"
+                        active={sourceFilter !== "all"}
+                      >
+                        {({ close }) => (
+                          <Select
+                            value={sourceFilter}
+                            onValueChange={(value) => {
+                              setSourceFilter(value);
+                              close();
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select method" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All methods</SelectItem>
+                              {filterOptions.sources.map((source) => (
+                                <SelectItem key={source.value} value={source.value}>
+                                  {source.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </TableColumnHeaderFilter>
+                    </th>
+                    <th className="text-left p-3">
+                      <TableColumnHeaderFilter
+                        label="Campaign"
+                        active={campaignFilter !== "all"}
+                      >
+                        {({ close }) => (
+                          <Select
+                            value={campaignFilter}
+                            onValueChange={(value) => {
+                              setCampaignFilter(value);
+                              close();
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select campaign" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All campaigns</SelectItem>
+                              {filterOptions.campaigns.map((campaign) => (
+                                <SelectItem key={campaign.id} value={campaign.id}>
+                                  {campaign.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </TableColumnHeaderFilter>
+                    </th>
+                    <th className="text-left p-3">
+                      <TableColumnHeaderFilter
+                        label="Fund"
+                        active={fundFilter !== "all"}
+                      >
+                        {({ close }) => (
+                          <Select
+                            value={fundFilter}
+                            onValueChange={(value) => {
+                              setFundFilter(value);
+                              close();
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select fund" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All funds</SelectItem>
+                              {filterOptions.funds.map((fund) => (
+                                <SelectItem key={fund.id} value={fund.id}>
+                                  {fund.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </TableColumnHeaderFilter>
+                    </th>
+                    <th className="text-left p-3">
+                      <TableColumnHeaderFilter
+                        label="Group"
+                        active={groupFilter !== "all"}
+                      >
+                        {({ close }) => (
+                          <Select
+                            value={groupFilter}
+                            onValueChange={(value) => {
+                              setGroupFilter(value);
+                              close();
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select group" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All groups</SelectItem>
+                              {filterOptions.campaignGroups.map((group) => (
+                                <SelectItem key={group.id} value={group.id}>
+                                  {group.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </TableColumnHeaderFilter>
+                    </th>
+                    <th className="text-left p-3">Receipt</th>
                     <th className="text-left p-3">
                       <TableColumnHeaderFilter
                         label="Status"
@@ -665,7 +953,7 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
                           <Select
                             value={statusFilter}
                             onValueChange={(value) => {
-                              setStatusFilter(value);
+                              setStatusFilter(value as PaymentStatusDisplayFilter | "all");
                               close();
                             }}
                           >
@@ -683,7 +971,7 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
                         )}
                       </TableColumnHeaderFilter>
                     </th>
-                    <th className="text-right p-3">Actions</th>
+                    {readOnly ? null : <th className="text-right p-3">Actions</th>}
                   </tr>
                 </thead>
 
@@ -709,9 +997,16 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
                         {formatCurrency(Number(payment.amount || 0))}
                       </td>
 
+                      <td className="p-3 text-muted-foreground">{paymentTypeLabel(payment)}</td>
+
                       <td className="p-3 text-muted-foreground">
                         {payment.method_display || "—"}
                       </td>
+
+                      <td className="p-3 text-muted-foreground">{payment.campaign_name || "—"}</td>
+                      <td className="p-3 text-muted-foreground">{payment.fund_name || "—"}</td>
+                      <td className="p-3 text-muted-foreground">{payment.campaign_group_name || "—"}</td>
+                      <td className="p-3 text-muted-foreground">{payment.receipt_status || "—"}</td>
 
                       <td className="p-3">
                         {payment.status_display ? (
@@ -729,6 +1024,7 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
                         )}
                       </td>
 
+                      {readOnly ? null : (
                       <td className="p-3 text-right">
                         <DonationPaymentRowActions
                           row={toPaymentHistoryRow(payment)}
@@ -744,6 +1040,7 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
                           onUpdated={() => void loadPayments()}
                         />
                       </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -932,7 +1229,15 @@ export function DonationPaymentsPanel({ embedded = false }: { embedded?: boolean
             <DonationAttributionFields
               organizationId={organizationId}
               value={attribution}
-              onChange={setAttribution}
+              onChange={(value) => {
+                setAttribution(value);
+                if (!value.campaignId) setWishlistItemId(null);
+              }}
+            />
+            <WishlistItemPicker
+              campaignId={attribution.campaignId || null}
+              value={wishlistItemId}
+              onChange={setWishlistItemId}
             />
 
             <div className="flex flex-col gap-2">

@@ -23,6 +23,8 @@ export interface SubItem {
   permissionKeys?: string[]
   exact?: boolean
   children?: SubItem[]
+  /** Render a compact divider above this item (Directory flyout sections). */
+  dividerBefore?: boolean
   /** Advanced Facilities-only nav (inventory, reservation center, ops overview). */
   advancedFacilities?: boolean
 }
@@ -52,10 +54,12 @@ const CONTACTS_LIST_SEGMENTS = new Set([
   "groups",
   "settings",
   "members",
+  "reports",
+  "role",
 ])
 
 export function isContactProfilePath(pathname: string) {
-  const match = pathname.match(/^\/contacts\/([^/]+)$/)
+  const match = pathname.match(/^\/(?:contacts|directory)\/([^/]+)$/)
   if (!match) return false
   return !CONTACTS_LIST_SEGMENTS.has(match[1])
 }

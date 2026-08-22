@@ -46,6 +46,7 @@ export async function createRecurringDonationCheckout(
       campaign_id: input.campaignId ?? null,
       campaign_group_id: input.campaignGroupId ?? null,
       attributed_group_contact_id: input.attributedGroupContactId ?? null,
+      wishlist_item_id: input.wishlistItemId ?? null,
       category_id: input.categoryId ?? null,
       subcategory_id: input.subcategoryId ?? null,
       amount: input.amount,
@@ -79,6 +80,7 @@ export async function createRecurringDonationCheckout(
       campaign_id: input.campaignId ?? null,
       campaign_group_id: input.campaignGroupId ?? null,
       attributed_group_contact_id: input.attributedGroupContactId ?? null,
+      wishlist_item_id: input.wishlistItemId ?? null,
       category_id: input.categoryId ?? null,
       subcategory_id: input.subcategoryId ?? null,
       recurring_donation_plan_id: planRow.id,
@@ -91,6 +93,7 @@ export async function createRecurringDonationCheckout(
         frequency: input.frequency,
         campaign_group_id: input.campaignGroupId ?? null,
         attributed_group_contact_id: input.attributedGroupContactId ?? null,
+        wishlist_item_id: input.wishlistItemId ?? null,
       },
     })
     .select("id")
@@ -108,6 +111,7 @@ export async function createRecurringDonationCheckout(
     campaignId: input.campaignId,
     campaignGroupId: input.campaignGroupId,
     attributedGroupContactId: input.attributedGroupContactId,
+    wishlistItemId: input.wishlistItemId,
     categoryId: input.categoryId,
     subcategoryId: input.subcategoryId,
     recurringDonationPlanId: planRow.id,

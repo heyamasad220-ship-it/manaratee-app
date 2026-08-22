@@ -1,5 +1,11 @@
-import { redirect } from "next/navigation"
+import { Suspense } from "react"
+
+import { DonationReportsLanding } from "@/components/donations/donation-reports-landing"
 
 export default function DonationsReportsPage() {
-  redirect("/donations/reports/one-time")
+  return (
+    <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading reports...</div>}>
+      <DonationReportsLanding />
+    </Suspense>
+  )
 }

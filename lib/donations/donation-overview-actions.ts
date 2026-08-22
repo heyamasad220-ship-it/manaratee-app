@@ -14,7 +14,7 @@ import {
 } from "@/lib/donations/donation-dashboard-actions"
 import { buildPledgeCollectionReport } from "@/lib/donations/pledge-reminder-data"
 import { paymentNetAmount } from "@/lib/donations/payment-net-amount"
-import { donationPaymentDetailHref } from "@/lib/donations/donation-payment-paths"
+import { donationPaymentDetailHref, donationReceiptsHref } from "@/lib/donations/donation-payment-paths"
 import { donationPledgesHref } from "@/lib/donations/donation-pledge-paths"
 
 const CAMPAIGNS_ENDING_SOON_DAYS = 14
@@ -59,6 +59,7 @@ function buildActionItems(input: {
   unresolvedCount: number
   overduePledgeCount: number
   failedReceiptCount: number
+  missingReceiptCount: number
   failedProcessorCount: number
   campaignsEndingSoon: Array<{ id: string; name: string; endDate: string }>
 }): DonationOverviewActionItem[] {
@@ -71,7 +72,7 @@ function buildActionItems(input: {
     items.push({
       id: "pending-match",
       label: `${input.pendingMatchCount} imported ${plural(input.pendingMatchCount, "payment")} waiting to be matched`,
-      href: "/donations/reports/match",
+      href: "/donations/payments/import-match?view=match",
     })
   }
 
@@ -79,7 +80,7 @@ function buildActionItems(input: {
     items.push({
       id: "linkable-pledge-payments",
       label: `${input.linkablePledgePaymentCount} ${plural(input.linkablePledgePaymentCount, "payment")} may be linked to an open pledge`,
-      href: "/donations/reports/match",
+      href: "/donations/payments/import-match?view=match",
     })
   }
 
@@ -87,7 +88,7 @@ function buildActionItems(input: {
     items.push({
       id: "unresolved",
       label: `${input.unresolvedCount} unresolved ${plural(input.unresolvedCount, "payment")} need review`,
-      href: "/donations/reports/match",
+      href: "/donations/payments/import-match?view=match",
     })
   }
 
@@ -95,7 +96,7 @@ function buildActionItems(input: {
     items.push({
       id: "processor-failures",
       label: `${input.failedProcessorCount} payment processor ${plural(input.failedProcessorCount, "issue", "issues")} need attention`,
-      href: "/donations/reports/match",
+      href: "/donations/payments/import-match?view=match",
     })
   }
 
@@ -111,7 +112,15 @@ function buildActionItems(input: {
     items.push({
       id: "failed-receipts",
       label: `${input.failedReceiptCount} failed ${plural(input.failedReceiptCount, "receipt")}`,
-      href: "/donations/reports/receipts",
+      href: donationReceiptsHref(),
+    })
+  }
+
+  if (input.missingReceiptCount > 0) {
+    items.push({
+      id: "missing-receipts",
+      label: `${input.missingReceiptCount} missing ${plural(input.missingReceiptCount, "receipt")}`,
+      href: donationReceiptsHref({ status: "missing" }),
     })
   }
 
@@ -300,7 +309,7 @@ async function buildRecentActivity(
       id: `import-${batch.id}`,
       label: `Import completed — ${rowCount} ${plural(rowCount, "row")} from ${fileName}`,
       occurredAt: batch.created_at as string,
-      href: "/donations/reports/import",
+      href: "/donations/payments/import-match",
     })
   }
 
@@ -340,6 +349,8 @@ export async function getDonationOverviewDashboardAction(): Promise<
     unresolvedResult,
     failedReceiptsResult,
     failedProcessorResult,
+    paymentsCountResult,
+    receiptedPaymentsCountResult,
     pledgeReport,
     campaignEntries,
   ] = await Promise.all([
@@ -364,6 +375,17 @@ export async function getDonationOverviewDashboardAction(): Promise<
       .select("id", { count: "exact", head: true })
       .eq("organization_id", access.orgId)
       .eq("processing_status", "failed"),
+    access.supabase
+      .from("payments")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", access.orgId)
+      .neq("status", "voided"),
+    access.supabase
+      .from("donation_receipts")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", access.orgId)
+      .eq("receipt_type", "payment")
+      .not("payment_id", "is", null),
     buildPledgeCollectionReport(access.supabase, access.orgId),
     fetchCampaignAnalyticsEntries(access.supabase, access.orgId),
   ])
@@ -389,6 +411,10 @@ export async function getDonationOverviewDashboardAction(): Promise<
     unresolvedCount: unresolvedResult.count ?? 0,
     overduePledgeCount: pledgeReport.overdueCount,
     failedReceiptCount: failedReceiptsResult.count ?? 0,
+    missingReceiptCount: Math.max(
+      0,
+      (paymentsCountResult.count ?? 0) - (receiptedPaymentsCountResult.count ?? 0)
+    ),
     failedProcessorCount: failedProcessorResult.count ?? 0,
     campaignsEndingSoon,
   })

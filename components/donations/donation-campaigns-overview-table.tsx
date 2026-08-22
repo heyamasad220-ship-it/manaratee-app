@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { Pencil, Plus, Trash2 } from "lucide-react"
+import { Plus } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -32,7 +32,6 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
-import { CampaignPhaseEditor } from "@/components/donations/campaign-phase-editor"
 import { CampaignProgressBar } from "@/components/donations/campaign-progress-bar"
 import {
   PledgeSummaryMetricCards,
@@ -41,17 +40,9 @@ import {
 import {
   formatDonationCurrency,
 } from "@/lib/donations/campaign-analytics"
-import {
-  draftsToPhaseWriteInputs,
-  emptyPhaseDraft,
-  phaseGoalsMatchCampaignGoal,
-  sumPhaseGoalAmounts,
-  type CampaignPhaseDraft,
-} from "@/lib/donations/campaign-phase-types"
 import { fetchPledgeSummaryMetricsAction } from "@/lib/donations/donation-list-actions"
 import {
   createCampaignAction,
-  deleteCampaignAction,
   getCampaignAnalyticsAction,
   updateCampaignAction,
 } from "@/lib/donations/donation-reports-actions"
@@ -149,9 +140,7 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
     startDate: "",
     endDate: "",
     status: "Draft" as CampaignStatus,
-    goalBreakdownEnabled: false,
   })
-  const [phaseDrafts, setPhaseDrafts] = useState<CampaignPhaseDraft[]>([])
   const [summaryMetrics, setSummaryMetrics] = useState<PledgeSummaryMetrics>({
     totalPledged: 0,
     totalCollected: 0,
@@ -216,9 +205,7 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
         startDate: editingCampaign.startDate,
         endDate: editingCampaign.endDate,
         status: editingCampaign.status,
-        goalBreakdownEnabled: false,
       })
-      setPhaseDrafts([])
       return
     }
 
@@ -229,9 +216,7 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
       startDate: "",
       endDate: "",
       status: "Draft",
-      goalBreakdownEnabled: false,
     })
-    setPhaseDrafts([])
   }, [editingCampaign])
 
   const sortedCampaigns = useMemo(() => sortCampaignsByStartDate(campaigns), [campaigns])
@@ -244,33 +229,10 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
   const displayedCampaigns = showAllCampaigns ? sortedCampaigns : defaultVisibleCampaigns
   const hiddenCampaignCount = Math.max(sortedCampaigns.length - defaultVisibleCampaigns.length, 0)
 
-  async function handleSaveCampaign(allowPhaseGoalMismatch = false) {
+  async function handleSaveCampaign() {
     if (!campaignForm.name.trim()) {
       alert("Campaign name is required")
       return
-    }
-
-    const goalBreakdownEnabled = campaignForm.goalBreakdownEnabled
-    const phaseInputs = goalBreakdownEnabled ? draftsToPhaseWriteInputs(phaseDrafts) : []
-
-    if (goalBreakdownEnabled && phaseInputs.length === 0) {
-      alert("Add at least one phase, or turn off Goal Breakdown.")
-      return
-    }
-
-    if (
-      goalBreakdownEnabled &&
-      !allowPhaseGoalMismatch &&
-      !phaseGoalsMatchCampaignGoal(
-        campaignForm.goalAmount ? Number(campaignForm.goalAmount) : null,
-        sumPhaseGoalAmounts(phaseDrafts)
-      )
-    ) {
-      const confirmed = window.confirm(
-        "Phase goals do not equal the overall campaign goal. Save anyway?"
-      )
-      if (!confirmed) return
-      return handleSaveCampaign(true)
     }
 
     const payload = {
@@ -280,30 +242,17 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
       start_date: campaignForm.startDate || null,
       end_date: campaignForm.endDate || null,
       status: campaignForm.status,
-      goal_breakdown_enabled: goalBreakdownEnabled,
-      phases: phaseInputs,
-      allow_phase_goal_mismatch: allowPhaseGoalMismatch,
     }
 
     if (editingCampaign) {
       const result = await updateCampaignAction(editingCampaign.id, payload)
       if (!result.success) {
-        if ("code" in result && result.code === "phase_goal_mismatch") {
-          const confirmed = window.confirm(`${result.error}\n\nSave anyway?`)
-          if (confirmed) return handleSaveCampaign(true)
-          return
-        }
         alert(result.error)
         return
       }
     } else {
       const result = await createCampaignAction(payload)
       if (!result.success) {
-        if ("code" in result && result.code === "phase_goal_mismatch") {
-          const confirmed = window.confirm(`${result.error}\n\nSave anyway?`)
-          if (confirmed) return handleSaveCampaign(true)
-          return
-        }
         alert(result.error)
         return
       }
@@ -317,21 +266,6 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
 
     setShowCampaignDialog(false)
     setEditingCampaign(null)
-    await loadCampaigns()
-    await loadSummaryMetrics()
-  }
-
-  async function handleDeleteCampaign(campaignId: string) {
-    if (!confirm("Are you sure you want to delete this campaign? This action cannot be undone.")) {
-      return
-    }
-
-    const result = await deleteCampaignAction(campaignId)
-    if (!result.success) {
-      alert(result.error)
-      return
-    }
-
     await loadCampaigns()
     await loadSummaryMetrics()
   }
@@ -378,14 +312,13 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
                   <TableHead>Collected</TableHead>
                   <TableHead>Progress</TableHead>
                   <TableHead>Status</TableHead>
-                  {canManage ? <TableHead className="w-[100px]" /> : null}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {displayedCampaigns.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={canManage ? 6 : 5}
+                      colSpan={5}
                       className="py-8 text-center text-muted-foreground"
                     >
                       {loading ? "Loading campaigns..." : "No campaigns yet"}
@@ -425,31 +358,6 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
                         <TableCell>
                           <CampaignStatusBadge status={campaign.status} />
                         </TableCell>
-                        {canManage ? (
-                          <TableCell>
-                            <div className="flex items-center gap-1">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => {
-                                  setEditingCampaign(campaign)
-                                  setShowCampaignDialog(true)
-                                }}
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-muted-foreground hover:text-red-600"
-                                onClick={() => void handleDeleteCampaign(campaign.id)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        ) : null}
                       </TableRow>
                     )
                   })
@@ -510,7 +418,7 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
                 />
               </div>
               <div className="flex flex-col gap-2">
-                <Label htmlFor="camp-goal">Overall Goal</Label>
+                <Label htmlFor="camp-goal">Goal</Label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
                     $
@@ -570,26 +478,6 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
                   </SelectContent>
                 </Select>
               </div>
-
-              {!editingCampaign ? (
-                <CampaignPhaseEditor
-                  enabled={campaignForm.goalBreakdownEnabled}
-                  onEnabledChange={(enabled) => {
-                    setCampaignForm((prev) => ({ ...prev, goalBreakdownEnabled: enabled }))
-                    if (enabled && phaseDrafts.length === 0) {
-                      setPhaseDrafts([emptyPhaseDraft(0), emptyPhaseDraft(1)])
-                    }
-                  }}
-                  phases={phaseDrafts}
-                  onPhasesChange={setPhaseDrafts}
-                  campaignGoalAmount={campaignForm.goalAmount}
-                  idPrefix="create-phase"
-                />
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Open the campaign workspace to edit goal phases for an existing campaign.
-                </p>
-              )}
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowCampaignDialog(false)}>

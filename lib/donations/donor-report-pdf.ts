@@ -50,8 +50,6 @@ export function buildDonorGivingReportHtml(input: DonorGivingReportPdfInput): st
         <td style="text-align:right">${formatMoney(Number(donor.total_donations || 0))}</td>
         <td style="text-align:right">${donor.donation_count ?? 0}</td>
         <td>${escapeHtml(formatReportDate(donor.last_donation_date))}</td>
-        <td>${escapeHtml(donor.pledge_status || "—")}</td>
-        <td style="text-align:right">${formatMoney(Number(donor.outstanding_pledge_balance || 0))}</td>
       </tr>`
     )
     .join("")
@@ -104,8 +102,6 @@ export function buildDonorGivingReportHtml(input: DonorGivingReportPdfInput): st
         <th class="num">Total Given</th>
         <th class="num">Gifts</th>
         <th>Last Gift</th>
-        <th>Pledge</th>
-        <th class="num">Outstanding Balance</th>
       </tr>
     </thead>
     <tbody>${rows}</tbody>
