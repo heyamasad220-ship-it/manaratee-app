@@ -46,8 +46,8 @@ export async function hasPermission(permissionKey: PermissionKey) {
     return true
   }
 
-  // Platform/system owner always has access.
-  if (membership.role === "owner") {
+  // Platform owner is platform-only. Org Super Admin (system role) has full access.
+  if (membership.role === "owner" || membership.role === "super_admin") {
     return true
   }
 
@@ -95,6 +95,13 @@ export async function getEnabledPermissionKeys() {
   if (membership.role === "owner") {
     return {
       isOwner: true,
+      enabledPermissions: new Set(Object.values(PERMISSIONS)),
+    }
+  }
+
+  if (membership.role === "super_admin") {
+    return {
+      isOwner: false,
       enabledPermissions: new Set(Object.values(PERMISSIONS)),
     }
   }

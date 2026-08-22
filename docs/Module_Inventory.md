@@ -49,6 +49,7 @@ Status: Working
 Features:
 
 * Custom organization roles
+* **Super Admin** and **Admin** are created automatically for every organization (SQL **`271`**). Super Admin is first; they invite Admins. `admin@manaratee.com` is a platform admin, not an org Super Admin.
 * Permission matrix
 * Permission assignment
 * Server-side permission checks
@@ -63,7 +64,7 @@ Status: Working
 Features:
 
 * Program CRUD
-* **Program kinds** — Academic vs Seasonal (`programs.program_kind`); org entitlement `organizations.program_kinds` (SQL **`246`**); policy + hard validation in `program-kind-policy.ts`; Phase 2–5 terminology/create/report work; Phase 6 packaging UI on Platform Admin Modules tab + tenant Billing
+* **Program kinds** — Academic vs Seasonal (`programs.program_kind`); org entitlement `organizations.program_kinds` (SQL **`246`**); policy + hard validation in `program-kind-policy.ts`; Phase 2–5 terminology/create/report work; Phase 6 packaging: Platform Admin Product Modules nests Academic/Seasonal toggles under Programs; tenant Billing still uses the dropdown card
 * **Quick Create** + program detail inline edit + offering manage (see `docs/programs-staff-setup-ui.md`)
 * Organization filtering
 * Program details
@@ -159,9 +160,11 @@ Route: `/settings/users`
 
 Features:
 
-* List organization members with roles
+* List organization members with roles (server-loaded; client refreshes only after invite/edit/delete)
 * Invite user by email (`/api/organizations/invite-user`)
 * Change member organization role
+
+**Links (`/settings/links`):** Public Community Calendar, Program Catalog, general customer portal, and donor signup URLs. Moved off Users (August 2026).
 
 Invite requirements:
 
@@ -283,7 +286,7 @@ Routes: `/directory` (Overview), `/directory/people`, `/directory/families`, `/d
 
 **Groups:** Giving groups (`contact_type = group`) are Fund Development only — **Reports → Donor Giving → Group Giving** (`/donations/reports/donors?view=group`) and workspace `/donations/groups/[id]`. They exist to roll up donations from a department or collective (for example Qur'an Institute for Ladies), not as Directory identities. Campaign groups (`campaign_groups`) stay on Campaign → Groups. Membership Groups remain `/membership/groups`. Legacy Directory Groups URLs redirect into Fund Development.
 
-**Reports:** Directory → Reports is analytics (growth, role distribution with overlap, completeness, possible duplicates). People / Organizations / Families are first-class Directory sections, not report tabs. Donor giving reports stay under Fund Development.
+**Reports:** Directory → Reports is analytics (growth, role distribution with overlap, completeness, possible duplicates). Types live in `lib/directory/directory-report-types.ts` (not the `"use server"` actions file). People / Organizations / Families are first-class Directory sections, not report tabs. Donor giving reports stay under Fund Development.
 
 **Dynamic role navigation:** Most role views (Employees, Volunteers, Members, Donors, Sponsors, Parents, Vendors, Childcare Providers, Rental Customers) appear in the Directory flyout only when the current tenant has matching records. **Service Providers** is always shown (`alwaysVisible` in `lib/directory/directory-roles.ts`) so staff can add contractors (plumbers, pest control, etc.) even before any exist. `/resources/service-providers` redirects to `/directory/role/service-providers`. Counts load with sidebar modules (`fetchDirectoryNavSummary`). These are filtered views of canonical contacts — not duplicate identity tables. Role-view tables add lookup columns from Workforce / Membership / Fund Development / Vendor Hub / Rentals (summaries only). Donor giving columns are gated by `donations.view`. **Sponsor** is a manual `contact_roles` value (`scripts/269_directory_sponsor_role.sql`).
 

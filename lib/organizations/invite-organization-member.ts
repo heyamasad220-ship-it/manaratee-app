@@ -5,9 +5,11 @@ import {
   invitedMemberSystemRoleCandidates,
   isCustomerPortalOrgRoleName,
   isCustomerPortalSystemRole,
+  isOrganizationMemberSystemRole,
   PLATFORM_INVITED_MEMBER_SYSTEM_ROLE_FALLBACKS,
   type OrganizationMemberSystemRole,
 } from "@/lib/organizations/organization-member-constants"
+import { ORGANIZATION_SUPER_ADMIN_ROLE_NAME } from "@/lib/organizations/organization-system-roles"
 import { syncProfileForOrganizationMember } from "@/lib/organizations/sync-profile-organization"
 import {
   getPlatformAdminUserIds,
@@ -94,11 +96,24 @@ async function upsertOrganizationMembership(
     roleId?: string | null
     inviterSystemRole?: string | null
     staffOnly?: boolean
+    preferredSystemRole?: OrganizationMemberSystemRole | null
   }
 ) {
-  const roleCandidates = input.staffOnly
+  const roleCandidates: OrganizationMemberSystemRole[] = []
+  if (
+    input.preferredSystemRole &&
+    isOrganizationMemberSystemRole(input.preferredSystemRole)
+  ) {
+    roleCandidates.push(input.preferredSystemRole)
+  }
+  const fallbacks = input.staffOnly
     ? PLATFORM_INVITED_MEMBER_SYSTEM_ROLE_FALLBACKS
     : invitedMemberSystemRoleCandidates(input.inviterSystemRole)
+  for (const role of fallbacks) {
+    if (!roleCandidates.includes(role)) {
+      roleCandidates.push(role)
+    }
+  }
   let lastError: { message?: string; hint?: string; code?: string } | null = null
 
   for (const role of roleCandidates) {
@@ -280,6 +295,11 @@ export async function inviteOrganizationMember(
     roleId,
     inviterSystemRole: input.inviterSystemRole ?? "admin",
     staffOnly: input.staffOnly === true,
+    preferredSystemRole:
+      invitedRoleName?.trim().toLowerCase() ===
+      ORGANIZATION_SUPER_ADMIN_ROLE_NAME.toLowerCase()
+        ? "super_admin"
+        : null,
   })
 
   if (membershipError) {

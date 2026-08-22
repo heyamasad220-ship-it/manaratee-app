@@ -2,6 +2,9 @@ import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { cookies } from "next/headers"
 
+import { ensureOrganizationSystemRoles } from "@/lib/organizations/organization-system-roles"
+import { isPlatformAdminUserId } from "@/lib/platform/is-platform-admin-user"
+
 function slugify(name: string) {
   return name
     .toLowerCase()
@@ -48,9 +51,9 @@ export async function POST(req: Request) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 
+    const creatorIsPlatformAdmin = await isPlatformAdminUserId(userId, supabase)
     const slug = slugify(name)
 
-    // 1) create organization
     const { data: organization, error: orgError } = await supabase
       .from("organizations")
       .insert({
@@ -70,42 +73,64 @@ export async function POST(req: Request) {
       )
     }
 
-    // 2) create membership for the current user
-    const { error: memberError } = await supabase
-      .from("organization_members")
-      .insert({
-        user_id: userId,
-        organization_id: organization.id,
-        role: "super_admin",
-      })
-
-    if (memberError) {
-      console.error("Create membership error:", memberError)
-
-      // rollback org if membership insert fails
+    let systemRoles
+    try {
+      systemRoles = await ensureOrganizationSystemRoles(supabase, organization.id)
+    } catch (roleError) {
+      console.error("Create organization roles error:", roleError)
       await supabase.from("organizations").delete().eq("id", organization.id)
-
       return NextResponse.json(
         {
           error:
-            memberError.message || "Failed to create organization membership",
+            roleError instanceof Error
+              ? roleError.message
+              : "Failed to create Super Admin and Admin roles",
         },
         { status: 500 }
       )
     }
 
-    // 3) set selected organization cookie
-    const cookieStore = await cookies()
+    // Platform admins stay on the platform console. They are not org Super Admins.
+    if (!creatorIsPlatformAdmin) {
+      const { error: memberError } = await supabase
+        .from("organization_members")
+        .insert({
+          user_id: userId,
+          organization_id: organization.id,
+          role: "super_admin",
+          role_id: systemRoles.superAdminRoleId,
+          status: "active",
+        })
 
+      if (memberError) {
+        console.error("Create membership error:", memberError)
+        await supabase.from("organizations").delete().eq("id", organization.id)
+        return NextResponse.json(
+          {
+            error:
+              memberError.message || "Failed to create organization membership",
+          },
+          { status: 500 }
+        )
+      }
+    }
+
+    const cookieStore = await cookies()
     cookieStore.set("selected_organization_id", organization.id, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
-      maxAge: 60 * 60 * 24 * 30, // 30 days
+      maxAge: 60 * 60 * 24 * 30,
     })
 
-    return NextResponse.json({ organization }, { status: 201 })
+    return NextResponse.json(
+      {
+        organization,
+        roles: systemRoles,
+      },
+      { status: 201 }
+    )
   } catch (error) {
     console.error("Route error:", error)
     return NextResponse.json(

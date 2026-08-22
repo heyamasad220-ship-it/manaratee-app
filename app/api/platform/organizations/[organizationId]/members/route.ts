@@ -6,6 +6,7 @@ import {
   resolveAppUrlFromRequest,
 } from "@/lib/organizations/invite-organization-member"
 import { requirePlatformAdmin } from "@/lib/platform/require-platform-admin"
+import { ensureOrganizationSystemRoles } from "@/lib/organizations/organization-system-roles"
 
 type RouteContext = {
   params: Promise<{ organizationId: string }>
@@ -20,6 +21,7 @@ export async function GET(_req: Request, context: RouteContext) {
   const { organizationId } = await context.params
 
   try {
+    await ensureOrganizationSystemRoles(auth.context.admin, organizationId)
     const payload = await listOrganizationMembers(
       auth.context.admin,
       organizationId,

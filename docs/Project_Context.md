@@ -70,8 +70,8 @@ organization_roles
 
 Examples:
 
-* Super Admin
-* Admin
+* Super Admin (created automatically for each new organization; invites Admins)
+* Admin (created automatically; invited by Super Admin)
 * Teacher
 * Volunteer Coordinator
 * Accountant
@@ -156,7 +156,7 @@ Staff UI labels: Program (`programs`) → Offering (`program_offerings`); see `l
 **Deferred naming (parked — high blast radius):** (1) DB rename `programs`→`seasons`, `program_offerings`→`programs` (fits years, seasons, camps); (2) align HR sidebar vs `/workforce/*` routes/folders; (3) Donations module → Fund Development in DB/routes (UI label already Fund Development). Do not start without a dedicated migration plan. Details in `docs/Features.md`.
 Registrations
 Financial Assistance
-**Programs flexibility contract** — **F1–F7** (`180`–`181`). Academic vs Seasonal modes + org `program_kinds` entitlement (SQL **`246`**); packaging UI on Platform Admin + Billing (Phase 6). Report Type filters + URL `?kind=` presets (Phases 3–4); kind-aware staff terminology (Phase 5). See [`docs/programs-flexibility-contract.md`](./programs-flexibility-contract.md).
+**Programs flexibility contract** — **F1–F7** (`180`–`181`). Academic vs Seasonal modes + org `program_kinds` entitlement (SQL **`246`**); packaging UI on Platform Admin (toggles under Programs) + Billing dropdown (Phase 6). Report Type filters + URL `?kind=` presets (Phases 3–4); kind-aware staff terminology (Phase 5). See [`docs/programs-flexibility-contract.md`](./programs-flexibility-contract.md).
 **Stripe Connect Express** for org donation payouts (implemented June 2026)
 **Platform subscription billing via Stripe** (orgs paying Manaratee — pending)
 Customer Experience
@@ -198,6 +198,8 @@ User Invitations
 **Fund Development group recurring + FD emails (August 2026)** — Recurring gifts on `/donate/g/{token}`; group pledge confirmation emails; daily prospect follow-up assignee digests. Migration **`266_group_recurring_and_fd_emails.sql`**. Cron: `/api/cron/prospect-follow-up-reminders`.
 
 **Fund Development IA redesign (August 2026)** — Sidebar: Overview / Campaigns / Pledges / **Donations** / Reports / Settings. Operations under `/donations/payments/*`; analytics landing at `/donations/reports`. Transactions/Giving Summary date range + export; receipts Missing queue; year-end KPIs from annual statements. No schema change.
+
+**Org Super Admin / Admin + Settings Users (August 2026)** — Each org auto-creates Super Admin and Admin (`scripts/271_org_system_roles_and_platform_admin.sql`). Platform admin is not an org Super Admin. Settings → Users / Roles load on the server so a client server-action `useEffect` cannot refresh the route in a loop. Public join URLs live on Settings → Links.
 
 **Fund Development campaign wishlist (August 2026)** — Campaign → Wishlist tab. Sub-goals linked to existing pledges/payments via nullable `wishlist_item_id`. Public donate `/donate/w/{token}`. Carry-forward without duplicating money. Migration **`267_campaign_wishlist.sql`**.
 

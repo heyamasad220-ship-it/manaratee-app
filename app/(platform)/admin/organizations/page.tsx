@@ -61,8 +61,11 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { PlatformEnterOrganizationButton } from "@/components/platform/platform-enter-organization-button"
-import { OrganizationProgramKindsSettingsCard } from "@/components/programs/organization-program-kinds-settings-card"
-import type { OrganizationProgramKindsEntitlement } from "@/lib/programs/program-kind-policy"
+import {
+  organizationProgramKindToggles,
+  organizationProgramKindsFromToggles,
+  type OrganizationProgramKindsEntitlement,
+} from "@/lib/programs/program-kind-policy"
 import { cn } from "@/lib/utils"
 
 const filterTabs = ["All", "Active", "Suspended", "Pending"] as const
@@ -174,6 +177,7 @@ export default function OrganizationsPage() {
     "academic" | "seasonal" | "both"
   >("both")
   const [loadingProgramKinds, setLoadingProgramKinds] = useState(false)
+  const [savingProgramKinds, setSavingProgramKinds] = useState(false)
 
   const [newOrgName, setNewOrgName] = useState("")
   const [newOrgEmail, setNewOrgEmail] = useState("")
@@ -456,6 +460,54 @@ export default function OrganizationsPage() {
       setProgramKinds("both")
     } finally {
       setLoadingProgramKinds(false)
+    }
+  }
+
+  const saveProgramKindToggle = async (
+    kind: "academic" | "seasonal",
+    enabled: boolean
+  ) => {
+    if (!selectedOrg || savingProgramKinds) return
+
+    const current = organizationProgramKindToggles(programKinds)
+    const nextToggles = { ...current, [kind]: enabled }
+    const next = organizationProgramKindsFromToggles(
+      nextToggles.academic,
+      nextToggles.seasonal
+    )
+    if (!next) {
+      alert("Turn on Academic, Seasonal, or both.")
+      return
+    }
+    if (next === programKinds) return
+
+    const previous = programKinds
+    setProgramKinds(next)
+    setSavingProgramKinds(true)
+    try {
+      const response = await fetch(
+        `/api/platform/organizations/${selectedOrg.id}/program-kinds`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ programKinds: next }),
+        }
+      )
+      const result = await response.json()
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || "Failed to save program modes.")
+      }
+      setProgramKinds(
+        result.programKinds as OrganizationProgramKindsEntitlement
+      )
+    } catch (error) {
+      console.error(error)
+      setProgramKinds(previous)
+      alert(
+        error instanceof Error ? error.message : "Failed to save program modes."
+      )
+    } finally {
+      setSavingProgramKinds(false)
     }
   }
 
@@ -824,30 +876,41 @@ export default function OrganizationsPage() {
         throw new Error("No organization returned from API")
       }
 
-      const inviteResponse = await fetch(
-        `/api/platform/organizations/${createResult.organization.id}/members`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            email: newOrgEmail.trim(),
-            organizationName: createResult.organization.name,
-          }),
-        }
-      )
-
-      const inviteResult = await inviteResponse.json()
-
-      if (!inviteResponse.ok) {
+      const inviteEmail = newOrgEmail.trim().toLowerCase()
+      if (inviteEmail === "admin@manaratee.com") {
         alert(
-          `Organization was created, but the admin invite failed: ${
-            inviteResult.error || "Unknown error"
-          }`
+          "Organization created. admin@manaratee.com stays a platform admin. Invite an organization Super Admin from the Members tab."
         )
       } else {
-        alert(`Organization created and admin invite sent to ${newOrgEmail}`)
+        const inviteResponse = await fetch(
+          `/api/platform/organizations/${createResult.organization.id}/members`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              email: newOrgEmail.trim(),
+              organizationName: createResult.organization.name,
+              roleId: createResult.roles?.superAdminRoleId || null,
+              roleName: "Super Admin",
+            }),
+          }
+        )
+
+        const inviteResult = await inviteResponse.json()
+
+        if (!inviteResponse.ok) {
+          alert(
+            `Organization was created, but the Super Admin invite failed: ${
+              inviteResult.error || "Unknown error"
+            }`
+          )
+        } else {
+          alert(
+            `Organization created and Super Admin invite sent to ${newOrgEmail}`
+          )
+        }
       }
 
       resetAddForm()
@@ -1311,40 +1374,6 @@ export default function OrganizationsPage() {
                 </p>
               </div>
 
-              {loadingProgramKinds ? (
-                <Card>
-                  <CardContent className="py-6 text-sm text-muted-foreground">
-                    Loading program modes…
-                  </CardContent>
-                </Card>
-              ) : selectedOrg ? (
-                <OrganizationProgramKindsSettingsCard
-                  value={programKinds}
-                  description="SaaS packaging for Programs: which create modes this tenant may use."
-                  onSave={async (next) => {
-                    const response = await fetch(
-                      `/api/platform/organizations/${selectedOrg.id}/program-kinds`,
-                      {
-                        method: "PATCH",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ programKinds: next }),
-                      }
-                    )
-                    const result = await response.json()
-                    if (!response.ok || !result.success) {
-                      return {
-                        success: false as const,
-                        error: result.error || "Failed to save program modes.",
-                      }
-                    }
-                    setProgramKinds(
-                      result.programKinds as OrganizationProgramKindsEntitlement
-                    )
-                    return { success: true as const }
-                  }}
-                />
-              ) : null}
-
               <Card>
                 <CardContent className="space-y-3 p-4">
                   <div>
@@ -1493,25 +1522,88 @@ export default function OrganizationsPage() {
                     </p>
                   ) : (
                     <div className="space-y-2">
-                      {orgModules.map((module) => (
-                        <div
-                          key={module.slug}
-                          className="flex items-center justify-between rounded-md border px-3 py-2"
-                        >
-                          <div className="pr-4">
-                            <p className="text-sm font-medium">{module.name}</p>
-                            {module.description ? (
-                              <p className="text-xs text-muted-foreground">
-                                {module.description}
-                              </p>
+                      {orgModules.map((module) => {
+                        const isPrograms = module.slug === "programs"
+                        const kindToggles =
+                          organizationProgramKindToggles(programKinds)
+                        return (
+                          <div
+                            key={module.slug}
+                            className="rounded-md border"
+                          >
+                            <div className="flex items-center justify-between px-3 py-2">
+                              <div className="pr-4">
+                                <p className="text-sm font-medium">
+                                  {module.name}
+                                </p>
+                                {module.description ? (
+                                  <p className="text-xs text-muted-foreground">
+                                    {module.description}
+                                  </p>
+                                ) : null}
+                              </div>
+                              <Switch
+                                checked={module.enabled}
+                                onCheckedChange={() =>
+                                  toggleModule(module.slug)
+                                }
+                              />
+                            </div>
+                            {isPrograms && module.enabled ? (
+                              <div className="space-y-1 border-t bg-zinc-50/70 px-3 py-2">
+                                {loadingProgramKinds ? (
+                                  <p className="text-xs text-muted-foreground">
+                                    Loading Academic and Seasonal options…
+                                  </p>
+                                ) : (
+                                  <>
+                                    <div className="flex items-center justify-between py-1 pl-3">
+                                      <div className="pr-4">
+                                        <p className="text-sm font-medium">
+                                          Academic
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                          Years and course offerings
+                                        </p>
+                                      </div>
+                                      <Switch
+                                        checked={kindToggles.academic}
+                                        disabled={savingProgramKinds}
+                                        onCheckedChange={(checked) =>
+                                          void saveProgramKindToggle(
+                                            "academic",
+                                            checked
+                                          )
+                                        }
+                                      />
+                                    </div>
+                                    <div className="flex items-center justify-between py-1 pl-3">
+                                      <div className="pr-4">
+                                        <p className="text-sm font-medium">
+                                          Seasonal
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                          Camps and seasons
+                                        </p>
+                                      </div>
+                                      <Switch
+                                        checked={kindToggles.seasonal}
+                                        disabled={savingProgramKinds}
+                                        onCheckedChange={(checked) =>
+                                          void saveProgramKindToggle(
+                                            "seasonal",
+                                            checked
+                                          )
+                                        }
+                                      />
+                                    </div>
+                                  </>
+                                )}
+                              </div>
                             ) : null}
                           </div>
-                          <Switch
-                            checked={module.enabled}
-                            onCheckedChange={() => toggleModule(module.slug)}
-                          />
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   )}
                 </CardContent>

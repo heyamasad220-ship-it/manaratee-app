@@ -32,13 +32,18 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Plus, Pencil, Trash2, Loader2, ShieldCheck } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
 import {
   permissionGroupsForDefinitions,
   type PermissionDefinition,
 } from "@/lib/permissions/permission-definitions"
 import { filterOrganizationRolesForOrganization } from "@/lib/permissions/facilities-access"
 import { setOrganizationRolePermissionAction } from "@/lib/organizations/role-permission-actions"
+import {
+  createOrganizationRoleAction,
+  deleteOrganizationRoleAction,
+  loadOrganizationRolesWorkspaceAction,
+  updateOrganizationRoleAction,
+} from "@/lib/organizations/organization-role-actions"
 
 type OrganizationRole = {
   id: string
@@ -67,66 +72,44 @@ export function RolesPermissionsClient({
   organizationId,
   enabledModuleSlugs,
   permissionDefinitions,
+  initialRoles,
+  initialMembers,
+  initialPermissions,
+  initialError,
 }: {
   organizationId: string
   enabledModuleSlugs: string[]
   permissionDefinitions: PermissionDefinition[]
+  initialRoles: OrganizationRole[]
+  initialMembers: OrganizationMember[]
+  initialPermissions: RolePermission[]
+  initialError: string | null
 }) {
-  const supabase = createClient()
   const permissionGroups = useMemo(
     () => permissionGroupsForDefinitions(permissionDefinitions),
     [permissionDefinitions]
   )
 
-  const [roles, setRoles] = useState<OrganizationRole[]>([])
-  const [members, setMembers] = useState<OrganizationMember[]>([])
-  const [permissions, setPermissions] = useState<RolePermission[]>([])
-  const [loading, setLoading] = useState(true)
+  const [roles, setRoles] = useState<OrganizationRole[]>(initialRoles)
+  const [members, setMembers] = useState<OrganizationMember[]>(initialMembers)
+  const [permissions, setPermissions] = useState<RolePermission[]>(initialPermissions)
+  const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [savingPermissionKey, setSavingPermissionKey] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(initialError)
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingRole, setEditingRole] = useState<OrganizationRole | null>(null)
   const [roleName, setRoleName] = useState("")
   const [roleDescription, setRoleDescription] = useState("")
 
-  async function ensurePermissionsForRoles(roleRows: OrganizationRole[]) {
-    if (roleRows.length === 0) return
-
-    const rowsToInsert = roleRows.flatMap((role) =>
-      permissionDefinitions.map((permission) => ({
-        organization_id: organizationId,
-        role_id: role.id,
-        permission_key: permission.key,
-        enabled: ["super admin", "admin"].includes(role.name.toLowerCase()),
-      })),
-    )
-
-    const { error } = await supabase
-      .from("role_permissions")
-      .upsert(rowsToInsert, {
-        onConflict: "role_id,permission_key",
-        ignoreDuplicates: true,
-      })
-
-    if (error) {
-      console.error("Ensure permissions error:", error)
-    }
-  }
-
   async function loadData() {
     setLoading(true)
     setError(null)
 
-    const rolesResult = await supabase
-      .from("organization_roles")
-      .select("*")
-      .eq("organization_id", organizationId)
-      .order("created_at", { ascending: true })
-
-    if (rolesResult.error) {
-      setError(rolesResult.error.message)
+    const result = await loadOrganizationRolesWorkspaceAction()
+    if (!result.success) {
+      setError(result.error)
       setRoles([])
       setMembers([])
       setPermissions([])
@@ -134,44 +117,18 @@ export function RolesPermissionsClient({
       return
     }
 
-    const roleRows = (rolesResult.data ?? []) as OrganizationRole[]
-    setRoles(roleRows)
-
-    await ensurePermissionsForRoles(roleRows)
-
-    const [membersResult, permissionsResult] = await Promise.all([
-      supabase
-        .from("organization_members")
-        .select("id, role_id")
-        .eq("organization_id", organizationId),
-
-      supabase
-        .from("role_permissions")
-        .select("*")
-        .eq("organization_id", organizationId),
-    ])
-
-    if (membersResult.error) {
-      setError(membersResult.error.message)
-      setMembers([])
-    } else {
-      setMembers((membersResult.data ?? []) as OrganizationMember[])
-    }
-
-    if (permissionsResult.error) {
-      setError(permissionsResult.error.message)
-      setPermissions([])
-    } else {
-      setPermissions((permissionsResult.data ?? []) as RolePermission[])
-    }
-
+    setRoles(result.roles as OrganizationRole[])
+    setMembers(result.members as OrganizationMember[])
+    setPermissions(result.permissions as RolePermission[])
     setLoading(false)
   }
 
   useEffect(() => {
-    loadData()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [organizationId])
+    setRoles(initialRoles)
+    setMembers(initialMembers)
+    setPermissions(initialPermissions)
+    setError(initialError)
+  }, [initialRoles, initialMembers, initialPermissions, initialError])
 
   const visibleRoles = useMemo(
     () => filterOrganizationRolesForOrganization(roles, enabledModuleSlugs),
@@ -225,34 +182,21 @@ export function RolesPermissionsClient({
     setSaving(true)
     setError(null)
 
-    if (editingRole) {
-      const { error } = await supabase
-        .from("organization_roles")
-        .update({
+    const result = editingRole
+      ? await updateOrganizationRoleAction({
+          roleId: editingRole.id,
           name: cleanName,
           description: cleanDescription || null,
         })
-        .eq("id", editingRole.id)
-        .eq("organization_id", organizationId)
+      : await createOrganizationRoleAction({
+          name: cleanName,
+          description: cleanDescription || null,
+        })
 
-      if (error) {
-        setError(error.message)
-        setSaving(false)
-        return
-      }
-    } else {
-      const { error } = await supabase.from("organization_roles").insert({
-        organization_id: organizationId,
-        name: cleanName,
-        description: cleanDescription || null,
-        is_system_role: false,
-      })
-
-      if (error) {
-        setError(error.message)
-        setSaving(false)
-        return
-      }
+    if (!result.success) {
+      setError(result.error)
+      setSaving(false)
+      return
     }
 
     setDialogOpen(false)
@@ -283,14 +227,9 @@ export function RolesPermissionsClient({
     setSaving(true)
     setError(null)
 
-    const { error } = await supabase
-      .from("organization_roles")
-      .delete()
-      .eq("id", role.id)
-      .eq("organization_id", organizationId)
-
-    if (error) {
-      setError(error.message)
+    const result = await deleteOrganizationRoleAction({ roleId: role.id })
+    if (!result.success) {
+      setError(result.error)
       setSaving(false)
       return
     }

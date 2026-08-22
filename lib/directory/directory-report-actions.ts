@@ -1,42 +1,17 @@
 "use server"
 
 import { fetchDirectoryNavSummary } from "@/lib/directory/directory-nav-summary"
-import {
-  DIRECTORY_DYNAMIC_ROLE_DEFS,
-  type DirectoryRoleCountMap,
-} from "@/lib/directory/directory-roles"
+import { DIRECTORY_DYNAMIC_ROLE_DEFS } from "@/lib/directory/directory-roles"
+import type {
+  DirectoryCompletenessStats,
+  DirectoryDuplicateRow,
+  DirectoryGrowthPoint,
+  DirectoryRoleDistributionRow,
+} from "@/lib/directory/directory-report-types"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { PERMISSIONS } from "@/lib/permissions/permission-keys"
 import { hasPermission } from "@/lib/permissions/permissions"
 import { createClient } from "@/lib/supabase/server"
-
-export type DirectoryRoleDistributionRow = {
-  key: string
-  label: string
-  count: number
-}
-
-export type DirectoryCompletenessStats = {
-  people: number
-  missingEmail: number
-  missingPhone: number
-  missingAddress: number
-  noRole: number
-}
-
-export type DirectoryGrowthPoint = {
-  month: string
-  people: number
-  organizations: number
-}
-
-export type DirectoryDuplicateRow = {
-  key: string
-  matchType: "email" | "phone"
-  value: string
-  contactIds: string[]
-  names: string[]
-}
 
 function startOfMonthUtc(date: Date) {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1))
@@ -208,5 +183,3 @@ export async function fetchDirectoryReportStatsAction(): Promise<
     duplicates: duplicates.slice(0, 100),
   }
 }
-
-export type { DirectoryRoleCountMap }

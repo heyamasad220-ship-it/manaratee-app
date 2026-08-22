@@ -59,24 +59,32 @@ import {
   Loader2,
   ExternalLink,
 } from "lucide-react"
-import { OrganizationJoinLinkCard } from "@/components/settings/organization-join-link-card"
 import { enterCustomerPortalAsUser } from "@/lib/organizations/org-user-access-actions"
 import { isOrganizationSystemAdmin } from "@/lib/organizations/organization-system-admin"
 import { createClient } from "@/lib/supabase/client"
 
+function defaultInviteRoleId(roles: OrganizationSettingsRole[]) {
+  const adminRole = roles.find((role) => role.name.toLowerCase() === "admin")
+  return adminRole?.id ?? roles[0]?.id ?? ""
+}
+
 export function UsersSettingsClient({
   organizationId,
   organizationName,
-  organizationSlug,
+  initialUsers,
+  initialRoles,
+  initialError,
 }: {
   organizationId: string | null
   organizationName: string
-  organizationSlug: string | null
+  initialUsers: OrganizationSettingsUser[]
+  initialRoles: OrganizationSettingsRole[]
+  initialError: string | null
 }) {
-  const [users, setUsers] = useState<OrganizationSettingsUser[]>([])
-  const [roles, setRoles] = useState<OrganizationSettingsRole[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [users, setUsers] = useState(initialUsers)
+  const [roles, setRoles] = useState(initialRoles)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(initialError)
 
   const [search, setSearch] = useState("")
   const [roleFilter, setRoleFilter] = useState("All")
@@ -86,7 +94,9 @@ export function UsersSettingsClient({
   const [inviteFirstName, setInviteFirstName] = useState("")
   const [inviteLastName, setInviteLastName] = useState("")
   const [inviteEmail, setInviteEmail] = useState("")
-  const [inviteRoleId, setInviteRoleId] = useState("")
+  const [inviteRoleId, setInviteRoleId] = useState(() =>
+    defaultInviteRoleId(initialRoles)
+  )
   const [sendingInvite, setSendingInvite] = useState(false)
 
   const [showRoleDialog, setShowRoleDialog] = useState(false)
@@ -121,8 +131,7 @@ export function UsersSettingsClient({
       setUsers(payload.users)
 
       if (!inviteRoleId && payload.roles.length > 0) {
-        const adminRole = payload.roles.find((role) => role.name.toLowerCase() === "admin")
-        setInviteRoleId(adminRole?.id ?? payload.roles[0].id)
+        setInviteRoleId(defaultInviteRoleId(payload.roles))
       }
     } catch (loadError) {
       console.error(loadError)
@@ -139,7 +148,12 @@ export function UsersSettingsClient({
   }
 
   useEffect(() => {
-    loadUsers()
+    setUsers(initialUsers)
+    setRoles(initialRoles)
+    setError(initialError)
+  }, [initialUsers, initialRoles, initialError])
+
+  useEffect(() => {
     void (async () => {
       const supabase = createClient()
       const {
@@ -147,8 +161,7 @@ export function UsersSettingsClient({
       } = await supabase.auth.getUser()
       setCurrentUserId(user?.id ?? null)
     })()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [organizationId])
+  }, [])
 
   function resetInviteForm() {
     setInviteFirstName("")
@@ -386,13 +399,6 @@ export function UsersSettingsClient({
                 <strong>Error:</strong> {error}
               </CardContent>
             </Card>
-          )}
-
-          {organizationSlug && (
-            <OrganizationJoinLinkCard
-              organizationName={organizationName}
-              organizationSlug={organizationSlug}
-            />
           )}
 
           <div className="flex flex-wrap gap-4 [&>*]:w-fit">

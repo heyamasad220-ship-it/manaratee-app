@@ -27,7 +27,7 @@ Every organization-specific table should either include `organization_id` direct
 
 * organizations
 * organization_members
-* organization_roles
+* organization_roles — every org gets **Super Admin** and **Admin** system roles (`is_system_role`); SQL **`271`** backfills existing orgs and lets Super Admin / Admin / platform admins insert roles (fixes RLS on Add Role).
 * role_permissions — keys include `events.view`, `events.checkin` (SQL **`257`**, door staff scan/check-in), `events.manage`, plus ticketing/program counterparts. `events.manage` still implies check-in in the app.
 * organization_audit_logs (migration `142` — append-only financial + permission audit trail)
 * profiles
@@ -75,7 +75,7 @@ organization_modules.module_id → modules.id
 
 **Organization subscription terms (migration `123`):** on `organizations` — `subscription_start_date`, `complimentary_months` (e.g. 3 for three months free), `first_year_special_monthly_rate` (optional promotional rate for year one; standard `plans.monthly_price` after). Platform admin: `PATCH /api/platform/organizations/[organizationId]/billing-terms`. Display: `lib/organizations/organization-subscription-terms.ts`.
 
-**Program mode packaging (migration `246`):** `organizations.program_kinds` text NOT NULL DEFAULT `'both'` — `academic` | `seasonal` | `both`. Controls which program create modes the tenant may use. App helpers: `lib/programs/organization-program-kinds.ts`, `lib/programs/program-kind-policy.ts`. UI: Platform Admin → Organizations → Modules; tenant Billing (super-admin). API: `PATCH /api/platform/organizations/[id]/program-kinds`.
+**Program mode packaging (migration `246`):** `organizations.program_kinds` text NOT NULL DEFAULT `'both'` — `academic` | `seasonal` | `both`. Controls which program create modes the tenant may use. App helpers: `lib/programs/organization-program-kinds.ts`, `lib/programs/program-kind-policy.ts`. UI: Platform Admin → Organizations → Modules → Programs (Academic and Seasonal toggles); tenant Billing (super-admin dropdown). API: `PATCH /api/platform/organizations/[id]/program-kinds`.
 
 **Stripe Connect Express for donations (migration `139_stripe_connect_donations.sql`):** `organizations.stripe_connect_account_id`, `stripe_connect_charges_enabled`, `stripe_connect_payouts_enabled`, `stripe_connect_details_submitted`, `stripe_connect_onboarded_at`. Donation Checkout runs on the connected account; platform `STRIPE_SECRET_KEY` is for Connect only. Separate from `organizations.stripe_customer_id` (future platform subscription billing, migration `121`).
 

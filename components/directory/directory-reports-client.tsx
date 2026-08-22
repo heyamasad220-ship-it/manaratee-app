@@ -12,7 +12,7 @@ import type {
   DirectoryDuplicateRow,
   DirectoryGrowthPoint,
   DirectoryRoleDistributionRow,
-} from "@/lib/directory/directory-report-actions"
+} from "@/lib/directory/directory-report-types"
 
 function formatMonth(value: string) {
   const [year, month] = value.split("-")

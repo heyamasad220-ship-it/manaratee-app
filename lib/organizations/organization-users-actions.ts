@@ -189,7 +189,7 @@ async function assertOrganizationUsersPermission(permissionKey: PermissionKey) {
   return organizationId
 }
 
-/** Load all org members for Settings → Users (bypasses client RLS limits). */
+/** Load all org members for Settings → Users (bypasses client RLS limits). Read-only — do not seed/mutate here. */
 export async function fetchOrganizationUsersForSettings(): Promise<{
   users: OrganizationSettingsUser[]
   roles: OrganizationSettingsRole[]

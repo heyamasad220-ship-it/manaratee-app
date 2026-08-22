@@ -890,6 +890,7 @@ function buildNavItems(
       children: [
         { label: "Users", href: "/settings/users", matchPrefix: "/settings/users", permissionKey: "settings.users.view" },
         { label: "Roles & Permissions", href: "/settings/roles-permissions", matchPrefix: "/settings/roles-permissions", permissionKey: "settings.roles.view" },
+        { label: "Links", href: "/settings/links", matchPrefix: "/settings/links", permissionKey: "settings.users.view" },
         {
           label: "Audit Log",
           href: "/settings/audit-log",

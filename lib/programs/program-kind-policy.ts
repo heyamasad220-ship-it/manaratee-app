@@ -114,6 +114,25 @@ export const ORGANIZATION_PROGRAM_KINDS_OPTIONS: Array<{
   },
 ]
 
+export function organizationProgramKindToggles(
+  entitlement: OrganizationProgramKindsEntitlement
+): { academic: boolean; seasonal: boolean } {
+  return {
+    academic: entitlement !== "seasonal",
+    seasonal: entitlement !== "academic",
+  }
+}
+
+export function organizationProgramKindsFromToggles(
+  academic: boolean,
+  seasonal: boolean
+): OrganizationProgramKindsEntitlement | null {
+  if (academic && seasonal) return "both"
+  if (academic) return "academic"
+  if (seasonal) return "seasonal"
+  return null
+}
+
 export function organizationAllowsProgramKind(
   entitlement: OrganizationProgramKindsEntitlement,
   kind: ProgramKind

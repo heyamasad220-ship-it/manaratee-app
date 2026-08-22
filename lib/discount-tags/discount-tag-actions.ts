@@ -200,5 +200,3 @@ export async function deleteDiscountTag(id: string) {
 
   revalidateDiscountTagPaths()
 }
-
-export type { DiscountTag }
