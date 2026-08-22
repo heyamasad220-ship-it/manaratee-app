@@ -11,9 +11,11 @@ import {
 } from "@/lib/organizations/organization-member-constants"
 import { ORGANIZATION_SUPER_ADMIN_ROLE_NAME } from "@/lib/organizations/organization-system-roles"
 import { syncProfileForOrganizationMember } from "@/lib/organizations/sync-profile-organization"
+import { isPlatformAdminUserId as userIdIsPlatformAdmin } from "@/lib/platform/is-platform-admin-user"
 import {
   getPlatformAdminUserIds,
   isPlatformAdminUserId,
+  isPlatformOwnerEmail,
 } from "@/lib/platform/platform-admin-users"
 
 export type InviteOrganizationMemberInput = {
@@ -174,6 +176,15 @@ export async function inviteOrganizationMember(
     }
   }
 
+  if (isPlatformOwnerEmail(email)) {
+    return {
+      success: false,
+      status: 400,
+      error:
+        "admin@manaratee.com is the platform owner, not an organization member. Invite a Super Admin at a different email.",
+    }
+  }
+
   let invitedRoleName = input.roleName?.trim() || null
 
   if (roleId) {
@@ -206,7 +217,7 @@ export async function inviteOrganizationMember(
     invitedRoleName = invitedRole.name
   }
 
-  const redirectTo = inviteAcceptRedirectUrl(input.appUrl)
+  const redirectTo = inviteAcceptRedirectUrl(input.appUrl, organizationId)
   const inviteMetadata: Record<string, string> = {
     organization_id: organizationId,
   }
@@ -282,6 +293,28 @@ export async function inviteOrganizationMember(
       status: 502,
       error: "Could not resolve invited user account.",
     }
+  }
+
+  if (await userIdIsPlatformAdmin(invitedUserId, admin)) {
+    return {
+      success: false,
+      status: 400,
+      error:
+        "This account is a platform admin. Platform admins open organizations from Platform Admin, not as org Super Admins.",
+    }
+  }
+
+  const { data: existingAuth } = await admin.auth.admin.getUserById(invitedUserId)
+  const nextMetadata = {
+    ...(existingAuth.user?.user_metadata ?? {}),
+    ...inviteMetadata,
+  }
+  const { error: metadataError } = await admin.auth.admin.updateUserById(
+    invitedUserId,
+    { user_metadata: nextMetadata }
+  )
+  if (metadataError) {
+    console.error("Invite user metadata update failed:", metadataError.message)
   }
 
   const {
@@ -362,9 +395,7 @@ export async function listOrganizationMembers(
   options?: { staffOnly?: boolean }
 ) {
   const staffOnly = options?.staffOnly === true
-  const platformAdminUserIds = staffOnly
-    ? await getPlatformAdminUserIds(admin)
-    : null
+  const platformAdminUserIds = await getPlatformAdminUserIds(admin)
   const { data: roles, error: rolesError } = await admin
     .from("organization_roles")
     .select("id, name, description")
@@ -452,13 +483,10 @@ export async function listOrganizationMembers(
     }
   })
     .filter((member) => {
-      if (!staffOnly) return true
-      if (
-        platformAdminUserIds &&
-        isPlatformAdminUserId(member.userId, platformAdminUserIds)
-      ) {
+      if (isPlatformAdminUserId(member.userId, platformAdminUserIds)) {
         return false
       }
+      if (!staffOnly) return true
       if (isCustomerPortalSystemRole(member.systemRole)) return false
       if (isCustomerPortalOrgRoleName(member.roleName)) return false
       return true

@@ -27,6 +27,20 @@ export async function getCurrentUserPermissionContext() {
     .maybeSingle()
 
   if (membershipError || !membership) {
+    if (await isPlatformAdminOrgSupportSession(organizationId)) {
+      return {
+        supabase,
+        user,
+        organizationId,
+        membership: {
+          id: "platform-support",
+          user_id: user.id,
+          organization_id: organizationId,
+          role: "owner",
+          role_id: null,
+        },
+      }
+    }
     redirect("/unauthorized")
   }
 

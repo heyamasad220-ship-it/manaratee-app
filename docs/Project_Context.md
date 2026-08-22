@@ -199,7 +199,7 @@ User Invitations
 
 **Fund Development IA redesign (August 2026)** — Sidebar: Overview / Campaigns / Pledges / **Donations** / Reports / Settings. Operations under `/donations/payments/*`; analytics landing at `/donations/reports`. Transactions/Giving Summary date range + export; receipts Missing queue; year-end KPIs from annual statements. No schema change.
 
-**Org Super Admin / Admin + Settings Users (August 2026)** — Each org auto-creates Super Admin and Admin (`scripts/271_org_system_roles_and_platform_admin.sql`). Platform admin is not an org Super Admin. Settings → Users / Roles load on the server so a client server-action `useEffect` cannot refresh the route in a loop. Public join URLs live on Settings → Links.
+**Org Super Admin / Admin + Settings Users (August 2026)** — Each org auto-creates Super Admin and Admin (`scripts/271_org_system_roles_and_platform_admin.sql`). Platform admin is not an org Super Admin; support rows are flagged `platform_support_access` (`scripts/272_hide_platform_admin_org_memberships.sql`). Invite/magic-link prefers the invited org when a person belongs to more than one tenant. Settings → Users / Roles load on the server. Public join URLs live on Settings → Links.
 
 **Fund Development campaign wishlist (August 2026)** — Campaign → Wishlist tab. Sub-goals linked to existing pledges/payments via nullable `wishlist_item_id`. Public donate `/donate/w/{token}`. Carry-forward without duplicating money. Migration **`267_campaign_wishlist.sql`**.
 

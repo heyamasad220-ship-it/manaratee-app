@@ -1,5 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 
+/** Platform owner login — never an organization Super Admin / owner. */
+export const PLATFORM_OWNER_EMAIL = "admin@manaratee.com"
+
+export function isPlatformOwnerEmail(email: string | null | undefined) {
+  return email?.trim().toLowerCase() === PLATFORM_OWNER_EMAIL
+}
+
 export async function getPlatformAdminUserIds(
   admin: SupabaseClient
 ): Promise<Set<string>> {

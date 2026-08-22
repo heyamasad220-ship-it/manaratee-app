@@ -109,7 +109,9 @@ function SetPasswordContent() {
         )
       }
 
-      const organizationId = user.user_metadata?.organization_id as string | undefined
+      const organizationId =
+        searchParams.get("organizationId")?.trim() ||
+        (user.user_metadata?.organization_id as string | undefined)
       if (organizationId) {
         await selectOrganization(organizationId)
 
@@ -125,7 +127,9 @@ function SetPasswordContent() {
         )
       }
 
-      await routeUserByRole(user.id, router)
+      await routeUserByRole(user.id, router, {
+        preferredOrganizationId: organizationId,
+      })
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Could not save password.")
       setIsSaving(false)

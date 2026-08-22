@@ -26,7 +26,7 @@ Every organization-specific table should either include `organization_id` direct
 ## Core Platform Tables
 
 * organizations
-* organization_members
+* organization_members — `role` is the platform access tier (`super_admin`, `admin`, `viewer`, …). `platform_support_access` (SQL **`086`**, **`272`**) marks platform-admin support rows so they are not treated as org Super Admins. `organization_users` is a convenience view over members (excludes support rows after **`272`**).
 * organization_roles — every org gets **Super Admin** and **Admin** system roles (`is_system_role`); SQL **`271`** backfills existing orgs and lets Super Admin / Admin / platform admins insert roles (fixes RLS on Add Role).
 * role_permissions — keys include `events.view`, `events.checkin` (SQL **`257`**, door staff scan/check-in), `events.manage`, plus ticketing/program counterparts. `events.manage` still implies check-in in the app.
 * organization_audit_logs (migration `142` — append-only financial + permission audit trail)
@@ -346,7 +346,7 @@ program_enrollment_fa_awards.participant_contact_id → contacts.id
 
 Import CSV flow writes directly to `payments` + `payment_import_batches` (no row staging table).
 
-**Dev seed:** `scripts/seed-donations-dev.mjs` inserts test data into canonical tables only (see `docs/Features.md` Donations section). Does not use dropped legacy tables.
+**Dev seed:** `scripts/seed-donations-dev.mjs` inserts test data into canonical tables only (see `docs/Features.md` Donations section). Does not use dropped legacy tables. Horizon demo: `scripts/seed-horizon-community-foundation-demo.mjs` (org-locked).
 
 **`payments.source` constraint (patch `131_payments_source_square.sql`):** lowercase channel keys (`cash`, `check`, **`square`**, `zelle`, `venmo`, `paypal`, `stripe`, `import`, `manual`). **`square`** = Square terminal batch deposit on a campaign (no donor/contact). Campaign overview classifies via memo `|batch|square|` or `source = square`. Customer portal normalizes configured payment method display names via `lib/donations/payment-source-channel.ts` before insert.
 
@@ -683,7 +683,6 @@ These tables either have no visible relationships in the current export or need 
 
 * my_sidebar_modules
 * organization_sidebar_modules
-* organization_users
 * subscriptions
 * staff_departments
 * staff_documents

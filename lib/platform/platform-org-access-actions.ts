@@ -65,41 +65,40 @@ export async function enterOrganizationAsPlatformAdmin(organizationId: string) {
 
   const { data: existingMembership } = await admin
     .from("organization_members")
-    .select("id, role")
+    .select("id, role, platform_support_access")
     .eq("organization_id", trimmedId)
     .eq("user_id", userId)
     .maybeSingle()
 
-  if (!existingMembership) {
-    let insertError = (
-      await admin.from("organization_members").upsert(
-        {
-          organization_id: trimmedId,
-          user_id: userId,
-          role: "owner",
-          status: "active",
-          platform_support_access: true,
-        },
-        { onConflict: "organization_id,user_id" }
-      )
-    ).error
+  if (existingMembership?.id) {
+    if (existingMembership.platform_support_access !== true) {
+      const { error: flagError } = await admin
+        .from("organization_members")
+        .update({ platform_support_access: true })
+        .eq("id", existingMembership.id)
 
-    if (insertError?.message?.includes("platform_support_access")) {
-      insertError = (
-        await admin.from("organization_members").upsert(
-          {
-            organization_id: trimmedId,
-            user_id: userId,
-            role: "owner",
-            status: "active",
-          },
-          { onConflict: "organization_id,user_id" }
-        )
-      ).error
+      if (flagError && !flagError.message?.includes("platform_support_access")) {
+        throw new Error(flagError.message || "Could not mark support membership")
+      }
     }
+  } else {
+    const { error: insertError } = await admin.from("organization_members").upsert(
+      {
+        organization_id: trimmedId,
+        user_id: userId,
+        role: "owner",
+        status: "active",
+        platform_support_access: true,
+      },
+      { onConflict: "organization_id,user_id" }
+    )
 
     if (insertError) {
-      throw new Error(insertError.message || "Could not create support membership")
+      throw new Error(
+        insertError.message?.includes("platform_support_access")
+          ? "Run scripts/086_platform_admin_org_access.sql, then try Enter organization again."
+          : insertError.message || "Could not create support membership"
+      )
     }
   }
 

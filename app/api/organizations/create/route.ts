@@ -113,16 +113,16 @@ export async function POST(req: Request) {
           { status: 500 }
         )
       }
-    }
 
-    const cookieStore = await cookies()
-    cookieStore.set("selected_organization_id", organization.id, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 30,
-    })
+      const cookieStore = await cookies()
+      cookieStore.set("selected_organization_id", organization.id, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        maxAge: 60 * 60 * 24 * 30,
+      })
+    }
 
     return NextResponse.json(
       {

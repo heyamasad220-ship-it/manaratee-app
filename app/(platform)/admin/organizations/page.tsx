@@ -66,6 +66,7 @@ import {
   organizationProgramKindsFromToggles,
   type OrganizationProgramKindsEntitlement,
 } from "@/lib/programs/program-kind-policy"
+import { PLATFORM_OWNER_EMAIL } from "@/lib/platform/platform-admin-users"
 import { cn } from "@/lib/utils"
 
 const filterTabs = ["All", "Active", "Suspended", "Pending"] as const
@@ -877,9 +878,9 @@ export default function OrganizationsPage() {
       }
 
       const inviteEmail = newOrgEmail.trim().toLowerCase()
-      if (inviteEmail === "admin@manaratee.com") {
+      if (inviteEmail === PLATFORM_OWNER_EMAIL) {
         alert(
-          "Organization created. admin@manaratee.com stays a platform admin. Invite an organization Super Admin from the Members tab."
+          `${PLATFORM_OWNER_EMAIL} stays a platform admin. Invite an organization Super Admin from the Members tab.`
         )
       } else {
         const inviteResponse = await fetch(

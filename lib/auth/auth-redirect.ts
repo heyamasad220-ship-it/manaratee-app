@@ -23,8 +23,14 @@ export function authCallbackUrl(nextPath: string = DEFAULT_POST_AUTH_PATH, baseU
   return `${base}/auth/callback?${params.toString()}`
 }
 
-export function inviteAcceptRedirectUrl(baseUrl?: string) {
-  return authCallbackUrl(SET_PASSWORD_PATH, baseUrl)
+export function inviteAcceptRedirectUrl(
+  baseUrl?: string,
+  organizationId?: string | null
+) {
+  const next = organizationId?.trim()
+    ? `${SET_PASSWORD_PATH}?organizationId=${encodeURIComponent(organizationId.trim())}`
+    : SET_PASSWORD_PATH
+  return authCallbackUrl(next, baseUrl)
 }
 
 /** Password reset uses /auth/confirm + token_hash (PKCE callback breaks across devices). */

@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { Copy, ExternalLink, Gift, Plus, QrCode } from "lucide-react"
+import { Copy, ExternalLink, Gift, Link2, Pencil, Plus, QrCode } from "lucide-react"
 
 import { CampaignProgressBar } from "@/components/donations/campaign-progress-bar"
 import {
@@ -260,6 +260,17 @@ export function CampaignWishlistTab({
     setDetail({ item: result.item, pledges: result.pledges, payments: result.payments })
   }
 
+  async function openCarryForward(itemId: string) {
+    setDetailId(null)
+    setDetail(null)
+    setCarryItemId(itemId)
+    const result = await listOrgCampaignsForCarryForwardAction(campaignId)
+    if (result.success) {
+      setCampaignOptions(result.campaigns)
+      setDestinationCampaignId(result.campaigns[0]?.id || "")
+    }
+  }
+
   async function handleCarryForward() {
     if (!carryItemId || !destinationCampaignId) return
     setSaving(true)
@@ -371,31 +382,31 @@ export function CampaignWishlistTab({
                       </TableCell>
                       <TableCell>{WISHLIST_PRIORITY_LABELS[item.priority]}</TableCell>
                       <TableCell>{item.public_visible ? "Yes" : "No"}</TableCell>
-                      <TableCell className="text-right" onClick={(event) => event.stopPropagation()}>
-                        <div className="flex justify-end gap-1">
+                      <TableCell className="w-[1%] text-right" onClick={(event) => event.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-0.5">
                           {item.public_visible ? (
-                            <Button variant="ghost" size="sm" onClick={() => setQrToken(item.public_token)}>
-                              Donation Link
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              title="Donation link"
+                              onClick={() => setQrToken(item.public_token)}
+                            >
+                              <Link2 className="h-4 w-4" />
+                              <span className="sr-only">Donation link</span>
                             </Button>
                           ) : null}
                           {canManage ? (
-                            <>
-                              <Button variant="ghost" size="sm" onClick={() => openEdit(item)}>Edit</Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={async () => {
-                                  setCarryItemId(item.id)
-                                  const result = await listOrgCampaignsForCarryForwardAction(campaignId)
-                                  if (result.success) {
-                                    setCampaignOptions(result.campaigns)
-                                    setDestinationCampaignId(result.campaigns[0]?.id || "")
-                                  }
-                                }}
-                              >
-                                Carry Forward
-                              </Button>
-                            </>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              title="Edit"
+                              onClick={() => openEdit(item)}
+                            >
+                              <Pencil className="h-4 w-4" />
+                              <span className="sr-only">Edit</span>
+                            </Button>
                           ) : null}
                         </div>
                       </TableCell>
@@ -619,6 +630,13 @@ export function CampaignWishlistTab({
           ) : (
             <p className="text-sm text-muted-foreground">Loading...</p>
           )}
+          {canManage && detail ? (
+            <DialogFooter>
+              <Button variant="outline" onClick={() => void openCarryForward(detail.item.id)}>
+                Carry Forward
+              </Button>
+            </DialogFooter>
+          ) : null}
         </DialogContent>
       </Dialog>
 

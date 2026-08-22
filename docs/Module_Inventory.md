@@ -160,7 +160,8 @@ Route: `/settings/users`
 
 Features:
 
-* List organization members with roles (server-loaded; client refreshes only after invite/edit/delete)
+* List organization **staff** members with roles (server-loaded; client refreshes only after invite/edit/delete). Customer-portal contacts (`viewer`) are not listed.
+* Platform owner (`admin@manaratee.com`) is hidden from this list even if a support membership exists
 * Invite user by email (`/api/organizations/invite-user`)
 * Change member organization role
 

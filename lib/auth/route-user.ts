@@ -17,7 +17,7 @@ function isOrgAdminDashboardRole(role: string | null | undefined) {
 export async function routeUserByRole(
   userId: string,
   router: { push: (path: string) => void; refresh?: () => void },
-  options?: { customerPath?: string | null }
+  options?: { customerPath?: string | null; preferredOrganizationId?: string | null }
 ) {
   const preferredCustomerPath = sanitizeCustomerPortalRedirectPath(options?.customerPath)
   const supabase = createClient()
@@ -68,6 +68,27 @@ export async function routeUserByRole(
     .eq("auth_user_id", userId)
 
   if (contactError) throw contactError
+
+  const {
+    data: { user: authUser },
+  } = await supabase.auth.getUser()
+
+  const preferredOrgId = (
+    options?.preferredOrganizationId ||
+    (authUser?.user_metadata?.organization_id as string | undefined) ||
+    ""
+  ).trim()
+
+  const preferredMembership = preferredOrgId
+    ? memberships?.find((membership) => membership.organization_id === preferredOrgId)
+    : undefined
+
+  if (preferredMembership && isOrgAdminDashboardRole(preferredMembership.role)) {
+    await selectOrganization(preferredMembership.organization_id)
+    router.refresh?.()
+    router.push("/dashboard")
+    return
+  }
 
   const contactOrgIds = (contactRows || [])
     .map((row) => row.organization_id as string)

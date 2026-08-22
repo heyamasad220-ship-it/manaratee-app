@@ -199,7 +199,9 @@ export async function fetchOrganizationUsersForSettings(): Promise<{
   )
 
   const admin = createServiceRoleClient()
-  const payload = await listOrganizationMembers(admin, organizationId)
+  const payload = await listOrganizationMembers(admin, organizationId, {
+    staffOnly: true,
+  })
   const enabledModuleSlugs = await loadOrganizationEnabledModuleSlugs(organizationId)
   const visibleRoles = filterOrganizationRolesForOrganization(
     payload.roles,
