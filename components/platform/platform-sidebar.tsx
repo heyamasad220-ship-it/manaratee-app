@@ -6,7 +6,6 @@ import Image from "next/image"
 import {
   LayoutDashboard,
   Building2,
-  CreditCard,
   Banknote,
   Users,
   ScrollText,
@@ -19,7 +18,6 @@ import { cn } from "@/lib/utils"
 const navItems = [
   { label: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard, matchPrefix: "/admin/dashboard" },
   { label: "Organizations", href: "/admin/organizations", icon: Building2, matchPrefix: "/admin/organizations" },
-  { label: "Plans", href: "/admin/plans", icon: CreditCard, matchPrefix: "/admin/plans" },
   { label: "Payments", href: "/admin/payments", icon: Banknote, matchPrefix: "/admin/payments" },
   { label: "Modules", href: "/admin/modules", icon: Boxes, matchPrefix: "/admin/modules" },
   { label: "Settings", href: "/admin/settings", icon: Settings, matchPrefix: "/admin/settings" },

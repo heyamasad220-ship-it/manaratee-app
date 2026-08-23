@@ -58,6 +58,9 @@ export async function GET() {
     name,
     monthly_price
   ),
+  organization_subscriptions (
+    billed_monthly_cents
+  ),
   organization_members ( id, role, user_id )
 `)
       .order("created_at", { ascending: false })
@@ -68,18 +71,25 @@ export async function GET() {
 
     const platformAdminUserIds = await getPlatformAdminUserIds(admin)
 
-    const formatted = (organizations || []).map((org: any) => ({
-  ...org,
-  members:
-    org.organization_members?.filter(
-      (member: { role?: string | null; user_id?: string | null }) =>
-        isOrgStaffSystemRole(member.role) &&
-        !isPlatformAdminUserId(member.user_id as string, platformAdminUserIds)
-    ).length || 0,
-  plan_id: org.plan_id || null,
-  plan_name: org.plans?.name || null,
-  mrr: Number(org.plans?.monthly_price || 0),
-}))
+    const formatted = (organizations || []).map((org: any) => {
+      const subscriptionRow = Array.isArray(org.organization_subscriptions)
+        ? org.organization_subscriptions[0]
+        : org.organization_subscriptions
+      const billedMonthlyCents = Number(subscriptionRow?.billed_monthly_cents || 0)
+      return {
+        ...org,
+        members:
+          org.organization_members?.filter(
+            (member: { role?: string | null; user_id?: string | null }) =>
+              isOrgStaffSystemRole(member.role) &&
+              !isPlatformAdminUserId(member.user_id as string, platformAdminUserIds)
+          ).length || 0,
+        plan_id: org.plan_id || null,
+        plan_name: org.plans?.name || null,
+        billed_monthly_cents: billedMonthlyCents,
+        mrr: billedMonthlyCents / 100,
+      }
+    })
 
 return NextResponse.json({ organizations: formatted })
   } catch (error) {

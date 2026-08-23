@@ -15,14 +15,18 @@ export async function PUT(
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 
+    const updates: Record<string, unknown> = {
+      name: body.name,
+      description: body.description,
+      is_active: body.is_active,
+    }
+    if (body.monthly_price_cents != null) {
+      updates.monthly_price_cents = Number(body.monthly_price_cents)
+    }
+
     const { data: module, error } = await supabase
       .from("modules")
-      .update({
-        name: body.name,
-        description: body.description,
-        is_active: body.is_active,
-        default_enabled: body.default_enabled,
-      })
+      .update(updates)
       .eq("id", id)
       .select()
       .single()

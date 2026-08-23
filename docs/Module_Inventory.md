@@ -28,6 +28,7 @@ Features:
 * Active organization switching
 * Dashboard org branding: logo preview uses the image aspect ratio (`object-contain`) instead of a cropped square; Change Logo is edit-mode only; Edit / Cancel / Save Changes sit at the bottom of the page
 * Dashboard **Subscribed Modules** lists enabled product modules from the same source as the staff sidebar (Event Management, Programs, Vendor Hub, Venue Rentals, Fund Development, Membership). Workforce, Finance, Facilities, and Community Calendar are not subscription SKUs; Facilities is implied by operations modules, and Community Calendar is implied by Vendor Hub or Event Management.
+* **Module-based pricing (August 2026):** Super Admin Modules page sets monthly prices and multi-module discounts. Organization Modules tab saves selected SKUs and billed cents. Plans are no longer required. Run SQL **`274`**.
 * Horizon Community Foundation demo: staff header user menu shows **Admin** instead of the email username
 
 ---

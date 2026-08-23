@@ -1,4 +1,4 @@
-import { createClient, SupabaseClient } from "@supabase/supabase-js"
+import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 import {
   CAPABILITY_MODULE_SLUGS,
   CORE_MODULE_SLUGS,
@@ -112,9 +112,10 @@ async function upsertOrganizationModule(
   enabled: boolean,
   manuallyOverridden: boolean
 ) {
+  const now = new Date().toISOString()
   const { data: existing, error: existingError } = await admin
     .from("organization_modules")
-    .select("id")
+    .select("id, enabled")
     .eq("organization_id", organizationId)
     .eq("module_id", moduleId)
     .maybeSingle()
@@ -123,13 +124,25 @@ async function upsertOrganizationModule(
     throw new Error(existingError.message)
   }
 
+  const wasEnabled = Boolean(existing?.enabled)
+  const payload: Record<string, unknown> = {
+    enabled,
+    manually_overridden: manuallyOverridden,
+    enabled_by_plan: false,
+  }
+
+  if (enabled && !wasEnabled) {
+    payload.enabled_at = now
+    payload.disabled_at = null
+  } else if (!enabled) {
+    payload.enabled_at = null
+    payload.disabled_at = now
+  }
+
   if (existing?.id) {
     const { error } = await admin
       .from("organization_modules")
-      .update({
-        enabled,
-        manually_overridden: manuallyOverridden,
-      })
+      .update(payload)
       .eq("id", existing.id)
 
     if (error) {
@@ -141,9 +154,7 @@ async function upsertOrganizationModule(
   const { error } = await admin.from("organization_modules").insert({
     organization_id: organizationId,
     module_id: moduleId,
-    enabled,
-    manually_overridden: manuallyOverridden,
-    enabled_by_plan: false,
+    ...payload,
   })
 
   if (error) {
@@ -322,9 +333,19 @@ export async function applySubscriptionBundleToOrganization(
     throw new Error(`Unknown subscription bundle: ${bundleSlug}`)
   }
 
+  return replaceOrganizationProductModules(organizationId, bundle.moduleSlugs, {
+    bundleSlug,
+  })
+}
+
+export async function replaceOrganizationProductModules(
+  organizationId: string,
+  productSlugs: Iterable<string>,
+  options?: { bundleSlug?: string | null }
+) {
   const admin = createAdminClient()
   const moduleIdsBySlug = await loadModuleSlugMap(admin)
-  const enabledSlugs = expandEnabledModuleSlugs(bundle.moduleSlugs)
+  const enabledSlugs = expandEnabledModuleSlugs(productSlugs)
 
   for (const productSlug of PRODUCT_MODULE_SLUGS) {
     const normalized = normalizeModuleSlug(productSlug)
@@ -337,16 +358,21 @@ export async function applySubscriptionBundleToOrganization(
       organizationId,
       moduleId,
       shouldEnable,
-      false
+      true
     )
   }
 
-  for (const slug of enabledSlugs) {
-    if (!isCapabilityModuleSlug(slug)) continue
+  for (const slug of CAPABILITY_MODULE_SLUGS) {
     const moduleId = moduleIdsBySlug.get(slug)
     if (!moduleId) continue
 
-    await upsertOrganizationModule(admin, organizationId, moduleId, true, false)
+    await upsertOrganizationModule(
+      admin,
+      organizationId,
+      moduleId,
+      enabledSlugs.has(slug),
+      false
+    )
   }
 
   for (const coreSlug of CORE_MODULE_SLUGS) {
@@ -355,19 +381,18 @@ export async function applySubscriptionBundleToOrganization(
     await upsertOrganizationModule(admin, organizationId, moduleId, true, false)
   }
 
-  for (const productSlug of bundle.moduleSlugs) {
-    await seedAdminRolePermissionsForModule(
-      admin,
-      organizationId,
-      normalizeModuleSlug(productSlug)
-    )
+  for (const productSlug of enabledSlugs) {
+    if (!isProductModuleSlug(productSlug)) continue
+    await seedAdminRolePermissionsForModule(admin, organizationId, productSlug)
   }
 
   await seedAdminRolePermissionsForModule(admin, organizationId, "workforce")
 
   const { error: orgError } = await admin
     .from("organizations")
-    .update({ subscription_bundle_slug: bundleSlug })
+    .update({
+      subscription_bundle_slug: options?.bundleSlug ?? null,
+    })
     .eq("id", organizationId)
 
   if (orgError) {
@@ -468,8 +493,6 @@ export async function setOrganizationModuleEnabled(
       false,
       true
     )
-    // Recompute implied capabilities from remaining enabled products so we
-    // do not turn off spaces/ticketing still required by another module.
     await syncImpliedModulesForOrganization(organizationId)
   }
 

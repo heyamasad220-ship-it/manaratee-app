@@ -1,3 +1,5 @@
+import { loadOrganizationSubscription } from "@/lib/billing/organization-subscription-service"
+import { formatCentsAsUsd } from "@/lib/billing/money"
 import {
   getSubscriptionBundle,
   isHiddenSubscriptionCapabilitySlug,
@@ -80,7 +82,9 @@ export async function getOrganizationSubscriptionSummary(
     manuallyOverridden: Boolean(item.organizationModuleId) && item.enabled && !item.enabledByPlan,
   })
 
-  const monthlyPrice = plan?.monthlyPrice ?? 0
+  const snapshot = await loadOrganizationSubscription(organizationId)
+  const billedMonthlyCents = snapshot?.billedMonthlyCents ?? 0
+  const billedMonthlyDollars = billedMonthlyCents / 100
   const subscriptionTerms = computeOrganizationSubscriptionTerms(
     {
       subscriptionStartDate: (org.subscription_start_date as string | null) ?? null,
@@ -90,11 +94,15 @@ export async function getOrganizationSubscriptionSummary(
           ? null
           : Number(org.first_year_special_monthly_rate),
     },
-    monthlyPrice
+    billedMonthlyDollars
   )
 
-  const billingAmount = plan ? subscriptionTerms.currentEffectiveMonthlyRate : 0
-  const billingLabel = plan ? subscriptionTerms.billingPhaseLabel : "Not assigned"
+  const billingAmount = snapshot
+    ? subscriptionTerms.currentEffectiveMonthlyRate
+    : 0
+  const billingLabel = snapshot
+    ? subscriptionTerms.billingPhaseLabel
+    : "Not assigned"
 
   return {
     organizationName: org.name as string,
@@ -105,6 +113,11 @@ export async function getOrganizationSubscriptionSummary(
     bundleDescription: bundle?.description ?? null,
     billingLabel,
     billingAmount,
+    billedMonthlyCents,
+    calculatedMonthlyCents: snapshot?.calculatedMonthlyCents ?? 0,
+    customMonthlyCents: snapshot?.customMonthlyCents ?? null,
+    isPriceLocked: Boolean(snapshot?.isPriceLocked),
+    billedMonthlyDisplay: formatCentsAsUsd(billedMonthlyCents),
     coreModules: access.coreModules.map(mapModule),
     productModules: access.catalogModules
       .filter((item) => item.enabled)

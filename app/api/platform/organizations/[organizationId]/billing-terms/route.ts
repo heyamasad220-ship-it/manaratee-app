@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { createClient as createServerClient } from "@/lib/supabase/server"
+import { loadOrganizationSubscription } from "@/lib/billing/organization-subscription-service"
 import { computeOrganizationSubscriptionTerms } from "@/lib/organizations/organization-subscription-terms"
 
 async function requirePlatformAdmin() {
@@ -36,6 +37,11 @@ async function requirePlatformAdmin() {
   }
 
   return { admin }
+}
+
+async function loadBilledMonthlyDollars(organizationId: string) {
+  const snapshot = await loadOrganizationSubscription(organizationId)
+  return (snapshot?.billedMonthlyCents ?? 0) / 100
 }
 
 function parseOptionalDate(value: unknown) {
@@ -74,14 +80,7 @@ export async function GET(
     const { organizationId } = await params
     const { data: org, error } = await auth.admin
       .from("organizations")
-      .select(
-        `
-        subscription_start_date,
-        complimentary_months,
-        first_year_special_monthly_rate,
-        plans ( monthly_price )
-      `
-      )
+      .select("subscription_start_date, complimentary_months, first_year_special_monthly_rate")
       .eq("id", organizationId)
       .maybeSingle()
 
@@ -92,8 +91,7 @@ export async function GET(
       return NextResponse.json({ error: "Organization not found." }, { status: 404 })
     }
 
-    const planRow = Array.isArray(org.plans) ? org.plans[0] : org.plans
-    const standardMonthlyRate = Number(planRow?.monthly_price || 0)
+    const standardMonthlyRate = await loadBilledMonthlyDollars(organizationId)
     const terms = computeOrganizationSubscriptionTerms(
       {
         subscriptionStartDate: (org.subscription_start_date as string | null) ?? null,
@@ -137,14 +135,7 @@ export async function PATCH(
         first_year_special_monthly_rate: firstYearSpecialMonthlyRate,
       })
       .eq("id", organizationId)
-      .select(
-        `
-        subscription_start_date,
-        complimentary_months,
-        first_year_special_monthly_rate,
-        plans ( monthly_price )
-      `
-      )
+      .select("subscription_start_date, complimentary_months, first_year_special_monthly_rate")
       .maybeSingle()
 
     if (error) {
@@ -154,8 +145,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Organization not found." }, { status: 404 })
     }
 
-    const planRow = Array.isArray(org.plans) ? org.plans[0] : org.plans
-    const standardMonthlyRate = Number(planRow?.monthly_price || 0)
+    const standardMonthlyRate = await loadBilledMonthlyDollars(organizationId)
     const terms = computeOrganizationSubscriptionTerms(
       {
         subscriptionStartDate: (org.subscription_start_date as string | null) ?? null,

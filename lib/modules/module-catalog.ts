@@ -49,14 +49,22 @@ export const HIDDEN_SUBSCRIPTION_CAPABILITY_SLUGS = [
   "bazaar",
   "spaces",
   "community-calendar",
+  "sign-ups",
+  "child-care",
 ] as const
 
 /** When a product module is enabled, these capability slugs are also enabled. */
 export const IMPLIED_MODULE_SLUGS: Record<string, readonly string[]> = {
-  /** Basic facility calendar, spaces, and conflict checking for campus events. */
-  "event-management": ["ticketing", "spaces", "community-calendar"],
-  /** Basic facility calendar/availability plus program billing, payroll, and FA. */
-  programs: ["spaces", "finance"],
+  /** Ticketing, facilities, community calendar, volunteer sign-ups, and childcare. */
+  "event-management": [
+    "ticketing",
+    "spaces",
+    "community-calendar",
+    "sign-ups",
+    "child-care",
+  ],
+  /** Facilities, program billing, volunteer sign-ups, and childcare. */
+  programs: ["spaces", "finance", "sign-ups", "child-care"],
   bookings: ["spaces"],
   /** Bazaar/vendor events that reserve campus spaces, plus the public community calendar. */
   "vendor-hub": ["spaces", "community-calendar"],
@@ -141,6 +149,33 @@ export function isHiddenSubscriptionCapabilitySlug(slug: string): boolean {
 
 export function isCatalogModuleSlug(slug: string): boolean {
   return isProductModuleSlug(slug)
+}
+
+export function filterProductModuleSlugs(slugs: Iterable<string>): string[] {
+  const selected = new Set<string>()
+  for (const rawSlug of slugs) {
+    const slug = normalizeModuleSlug(rawSlug)
+    if (isProductModuleSlug(slug)) selected.add(slug)
+  }
+  return PRODUCT_MODULE_SLUGS.filter((slug) => selected.has(slug))
+}
+
+export function getProductImpliedCapabilitySlugs(
+  productSlug: string
+): readonly string[] {
+  return IMPLIED_MODULE_SLUGS[normalizeModuleSlug(productSlug)] ?? []
+}
+
+/** Product slugs plus implied capabilities. Used when saving organization_modules. */
+export function expandPlanModuleSlugs(productSlugs: Iterable<string>): string[] {
+  const products = filterProductModuleSlugs(productSlugs)
+  const enabled = new Set<string>(products)
+  for (const slug of products) {
+    for (const implied of IMPLIED_MODULE_SLUGS[slug] ?? []) {
+      enabled.add(implied)
+    }
+  }
+  return Array.from(enabled)
 }
 
 export function getSubscriptionBundle(slug: string): SubscriptionBundle | undefined {

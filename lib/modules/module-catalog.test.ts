@@ -68,13 +68,20 @@ describe("module catalog subscriptions", () => {
       expandEnabledModuleSlugs(["bookings"]).has("community-calendar"),
       false
     )
-    assert.equal(
-      expandEnabledModuleSlugs(["membership"]).has("community-calendar"),
-      false
-    )
-    assert.equal(
-      expandEnabledModuleSlugs(["donations"]).has("community-calendar"),
-      false
-    )
+    assert.equal(expandEnabledModuleSlugs(["membership"]).has("community-calendar"), false)
+    assert.equal(expandEnabledModuleSlugs(["donations"]).has("community-calendar"), false)
+  })
+
+  it("includes volunteer sign-ups and childcare with Event Management and Programs", () => {
+    const events = expandEnabledModuleSlugs(["event-management"])
+    const programs = expandEnabledModuleSlugs(["programs"])
+    assert.equal(events.has("sign-ups"), true)
+    assert.equal(events.has("child-care"), true)
+    assert.equal(programs.has("sign-ups"), true)
+    assert.equal(programs.has("child-care"), true)
+    assert.equal(isProductModuleSlug("sign-ups"), false)
+    assert.equal(isProductModuleSlug("child-care"), false)
+    assert.equal(isHiddenSubscriptionCapabilitySlug("sign-ups"), true)
+    assert.equal(isHiddenSubscriptionCapabilitySlug("child-care"), true)
   })
 })

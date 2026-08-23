@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { createClient as createServerClient } from "@/lib/supabase/server"
+import { persistSubscriptionFromCurrentModules } from "@/lib/billing/organization-subscription-service"
 import {
   applySubscriptionBundleToOrganization,
   getOrganizationModuleAccess,
@@ -83,8 +84,12 @@ export async function POST(
       organizationId,
       bundleSlug
     )
+    const snapshot = await persistSubscriptionFromCurrentModules({
+      organizationId,
+      reason: `bundle:${bundleSlug}`,
+    })
 
-    return NextResponse.json({ success: true, ...access })
+    return NextResponse.json({ success: true, snapshot, ...access })
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to apply bundle"
@@ -117,8 +122,12 @@ export async function PATCH(
       moduleSlug,
       enabled
     )
+    const snapshot = await persistSubscriptionFromCurrentModules({
+      organizationId,
+      reason: enabled ? "module_enabled" : "module_disabled",
+    })
 
-    return NextResponse.json({ success: true, ...access })
+    return NextResponse.json({ success: true, snapshot, ...access })
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to update module"

@@ -28,6 +28,11 @@ export type OrganizationSubscriptionSummary = {
   bundleDescription: string | null
   billingLabel: string
   billingAmount: number
+  billedMonthlyCents?: number
+  calculatedMonthlyCents?: number
+  customMonthlyCents?: number | null
+  isPriceLocked?: boolean
+  billedMonthlyDisplay?: string
   coreModules: OrganizationSubscriptionModule[]
   productModules: OrganizationSubscriptionModule[]
   capabilityModules: OrganizationSubscriptionModule[]

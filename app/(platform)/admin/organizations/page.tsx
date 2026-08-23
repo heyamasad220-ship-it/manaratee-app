@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { PlatformHeader } from "@/components/platform/platform-header"
+import { OrganizationSubscriptionPanel } from "@/components/platform/organization-subscription-panel"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -1266,9 +1267,9 @@ export default function OrganizationsPage() {
                   </div>
 
                   <div className="flex justify-between">
-                    <span className="text-sm text-muted-foreground">Plan</span>
+                    <span className="text-sm text-muted-foreground">Monthly total</span>
                     <span className="text-sm">
-                      {selectedOrg?.plan_name || "Not set"}
+                      ${Number(selectedOrg?.mrr || 0).toFixed(2)}
                     </span>
                   </div>
                 </CardContent>
@@ -1369,62 +1370,36 @@ export default function OrganizationsPage() {
 
             <TabsContent value="modules" className="mt-6 space-y-4">
               <div>
-                <h3 className="font-medium">Module Access</h3>
+                <h3 className="font-medium">Subscription modules</h3>
                 <p className="text-sm text-muted-foreground">
-                  Enable or disable modules for this organization
+                  Choose product modules and pricing for this organization. Core platform
+                  features stay included.
                 </p>
               </div>
+
+              {selectedOrg ? (
+                <OrganizationSubscriptionPanel
+                  organizationId={selectedOrg.id}
+                  onSaved={(billedMonthlyCents) => {
+                    const nextMrr = billedMonthlyCents / 100
+                    setSelectedOrg((current) =>
+                      current ? { ...current, mrr: nextMrr } : current
+                    )
+                    setOrganizations((current) =>
+                      current.map((org) =>
+                        org.id === selectedOrg.id ? { ...org, mrr: nextMrr } : org
+                      )
+                    )
+                  }}
+                />
+              ) : null}
 
               <Card>
                 <CardContent className="space-y-3 p-4">
                   <div>
-                    <h3 className="text-sm font-semibold">Subscription Plan</h3>
+                    <h3 className="text-sm font-semibold">Persona presets</h3>
                     <p className="text-xs text-muted-foreground">
-                      Assign a plan to control included modules and billing access.
-                    </p>
-                  </div>
-
-                  <div className="flex flex-col gap-3 sm:flex-row">
-                    <Select
-                      value={selectedPlanId || undefined}
-                      onValueChange={setSelectedPlanId}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="No Plan Selected" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {plans.map((plan) => (
-                          <SelectItem key={plan.id} value={plan.id}>
-                            {plan.name} (${plan.monthly_price}/month)
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-
-                    <Button
-                      className="bg-emerald-600 text-white hover:bg-emerald-700"
-                      onClick={saveOrganizationPlan}
-                      disabled={savingPlan}
-                    >
-                      {savingPlan ? "Saving..." : "Save Plan"}
-                    </Button>
-                  </div>
-
-                  <p className="text-xs text-muted-foreground">
-                    Current plan: {selectedOrg?.plan_name || "Not set"}
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent className="space-y-4 p-4">
-                  <div>
-                    <h3 className="text-sm font-semibold">Persona Bundle</h3>
-                    <p className="text-xs text-muted-foreground">
-                      Apply a preset module mix for common organization types.
-                      {activeBundleSlug
-                        ? ` Active bundle: ${activeBundleSlug.replace(/-/g, " ")}.`
-                        : " Custom module mix (no bundle applied)."}
+                      Optional starting mixes. They save through the same module pricing path.
                     </p>
                   </div>
 

@@ -58,6 +58,8 @@ customer_profiles.organization_id → organizations.id
 * plan_modules
 * modules
 * organization_modules — product SKUs in `lib/modules/module-catalog.ts` (Workforce/Finance are not catalog modules; SQL **`273`**)
+* module_discount_rules — percent off by selected product-module count (SQL **`274`**)
+* organization_subscriptions — current billed snapshot in integer cents (SQL **`274`**); historical invoices stay on organization_billing_invoices
 * my_sidebar_modules
 * organization_sidebar_modules
 * subscriptions
@@ -73,7 +75,7 @@ organization_modules.organization_id → organizations.id
 organization_modules.module_id → modules.id
 ```
 
-**Organization subscription terms (migration `123`):** on `organizations` — `subscription_start_date`, `complimentary_months` (e.g. 3 for three months free), `first_year_special_monthly_rate` (optional promotional rate for year one; standard `plans.monthly_price` after). Platform admin: `PATCH /api/platform/organizations/[organizationId]/billing-terms`. Display: `lib/organizations/organization-subscription-terms.ts`.
+**Organization subscription terms (migration `123`):** on `organizations` — `subscription_start_date`, `complimentary_months` (e.g. 3 for three months free), `first_year_special_monthly_rate` (optional promotional rate for year one). Standard monthly amount now comes from `organization_subscriptions.billed_monthly_cents` (SQL **`274`**), not `plans.monthly_price`. Platform admin: `PATCH /api/platform/organizations/[organizationId]/billing-terms`. Display: `lib/organizations/organization-subscription-terms.ts`.
 
 **Program mode packaging (migration `246`):** `organizations.program_kinds` text NOT NULL DEFAULT `'both'` — `academic` | `seasonal` | `both`. Controls which program create modes the tenant may use. App helpers: `lib/programs/organization-program-kinds.ts`, `lib/programs/program-kind-policy.ts`. UI: Platform Admin → Organizations → Modules → Programs (Academic and Seasonal toggles); tenant Billing (super-admin dropdown). API: `PATCH /api/platform/organizations/[id]/program-kinds`.
 

@@ -173,16 +173,16 @@ export function OrganizationBillingClient({
       <div className="space-y-6 p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h2 className="text-xl font-semibold text-foreground">Plan &amp; billing</h2>
+            <h2 className="text-xl font-semibold text-foreground">Subscription &amp; billing</h2>
             <p className="text-sm text-muted-foreground">
-              Subscription plan, payment methods, and billing history for {summary.organizationName}.
+              Product modules, payment methods, and billing history for {summary.organizationName}.
               {billingEmail ? ` Billing email: ${billingEmail}.` : null}
             </p>
           </div>
           <Button variant="outline" asChild>
             <Link href="mailto:support@manaratee.com?subject=Subscription%20change%20request">
               <Mail className="mr-2 h-4 w-4" />
-              Request plan change
+              Request subscription change
             </Link>
           </Button>
         </div>
@@ -231,20 +231,27 @@ export function OrganizationBillingClient({
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                 <CreditCard className="h-4 w-4" />
-                Current plan
+                Current subscription
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold">{summary.plan?.name ?? "No plan assigned"}</p>
-              {summary.plan?.description ? (
-                <p className="mt-2 text-sm text-muted-foreground">{summary.plan.description}</p>
-              ) : null}
+              <p className="text-2xl font-bold">
+                {summary.billedMonthlyDisplay ??
+                  formatSubscriptionPrice(summary.billingAmount)}
+              </p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {summary.productModules.length > 0
+                  ? summary.productModules.map((module) => module.name).join(", ")
+                  : "No product modules selected"}
+              </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Bundle price</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Monthly total
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-2xl font-bold">{summary.billingLabel}</p>
