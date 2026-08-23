@@ -1,4 +1,7 @@
-import { getSubscriptionBundle } from "@/lib/modules/module-catalog"
+import {
+  getSubscriptionBundle,
+  isHiddenSubscriptionCapabilitySlug,
+} from "@/lib/modules/module-catalog"
 import {
   getOrganizationModuleAccess,
   type OrganizationModuleStatus,
@@ -107,7 +110,9 @@ export async function getOrganizationSubscriptionSummary(
       .filter((item) => item.enabled)
       .map(mapModule),
     capabilityModules: access.capabilityModules
-      .filter((item) => item.enabled)
+      .filter(
+        (item) => item.enabled && !isHiddenSubscriptionCapabilitySlug(item.slug)
+      )
       .map(mapModule),
   }
 }

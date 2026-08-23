@@ -174,6 +174,9 @@ export default function ModulesPage() {
 
   function catalogLabel(module: Module) {
     if (module.is_core || isCoreModuleSlug(module.slug)) return "Core"
+    if (isCapabilityModuleSlug(module.slug) || !isProductModuleSlug(module.slug)) {
+      return "Capability"
+    }
     if (module.include_in_catalog) return "Product"
     return "Capability"
   }

@@ -57,7 +57,7 @@ customer_profiles.organization_id → organizations.id
 * plan_limits
 * plan_modules
 * modules
-* organization_modules
+* organization_modules — product SKUs in `lib/modules/module-catalog.ts` (Workforce/Finance are not catalog modules; SQL **`273`**)
 * my_sidebar_modules
 * organization_sidebar_modules
 * subscriptions

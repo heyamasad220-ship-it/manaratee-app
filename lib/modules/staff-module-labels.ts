@@ -1,5 +1,4 @@
 import { FUND_DEVELOPMENT_MODULE_LABEL } from "@/lib/donations/fund-development-module-label"
-import { WORKFORCE_MODULE_LABEL } from "@/lib/hr/hr-module-label"
 import {
   isProductModuleSlug,
   normalizeModuleSlug,
@@ -8,8 +7,8 @@ import {
 const STAFF_MODULE_LABELS: Record<string, string> = {
   contacts: "Directory",
   donations: FUND_DEVELOPMENT_MODULE_LABEL,
-  workforce: WORKFORCE_MODULE_LABEL,
-  hr: WORKFORCE_MODULE_LABEL,
+  workforce: "Administration",
+  hr: "Administration",
   membership: "Membership",
   programs: "Programs",
   "event-management": "Event Management",
@@ -17,12 +16,13 @@ const STAFF_MODULE_LABELS: Record<string, string> = {
   spaces: "Facilities",
   finance: "Finance",
   "vendor-hub": "Vendor Hub",
+  "community-calendar": "Community Calendar",
 }
 
-/** Product (and Facilities) modules shown as the org's subscription on Dashboard. */
+/** Product modules shown as the org's subscription on Dashboard. Facilities is implied, not listed. */
 export function isDashboardSubscribedModule(slug: string) {
   const normalized = normalizeModuleSlug(slug)
-  return isProductModuleSlug(normalized) || normalized === "spaces"
+  return isProductModuleSlug(normalized)
 }
 
 export function staffModuleDisplayName(slug: string, fallback?: string | null) {

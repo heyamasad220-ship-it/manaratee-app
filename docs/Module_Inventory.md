@@ -27,7 +27,7 @@ Features:
 * Organization membership
 * Active organization switching
 * Dashboard org branding: logo preview uses the image aspect ratio (`object-contain`) instead of a cropped square; Change Logo is edit-mode only; Edit / Cancel / Save Changes sit at the bottom of the page
-* Dashboard **Subscribed Modules** lists enabled product modules from the same source as the staff sidebar (for example Fund Development)
+* Dashboard **Subscribed Modules** lists enabled product modules from the same source as the staff sidebar (Event Management, Programs, Vendor Hub, Venue Rentals, Fund Development, Membership). Workforce, Finance, Facilities, and Community Calendar are not subscription SKUs; Facilities is implied by operations modules, and Community Calendar is implied by Vendor Hub or Event Management.
 * Horizon Community Foundation demo: staff header user menu shows **Admin** instead of the email username
 
 ---
@@ -196,7 +196,7 @@ Features:
 
 ## Finance
 
-Status: Working (Financial Assistance and Reports live under **Programs** when that module is on; otherwise Finance stays a rail item)
+Status: Working (not a subscription SKU — included with **Programs**. Financial Assistance and Reports live under Programs when that module is on; otherwise Finance stays a rail item only if a leftover `finance` org row is still enabled)
 
 Routes:
 
@@ -490,7 +490,7 @@ Key file: `components/hr/hr-reports-client.tsx` (`HrOverviewDashboard`)
 
 Status: Working (shared)
 
-* Staff route: `/community-calendar` (top-level sidebar when Vendor Hub and/or Event Management is enabled)
+* Staff route: `/community-calendar` (top-level sidebar; included with Vendor Hub or Event Management, not a separate SKU)
 * Public (no-login): `/o/[orgSlug]/community-calendar` — featured event, event-type circles, All/Today/This weekend, 4-column cards; ticketed → `/o/[orgSlug]/events/[id]`
 * Sources: Vendor Hub bazaars (`vendor_hub_events.calendar_status`) + Event Management (`internal_events.community_calendar_status`; SQL `247`)
 * Public page and staff UI use **Private** / **Public** (`published`); legacy `community_visible` rows still appear on the staff calendar until re-saved as Public

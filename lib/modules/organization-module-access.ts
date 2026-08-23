@@ -12,6 +12,7 @@ import {
   PRODUCT_MODULE_SLUGS,
   SUBSCRIPTION_BUNDLES,
 } from "@/lib/modules/module-catalog"
+import { staffModuleDisplayName } from "@/lib/modules/staff-module-labels"
 import { PERMISSIONS } from "@/lib/permissions/permission-keys"
 
 /** Permissions to grant Admin / Super Admin roles when a product module is turned on. */
@@ -30,6 +31,8 @@ const MODULE_ENABLE_PERMISSION_SEEDS: Record<string, string[]> = {
     PERMISSIONS.PROGRAMS_MANAGE,
     PERMISSIONS.SPACES_VIEW,
     PERMISSIONS.REPORTS_VIEW,
+    PERMISSIONS.FINANCE_VIEW,
+    PERMISSIONS.FINANCE_MANAGE,
   ],
   donations: [PERMISSIONS.DONATIONS_VIEW, PERMISSIONS.DONATIONS_MANAGE],
   workforce: [PERMISSIONS.STAFF_VIEW, PERMISSIONS.STAFF_MANAGE],
@@ -293,13 +296,20 @@ export async function getOrganizationModuleAccess(organizationId: string) {
     )
   })
 
+  const withStaffName = (
+    module: OrganizationModuleStatus
+  ): OrganizationModuleStatus => ({
+    ...module,
+    name: staffModuleDisplayName(module.slug, module.name),
+  })
+
   return {
     bundleSlug: (org as { subscription_bundle_slug?: string | null } | null)
       ?.subscription_bundle_slug,
     bundles: SUBSCRIPTION_BUNDLES,
-    coreModules,
-    catalogModules,
-    capabilityModules,
+    coreModules: coreModules.map(withStaffName),
+    catalogModules: catalogModules.map(withStaffName),
+    capabilityModules: capabilityModules.map(withStaffName),
   }
 }
 
@@ -352,6 +362,8 @@ export async function applySubscriptionBundleToOrganization(
       normalizeModuleSlug(productSlug)
     )
   }
+
+  await seedAdminRolePermissionsForModule(admin, organizationId, "workforce")
 
   const { error: orgError } = await admin
     .from("organizations")

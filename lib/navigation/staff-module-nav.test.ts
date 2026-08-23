@@ -14,6 +14,7 @@ describe("staff module nav", () => {
     assert.equal(isHiddenTopLevelStaffModule("finance", slugs), true)
     assert.equal(isHiddenTopLevelStaffModule("programs", slugs), false)
     assert.equal(isHiddenTopLevelStaffModule("event-management", slugs), false)
+    assert.equal(isHiddenTopLevelStaffModule("community-calendar", slugs), true)
   })
 
   it("keeps Finance when Programs is not subscribed", () => {

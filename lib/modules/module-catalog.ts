@@ -11,7 +11,12 @@ export type SubscriptionBundle = {
 }
 
 /** Always included for every tenant — not sold separately. */
-export const CORE_MODULE_SLUGS = ["dashboard", "contacts", "settings"] as const
+export const CORE_MODULE_SLUGS = [
+  "dashboard",
+  "contacts",
+  "settings",
+  "workforce",
+] as const
 
 /** Billable product modules shown in the platform admin catalog. */
 export const PRODUCT_MODULE_SLUGS = [
@@ -20,8 +25,6 @@ export const PRODUCT_MODULE_SLUGS = [
   "vendor-hub",
   "bookings",
   "donations",
-  "finance",
-  "workforce",
   "membership",
 ] as const
 
@@ -35,15 +38,28 @@ export const CAPABILITY_MODULE_SLUGS = [
   "hr",
   "reports",
   "applications",
+  "finance",
+  "community-calendar",
+] as const
+
+/** Capability slugs that stay in the database but are not shown on billing/subscription UI. */
+export const HIDDEN_SUBSCRIPTION_CAPABILITY_SLUGS = [
+  "finance",
+  "hr",
+  "bazaar",
+  "spaces",
+  "community-calendar",
 ] as const
 
 /** When a product module is enabled, these capability slugs are also enabled. */
 export const IMPLIED_MODULE_SLUGS: Record<string, readonly string[]> = {
   /** Basic facility calendar, spaces, and conflict checking for campus events. */
-  "event-management": ["ticketing", "spaces"],
-  /** Basic facility calendar/availability for program sessions that use spaces. */
-  programs: ["spaces"],
+  "event-management": ["ticketing", "spaces", "community-calendar"],
+  /** Basic facility calendar/availability plus program billing, payroll, and FA. */
+  programs: ["spaces", "finance"],
   bookings: ["spaces"],
+  /** Bazaar/vendor events that reserve campus spaces, plus the public community calendar. */
+  "vendor-hub": ["spaces", "community-calendar"],
 }
 
 /** Legacy slugs mapped to current product modules during migration / reads. */
@@ -57,15 +73,13 @@ export const SUBSCRIPTION_BUNDLES: SubscriptionBundle[] = [
     slug: "community-center",
     name: "Community Center",
     description:
-      "Full operations suite — events, programs, vendors, venue rentals, giving, workforce, and membership.",
+      "Full operations suite — events, programs, vendors, venue rentals, giving, and membership.",
     moduleSlugs: [
       "event-management",
       "programs",
       "vendor-hub",
       "bookings",
       "donations",
-      "finance",
-      "workforce",
       "membership",
     ],
   },
@@ -106,7 +120,7 @@ export function normalizeModuleSlug(slug: string): string {
 }
 
 export function isCoreModuleSlug(slug: string): boolean {
-  return (CORE_MODULE_SLUGS as readonly string[]).includes(slug)
+  return (CORE_MODULE_SLUGS as readonly string[]).includes(normalizeModuleSlug(slug))
 }
 
 export function isProductModuleSlug(slug: string): boolean {
@@ -117,6 +131,12 @@ export function isProductModuleSlug(slug: string): boolean {
 
 export function isCapabilityModuleSlug(slug: string): boolean {
   return (CAPABILITY_MODULE_SLUGS as readonly string[]).includes(slug)
+}
+
+export function isHiddenSubscriptionCapabilitySlug(slug: string): boolean {
+  return (HIDDEN_SUBSCRIPTION_CAPABILITY_SLUGS as readonly string[]).includes(
+    normalizeModuleSlug(slug)
+  )
 }
 
 export function isCatalogModuleSlug(slug: string): boolean {

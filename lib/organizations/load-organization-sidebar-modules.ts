@@ -28,7 +28,7 @@ const SIDEBAR_MODULE_DEFAULTS: Record<
     sort_order: 10,
   },
   workforce: {
-    name: "Workforce",
+    name: "Administration",
     route: "/workforce/employees",
     icon_name: "Users",
     group_name: "People",
@@ -84,11 +84,18 @@ const SIDEBAR_MODULE_DEFAULTS: Record<
     sort_order: 70,
   },
   spaces: {
-    name: "Bookings",
+    name: "Facilities",
     route: "/facilities/overview",
     icon_name: "Building2",
     group_name: "Facilities",
     sort_order: 80,
+  },
+  "community-calendar": {
+    name: "Community Calendar",
+    route: "/community-calendar",
+    icon_name: "Calendar",
+    group_name: "Operations",
+    sort_order: 55,
   },
 }
 

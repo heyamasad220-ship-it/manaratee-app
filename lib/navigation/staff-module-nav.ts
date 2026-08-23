@@ -31,6 +31,7 @@ export function isHiddenTopLevelStaffModule(
   slugs: StaffModuleSlugSet
 ) {
   if (slug === "workforce" || slug === "hr") return true
+  if (slug === "community-calendar") return true
   if (slug === "finance" && hasPrograms(slugs)) return true
   return false
 }
