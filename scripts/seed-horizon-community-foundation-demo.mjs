@@ -656,7 +656,7 @@ async function seed(orgId) {
       source: row.source,
       source_type: "manual",
       memo: `${SEED_TAG} ${row.label}`,
-      status: row.pledgeId ? "allocated" : "allocated",
+      status: row.pledgeId ? "allocated" : "unallocated",
       is_verified: true,
     })
     throwIfError("payments insert", error)

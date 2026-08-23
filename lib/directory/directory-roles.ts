@@ -70,7 +70,7 @@ export const DIRECTORY_DYNAMIC_ROLE_DEFS = [
     source: "contact_roles" as const,
     operationalHref: "/workforce/service-providers",
     operationalLabel: "Open Workforce",
-    alwaysVisible: true,
+    requiresFacilities: true,
     emptyDescription:
       "Contractors the organization uses — plumbers, pest control, cleaning, HVAC, and similar building services. This is separate from event vendors in Vendor Hub.",
   },
@@ -102,7 +102,22 @@ export type DirectoryNavSummary = {
   organizations: number
   groups: number
   roles: DirectoryRoleCountMap
+  facilitiesEnabled: boolean
 }
+
+export type DirectoryRoleNavOptions = {
+  facilitiesEnabled?: boolean
+  /** Directory flyout/overview: hide roles owned by Administration or Fund Development. */
+  directoryNav?: boolean
+}
+
+const DIRECTORY_NAV_HIDDEN_ROLE_KEYS = new Set<DirectoryDynamicRoleKey>([
+  "employees",
+  "volunteers",
+  "donors",
+  "childcare-providers",
+  "service-providers",
+])
 
 const ROLE_BY_KEY = new Map(
   DIRECTORY_DYNAMIC_ROLE_DEFS.map((def) => [def.key, def] as const)
@@ -161,23 +176,37 @@ export const DIRECTORY_ORGANIZATION_ASSIGNABLE_ROLES: ContactRoleValue[] = [
 ]
 
 export function getDirectoryAssignableRoles(
-  recordType: "individual" | "organization" | "group"
+  recordType: "individual" | "organization" | "group",
+  options: DirectoryRoleNavOptions = {}
 ): { value: ContactRoleValue; label: string }[] {
   const values =
     recordType === "organization" || recordType === "group"
       ? DIRECTORY_ORGANIZATION_ASSIGNABLE_ROLES
       : DIRECTORY_PERSON_ASSIGNABLE_ROLES
 
-  return values.map((value) => ({
-    value,
-    label: ROLE_VALUE_TO_LABEL[value],
-  }))
+  return values
+    .filter(
+      (value) => value !== "service_provider" || Boolean(options.facilitiesEnabled)
+    )
+    .map((value) => ({
+      value,
+      label: ROLE_VALUE_TO_LABEL[value],
+    }))
 }
 
-export function populatedDirectoryRoles(counts: DirectoryRoleCountMap) {
-  return DIRECTORY_DYNAMIC_ROLE_DEFS.filter(
-    (def) => def.key === "service-providers" || (counts[def.key] ?? 0) > 0
-  )
+export function populatedDirectoryRoles(
+  counts: DirectoryRoleCountMap,
+  options: DirectoryRoleNavOptions = {}
+) {
+  return DIRECTORY_DYNAMIC_ROLE_DEFS.filter((def) => {
+    if (options.directoryNav && DIRECTORY_NAV_HIDDEN_ROLE_KEYS.has(def.key)) {
+      return false
+    }
+    if (def.key === "service-providers") {
+      return Boolean(options.facilitiesEnabled)
+    }
+    return (counts[def.key] ?? 0) > 0
+  })
 }
 
 export type DirectoryRoleExtraColumn = {

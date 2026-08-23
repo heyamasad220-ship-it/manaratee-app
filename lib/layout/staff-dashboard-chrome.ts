@@ -11,6 +11,6 @@ export const STAFF_MAIN_CONTENT_STICKY_TOP_CLASS = "top-[11.75rem]"
 /** Rem value matching STAFF_MAIN_CONTENT_STICKY_TOP_CLASS — for `calc()` with dynamic offsets. */
 export const STAFF_MAIN_CONTENT_STICKY_TOP_REM = 11.75
 
-/** Sidebar nav + module drawer start below the logo band and breadcrumb spacer. */
+/** Sidebar nav + module drawer start below the header spacer and breadcrumb spacer. */
 export const STAFF_SIDEBAR_NAV_TOP_CLASS = STAFF_MAIN_CONTENT_STICKY_TOP_CLASS
 export const STAFF_SIDEBAR_NAV_HEIGHT_CLASS = "h-[calc(100vh-11.75rem)]"

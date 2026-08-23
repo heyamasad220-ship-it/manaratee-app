@@ -32,6 +32,7 @@ export default async function ProgramsPage({
     audience: getValue(resolvedSearchParams?.audience) || "all",
     age: getValue(resolvedSearchParams?.age) || "",
     page: getValue(resolvedSearchParams?.page) || "1",
+    kind: getValue(resolvedSearchParams?.kind) || "",
   }
 
   const organizationId = await getSelectedOrganizationId()
@@ -48,6 +49,13 @@ export default async function ProgramsPage({
     }
   }
 
+  const catalogTitle =
+    filters.kind === "academic"
+      ? "Academic Catalog"
+      : filters.kind === "seasonal"
+        ? "Seasonal Catalog"
+        : "Program Catalog"
+
   const [offerings, departments] = await Promise.all([
     getActiveOfferingsForCatalog({
       q: filters.q,
@@ -55,6 +63,7 @@ export default async function ProgramsPage({
       gender: filters.gender,
       audience: filters.audience,
       age: filters.age,
+      kind: filters.kind,
     }),
     getDepartments(),
   ])
@@ -76,7 +85,7 @@ export default async function ProgramsPage({
 
   return (
     <>
-      <Header title="Program Catalog" />
+      <Header title={catalogTitle} />
 
       <div className="space-y-4 p-6">
         {publicCatalogUrl ? (
@@ -99,7 +108,7 @@ export default async function ProgramsPage({
           totalPages={totalPages}
           totalCount={totalCount}
           pageSize={PROGRAM_CATALOG_PAGE_SIZE}
-          title="Program Catalog"
+          title={catalogTitle}
           emptyTitle={`No active ${PROGRAM_LABEL_PLURAL.toLowerCase()} found`}
           emptyDescription={`Add ${PROGRAM_LABEL_PLURAL.toLowerCase()} from a department workspace, or adjust your filters.`}
           getOfferingHref={(offering) =>
@@ -118,6 +127,7 @@ export default async function ProgramsPage({
                 audience: filters.audience,
                 age: filters.age,
                 view: "cards",
+                kind: filters.kind,
               },
               targetPage
             )

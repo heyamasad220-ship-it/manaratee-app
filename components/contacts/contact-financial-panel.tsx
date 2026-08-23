@@ -17,6 +17,7 @@ import {
 } from "lucide-react"
 import { Cell, Pie, PieChart } from "recharts"
 
+import { PledgeDetailsDialog } from "@/components/donations/pledge-details-dialog"
 import { DonationRecurringPanel } from "@/components/donations/donation-recurring-panel"
 import { DonorPledgesTab } from "@/components/donations/donor-pledges-tab"
 import { GivingStatementActions } from "@/components/donations/giving-statement-actions"
@@ -153,7 +154,13 @@ function isPaidTransaction(event: ContactFinancialTimelineEvent) {
   )
 }
 
-function OpenBalancesTable({ rows }: { rows: ContactOpenBalanceRow[] }) {
+function OpenBalancesTable({
+  rows,
+  onPledgeClick,
+}: {
+  rows: ContactOpenBalanceRow[]
+  onPledgeClick?: (pledgeId: string) => void
+}) {
   if (rows.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">No open balances found for this contact.</p>
@@ -178,7 +185,15 @@ function OpenBalancesTable({ rows }: { rows: ContactOpenBalanceRow[] }) {
             <TableRow key={`${row.sourceModule}-${row.id}`}>
               <TableCell>{row.type}</TableCell>
               <TableCell className="max-w-[220px] truncate">
-                {row.href ? (
+                {row.type === "Pledge" && onPledgeClick ? (
+                  <button
+                    type="button"
+                    className="text-primary hover:underline"
+                    onClick={() => onPledgeClick(row.id)}
+                  >
+                    {row.description}
+                  </button>
+                ) : row.href ? (
                   <Link href={row.href} className="text-primary hover:underline">
                     {row.description}
                   </Link>
@@ -481,6 +496,8 @@ export function ContactFinancialPanel({
   const [openBalancesOpen, setOpenBalancesOpen] = useState(false)
   const [allTransactionsOpen, setAllTransactionsOpen] = useState(false)
   const [detailTab, setDetailTab] = useState<FinancialDetailTab>("payment-plans")
+  const [detailsOpen, setDetailsOpen] = useState(false)
+  const [detailsPledgeId, setDetailsPledgeId] = useState<string | null>(null)
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -767,7 +784,17 @@ export function ContactFinancialPanel({
               </SheetDescription>
             </SheetHeader>
             <div className="mt-4 min-h-0 flex-1 overflow-y-auto pr-1">
-              <OpenBalancesTable rows={openBalances} />
+              <OpenBalancesTable
+                rows={openBalances}
+                onPledgeClick={
+                  isCustomer
+                    ? undefined
+                    : (pledgeId) => {
+                        setDetailsPledgeId(pledgeId)
+                        setDetailsOpen(true)
+                      }
+                }
+              />
             </div>
           </SheetContent>
         </Sheet>
@@ -1098,6 +1125,24 @@ export function ContactFinancialPanel({
           </aside>
         ) : null}
       </div>
+      {!isCustomer ? (
+        <PledgeDetailsDialog
+          open={detailsOpen}
+          onOpenChange={(open) => {
+            setDetailsOpen(open)
+            if (!open) setDetailsPledgeId(null)
+          }}
+          pledgeId={detailsPledgeId}
+          onSaved={() => {
+            void loadData()
+          }}
+          onDeleted={() => {
+            setDetailsOpen(false)
+            setDetailsPledgeId(null)
+            void loadData()
+          }}
+        />
+      ) : null}
     </div>
   )
 }

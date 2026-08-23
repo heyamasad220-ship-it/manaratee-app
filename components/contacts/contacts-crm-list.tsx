@@ -124,6 +124,8 @@ export type ContactsCrmListProps = {
   showUniversalAdd?: boolean
   emptyTitle?: string
   emptyDescription?: string
+  /** When false, Service Provider is omitted from Directory role assignment. */
+  facilitiesEnabled?: boolean
 }
 
 function getInitials(name: string) {
@@ -168,6 +170,7 @@ function ContactsCrmListInner({
   showUniversalAdd = true,
   emptyTitle,
   emptyDescription,
+  facilitiesEnabled = false,
 }: ContactsCrmListProps = {}) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -826,7 +829,9 @@ function ContactsCrmListInner({
               <div className="flex flex-col gap-2">
                 <Label>Roles</Label>
                 <div className="grid gap-2 sm:grid-cols-2">
-                  {getDirectoryAssignableRoles(contactType).map((role) => {
+                  {getDirectoryAssignableRoles(contactType, {
+                    facilitiesEnabled,
+                  }).map((role) => {
                     const checked = contactRoles.includes(role.value)
                     return (
                       <label

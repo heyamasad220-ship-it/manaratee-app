@@ -7,6 +7,7 @@ import { resolveDepartmentHeadship } from "@/lib/departments/department-headship
 import { isCurrentUserPlatformAdmin } from "@/lib/platform/is-platform-admin-user"
 import { getPlatformAdminOrgAccessOrganizationId } from "@/lib/platform/platform-org-access"
 import { getServiceRoleClient } from "@/lib/platform/require-platform-admin"
+import { normalizeOrganizationProgramKinds } from "@/lib/programs/program-kind-policy"
 import { createClient } from "@/lib/supabase/server"
 
 export const dynamic = "force-dynamic"
@@ -105,12 +106,35 @@ export async function GET() {
       console.warn("directory role counts unavailable:", error)
     }
 
+    let programKinds = normalizeOrganizationProgramKinds(null)
+    try {
+      const { data: organizationRow, error: programKindsError } = await admin
+        .from("organizations")
+        .select("program_kinds")
+        .eq("id", organizationId)
+        .maybeSingle()
+
+      if (
+        programKindsError &&
+        !/program_kinds|does not exist/i.test(programKindsError.message || "")
+      ) {
+        console.warn("program kinds unavailable:", programKindsError.message)
+      }
+
+      programKinds = normalizeOrganizationProgramKinds(
+        (organizationRow as { program_kinds?: string | null } | null)?.program_kinds
+      )
+    } catch (error) {
+      console.warn("program kinds unavailable:", error)
+    }
+
     return NextResponse.json({
       modules,
       platformSupportMode,
       myDepartment,
       permissionContext,
       directoryRoleCounts,
+      programKinds,
     })
   } catch (error) {
     console.error("sidebar-modules GET failed:", error)

@@ -8,6 +8,7 @@ import { ArrowLeft, Plus } from "lucide-react"
 import { ContactProfileDialog } from "@/components/contacts/contact-profile-dialog"
 import { Button } from "@/components/ui/button"
 import { CampaignEditDialog } from "@/components/donations/campaign-edit-dialog"
+import { PledgeDetailsDialog } from "@/components/donations/pledge-details-dialog"
 import { CampaignGroupsTab } from "@/components/donations/campaign-groups-tab"
 import { CampaignOverviewTab } from "@/components/donations/campaign-overview-tab"
 import { CampaignProspectsTab } from "@/components/donations/campaign-prospects-tab"
@@ -42,6 +43,7 @@ import {
   parseCampaignWorkspaceTab,
 } from "@/lib/donations/campaign-workspace-paths"
 import { donationPledgesHref } from "@/lib/donations/donation-pledge-paths"
+import { formatPaymentAllocationStatus, isOpenAllocatablePledge } from "@/lib/donations/donation-status"
 import { createClient } from "@/lib/supabase/client"
 
 type ContactProfileTarget = {
@@ -51,7 +53,8 @@ type ContactProfileTarget = {
 
 function formatShortDate(value: string | null | undefined) {
   if (!value) return "—"
-  const date = new Date(`${value}T00:00:00`)
+  const dateOnly = value.match(/^(\d{4}-\d{2}-\d{2})/)?.[1]
+  const date = dateOnly ? new Date(`${dateOnly}T00:00:00`) : new Date(value)
   if (Number.isNaN(date.getTime())) return value
   return date.toLocaleDateString(undefined, {
     month: "short",
@@ -65,11 +68,15 @@ function CampaignPledgesTab({
   pledges,
   canManage,
   onDonorClick,
+  onAddPledge,
+  onPledgeClick,
 }: {
   campaignId: string
   pledges: CampaignOutstandingPledgeRow[]
   canManage: boolean
   onDonorClick: (pledge: CampaignOutstandingPledgeRow) => void
+  onAddPledge: () => void
+  onPledgeClick: (pledgeId: string) => void
 }) {
   return (
     <div className="flex flex-col gap-4">
@@ -85,11 +92,9 @@ function CampaignPledgesTab({
             <Link href={donationPledgesHref({ campaignId })}>Open full pledges view</Link>
           </Button>
           {canManage ? (
-            <Button asChild>
-              <Link href={donationPledgesHref({ action: "add", campaignId })}>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Pledge
-              </Link>
+            <Button onClick={onAddPledge}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Pledge
             </Button>
           ) : null}
         </div>
@@ -117,12 +122,19 @@ function CampaignPledgesTab({
                 </TableRow>
               ) : (
                 pledges.map((pledge) => (
-                  <TableRow key={pledge.id}>
+                  <TableRow
+                    key={pledge.id}
+                    className="cursor-pointer hover:bg-muted/40"
+                    onClick={() => onPledgeClick(pledge.id)}
+                  >
                     <TableCell>
                       <button
                         type="button"
                         className="font-medium text-primary hover:underline"
-                        onClick={() => onDonorClick(pledge)}
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          onDonorClick(pledge)
+                        }}
                       >
                         {pledge.donorName}
                       </button>
@@ -151,10 +163,16 @@ function CampaignPledgesTab({
 
 function CampaignDonationsTab({
   payments,
+  openPledgeDonorIds,
+  openPledgeContactIds,
   onDonorClick,
+  onPledgeClick,
 }: {
   payments: CampaignPaymentRow[]
+  openPledgeDonorIds: Set<string>
+  openPledgeContactIds: Set<string>
   onDonorClick: (payment: CampaignPaymentRow) => void
+  onPledgeClick: (pledgeId: string) => void
 }) {
   return (
     <div className="flex flex-col gap-4">
@@ -204,10 +222,30 @@ function CampaignDonationsTab({
                     <TableCell className="capitalize">
                       {payment.source || "—"}
                     </TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">
-                      {payment.pledge_id ? `${payment.pledge_id.slice(0, 8)}…` : "—"}
+                    <TableCell className="font-mono text-xs">
+                      {payment.pledge_id ? (
+                        <button
+                          type="button"
+                          className="text-primary hover:underline"
+                          title="Open pledge"
+                          onClick={() => onPledgeClick(payment.pledge_id!)}
+                        >
+                          {`${payment.pledge_id.slice(0, 8)}…`}
+                        </button>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
                     </TableCell>
-                    <TableCell className="capitalize">{payment.status || "—"}</TableCell>
+                    <TableCell className="capitalize">
+                      {formatPaymentAllocationStatus({
+                        status: payment.status,
+                        pledgeId: payment.pledge_id,
+                        donorHasOpenPledge: Boolean(
+                          (payment.donor_id && openPledgeDonorIds.has(payment.donor_id)) ||
+                            (payment.contact_id && openPledgeContactIds.has(payment.contact_id))
+                        ),
+                      })}
+                    </TableCell>
                   </TableRow>
                 ))
               )}
@@ -253,8 +291,28 @@ export default function CampaignDetailPage() {
   const [showDonorsDialog, setShowDonorsDialog] = useState(false)
   const [contactProfileId, setContactProfileId] = useState<string | null>(null)
   const [showContactProfile, setShowContactProfile] = useState(false)
+  const [detailsOpen, setDetailsOpen] = useState(false)
+  const [detailsPledgeId, setDetailsPledgeId] = useState<string | null>(null)
 
   const supabase = useMemo(() => createClient(), [])
+
+  const { openPledgeDonorIds, openPledgeContactIds } = useMemo(() => {
+    const donorIds = new Set<string>()
+    const contactIds = new Set<string>()
+    for (const pledge of campaignPledges) {
+      if (
+        !isOpenAllocatablePledge({
+          status: pledge.status,
+          balanceRemaining: pledge.balanceRemaining,
+        })
+      ) {
+        continue
+      }
+      if (pledge.donorId) donorIds.add(pledge.donorId)
+      if (pledge.contactId) contactIds.add(pledge.contactId)
+    }
+    return { openPledgeDonorIds: donorIds, openPledgeContactIds: contactIds }
+  }, [campaignPledges])
 
   const openContactProfile = useCallback(
     async ({ contactId, donorId }: ContactProfileTarget) => {
@@ -457,6 +515,10 @@ export default function CampaignDetailPage() {
               onShowDonorsDialogChange={setShowDonorsDialog}
               onOverviewMetricKeysSaved={setOverviewMetricKeys}
               onOpenContactProfile={(target) => void openContactProfile(target)}
+              onPledgeClick={(pledgeId) => {
+                setDetailsPledgeId(pledgeId)
+                setDetailsOpen(true)
+              }}
               onReload={() => void loadCampaign()}
             />
           ) : null}
@@ -504,18 +566,32 @@ export default function CampaignDetailPage() {
                   donorId: pledge.donorId,
                 })
               }
+              onAddPledge={() => {
+                setDetailsPledgeId(null)
+                setDetailsOpen(true)
+              }}
+              onPledgeClick={(pledgeId) => {
+                setDetailsPledgeId(pledgeId)
+                setDetailsOpen(true)
+              }}
             />
           ) : null}
 
           {activeTab === "donations" ? (
             <CampaignDonationsTab
               payments={campaignPayments}
+              openPledgeDonorIds={openPledgeDonorIds}
+              openPledgeContactIds={openPledgeContactIds}
               onDonorClick={(payment) =>
                 void openContactProfile({
                   contactId: payment.contact_id,
                   donorId: payment.donor_id,
                 })
               }
+              onPledgeClick={(pledgeId) => {
+                setDetailsPledgeId(pledgeId)
+                setDetailsOpen(true)
+              }}
             />
           ) : null}
 
@@ -553,6 +629,27 @@ export default function CampaignDetailPage() {
           }}
         />
       ) : null}
+
+      <PledgeDetailsDialog
+        open={detailsOpen}
+        onOpenChange={(open) => {
+          setDetailsOpen(open)
+          if (!open) setDetailsPledgeId(null)
+        }}
+        pledgeId={detailsPledgeId}
+        organizationId={campaign.organization_id}
+        defaultCampaignId={campaign.id}
+        canManage={canManage}
+        onSaved={(pledgeId) => {
+          setDetailsPledgeId(pledgeId)
+          void loadCampaign()
+        }}
+        onDeleted={() => {
+          setDetailsOpen(false)
+          setDetailsPledgeId(null)
+          void loadCampaign()
+        }}
+      />
 
       <ContactProfileDialog
         contactId={contactProfileId}

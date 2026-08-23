@@ -44,6 +44,7 @@ type CampaignOverviewTabProps = {
   onShowDonorsDialogChange: (open: boolean) => void
   onOverviewMetricKeysSaved: (keys: CampaignOverviewMetricKey[] | null) => void
   onOpenContactProfile: (target: ContactProfileTarget) => void
+  onPledgeClick?: (pledgeId: string) => void
   onReload: () => void
 }
 
@@ -61,6 +62,7 @@ export function CampaignOverviewTab({
   onShowDonorsDialogChange,
   onOverviewMetricKeysSaved,
   onOpenContactProfile,
+  onPledgeClick,
   onReload,
 }: CampaignOverviewTabProps) {
   const { metrics } = entry
@@ -206,6 +208,7 @@ export function CampaignOverviewTab({
               donorId: pledge.donorId,
             })
           }
+          onPledgeClick={onPledgeClick}
         />
 
         <CampaignOverviewGroupsCard campaignId={campaign.id} />

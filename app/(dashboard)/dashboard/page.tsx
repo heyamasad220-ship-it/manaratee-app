@@ -2,6 +2,10 @@
 
 import { createClient } from "@/lib/supabase/client"
 import { getCurrentOrganizationId } from "@/lib/current-organization"
+import {
+  isDashboardSubscribedModule,
+  staffModuleDisplayName,
+} from "@/lib/modules/staff-module-labels"
 import { useEffect, useState } from "react"
 import { Header } from "@/components/layout/header"
 import {
@@ -61,6 +65,11 @@ type QuickLink = {
   url: string
 }
 
+type SubscribedModule = {
+  slug: string
+  name: string
+}
+
 type Organization = {
   id?: string
   name?: string
@@ -111,6 +120,10 @@ export default function DashboardPage() {
   const [showLogoDialog, setShowLogoDialog] = useState(false)
   const [showLinkDialog, setShowLinkDialog] = useState(false)
   const [org, setOrg] = useState<Organization | null>(null)
+  const [orgSnapshot, setOrgSnapshot] = useState<Organization | null>(null)
+  const [subscribedModules, setSubscribedModules] = useState<SubscribedModule[]>(
+    []
+  )
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
 
@@ -123,15 +136,15 @@ export default function DashboardPage() {
       if (!orgId) {
         console.error("No selected organization")
         setOrg(emptyOrganization)
+        setSubscribedModules([])
         setIsLoading(false)
         return
       }
 
-      const { data, error } = await supabase
-        .from("organizations")
-        .select("*")
-        .eq("id", orgId)
-        .single()
+      const [{ data, error }, modulesResponse] = await Promise.all([
+        supabase.from("organizations").select("*").eq("id", orgId).single(),
+        fetch("/api/organizations/sidebar-modules", { cache: "no-store" }),
+      ])
 
       if (error) {
         console.error("Error loading organization:", error)
@@ -148,6 +161,29 @@ export default function DashboardPage() {
         address: data.address || emptyOrganization.address,
       })
 
+      if (modulesResponse.ok) {
+        const payload = (await modulesResponse.json()) as {
+          modules?: Array<{ slug?: string; name?: string; sort_order?: number | null }>
+        }
+        const modules = (payload.modules || [])
+          .filter((row) => typeof row.slug === "string" && isDashboardSubscribedModule(row.slug))
+          .map((row) => ({
+            slug: row.slug as string,
+            name: staffModuleDisplayName(row.slug as string, row.name),
+            sortOrder: row.sort_order ?? 999,
+          }))
+          .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))
+          .map(({ slug, name }) => ({ slug, name }))
+
+        const unique = new Map<string, SubscribedModule>()
+        for (const module of modules) {
+          unique.set(staffModuleDisplayName(module.slug), module)
+        }
+        setSubscribedModules(Array.from(unique.values()))
+      } else {
+        setSubscribedModules([])
+      }
+
       setIsLoading(false)
     }
 
@@ -156,6 +192,8 @@ export default function DashboardPage() {
 
   async function saveOrganization() {
     if (!org?.id) {
+      setOrgSnapshot(null)
+      setShowLogoDialog(false)
       setIsEditing(false)
       return
     }
@@ -186,6 +224,27 @@ export default function DashboardPage() {
     }
 
     setIsSaving(false)
+    setOrgSnapshot(null)
+    setShowLogoDialog(false)
+    setIsEditing(false)
+  }
+
+  function startEditing() {
+    if (!org) return
+    setOrgSnapshot(structuredClone(org))
+    setIsEditing(true)
+  }
+
+  function cancelEditing() {
+    if (orgSnapshot) {
+      setOrg({
+        ...orgSnapshot,
+        logo: org?.logo ?? orgSnapshot.logo,
+        logo_url: org?.logo_url ?? orgSnapshot.logo_url,
+      })
+    }
+    setOrgSnapshot(null)
+    setShowLogoDialog(false)
     setIsEditing(false)
   }
 
@@ -233,63 +292,67 @@ export default function DashboardPage() {
               <div className="flex flex-col gap-6 md:flex-row md:items-start">
                 <div className="flex flex-col items-center gap-2">
                   <div
-                    className="flex h-28 w-28 cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-border bg-muted/50 transition-colors hover:border-primary hover:bg-muted"
-                    onClick={() => setShowLogoDialog(true)}
+                    className={
+                      logoUrl
+                        ? isEditing
+                          ? "inline-flex max-h-40 max-w-[18rem] cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-border bg-white p-2 transition-colors hover:border-primary hover:bg-muted/40"
+                          : "inline-flex max-h-40 max-w-[18rem] items-center justify-center bg-white"
+                        : isEditing
+                          ? "flex h-28 w-28 cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-border bg-muted/50 transition-colors hover:border-primary hover:bg-muted"
+                          : "flex h-28 w-28 items-center justify-center rounded-xl border bg-muted/40"
+                    }
+                    onClick={
+                      isEditing ? () => setShowLogoDialog(true) : undefined
+                    }
+                    role={isEditing ? "button" : undefined}
+                    tabIndex={isEditing ? 0 : undefined}
+                    onKeyDown={
+                      isEditing
+                        ? (event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault()
+                              setShowLogoDialog(true)
+                            }
+                          }
+                        : undefined
+                    }
                   >
                     {logoUrl ? (
                       <img
                         src={logoUrl}
                         alt="Organization logo"
-                        className="h-full w-full rounded-xl object-cover"
+                        className="h-auto max-h-36 w-auto max-w-full object-contain"
                       />
                     ) : (
                       <div className="flex flex-col items-center gap-1 text-muted-foreground">
                         <Upload className="h-8 w-8" />
-                        <span className="text-xs">Upload Logo</span>
+                        <span className="text-xs">
+                          {isEditing ? "Upload Logo" : "No logo"}
+                        </span>
                       </div>
                     )}
                   </div>
 
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowLogoDialog(true)}
-                  >
-                    Change Logo
-                  </Button>
+                  {isEditing ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowLogoDialog(true)}
+                    >
+                      Change Logo
+                    </Button>
+                  ) : null}
                 </div>
 
                 <div className="flex-1">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h2 className="text-2xl font-bold text-foreground">
-                        {org.name || "Organization name not set"}
-                      </h2>
+                  <div>
+                    <h2 className="text-2xl font-bold text-foreground">
+                      {org.name || "Organization name not set"}
+                    </h2>
 
-                      <p className="mt-1 text-muted-foreground">
-                        {org.tagline || "No tagline set yet"}
-                      </p>
-                    </div>
-
-                    <Button
-                      variant={isEditing ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => {
-                        if (isEditing) {
-                          saveOrganization()
-                        } else {
-                          setIsEditing(true)
-                        }
-                      }}
-                      disabled={isSaving}
-                    >
-                      <Pencil className="mr-2 h-4 w-4" />
-                      {isEditing
-                        ? isSaving
-                          ? "Saving..."
-                          : "Save Changes"
-                        : "Edit"}
-                    </Button>
+                    <p className="mt-1 text-muted-foreground">
+                      {org.tagline || "No tagline set yet"}
+                    </p>
                   </div>
 
                   {isEditing ? (
@@ -715,31 +778,83 @@ export default function DashboardPage() {
               </CardHeader>
 
               <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  No subscribed modules found.
-                </p>
+                {subscribedModules.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {subscribedModules.map((module) => (
+                      <Badge key={module.slug} variant="secondary">
+                        {module.name}
+                      </Badge>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No subscribed modules found.
+                  </p>
+                )}
               </CardContent>
             </Card>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {isEditing ? (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={cancelEditing}
+                  disabled={isSaving}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    void saveOrganization()
+                  }}
+                  disabled={isSaving}
+                >
+                  {isSaving ? "Saving..." : "Save Changes"}
+                </Button>
+              </>
+            ) : (
+              <Button type="button" variant="outline" onClick={startEditing}>
+                <Pencil className="mr-2 h-4 w-4" />
+                Edit
+              </Button>
+            )}
           </div>
         </div>
       </div>
 
-      <Dialog open={showLogoDialog} onOpenChange={setShowLogoDialog}>
+      <Dialog
+        open={isEditing && showLogoDialog}
+        onOpenChange={(open) => {
+          if (!isEditing) return
+          setShowLogoDialog(open)
+        }}
+      >
   <DialogContent>
     <DialogHeader>
       <DialogTitle>Upload Organization Logo</DialogTitle>
       <DialogDescription>
-        Upload a logo for your organization. Recommended size: 200x200 pixels.
+        Upload a PNG, SVG, or JPG. Wide or square logos both work — the preview
+        keeps the full image without cropping.
       </DialogDescription>
     </DialogHeader>
 
     <div className="flex flex-col items-center gap-4 py-4">
-      <div className="flex h-40 w-40 items-center justify-center rounded-xl border-2 border-dashed border-border bg-muted/50">
+      <div
+        className={
+          logoUrl
+            ? "inline-flex max-h-48 max-w-full items-center justify-center rounded-xl border-2 border-dashed border-border bg-white p-3"
+            : "flex h-40 w-40 items-center justify-center rounded-xl border-2 border-dashed border-border bg-muted/50"
+        }
+      >
         {logoUrl ? (
           <img
             src={logoUrl}
             alt="Organization logo"
-            className="h-full w-full rounded-xl object-cover"
+            className="h-auto max-h-44 w-auto max-w-full object-contain"
           />
         ) : (
           <div className="flex flex-col items-center gap-2 text-muted-foreground">

@@ -1,10 +1,9 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import Link from "next/link"
 import { Plus, Search } from "lucide-react"
 
-import { CampaignProspectRecordPledgeDialog } from "@/components/donations/campaign-prospect-record-pledge-dialog"
+import { PledgeDetailsDialog } from "@/components/donations/pledge-details-dialog"
 import { CampaignProspectStageBadge } from "@/components/donations/campaign-prospect-stage-badge"
 import { PledgeContactPicker } from "@/components/donations/pledge-contact-picker"
 import { QuickAddContactDialog } from "@/components/contacts/quick-add-contact-dialog"
@@ -56,7 +55,6 @@ import {
   type CampaignProspectListItem,
   type CampaignProspectStage,
 } from "@/lib/donations/campaign-prospect-types"
-import { donationPledgesHref } from "@/lib/donations/donation-pledge-paths"
 import { DONATIONS_PAGE_SIZE } from "@/lib/donations/donation-pagination"
 import { cn } from "@/lib/utils"
 
@@ -114,7 +112,8 @@ function emptyForm(askLevels: CampaignAskLevelRow[]): ProspectFormState {
 
 function formatShortDate(value: string | null | undefined) {
   if (!value) return "—"
-  const date = new Date(`${value}T00:00:00`)
+  const dateOnly = value.match(/^(\d{4}-\d{2}-\d{2})/)?.[1]
+  const date = dateOnly ? new Date(`${dateOnly}T00:00:00`) : new Date(value)
   if (Number.isNaN(date.getTime())) return value
   return date.toLocaleDateString(undefined, {
     month: "short",
@@ -156,6 +155,7 @@ export function CampaignProspectsTab({
   const [bulkAssigneeLabel, setBulkAssigneeLabel] = useState("")
   const [convertProspectId, setConvertProspectId] = useState<string | null>(null)
   const [showConvertDialog, setShowConvertDialog] = useState(false)
+  const [pledgeDetailsId, setPledgeDetailsId] = useState<string | null>(null)
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 300)
@@ -781,6 +781,7 @@ export function CampaignProspectsTab({
                     disabled={saving}
                     onClick={() => {
                       setShowDialog(false)
+                      setPledgeDetailsId(null)
                       setConvertProspectId(editing.id)
                       setShowConvertDialog(true)
                     }}
@@ -788,15 +789,17 @@ export function CampaignProspectsTab({
                     Record Pledge
                   </Button>
                 ) : editing.converted_pledge_id ? (
-                  <Button type="button" variant="outline" asChild>
-                    <Link
-                      href={donationPledgesHref({
-                        pledgeId: editing.converted_pledge_id,
-                        action: "view",
-                      })}
-                    >
-                      View Pledge
-                    </Link>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setShowDialog(false)
+                      setConvertProspectId(null)
+                      setPledgeDetailsId(editing.converted_pledge_id)
+                      setShowConvertDialog(true)
+                    }}
+                  >
+                    View Pledge
                   </Button>
                 ) : null}
               </div>
@@ -837,15 +840,31 @@ export function CampaignProspectsTab({
         }}
       />
 
-      <CampaignProspectRecordPledgeDialog
+      <PledgeDetailsDialog
         open={showConvertDialog}
         onOpenChange={(open) => {
           setShowConvertDialog(open)
-          if (!open) setConvertProspectId(null)
+          if (!open) {
+            setConvertProspectId(null)
+            setPledgeDetailsId(null)
+          }
         }}
+        pledgeId={pledgeDetailsId}
         prospectId={convertProspectId}
         organizationId={organizationId}
-        onConverted={() => {
+        defaultCampaignId={campaignId}
+        canManage={canManage}
+        onSaved={(pledgeId) => {
+          setPledgeDetailsId(pledgeId)
+          setConvertProspectId(null)
+          void loadProspects()
+          void loadAssignees()
+          onChanged()
+        }}
+        onDeleted={() => {
+          setShowConvertDialog(false)
+          setPledgeDetailsId(null)
+          setConvertProspectId(null)
           void loadProspects()
           void loadAssignees()
           onChanged()

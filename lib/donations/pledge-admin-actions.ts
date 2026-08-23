@@ -224,6 +224,105 @@ async function reassignPledgeContact(
   }
 }
 
+export async function createPledgeAction(input: {
+  contactId: string
+  amountPledged: number
+  pledgeDate?: string | null
+  frequency?: string | null
+  notes?: string | null
+  campaignId?: string | null
+  categoryId?: string | null
+  subcategoryId?: string | null
+  wishlistItemId?: string | null
+}): Promise<{ success: true; pledgeId: string } | { success: false; error: string }> {
+  const access = await requireDonationStaffAccess("manage")
+  if (!access.ok) return { success: false, error: access.error }
+
+  const amount = Number(input.amountPledged)
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return { success: false, error: "Amount must be greater than zero." }
+  }
+
+  const contactId = input.contactId.trim()
+  if (!contactId) {
+    return { success: false, error: "Please select a contact." }
+  }
+
+  const donorId = await ensureDonorExtensionForContact(
+    access.orgId,
+    contactId,
+    access.supabase
+  )
+  if (!donorId) {
+    return { success: false, error: "Could not resolve a donor record for the selected contact." }
+  }
+
+  if (input.subcategoryId) {
+    const fundCheck = await validateOpenDonationFund(
+      access.supabase,
+      access.orgId,
+      input.subcategoryId
+    )
+    if (!fundCheck.ok) {
+      return { success: false, error: fundCheck.error }
+    }
+  }
+
+  const frequency = frequencyToStorage(input.frequency || "One-Time")
+  const { data: pledge, error } = await access.supabase
+    .from("pledges")
+    .insert({
+      organization_id: access.orgId,
+      donor_id: donorId,
+      campaign_id: input.campaignId || null,
+      category_id: input.categoryId || null,
+      subcategory_id: input.subcategoryId || null,
+      wishlist_item_id: input.campaignId ? input.wishlistItemId || null : null,
+      amount_pledged: amount,
+      pledge_date: normalizeDateInput(input.pledgeDate) || getTodayPlainDate(),
+      pledge_type: frequency,
+      frequency,
+      status: "open",
+      notes: input.notes?.trim() || null,
+    })
+    .select("id")
+    .single()
+
+  if (error || !pledge) {
+    return { success: false, error: error?.message || "Could not create pledge." }
+  }
+
+  try {
+    await handleDonationAffiliationSync({
+      organizationId: access.orgId,
+      donorId,
+      contactId,
+    })
+  } catch (syncError) {
+    console.error(
+      `[create-pledge] affiliation sync failed: ${
+        syncError instanceof Error ? syncError.message : String(syncError)
+      }`
+    )
+  }
+
+  await writeOrganizationAuditLog({
+    organizationId: access.orgId,
+    category: "financial",
+    action: ORGANIZATION_AUDIT_ACTIONS.PLEDGE_CREATED,
+    actorUserId: access.userId,
+    actorEmail: access.userEmail,
+    targetType: "pledge",
+    targetId: pledge.id,
+    targetLabel: formatMoney(amount),
+    summary: `Created pledge ${formatMoney(amount)}`,
+    metadata: { amount, frequency, contactId, campaignId: input.campaignId || null },
+  })
+
+  revalidatePledgePaths(donorId, [contactId])
+  return { success: true, pledgeId: pledge.id as string }
+}
+
 export async function getPledgeForEditAction(pledgeId: string) {
   const loaded = await loadOrgPledge(pledgeId)
   if (!loaded.ok) return { success: false as const, error: loaded.error }
@@ -259,6 +358,7 @@ export async function getPledgeForEditAction(pledgeId: string) {
       totalPayments: pledge.total_payments == null ? null : Number(pledge.total_payments),
       firstPaymentDate: normalizeDateInput(pledge.first_payment_date) || "",
       nextPaymentDate: normalizeDateInput(pledge.next_payment_date) || "",
+      campaignName: pledge.campaign_name || "",
     },
   }
 }
@@ -606,5 +706,47 @@ export async function cancelPledgeAction(pledgeId: string) {
   })
 
   revalidatePledgePaths(loaded.pledge.donor_id)
+  return { success: true as const }
+}
+
+export async function deletePledgeAction(pledgeId: string) {
+  const loaded = await loadOrgPledge(pledgeId)
+  if (!loaded.ok) return { success: false as const, error: loaded.error }
+
+  const { supabase, orgId } = loaded.access
+  const contactId = await resolveDonorContactId(supabase, loaded.pledge.donor_id)
+
+  const { error: unlinkError } = await supabase
+    .from("payments")
+    .update({ pledge_id: null })
+    .eq("pledge_id", pledgeId)
+    .eq("organization_id", orgId)
+
+  if (unlinkError) {
+    return { success: false as const, error: unlinkError.message }
+  }
+
+  const { error } = await supabase
+    .from("pledges")
+    .delete()
+    .eq("id", pledgeId)
+    .eq("organization_id", orgId)
+
+  if (error) return { success: false as const, error: error.message }
+
+  const label = pledgeLabel(loaded.pledge)
+  await writeOrganizationAuditLog({
+    organizationId: orgId,
+    category: "financial",
+    action: ORGANIZATION_AUDIT_ACTIONS.PLEDGE_DELETED,
+    actorUserId: loaded.access.userId,
+    actorEmail: loaded.access.userEmail,
+    targetType: "pledge",
+    targetId: pledgeId,
+    targetLabel: label,
+    summary: `Deleted pledge ${label}`,
+  })
+
+  revalidatePledgePaths(loaded.pledge.donor_id, [contactId])
   return { success: true as const }
 }

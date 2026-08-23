@@ -163,7 +163,7 @@ Customer Experience
 User Invitations
 **Contacts Phase 1 — identity linkage + affiliation sync** — **Complete** (S-01–S-13, June 2026). Validation gate: `npm run validate:contacts-phase1`. Deferred: merge UI, historical backfill, venue rental derivation, segmentation.
 
-**Directory module (August 2026)** — User-facing Contacts sidebar is now **Directory**. Canonical table remains `contacts`. Overview, People, Families, Organizations, Reports, and Settings are always visible. Giving groups are not a Directory section — they live under Fund Development (Group Giving). Most role views (Employees, Volunteers, Members, Donors, Sponsors, Parents, Vendors, Childcare Providers, Rental Customers) appear only when the current tenant has records. **Service Providers** is always listed (contractors such as plumbers and pest control, distinct from Vendor Hub). Role views show lightweight lookup columns; operational work stays in Workforce / Fund Development / Membership / Vendor Hub / Venue Rentals. Membership add searches Directory first. Sponsor is a manual role on the same contact (`269`). Routes: `/directory/*` with redirects from `/contacts/*` and `/resources/service-providers`.
+**Directory module (August 2026)** — User-facing Contacts sidebar is **Directory**. Canonical table remains `contacts`. Overview, People, Families, Organizations, Reports, and Settings are always visible. Giving groups are not a Directory section — they live under Fund Development (Group Giving). Directory role flyouts keep CRM lookups (Members, Sponsors, Parents, Vendors, Rental Customers) when the tenant has records. **Donors** and Administration-owned roles (Employees, Volunteers, Childcare Providers, Service Providers) are omitted from Directory nav; operational work stays in Administration / Fund Development. Membership add searches Directory first. Sponsor is a manual role on the same contact (`269`). Routes: `/directory/*` with redirects from `/contacts/*` and `/resources/service-providers`.
 
 **Contacts security remediation (RLS wave 1)** — **G6 complete** (June 2026). M6b gate alignment + CR-8 harness shipped. M4 (`111`) **authorized for staging** after `109`–`110` applied. Validation: `npm run validate:contacts-g6`.
 
@@ -203,6 +203,8 @@ User Invitations
 
 **Fund Development campaign wishlist (August 2026)** — Campaign → Wishlist tab. Sub-goals linked to existing pledges/payments via nullable `wishlist_item_id`. Public donate `/donate/w/{token}`. Carry-forward without duplicating money. Migration **`267_campaign_wishlist.sql`**.
 
+**Canonical Pledge Details window (August 2026)** — Staff add/edit/collect/remind/delete pledges from one dialog (`components/donations/pledge-details-dialog.tsx`) on Pledges, campaign workspace, prospects, and contact Financial. Customer portal unchanged.
+
 ---
 
 ## People Management Module
@@ -220,7 +222,7 @@ Routes remain under `/hr/*` / `/workforce/*` for now. Application submissions li
 
 Sidebar (HR):
 
-* Overview → `/workforce` (drawer + in-page tabs: Employees, Volunteers, Childcare Providers). Path sections: `/workforce/departments`, `/workforce/employees`, `/workforce/volunteers`, `/workforce/childcare`. Employees includes Positions (`?view=positions`). Org payroll queue is **Programs/ Events → Reports → Payroll** (`/finance/payroll`); legacy `/workforce?tab=payroll` redirects there. Sidebar: **Programs/ Events** merges Workforce, Programs, Financial Assistance, Event Management, and Reports. Legacy `/workforce?tab=…` redirects to the matching path. Legacy `/reports` redirects to **Reports → Transactions**.
+* Overview → `/workforce` (drawer + in-page tabs: Employees, Volunteers, Childcare Providers). Path sections: `/workforce/departments`, `/workforce/employees`, `/workforce/volunteers`, `/workforce/childcare`. Employees includes Positions (`?view=positions`). Org payroll queue is **Programs → Reports → Payroll** (`/finance/payroll`); legacy `/workforce?tab=payroll` redirects there. Sidebar: **Administration** owns Departments / Employees / Volunteers / Childcare / Service Providers. **Programs** and **Event Management** are separate rail items. Legacy `/workforce?tab=…` redirects to the matching path. Legacy `/reports` redirects to **Reports → Transactions**.
 * Discount Policies → `/hr/settings` (Membership Benefits redirect path may apply). Department **list** is Overview → Departments (`/workforce?tab=departments`); department **workspace** remains `/workforce/departments/[id]` (**department-level:** Overview, Programs, Schedule [Class times / Activity planner; CTAs to Facilities + Master Calendar], Financial [Employees / Payroll / Expenses / Financial Summary — open years], **Reports** [year/season filter], Group giving when linked, Events `?tab=activity`, Settings; **year-level** `?year=`: Overview, Offerings, Registrations [Applications / Approved / Registrations]). **Department Heads** open the workspace from Staff Tools (**My department**) or a sidebar **My department** link when they lack org-wide HR (`staff.view`). SaaS **Billing** stays in the footer.
 
 **Finance** sidebar module (`finance`): Transactions (`/finance/transactions`), Payroll (`/finance/payroll`), Financial Assistance (`/finance/financial-assistance`). Enable with `scripts/192_finance_module_sidebar_restore.sql`.

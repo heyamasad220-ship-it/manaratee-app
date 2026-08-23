@@ -8,7 +8,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { CampaignOutstandingPledgeActions } from "@/components/donations/campaign-outstanding-pledge-actions"
 import { PledgeDonorSubline } from "@/components/donations/pledge-donor-subline"
 import {
   formatDonationCurrency,
@@ -21,6 +20,7 @@ type CampaignOutstandingPledgesTableProps = {
   pledges: CampaignOutstandingPledgeRow[]
   pledgesPageHref?: string
   onDonorClick?: (pledge: CampaignOutstandingPledgeRow) => void
+  onPledgeClick?: (pledgeId: string) => void
 }
 
 function formatPledgeDate(value: string | null) {
@@ -57,6 +57,7 @@ export function CampaignOutstandingPledgesTable({
   pledges,
   pledgesPageHref = DONATION_PLEDGES_PATH,
   onDonorClick,
+  onPledgeClick,
 }: CampaignOutstandingPledgesTableProps) {
   return (
     <Card>
@@ -76,25 +77,31 @@ export function CampaignOutstandingPledgesTable({
               <TableHead>Balance</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Pledge Date</TableHead>
-              <TableHead className="w-[52px] text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {pledges.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
                   No outstanding pledges for this campaign.
                 </TableCell>
               </TableRow>
             ) : (
               pledges.map((pledge) => (
-                <TableRow key={pledge.id}>
+                <TableRow
+                  key={pledge.id}
+                  className={onPledgeClick ? "cursor-pointer hover:bg-muted/50" : undefined}
+                  onClick={onPledgeClick ? () => onPledgeClick(pledge.id) : undefined}
+                >
                   <TableCell>
                     <div>
                       {onDonorClick && (pledge.contactId || pledge.donorId) ? (
                         <button
                           type="button"
-                          onClick={() => onDonorClick(pledge)}
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            onDonorClick(pledge)
+                          }}
                           className="font-medium text-primary hover:underline"
                         >
                           {pledge.donorName}
@@ -121,9 +128,6 @@ export function CampaignOutstandingPledgesTable({
                   <TableCell>{renderStatusBadge(pledge.status)}</TableCell>
                   <TableCell className="text-muted-foreground">
                     {formatPledgeDate(pledge.pledgeDate)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <CampaignOutstandingPledgeActions pledgeId={pledge.id} />
                   </TableCell>
                 </TableRow>
               ))

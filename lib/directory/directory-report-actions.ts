@@ -45,7 +45,9 @@ export async function fetchDirectoryReportStatsAction(): Promise<
   const supabase = await createClient()
   const summary = await fetchDirectoryNavSummary(organizationId)
 
-  const roleDistribution = DIRECTORY_DYNAMIC_ROLE_DEFS.map((def) => ({
+  const roleDistribution = DIRECTORY_DYNAMIC_ROLE_DEFS.filter(
+    (def) => def.key !== "service-providers" || summary.facilitiesEnabled
+  ).map((def) => ({
     key: def.key,
     label: def.label,
     count: summary.roles[def.key] ?? 0,

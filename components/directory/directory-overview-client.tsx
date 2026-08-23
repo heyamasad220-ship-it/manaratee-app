@@ -14,14 +14,18 @@ import { DirectoryAddMenu } from "@/components/directory/directory-add-menu"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { StatCard, StatCardsRow } from "@/components/ui/stat-card"
+import { StatCard, StatCardsRow, type StatCardTone } from "@/components/ui/stat-card"
 import {
   DIRECTORY_FAMILIES_PATH,
   DIRECTORY_ORGANIZATIONS_PATH,
   DIRECTORY_PEOPLE_PATH,
   directoryRolePath,
 } from "@/lib/directory/directory-paths"
-import { populatedDirectoryRoles, type DirectoryNavSummary } from "@/lib/directory/directory-roles"
+import {
+  populatedDirectoryRoles,
+  type DirectoryDynamicRoleKey,
+  type DirectoryNavSummary,
+} from "@/lib/directory/directory-roles"
 import {
   searchDirectoryAction,
   type DirectorySearchHit,
@@ -32,6 +36,25 @@ const TYPE_LABEL: Record<DirectorySearchHit["type"], string> = {
   person: "Person",
   organization: "Organization",
   family: "Family",
+}
+
+const METRIC_TONES: Record<"People" | "Families" | "Organizations", StatCardTone> = {
+  People: "blue",
+  Families: "emerald",
+  Organizations: "violet",
+}
+
+const ROLE_TONES: Record<DirectoryDynamicRoleKey, StatCardTone> = {
+  employees: "sky",
+  volunteers: "teal",
+  members: "amber",
+  donors: "emerald",
+  sponsors: "indigo",
+  parents: "rose",
+  vendors: "orange",
+  "service-providers": "slate",
+  "childcare-providers": "violet",
+  "rental-customers": "blue",
 }
 
 export function DirectoryOverviewClient({
@@ -83,8 +106,12 @@ export function DirectoryOverviewClient({
   }, [])
 
   const activeRoles = useMemo(
-    () => populatedDirectoryRoles(summary.roles),
-    [summary.roles]
+    () =>
+      populatedDirectoryRoles(summary.roles, {
+        facilitiesEnabled: summary.facilitiesEnabled,
+        directoryNav: true,
+      }),
+    [summary.roles, summary.facilitiesEnabled]
   )
 
   const metrics = [
@@ -182,6 +209,8 @@ export function DirectoryOverviewClient({
               icon={metric.icon}
               layout="header"
               fill
+              tone={METRIC_TONES[metric.label]}
+              className="transition-shadow hover:shadow-sm"
             />
           </Link>
         ))}
@@ -197,19 +226,22 @@ export function DirectoryOverviewClient({
             </p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {activeRoles.map((role) => (
-              <Link key={role.key} href={directoryRolePath(role.key)}>
-                <Card className="h-full transition-colors hover:border-primary/40">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base">{role.label}</CardTitle>
-                    <CardDescription>
-                      {(summary.roles[role.key] ?? 0).toLocaleString()} record
-                      {(summary.roles[role.key] ?? 0) === 1 ? "" : "s"}
-                    </CardDescription>
-                  </CardHeader>
-                </Card>
-              </Link>
-            ))}
+            {activeRoles.map((role) => {
+              const count = summary.roles[role.key] ?? 0
+              return (
+                <Link key={role.key} href={directoryRolePath(role.key)} className="min-w-0">
+                  <StatCard
+                    label={role.label}
+                    value={count.toLocaleString()}
+                    hint={count === 1 ? "record" : "records"}
+                    layout="header"
+                    fill
+                    tone={ROLE_TONES[role.key]}
+                    className="transition-shadow hover:shadow-sm"
+                  />
+                </Link>
+              )
+            })}
           </div>
         </div>
       ) : (

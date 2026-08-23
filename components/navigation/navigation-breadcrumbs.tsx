@@ -44,7 +44,13 @@ export function NavigationBreadcrumbs({
   }
 
   const profileListSegment = resolveContactProfileListSegment(pathname, searchParams)
-  const trail = buildNavigationTrail(pathname, navItems, profileListSegment, extras)
+  const trail = buildNavigationTrail(
+    pathname,
+    navItems,
+    profileListSegment,
+    extras,
+    searchParams
+  )
 
   if (trail.length <= 1) {
     return null

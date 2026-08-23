@@ -11,8 +11,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { PledgeDetailsDialog } from "@/components/donations/pledge-details-dialog"
 import { getDonorPledgeCollectionSummaryAction } from "@/lib/donations/pledge-reminder-actions"
-import { PledgeReminderActions } from "@/components/donations/pledge-reminder-actions"
 import { formatPledgeStatusLabel } from "@/lib/donations/donation-status"
 
 type DonorPledgeCollectionPanelProps = {
@@ -35,12 +35,13 @@ function formatDate(value: string | null) {
 
 export function DonorPledgeCollectionPanel({
   donorId,
-  donorName,
 }: DonorPledgeCollectionPanelProps) {
   const [summary, setSummary] = useState<Awaited<
     ReturnType<typeof getDonorPledgeCollectionSummaryAction>
   > | null>(null)
   const [loading, setLoading] = useState(true)
+  const [detailsOpen, setDetailsOpen] = useState(false)
+  const [detailsPledgeId, setDetailsPledgeId] = useState<string | null>(null)
 
   async function load() {
     setLoading(true)
@@ -81,12 +82,18 @@ export function DonorPledgeCollectionPanel({
                 <TableHead>Campaign</TableHead>
                 <TableHead className="text-right">Balance</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {data.activePledges.map((pledge) => (
-                <TableRow key={pledge.id}>
+                <TableRow
+                  key={pledge.id}
+                  className="cursor-pointer hover:bg-muted/50"
+                  onClick={() => {
+                    setDetailsPledgeId(pledge.id)
+                    setDetailsOpen(true)
+                  }}
+                >
                   <TableCell>{pledge.campaignName || "—"}</TableCell>
                   <TableCell className="text-right">
                     {formatCurrency(pledge.balanceRemaining)}
@@ -95,14 +102,6 @@ export function DonorPledgeCollectionPanel({
                     <Badge variant="secondary">
                       {formatPledgeStatusLabel(pledge.status)}
                     </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <PledgeReminderActions
-                      pledgeId={pledge.id}
-                      donorName={donorName}
-                      onUpdated={load}
-                      compact
-                    />
                   </TableCell>
                 </TableRow>
               ))}
@@ -134,6 +133,22 @@ export function DonorPledgeCollectionPanel({
           </div>
         )}
       </CardContent>
+      <PledgeDetailsDialog
+        open={detailsOpen}
+        onOpenChange={(open) => {
+          setDetailsOpen(open)
+          if (!open) setDetailsPledgeId(null)
+        }}
+        pledgeId={detailsPledgeId}
+        onSaved={() => {
+          void load()
+        }}
+        onDeleted={() => {
+          setDetailsOpen(false)
+          setDetailsPledgeId(null)
+          void load()
+        }}
+      />
     </Card>
   )
 }

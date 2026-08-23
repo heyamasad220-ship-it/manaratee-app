@@ -3,6 +3,7 @@
 import type { ReactNode } from "react"
 import { Suspense, useEffect, useState } from "react"
 import Image from "next/image"
+import Link from "next/link"
 
 import { UserMenu } from "@/components/layout/user-menu"
 import { MobileMenuTrigger } from "@/components/layout/sidebar"
@@ -27,9 +28,10 @@ interface HeaderProps {
 
 export function Header({ showSearch = false, actions, breadcrumbExtras }: HeaderProps) {
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
+  const [organizationName, setOrganizationName] = useState<string | null>(null)
 
   useEffect(() => {
-    async function loadOrganizationLogo() {
+    async function loadOrganizationBranding() {
       try {
         const supabase = createClient()
 
@@ -39,7 +41,7 @@ export function Header({ showSearch = false, actions, breadcrumbExtras }: Header
 
         const { data, error } = await supabase
           .from("organizations")
-          .select("logo_url")
+          .select("name, logo_url")
           .eq("id", orgId)
           .maybeSingle()
 
@@ -50,7 +52,7 @@ export function Header({ showSearch = false, actions, breadcrumbExtras }: Header
             typeof error.message === "string" ? error.message.trim() : ""
           if (message) {
             console.warn(
-              "Error loading organization logo:",
+              "Error loading organization branding:",
               error.code ?? "unknown",
               message
             )
@@ -58,13 +60,14 @@ export function Header({ showSearch = false, actions, breadcrumbExtras }: Header
           return
         }
 
+        setOrganizationName((data?.name as string | null)?.trim() || null)
         setLogoUrl(data?.logo_url || null)
       } catch (err) {
-        console.warn("Header logo error:", err)
+        console.warn("Header branding error:", err)
       }
     }
 
-    loadOrganizationLogo()
+    void loadOrganizationBranding()
   }, [])
 
   return (
@@ -75,11 +78,26 @@ export function Header({ showSearch = false, actions, breadcrumbExtras }: Header
           STAFF_HEADER_HEIGHT_CLASS,
         )}
       >
-        <div className="mr-auto flex min-w-0 items-center gap-3 lg:mr-0">
+        <div className="mr-auto flex min-w-0 items-center gap-3">
           <MobileMenuTrigger />
+          <Link
+            href="/dashboard"
+            prefetch={false}
+            className="flex min-w-0 items-center py-1"
+            aria-label="Manaratee home"
+          >
+            <Image
+              src="/Logo2.png"
+              alt="Manaratee"
+              width={720}
+              height={180}
+              priority
+              className="h-16 w-auto max-w-[min(100%,22rem)] object-contain object-left sm:h-24 sm:max-w-[26rem] lg:h-[7.5rem] lg:max-w-[32rem]"
+            />
+          </Link>
         </div>
 
-        <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
+        <div className="ml-auto flex min-w-0 shrink-0 items-center gap-2 sm:gap-3">
           {actions}
           {showSearch && (
             <div className="relative hidden md:flex">
@@ -89,15 +107,24 @@ export function Header({ showSearch = false, actions, breadcrumbExtras }: Header
             </div>
           )}
 
-          {logoUrl ? (
-            <div className="flex items-center justify-center overflow-hidden rounded-md border bg-white p-1">
-              <Image
-                src={logoUrl}
-                alt="Organization Logo"
-                width={40}
-                height={40}
-                className="h-9 w-auto max-w-[140px] object-contain"
-              />
+          {organizationName || logoUrl ? (
+            <div className="flex min-w-0 items-center gap-2.5">
+              {organizationName ? (
+                <p className="hidden max-w-[10rem] truncate text-sm font-semibold leading-tight text-foreground sm:block sm:max-w-[14rem] lg:max-w-[18rem] lg:text-base">
+                  {organizationName}
+                </p>
+              ) : null}
+              {logoUrl ? (
+                <div className="flex shrink-0 items-center justify-center overflow-hidden rounded-md border bg-white p-1">
+                  <Image
+                    src={logoUrl}
+                    alt={organizationName || "Organization logo"}
+                    width={40}
+                    height={40}
+                    className="h-9 w-auto max-w-[140px] object-contain"
+                  />
+                </div>
+              ) : null}
             </div>
           ) : null}
 

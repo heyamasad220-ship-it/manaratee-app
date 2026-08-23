@@ -116,12 +116,20 @@ export function ContactDiscountTagsField({
   }, [load])
 
   async function handleChange(value: string) {
+    if (loading || !value || value === selectedManualTagId || (value === NONE_VALUE && !selectedManualTagId)) {
+      return
+    }
     const nextTagId = value === NONE_VALUE ? null : value
     const previous = selectedManualTagId
     setSelectedManualTagId(nextTagId)
     setSaving(true)
     try {
-      await setPersonDiscountTag(contactId, nextTagId)
+      const result = await setPersonDiscountTag(contactId, nextTagId)
+      if (!result.success) {
+        setSelectedManualTagId(previous)
+        alert(result.error)
+        return
+      }
       await load()
     } catch (error) {
       console.error("Error updating discount tag:", error)

@@ -69,6 +69,30 @@ export const STAT_CARD_TONES = {
     icon: "text-slate-500",
     iconWrap: "bg-slate-100",
   },
+  teal: {
+    card: "border-teal-200 bg-teal-50 shadow-none",
+    label: "text-teal-700",
+    value: "text-teal-950",
+    hint: "text-teal-700/75",
+    icon: "text-teal-600",
+    iconWrap: "bg-teal-100",
+  },
+  orange: {
+    card: "border-orange-200 bg-orange-50 shadow-none",
+    label: "text-orange-700",
+    value: "text-orange-950",
+    hint: "text-orange-700/75",
+    icon: "text-orange-600",
+    iconWrap: "bg-orange-100",
+  },
+  indigo: {
+    card: "border-indigo-200 bg-indigo-50 shadow-none",
+    label: "text-indigo-700",
+    value: "text-indigo-950",
+    hint: "text-indigo-700/75",
+    icon: "text-indigo-600",
+    iconWrap: "bg-indigo-100",
+  },
 } as const
 
 export type StatCardTone = keyof typeof STAT_CARD_TONES

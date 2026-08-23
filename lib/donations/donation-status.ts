@@ -26,6 +26,36 @@ export function formatPaymentStatusLabel(status: string | null | undefined): str
   return normalized.replaceAll("_", " ")
 }
 
+/** Campaign Donations: allocated/unallocated only when a pledge can receive the gift. */
+export function formatPaymentAllocationStatus(input: {
+  status?: string | null
+  pledgeId?: string | null
+  donorHasOpenPledge?: boolean
+}): string {
+  const normalized = normalizePaymentStatus(input.status)
+  if (
+    normalized === "voided" ||
+    normalized === "refunded" ||
+    normalized === "partially_refunded" ||
+    normalized === "pending_review" ||
+    normalized === "unresolved"
+  ) {
+    return formatPaymentStatusLabel(normalized)
+  }
+  if (input.pledgeId) return "allocated"
+  if (input.donorHasOpenPledge) return "unallocated"
+  return "—"
+}
+
+export function isOpenAllocatablePledge(input: {
+  status?: string | null
+  balanceRemaining?: number | null
+}): boolean {
+  const status = String(input.status || "").toLowerCase()
+  if (status === "cancelled" || status === "fulfilled") return false
+  return Number(input.balanceRemaining || 0) > 0
+}
+
 /** Staff-facing label for the payments list pledge column (Yes / No). */
 export function formatPaymentPledgeColumnLabel(status: string | null | undefined): string {
   const normalized = normalizePaymentStatus(status)

@@ -11,6 +11,10 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { getCurrentOrganizationId } from "@/lib/current-organization"
 import {
+  HORIZON_DEMO_STAFF_DISPLAY_NAME,
+  isHorizonDemoOrganization,
+} from "@/lib/organizations/horizon-demo"
+import {
   fetchUserPortalCapabilities,
 } from "@/lib/auth/portal-capabilities-client"
 import type { UserPortalCapabilities } from "@/lib/auth/portal-capabilities-types"
@@ -33,6 +37,7 @@ export function UserMenu() {
   const pathname = usePathname()
 
   const [profile, setProfile] = useState<UserProfile | null>(null)
+  const [organizationName, setOrganizationName] = useState<string | null>(null)
   const [portalCapabilities, setPortalCapabilities] =
     useState<UserPortalCapabilities | null>(null)
 
@@ -60,6 +65,17 @@ export function UserMenu() {
       const orgId = await getCurrentOrganizationId()
       if (cancelled) return
 
+      if (orgId) {
+        const { data: organization } = await supabase
+          .from("organizations")
+          .select("name")
+          .eq("id", orgId)
+          .maybeSingle()
+
+        if (cancelled) return
+        setOrganizationName((organization?.name as string | null)?.trim() || null)
+      }
+
       const capabilities = await fetchUserPortalCapabilities(
         supabase,
         user.id,
@@ -83,10 +99,11 @@ export function UserMenu() {
     window.location.href = "/login"
   }
 
-  const displayName =
-    profile?.full_name ||
-    profile?.email?.split("@")[0] ||
-    "User"
+  const displayName = isHorizonDemoOrganization(organizationName)
+    ? HORIZON_DEMO_STAFF_DISPLAY_NAME
+    : profile?.full_name?.trim() ||
+      profile?.email?.split("@")[0] ||
+      "User"
 
   const initials = displayName
     .split(" ")

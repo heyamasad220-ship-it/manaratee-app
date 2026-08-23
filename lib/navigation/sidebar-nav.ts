@@ -64,10 +64,33 @@ export function isContactProfilePath(pathname: string) {
   return !CONTACTS_LIST_SEGMENTS.has(match[1])
 }
 
+export type SearchParamReader = Pick<URLSearchParams, "get"> | null | undefined
+
+function pathnameFromHref(href: string) {
+  const queryIndex = href.indexOf("?")
+  return queryIndex === -1 ? href : href.slice(0, queryIndex)
+}
+
+function hrefQueryMatches(
+  href: string,
+  searchParams: SearchParamReader
+) {
+  const queryIndex = href.indexOf("?")
+  if (queryIndex === -1) return true
+  if (!searchParams) return false
+
+  const required = new URLSearchParams(href.slice(queryIndex + 1))
+  for (const [key, value] of required.entries()) {
+    if (searchParams.get(key) !== value) return false
+  }
+  return true
+}
+
 export function subItemMatchesPath(
   child: SubItem,
   pathname: string,
-  profileListSegment: ContactsListSegment | null
+  profileListSegment: ContactsListSegment | null,
+  searchParams?: SearchParamReader
 ) {
   const isExcluded = (pathnameToCheck: string) =>
     child.excludeMatchPrefixes?.some(
@@ -75,11 +98,13 @@ export function subItemMatchesPath(
         pathnameToCheck === prefix || pathnameToCheck.startsWith(`${prefix}/`)
     ) ?? false
 
+  const hrefPath = pathnameFromHref(child.href)
+
   if (child.exact) {
-    if (child.href === "/donations/campaigns") {
+    if (hrefPath === "/donations/campaigns") {
       return isDonationCampaignsOverviewPath(pathname)
     }
-    if (pathname === child.href) {
+    if (pathname === hrefPath && hrefQueryMatches(child.href, searchParams)) {
       return true
     }
     return (
@@ -90,8 +115,11 @@ export function subItemMatchesPath(
   }
 
   if (
-    (pathname === child.href || pathname.startsWith(`${child.matchPrefix}/`)) &&
-    !isExcluded(pathname)
+    (pathname === hrefPath ||
+      pathname === child.matchPrefix ||
+      pathname.startsWith(`${child.matchPrefix}/`)) &&
+    !isExcluded(pathname) &&
+    hrefQueryMatches(child.href, searchParams)
   ) {
     return true
   }
@@ -112,14 +140,15 @@ export function subItemMatchesPath(
 export function subItemHasActiveDescendant(
   child: SubItem,
   pathname: string,
-  profileListSegment: ContactsListSegment | null
+  profileListSegment: ContactsListSegment | null,
+  searchParams?: SearchParamReader
 ): boolean {
-  if (subItemMatchesPath(child, pathname, profileListSegment)) {
+  if (subItemMatchesPath(child, pathname, profileListSegment, searchParams)) {
     return true
   }
 
   return (child.children ?? []).some((nested) =>
-    subItemHasActiveDescendant(nested, pathname, profileListSegment)
+    subItemHasActiveDescendant(nested, pathname, profileListSegment, searchParams)
   )
 }
 
@@ -127,16 +156,17 @@ export function isChildActive(
   child: SubItem,
   siblings: SubItem[],
   pathname: string,
-  profileListSegment: ContactsListSegment | null
+  profileListSegment: ContactsListSegment | null,
+  searchParams?: SearchParamReader
 ) {
-  if (!subItemHasActiveDescendant(child, pathname, profileListSegment)) {
+  if (!subItemHasActiveDescendant(child, pathname, profileListSegment, searchParams)) {
     return false
   }
 
   const isChildOverridden = siblings.some(
     (other) =>
       other.label !== child.label &&
-      subItemHasActiveDescendant(other, pathname, profileListSegment) &&
+      subItemHasActiveDescendant(other, pathname, profileListSegment, searchParams) &&
       (other.matchPrefix.length > child.matchPrefix.length ||
         Boolean(other.alsoMatchPrefixes?.length) ||
         Boolean(other.children?.length))
@@ -149,7 +179,8 @@ export function isItemActive(
   item: NavItem,
   pathname: string,
   navItems: NavItem[],
-  profileListSegment: ContactsListSegment | null
+  profileListSegment: ContactsListSegment | null,
+  searchParams?: SearchParamReader
 ) {
   const matchesPrefix = (prefix: string) =>
     pathname === prefix || pathname.startsWith(`${prefix}/`)
@@ -159,7 +190,7 @@ export function isItemActive(
     (item.alsoMatchPrefixes?.some(matchesPrefix) ?? false)
   const matchesChild =
     item.children?.some((child) =>
-      subItemHasActiveDescendant(child, pathname, profileListSegment)
+      subItemHasActiveDescendant(child, pathname, profileListSegment, searchParams)
     ) ?? false
   const isOverridden = navItems.some(
     (other) =>
@@ -174,14 +205,15 @@ export function isItemActive(
 export function findActiveModuleWithChildren(
   navItems: NavItem[],
   pathname: string,
-  profileListSegment: ContactsListSegment | null
+  profileListSegment: ContactsListSegment | null,
+  searchParams?: SearchParamReader
 ): NavItem | null {
-  // Prefer a module whose child matches the path (e.g. HR → Departments at
-  // /workforce/departments) over a broader module prefix match.
+  // Prefer a module whose child matches the path (e.g. Administration →
+  // Departments at /workforce/departments) over a broader module prefix match.
   for (const item of navItems) {
     if (
       item.children?.some((child) =>
-        subItemHasActiveDescendant(child, pathname, profileListSegment)
+        subItemHasActiveDescendant(child, pathname, profileListSegment, searchParams)
       )
     ) {
       return item
@@ -192,7 +224,7 @@ export function findActiveModuleWithChildren(
     if (
       item.children &&
       item.children.length > 0 &&
-      isItemActive(item, pathname, navItems, profileListSegment)
+      isItemActive(item, pathname, navItems, profileListSegment, searchParams)
     ) {
       return item
     }
@@ -208,15 +240,17 @@ type SubItemMatch = {
 function subItemPathMatchScore(
   item: SubItem,
   pathname: string,
-  profileListSegment: ContactsListSegment | null
+  profileListSegment: ContactsListSegment | null,
+  searchParams?: SearchParamReader
 ): number {
-  if (!subItemMatchesPath(item, pathname, profileListSegment)) {
+  if (!subItemMatchesPath(item, pathname, profileListSegment, searchParams)) {
     return -1
   }
 
+  const hrefPath = pathnameFromHref(item.href)
   let score = 0
   if (
-    pathname === item.href ||
+    pathname === hrefPath ||
     pathname === item.matchPrefix ||
     pathname.startsWith(`${item.matchPrefix}/`)
   ) {
@@ -228,8 +262,8 @@ function subItemPathMatchScore(
     }
   }
   // Exact href match without a longer prefix still counts.
-  if (score === 0 && pathname === item.href) {
-    score = item.href.length
+  if (score === 0 && pathname === hrefPath) {
+    score = hrefPath.length
   }
   return score
 }
@@ -238,7 +272,8 @@ function findDeepestSubItemMatch(
   items: SubItem[],
   pathname: string,
   profileListSegment: ContactsListSegment | null,
-  ancestors: SubItem[] = []
+  ancestors: SubItem[] = [],
+  searchParams?: SearchParamReader
 ): SubItemMatch | null {
   let best: SubItemMatch | null = null
   let bestScore = -1
@@ -251,13 +286,15 @@ function findDeepestSubItemMatch(
         item.children,
         pathname,
         profileListSegment,
-        nextAncestors
+        nextAncestors,
+        searchParams
       )
       if (nested?.leaf) {
         const nestedScore = subItemPathMatchScore(
           nested.leaf,
           pathname,
-          profileListSegment
+          profileListSegment,
+          searchParams
         )
         if (nestedScore > bestScore) {
           best = nested
@@ -267,7 +304,12 @@ function findDeepestSubItemMatch(
       continue
     }
 
-    const score = subItemPathMatchScore(item, pathname, profileListSegment)
+    const score = subItemPathMatchScore(
+      item,
+      pathname,
+      profileListSegment,
+      searchParams
+    )
     if (score > bestScore) {
       best = { chain: ancestors, leaf: item }
       bestScore = score
@@ -292,7 +334,8 @@ export function buildNavigationTrail(
   pathname: string,
   navItems: NavItem[],
   profileListSegment: ContactsListSegment | null,
-  trailingSegments: NavigationTrailSegment[] = []
+  trailingSegments: NavigationTrailSegment[] = [],
+  searchParams?: SearchParamReader
 ): NavigationTrailSegment[] {
   const trail: NavigationTrailSegment[] = [{ label: "Dashboard", href: "/dashboard" }]
 
@@ -300,7 +343,12 @@ export function buildNavigationTrail(
     return trailingSegments.length > 0 ? [...trail, ...trailingSegments] : trail
   }
 
-  const activeModule = findActiveModuleWithChildren(navItems, pathname, profileListSegment)
+  const activeModule = findActiveModuleWithChildren(
+    navItems,
+    pathname,
+    profileListSegment,
+    searchParams
+  )
 
   if (!activeModule?.children?.length) {
     trail.push({ label: getReturnToLabel(pathname), href: pathname })
@@ -316,7 +364,13 @@ export function buildNavigationTrail(
     module: activeModule,
   })
 
-  const match = findDeepestSubItemMatch(activeModule.children, pathname, profileListSegment)
+  const match = findDeepestSubItemMatch(
+    activeModule.children,
+    pathname,
+    profileListSegment,
+    [],
+    searchParams
+  )
   if (!match?.leaf) {
     const pageLabel = getReturnToLabel(pathname)
     if (pageLabel !== activeModule.label) {
@@ -348,7 +402,12 @@ export function buildNavigationTrail(
 
   if (match.leaf) {
     const leafAncestors = [...ancestorLabels, match.leaf.label]
-    const leafIsCurrentPage = subItemMatchesPath(match.leaf, pathname, profileListSegment)
+    const leafIsCurrentPage = subItemMatchesPath(
+      match.leaf,
+      pathname,
+      profileListSegment,
+      searchParams
+    )
     const leafExpandKeys = leafAncestors.map((label, index) =>
       buildSubExpandKey(activeModule.label, leafAncestors.slice(0, index), label)
     )

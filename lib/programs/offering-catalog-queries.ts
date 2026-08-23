@@ -8,6 +8,7 @@ import {
 } from "@/lib/programs/program-offering-inherit"
 import type { ProgramOffering } from "@/lib/programs/program-offering-types"
 import { YEAR_SEASON_LABEL } from "@/lib/programs/program-display-labels"
+import { normalizeProgramKind } from "@/lib/programs/program-kind"
 import { getOfferingEnrollmentCount } from "@/lib/programs/program-staff-assignment-queries"
 import { createClient } from "@/lib/supabase/server"
 
@@ -52,6 +53,8 @@ export type OfferingCatalogFilters = {
   audience?: string
   /** Participant age (number as string); used when audience is youth. */
   age?: string
+  /** academic | seasonal — staff Programs flyout */
+  kind?: string
 }
 
 function matchesAudienceFilter(
@@ -182,7 +185,8 @@ export async function getActiveOfferingsForCatalog(
       require_emergency_contact,
       enable_waitlist,
       waitlist_capacity,
-      waitlist_offer_deadline_days
+      waitlist_offer_deadline_days,
+      program_kind
     `
     )
     .eq("organization_id", organizationId)
@@ -241,7 +245,7 @@ export async function getActiveOfferingsForCatalog(
     return []
   }
 
-  const visiblePrograms = options?.customerVisibleOnly
+  let visiblePrograms = options?.customerVisibleOnly
     ? programRows.filter((row) => {
         const visibility = (row as { visibility?: string | null }).visibility
         if (visibility === "private") return false
@@ -249,6 +253,18 @@ export async function getActiveOfferingsForCatalog(
         return true
       })
     : programRows
+
+  if (filters.kind === "academic" || filters.kind === "seasonal") {
+    const hasKindColumn = visiblePrograms.some((row) => "program_kind" in row)
+    if (hasKindColumn) {
+      visiblePrograms = visiblePrograms.filter(
+        (row) =>
+          normalizeProgramKind(
+            (row as { program_kind?: string | null }).program_kind
+          ) === filters.kind
+      )
+    }
+  }
 
   if (!visiblePrograms.length) return []
 

@@ -26,6 +26,7 @@ export type ProgramCatalogFilterValues = {
   age?: string
   view?: string
   page?: string
+  kind?: string
 }
 
 export function formatProgramCatalogDate(value: string | null) {
@@ -160,6 +161,9 @@ export function buildProgramCatalogHref(
     params.set("audience", filters.audience)
   }
   if (filters.age?.trim()) params.set("age", filters.age.trim())
+  if (filters.kind === "academic" || filters.kind === "seasonal") {
+    params.set("kind", filters.kind)
+  }
   if (filters.view === "table") params.set("view", "table")
   if (page > 1) params.set("page", String(page))
   const query = params.toString()

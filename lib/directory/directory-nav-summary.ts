@@ -4,6 +4,7 @@ import {
   type DirectoryNavSummary,
   type DirectoryRoleCountMap,
 } from "@/lib/directory/directory-roles"
+import { isOrganizationModuleEnabled, loadOrganizationEnabledModuleSlugs } from "@/lib/modules/dashboard-module-access-server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { PERMISSIONS } from "@/lib/permissions/permission-keys"
 import { hasPermission } from "@/lib/permissions/permissions"
@@ -15,6 +16,15 @@ function excludedStatusFilter() {
   return `(${VENUE_RENTAL_CUSTOMER_EXCLUDED_STATUSES.join(",")})`
 }
 
+export async function isDirectoryFacilitiesEnabled(
+  organizationId?: string | null
+) {
+  const orgId = organizationId ?? (await getSelectedOrganizationId())
+  if (!orgId) return false
+  const slugs = await loadOrganizationEnabledModuleSlugs(orgId)
+  return isOrganizationModuleEnabled(slugs, "spaces")
+}
+
 export async function fetchDirectoryNavSummary(
   organizationId?: string | null
 ): Promise<DirectoryNavSummary> {
@@ -24,6 +34,7 @@ export async function fetchDirectoryNavSummary(
     organizations: 0,
     groups: 0,
     roles: {},
+    facilitiesEnabled: false,
   }
 
   const allowed = await hasPermission(PERMISSIONS.CONTACTS_VIEW)
@@ -87,11 +98,14 @@ export async function fetchDirectoryNavSummary(
   const rentalCount = rest[roleDefs.length + 1]?.count ?? 0
   if (rentalCount > 0) roles["rental-customers"] = rentalCount
 
+  const enabledSlugs = await loadOrganizationEnabledModuleSlugs(orgId)
+
   return {
     people: peopleRes.count ?? 0,
     families: familiesRes.error ? 0 : (familiesRes.count ?? 0),
     organizations: organizationsRes.count ?? 0,
     groups: 0,
     roles,
+    facilitiesEnabled: isOrganizationModuleEnabled(enabledSlugs, "spaces"),
   }
 }

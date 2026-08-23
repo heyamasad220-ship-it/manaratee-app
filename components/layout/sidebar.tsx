@@ -27,17 +27,31 @@ import {
   Baby,
   UserCheck,
   Wallet,
+  Briefcase,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { isContactsListSegment, type ContactsListSegment } from "@/lib/contacts/contact-module-label"
 import {
-  DIRECTORY_DYNAMIC_ROLE_DEFS,
   directoryRolePath,
+  populatedDirectoryRoles,
   type DirectoryRoleCountMap,
 } from "@/lib/directory/directory-roles"
 import { DONATIONS_SIDEBAR_CHILDREN } from "@/lib/navigation/donations-sidebar-children"
+import {
+  ADMINISTRATION_MODULE_LABEL,
+  ADMINISTRATION_MODULE_SLUG,
+  buildAdministrationChildren,
+  buildEventManagementChildren,
+  buildFinanceChildren,
+  buildProgramsChildren,
+  isHiddenTopLevelStaffModule,
+} from "@/lib/navigation/staff-module-nav"
 import { normalizeModuleSlug } from "@/lib/modules/module-catalog"
+import {
+  normalizeOrganizationProgramKinds,
+  type OrganizationProgramKindsEntitlement,
+} from "@/lib/programs/program-kind-policy"
 import {
   buildSubExpandKey,
   filterSubItemsByPermission,
@@ -128,6 +142,7 @@ const STATIC_SIDEBAR_MODULES: SidebarModuleRow[] = [
 /** Staff sidebar module order (Dashboard is always first; Billing/Settings are pinned last). */
 const moduleSortOrderOverride: Record<string, number> = {
   contacts: 10,
+  administration: 15,
   workforce: 20,
   membership: 25,
   donations: 30,
@@ -215,6 +230,7 @@ const iconMap: Record<string, LucideIcon> = {
   Baby,
   UserCheck,
   Wallet,
+  Briefcase,
 }
 
 const modulePermissionMap: Record<string, string> = {
@@ -390,133 +406,54 @@ const moduleChildren: Record<string, SubItem[]> = {
   ],
 }
 
-/** Top-level modules folded into one sidebar entry (menus to be simplified next). */
-const PROGRAMS_AND_EVENTS_MERGED_SLUGS = new Set([
-  "workforce",
-  "hr",
-  "finance",
-  "programs",
-  "event-management",
-])
-
-const PROGRAMS_AND_EVENTS_MODULE_LABEL = "Programs/ Events"
-const PROGRAMS_AND_EVENTS_MODULE_SLUG = "programs-and-events"
-
-function buildProgramsAndEventsChildren(availableSlugs: Set<string>): SubItem[] {
-  const hasWorkforce =
-    availableSlugs.has("workforce") || availableSlugs.has("hr")
-
-  const items: SubItem[] = []
-
-  // Drawer order: Departments, Program Catalog, Event Management (Events +
-  // Master Calendar), Ticketing, Financial Assistance, Workforce, Reports, Settings.
-  if (hasWorkforce) {
-    items.push({
-      label: "Departments",
-      href: "/workforce/departments",
-      matchPrefix: "/workforce/departments",
-      permissionKey: "staff.view",
-    })
+function injectAdministrationNavItem(
+  items: NavItem[],
+  availableSlugs: Set<string>
+): NavItem[] {
+  const children = buildAdministrationChildren(availableSlugs)
+  if (children.length === 0) {
+    return items
   }
 
-  if (availableSlugs.has("programs")) {
-    items.push({
-      label: "Program Catalog",
-      href: "/programs/catalog",
-      matchPrefix: "/programs/catalog",
-      permissionKey: "programs.view",
-    })
+  if (items.some((item) => item.moduleSlug === ADMINISTRATION_MODULE_SLUG)) {
+    return items
   }
 
-  if (availableSlugs.has("event-management")) {
-    items.push({
-      label: "Event Management",
-      href: "/event-management",
-      matchPrefix: "/event-management",
-      excludeMatchPrefixes: [
-        "/event-management/ticketing",
-        "/event-management/settings",
-      ],
-      permissionKey: "events.view",
-      children: [
-        {
-          label: "Events",
-          href: "/event-management",
-          matchPrefix: "/event-management",
-          excludeMatchPrefixes: [
-            "/event-management/calendar",
-            "/event-management/ticketing",
-            "/event-management/settings",
-          ],
-          permissionKey: "events.view",
-        },
-        {
-          label: "Master Calendar",
-          href: "/event-management/calendar",
-          matchPrefix: "/event-management/calendar",
-          permissionKey: "events.view",
-        },
-      ],
-    })
-    items.push({
-      label: "Ticketing",
-      href: "/event-management/ticketing",
-      matchPrefix: "/event-management/ticketing",
-      permissionKey: "ticketing.view",
-    })
+  const administrationItem: NavItem = {
+    label: ADMINISTRATION_MODULE_LABEL,
+    href: children[0]?.href || "/workforce/departments",
+    icon: Briefcase,
+    matchPrefix: "/workforce",
+    group: "People",
+    permissionKey: "staff.view",
+    moduleSlug: ADMINISTRATION_MODULE_SLUG,
+    children,
   }
 
-  if (availableSlugs.has("finance") || availableSlugs.has("programs")) {
-    items.push({
-      label: "Financial Assistance",
-      href: "/finance/financial-assistance",
-      matchPrefix: "/finance/financial-assistance",
-      permissionKey: "applications.view",
-      permissionKeys: ["finance.view", "applications.view"],
-    })
+  const result = [...items]
+  const directoryIndex = result.findIndex((item) => {
+    const slug = item.moduleSlug ? normalizeModuleSlug(item.moduleSlug) : ""
+    return slug === "contacts" || item.label === "Directory"
+  })
+
+  if (directoryIndex >= 0) {
+    result.splice(directoryIndex + 1, 0, administrationItem)
+    return result
   }
 
-  if (hasWorkforce) {
-    items.push({
-      label: WORKFORCE_MODULE_LABEL,
-      href: "/workforce/employees",
-      matchPrefix: "/workforce/employees",
-      alsoMatchPrefixes: [
-        "/workforce/volunteers",
-        "/workforce/childcare",
-      ],
-      permissionKey: "staff.view",
-    })
-  }
-
-  if (availableSlugs.has("programs") || availableSlugs.has("finance")) {
-    items.push({
-      label: "Reports",
-      href: "/programs/registrations",
-      matchPrefix: "/programs/registrations",
-      alsoMatchPrefixes: [
-        "/programs/reports",
-        "/finance/transactions",
-        "/finance/payroll",
-      ],
-      permissionKey: "reports.view",
-      permissionKeys: ["reports.view", "finance.view", "staff.view", "events.view"],
-    })
-  }
-
-  if (availableSlugs.has("event-management")) {
-    items.push({
-      label: "Settings",
-      href: "/event-management/settings/notifications",
-      matchPrefix: "/event-management/settings",
-      permissionKey: "events.manage",
-    })
-  }
-
-  return items
+  const dashboardIndex = result.findIndex((item) => item.label === "Dashboard")
+  result.splice(
+    dashboardIndex >= 0 ? dashboardIndex + 1 : 0,
+    0,
+    administrationItem
+  )
+  return result
 }
 
-function buildDirectoryChildren(roleCounts: DirectoryRoleCountMap = {}): SubItem[] {
+function buildDirectoryChildren(
+  roleCounts: DirectoryRoleCountMap = {},
+  options: { facilitiesEnabled?: boolean } = {}
+): SubItem[] {
   const core: SubItem[] = [
     {
       label: "Overview",
@@ -552,9 +489,10 @@ function buildDirectoryChildren(roleCounts: DirectoryRoleCountMap = {}): SubItem
   ]
 
   const roleItems: SubItem[] = []
-  for (const role of DIRECTORY_DYNAMIC_ROLE_DEFS) {
-    const alwaysShow = role.key === "service-providers"
-    if (!alwaysShow && (roleCounts[role.key] ?? 0) <= 0) continue
+  for (const role of populatedDirectoryRoles(roleCounts, {
+    ...options,
+    directoryNav: true,
+  })) {
     roleItems.push({
       label: role.label,
       href: directoryRolePath(role.key),
@@ -583,65 +521,6 @@ function buildDirectoryChildren(roleCounts: DirectoryRoleCountMap = {}): SubItem
   ]
 
   return [...core, ...roleItems, ...footer]
-}
-
-function collapseProgramsAndEventsNavItems(items: NavItem[]): NavItem[] {
-  const mergedSource = items.filter((item) => {
-    const slug = item.moduleSlug ? normalizeModuleSlug(item.moduleSlug) : ""
-    return PROGRAMS_AND_EVENTS_MERGED_SLUGS.has(slug)
-  })
-
-  if (mergedSource.length === 0) {
-    return items
-  }
-
-  const availableSlugs = new Set(
-    mergedSource.map((item) => normalizeModuleSlug(item.moduleSlug || ""))
-  )
-  const children = buildProgramsAndEventsChildren(availableSlugs)
-  if (children.length === 0) {
-    return items.filter((item) => {
-      const slug = item.moduleSlug ? normalizeModuleSlug(item.moduleSlug) : ""
-      return !PROGRAMS_AND_EVENTS_MERGED_SLUGS.has(slug)
-    })
-  }
-
-  const combined: NavItem = {
-    label: PROGRAMS_AND_EVENTS_MODULE_LABEL,
-    href: children[0]?.href || "/programs/catalog",
-    icon: GraduationCap,
-    matchPrefix: children[0]?.matchPrefix || "/programs",
-    alsoMatchPrefixes: [
-      "/workforce",
-      "/programs",
-      "/finance",
-      "/event-management",
-      "/reports",
-    ],
-    group: "Operations",
-    moduleSlug: PROGRAMS_AND_EVENTS_MODULE_SLUG,
-    children,
-  }
-
-  const result: NavItem[] = []
-  let inserted = false
-  for (const item of items) {
-    const slug = item.moduleSlug ? normalizeModuleSlug(item.moduleSlug) : ""
-    if (PROGRAMS_AND_EVENTS_MERGED_SLUGS.has(slug)) {
-      if (!inserted) {
-        result.push(combined)
-        inserted = true
-      }
-      continue
-    }
-    result.push(item)
-  }
-
-  if (!inserted) {
-    result.push(combined)
-  }
-
-  return result
 }
 
 /** Shared Community Calendar — top-level when Vendor Hub and/or Event Management is enabled. */
@@ -686,8 +565,8 @@ function injectCommunityCalendarNavItem(
       : ""
     if (
       slug === "vendor-hub" ||
-      slug === PROGRAMS_AND_EVENTS_MODULE_SLUG ||
-      result[i].label === PROGRAMS_AND_EVENTS_MODULE_LABEL
+      slug === "programs" ||
+      slug === "event-management"
     ) {
       insertAt = i
     }
@@ -777,7 +656,7 @@ function filterNavItemsByPermissions(items: NavItem[], permissionContext: UserPe
       }
       // Combined module with no visible groups after permissions.
       if (
-        item.moduleSlug === PROGRAMS_AND_EVENTS_MODULE_SLUG &&
+        item.moduleSlug === ADMINISTRATION_MODULE_SLUG &&
         (!item.children || item.children.length === 0)
       ) {
         return false
@@ -805,15 +684,29 @@ function buildNavItems(
   rows: SidebarModuleRow[],
   permissionContext: UserPermissionContext,
   myDepartment?: { id: string; name: string } | null,
-  directoryRoleCounts: DirectoryRoleCountMap = {}
+  directoryRoleCounts: DirectoryRoleCountMap = {},
+  programKinds: OrganizationProgramKindsEntitlement = "both"
 ): NavItem[] {
+  const availableSlugs = new Set(
+    rows.map((row) => normalizeModuleSlug(row.slug))
+  )
+
   const dynamicItems: NavItem[] = rows
-    .filter((row) => row.route && row.slug !== "applications")
+    .filter((row) => {
+      if (!row.route || row.slug === "applications") return false
+      return !isHiddenTopLevelStaffModule(
+        normalizeModuleSlug(row.slug),
+        availableSlugs
+      )
+    })
     .map((row) => {
       const slug = normalizeModuleSlug(row.slug)
       const navSlug = resolveModuleNavSlug(slug)
       const hasVenueRentals = rows.some(
         (candidate) => normalizeModuleSlug(candidate.slug) === "bookings"
+      )
+      const facilitiesEnabled = rows.some(
+        (candidate) => normalizeModuleSlug(candidate.slug) === "spaces"
       )
       const href =
         navSlug === "spaces" && !hasVenueRentals
@@ -825,9 +718,9 @@ function buildNavItems(
         href
       const iconName = row.icon_name || "Boxes"
       const Icon = iconMap[iconName] || Boxes
-      const rawChildren =
+      let rawChildren =
         navSlug === "contacts" || slug === "contacts"
-          ? buildDirectoryChildren(directoryRoleCounts)
+          ? buildDirectoryChildren(directoryRoleCounts, { facilitiesEnabled })
           : moduleChildren[navSlug] ||
             moduleChildren[slug] ||
             [
@@ -838,16 +731,36 @@ function buildNavItems(
                 permissionKey: modulePermissionMap[navSlug] ?? modulePermissionMap[slug],
               },
             ]
+
+      if (navSlug === "programs") {
+        rawChildren = buildProgramsChildren(programKinds)
+      } else if (navSlug === "event-management") {
+        rawChildren = buildEventManagementChildren()
+      } else if (navSlug === "finance") {
+        rawChildren = buildFinanceChildren()
+      }
+
       const children =
         navSlug === "spaces" && !hasVenueRentals
           ? rawChildren.filter((child) => !child.advancedFacilities)
           : rawChildren
+      const itemHref =
+        navSlug === "programs" && children[0]?.href ? children[0].href : href
       return {
         label: moduleDisplayNameMap[navSlug] ?? moduleDisplayNameMap[slug] ?? row.name,
-        href,
+        href: itemHref,
         icon: Icon,
         matchPrefix,
-        alsoMatchPrefixes: navSlug === "contacts" ? ["/contacts"] : undefined,
+        alsoMatchPrefixes:
+          navSlug === "contacts"
+            ? ["/contacts"]
+            : navSlug === "programs"
+              ? [
+                  "/finance/financial-assistance",
+                  "/finance/transactions",
+                  "/finance/payroll",
+                ]
+              : undefined,
         group: moduleGroupOverride[navSlug] ?? row.group_name,
         permissionKey: modulePermissionMap[navSlug] ?? modulePermissionMap[slug],
         moduleSlug: slug,
@@ -914,7 +827,7 @@ function buildNavItems(
 
   return filterNavItemsByPermissions(
     injectCommunityCalendarNavItem(
-      collapseProgramsAndEventsNavItems(allItems),
+      injectAdministrationNavItem(allItems, availableSlugs),
       rows
     ),
     permissionContext
@@ -1011,13 +924,17 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
 
         const directoryRoleCounts = (modulesPayload.directoryRoleCounts ||
           {}) as DirectoryRoleCountMap
+        const programKinds = normalizeOrganizationProgramKinds(
+          modulesPayload.programKinds
+        )
 
         setNavItems(
           buildNavItems(
             mergeSidebarModules(moduleRows),
             permissionContext,
             myDepartment,
-            directoryRoleCounts
+            directoryRoleCounts,
+            programKinds
           )
         )
       } catch (error) {
@@ -1085,7 +1002,12 @@ function SidebarSelectionSync() {
       pathname,
       new URLSearchParams(search)
     )
-    const activeModule = findActiveModuleWithChildren(navItems, pathname, profileListSegment)
+    const activeModule = findActiveModuleWithChildren(
+      navItems,
+      pathname,
+      profileListSegment,
+      searchParams
+    )
 
     if (!activeModule?.children?.length) {
       return
@@ -1094,7 +1016,7 @@ function SidebarSelectionSync() {
     const keysToExpand: string[] = []
     for (const child of activeModule.children) {
       const expandKey = buildSubExpandKey(activeModule.label, [], child.label)
-      if (subItemHasActiveDescendant(child, pathname, profileListSegment) && child.children?.length) {
+      if (subItemHasActiveDescendant(child, pathname, profileListSegment, searchParams) && child.children?.length) {
         keysToExpand.push(expandKey)
       }
     }
@@ -1208,7 +1130,7 @@ function SidebarPrimaryNav({ onNavigate }: { onNavigate?: () => void }) {
             <PrimaryNavLink
               key={item.label}
               item={item}
-              isActive={isItemActive(item, pathname, navItems, profileListSegment)}
+              isActive={isItemActive(item, pathname, navItems, profileListSegment, searchParams)}
               isSelected={moduleDrawerModule?.label === item.label}
               onNavigate={() => {
                 closeModuleDrawer()
@@ -1226,7 +1148,7 @@ function SidebarPrimaryNav({ onNavigate }: { onNavigate?: () => void }) {
             <PrimaryNavLink
               key={item.label}
               item={item}
-              isActive={isItemActive(item, pathname, navItems, profileListSegment)}
+              isActive={isItemActive(item, pathname, navItems, profileListSegment, searchParams)}
               isSelected={moduleDrawerModule?.label === item.label}
               onNavigate={() => {
                 closeModuleDrawer()
@@ -1262,8 +1184,8 @@ function SidebarSubNavItem({
   const { expandedSubKeys, toggleSubExpanded } = useSidebarContext()
   const hasChildren = Boolean(item.children && item.children.length > 0)
   const expandKey = buildSubExpandKey(moduleLabel, ancestorLabels, item.label)
-  const isExpanded = expandedSubKeys.has(expandKey) || subItemHasActiveDescendant(item, pathname, profileListSegment)
-  const active = isChildActive(item, siblings, pathname, profileListSegment)
+  const isExpanded = expandedSubKeys.has(expandKey) || subItemHasActiveDescendant(item, pathname, profileListSegment, searchParams)
+  const active = isChildActive(item, siblings, pathname, profileListSegment, searchParams)
 
   if (hasChildren) {
     return (
@@ -1399,39 +1321,22 @@ function ModuleNavDrawerContent() {
   )
 }
 
-function SidebarLogoBand() {
+function SidebarHeaderSpacer() {
   return (
     <div
       className={cn(
-        "relative hidden shrink-0 border-b border-zinc-200 lg:block",
+        "hidden shrink-0 border-b border-zinc-200 lg:block",
         STAFF_HEADER_HEIGHT_CLASS,
       )}
-    >
-      <Link
-        href="/dashboard"
-        prefetch={false}
-        className="absolute inset-0 flex items-center justify-center px-2 py-3"
-        aria-label="Manaratee home"
-      >
-        <div className="relative h-full w-full">
-          <Image
-            src="/Logo2.png"
-            alt="Manaratee"
-            fill
-            sizes="180px"
-            className="object-contain object-center"
-            priority
-          />
-        </div>
-      </Link>
-    </div>
+      aria-hidden
+    />
   )
 }
 
 function SidebarChromeSpacer() {
   return (
     <>
-      <SidebarLogoBand />
+      <SidebarHeaderSpacer />
       <div
         className={cn(
           "hidden shrink-0 border-b border-zinc-200 lg:block",
@@ -1511,10 +1416,15 @@ function MobileSidebarContent() {
 
   useEffect(() => {
     if (mobileOpen) {
-      const active = findActiveModuleWithChildren(navItems, pathname, profileListSegment)
+      const active = findActiveModuleWithChildren(
+        navItems,
+        pathname,
+        profileListSegment,
+        searchParams
+      )
       setMobileModule(active)
     }
-  }, [mobileOpen, navItems, pathname])
+  }, [mobileOpen, navItems, pathname, profileListSegment, searchParams])
 
   function closeMobile() {
     setMobileOpen(false)

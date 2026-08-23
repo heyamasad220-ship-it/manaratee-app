@@ -3,6 +3,7 @@ import { notFound } from "next/navigation"
 import { Header } from "@/components/layout/header"
 import { ContactsCrmList } from "@/components/contacts/contacts-crm-list"
 import { parseDirectoryRoleKey } from "@/lib/directory/directory-paths"
+import { isDirectoryFacilitiesEnabled } from "@/lib/directory/directory-nav-summary"
 import { getDirectoryRoleDef } from "@/lib/directory/directory-roles"
 
 export default async function DirectoryRoleViewPage({
@@ -14,6 +15,9 @@ export default async function DirectoryRoleViewPage({
   const roleKey = parseDirectoryRoleKey(role)
   if (!roleKey) notFound()
 
+  const facilitiesEnabled = await isDirectoryFacilitiesEnabled()
+  if (roleKey === "service-providers" && !facilitiesEnabled) notFound()
+
   const def = getDirectoryRoleDef(roleKey)
 
   return (
@@ -23,6 +27,7 @@ export default async function DirectoryRoleViewPage({
         lockedRoleKey={roleKey}
         showStats={false}
         defaultAddRoles={def.contactRole ? [def.contactRole] : []}
+        facilitiesEnabled={facilitiesEnabled}
         emptyTitle={`No ${def.label.toLowerCase()} yet`}
         emptyDescription={
           "emptyDescription" in def && def.emptyDescription

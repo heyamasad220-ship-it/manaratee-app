@@ -26,6 +26,9 @@ Features:
 * Multi-tenant organizations
 * Organization membership
 * Active organization switching
+* Dashboard org branding: logo preview uses the image aspect ratio (`object-contain`) instead of a cropped square; Change Logo is edit-mode only; Edit / Cancel / Save Changes sit at the bottom of the page
+* Dashboard **Subscribed Modules** lists enabled product modules from the same source as the staff sidebar (for example Fund Development)
+* Horizon Community Foundation demo: staff header user menu shows **Admin** instead of the email username
 
 ---
 
@@ -185,7 +188,7 @@ Features:
 * Subscription filtering
 * Permission filtering
 * Dynamic visibility
-* Module order: Dashboard → Contacts → **Programs/ Events** → Membership → Fund Development → …
+* Module order: Dashboard → Directory → **Administration** → Membership → Fund Development → Programs → Event Management → …
 
 * Pinned footer: Billing (super admin SaaS subscription) → Settings
 
@@ -193,7 +196,7 @@ Features:
 
 ## Finance
 
-Status: Working (nav folded into **Programs/ Events**)
+Status: Working (Financial Assistance and Reports live under **Programs** when that module is on; otherwise Finance stays a rail item)
 
 Routes:
 
@@ -289,7 +292,7 @@ Routes: `/directory` (Overview), `/directory/people`, `/directory/families`, `/d
 
 **Reports:** Directory → Reports is analytics (growth, role distribution with overlap, completeness, possible duplicates). Types live in `lib/directory/directory-report-types.ts` (not the `"use server"` actions file). People / Organizations / Families are first-class Directory sections, not report tabs. Donor giving reports stay under Fund Development.
 
-**Dynamic role navigation:** Most role views (Employees, Volunteers, Members, Donors, Sponsors, Parents, Vendors, Childcare Providers, Rental Customers) appear in the Directory flyout only when the current tenant has matching records. **Service Providers** is always shown (`alwaysVisible` in `lib/directory/directory-roles.ts`) so staff can add contractors (plumbers, pest control, etc.) even before any exist. `/resources/service-providers` redirects to `/directory/role/service-providers`. Counts load with sidebar modules (`fetchDirectoryNavSummary`). These are filtered views of canonical contacts — not duplicate identity tables. Role-view tables add lookup columns from Workforce / Membership / Fund Development / Vendor Hub / Rentals (summaries only). Donor giving columns are gated by `donations.view`. **Sponsor** is a manual `contact_roles` value (`scripts/269_directory_sponsor_role.sql`).
+**Dynamic role navigation:** Directory flyout CRM lookups (Members, Sponsors, Parents, Vendors, Rental Customers) appear only when the current tenant has matching records. **Donors**, **Employees**, **Volunteers**, **Childcare Providers**, and **Service Providers** are not Directory nav items — operational lists live under **Administration** or Fund Development reports. Role-view URLs still work as bookmarks. `/resources/service-providers` redirects to `/directory/role/service-providers`. Counts load with sidebar modules (`fetchDirectoryNavSummary`). These are filtered views of canonical contacts — not duplicate identity tables. Role-view tables add lookup columns from Workforce / Membership / Fund Development / Vendor Hub / Rentals (summaries only). Donor giving columns are gated by `donations.view`. **Sponsor** is a manual `contact_roles` value (`scripts/269_directory_sponsor_role.sql`).
 
 **Search Directory first:** Workforce, Vendor Hub, Venue Rentals, Fund Development, and Membership add flows search existing Directory people/organizations before creating a new canonical record.
 
@@ -319,7 +322,7 @@ Transactions and Giving Summary share a date range (`?range=`) that filters KPIs
 
 Permissions: `donations.view`, `donations.manage`, `donations.campaigns.manage`, `donations.prospects.manage`, `donations.reports.manage`.
 
-Campaign workspace tabs: Overview, Strategy, Prospects, Pledges, Donations, Groups, **Wishlist**. Each campaign has one goal (`campaigns.goal_amount`); Goal Breakdown phases are retired (`scripts/270_disable_campaign_goal_phases.sql`). Wishlist items are campaign priorities (`campaign_wishlist_items`); pledged/collected come from `pledges`/`payments.wishlist_item_id`. Public donate: `/donate/w/{token}`. SQL: `scripts/267_campaign_wishlist.sql`.
+Campaign workspace tabs: Overview, Strategy, Prospects, Pledges, Donations, Groups, **Wishlist**. Each campaign has one goal (`campaigns.goal_amount`); Goal Breakdown phases are retired (`scripts/270_disable_campaign_goal_phases.sql`). Wishlist items are campaign priorities (`campaign_wishlist_items`); pledged/collected come from `pledges`/`payments.wishlist_item_id`. Public donate: `/donate/w/{token}`. SQL: `scripts/267_campaign_wishlist.sql`. Staff add/edit/collect pledges through one **Pledge Details** window (`components/donations/pledge-details-dialog.tsx`) on the global Pledges page, campaign workspace, prospects, and contact Financial pledges.
 
 ---
 
