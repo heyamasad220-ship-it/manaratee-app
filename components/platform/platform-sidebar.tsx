@@ -29,7 +29,7 @@ export function PlatformSidebar() {
   const pathname = usePathname()
 
   return (
-    <aside className="flex h-screen w-[220px] shrink-0 flex-col border-r border-zinc-200 bg-white text-zinc-900">
+    <aside className="flex h-full w-[220px] shrink-0 flex-col border-r border-zinc-200 bg-white text-zinc-900">
       <div className="flex items-center justify-center px-4 py-5">
         <Image
           src="/logo.png"

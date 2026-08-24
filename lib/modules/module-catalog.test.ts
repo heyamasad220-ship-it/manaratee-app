@@ -6,7 +6,10 @@ import {
   isCoreModuleSlug,
   isHiddenSubscriptionCapabilitySlug,
   isProductModuleSlug,
+  isValidProductModuleSlug,
   PRODUCT_MODULE_SLUGS,
+  sanitizeIncludedCapabilitySlugs,
+  slugifyProductModuleSlug,
 } from "./module-catalog"
 
 describe("module catalog subscriptions", () => {
@@ -83,5 +86,18 @@ describe("module catalog subscriptions", () => {
     assert.equal(isProductModuleSlug("child-care"), false)
     assert.equal(isHiddenSubscriptionCapabilitySlug("sign-ups"), true)
     assert.equal(isHiddenSubscriptionCapabilitySlug("child-care"), true)
+  })
+
+  it("slugifies custom product module names", () => {
+    assert.equal(slugifyProductModuleSlug("Custom Youth Program"), "custom-youth-program")
+    assert.equal(isValidProductModuleSlug("custom-youth-program"), true)
+    assert.equal(isValidProductModuleSlug("Youth"), false)
+  })
+
+  it("keeps only editable capability slugs", () => {
+    assert.deepEqual(
+      sanitizeIncludedCapabilitySlugs(["spaces", "hr", "ticketing", "spaces"]),
+      ["ticketing", "spaces"]
+    )
   })
 })

@@ -56,7 +56,7 @@ customer_profiles.organization_id → organizations.id
 * plans
 * plan_limits
 * plan_modules
-* modules
+* modules — product SKU monthly price is `monthly_price_cents` (SQL **`274`**). Included capabilities are `included_capability_slugs` (SQL **`275`**). Legacy dollar columns (`price_monthly`, `monthly_price`) are not guaranteed and must not be selected from the app.
 * organization_modules — product SKUs in `lib/modules/module-catalog.ts` (Workforce/Finance are not catalog modules; SQL **`273`**)
 * module_discount_rules — percent off by selected product-module count (SQL **`274`**)
 * organization_subscriptions — current billed snapshot in integer cents (SQL **`274`**); historical invoices stay on organization_billing_invoices

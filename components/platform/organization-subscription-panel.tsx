@@ -38,13 +38,6 @@ type Snapshot = {
   billingStatus?: string
 }
 
-type BundleOption = {
-  slug: string
-  name: string
-  description: string
-  moduleSlugs: string[]
-}
-
 type OrganizationSubscriptionPanelProps = {
   organizationId: string
   onSaved?: (billedMonthlyCents: number) => void
@@ -63,8 +56,6 @@ export function OrganizationSubscriptionPanel({
   const [customPriceInput, setCustomPriceInput] = useState("")
   const [useCustomPrice, setUseCustomPrice] = useState(false)
   const [isPriceLocked, setIsPriceLocked] = useState(false)
-  const [bundles, setBundles] = useState<BundleOption[]>([])
-  const [activeBundleSlug, setActiveBundleSlug] = useState<string | null>(null)
 
   async function load() {
     setLoading(true)
@@ -84,8 +75,6 @@ export function OrganizationSubscriptionPanel({
       const custom = result.snapshot?.customMonthlyCents
       setUseCustomPrice(custom != null)
       setCustomPriceInput(custom == null ? "" : (custom / 100).toFixed(2))
-      setBundles(result.access?.bundles || [])
-      setActiveBundleSlug(result.access?.bundleSlug || null)
     } catch (error) {
       alert(error instanceof Error ? error.message : "Failed to load subscription.")
     } finally {
@@ -128,7 +117,6 @@ export function OrganizationSubscriptionPanel({
       else next.delete(slug)
       return catalog.map((item) => item.slug).filter((item) => next.has(item))
     })
-    setActiveBundleSlug(null)
   }
 
   async function save() {
@@ -147,7 +135,6 @@ export function OrganizationSubscriptionPanel({
             selectedProductSlugs: selectedSlugs,
             customMonthlyCents: useCustomPrice ? parseUsdToCents(customPriceInput) : null,
             isPriceLocked,
-            bundleSlug: activeBundleSlug,
           }),
         }
       )
@@ -216,44 +203,6 @@ export function OrganizationSubscriptionPanel({
           ) : null}
         </CardContent>
       </Card>
-
-      {bundles.length > 0 ? (
-        <Card>
-          <CardContent className="space-y-3 p-4">
-            <div>
-              <h3 className="text-sm font-semibold">Optional presets</h3>
-              <p className="text-xs text-muted-foreground">
-                Presets only pre-select product modules. They are not billed plans.
-              </p>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {bundles.map((bundle) => (
-                <div
-                  key={bundle.slug}
-                  className={cn(
-                    "rounded-lg border p-3",
-                    activeBundleSlug === bundle.slug && "border-emerald-500 bg-emerald-50/40"
-                  )}
-                >
-                  <p className="text-sm font-medium">{bundle.name}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{bundle.description}</p>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="mt-3"
-                    onClick={() => {
-                      setSelectedSlugs(bundle.moduleSlugs)
-                      setActiveBundleSlug(bundle.slug)
-                    }}
-                  >
-                    Use preset
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
 
       <Card>
         <CardContent className="space-y-3 p-4">

@@ -53,6 +53,18 @@ export const HIDDEN_SUBSCRIPTION_CAPABILITY_SLUGS = [
   "child-care",
 ] as const
 
+/** Capabilities Super Admin can attach to a product module. Omits legacy hr/bazaar. */
+export const EDITABLE_CAPABILITY_SLUGS = [
+  "ticketing",
+  "spaces",
+  "community-calendar",
+  "sign-ups",
+  "child-care",
+  "finance",
+  "reports",
+  "applications",
+] as const
+
 /** When a product module is enabled, these capability slugs are also enabled. */
 export const IMPLIED_MODULE_SLUGS: Record<string, readonly string[]> = {
   /** Ticketing, facilities, community calendar, volunteer sign-ups, and childcare. */
@@ -151,27 +163,65 @@ export function isCatalogModuleSlug(slug: string): boolean {
   return isProductModuleSlug(slug)
 }
 
+export function slugifyProductModuleSlug(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48)
+}
+
+export function isValidProductModuleSlug(slug: string): boolean {
+  return /^[a-z][a-z0-9-]{1,47}$/.test(slug)
+}
+
+export function sanitizeIncludedCapabilitySlugs(values: unknown): string[] {
+  if (!Array.isArray(values)) return []
+  const selected = new Set<string>()
+  for (const value of values) {
+    const slug = String(value || "").trim()
+    if ((EDITABLE_CAPABILITY_SLUGS as readonly string[]).includes(slug)) {
+      selected.add(slug)
+    }
+  }
+  return EDITABLE_CAPABILITY_SLUGS.filter((slug) => selected.has(slug))
+}
+
 export function filterProductModuleSlugs(slugs: Iterable<string>): string[] {
   const selected = new Set<string>()
   for (const rawSlug of slugs) {
     const slug = normalizeModuleSlug(rawSlug)
-    if (isProductModuleSlug(slug)) selected.add(slug)
+    if (!slug || isCoreModuleSlug(slug) || isCapabilityModuleSlug(slug)) continue
+    selected.add(slug)
   }
-  return PRODUCT_MODULE_SLUGS.filter((slug) => selected.has(slug))
+  const ordered = PRODUCT_MODULE_SLUGS.filter((slug) => selected.has(slug))
+  for (const slug of selected) {
+    if (!ordered.includes(slug)) ordered.push(slug)
+  }
+  return ordered
 }
 
 export function getProductImpliedCapabilitySlugs(
-  productSlug: string
+  productSlug: string,
+  impliedByProduct?: Record<string, readonly string[]>
 ): readonly string[] {
-  return IMPLIED_MODULE_SLUGS[normalizeModuleSlug(productSlug)] ?? []
+  const slug = normalizeModuleSlug(productSlug)
+  if (impliedByProduct && Object.prototype.hasOwnProperty.call(impliedByProduct, slug)) {
+    return impliedByProduct[slug] ?? []
+  }
+  return IMPLIED_MODULE_SLUGS[slug] ?? []
 }
 
 /** Product slugs plus implied capabilities. Used when saving organization_modules. */
-export function expandPlanModuleSlugs(productSlugs: Iterable<string>): string[] {
+export function expandPlanModuleSlugs(
+  productSlugs: Iterable<string>,
+  impliedByProduct?: Record<string, readonly string[]>
+): string[] {
   const products = filterProductModuleSlugs(productSlugs)
   const enabled = new Set<string>(products)
   for (const slug of products) {
-    for (const implied of IMPLIED_MODULE_SLUGS[slug] ?? []) {
+    for (const implied of getProductImpliedCapabilitySlugs(slug, impliedByProduct)) {
       enabled.add(implied)
     }
   }
@@ -183,14 +233,18 @@ export function getSubscriptionBundle(slug: string): SubscriptionBundle | undefi
 }
 
 /** Expand a set of enabled product slugs to include implied capabilities. */
-export function expandEnabledModuleSlugs(productSlugs: Iterable<string>): Set<string> {
+export function expandEnabledModuleSlugs(
+  productSlugs: Iterable<string>,
+  impliedByProduct?: Record<string, readonly string[]>
+): Set<string> {
   const enabled = new Set<string>()
 
   for (const rawSlug of productSlugs) {
     const slug = normalizeModuleSlug(rawSlug)
+    if (!slug || isCoreModuleSlug(slug) || isCapabilityModuleSlug(slug)) continue
     enabled.add(slug)
 
-    for (const implied of IMPLIED_MODULE_SLUGS[slug] ?? []) {
+    for (const implied of getProductImpliedCapabilitySlugs(slug, impliedByProduct)) {
       enabled.add(implied)
     }
   }
@@ -205,19 +259,15 @@ export function expandEnabledModuleSlugs(productSlugs: Iterable<string>): Set<st
 /** Slugs that should flip when toggling a product module on/off. */
 export function getModuleToggleTargets(
   moduleSlug: string,
-  enabled: boolean
+  enabled: boolean,
+  impliedByProduct?: Record<string, readonly string[]>
 ): string[] {
   const slug = normalizeModuleSlug(moduleSlug)
   const targets = new Set<string>([slug])
+  void enabled
 
-  if (enabled) {
-    for (const implied of IMPLIED_MODULE_SLUGS[slug] ?? []) {
-      targets.add(implied)
-    }
-  } else {
-    for (const implied of IMPLIED_MODULE_SLUGS[slug] ?? []) {
-      targets.add(implied)
-    }
+  for (const implied of getProductImpliedCapabilitySlugs(slug, impliedByProduct)) {
+    targets.add(implied)
   }
 
   return Array.from(targets)

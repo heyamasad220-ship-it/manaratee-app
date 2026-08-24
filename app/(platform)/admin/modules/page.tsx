@@ -5,6 +5,7 @@ import { PlatformHeader } from "@/components/platform/platform-header"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
@@ -25,9 +26,20 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Boxes, Calendar, GraduationCap, Heart, Pencil, Store, Ticket, Users } from "lucide-react"
+import {
+  Boxes,
+  Calendar,
+  GraduationCap,
+  Heart,
+  Pencil,
+  Plus,
+  Store,
+  Ticket,
+  Users,
+} from "lucide-react"
 import { formatCentsAsUsd, parseUsdToCents } from "@/lib/billing/money"
-import { productModuleIncludesCaption } from "@/lib/modules/staff-module-labels"
+import { slugifyProductModuleSlug } from "@/lib/modules/module-catalog"
+import { catalogCapabilityCheckboxItems } from "@/lib/modules/staff-module-labels"
 
 type CatalogModule = {
   id: string
@@ -36,12 +48,18 @@ type CatalogModule = {
   description: string | null
   monthlyPriceCents: number
   isActive: boolean
+  includedCapabilitySlugs: string[]
 }
 
 type DiscountRule = {
   moduleCount: number
   discountPercent: number
   isActive: boolean
+}
+
+type CapabilityOption = {
+  slug: string
+  name: string
 }
 
 const moduleIcons: Record<string, React.ElementType> = {
@@ -53,17 +71,25 @@ const moduleIcons: Record<string, React.ElementType> = {
   membership: Users,
 }
 
+const defaultCapabilities = catalogCapabilityCheckboxItems()
+
 export default function ModulesPage() {
   const [modules, setModules] = useState<CatalogModule[]>([])
   const [discountRules, setDiscountRules] = useState<DiscountRule[]>([])
+  const [capabilities, setCapabilities] = useState<CapabilityOption[]>(defaultCapabilities)
   const [loading, setLoading] = useState(true)
-  const [editingModule, setEditingModule] = useState<CatalogModule | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [editingModule, setEditingModule] = useState<CatalogModule | null>(null)
   const [saving, setSaving] = useState(false)
   const [savingDiscounts, setSavingDiscounts] = useState(false)
   const [editName, setEditName] = useState("")
+  const [editSlug, setEditSlug] = useState("")
+  const [slugTouched, setSlugTouched] = useState(false)
   const [editDescription, setEditDescription] = useState("")
   const [editPrice, setEditPrice] = useState("")
+  const [editCapabilitySlugs, setEditCapabilitySlugs] = useState<string[]>([])
+
+  const isAdd = dialogOpen && !editingModule
 
   async function loadCatalog() {
     setLoading(true)
@@ -73,6 +99,9 @@ export default function ModulesPage() {
       if (!response.ok) throw new Error(result.error || "Failed to load modules.")
       setModules(result.modules || [])
       setDiscountRules(result.discountRules || [])
+      if (Array.isArray(result.capabilities) && result.capabilities.length > 0) {
+        setCapabilities(result.capabilities)
+      }
     } catch (error) {
       alert(error instanceof Error ? error.message : "Failed to load modules.")
     } finally {
@@ -105,37 +134,74 @@ export default function ModulesPage() {
     }
   }
 
-  function openEdit(module: CatalogModule) {
-    setEditingModule(module)
-    setEditName(module.name)
-    setEditDescription(module.description || "")
-    setEditPrice((module.monthlyPriceCents / 100).toFixed(2))
+  function resetDialog(module?: CatalogModule | null) {
+    setEditingModule(module ?? null)
+    setEditName(module?.name || "")
+    setEditSlug(module?.slug || "")
+    setSlugTouched(Boolean(module))
+    setEditDescription(module?.description || "")
+    setEditPrice(module ? (module.monthlyPriceCents / 100).toFixed(2) : "")
+    setEditCapabilitySlugs(module?.includedCapabilitySlugs || [])
+  }
+
+  function openAdd() {
+    resetDialog(null)
     setDialogOpen(true)
   }
 
-  async function saveEdit() {
-    if (!editingModule) return
+  function openEdit(module: CatalogModule) {
+    resetDialog(module)
+    setDialogOpen(true)
+  }
+
+  function toggleCapability(slug: string, checked: boolean) {
+    setEditCapabilitySlugs((current) => {
+      const next = new Set(current)
+      if (checked) next.add(slug)
+      else next.delete(slug)
+      return capabilities.map((item) => item.slug).filter((item) => next.has(item))
+    })
+  }
+
+  async function saveModule() {
+    const name = editName.trim()
+    if (!name) {
+      alert("Enter a module name.")
+      return
+    }
     const cents = parseUsdToCents(editPrice)
     if (cents == null) {
       alert("Enter a valid monthly price such as 149.00.")
       return
     }
+    const slug = slugifyProductModuleSlug(isAdd ? editSlug || name : editingModule?.slug || "")
     setSaving(true)
     try {
-      const response = await fetch(`/api/platform/modules/${editingModule.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: editName,
-          description: editDescription,
-          monthlyPriceCents: cents,
-        }),
-      })
+      const response = await fetch(
+        isAdd ? "/api/platform/modules" : `/api/platform/modules/${editingModule?.id}`,
+        {
+          method: isAdd ? "POST" : "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name,
+            description: editDescription,
+            monthlyPriceCents: cents,
+            includedCapabilitySlugs: editCapabilitySlugs,
+            ...(isAdd ? { slug } : {}),
+          }),
+        }
+      )
       const result = await response.json()
       if (!response.ok) throw new Error(result.error || "Failed to save module.")
-      setModules((current) =>
-        current.map((item) => (item.id === editingModule.id ? result.module : item))
-      )
+      if (isAdd) {
+        setModules((current) =>
+          [...current, result.module].sort((a, b) => a.name.localeCompare(b.name))
+        )
+      } else {
+        setModules((current) =>
+          current.map((item) => (item.id === editingModule?.id ? result.module : item))
+        )
+      }
       setDialogOpen(false)
     } catch (error) {
       alert(error instanceof Error ? error.message : "Failed to save module.")
@@ -170,7 +236,18 @@ export default function ModulesPage() {
   return (
     <>
       <PlatformHeader title="Modules" />
-      <div className="flex flex-col gap-6 p-6">
+      <div className="flex flex-col gap-6 p-6 pb-10">
+        <p className="text-sm text-muted-foreground">
+          If this catalog is empty or monthly prices are $0.00, run{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            scripts/274_module_based_subscription_pricing.sql
+          </code>{" "}
+          then{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            scripts/275_module_included_capabilities.sql
+          </code>{" "}
+          in the Supabase SQL Editor, then refresh this page.
+        </p>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Card className="border border-border shadow-sm">
             <CardContent className="flex items-start gap-4 p-5">
@@ -213,12 +290,18 @@ export default function ModulesPage() {
 
         <Card className="border border-border shadow-sm">
           <CardContent className="p-0">
-            <div className="border-b border-border px-5 py-4">
-              <h3 className="text-base font-semibold">Product catalog</h3>
-              <p className="text-sm text-muted-foreground">
-                Monthly prices are stored as integer cents. Inactive modules cannot be newly added
-                to an organization.
-              </p>
+            <div className="flex flex-col gap-3 border-b border-border px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h3 className="text-base font-semibold">Product catalog</h3>
+                <p className="text-sm text-muted-foreground">
+                  Monthly prices are stored as integer cents. Inactive modules cannot be newly added
+                  to an organization. Included capabilities are set in Add / Edit module.
+                </p>
+              </div>
+              <Button onClick={openAdd}>
+                <Plus className="mr-1 h-4 w-4" />
+                Add module
+              </Button>
             </div>
             <Table>
               <TableHeader>
@@ -226,7 +309,6 @@ export default function ModulesPage() {
                   <TableHead>Module</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead>Monthly price</TableHead>
-                  <TableHead>Included with this module</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -234,14 +316,14 @@ export default function ModulesPage() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                    <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
                       Loading modules...
                     </TableCell>
                   </TableRow>
                 ) : modules.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                      No product modules found. Run SQL script 274.
+                    <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                      No product modules found. Run SQL scripts 274 and 275.
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -260,14 +342,11 @@ export default function ModulesPage() {
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell className="max-w-[280px] text-sm text-muted-foreground">
+                        <TableCell className="max-w-[320px] text-sm text-muted-foreground">
                           {module.description || "No description"}
                         </TableCell>
                         <TableCell className="font-medium">
                           {formatCentsAsUsd(module.monthlyPriceCents)}
-                        </TableCell>
-                        <TableCell className="max-w-[260px] text-sm text-muted-foreground">
-                          {productModuleIncludesCaption(module.slug) || "—"}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
@@ -354,20 +433,40 @@ export default function ModulesPage() {
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Edit module</DialogTitle>
+            <DialogTitle>{isAdd ? "Add module" : "Edit module"}</DialogTitle>
             <DialogDescription>
-              Update the name, description, and monthly price. Status stays on the table.
+              {isAdd
+                ? "Create a product module and choose which capabilities it includes."
+                : "Update the name, description, monthly price, and included capabilities. Status stays on the table."}
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
+          <div className="grid gap-4 py-2">
             <div className="grid gap-2">
               <Label htmlFor="module-name">Module name</Label>
               <Input
                 id="module-name"
                 value={editName}
-                onChange={(event) => setEditName(event.target.value)}
+                onChange={(event) => {
+                  const value = event.target.value
+                  setEditName(value)
+                  if (isAdd && !slugTouched) {
+                    setEditSlug(slugifyProductModuleSlug(value))
+                  }
+                }}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="module-slug">Slug</Label>
+              <Input
+                id="module-slug"
+                value={editSlug}
+                disabled={!isAdd}
+                onChange={(event) => {
+                  setSlugTouched(true)
+                  setEditSlug(slugifyProductModuleSlug(event.target.value) || event.target.value)
+                }}
               />
             </div>
             <div className="grid gap-2">
@@ -388,13 +487,38 @@ export default function ModulesPage() {
                 placeholder="149.00"
               />
             </div>
+            <div className="grid gap-2">
+              <Label>Included capabilities</Label>
+              <p className="text-xs text-muted-foreground">
+                Select every capability this product module should turn on for a tenant.
+              </p>
+              <div className="max-h-56 space-y-1 overflow-y-auto rounded-md border p-2">
+                {capabilities.map((capability) => {
+                  const checked = editCapabilitySlugs.includes(capability.slug)
+                  return (
+                    <label
+                      key={capability.slug}
+                      className="flex items-center gap-3 rounded-md px-2 py-1.5 hover:bg-muted/60"
+                    >
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={(value) =>
+                          toggleCapability(capability.slug, value === true)
+                        }
+                      />
+                      <span className="text-sm">{capability.name}</span>
+                    </label>
+                  )
+                })}
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={() => void saveEdit()} disabled={saving}>
-              {saving ? "Saving..." : "Save changes"}
+            <Button onClick={() => void saveModule()} disabled={saving}>
+              {saving ? "Saving..." : isAdd ? "Add module" : "Save changes"}
             </Button>
           </DialogFooter>
         </DialogContent>

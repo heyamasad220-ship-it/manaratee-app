@@ -3,6 +3,7 @@ import {
   CAPABILITY_MODULE_SLUGS,
   CORE_MODULE_SLUGS,
   expandEnabledModuleSlugs,
+  filterProductModuleSlugs,
   getModuleToggleTargets,
   getSubscriptionBundle,
   isCapabilityModuleSlug,
@@ -10,6 +11,7 @@ import {
   isProductModuleSlug,
   normalizeModuleSlug,
   PRODUCT_MODULE_SLUGS,
+  sanitizeIncludedCapabilitySlugs,
   SUBSCRIPTION_BUNDLES,
 } from "@/lib/modules/module-catalog"
 import { staffModuleDisplayName } from "@/lib/modules/staff-module-labels"
@@ -89,6 +91,35 @@ function unwrapModule(
 ): ModuleRow | null {
   if (!modules) return null
   return Array.isArray(modules) ? modules[0] ?? null : modules
+}
+
+async function loadIncludedCapabilityMap(admin: SupabaseClient) {
+  const { data, error } = await admin
+    .from("modules")
+    .select("slug, included_capability_slugs")
+
+  if (error) {
+    if (/included_capability_slugs/i.test(error.message)) {
+      return undefined
+    }
+    throw new Error(error.message)
+  }
+
+  const map: Record<string, readonly string[]> = {}
+  for (const row of data ?? []) {
+    const slug = normalizeModuleSlug(String(row.slug || ""))
+    if (!slug) continue
+    map[slug] = sanitizeIncludedCapabilitySlugs(row.included_capability_slugs)
+  }
+  return map
+}
+
+function isSellableProductSlug(
+  slug: string,
+  includeInCatalog: boolean | null | undefined
+) {
+  if (isCoreModuleSlug(slug) || isCapabilityModuleSlug(slug)) return false
+  return isProductModuleSlug(slug) || includeInCatalog === true
 }
 
 async function loadModuleSlugMap(admin: SupabaseClient) {
@@ -226,8 +257,8 @@ export async function getOrganizationModuleAccess(organizationId: string) {
     const slug = normalizeModuleSlug(moduleRow.slug)
     const meta = moduleMetaBySlug.get(slug) ?? moduleRow
     const isCore = isCoreModuleSlug(slug) || Boolean(meta.is_core)
-    const isProduct = isProductModuleSlug(slug)
     const isCapability = isCapabilityModuleSlug(slug)
+    const isProduct = isSellableProductSlug(slug, meta.include_in_catalog)
 
     bySlug.set(slug, {
       id: meta.id,
@@ -245,7 +276,22 @@ export async function getOrganizationModuleAccess(organizationId: string) {
     })
   }
 
-  const catalogModules = PRODUCT_MODULE_SLUGS.map((slug) => {
+  const catalogSlugs: string[] = []
+  const seenCatalog = new Set<string>()
+  for (const slug of [
+    ...PRODUCT_MODULE_SLUGS,
+    ...(allModules ?? []).map((row) => normalizeModuleSlug(row.slug)),
+  ]) {
+    if (seenCatalog.has(slug)) continue
+    const meta = moduleMetaBySlug.get(slug)
+    if (!isSellableProductSlug(slug, meta?.include_in_catalog ?? isProductModuleSlug(slug))) {
+      continue
+    }
+    seenCatalog.add(slug)
+    catalogSlugs.push(slug)
+  }
+
+  const catalogModules = catalogSlugs.map((slug) => {
     const existing = bySlug.get(slug)
     const meta = moduleMetaBySlug.get(slug)
 
@@ -345,9 +391,23 @@ export async function replaceOrganizationProductModules(
 ) {
   const admin = createAdminClient()
   const moduleIdsBySlug = await loadModuleSlugMap(admin)
-  const enabledSlugs = expandEnabledModuleSlugs(productSlugs)
+  const impliedMap = await loadIncludedCapabilityMap(admin)
+  const enabledSlugs = expandEnabledModuleSlugs(productSlugs, impliedMap)
+  const { data: catalogRows, error: catalogError } = await admin
+    .from("modules")
+    .select("slug, include_in_catalog")
+  if (catalogError) throw new Error(catalogError.message)
 
-  for (const productSlug of PRODUCT_MODULE_SLUGS) {
+  const sellableSlugs = new Set<string>(PRODUCT_MODULE_SLUGS)
+  for (const row of catalogRows ?? []) {
+    const slug = normalizeModuleSlug(String(row.slug || ""))
+    if (isSellableProductSlug(slug, row.include_in_catalog)) sellableSlugs.add(slug)
+  }
+  for (const slug of filterProductModuleSlugs(productSlugs)) {
+    sellableSlugs.add(slug)
+  }
+
+  for (const productSlug of sellableSlugs) {
     const normalized = normalizeModuleSlug(productSlug)
     const moduleId = moduleIdsBySlug.get(normalized)
     if (!moduleId) continue
@@ -470,8 +530,9 @@ export async function setOrganizationModuleEnabled(
     )
   }
 
+  const impliedMap = await loadIncludedCapabilityMap(admin)
   if (enabled) {
-    const targets = getModuleToggleTargets(slug, true)
+    const targets = getModuleToggleTargets(slug, true, impliedMap)
     for (const targetSlug of targets) {
       const moduleId = moduleIdsBySlug.get(targetSlug)
       if (!moduleId) continue
@@ -511,13 +572,14 @@ export async function setOrganizationModuleEnabled(
 export async function syncImpliedModulesForOrganization(organizationId: string) {
   const admin = createAdminClient()
   const moduleIdsBySlug = await loadModuleSlugMap(admin)
+  const impliedMap = await loadIncludedCapabilityMap(admin)
 
   const { data, error } = await admin
     .from("organization_modules")
     .select(
       `
       enabled,
-      modules ( slug )
+      modules ( slug, include_in_catalog )
     `
     )
     .eq("organization_id", organizationId)
@@ -532,12 +594,12 @@ export async function syncImpliedModulesForOrganization(organizationId: string) 
     const moduleRow = unwrapModule(row.modules as OrganizationModuleRow["modules"])
     if (!moduleRow?.slug) continue
     const slug = normalizeModuleSlug(moduleRow.slug)
-    if (isProductModuleSlug(slug)) {
+    if (isSellableProductSlug(slug, moduleRow.include_in_catalog)) {
       enabledProductSlugs.push(slug)
     }
   }
 
-  const targetSlugs = expandEnabledModuleSlugs(enabledProductSlugs)
+  const targetSlugs = expandEnabledModuleSlugs(enabledProductSlugs, impliedMap)
 
   for (const slug of CAPABILITY_MODULE_SLUGS) {
     const moduleId = moduleIdsBySlug.get(slug)

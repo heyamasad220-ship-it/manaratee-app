@@ -103,13 +103,6 @@ interface ModuleConfig {
   organizationModuleId?: string
 }
 
-interface SubscriptionBundleOption {
-  slug: string
-  name: string
-  description: string
-  moduleSlugs: string[]
-}
-
 interface OrgRole {
   id: string
   name: string
@@ -167,13 +160,6 @@ export default function OrganizationsPage() {
   const [orgModules, setOrgModules] = useState<ModuleConfig[]>([])
   const [coreModules, setCoreModules] = useState<ModuleConfig[]>([])
   const [capabilityModules, setCapabilityModules] = useState<ModuleConfig[]>([])
-  const [subscriptionBundles, setSubscriptionBundles] = useState<
-    SubscriptionBundleOption[]
-  >([])
-  const [activeBundleSlug, setActiveBundleSlug] = useState<string | null>(null)
-  const [applyingBundleSlug, setApplyingBundleSlug] = useState<string | null>(
-    null
-  )
   const [loadingModules, setLoadingModules] = useState(false)
   const [programKinds, setProgramKinds] = useState<
     "academic" | "seasonal" | "both"
@@ -422,8 +408,6 @@ export default function OrganizationsPage() {
       setOrgModules((result.catalogModules || []).map(mapModule))
       setCoreModules((result.coreModules || []).map(mapModule))
       setCapabilityModules((result.capabilityModules || []).map(mapModule))
-      setSubscriptionBundles(result.bundles || [])
-      setActiveBundleSlug(result.bundleSlug || null)
     } catch (error) {
       console.error(error)
       alert(
@@ -661,54 +645,6 @@ export default function OrganizationsPage() {
     setAddOrgOpen(true)
   }
 
-  const applySubscriptionBundle = async (bundleSlug: string) => {
-    if (!selectedOrg) return
-
-    setApplyingBundleSlug(bundleSlug)
-
-    try {
-      const response = await fetch(
-        `/api/platform/organizations/${selectedOrg.id}/modules`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ bundleSlug }),
-        }
-      )
-      const result = await response.json()
-
-      if (!response.ok) {
-        throw new Error(result.error || "Failed to apply bundle.")
-      }
-
-      const mapModule = (item: any): ModuleConfig => ({
-        id: item.id,
-        name: item.name,
-        slug: item.slug,
-        description: item.description,
-        enabled: item.enabled,
-        isDefault: item.enabledByPlan,
-        isCore: item.isCore,
-        isProduct: item.isProduct,
-        isCapability: item.isCapability,
-        organizationModuleId: item.organizationModuleId,
-      })
-
-      setOrgModules((result.catalogModules || []).map(mapModule))
-      setCoreModules((result.coreModules || []).map(mapModule))
-      setCapabilityModules((result.capabilityModules || []).map(mapModule))
-      setActiveBundleSlug(result.bundleSlug || bundleSlug)
-      alert("Subscription bundle applied.")
-    } catch (error) {
-      console.error(error)
-      alert(
-        error instanceof Error ? error.message : "Failed to apply bundle."
-      )
-    } finally {
-      setApplyingBundleSlug(null)
-    }
-  }
-
   const toggleModule = async (moduleSlug: string) => {
     if (!selectedOrg) return
 
@@ -753,7 +689,6 @@ export default function OrganizationsPage() {
 
       setOrgModules((result.catalogModules || []).map(mapModule))
       setCapabilityModules((result.capabilityModules || []).map(mapModule))
-      setActiveBundleSlug(result.bundleSlug || null)
     } catch (error) {
       console.error(error)
       setOrgModules((prev) =>
@@ -1150,8 +1085,8 @@ export default function OrganizationsPage() {
         }}
       >
         {selectedOrg ? (
-        <SheetContent className="w-[95vw] max-w-none overflow-y-auto sm:max-w-none lg:w-[1100px]">
-          <SheetHeader className="border-b pb-4">
+        <SheetContent className="flex h-full w-[95vw] max-w-none flex-col overflow-hidden sm:max-w-none lg:w-[1100px]">
+          <SheetHeader className="shrink-0 border-b pb-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100">
@@ -1181,6 +1116,7 @@ export default function OrganizationsPage() {
             </div>
           </SheetHeader>
 
+          <div className="platform-main-scroll min-h-0 flex-1 overflow-y-scroll pr-1">
           <Tabs defaultValue="overview" className="mt-6">
             <TabsList className="flex w-full flex-nowrap items-center gap-2 overflow-hidden rounded-lg bg-muted p-1">
               <TabsTrigger
@@ -1393,55 +1329,6 @@ export default function OrganizationsPage() {
                   }}
                 />
               ) : null}
-
-              <Card>
-                <CardContent className="space-y-3 p-4">
-                  <div>
-                    <h3 className="text-sm font-semibold">Persona presets</h3>
-                    <p className="text-xs text-muted-foreground">
-                      Optional starting mixes. They save through the same module pricing path.
-                    </p>
-                  </div>
-
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {subscriptionBundles.map((bundle) => (
-                      <div
-                        key={bundle.slug}
-                        className={cn(
-                          "rounded-lg border p-3",
-                          activeBundleSlug === bundle.slug &&
-                            "border-emerald-500 bg-emerald-50/40"
-                        )}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <p className="text-sm font-medium">{bundle.name}</p>
-                            <p className="mt-1 text-xs text-muted-foreground">
-                              {bundle.description}
-                            </p>
-                          </div>
-                          <Button
-                            size="sm"
-                            variant={
-                              activeBundleSlug === bundle.slug
-                                ? "secondary"
-                                : "outline"
-                            }
-                            disabled={applyingBundleSlug !== null}
-                            onClick={() => applySubscriptionBundle(bundle.slug)}
-                          >
-                            {applyingBundleSlug === bundle.slug
-                              ? "Applying..."
-                              : activeBundleSlug === bundle.slug
-                                ? "Reapply"
-                                : "Apply"}
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
 
               <Card>
                 <CardContent className="space-y-4 p-4">
@@ -1774,6 +1661,7 @@ export default function OrganizationsPage() {
               </Card>
             </TabsContent>
           </Tabs>
+          </div>
         </SheetContent>
         ) : null}
       </Sheet>

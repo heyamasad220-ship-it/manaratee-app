@@ -125,3 +125,25 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Always-visible vertical scrollbar for Super Admin pages taller than the viewport. */
+.platform-main-scroll {
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(161 161 170) transparent;
+}
+
+.platform-main-scroll::-webkit-scrollbar {
+  width: 12px;
+}
+
+.platform-main-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.platform-main-scroll::-webkit-scrollbar-thumb {
+  background-color: rgb(161 161 170);
+  border-radius: 9999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}

@@ -8,7 +8,7 @@ export function PlatformHeader({
   breadcrumb?: string
 }) {
   return (
-    <header className="flex items-center gap-3 border-b border-border bg-card px-6 py-4">
+    <header className="sticky top-0 z-10 flex shrink-0 items-center gap-3 border-b border-border bg-card px-6 py-4">
       {breadcrumb && (
         <>
           <span className="text-sm text-muted-foreground">{breadcrumb}</span>

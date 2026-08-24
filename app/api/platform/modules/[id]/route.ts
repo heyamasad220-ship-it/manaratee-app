@@ -1,8 +1,35 @@
 import { NextResponse } from "next/server"
 
 import { parseUsdToCents } from "@/lib/billing/money"
-import { isProductModuleSlug } from "@/lib/modules/module-catalog"
+import {
+  isCapabilityModuleSlug,
+  isCoreModuleSlug,
+  isProductModuleSlug,
+  sanitizeIncludedCapabilitySlugs,
+} from "@/lib/modules/module-catalog"
 import { requirePlatformAdmin } from "@/lib/platform/require-platform-admin"
+
+function serializeModule(module: {
+  id: string
+  slug: string
+  name: string
+  description: string | null
+  monthly_price_cents: number | null
+  is_active: boolean | null
+  included_capability_slugs?: unknown
+}) {
+  return {
+    id: module.id,
+    slug: module.slug,
+    name: module.name,
+    description: module.description,
+    monthlyPriceCents: Number(module.monthly_price_cents) || 0,
+    isActive: module.is_active !== false,
+    includedCapabilitySlugs: sanitizeIncludedCapabilitySlugs(
+      module.included_capability_slugs
+    ),
+  }
+}
 
 export async function PATCH(
   request: Request,
@@ -19,7 +46,7 @@ export async function PATCH(
 
     const { data: existing, error: existingError } = await auth.context.admin
       .from("modules")
-      .select("id, slug")
+      .select("id, slug, include_in_catalog")
       .eq("id", id)
       .maybeSingle()
 
@@ -29,9 +56,21 @@ export async function PATCH(
     if (!existing) {
       return NextResponse.json({ error: "Module not found." }, { status: 404 })
     }
-    if (!isProductModuleSlug(existing.slug)) {
+    if (
+      isCoreModuleSlug(existing.slug) ||
+      isCapabilityModuleSlug(existing.slug)
+    ) {
       return NextResponse.json(
-        { error: "Only product modules can be priced and edited here." },
+        { error: "Core and capability modules are not edited here." },
+        { status: 400 }
+      )
+    }
+    if (
+      !isProductModuleSlug(existing.slug) &&
+      existing.include_in_catalog !== true
+    ) {
+      return NextResponse.json(
+        { error: "Only product catalog modules can be priced and edited here." },
         { status: 400 }
       )
     }
@@ -64,28 +103,42 @@ export async function PATCH(
       updates.monthly_price_cents = cents
     }
 
-    const { data: module, error } = await auth.context.admin
+    if (body.includedCapabilitySlugs !== undefined) {
+      updates.included_capability_slugs = sanitizeIncludedCapabilitySlugs(
+        body.includedCapabilitySlugs
+      )
+    }
+
+    const selectWithCapabilities =
+      "id, slug, name, description, monthly_price_cents, is_active, included_capability_slugs"
+    const selectWithoutCapabilities =
+      "id, slug, name, description, monthly_price_cents, is_active"
+
+    let { data: module, error } = await auth.context.admin
       .from("modules")
       .update(updates)
       .eq("id", id)
-      .select(
-        "id, slug, name, description, monthly_price_cents, is_active"
-      )
+      .select(selectWithCapabilities)
       .single()
+
+    if (error && /included_capability_slugs/i.test(error.message)) {
+      delete updates.included_capability_slugs
+      const retry = await auth.context.admin
+        .from("modules")
+        .update(updates)
+        .eq("id", id)
+        .select(selectWithoutCapabilities)
+        .single()
+      module = retry.data
+      error = retry.error
+    }
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
     return NextResponse.json({
-      module: {
-        id: module.id,
-        slug: module.slug,
-        name: module.name,
-        description: module.description,
-        monthlyPriceCents: Number(module.monthly_price_cents) || 0,
-        isActive: module.is_active !== false,
-      },
+      module: serializeModule(module),
     })
   } catch (error) {
     const message =

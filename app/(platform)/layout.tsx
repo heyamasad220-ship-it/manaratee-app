@@ -6,9 +6,9 @@ export default function PlatformLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-dvh overflow-hidden">
       <PlatformSidebar />
-      <main className="flex flex-1 flex-col overflow-auto bg-background">
+      <main className="platform-main-scroll flex min-h-0 min-w-0 flex-1 flex-col overflow-y-scroll overscroll-y-contain bg-background">
         {children}
       </main>
     </div>

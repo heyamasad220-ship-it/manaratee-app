@@ -7,8 +7,11 @@ import {
 } from "@/lib/billing/module-subscription-pricing"
 import {
   filterProductModuleSlugs,
+  isCapabilityModuleSlug,
+  isCoreModuleSlug,
   isProductModuleSlug,
-  PRODUCT_MODULE_SLUGS,
+  sanitizeIncludedCapabilitySlugs,
+  IMPLIED_MODULE_SLUGS,
 } from "@/lib/modules/module-catalog"
 import {
   getOrganizationModuleAccess,
@@ -40,6 +43,7 @@ export type CatalogModuleRow = {
   description: string | null
   monthlyPriceCents: number
   isActive: boolean
+  includedCapabilitySlugs: string[]
 }
 
 function normalizeInterval(value: unknown): "monthly" | "annual" {
@@ -54,11 +58,16 @@ function centsFromLegacyDollars(value: unknown): number {
 
 function rowToCatalogModule(row: Record<string, unknown>): CatalogModuleRow | null {
   const slug = String(row.slug || "").trim()
-  if (!isProductModuleSlug(slug)) return null
+  if (!slug || isCoreModuleSlug(slug) || isCapabilityModuleSlug(slug)) return null
+  if (!isProductModuleSlug(slug) && row.include_in_catalog !== true) return null
   const monthlyPriceCents =
     Number(row.monthly_price_cents) ||
     centsFromLegacyDollars(row.price_monthly ?? row.monthly_price) ||
     0
+  const includedCapabilitySlugs =
+    row.included_capability_slugs == null
+      ? [...(IMPLIED_MODULE_SLUGS[slug] ?? [])]
+      : sanitizeIncludedCapabilitySlugs(row.included_capability_slugs)
   return {
     id: String(row.id),
     slug,
@@ -66,23 +75,45 @@ function rowToCatalogModule(row: Record<string, unknown>): CatalogModuleRow | nu
     description: row.description == null ? null : String(row.description),
     monthlyPriceCents: Math.max(0, Math.round(monthlyPriceCents)),
     isActive: row.is_active !== false,
+    includedCapabilitySlugs,
   }
 }
 
 export async function loadProductModuleCatalog(): Promise<CatalogModuleRow[]> {
   const supabase = createServiceRoleClient()
-  const { data, error } = await supabase
+  // monthly_price_cents is the source of truth. included_capability_slugs is
+  // added by SQL 275; retry without it so the catalog still loads beforehand.
+  const withCapabilities =
+    "id, slug, name, description, monthly_price_cents, is_active, include_in_catalog, included_capability_slugs"
+  const withoutCapabilities =
+    "id, slug, name, description, monthly_price_cents, is_active, include_in_catalog"
+
+  let { data, error } = await supabase
     .from("modules")
-    .select(
-      "id, slug, name, description, monthly_price_cents, price_monthly, monthly_price, is_active"
-    )
-    .in("slug", [...PRODUCT_MODULE_SLUGS])
+    .select(withCapabilities)
     .order("name", { ascending: true })
+
+  if (error && /included_capability_slugs/i.test(error.message)) {
+    const retry = await supabase
+      .from("modules")
+      .select(withoutCapabilities)
+      .order("name", { ascending: true })
+    data = retry.data
+    error = retry.error
+  }
 
   if (error) throw new Error(error.message)
   return ((data || []) as Record<string, unknown>[])
     .map(rowToCatalogModule)
     .filter((row): row is CatalogModuleRow => Boolean(row))
+}
+
+export function catalogImpliedCapabilityMap(
+  catalog: CatalogModuleRow[]
+): Record<string, readonly string[]> {
+  return Object.fromEntries(
+    catalog.map((row) => [row.slug, row.includedCapabilitySlugs])
+  )
 }
 
 export async function loadDiscountRules(): Promise<ModuleDiscountRule[]> {
