@@ -220,12 +220,13 @@ export async function createProgram(input: CreateProgramInput) {
       .single())
   }
 
-  if (error || !data) {
+  const createdProgramId = data?.id
+  if (error || !createdProgramId) {
     console.error(error)
     throw new Error("Failed to create program")
   }
 
-  const programId = data.id as string
+  const programId = String(createdProgramId)
 
   let offeringId: string | null = null
   if (programKind === "seasonal") {

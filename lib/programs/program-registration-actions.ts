@@ -503,16 +503,18 @@ export async function registerForProgram(formData: FormData) {
     redirect(`${redirectBase}?error=missing-fields`)
   }
 
-  if (!isAdultProgram && customerContact.person_id) {
+  const registrantPersonId = customerContact.person_id
+  if (!isAdultProgram && registrantPersonId) {
     for (const participant of participants) {
-      if (!participant.participantPersonId) {
+      const participantPersonId = participant.participantPersonId
+      if (!participantPersonId) {
         redirect(`${redirectBase}?error=invalid-participant`)
       }
       const isFamilyParticipant = await verifyParticipantPersonInRegistrantFamily(
         {
           organizationId,
-          registrantPersonId: customerContact.person_id,
-          participantPersonId: participant.participantPersonId,
+          registrantPersonId,
+          participantPersonId,
         }
       )
 

@@ -223,10 +223,13 @@ export async function fetchDepartmentParticipants(
   )
 
   const participants: DepartmentParticipantRow[] = enrollments.map((row) => {
-    const offering = row.offering as unknown as {
-      id: string
-      name: string | null
-    } | null
+    const offeringRaw = Array.isArray(row.offering)
+      ? row.offering[0]
+      : row.offering
+    const offering =
+      offeringRaw && typeof offeringRaw === "object"
+        ? (offeringRaw as { id: string; name: string | null })
+        : null
     const programId = row.program_id as string
     const offeringId = (row.offering_id as string | null) ?? null
     const parentContactId =
