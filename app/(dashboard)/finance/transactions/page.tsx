@@ -1,7 +1,7 @@
 import { Suspense } from "react"
 
 import { Header } from "@/components/layout/header"
-import { ProgramsReportsNav } from "@/components/programs/programs-reports-nav"
+import { ProgramsStaffSubnav } from "@/components/programs/programs-staff-subnav"
 import { OrgReportsClient } from "@/components/reports/org-reports-client"
 import { FINANCE_TRANSACTIONS_PATH } from "@/lib/finance/finance-paths"
 import { hasPermission, PERMISSIONS } from "@/lib/permissions/permissions"
@@ -17,11 +17,8 @@ export default async function FinanceTransactionsPage() {
 
   return (
     <>
-      <Header title="Reports" />
-
-      <Suspense fallback={null}>
-        <ProgramsReportsNav />
-      </Suspense>
+      <Header title="Finance" />
+      <ProgramsStaffSubnav secondary="finance" requireProgramsModule />
 
       <div className="flex flex-col gap-6 p-6">
         <div>

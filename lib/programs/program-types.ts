@@ -27,6 +27,13 @@ export interface Program {
   enrollment_open_date: string | null
   enrollment_close_date: string | null
 
+  /** direct_registration = register without applying; application_approval = apply then register. */
+  enrollment_process?: "direct_registration" | "application_approval" | null
+  /** When true, application-based programs require an evaluation before approval. */
+  evaluation_required?: boolean | null
+  /** on_registration = Active on submit; after_initial_payment = Pending until first payment. */
+  seat_activation_rule?: "on_registration" | "after_initial_payment" | null
+
   financial_assistance_enabled: boolean
 financial_assistance_open: boolean
 financial_assistance_close_date: string | null

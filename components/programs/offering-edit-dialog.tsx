@@ -44,6 +44,7 @@ import {
 } from "@/components/ui/dialog"
 import type { OfferingManageSummary } from "@/lib/programs/offering-manage-summary"
 import type { OfferingWorkspaceData } from "@/lib/programs/offering-workspace-types"
+import { pickPrimaryInstructorAssignment } from "@/lib/programs/primary-instructor"
 import type { ProgramCapacityGroupInput } from "@/lib/programs/program-capacity-group-types"
 import { PROGRAM_LABEL } from "@/lib/programs/program-display-labels"
 import type { OfferingDeliveryFormat } from "@/lib/programs/program-offering-attributes"
@@ -55,7 +56,9 @@ import {
   type ProgramOffering,
   type ProgramOfferingStatus,
 } from "@/lib/programs/program-offering-types"
+import type { ProgramStaffAssignmentWithDetails } from "@/lib/programs/program-staff-assignment-types"
 import type { Program } from "@/lib/programs/program-types"
+import { programWorkspaceHref } from "@/lib/programs/program-workspace-path"
 import {
   normalizeProgramKind,
   type ProgramKind,
@@ -87,21 +90,8 @@ function normalizeGender(value: string | null | undefined): ProgramGender {
 function getPrimaryInstructorContactId(
   workspaceData: OfferingWorkspaceData
 ): string {
-  const active = workspaceData.staffAssignments.filter(
-    (row) => row.is_active !== false
-  )
-  const offeringLevel = active.filter((row) => row.session_id == null)
-  const pool = offeringLevel.length > 0 ? offeringLevel : active
-  const primary = pool.find(
-    (row) => row.assignment_role === "primary_instructor"
-  )
-  if (primary) return primary.contact_id
-  const instructor = pool.find(
-    (row) =>
-      row.assignment_role === "assistant_instructor" ||
-      String(row.assignment_role) === "instructor"
-  )
-  return instructor?.contact_id ?? ""
+  return pickPrimaryInstructorAssignment(workspaceData.staffAssignments)
+    ?.contact_id ?? ""
 }
 
 export function OfferingEditDialog({
@@ -125,7 +115,10 @@ export function OfferingEditDialog({
   workspaceData: OfferingWorkspaceData
   capacityGroups: ProgramCapacityGroupInput[]
   summary: OfferingManageSummary
-  onSaved: (updated: ProgramOffering) => void
+  onSaved: (
+    updated: ProgramOffering,
+    extras?: { staffAssignments?: ProgramStaffAssignmentWithDetails[] }
+  ) => void
 }) {
   const router = useRouter()
   const [offering, setOffering] = React.useState(initialOffering)
@@ -158,6 +151,7 @@ export function OfferingEditDialog({
   const [primaryInstructorId, setPrimaryInstructorId] = React.useState(() =>
     getPrimaryInstructorContactId(initialWorkspaceData)
   )
+  const selectedInstructorIdRef = React.useRef(primaryInstructorId)
   const [gender, setGender] = React.useState<ProgramGender>(() =>
     normalizeGender(initialOffering.gender)
   )
@@ -221,12 +215,18 @@ export function OfferingEditDialog({
     setAdvancedEverOpened(false)
     setError(null)
     setRegistrationResetKey((key) => key + 1)
+    selectedInstructorIdRef.current = getPrimaryInstructorContactId(
+      initialWorkspaceData
+    )
   }, [initialOffering, initialWorkspaceData, initialCapacityGroups, program.program_kind])
+
+  const resetFromPropsRef = React.useRef(resetFromProps)
+  resetFromPropsRef.current = resetFromProps
 
   React.useEffect(() => {
     if (!open) return
-    resetFromProps()
-  }, [open, resetFromProps])
+    resetFromPropsRef.current()
+  }, [open])
 
   React.useEffect(() => {
     if (!open) return
@@ -269,42 +269,38 @@ export function OfferingEditDialog({
     }
   }
 
-  async function applyInstructorAndFee(input: {
-    programId: string
-    offeringId: string
-    offeringName: string
-  }) {
-    const initialPrimaryId = getPrimaryInstructorContactId(workspaceData)
-    if (primaryInstructorId && primaryInstructorId !== initialPrimaryId) {
-      const { createProgramStaffAssignment } = await import(
-        "@/lib/programs/program-staff-assignment-actions"
+  const instructorOptions = React.useMemo(() => {
+    const byId = new Map(staffOptions.map((row) => [row.id, row]))
+    const assignedId = getPrimaryInstructorContactId(workspaceData)
+    if (assignedId && !byId.has(assignedId)) {
+      const assignment = workspaceData.staffAssignments.find(
+        (row) => row.contact_id === assignedId
       )
-      await createProgramStaffAssignment({
-        programId: input.programId,
-        offeringId: input.offeringId,
-        contactId: primaryInstructorId,
-        assignmentRole: "primary_instructor",
+      byId.set(assignedId, {
+        id: assignedId,
+        full_name: assignment?.contact_name ?? "Current instructor",
+        email: assignment?.contact_email ?? null,
       })
-    } else if (!primaryInstructorId && initialPrimaryId) {
-      const existing = workspaceData.staffAssignments.find(
-        (row) =>
-          row.is_active !== false &&
-          row.session_id == null &&
-          row.assignment_role === "primary_instructor" &&
-          row.contact_id === initialPrimaryId
-      )
-      if (existing) {
-        const { removeProgramStaffAssignment } = await import(
-          "@/lib/programs/program-staff-assignment-actions"
-        )
-        await removeProgramStaffAssignment({
-          programId: input.programId,
-          assignmentId: existing.id,
-        })
-      }
     }
+    if (primaryInstructorId && !byId.has(primaryInstructorId)) {
+      byId.set(primaryInstructorId, {
+        id: primaryInstructorId,
+        full_name: "Selected instructor",
+        email: null,
+      })
+    }
+    return Array.from(byId.values())
+  }, [staffOptions, workspaceData, primaryInstructorId])
 
-    // Fees are managed under Advanced Settings → Pricing.
+  async function persistPrimaryInstructor() {
+    const { setOfferingPrimaryInstructor } = await import(
+      "@/lib/programs/program-staff-assignment-actions"
+    )
+    return setOfferingPrimaryInstructor({
+      programId: program.id,
+      offeringId: offering.id,
+      contactId: selectedInstructorIdRef.current || null,
+    })
   }
 
   async function handleSave() {
@@ -350,11 +346,7 @@ export function OfferingEditDialog({
         })
       }
 
-      await applyInstructorAndFee({
-        programId: program.id,
-        offeringId: offering.id,
-        offeringName: trimmedName,
-      })
+      const nextAssignments = await persistPrimaryInstructor()
 
       if (advancedEverOpened) {
         if (staffSaveRef.current) {
@@ -376,7 +368,11 @@ export function OfferingEditDialog({
       }
 
       setOffering(updated)
-      onSaved(updated)
+      setWorkspaceData((current) => ({
+        ...current,
+        staffAssignments: nextAssignments,
+      }))
+      onSaved(updated, { staffAssignments: nextAssignments })
       onOpenChange(false)
       router.refresh()
     } catch (saveError) {
@@ -398,13 +394,7 @@ export function OfferingEditDialog({
       await deleteProgramOffering(offering.id)
       onOpenChange(false)
       router.refresh()
-      if (departmentId) {
-        router.push(
-          `/workforce/departments/${departmentId}?tab=programs&year=${program.id}`
-        )
-      } else {
-        router.push(`/programs/${program.id}`)
-      }
+      router.push(programWorkspaceHref(program.id, { tab: "offerings" }))
     } catch (deleteError) {
       setError(
         deleteError instanceof Error
@@ -438,7 +428,7 @@ export function OfferingEditDialog({
             disabled={isSaving || isDeleting}
             departmentId={departmentId}
             departmentName={departmentName}
-            staffOptions={staffOptions}
+            staffOptions={instructorOptions}
             statusOptions={
               status === "closed"
                 ? (["draft", "active", "closed"] as ProgramOfferingStatus[])
@@ -476,6 +466,7 @@ export function OfferingEditDialog({
                 setEnrollmentCloseDate(patch.enrollmentCloseDate)
               }
               if (patch.primaryInstructorId !== undefined) {
+                selectedInstructorIdRef.current = patch.primaryInstructorId
                 setPrimaryInstructorId(patch.primaryInstructorId)
               }
               if (patch.gender !== undefined) setGender(patch.gender)

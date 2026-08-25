@@ -3,6 +3,7 @@ import { describe, it } from "node:test"
 
 import {
   buildAdministrationChildren,
+  buildEventManagementChildren,
   buildProgramsChildren,
   isHiddenTopLevelStaffModule,
 } from "./staff-module-nav"
@@ -22,22 +23,10 @@ describe("staff module nav", () => {
     assert.equal(isHiddenTopLevelStaffModule("finance", slugs), false)
   })
 
-  it("nests Academic and Seasonal under Programs when both kinds are allowed", () => {
-    const labels = buildProgramsChildren("both").map((item) => item.label)
-    assert.deepEqual(labels.slice(0, 2), ["Academic", "Seasonal"])
-    assert.equal(labels.includes("Financial Assistance"), true)
-    assert.equal(labels.includes("Reports"), true)
-  })
-
-  it("omits the unused program-kind sibling", () => {
-    assert.deepEqual(
-      buildProgramsChildren("academic").map((item) => item.label),
-      ["Academic", "Financial Assistance", "Reports"]
-    )
-    assert.deepEqual(
-      buildProgramsChildren("seasonal").map((item) => item.label),
-      ["Seasonal", "Financial Assistance", "Reports"]
-    )
+  it("keeps Programs as a single rail item with no flyout children", () => {
+    assert.deepEqual(buildProgramsChildren("both"), [])
+    assert.deepEqual(buildProgramsChildren("academic"), [])
+    assert.deepEqual(buildProgramsChildren("seasonal"), [])
   })
 
   it("shows Volunteers when Programs or Event Management is on", () => {
@@ -62,5 +51,21 @@ describe("staff module nav", () => {
       ),
       false
     )
+  })
+
+  it("puts Reports on Event Management with Childcare under that prefix", () => {
+    const labels = buildEventManagementChildren().map((item) => item.label)
+    assert.deepEqual(labels, [
+      "Events",
+      "Master Calendar",
+      "Ticketing",
+      "Reports",
+      "Settings",
+    ])
+    const reports = buildEventManagementChildren().find(
+      (item) => item.label === "Reports"
+    )
+    assert.equal(reports?.href, "/event-management/reports")
+    assert.equal(reports?.matchPrefix, "/event-management/reports")
   })
 })

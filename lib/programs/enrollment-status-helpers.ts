@@ -14,6 +14,9 @@ export const ACTIVE_ENROLLMENT_STATUSES = [
   "active",
 ] as const
 
+/** Seats on the operational roster. Pending checkout does not belong here. */
+export const ROSTER_ENROLLMENT_STATUSES = ["enrolled", "active"] as const
+
 export function normalizeEnrollmentStatus(status: string | null | undefined) {
   return (status || "").trim().toLowerCase()
 }

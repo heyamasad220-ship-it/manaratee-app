@@ -1,0 +1,57 @@
+{
+  "importTag": "QIL_2026_27_PAYMENTS_V1",
+  "mode": "execute",
+  "generatedAt": "2026-08-24T22:39:56.134Z",
+  "totals": {
+    "csvRows": 63,
+    "succeeded": 59,
+    "refunded": 4,
+    "enrollments": 59,
+    "cancelled": 3,
+    "active": 56,
+    "netCollected": 7700,
+    "csvNet": 7700
+  },
+  "created": {
+    "enrollments": 59,
+    "nameFixes": 0,
+    "applicationsLinked": 59
+  },
+  "nameFixes": [],
+  "ambiguous": [
+    {
+      "memberName": "Birlanti abdalhamid Alsawfta",
+      "chosen": "Recitation Improvement",
+      "alternatives": [
+        "Tajweed (Osool)"
+      ],
+      "reason": "Tajweed & Recitation"
+    },
+    {
+      "memberName": "Soumia B Bouhlal",
+      "chosen": "Recitation Improvement",
+      "alternatives": [
+        "Tajweed (Beginner)"
+      ],
+      "reason": "Tajweed & Recitation"
+    },
+    {
+      "memberName": "Hanan Dabaja",
+      "chosen": "Recitation Improvement",
+      "alternatives": [
+        "Tajweed (Beginner)"
+      ],
+      "reason": "Tajweed & Recitation"
+    },
+    {
+      "memberName": "Sana Hamdan",
+      "chosen": "Recitation Improvement",
+      "alternatives": [
+        "Tajweed (Advanced)"
+      ],
+      "reason": "Tajweed & Recitation"
+    }
+  ],
+  "unmatchedMembers": [],
+  "unmatchedOfferings": []
+}

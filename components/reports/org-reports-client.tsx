@@ -209,9 +209,12 @@ function PaymentTransactionsTable({
 
 export function OrgReportsClient({
   basePath = "/finance/transactions",
+  lockedProgramId,
 }: {
   /** Path used for legacy tab URL cleanup (Finance Transactions or /reports). */
   basePath?: string
+  /** When set, only this program’s payments load and program/dept/type filters stay hidden. */
+  lockedProgramId?: string
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -219,8 +222,12 @@ export function OrgReportsClient({
   const [error, setError] = React.useState<string | null>(null)
   const [rows, setRows] = React.useState<OrgPaymentTransactionRow[]>([])
   const [departmentFilter, setDepartmentFilter] = React.useState(ALL)
-  const { kindFilter, setKindFilter } = useProgramKindReportPreset()
-  const [programFilter, setProgramFilter] = React.useState(ALL)
+  const { kindFilter: urlKindFilter, setKindFilter } =
+    useProgramKindReportPreset()
+  const kindFilter = lockedProgramId ? "all" : urlKindFilter
+  const [programFilter, setProgramFilter] = React.useState(
+    lockedProgramId || ALL
+  )
   const [offeringFilter, setOfferingFilter] = React.useState(ALL)
   const [statusFilter, setStatusFilter] =
     React.useState<OfferingActivityFilter>("active")
@@ -228,15 +235,17 @@ export function OrgReportsClient({
     React.useState<PaymentStatusFilter>("default")
 
   React.useEffect(() => {
+    if (lockedProgramId) return
     setProgramFilter(ALL)
     setOfferingFilter(ALL)
-  }, [kindFilter])
+  }, [kindFilter, lockedProgramId])
 
   const reportLabels = getReportHierarchyLabels(
     kindFilter === "all" ? null : kindFilter
   )
 
   React.useEffect(() => {
+    if (lockedProgramId) return
     const tab = searchParams.get("tab")
     if (tab === "failed" || tab === "more" || tab === "payments") {
       const params = new URLSearchParams(searchParams.toString())
@@ -244,7 +253,7 @@ export function OrgReportsClient({
       const query = params.toString()
       router.replace(query ? `${basePath}?${query}` : basePath)
     }
-  }, [basePath, router, searchParams])
+  }, [basePath, lockedProgramId, router, searchParams])
 
   React.useEffect(() => {
     let cancelled = false
@@ -253,6 +262,7 @@ export function OrgReportsClient({
       setError(null)
       const result = await fetchOrgPaymentTransactionsAction({
         limit: 400,
+        programId: lockedProgramId || null,
       })
       if (cancelled) return
       if (!result.success) {
@@ -267,7 +277,7 @@ export function OrgReportsClient({
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [lockedProgramId])
 
   const departmentOptions = React.useMemo(
     () =>
@@ -313,13 +323,14 @@ export function OrgReportsClient({
   }, [rows, departmentFilter, kindFilter, programFilter])
 
   React.useEffect(() => {
+    if (lockedProgramId) return
     if (
       programFilter !== ALL &&
       !programOptions.some((option) => option.id === programFilter)
     ) {
       setProgramFilter(ALL)
     }
-  }, [programFilter, programOptions])
+  }, [lockedProgramId, programFilter, programOptions])
 
   React.useEffect(() => {
     if (
@@ -341,7 +352,10 @@ export function OrgReportsClient({
           return false
         }
       }
-      if (programFilter !== ALL && row.programId !== programFilter) {
+      if (
+        (lockedProgramId || programFilter !== ALL) &&
+        row.programId !== (lockedProgramId || programFilter)
+      ) {
         return false
       }
       if (offeringFilter !== ALL && row.offeringId !== offeringFilter) {
@@ -360,6 +374,7 @@ export function OrgReportsClient({
     })
   }, [
     rows,
+    lockedProgramId,
     departmentFilter,
     kindFilter,
     programFilter,
@@ -369,9 +384,9 @@ export function OrgReportsClient({
   ])
 
   const filtersActive =
-    departmentFilter !== ALL ||
-    kindFilter !== "all" ||
-    programFilter !== ALL ||
+    (!lockedProgramId && departmentFilter !== ALL) ||
+    (!lockedProgramId && kindFilter !== "all") ||
+    (!lockedProgramId && programFilter !== ALL) ||
     offeringFilter !== ALL ||
     statusFilter !== "active" ||
     paymentStatusFilter !== "default"
@@ -396,77 +411,81 @@ export function OrgReportsClient({
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
-        <div className="space-y-1.5 sm:w-44">
-          <Label htmlFor="transactions-department">Department</Label>
-          <Select
-            value={departmentFilter}
-            onValueChange={(value) => {
-              setDepartmentFilter(value)
-              setProgramFilter(ALL)
-              setOfferingFilter(ALL)
-            }}
-          >
-            <SelectTrigger id="transactions-department">
-              <SelectValue placeholder="All departments" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL}>All departments</SelectItem>
-              {departmentOptions.map((option) => (
-                <SelectItem key={option.id} value={option.id}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-1.5 sm:w-36">
-          <Label htmlFor="transactions-kind">Type</Label>
-          <Select
-            value={kindFilter}
-            onValueChange={(value) => {
-              setKindFilter(value as "all" | "academic" | "seasonal")
-              setProgramFilter(ALL)
-              setOfferingFilter(ALL)
-            }}
-          >
-            <SelectTrigger id="transactions-kind">
-              <SelectValue placeholder="All types" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All types</SelectItem>
-              <SelectItem value="academic">Academic</SelectItem>
-              <SelectItem value="seasonal">Seasonal</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-1.5 sm:w-44">
-          <Label htmlFor="transactions-program">
-            {reportLabels.containerSingular}
-          </Label>
-          <Select
-            value={programFilter}
-            onValueChange={(value) => {
-              setProgramFilter(value)
-              setOfferingFilter(ALL)
-            }}
-          >
-            <SelectTrigger id="transactions-program">
-              <SelectValue
-                placeholder={`All ${reportLabels.containerPlural.toLowerCase()}`}
-              />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL}>
-                All {reportLabels.containerPlural.toLowerCase()}
-              </SelectItem>
-              {programOptions.map((option) => (
-                <SelectItem key={option.id} value={option.id}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {lockedProgramId ? null : (
+          <>
+            <div className="space-y-1.5 sm:w-44">
+              <Label htmlFor="transactions-department">Department</Label>
+              <Select
+                value={departmentFilter}
+                onValueChange={(value) => {
+                  setDepartmentFilter(value)
+                  setProgramFilter(ALL)
+                  setOfferingFilter(ALL)
+                }}
+              >
+                <SelectTrigger id="transactions-department">
+                  <SelectValue placeholder="All departments" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL}>All departments</SelectItem>
+                  {departmentOptions.map((option) => (
+                    <SelectItem key={option.id} value={option.id}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5 sm:w-36">
+              <Label htmlFor="transactions-kind">Type</Label>
+              <Select
+                value={kindFilter}
+                onValueChange={(value) => {
+                  setKindFilter(value as "all" | "academic" | "seasonal")
+                  setProgramFilter(ALL)
+                  setOfferingFilter(ALL)
+                }}
+              >
+                <SelectTrigger id="transactions-kind">
+                  <SelectValue placeholder="All types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All types</SelectItem>
+                  <SelectItem value="academic">Academic</SelectItem>
+                  <SelectItem value="seasonal">Seasonal</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5 sm:w-44">
+              <Label htmlFor="transactions-program">
+                {reportLabels.containerSingular}
+              </Label>
+              <Select
+                value={programFilter}
+                onValueChange={(value) => {
+                  setProgramFilter(value)
+                  setOfferingFilter(ALL)
+                }}
+              >
+                <SelectTrigger id="transactions-program">
+                  <SelectValue
+                    placeholder={`All ${reportLabels.containerPlural.toLowerCase()}`}
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL}>
+                    All {reportLabels.containerPlural.toLowerCase()}
+                  </SelectItem>
+                  {programOptions.map((option) => (
+                    <SelectItem key={option.id} value={option.id}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </>
+        )}
         <div className="space-y-1.5 sm:w-44">
           <Label htmlFor="transactions-offering">
             {reportLabels.offeringSingular}
@@ -512,9 +531,11 @@ export function OrgReportsClient({
             type="button"
             variant="ghost"
             onClick={() => {
-              setDepartmentFilter(ALL)
-              setKindFilter("all")
-              setProgramFilter(ALL)
+              if (!lockedProgramId) {
+                setDepartmentFilter(ALL)
+                setKindFilter("all")
+                setProgramFilter(ALL)
+              }
               setOfferingFilter(ALL)
               setStatusFilter("active")
               setPaymentStatusFilter("default")

@@ -6,7 +6,12 @@ import { createClient } from "@/lib/supabase/server"
 import { createServiceRoleClient } from "@/lib/supabase/service-role"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { getDepartments } from "@/lib/departments/department-queries"
+import { summarizeDepartmentStaff } from "@/lib/departments/department-list-summary"
 import { canViewDepartment } from "@/lib/departments/department-access"
+import {
+  departmentDeleteBlockedReason,
+  type DepartmentDeleteUsage,
+} from "@/lib/departments/department-delete-blockers"
 import { hasPermission, PERMISSIONS } from "@/lib/permissions/permissions"
 import { isRichTextEmpty, sanitizeRichTextHtml } from "@/lib/ui/rich-text"
 
@@ -37,6 +42,8 @@ export type DepartmentWithProgramCount = {
   color: string
   flyer_url: string | null
   programs_count: number
+  director_name: string | null
+  employees_count: number
 }
 
 function revalidateDepartmentPaths(departmentId?: string) {
@@ -115,6 +122,62 @@ async function requireDepartmentWriteAccess() {
   }
 }
 
+async function loadDepartmentDeleteUsage(
+  supabase: ReturnType<typeof createServiceRoleClient>,
+  organizationId: string,
+  departmentId: string
+): Promise<DepartmentDeleteUsage> {
+  const [programsResult, staffResult] = await Promise.all([
+    supabase
+      .from("programs")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .eq("department_id", departmentId),
+    supabase
+      .from("staff")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .eq("department_id", departmentId),
+  ])
+
+  const programIds = (programsResult.data || []).map((row) => row.id as string)
+  let offerings = 0
+  if (programIds.length > 0) {
+    const offeringsResult = await supabase
+      .from("program_offerings")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .in("program_id", programIds)
+    offerings = offeringsResult.count ?? 0
+  }
+
+  return {
+    programs: programIds.length,
+    offerings,
+    employees: staffResult.count ?? 0,
+  }
+}
+
+export async function fetchDepartmentDeleteUsage(
+  departmentId: string
+): Promise<DepartmentDeleteUsage> {
+  const canView = await canViewDepartment(departmentId)
+  if (!canView) {
+    throw new Error("You do not have permission to view this department.")
+  }
+
+  const organizationId = await getSelectedOrganizationId()
+  if (!organizationId) {
+    throw new Error("No organization selected")
+  }
+
+  return loadDepartmentDeleteUsage(
+    createServiceRoleClient(),
+    organizationId,
+    departmentId
+  )
+}
+
 export async function createDepartment(input: CreateDepartmentInput) {
   const name = input.name.trim()
   if (!name) {
@@ -152,14 +215,20 @@ export async function updateDepartment(input: UpdateDepartmentInput) {
 
   const { organizationId, supabase } = await requireDepartmentWriteAccess()
 
+  const updatePayload: Record<string, unknown> = {
+    name,
+    color: normalizeDepartmentColor(input.color),
+  }
+  if (input.description !== undefined) {
+    updatePayload.description = normalizeDepartmentDescription(input.description)
+  }
+  if (input.flyerUrl !== undefined) {
+    updatePayload.flyer_url = input.flyerUrl?.trim() || null
+  }
+
   const { error } = await supabase
     .from("departments")
-    .update({
-      name,
-      description: normalizeDepartmentDescription(input.description),
-      color: normalizeDepartmentColor(input.color),
-      flyer_url: input.flyerUrl?.trim() || null,
-    })
+    .update(updatePayload)
     .eq("id", input.id)
     .eq("organization_id", organizationId)
 
@@ -195,6 +264,12 @@ export async function updateDepartmentFlyer(input: {
 
 export async function deleteDepartment(id: string) {
   const { organizationId, supabase } = await requireDepartmentWriteAccess()
+
+  const usage = await loadDepartmentDeleteUsage(supabase, organizationId, id)
+  const blockedReason = departmentDeleteBlockedReason(usage)
+  if (blockedReason) {
+    throw new Error(blockedReason)
+  }
 
   const { error } = await supabase
     .from("departments")
@@ -245,14 +320,60 @@ export async function fetchDepartmentsWithProgramCounts(): Promise<
     )
   }
 
-  return departments.map((department) => ({
-    id: department.id,
-    name: department.name,
-    description: department.description,
-    color: department.color,
-    flyer_url: department.flyer_url ?? null,
-    programs_count: programCounts.get(department.id) || 0,
-  }))
+  const staffSelectWithHead =
+    "department_id, first_name, last_name, status, is_department_head"
+  const staffSelectBasic = "department_id, first_name, last_name, status"
+
+  let staffRows:
+    | Array<{
+        department_id: string | null
+        first_name: string | null
+        last_name: string | null
+        status: string | null
+        is_department_head?: boolean | null
+      }>
+    | null = null
+
+  const staffWithHead = await supabase
+    .from("staff")
+    .select(staffSelectWithHead)
+    .eq("organization_id", organizationId)
+
+  if (
+    staffWithHead.error &&
+    /is_department_head/i.test(staffWithHead.error.message || "")
+  ) {
+    const retry = await supabase
+      .from("staff")
+      .select(staffSelectBasic)
+      .eq("organization_id", organizationId)
+    if (retry.error && retry.error.code !== "42P01") {
+      console.error(retry.error)
+      throw new Error("Failed to load staff for departments")
+    }
+    staffRows = (retry.data || []) as typeof staffRows
+  } else if (staffWithHead.error && staffWithHead.error.code !== "42P01") {
+    console.error(staffWithHead.error)
+    throw new Error("Failed to load staff for departments")
+  } else {
+    staffRows = (staffWithHead.data || []) as typeof staffRows
+  }
+
+  const staffSummaries = summarizeDepartmentStaff(staffRows || [])
+
+  return departments.map((department) => {
+    const staffSummary = staffSummaries.get(department.id)
+    return {
+      id: department.id,
+      name: department.name,
+      description: department.description,
+      color: department.color,
+      flyer_url: department.flyer_url ?? null,
+      programs_count: programCounts.get(department.id) || 0,
+      director_name: staffSummary?.directorName ?? null,
+      employees_count: staffSummary?.employeesCount ?? 0,
+    }
+  })
 }
 
 export type DepartmentStaffMember = {
@@ -268,6 +389,7 @@ export type DepartmentStaffMember = {
   hourlyRate: number | null
   payBasis: "hourly" | "monthly"
   monthlySalary: number | null
+  isDepartmentHead: boolean
 }
 
 export type DepartmentDetail = {
@@ -333,11 +455,11 @@ export async function fetchDepartmentDetail(
   if (!department) return null
 
   const staffSelectWithPay =
-    "id, contact_id, first_name, last_name, email, status, staff_type, hourly_rate, pay_basis, monthly_salary, position, position_id, hr_positions:position_id (name)"
+    "id, contact_id, first_name, last_name, email, status, staff_type, hourly_rate, pay_basis, monthly_salary, position, position_id, is_department_head, hr_positions:position_id (name)"
   const staffSelectWithRate =
-    "id, contact_id, first_name, last_name, email, status, staff_type, hourly_rate, position, position_id, hr_positions:position_id (name)"
+    "id, contact_id, first_name, last_name, email, status, staff_type, hourly_rate, position, position_id, is_department_head, hr_positions:position_id (name)"
   const staffSelectBasic =
-    "id, contact_id, first_name, last_name, email, status, staff_type, position, position_id, hr_positions:position_id (name)"
+    "id, contact_id, first_name, last_name, email, status, staff_type, position, position_id, is_department_head, hr_positions:position_id (name)"
 
   let staffRows: any[] | null = null
   const staffWithPay = await supabase
@@ -428,6 +550,7 @@ export async function fetchDepartmentDetail(
       hourlyRate,
       payBasis: (row.pay_basis as string) === "monthly" ? "monthly" : "hourly",
       monthlySalary,
+      isDepartmentHead: Boolean(row.is_department_head),
     }
   })
 

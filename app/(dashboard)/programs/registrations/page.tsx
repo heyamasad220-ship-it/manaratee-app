@@ -7,7 +7,6 @@ import {
 
 import { Header } from "@/components/layout/header"
 import { ProgramsRegistrationsTable } from "@/components/programs/programs-registrations-table"
-import { ProgramsReportsNav } from "@/components/programs/programs-reports-nav"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 
@@ -839,11 +838,7 @@ export default async function ProgramsRegistrationsPage({
 
   return (
     <>
-      <Header title="Reports" />
-
-      <Suspense fallback={null}>
-        <ProgramsReportsNav />
-      </Suspense>
+      <Header title="Registrations" />
 
       <div className="p-6">
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

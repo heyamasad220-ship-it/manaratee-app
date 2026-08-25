@@ -1,12 +1,16 @@
 /**
- * Demo seed for Horizon Community Foundation only (donations + directory).
+ * Demo seed for Horizon Community Foundation only
+ * (directory, fund development, departments, programs/offerings, events).
  *
  * Usage:
  *   node scripts/seed-horizon-community-foundation-demo.mjs --execute
  *   node scripts/seed-horizon-community-foundation-demo.mjs --clean --execute
  *   node scripts/seed-horizon-community-foundation-demo.mjs --wishlist-only --execute
+ *   node scripts/seed-horizon-community-foundation-demo.mjs --programs --execute
+ *   node scripts/seed-horizon-community-foundation-demo.mjs --programs --clean --execute
  *
  * Safety: refuses any org that is not named Horizon Community Foundation.
+ * Does not write to MAS Dallas or any other tenant.
  */
 import { randomBytes } from "node:crypto"
 import { existsSync, readFileSync } from "node:fs"
@@ -49,6 +53,7 @@ function parseArgs(argv) {
     clean: argv.includes("--clean") || argv.includes("--clean-only"),
     cleanOnly: argv.includes("--clean-only"),
     wishlistOnly: argv.includes("--wishlist-only"),
+    programsOnly: argv.includes("--programs") || argv.includes("--programs-only"),
   }
 }
 
@@ -66,7 +71,9 @@ function throwIfError(label, error) {
 
 loadEnvLocal()
 
-const { execute, clean, cleanOnly, wishlistOnly } = parseArgs(process.argv.slice(2))
+const { execute, clean, cleanOnly, wishlistOnly, programsOnly } = parseArgs(
+  process.argv.slice(2)
+)
 
 if (!execute) {
   console.error("Refusing to run without --execute")
@@ -255,6 +262,8 @@ async function cleanSeed(orgId) {
     await sb.from("donation_subcategories").delete().eq("organization_id", orgId).in("category_id", categoryIds)
     await sb.from("donation_categories").delete().in("id", categoryIds)
   }
+
+  await cleanProgramsSeed(orgId)
 
   console.log("Clean complete.")
 }
@@ -904,12 +913,441 @@ async function addMissingWishlists(orgId) {
   return items || []
 }
 
+function taggedDescription(text) {
+  return `${text}\n\n${SEED_TAG}`
+}
+
+function unknownColumnFromError(message) {
+  const match =
+    message.match(/Could not find the '([^']+)' column/i) ||
+    message.match(/column [^.\s]+\.(\w+) does not exist/i)
+  return match?.[1] || null
+}
+
+async function insertIgnoringUnknownColumns(table, payload, label) {
+  const current = { ...payload }
+  for (let attempt = 0; attempt < 12; attempt++) {
+    const { data, error } = await sb.from(table).insert(current).select("id").single()
+    if (!error) return data
+    const column = unknownColumnFromError(error.message || "")
+    if (column && Object.prototype.hasOwnProperty.call(current, column)) {
+      delete current[column]
+      continue
+    }
+    throwIfError(label, error)
+  }
+  throw new Error(`${label}: too many unknown columns`)
+}
+
+async function idsByTaggedDescription(table, orgId) {
+  const { data, error } = await sb
+    .from(table)
+    .select("id")
+    .eq("organization_id", orgId)
+    .ilike("description", `%${SEED_TAG}%`)
+  throwIfError(`find tagged ${table}`, error)
+  return (data || []).map((row) => row.id)
+}
+
+async function deleteByIds(table, orgId, ids, label) {
+  if (!ids.length) return
+  const { error } = await sb.from(table).delete().eq("organization_id", orgId).in("id", ids)
+  throwIfError(label, error)
+}
+
+async function cleanProgramsSeed(orgId) {
+  console.log(`Cleaning ${SEED_TAG} departments, programs, and events from ${ORG_NAME}...`)
+
+  const eventIds = await idsByTaggedDescription("internal_events", orgId)
+  await deleteByIds("internal_events", orgId, eventIds, "delete seed events")
+
+  const eventTypeIds = await idsByTaggedDescription("event_types", orgId)
+  await deleteByIds("event_types", orgId, eventTypeIds, "delete seed event types")
+
+  const programIds = await idsByTaggedDescription("programs", orgId)
+  if (programIds.length) {
+    const { data: offerings, error: offeringError } = await sb
+      .from("program_offerings")
+      .select("id")
+      .eq("organization_id", orgId)
+      .in("program_id", programIds)
+    throwIfError("find seed offerings", offeringError)
+    const offeringIds = (offerings || []).map((row) => row.id)
+
+    if (offeringIds.length) {
+      await sb
+        .from("program_registration_options")
+        .delete()
+        .eq("organization_id", orgId)
+        .in("offering_id", offeringIds)
+      await sb
+        .from("program_offerings")
+        .delete()
+        .eq("organization_id", orgId)
+        .in("id", offeringIds)
+    }
+
+    await sb.from("programs").delete().eq("organization_id", orgId).in("id", programIds)
+  }
+
+  const departmentIds = await idsByTaggedDescription("departments", orgId)
+  await deleteByIds("departments", orgId, departmentIds, "delete seed departments")
+}
+
+async function ensureDepartment(orgId, { name, description, color }) {
+  const { data: existing } = await sb
+    .from("departments")
+    .select("id, name")
+    .eq("organization_id", orgId)
+    .eq("name", name)
+    .maybeSingle()
+  if (existing?.id) return existing
+
+  return insertIgnoringUnknownColumns(
+    "departments",
+    {
+      organization_id: orgId,
+      name,
+      description: taggedDescription(description),
+      color,
+    },
+    `department ${name}`
+  )
+}
+
+async function ensureProgram(orgId, payload) {
+  const { data: existing } = await sb
+    .from("programs")
+    .select("id, name")
+    .eq("organization_id", orgId)
+    .eq("name", payload.name)
+    .maybeSingle()
+  if (existing?.id) return existing
+
+  return insertIgnoringUnknownColumns("programs", payload, `program ${payload.name}`)
+}
+
+async function ensureOffering(orgId, programId, payload) {
+  const { data: existing } = await sb
+    .from("program_offerings")
+    .select("id, name")
+    .eq("organization_id", orgId)
+    .eq("program_id", programId)
+    .eq("name", payload.name)
+    .maybeSingle()
+  if (existing?.id) return existing
+
+  return insertIgnoringUnknownColumns(
+    "program_offerings",
+    payload,
+    `offering ${payload.name}`
+  )
+}
+
+async function ensureRegistrationOption(orgId, programId, offeringId) {
+  const { data: existing } = await sb
+    .from("program_registration_options")
+    .select("id")
+    .eq("organization_id", orgId)
+    .eq("offering_id", offeringId)
+    .eq("option_type", "full_program")
+    .maybeSingle()
+  if (existing?.id) return existing
+
+  const { error } = await sb.from("program_registration_options").insert({
+    organization_id: orgId,
+    program_id: programId,
+    offering_id: offeringId,
+    name: "Full Program",
+    option_type: "full_program",
+    is_active: true,
+    priority_rank: 10,
+  })
+  if (error && !/duplicate|unique/i.test(error.message || "")) {
+    throwIfError("registration option", error)
+  }
+}
+
+async function ensureEventType(orgId, { name, slug, description }) {
+  const { data: existing } = await sb
+    .from("event_types")
+    .select("id, name")
+    .eq("organization_id", orgId)
+    .eq("slug", slug)
+    .maybeSingle()
+  if (existing?.id) return existing
+
+  return insertIgnoringUnknownColumns(
+    "event_types",
+    {
+      organization_id: orgId,
+      name,
+      slug,
+      description: taggedDescription(description),
+      is_active: true,
+      sort_order: 10,
+    },
+    `event type ${name}`
+  )
+}
+
+async function ensureEvent(orgId, payload) {
+  const { data: existing } = await sb
+    .from("internal_events")
+    .select("id, name")
+    .eq("organization_id", orgId)
+    .eq("name", payload.name)
+    .maybeSingle()
+  if (existing?.id) return existing
+
+  return insertIgnoringUnknownColumns("internal_events", payload, `event ${payload.name}`)
+}
+
+function offeringAttributes({ applicationRequired }) {
+  return {
+    audience_type: "youth",
+    min_age: 6,
+    max_age: 14,
+    gender: "All",
+    require_guardian: true,
+    require_grade: false,
+    require_emergency_contact: true,
+    capacity_mode: "unlimited",
+    capacity: null,
+    enable_waitlist: false,
+    registration_mode: "required",
+    application_required: applicationRequired,
+    attendance_tracked: false,
+    care_enabled: false,
+    delivery_format: "in_person",
+    inherit_dates: false,
+    inherit_eligibility: true,
+    inherit_enrollment: true,
+  }
+}
+
+async function seedPrograms(orgId) {
+  console.log(`Seeding departments, programs, and events for ${ORG_NAME} (${orgId})`)
+
+  const youth = await ensureDepartment(orgId, {
+    name: "Youth Programs",
+    description:
+      "After-school tutoring, STEM labs, and seasonal camps for children and teens.",
+    color: "#2563eb",
+  })
+  const community = await ensureDepartment(orgId, {
+    name: "Community Engagement",
+    description: "Volunteer days, family nights, and neighborhood gatherings.",
+    color: "#059669",
+  })
+
+  const scholars = await ensureProgram(orgId, {
+    organization_id: orgId,
+    department_id: youth.id,
+    name: "Horizon Scholars 2026–27",
+    subtitle: "Year-round academic enrichment",
+    description: taggedDescription(
+      "Tutoring and STEM labs for elementary and middle school students."
+    ),
+    program_kind: "academic",
+    program_type: "youth",
+    status: "active",
+    visibility: "public",
+    start_date: "2026-08-17",
+    end_date: "2027-05-28",
+    gender: "All",
+    min_age: 6,
+    max_age: 14,
+    require_guardian: true,
+    require_emergency_contact: true,
+    full_program_registration_enabled: true,
+    session_registration_enabled: false,
+    capacity: 0,
+    enrolled: 0,
+    waitlist: 0,
+  })
+
+  const fallOffering = await ensureOffering(orgId, scholars.id, {
+    organization_id: orgId,
+    program_id: scholars.id,
+    name: "Fall Tutoring Circle",
+    is_default: true,
+    offering_type: "academic_year",
+    start_date: "2026-09-08",
+    end_date: "2026-12-18",
+    status: "active",
+    sort_order: 10,
+    ...offeringAttributes({ applicationRequired: true }),
+  })
+  const springOffering = await ensureOffering(orgId, scholars.id, {
+    organization_id: orgId,
+    program_id: scholars.id,
+    name: "Spring STEM Lab",
+    is_default: false,
+    offering_type: "academic_year",
+    start_date: "2027-01-12",
+    end_date: "2027-05-21",
+    status: "active",
+    sort_order: 20,
+    ...offeringAttributes({ applicationRequired: true }),
+  })
+
+  const summer = await ensureProgram(orgId, {
+    organization_id: orgId,
+    department_id: youth.id,
+    name: "Summer Adventure Camp",
+    subtitle: "Outdoor weeks for ages 6–14",
+    description: taggedDescription(
+      "A day camp with hiking, crafts, and neighborhood field trips."
+    ),
+    program_kind: "seasonal",
+    program_type: "youth",
+    status: "active",
+    visibility: "public",
+    start_date: "2027-06-08",
+    end_date: "2027-07-31",
+    gender: "All",
+    min_age: 6,
+    max_age: 14,
+    require_guardian: true,
+    require_emergency_contact: true,
+    full_program_registration_enabled: true,
+    session_registration_enabled: true,
+    capacity: 0,
+    enrolled: 0,
+    waitlist: 0,
+  })
+  const summerOffering = await ensureOffering(orgId, summer.id, {
+    organization_id: orgId,
+    program_id: summer.id,
+    name: "Summer Adventure Camp",
+    is_default: true,
+    offering_type: "summer",
+    start_date: "2027-06-08",
+    end_date: "2027-07-31",
+    status: "active",
+    sort_order: 10,
+    ...offeringAttributes({ applicationRequired: false }),
+  })
+
+  const winter = await ensureProgram(orgId, {
+    organization_id: orgId,
+    department_id: youth.id,
+    name: "Winter Break Camp",
+    subtitle: "Holiday week for ages 6–12",
+    description: taggedDescription(
+      "Indoor games, cooking, and community service during winter break."
+    ),
+    program_kind: "seasonal",
+    program_type: "youth",
+    status: "active",
+    visibility: "public",
+    start_date: "2026-12-21",
+    end_date: "2027-01-02",
+    gender: "All",
+    min_age: 6,
+    max_age: 12,
+    require_guardian: true,
+    require_emergency_contact: true,
+    full_program_registration_enabled: true,
+    session_registration_enabled: false,
+    capacity: 0,
+    enrolled: 0,
+    waitlist: 0,
+  })
+  const winterOffering = await ensureOffering(orgId, winter.id, {
+    organization_id: orgId,
+    program_id: winter.id,
+    name: "Winter Break Camp",
+    is_default: true,
+    offering_type: "season",
+    start_date: "2026-12-21",
+    end_date: "2027-01-02",
+    status: "active",
+    sort_order: 10,
+    ...offeringAttributes({ applicationRequired: false }),
+  })
+
+  for (const row of [
+    [scholars.id, fallOffering.id],
+    [scholars.id, springOffering.id],
+    [summer.id, summerOffering.id],
+    [winter.id, winterOffering.id],
+  ]) {
+    await ensureRegistrationOption(orgId, row[0], row[1])
+  }
+
+  const eventType = await ensureEventType(orgId, {
+    name: "Community Gathering",
+    slug: "community-gathering",
+    description: "Public-facing community events for Horizon demo data.",
+  })
+
+  const volunteerDay = await ensureEvent(orgId, {
+    organization_id: orgId,
+    department_id: community.id,
+    event_type_id: eventType.id,
+    name: "Horizon Volunteer Day",
+    description: taggedDescription(
+      "Neighbors help with park cleanup, donation sorting, and welcome tables."
+    ),
+    status: "scheduled",
+    start_at: "2026-09-12T14:00:00.000Z",
+    end_at: "2026-09-12T18:00:00.000Z",
+    timezone: "America/Chicago",
+    location_type: "external",
+    location_label: "Riverside Park Pavilion",
+    location_address: "1400 Lakeshore Blvd, Austin, TX 78701",
+    requires_volunteers: true,
+  })
+  const familyNight = await ensureEvent(orgId, {
+    organization_id: orgId,
+    department_id: youth.id,
+    event_type_id: eventType.id,
+    name: "Family Welcome Night",
+    description: taggedDescription(
+      "Meet Youth Programs staff and preview fall tutoring and STEM lab offerings."
+    ),
+    status: "scheduled",
+    start_at: "2026-10-02T23:00:00.000Z",
+    end_at: "2026-10-03T01:00:00.000Z",
+    timezone: "America/Chicago",
+    location_type: "online",
+    location_label: "Online",
+    requires_childcare: false,
+  })
+
+  return {
+    departments: [youth.name, community.name],
+    programs: [scholars.name, summer.name, winter.name],
+    offerings: [
+      fallOffering.name,
+      springOffering.name,
+      summerOffering.name,
+      winterOffering.name,
+    ],
+    events: [volunteerDay.name, familyNight.name],
+  }
+}
+
 try {
   const org = await resolveHorizonOrg()
 
   if (wishlistOnly) {
     const items = await addMissingWishlists(org.id)
     console.log(JSON.stringify({ ok: true, org: org.name, wishlist: items }, null, 2))
+    process.exit(0)
+  }
+
+  if (programsOnly) {
+    if (clean) {
+      await cleanProgramsSeed(org.id)
+      if (cleanOnly) {
+        process.exit(0)
+      }
+    }
+    const programs = await seedPrograms(org.id)
+    console.log(JSON.stringify({ ok: true, org: org.name, ...programs }, null, 2))
     process.exit(0)
   }
 
@@ -922,13 +1360,14 @@ try {
     }
   } else if (existing.length > 0) {
     console.error(
-      "Demo contacts already exist. Run with --clean --execute to reset and re-seed."
+      "Demo contacts already exist. Run with --clean --execute to reset and re-seed, or --programs --execute to add departments/programs/events only."
     )
     process.exit(1)
   }
 
   const result = await seed(org.id)
-  console.log(JSON.stringify({ ok: true, org: org.name, ...result }, null, 2))
+  const programs = await seedPrograms(org.id)
+  console.log(JSON.stringify({ ok: true, org: org.name, ...result, ...programs }, null, 2))
 } catch (error) {
   console.error(error instanceof Error ? error.message : error)
   process.exit(1)

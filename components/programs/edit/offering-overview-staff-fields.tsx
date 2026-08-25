@@ -22,6 +22,7 @@ import {
   searchProgramStaffContactsAction,
 } from "@/lib/programs/program-staff-assignment-actions"
 import type { StaffEligibleContact } from "@/lib/programs/program-staff-assignment-queries"
+import { pickPrimaryInstructorAssignment } from "@/lib/programs/primary-instructor"
 import {
   OFFERING_STAFF_ROLE_OPTIONS,
   PROGRAM_STAFF_ASSIGNMENT_ROLE_LABELS,
@@ -202,13 +203,9 @@ export function OfferingOverviewStaffFields({
     }
   }
 
-  const primaryInstructor = assignments.find(
-    (item) =>
-      item.assignment_role === "primary_instructor" && !item.session_id
-  )
+  const primaryInstructor = pickPrimaryInstructorAssignment(assignments)
   const additionalStaff = assignments.filter(
-    (item) =>
-      !(item.assignment_role === "primary_instructor" && !item.session_id)
+    (item) => item.id !== primaryInstructor?.id
   )
 
   async function handlePendingAdditionalSave(): Promise<boolean> {

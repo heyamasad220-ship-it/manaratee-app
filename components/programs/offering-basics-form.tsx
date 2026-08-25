@@ -276,6 +276,12 @@ export function OfferingBasicsForm({
                   {staff.full_name || staff.email || "Unnamed contact"}
                 </option>
               ))}
+              {values.primaryInstructorId &&
+              !staffOptions.some((staff) => staff.id === values.primaryInstructorId) ? (
+                <option value={values.primaryInstructorId}>
+                  Current instructor
+                </option>
+              ) : null}
             </select>
             {departmentId ? (
               <p className="text-xs text-muted-foreground">

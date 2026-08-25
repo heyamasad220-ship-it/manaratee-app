@@ -137,3 +137,72 @@ export function formatOfferingScheduleSummary(
   if (!lines) return null
   return [lines.days, lines.time, lines.location].filter(Boolean).join(" · ")
 }
+
+const DAY_SHORT: Record<string, string> = {
+  monday: "Mon",
+  tuesday: "Tue",
+  wednesday: "Wed",
+  thursday: "Thu",
+  friday: "Fri",
+  saturday: "Sat",
+  sunday: "Sun",
+}
+
+function formatTimeClockSpaced(value: string | null | undefined) {
+  if (!value) return ""
+  const match = /^(\d{1,2}):(\d{2})/.exec(String(value).trim())
+  if (!match) return String(value)
+  const hour = Number(match[1])
+  const minute = Number(match[2])
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return String(value)
+  const period = hour >= 12 ? "PM" : "AM"
+  const hour12 = hour % 12 || 12
+  return `${hour12}:${String(minute).padStart(2, "0")} ${period}`
+}
+
+/**
+ * Compact admin-table schedule, e.g. `Sun · 10:00 AM–2:00 PM` or `Tue/Thu · 10:00 AM–12:00 PM`.
+ */
+export function formatOfferingScheduleCompact(
+  items: Array<{
+    day_of_week?: string | null
+    start_time?: string | null
+    end_time?: string | null
+  }>
+): string | null {
+  if (!items.length) return null
+
+  const days = [
+    ...new Set(
+      items
+        .map((item) => String(item.day_of_week || "").toLowerCase())
+        .filter((day) => Boolean(DAY_SHORT[day]))
+    ),
+  ].sort((a, b) => (DAY_ORDER[a] || 99) - (DAY_ORDER[b] || 99))
+
+  const dayLabel =
+    days.length === 0 ? null : days.map((day) => DAY_SHORT[day]).join("/")
+
+  const timeRanges = [
+    ...new Set(
+      items
+        .map((item) => {
+          const start = formatTimeClockSpaced(item.start_time)
+          const end = formatTimeClockSpaced(item.end_time)
+          if (!start || !end) return ""
+          return `${start}–${end}`
+        })
+        .filter(Boolean)
+    ),
+  ]
+  const timeLabel =
+    timeRanges.length === 0
+      ? null
+      : timeRanges.length === 1
+        ? timeRanges[0]
+        : timeRanges.join(", ")
+
+  if (!dayLabel && !timeLabel) return null
+  if (dayLabel && timeLabel) return `${dayLabel} · ${timeLabel}`
+  return dayLabel || timeLabel
+}

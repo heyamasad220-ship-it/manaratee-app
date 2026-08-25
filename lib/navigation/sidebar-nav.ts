@@ -343,14 +343,19 @@ export function buildNavigationTrail(
     return trailingSegments.length > 0 ? [...trail, ...trailingSegments] : trail
   }
 
-  const activeModule = findActiveModuleWithChildren(
-    navItems,
-    pathname,
-    profileListSegment,
-    searchParams
-  )
+  const activeModule =
+    findActiveModuleWithChildren(
+      navItems,
+      pathname,
+      profileListSegment,
+      searchParams
+    ) ??
+    navItems.find((item) =>
+      isItemActive(item, pathname, navItems, profileListSegment, searchParams)
+    ) ??
+    null
 
-  if (!activeModule?.children?.length) {
+  if (!activeModule) {
     trail.push({ label: getReturnToLabel(pathname), href: pathname })
     if (trailingSegments.length > 0) {
       trail.push(...trailingSegments)
@@ -363,6 +368,21 @@ export function buildNavigationTrail(
     href: activeModule.href,
     module: activeModule,
   })
+
+  if (!activeModule.children?.length) {
+    if (trailingSegments.length > 0) {
+      trail.push(...trailingSegments)
+      return trail
+    }
+    const moduleHome = pathnameFromHref(activeModule.href)
+    const pageLabel = getReturnToLabel(pathname)
+    if (pathname !== moduleHome) {
+      trail.push({ label: pageLabel })
+    } else if (pageLabel !== activeModule.label) {
+      trail.push({ label: pageLabel })
+    }
+    return trail
+  }
 
   const match = findDeepestSubItemMatch(
     activeModule.children,

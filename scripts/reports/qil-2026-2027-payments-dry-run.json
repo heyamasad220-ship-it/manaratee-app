@@ -1,0 +1,1264 @@
+{
+  "importTag": "QIL_2026_27_PAYMENTS_V1",
+  "mode": "dry-run",
+  "generatedAt": "2026-08-24T22:38:55.866Z",
+  "totals": {
+    "csvRows": 63,
+    "succeeded": 59,
+    "refunded": 4,
+    "enrollments": 59,
+    "cancelled": 3,
+    "active": 56,
+    "netCollected": 7700,
+    "csvNet": 7700
+  },
+  "nameFixes": [],
+  "ambiguous": [
+    {
+      "memberName": "Birlanti abdalhamid Alsawfta",
+      "chosen": "Recitation Improvement",
+      "alternatives": [
+        "Tajweed (Osool)"
+      ],
+      "reason": "Tajweed & Recitation"
+    },
+    {
+      "memberName": "Soumia B Bouhlal",
+      "chosen": "Recitation Improvement",
+      "alternatives": [
+        "Tajweed (Beginner)"
+      ],
+      "reason": "Tajweed & Recitation"
+    },
+    {
+      "memberName": "Hanan Dabaja",
+      "chosen": "Recitation Improvement",
+      "alternatives": [
+        "Tajweed (Beginner)"
+      ],
+      "reason": "Tajweed & Recitation"
+    },
+    {
+      "memberName": "Sana Hamdan",
+      "chosen": "Recitation Improvement",
+      "alternatives": [
+        "Tajweed (Advanced)"
+      ],
+      "reason": "Tajweed & Recitation"
+    }
+  ],
+  "unmatchedMembers": [],
+  "unmatchedOfferings": [],
+  "payerCreates": [],
+  "enrollments": [
+    {
+      "student": "Narmeen Alfahal",
+      "matchedContact": "Narmeen Alfahal",
+      "payer": "Narmeen Alfahal",
+      "offering": "Tajweed (Advanced)",
+      "originalFee": 450,
+      "assistedFee": 450,
+      "amountPaid": 50,
+      "remaining": 400,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 50,
+          "date": "2026-08-24",
+          "txn": "ch_3U853tHFcF18bCZG0DNVdkai"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Heba El Manawy",
+      "matchedContact": "Heba El Manawy",
+      "payer": "Heba El Manawy",
+      "offering": "Memorization (Surat Al-Baqara)",
+      "originalFee": 225,
+      "assistedFee": 0,
+      "amountPaid": 0,
+      "remaining": 0,
+      "cancelled": true,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 200,
+          "date": "2026-07-01",
+          "txn": "ch_3ToVa7HFcF18bCZG0q4DsX2U"
+        }
+      ],
+      "refunds": [
+        {
+          "amount": 200,
+          "date": "2026-08-24",
+          "txn": "ch_3ToVa7HFcF18bCZG0q4DsX2U"
+        }
+      ]
+    },
+    {
+      "student": "Madihah Ahmed",
+      "matchedContact": "Madihah Ahmed",
+      "payer": "Madihah Ahmed",
+      "offering": "Recitation Improvement",
+      "originalFee": 450,
+      "assistedFee": 0,
+      "amountPaid": 0,
+      "remaining": 0,
+      "cancelled": true,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 50,
+          "date": "2026-08-21",
+          "txn": "ch_3U71ExHFcF18bCZG1EfFu5Ud"
+        }
+      ],
+      "refunds": [
+        {
+          "amount": 50,
+          "date": "2026-08-24",
+          "txn": "ch_3U71ExHFcF18bCZG1EfFu5Ud"
+        }
+      ]
+    },
+    {
+      "student": "Abeer Zoubi",
+      "matchedContact": "Abeer Zoubi",
+      "payer": "Abeer Zoubi",
+      "offering": "Memorization (Surat Al-Omran)",
+      "originalFee": 225,
+      "assistedFee": 225,
+      "amountPaid": 25,
+      "remaining": 200,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 25,
+          "date": "2026-08-24",
+          "txn": "ch_3U7mmJHFcF18bCZG1crKXr71"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Rowaida M Ramadan",
+      "matchedContact": "Rowaida M Ramadan",
+      "payer": "Rowaida M Ramadan",
+      "offering": "Recitation Improvement",
+      "originalFee": 450,
+      "assistedFee": 450,
+      "amountPaid": 450,
+      "remaining": 0,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 450,
+          "date": "2026-08-22",
+          "txn": "ch_3U7IXmHFcF18bCZG0TUWcmVg"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Malak Ahmed Hmimy",
+      "matchedContact": "Malak Ahmed Hmimy",
+      "payer": "Rowaida M Ramadan",
+      "offering": "Al Nouraniyyeh",
+      "originalFee": 450,
+      "assistedFee": 450,
+      "amountPaid": 450,
+      "remaining": 0,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 450,
+          "date": "2026-08-22",
+          "txn": "ch_3U7IXmHFcF18bCZG0TUWcmVg"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Wessam Abuelfarah",
+      "matchedContact": "Wessam Abuelfarah",
+      "payer": "Wessam Abuelfarah",
+      "offering": "Memorization (Yusif - Annahl)",
+      "originalFee": 450,
+      "assistedFee": 450,
+      "amountPaid": 50,
+      "remaining": 400,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 50,
+          "date": "2026-08-21",
+          "txn": "ch_3U6vO1HFcF18bCZG0XpBzci8"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Wafa Manasrah",
+      "matchedContact": "Wafa Manasrah",
+      "payer": "Wafa Manasrah",
+      "offering": "Recitation Improvement",
+      "originalFee": 450,
+      "assistedFee": 450,
+      "amountPaid": 50,
+      "remaining": 400,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 50,
+          "date": "2026-08-19",
+          "txn": "ch_3U68ZuHFcF18bCZG0rBFODxd"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Rawya Tawfig",
+      "matchedContact": "Rawya Tawfig",
+      "payer": "Rawya Tawfig",
+      "offering": "Tajweed (Osool)",
+      "originalFee": 450,
+      "assistedFee": 450,
+      "amountPaid": 50,
+      "remaining": 400,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 50,
+          "date": "2026-08-19",
+          "txn": "ch_3U5xghHFcF18bCZG04qnsaeJ"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Birlanti abdalhamid Alsawfta",
+      "matchedContact": "Birlanti abdalhamid Alsawfta",
+      "payer": "Birlanti abdalhamid Alsawfta",
+      "offering": "Recitation Improvement",
+      "originalFee": 450,
+      "assistedFee": 450,
+      "amountPaid": 50,
+      "remaining": 400,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 50,
+          "date": "2026-08-18",
+          "txn": "ch_3U5dVhHFcF18bCZG0i6ecFK1"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Soumia B Bouhlal",
+      "matchedContact": "Soumia B Bouhlal",
+      "payer": "Soumia B Bouhlal",
+      "offering": "Recitation Improvement",
+      "originalFee": 450,
+      "assistedFee": 450,
+      "amountPaid": 50,
+      "remaining": 400,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 50,
+          "date": "2026-08-17",
+          "txn": "ch_3U5YhFHFcF18bCZG1NvLHkUd"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Tonazzina Zaman",
+      "matchedContact": "Tonazzina Zaman",
+      "payer": "Tonazzina Zaman",
+      "offering": "Recitation Improvement",
+      "originalFee": 450,
+      "assistedFee": 450,
+      "amountPaid": 50,
+      "remaining": 400,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 50,
+          "date": "2026-08-17",
+          "txn": "ch_3U5W11HFcF18bCZG1Dhnqyn8"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Farah Dabbura",
+      "matchedContact": "Farah Dabbura",
+      "payer": "Farah Dabbura",
+      "offering": "Preparing for Ijaza",
+      "originalFee": 450,
+      "assistedFee": 450,
+      "amountPaid": 50,
+      "remaining": 400,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 50,
+          "date": "2026-08-17",
+          "txn": "ch_3U5TFgHFcF18bCZG1jHy4D3S"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Nemat Sedeeg Omer",
+      "matchedContact": "Nemat Sedeeg Omer",
+      "payer": "Nemat Sedeeg Omer",
+      "offering": "Memorization (Yusif - Annahl)",
+      "originalFee": 450,
+      "assistedFee": 450,
+      "amountPaid": 50,
+      "remaining": 400,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 50,
+          "date": "2026-08-17",
+          "txn": "ch_3U5TFdHFcF18bCZG06psK8nX"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Hanan Dabaja",
+      "matchedContact": "Hanan Dabaja",
+      "payer": "Hanan Dabaja",
+      "offering": "Recitation Improvement",
+      "originalFee": 450,
+      "assistedFee": 450,
+      "amountPaid": 50,
+      "remaining": 400,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 50,
+          "date": "2026-08-17",
+          "txn": "ch_3U5TFZHFcF18bCZG0OsmR8RB"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Hiba Ayed Hurani",
+      "matchedContact": "Hiba Ayed Hurani",
+      "payer": "Hiba Ayed Hurani",
+      "offering": "Tajweed (Beginner)",
+      "originalFee": 450,
+      "assistedFee": 450,
+      "amountPaid": 50,
+      "remaining": 400,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 50,
+          "date": "2026-08-17",
+          "txn": "py_3U5TFVHFcF18bCZG1960VEid"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Heba Jandali",
+      "matchedContact": "Heba Jandali",
+      "payer": "Heba Jandali",
+      "offering": "Tajweed Level 1 (Non-Arabic Speaking)",
+      "originalFee": 450,
+      "assistedFee": 450,
+      "amountPaid": 50,
+      "remaining": 400,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 50,
+          "date": "2026-08-17",
+          "txn": "ch_3U5TFUHFcF18bCZG0PWEV5YD"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Sarah Yousif",
+      "matchedContact": "Sarah Yousif",
+      "payer": "Sarah Yousif",
+      "offering": "Memorization (Yusif - Annahl)",
+      "originalFee": 450,
+      "assistedFee": 450,
+      "amountPaid": 50,
+      "remaining": 400,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 50,
+          "date": "2026-08-17",
+          "txn": "ch_3U5TFSHFcF18bCZG1RMSr3Wz"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Nuha Aldaqqa",
+      "matchedContact": "Nuha Aldaqqa",
+      "payer": "Nuha Aldaqqa",
+      "offering": "Recitation Improvement",
+      "originalFee": 450,
+      "assistedFee": 450,
+      "amountPaid": 50,
+      "remaining": 400,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 50,
+          "date": "2026-08-17",
+          "txn": "ch_3U5TFQHFcF18bCZG0kKIMqNb"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Uzma Shekha",
+      "matchedContact": "Uzma Shekha",
+      "payer": "Uzma Shekha",
+      "offering": "Tajweed Level 1 (Non-Arabic Speaking)",
+      "originalFee": 450,
+      "assistedFee": 450,
+      "amountPaid": 50,
+      "remaining": 400,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 50,
+          "date": "2026-08-17",
+          "txn": "ch_3U5TFOHFcF18bCZG0kcsPfSK"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Noha Abdellatif",
+      "matchedContact": "Noha Abdellatif",
+      "payer": "Noha Abdellatif",
+      "offering": "Memorization (Yusif - Annahl)",
+      "originalFee": 450,
+      "assistedFee": 450,
+      "amountPaid": 50,
+      "remaining": 400,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 50,
+          "date": "2026-08-17",
+          "txn": "ch_3U5TFMHFcF18bCZG1QMiwYcF"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Ola AlKhousi",
+      "matchedContact": "Ola AlKhousi",
+      "payer": "Ola AlKhousi",
+      "offering": "Recitation Improvement",
+      "originalFee": 450,
+      "assistedFee": 450,
+      "amountPaid": 50,
+      "remaining": 400,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 50,
+          "date": "2026-08-17",
+          "txn": "ch_3U5TFLHFcF18bCZG1hVEftNN"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Sana Hamdan",
+      "matchedContact": "Sana Hamdan",
+      "payer": "Sana Hamdan",
+      "offering": "Recitation Improvement",
+      "originalFee": 450,
+      "assistedFee": 450,
+      "amountPaid": 50,
+      "remaining": 400,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 50,
+          "date": "2026-08-17",
+          "txn": "ch_3U5TFFHFcF18bCZG0LmAwtgs"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Noha Abdellatif",
+      "matchedContact": "Noha Abdellatif",
+      "payer": "Noha Abdellatif",
+      "offering": "Tajweed (Osool)",
+      "originalFee": 450,
+      "assistedFee": 450,
+      "amountPaid": 50,
+      "remaining": 400,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 50,
+          "date": "2026-08-17",
+          "txn": "ch_3U5TFEHFcF18bCZG1Jd3Iss4"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Raddwa Sayed Abdalla",
+      "matchedContact": "Raddwa Sayed Abdalla",
+      "payer": "Raddwa Sayed Abdalla",
+      "offering": "Recitation Improvement",
+      "originalFee": 450,
+      "assistedFee": 450,
+      "amountPaid": 50,
+      "remaining": 400,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 50,
+          "date": "2026-08-17",
+          "txn": "ch_3U5TFCHFcF18bCZG0cR0ZjBA"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Yasmeen Maligeli",
+      "matchedContact": "Yasmeen Maligeli",
+      "payer": "Yasmeen Maligeli",
+      "offering": "Recitation Improvement",
+      "originalFee": 450,
+      "assistedFee": 450,
+      "amountPaid": 50,
+      "remaining": 400,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 50,
+          "date": "2026-08-17",
+          "txn": "ch_3U5TFAHFcF18bCZG16LewMpZ"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Nada Saleh",
+      "matchedContact": "Nada Saleh",
+      "payer": "Nada Saleh",
+      "offering": "Memorization (Surat Al-Baqara)",
+      "originalFee": 225,
+      "assistedFee": 225,
+      "amountPaid": 25,
+      "remaining": 200,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 25,
+          "date": "2026-08-17",
+          "txn": "ch_3U5TF9HFcF18bCZG0a76jbPc"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Safa S siddiqui",
+      "matchedContact": "Safa S siddiqui",
+      "payer": "Safa S siddiqui",
+      "offering": "Tajweed Level 1 (Non-Arabic Speaking)",
+      "originalFee": 450,
+      "assistedFee": 450,
+      "amountPaid": 50,
+      "remaining": 400,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 50,
+          "date": "2026-08-17",
+          "txn": "ch_3U5TF7HFcF18bCZG1okojjZf"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Meriem Douma",
+      "matchedContact": "Meriem Douma",
+      "payer": "Meriem Douma",
+      "offering": "Tajweed (Beginner)",
+      "originalFee": 450,
+      "assistedFee": 225,
+      "amountPaid": 25,
+      "remaining": 200,
+      "cancelled": false,
+      "coupon": "STAFF-QIL2627-50",
+      "payments": [
+        {
+          "amount": 25,
+          "date": "2026-08-17",
+          "txn": "ch_3U5TF6HFcF18bCZG18K88pOQ"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Nagham Issa",
+      "matchedContact": "Nagham Issa",
+      "payer": "Nagham Issa",
+      "offering": "Preparing for Ijaza",
+      "originalFee": 450,
+      "assistedFee": 450,
+      "amountPaid": 50,
+      "remaining": 400,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 50,
+          "date": "2026-08-17",
+          "txn": "ch_3U5TF3HFcF18bCZG15XEeGtp"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Ghadeer Zarkani",
+      "matchedContact": "Ghadeer Zarkani",
+      "payer": "Ghadeer Zarkani",
+      "offering": "Recitation Improvement",
+      "originalFee": 450,
+      "assistedFee": 450,
+      "amountPaid": 50,
+      "remaining": 400,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 50,
+          "date": "2026-08-17",
+          "txn": "ch_3U5TF0HFcF18bCZG1r2sCQa5"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "hadeel khuffash",
+      "matchedContact": "hadeel khuffash",
+      "payer": "hadeel khuffash",
+      "offering": "Memorization (Yusif - Annahl)",
+      "originalFee": 450,
+      "assistedFee": 450,
+      "amountPaid": 50,
+      "remaining": 400,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 50,
+          "date": "2026-08-17",
+          "txn": "ch_3U5TEzHFcF18bCZG1zrmQw2u"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Fatema Odeh",
+      "matchedContact": "Fatema Odeh",
+      "payer": "Fatema Odeh",
+      "offering": "Memorization (Surat Al-Omran)",
+      "originalFee": 225,
+      "assistedFee": 225,
+      "amountPaid": 25,
+      "remaining": 200,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 25,
+          "date": "2026-08-17",
+          "txn": "ch_3U5TEqHFcF18bCZG0zlSPiQV"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Leah Antoinette Sen",
+      "matchedContact": "Leah Antoinette Sen",
+      "payer": "Leah Antoinette Sen",
+      "offering": "Recitation Improvement",
+      "originalFee": 450,
+      "assistedFee": 450,
+      "amountPaid": 50,
+      "remaining": 400,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 50,
+          "date": "2026-08-17",
+          "txn": "ch_3U5TEoHFcF18bCZG08jL9lEH"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Ozlem Yurttas",
+      "matchedContact": "Ozlem Yurttas",
+      "payer": "Ozlem Yurttas",
+      "offering": "Recitation Improvement",
+      "originalFee": 450,
+      "assistedFee": 450,
+      "amountPaid": 50,
+      "remaining": 400,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 50,
+          "date": "2026-08-17",
+          "txn": "ch_3U5TEmHFcF18bCZG1Oui8rkP"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Anum Zeeshan",
+      "matchedContact": "Anum Zeeshan",
+      "payer": "Anum Zeeshan",
+      "offering": "Recitation Improvement",
+      "originalFee": 450,
+      "assistedFee": 450,
+      "amountPaid": 50,
+      "remaining": 400,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 50,
+          "date": "2026-08-17",
+          "txn": "py_3U5TEiHFcF18bCZG1KcPDWvQ"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Sadia Shakeel",
+      "matchedContact": "Sadia Shakeel",
+      "payer": "Sadia Shakeel",
+      "offering": "Recitation Improvement",
+      "originalFee": 450,
+      "assistedFee": 450,
+      "amountPaid": 50,
+      "remaining": 400,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 50,
+          "date": "2026-08-17",
+          "txn": "ch_3U5TDxHFcF18bCZG1ifX2CiS"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Ghada Abofarag",
+      "matchedContact": "Ghada Abofarag",
+      "payer": "Ghada Abofarag",
+      "offering": "Tajweed (Advanced)",
+      "originalFee": 450,
+      "assistedFee": 450,
+      "amountPaid": 50,
+      "remaining": 400,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 50,
+          "date": "2026-08-17",
+          "txn": "ch_3U5TDOHFcF18bCZG1SvzlPrg"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Reda Hussain Elkomy",
+      "matchedContact": "Reda Hussain Elkomy",
+      "payer": "Reda Hussain Elkomy",
+      "offering": "Tajweed (Beginner)",
+      "originalFee": 450,
+      "assistedFee": 0,
+      "amountPaid": 0,
+      "remaining": 0,
+      "cancelled": false,
+      "coupon": "FA-QIL2627-100",
+      "payments": [
+        {
+          "amount": 0,
+          "date": "2026-08-17",
+          "txn": ""
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "wafa yerrou",
+      "matchedContact": "wafa yerrou",
+      "payer": "wafa yerrou",
+      "offering": "Memorization (Surat Al-Omran)",
+      "originalFee": 225,
+      "assistedFee": 200,
+      "amountPaid": 200,
+      "remaining": 0,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 200,
+          "date": "2026-08-17",
+          "txn": "ch_3U5PaJHFcF18bCZG0MivQBcX"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Israa Alaomairi",
+      "matchedContact": "Israa Alaomairi",
+      "payer": "Sarfraz Amin",
+      "offering": "Preparing for Ijaza",
+      "originalFee": 450,
+      "assistedFee": 400,
+      "amountPaid": 400,
+      "remaining": 0,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 400,
+          "date": "2026-08-17",
+          "txn": "ch_3U5H8xHFcF18bCZG0daZ9rpL"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Asmaa Ali",
+      "matchedContact": "Asmaa Ali",
+      "payer": "Asmaa Ali",
+      "offering": "Tajweed (Osool)",
+      "originalFee": 450,
+      "assistedFee": 0,
+      "amountPaid": 0,
+      "remaining": 0,
+      "cancelled": false,
+      "coupon": "FA-QIL2627-100",
+      "payments": [
+        {
+          "amount": 0,
+          "date": "2026-08-16",
+          "txn": ""
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Mona Alnaeemi",
+      "matchedContact": "Mona Alnaeemi",
+      "payer": "Mona Alnaeemi",
+      "offering": "Memorization (Surat Al-Omran)",
+      "originalFee": 225,
+      "assistedFee": 200,
+      "amountPaid": 200,
+      "remaining": 0,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 200,
+          "date": "2026-08-14",
+          "txn": "ch_3U4BmLHFcF18bCZG0hprE0kh"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Anhar Ahmed",
+      "matchedContact": "Anhar Ahmed",
+      "payer": "Hanan Ahmed",
+      "offering": "Recitation Improvement",
+      "originalFee": 450,
+      "assistedFee": 0,
+      "amountPaid": 0,
+      "remaining": 0,
+      "cancelled": true,
+      "coupon": "STAFF-QIL2627-50",
+      "payments": [
+        {
+          "amount": 175,
+          "date": "2026-08-12",
+          "txn": "ch_3U3SrVHFcF18bCZG1oshlxnp"
+        }
+      ],
+      "refunds": [
+        {
+          "amount": 175,
+          "date": "2026-08-13",
+          "txn": "ch_3U3SrVHFcF18bCZG1oshlxnp"
+        }
+      ]
+    },
+    {
+      "student": "Zainab Irshaid",
+      "matchedContact": "Zainab Irshaid",
+      "payer": "Zainab Irshaid",
+      "offering": "Memorization (Surat Al-Baqara)",
+      "originalFee": 225,
+      "assistedFee": 200,
+      "amountPaid": 200,
+      "remaining": 0,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 200,
+          "date": "2026-08-10",
+          "txn": "ch_3U2uLYHFcF18bCZG0kfCMAhU"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Zainab Irshaid",
+      "matchedContact": "Zainab Irshaid",
+      "payer": "Zainab Irshaid",
+      "offering": "Preparing for Ijaza",
+      "originalFee": 450,
+      "assistedFee": 400,
+      "amountPaid": 400,
+      "remaining": 0,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 400,
+          "date": "2026-08-10",
+          "txn": "ch_3U2uJzHFcF18bCZG1Sox8bih"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Marwa Taissir Elgamal",
+      "matchedContact": "Marwa Taissir Elgamal",
+      "payer": "Marwa Taissir Elgamal",
+      "offering": "Tajweed (Osool)",
+      "originalFee": 450,
+      "assistedFee": 400,
+      "amountPaid": 400,
+      "remaining": 0,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 400,
+          "date": "2026-08-09",
+          "txn": "ch_3U2Y2KHFcF18bCZG0RX7WA0T"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Nagham Issa",
+      "matchedContact": "Nagham Issa",
+      "payer": "Nagham Issa",
+      "offering": "Memorization (Surat Al-Baqara)",
+      "originalFee": 225,
+      "assistedFee": 200,
+      "amountPaid": 200,
+      "remaining": 0,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 200,
+          "date": "2026-08-08",
+          "txn": "ch_3U2DHjHFcF18bCZG0AdcZINo"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Heba Hassan",
+      "matchedContact": "Heba Hassan",
+      "payer": "Heba Hassan",
+      "offering": "Memorization (Surat Al-Baqara)",
+      "originalFee": 225,
+      "assistedFee": 200,
+      "amountPaid": 200,
+      "remaining": 0,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 200,
+          "date": "2026-08-08",
+          "txn": "ch_3U2AOhHFcF18bCZG1aQleElE"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Enas Elsaegh",
+      "matchedContact": "Enas Elsaegh",
+      "payer": "Enas Elsaegh",
+      "offering": "Memorization (Surat Al-Omran)",
+      "originalFee": 225,
+      "assistedFee": 200,
+      "amountPaid": 200,
+      "remaining": 0,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 200,
+          "date": "2026-08-06",
+          "txn": "ch_3U1UX6HFcF18bCZG0b8Nvv7u"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "NoorElaine Abushaaban",
+      "matchedContact": "NoorElaine Abushaaban",
+      "payer": "NoorElaine Abushaaban",
+      "offering": "Recitation Improvement",
+      "originalFee": 450,
+      "assistedFee": 400,
+      "amountPaid": 400,
+      "remaining": 0,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 400,
+          "date": "2026-08-02",
+          "txn": "ch_3Tzo7LHFcF18bCZG1iAXyx1z"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Iman Elghandour",
+      "matchedContact": "Iman Elghandour",
+      "payer": "Iman Elghandour",
+      "offering": "Tajweed (Osool)",
+      "originalFee": 450,
+      "assistedFee": 400,
+      "amountPaid": 400,
+      "remaining": 0,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 400,
+          "date": "2026-07-24",
+          "txn": "ch_3Twj3NHFcF18bCZG1qS1odNh"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Heba El Manawy",
+      "matchedContact": "Heba El Manawy",
+      "payer": "Heba El Manawy",
+      "offering": "Tajweed (Osool)",
+      "originalFee": 450,
+      "assistedFee": 400,
+      "amountPaid": 400,
+      "remaining": 0,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 400,
+          "date": "2026-07-01",
+          "txn": "ch_3ToVZCHFcF18bCZG0vm8glj7"
+        },
+        {
+          "amount": 400,
+          "date": "2026-06-12",
+          "txn": "ch_3ThbJrHFcF18bCZG1cFak1WF"
+        }
+      ],
+      "refunds": [
+        {
+          "amount": 400,
+          "date": "2026-06-12",
+          "txn": "ch_3ThbJrHFcF18bCZG1cFak1WF"
+        }
+      ]
+    },
+    {
+      "student": "Imene Latreche",
+      "matchedContact": "Imene Latreche",
+      "payer": "Imene Latreche",
+      "offering": "Memorization (Surat Al-Omran)",
+      "originalFee": 225,
+      "assistedFee": 200,
+      "amountPaid": 200,
+      "remaining": 0,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 200,
+          "date": "2026-06-22",
+          "txn": "ch_3TkzKYHFcF18bCZG0bCIcVBJ"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Beyza Sahin",
+      "matchedContact": "Beyza Sahin",
+      "payer": "Beyza Sahin",
+      "offering": "Recitation Improvement",
+      "originalFee": 450,
+      "assistedFee": 400,
+      "amountPaid": 400,
+      "remaining": 0,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 400,
+          "date": "2026-06-16",
+          "txn": "ch_3Tj1BGHFcF18bCZG0nWRX5hD"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Iman Ettabaq",
+      "matchedContact": "Iman Ettabaq",
+      "payer": "Iman Ettabaq",
+      "offering": "Memorization (Surat Al-Omran)",
+      "originalFee": 225,
+      "assistedFee": 200,
+      "amountPaid": 200,
+      "remaining": 0,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 200,
+          "date": "2026-06-16",
+          "txn": "ch_3TizcZHFcF18bCZG0DbyWNpe"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Soumia B Bouhlal",
+      "matchedContact": "Soumia B Bouhlal",
+      "payer": "Soumia B Bouhlal",
+      "offering": "Memorization (Surat Al-Omran)",
+      "originalFee": 225,
+      "assistedFee": 200,
+      "amountPaid": 200,
+      "remaining": 0,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 200,
+          "date": "2026-06-16",
+          "txn": "ch_3TiwUbHFcF18bCZG1KGPL0ic"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Sara Kenana",
+      "matchedContact": "Sara Kenana",
+      "payer": "Sara Kenana",
+      "offering": "Tajweed (Osool)",
+      "originalFee": 450,
+      "assistedFee": 400,
+      "amountPaid": 400,
+      "remaining": 0,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 400,
+          "date": "2026-06-11",
+          "txn": "ch_3Th7lVHFcF18bCZG0f3K8CUH"
+        }
+      ],
+      "refunds": []
+    },
+    {
+      "student": "Sara Kenana",
+      "matchedContact": "Sara Kenana",
+      "payer": "Sara Kenana",
+      "offering": "Memorization (Surat Al-Omran)",
+      "originalFee": 225,
+      "assistedFee": 200,
+      "amountPaid": 200,
+      "remaining": 0,
+      "cancelled": false,
+      "coupon": null,
+      "payments": [
+        {
+          "amount": 200,
+          "date": "2026-06-11",
+          "txn": "ch_3Th7k5HFcF18bCZG1NOzhed4"
+        }
+      ],
+      "refunds": []
+    }
+  ]
+}

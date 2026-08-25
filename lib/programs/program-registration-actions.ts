@@ -19,7 +19,11 @@ import {
   verifyParticipantPersonInRegistrantFamily,
 } from "@/lib/programs/registration-contact-resolver"
 import { userHasActiveMembership } from "@/lib/memberships/membership-queries"
-import { isProgramPublishedForRegistration } from "@/lib/programs/program-enrollment-availability"
+import { enrollmentStatusForSeatActivation, normalizeSeatActivationRule } from "@/lib/programs/enrollment-process"
+import {
+  isEnrollmentWindowOpen,
+  isProgramPublishedForRegistration,
+} from "@/lib/programs/program-enrollment-availability"
 import { isOfferingEnrollmentOpenForProgram } from "@/lib/programs/program-offering-display"
 import { shouldWaitlistForFullCampPriority } from "@/lib/programs/session-package-priority"
 
@@ -301,6 +305,15 @@ async function registerSingleParticipant(input: {
       enrollmentId: result.enrollment_id,
       context: "register_for_program",
     })
+    await finalizeEnrollmentAfterRegistration({
+      supabase: input.supabase,
+      organizationId: input.organizationId,
+      programId: input.programId,
+      offeringId: input.offeringId,
+      enrollmentId: result.enrollment_id,
+      participantContactId: input.participant.participantContactId,
+      participantPersonId: input.participant.participantPersonId,
+    })
   }
 
   if (result.mode === "waitlist" && result.waitlist_id) {
@@ -312,6 +325,81 @@ async function registerSingleParticipant(input: {
   }
 
   return result
+}
+
+async function finalizeEnrollmentAfterRegistration(input: {
+  supabase: Awaited<ReturnType<typeof createClient>>
+  organizationId: string
+  programId: string
+  offeringId: string
+  enrollmentId: string
+  participantContactId?: string | null
+  participantPersonId?: string | null
+}) {
+  const { data: program } = await input.supabase
+    .from("programs")
+    .select("seat_activation_rule, enrollment_process")
+    .eq("id", input.programId)
+    .eq("organization_id", input.organizationId)
+    .maybeSingle()
+
+  const { data: enrollment } = await input.supabase
+    .from("program_enrollments")
+    .select("id, status, payment_required, total_amount, amount_paid")
+    .eq("id", input.enrollmentId)
+    .eq("organization_id", input.organizationId)
+    .maybeSingle()
+
+  if (enrollment) {
+    const rule = normalizeSeatActivationRule(program?.seat_activation_rule as string | null)
+    const paymentRequired = Boolean(enrollment.payment_required) && Number(enrollment.total_amount || 0) > 0.009
+    const nextStatus = enrollmentStatusForSeatActivation(rule, paymentRequired)
+    const current = String(enrollment.status || "")
+    if (current !== nextStatus && (current === "pending" || current === "pending_payment" || current === "enrolled")) {
+      await input.supabase
+        .from("program_enrollments")
+        .update({ status: nextStatus, updated_at: new Date().toISOString() })
+        .eq("id", input.enrollmentId)
+        .eq("organization_id", input.organizationId)
+    }
+  }
+
+  let applicationQuery = input.supabase
+    .from("program_applications")
+    .select("id")
+    .eq("organization_id", input.organizationId)
+    .eq("program_id", input.programId)
+    .eq("status", "approved")
+    .is("enrollment_id", null)
+    .limit(1)
+
+  if (input.participantContactId) {
+    applicationQuery = applicationQuery.eq(
+      "participant_contact_id",
+      input.participantContactId
+    )
+  }
+
+  const { data: application } = await applicationQuery.maybeSingle()
+  if (!application?.id) return
+
+  await input.supabase
+    .from("program_applications")
+    .update({
+      enrollment_id: input.enrollmentId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", application.id)
+    .eq("organization_id", input.organizationId)
+
+  await input.supabase
+    .from("program_enrollments")
+    .update({
+      application_id: application.id,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", input.enrollmentId)
+    .eq("organization_id", input.organizationId)
 }
 
 export async function registerForProgram(formData: FormData) {
@@ -369,7 +457,24 @@ export async function registerForProgram(formData: FormData) {
       status,
       enrollment_open_date,
       enrollment_close_date,
-      visibility
+      start_date,
+      end_date,
+      program_type,
+      min_age,
+      max_age,
+      min_grade,
+      max_grade,
+      grade_levels,
+      gender,
+      require_guardian,
+      require_grade,
+      require_emergency_contact,
+      enable_waitlist,
+      waitlist_capacity,
+      waitlist_offer_deadline_days,
+      visibility,
+      enrollment_process,
+      seat_activation_rule
     `
     )
     .eq("id", programId)
@@ -400,6 +505,9 @@ export async function registerForProgram(formData: FormData) {
 
   if (!isAdultProgram && customerContact.person_id) {
     for (const participant of participants) {
+      if (!participant.participantPersonId) {
+        redirect(`${redirectBase}?error=invalid-participant`)
+      }
       const isFamilyParticipant = await verifyParticipantPersonInRegistrantFamily(
         {
           organizationId,

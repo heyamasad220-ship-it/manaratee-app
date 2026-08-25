@@ -1,5 +1,11 @@
+import { redirect } from "next/navigation"
+
+import { getDepartmentHeadshipForCurrentUser } from "@/lib/departments/department-access"
 import { requireOrganizationModule } from "@/lib/modules/dashboard-module-access-server"
-import { PERMISSIONS, requireAnyPermission } from "@/lib/permissions/permissions"
+import {
+  hasAnyPermission,
+  PERMISSIONS,
+} from "@/lib/permissions/permissions"
 
 export default async function ProgramsLayout({
   children,
@@ -7,10 +13,17 @@ export default async function ProgramsLayout({
   children: React.ReactNode
 }) {
   await requireOrganizationModule("programs")
-  await requireAnyPermission(
+
+  const canViewPrograms = await hasAnyPermission(
     PERMISSIONS.PROGRAMS_VIEW,
     PERMISSIONS.PROGRAMS_MANAGE
   )
+  if (!canViewPrograms) {
+    const headship = await getDepartmentHeadshipForCurrentUser()
+    if (!headship) {
+      redirect("/unauthorized")
+    }
+  }
 
   return children
 }

@@ -500,7 +500,6 @@ export function ContactFinancialPanel({
   const [detailsPledgeId, setDetailsPledgeId] = useState<string | null>(null)
 
   const loadData = useCallback(async () => {
-    setLoading(true)
     setError(null)
 
     if (isCustomer) {
@@ -545,6 +544,7 @@ export function ContactFinancialPanel({
   ])
 
   useEffect(() => {
+    setLoading(true)
     void loadData()
   }, [loadData, refreshToken])
 

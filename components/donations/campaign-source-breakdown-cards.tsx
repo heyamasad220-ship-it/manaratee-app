@@ -236,7 +236,7 @@ export function CampaignOverviewMetricsTable({
     .filter((row): row is MetricTableRow => Boolean(row))
 
   return (
-    <Card>
+    <Card className="h-full">
       {canCustomize ? (
         <CardHeader className="flex flex-row items-center justify-between space-y-0 px-4 py-3">
           <CardTitle className="text-base font-medium">Overview metrics</CardTitle>

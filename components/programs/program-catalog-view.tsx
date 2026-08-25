@@ -22,7 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { departmentGroupWorkspaceHref } from "@/lib/donations/donation-group-path"
+import { programWorkspaceHref } from "@/lib/programs/program-workspace-path"
 import {
   formatEnrollmentCapacityLabel,
   type ProgramCatalogCapacity,
@@ -53,13 +53,7 @@ import type { Program } from "@/lib/programs/program-types"
 import { cn } from "@/lib/utils"
 
 function programDetailsHref(program: Program) {
-  if (program.department_id) {
-    return departmentGroupWorkspaceHref(program.department_id, {
-      tab: "overview",
-      yearProgramId: program.id,
-    })
-  }
-  return `/programs/${program.id}`
+  return programWorkspaceHref(program.id)
 }
 
 function ProgramStatusBadge({ status }: { status: ProgramStatus }) {

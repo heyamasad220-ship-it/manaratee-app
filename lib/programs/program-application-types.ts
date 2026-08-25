@@ -5,15 +5,35 @@
 
 export type ProgramApplicantType = "returning" | "new"
 export type ProgramApplicationStatus =
+  | "draft"
   | "submitted"
+  | "evaluation_required"
+  | "evaluation_scheduled"
+  | "evaluation_completed"
   | "approved"
+  | "waitlisted"
   | "not_approved"
+  | "declined"
   | "withdrawn"
 export type ProgramApplicationSource = "customer" | "staff"
 
 export type DepartmentApplicationListFilter =
+  | "all"
   | "submitted"
+  | "needs_review"
+  | "evaluation"
+  | "approved"
   | "approved_pending_registration"
+  | "waitlisted"
+  | "declined"
+
+export type ApplicationStatusChip =
+  | "all"
+  | "needs_review"
+  | "evaluation"
+  | "approved"
+  | "waitlisted"
+  | "declined"
 
 /** New-student prior learning path. */
 export type ProgramApplicationPriorBackground =
@@ -42,10 +62,48 @@ export const PROGRAM_APPLICATION_STATUS_LABELS: Record<
   ProgramApplicationStatus,
   string
 > = {
-  submitted: "Pending evaluation",
+  draft: "Draft",
+  submitted: "Needs Review",
+  evaluation_required: "Evaluation Required",
+  evaluation_scheduled: "Evaluation Scheduled",
+  evaluation_completed: "Evaluation Completed",
   approved: "Approved",
-  not_approved: "Not approved",
+  waitlisted: "Waitlisted",
+  not_approved: "Declined",
+  declined: "Declined",
   withdrawn: "Withdrawn",
+}
+
+export const EVALUATION_APPLICATION_STATUSES: ProgramApplicationStatus[] = [
+  "evaluation_required",
+  "evaluation_scheduled",
+  "evaluation_completed",
+]
+
+export const DECLINED_APPLICATION_STATUSES: ProgramApplicationStatus[] = [
+  "not_approved",
+  "declined",
+]
+
+export const NEEDS_REVIEW_APPLICATION_STATUSES: ProgramApplicationStatus[] = [
+  "submitted",
+]
+
+export function applicationStatusChipFor(
+  status: ProgramApplicationStatus | string
+): ApplicationStatusChip | null {
+  if (status === "submitted") return "needs_review"
+  if (
+    status === "evaluation_required" ||
+    status === "evaluation_scheduled" ||
+    status === "evaluation_completed"
+  ) {
+    return "evaluation"
+  }
+  if (status === "approved") return "approved"
+  if (status === "waitlisted") return "waitlisted"
+  if (status === "not_approved" || status === "declined") return "declined"
+  return null
 }
 
 export const PROGRAM_APPLICANT_TYPE_LABELS: Record<

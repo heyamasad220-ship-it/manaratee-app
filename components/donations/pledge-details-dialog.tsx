@@ -281,7 +281,6 @@ export function PledgeDetailsDialog({
       setOrganizationId(await getSelectedOrganizationIdClient())
     })()
     // Re-initialize only when the window opens or the target pledge changes.
-    // After creating a pledge, the parent should pass the new pledgeId.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, pledgeId])
 
@@ -451,8 +450,8 @@ export function PledgeDetailsDialog({
       }
     }
 
+    onOpenChange(false)
     onSaved?.(savedId)
-    await loadExisting(savedId)
     setSaving(false)
   }
 
@@ -482,10 +481,10 @@ export function PledgeDetailsDialog({
             <DialogTitle>Pledge Details</DialogTitle>
             <DialogDescription>
               {isExisting
-                ? "View and manage this pledge, payments, and collection. Use Save at the bottom to keep all changes."
+                ? "View and manage this pledge, payments, and collection. Save closes this window."
                 : convertProspectId
                   ? "Creates one pledge and marks the prospect as Pledged."
-                  : "Create a pledge. Collection fields appear after you save."}
+                  : "Create a pledge. After you save, this window closes. Open the pledge later to record payments or reminders."}
             </DialogDescription>
           </DialogHeader>
 

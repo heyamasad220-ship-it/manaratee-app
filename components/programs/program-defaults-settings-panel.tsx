@@ -12,6 +12,14 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { saveProgramEnrollmentDefaults } from "@/lib/programs/program-detail-actions"
+import {
+  ENROLLMENT_PROCESS_OPTIONS,
+  SEAT_ACTIVATION_OPTIONS,
+  normalizeEnrollmentProcess,
+  normalizeSeatActivationRule,
+  type EnrollmentProcess,
+  type SeatActivationRule,
+} from "@/lib/programs/enrollment-process"
 import { parseProgramAgeBounds } from "@/lib/programs/program-eligibility-display"
 import type { ProgramAudienceType } from "@/lib/programs/program-offering-attributes"
 import type { Program } from "@/lib/programs/program-types"
@@ -89,6 +97,20 @@ export function ProgramDefaultsSettingsPanel({
   const [waitlistCapacity, setWaitlistCapacity] = React.useState(
     program.waitlist_capacity?.toString() ?? ""
   )
+  const [enrollmentProcess, setEnrollmentProcess] =
+    React.useState<EnrollmentProcess>(() =>
+      normalizeEnrollmentProcess(
+        program.enrollment_process,
+        program.program_kind
+      )
+    )
+  const [evaluationRequired, setEvaluationRequired] = React.useState(
+    Boolean(program.evaluation_required)
+  )
+  const [seatActivationRule, setSeatActivationRule] =
+    React.useState<SeatActivationRule>(() =>
+      normalizeSeatActivationRule(program.seat_activation_rule)
+    )
   const [isSaving, setIsSaving] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [success, setSuccess] = React.useState(false)
@@ -111,6 +133,16 @@ export function ProgramDefaultsSettingsPanel({
     )
     setEnableWaitlist(program.enable_waitlist ?? false)
     setWaitlistCapacity(program.waitlist_capacity?.toString() ?? "")
+    setEnrollmentProcess(
+      normalizeEnrollmentProcess(
+        program.enrollment_process,
+        program.program_kind
+      )
+    )
+    setEvaluationRequired(Boolean(program.evaluation_required))
+    setSeatActivationRule(
+      normalizeSeatActivationRule(program.seat_activation_rule)
+    )
   }, [program])
 
   React.useEffect(() => {
@@ -153,6 +185,12 @@ export function ProgramDefaultsSettingsPanel({
       enable_waitlist: enableWaitlist,
       waitlist_capacity:
         waitlistCapacity.trim() === "" ? null : Number(waitlistCapacity),
+      enrollment_process: enrollmentProcess,
+      evaluation_required:
+        enrollmentProcess === "application_approval"
+          ? evaluationRequired
+          : false,
+      seat_activation_rule: seatActivationRule,
     })
 
     setIsSaving(false)
@@ -173,6 +211,89 @@ export function ProgramDefaultsSettingsPanel({
         Existing offerings keep their own values unless they still have inherit
         turned on.
       </div>
+
+      <EditSectionCard
+        title="Enrollment process"
+        description="One registration engine. Application and approval are optional."
+      >
+        <div className="space-y-4">
+          <div className="space-y-2">
+            {ENROLLMENT_PROCESS_OPTIONS.map((option) => (
+              <label
+                key={option.id}
+                className="flex cursor-pointer items-start gap-3 rounded-md border px-3 py-2"
+              >
+                <input
+                  type="radio"
+                  name="enrollment-process"
+                  className="mt-1 size-3.5"
+                  checked={enrollmentProcess === option.id}
+                  onChange={() => setEnrollmentProcess(option.id)}
+                />
+                <span>
+                  <span className="block text-sm font-medium">{option.label}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {option.description}
+                  </span>
+                </span>
+              </label>
+            ))}
+          </div>
+
+          {enrollmentProcess === "application_approval" ? (
+            <div className="flex flex-wrap items-end gap-6 border-t pt-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="defaults-evaluation">Evaluation required</Label>
+                <div className="flex h-9 items-center gap-3">
+                  <Switch
+                    id="defaults-evaluation"
+                    checked={evaluationRequired}
+                    onCheckedChange={setEvaluationRequired}
+                  />
+                  <span className="text-sm text-muted-foreground">
+                    {evaluationRequired ? "Yes" : "No"}
+                  </span>
+                </div>
+                <p className="max-w-xl text-xs text-muted-foreground">
+                  When enabled, applicants must complete an evaluation before
+                  approval.
+                </p>
+              </div>
+            </div>
+          ) : null}
+
+          <div className="space-y-2 border-t pt-4">
+            <Label>When should the participant’s seat become active?</Label>
+            {SEAT_ACTIVATION_OPTIONS.map((option) => (
+              <label
+                key={option.id}
+                className="flex cursor-pointer items-start gap-3 rounded-md border px-3 py-2"
+              >
+                <input
+                  type="radio"
+                  name="seat-activation"
+                  className="mt-1 size-3.5"
+                  checked={seatActivationRule === option.id}
+                  onChange={() => setSeatActivationRule(option.id)}
+                />
+                <span>
+                  <span className="block text-sm font-medium">
+                    {option.label}
+                    {option.recommended ? (
+                      <span className="ml-2 text-xs font-normal text-muted-foreground">
+                        Recommended
+                      </span>
+                    ) : null}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {option.description}
+                  </span>
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
+      </EditSectionCard>
 
       <EditSectionCard
         title="Program dates & enrollment window"

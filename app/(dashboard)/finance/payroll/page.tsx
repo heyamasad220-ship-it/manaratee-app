@@ -1,8 +1,6 @@
-import { Suspense } from "react"
-
 import { Header } from "@/components/layout/header"
 import { FinancePayrollQueuePanel } from "@/components/finance/finance-payroll-queue-panel"
-import { ProgramsReportsNav } from "@/components/programs/programs-reports-nav"
+import { ProgramsStaffSubnav } from "@/components/programs/programs-staff-subnav"
 import { hasPermission, PERMISSIONS } from "@/lib/permissions/permissions"
 import { redirect } from "next/navigation"
 
@@ -16,11 +14,8 @@ export default async function FinancePayrollPage() {
 
   return (
     <>
-      <Header title="Reports" />
-
-      <Suspense fallback={null}>
-        <ProgramsReportsNav />
-      </Suspense>
+      <Header title="Finance" />
+      <ProgramsStaffSubnav secondary="finance" requireProgramsModule />
 
       <div className="flex flex-col gap-6 p-6">
         <div>

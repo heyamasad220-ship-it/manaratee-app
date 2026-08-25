@@ -1,7 +1,6 @@
 "use client"
 
 import * as React from "react"
-import { useRouter, useSearchParams } from "next/navigation"
 import { Loader2 } from "lucide-react"
 
 import { ProgramDefaultsSettingsPanel } from "@/components/programs/program-defaults-settings-panel"
@@ -20,7 +19,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { departmentGroupWorkspaceHref } from "@/lib/donations/donation-group-path"
 import { getSelectedOrganizationIdClient } from "@/lib/organizations/get-selected-organization-id-client"
 import { getHierarchyLabels } from "@/lib/programs/program-display-labels"
 import { normalizeProgramKind } from "@/lib/programs/program-kind"
@@ -40,10 +38,7 @@ export function DepartmentYearDefaultsSettingsPanel({
 }: {
   departmentId: string
 }) {
-  const router = useRouter()
-  const searchParams = useSearchParams()
   const supabase = createClient()
-  const yearFromUrl = searchParams.get("year") || ""
 
   const [loading, setLoading] = React.useState(true)
   const [loadingProgram, setLoadingProgram] = React.useState(false)
@@ -89,9 +84,6 @@ export function DepartmentYearDefaultsSettingsPanel({
         setYears(nextYears)
 
         const preferred =
-          (yearFromUrl && nextYears.some((y) => y.id === yearFromUrl)
-            ? yearFromUrl
-            : null) ||
           nextYears.find((y) => y.status !== "archived")?.id ||
           nextYears[0]?.id ||
           ""
@@ -110,16 +102,7 @@ export function DepartmentYearDefaultsSettingsPanel({
     }
 
     void loadYears()
-    // Prefill from URL on mount / department change only.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [departmentId, supabase])
-
-  React.useEffect(() => {
-    if (!yearFromUrl || yearFromUrl === selectedYearId) return
-    if (years.some((year) => year.id === yearFromUrl)) {
-      setSelectedYearId(yearFromUrl)
-    }
-  }, [yearFromUrl, years, selectedYearId])
 
   React.useEffect(() => {
     if (!selectedYearId) {
@@ -171,14 +154,6 @@ export function DepartmentYearDefaultsSettingsPanel({
 
   function handleYearChange(nextYearId: string) {
     setSelectedYearId(nextYearId)
-    router.replace(
-      departmentGroupWorkspaceHref(departmentId, {
-        tab: "settings",
-        settingsSection: "year-defaults",
-        yearProgramId: nextYearId || undefined,
-      }),
-      { scroll: false }
-    )
   }
 
   const selectedYear = years.find((year) => year.id === selectedYearId)

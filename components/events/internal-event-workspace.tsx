@@ -10,6 +10,7 @@ import { InternalEventCommunityCalendarCard } from "@/components/events/internal
 import { InternalEventDescriptionCard } from "@/components/events/internal-event-description-card"
 import { InternalEventFeaturesSettings } from "@/components/events/internal-event-features-settings"
 import { InternalEventMetaSettings } from "@/components/events/internal-event-meta-settings"
+import { InternalEventServiceNeedsSettings } from "@/components/events/internal-event-service-needs-settings"
 import { InternalEventFinanceTab } from "@/components/events/internal-event-finance-tab"
 import { InternalEventFlyerCard } from "@/components/events/internal-event-flyer-card"
 import { InternalEventModuleSetupPanel } from "@/components/events/internal-event-module-setup-panel"
@@ -493,6 +494,13 @@ export function InternalEventWorkspace({
 
           <TabsContent value="settings" className="mt-0">
             <div className="space-y-6">
+              <InternalEventServiceNeedsSettings
+                key={event.id}
+                event={event}
+                vendorTypes={vendorTypes}
+                canManage={canManage}
+                canManageVendorTypes={canManage}
+              />
               <InternalEventFeaturesSettings
                 eventId={event.id}
                 initialFeatures={features}

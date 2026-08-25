@@ -6,6 +6,7 @@ import { estimateHoursFromTimeRange } from "@/lib/child-care/childcare-event-hou
 import { logDepartmentStaffHoursAction } from "@/lib/departments/department-payroll"
 import { workforceDepartmentDetailPath } from "@/lib/departments/department-paths"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
+import { EVENT_MANAGEMENT_CHILDCARE_REPORTS_PATH } from "@/lib/events/event-management-reports-path"
 import { createClient } from "@/lib/supabase/server"
 
 /**
@@ -162,7 +163,7 @@ export async function logChildcareEventHoursAction(input: {
   revalidatePath(workforceDepartmentDetailPath(departmentId))
   revalidatePath("/workforce")
   revalidatePath("/finance/payroll")
-  revalidatePath("/programs/reports/childcare")
+  revalidatePath(EVENT_MANAGEMENT_CHILDCARE_REPORTS_PATH)
   if (sourceId) {
     revalidatePath(`/event-management/${sourceId}`)
   }

@@ -10,7 +10,9 @@ async function repairLegacyDepartments(
     return
   }
 
-  // Departments created before the org-id fix were saved with auth user id.
+  // Early department rows stored auth.uid() in organization_id. Only rewrite
+  // those rows — never other tenants' departments that RLS happens to expose
+  // because the current user belongs to more than one organization.
   const { error } = await supabase
     .from("departments")
     .update({ organization_id: organizationId })
@@ -35,7 +37,7 @@ export async function getDepartments() {
 
   await repairLegacyDepartments(supabase, organizationId, user?.id)
 
-  let { data, error } = await supabase
+  const { data, error } = await supabase
     .from("departments")
     .select("*")
     .eq("organization_id", organizationId)
@@ -46,42 +48,5 @@ export async function getDepartments() {
     throw new Error("Failed to load departments")
   }
 
-  let departments = data || []
-
-  // If nothing matched, repair visible legacy rows and reload once.
-  if (departments.length === 0) {
-    const { data: visibleDepartments, error: visibleError } = await supabase
-      .from("departments")
-      .select("id")
-      .order("name", { ascending: true })
-
-    if (!visibleError && visibleDepartments?.length) {
-      const { error: repairError } = await supabase
-        .from("departments")
-        .update({ organization_id: organizationId })
-        .in(
-          "id",
-          visibleDepartments.map((department) => department.id)
-        )
-
-      if (repairError) {
-        console.error("Failed to repair visible departments:", repairError)
-      } else {
-        const reload = await supabase
-          .from("departments")
-          .select("*")
-          .eq("organization_id", organizationId)
-          .order("name", { ascending: true })
-
-        if (reload.error) {
-          console.error(reload.error)
-          throw new Error("Failed to load departments")
-        }
-
-        departments = reload.data || []
-      }
-    }
-  }
-
-  return departments
+  return data || []
 }

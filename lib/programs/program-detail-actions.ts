@@ -262,6 +262,9 @@ export type ProgramEnrollmentDefaultsInput = {
   single_session_registration_enabled: boolean
   enable_waitlist: boolean
   waitlist_capacity: number | null
+  enrollment_process: "direct_registration" | "application_approval"
+  evaluation_required: boolean
+  seat_activation_rule: "on_registration" | "after_initial_payment"
 }
 
 /** F2: Save program enrollment defaults and snapshot onto inheriting offerings. */
@@ -362,8 +365,26 @@ export async function saveProgramEnrollmentDefaults(
         input.single_session_registration_enabled,
       enable_waitlist: input.enable_waitlist,
       waitlist_capacity: input.waitlist_capacity,
+      enrollment_process: input.enrollment_process,
+      evaluation_required:
+        input.enrollment_process === "application_approval"
+          ? input.evaluation_required
+          : false,
+      seat_activation_rule: input.seat_activation_rule,
       identityAndDefaultsOnly: true,
     })
+
+    const applicationRequired =
+      input.enrollment_process === "application_approval"
+    await supabase
+      .from("program_offerings")
+      .update({
+        application_required: applicationRequired,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("organization_id", organizationId)
+      .eq("program_id", input.programId)
+      .neq("status", "archived")
 
     const { syncInheritingOfferingsFromProgram } = await import(
       "@/lib/programs/program-offering-actions"

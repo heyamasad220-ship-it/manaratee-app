@@ -26,7 +26,7 @@ export async function getOfferingManageSummary(
         .select("id", { count: "exact", head: true })
         .eq("organization_id", organizationId)
         .eq("offering_id", offeringId)
-        .neq("status", "cancelled"),
+        .in("status", ["enrolled", "active"]),
       supabase
         .from("program_waitlist")
         .select("id", { count: "exact", head: true })

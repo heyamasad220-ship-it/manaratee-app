@@ -29,6 +29,7 @@ import {
 } from "@/lib/events/facility-event-request-href"
 import { YEAR_SEASON_LABEL } from "@/lib/programs/program-display-labels"
 import { programOfferingManageHref } from "@/lib/programs/program-offering-paths"
+import { programWorkspaceHref } from "@/lib/programs/program-workspace-path"
 
 function formatDate(value: string | null) {
   if (!value) return "—"
@@ -66,18 +67,25 @@ function spaceOrLocationLabel(row: {
 
 type ScheduleSection = "class-times" | "activity-planner"
 
-function scheduleReturnTo(departmentId: string) {
-  return `/workforce/departments/${departmentId}?tab=schedule`
+function scheduleReturnTo(departmentId: string, programId?: string) {
+  if (programId) {
+    return programWorkspaceHref(programId, { tab: "schedule" })
+  }
+  return `/workforce/departments/${departmentId}?tab=programs`
 }
 
 export function DepartmentSchedulePanel({
   departmentId,
   departmentName,
+  programId,
+  programName,
   initialSection = "class-times",
   onSectionChange,
 }: {
   departmentId: string
   departmentName: string
+  programId?: string
+  programName?: string
   initialSection?: ScheduleSection
   onSectionChange?: (section: ScheduleSection) => void
 }) {
@@ -85,6 +93,8 @@ export function DepartmentSchedulePanel({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [summary, setSummary] = useState<DepartmentScheduleSummary | null>(null)
+  const scopedToProgram = Boolean(programId)
+  const scopeLabel = programName || departmentName
 
   useEffect(() => {
     setSection(initialSection)
@@ -93,7 +103,10 @@ export function DepartmentSchedulePanel({
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
-    const result = await fetchDepartmentScheduleAction(departmentId)
+    const result = await fetchDepartmentScheduleAction(
+      departmentId,
+      programId ? { programId } : undefined
+    )
     if (!result.success) {
       setError(result.error)
       setSummary(null)
@@ -102,7 +115,7 @@ export function DepartmentSchedulePanel({
     }
     setSummary(result.summary)
     setLoading(false)
-  }, [departmentId])
+  }, [departmentId, programId])
 
   useEffect(() => {
     void load()
@@ -114,7 +127,7 @@ export function DepartmentSchedulePanel({
     onSectionChange?.(value)
   }
 
-  const returnTo = scheduleReturnTo(departmentId)
+  const returnTo = scheduleReturnTo(departmentId, programId)
   const spacesHref = buildFacilitiesCalendarHref({ returnTo })
   const masterCalendarHref = eventManagementMasterCalendarHref({
     departmentId,
@@ -127,8 +140,10 @@ export function DepartmentSchedulePanel({
         <div>
           <h2 className="text-lg font-semibold tracking-tight">Schedule</h2>
           <p className="text-sm text-muted-foreground">
-            Class times and rooms for this department&apos;s offerings. Use Facilities to check
-            building-wide space availability; Master Calendar for department events.
+            Class times and rooms for this{" "}
+            {scopedToProgram ? "program's" : "department's"} offerings. Use
+            Facilities to check building-wide space availability; Master Calendar
+            for department events.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -165,7 +180,7 @@ export function DepartmentSchedulePanel({
 
           {!loading && !error && (!summary || summary.programs.length === 0) ? (
             <p className="rounded-md border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
-              No schedule for {departmentName} yet. Add offerings and set weekly times on each
+              No schedule for {scopeLabel} yet. Add offerings and set weekly times on each
               offering&apos;s Schedule tab.
             </p>
           ) : null}
@@ -193,7 +208,9 @@ export function DepartmentSchedulePanel({
                             <TableHead>Day</TableHead>
                             <TableHead>Time</TableHead>
                             <TableHead>Title</TableHead>
-                            <TableHead>{YEAR_SEASON_LABEL}</TableHead>
+                            {scopedToProgram ? null : (
+                              <TableHead>{YEAR_SEASON_LABEL}</TableHead>
+                            )}
                             <TableHead>Program</TableHead>
                             <TableHead>Space</TableHead>
                             <TableHead>Instructor</TableHead>
@@ -209,9 +226,11 @@ export function DepartmentSchedulePanel({
                                 {formatTime(row.startTime)} – {formatTime(row.endTime)}
                               </TableCell>
                               <TableCell>{row.title}</TableCell>
-                              <TableCell className="text-muted-foreground">
-                                {row.programName}
-                              </TableCell>
+                              {scopedToProgram ? null : (
+                                <TableCell className="text-muted-foreground">
+                                  {row.programName}
+                                </TableCell>
+                              )}
                               <TableCell className="text-muted-foreground">
                                 {row.offeringName || "—"}
                               </TableCell>
@@ -249,7 +268,9 @@ export function DepartmentSchedulePanel({
                           <TableRow>
                             <TableHead>Session</TableHead>
                             <TableHead>Program</TableHead>
-                            <TableHead>{YEAR_SEASON_LABEL}</TableHead>
+                            {scopedToProgram ? null : (
+                              <TableHead>{YEAR_SEASON_LABEL}</TableHead>
+                            )}
                             <TableHead>Dates</TableHead>
                             <TableHead>Enrollment</TableHead>
                             <TableHead>Status</TableHead>
@@ -263,9 +284,11 @@ export function DepartmentSchedulePanel({
                               <TableCell className="text-muted-foreground">
                                 {row.offeringName || "—"}
                               </TableCell>
-                              <TableCell className="text-muted-foreground">
-                                {row.programName}
-                              </TableCell>
+                              {scopedToProgram ? null : (
+                                <TableCell className="text-muted-foreground">
+                                  {row.programName}
+                                </TableCell>
+                              )}
                               <TableCell className="text-sm text-muted-foreground">
                                 {formatDate(row.startDate)} – {formatDate(row.endDate)}
                               </TableCell>
@@ -316,7 +339,11 @@ export function DepartmentSchedulePanel({
         </TabsContent>
 
         <TabsContent value="activity-planner" className="mt-4">
-          <ProgramsScheduleBuilder departmentId={departmentId} embedded />
+          <ProgramsScheduleBuilder
+            departmentId={departmentId}
+            programId={programId}
+            embedded
+          />
         </TabsContent>
       </Tabs>
     </div>

@@ -1,382 +1,291 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
-import { FileText, Loader2, Trash2, Upload } from "lucide-react"
-
-import { ProgramFlyerField } from "@/components/programs/edit/program-flyer-field"
+import { useCallback, useEffect, useState } from "react"
+import Link from "next/link"
 import {
-  RichTextDisplay,
-  RichTextEditor,
-} from "@/components/ui/rich-text-editor"
+  BookOpen,
+  CalendarDays,
+  CircleDollarSign,
+  Layers,
+  Loader2,
+  UserCheck,
+  Users,
+  Wallet,
+} from "lucide-react"
+
 import { Button } from "@/components/ui/button"
-import { Label } from "@/components/ui/label"
 import {
-  updateDepartment,
-  updateDepartmentFlyer,
-  updateDepartmentTerms,
-} from "@/lib/departments/department-actions"
-import { uploadDepartmentTermsPdf } from "@/lib/departments/department-terms-actions"
-import { fetchDepartmentYearProgramsAction } from "@/lib/departments/department-year-actions"
-import { sanitizeRichTextHtml } from "@/lib/ui/rich-text"
-import { cn } from "@/lib/utils"
+  Card,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import { StatCard, StatCardsRow } from "@/components/ui/stat-card"
+import { departmentGroupWorkspaceHref } from "@/lib/donations/donation-group-path"
+import {
+  fetchDepartmentWorkspaceOverviewAction,
+  type DepartmentWorkspaceOverview,
+} from "@/lib/departments/department-workspace-overview"
+import {
+  fetchDepartmentYearProgramsAction,
+  type DepartmentYearProgramRow,
+} from "@/lib/departments/department-year-actions"
+import { programCountPhrase } from "@/lib/programs/program-display-labels"
+import {
+  getProgramStatusLabel,
+  type ProgramStatus,
+} from "@/lib/programs/program-status"
+import { programWorkspaceHref } from "@/lib/programs/program-workspace-path"
 
-const FLYER_PLACEHOLDER_COLORS = [
-  "bg-sky-500",
-  "bg-emerald-400",
-  "bg-violet-500",
-  "bg-amber-500",
-  "bg-rose-400",
-  "bg-indigo-500",
-] as const
+function formatUsd(value: number) {
+  const rounded = Math.round(value * 100) / 100
+  const whole = Math.abs(rounded - Math.round(rounded)) < 0.009
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: whole ? 0 : 2,
+    maximumFractionDigits: 2,
+  }).format(rounded)
+}
 
-function getFlyerPlaceholderColor(departmentId: string) {
-  let hash = 0
-  for (let index = 0; index < departmentId.length; index += 1) {
-    hash = (hash + departmentId.charCodeAt(index) * (index + 1)) % 997
-  }
-  return FLYER_PLACEHOLDER_COLORS[hash % FLYER_PLACEHOLDER_COLORS.length]
+function formatCount(value: number) {
+  return new Intl.NumberFormat("en-US").format(value)
+}
+
+function enrollmentPhrase(count: number) {
+  return `${count} ${count === 1 ? "enrollment" : "enrollments"}`
 }
 
 export function DepartmentOverviewPanel({
   departmentId,
-  departmentName,
-  departmentDescription = null,
-  departmentFlyerUrl = null,
-  departmentColor = null,
-  departmentTermsHtml = null,
-  departmentTermsPdfUrl = null,
-  onDepartmentMetaChanged,
 }: {
   departmentId: string
-  departmentName: string
-  departmentDescription?: string | null
-  departmentFlyerUrl?: string | null
-  departmentColor?: string | null
-  departmentTermsHtml?: string | null
-  departmentTermsPdfUrl?: string | null
-  onDepartmentMetaChanged?: () => void
 }) {
-  const pdfInputRef = useRef<HTMLInputElement>(null)
-  const [canEditMeta, setCanEditMeta] = useState(false)
-  const [descriptionDraft, setDescriptionDraft] = useState(
-    departmentDescription || ""
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [overview, setOverview] = useState<DepartmentWorkspaceOverview | null>(
+    null
   )
-  const [termsDraft, setTermsDraft] = useState(departmentTermsHtml || "")
-  const [deptFlyerDraft, setDeptFlyerDraft] = useState(departmentFlyerUrl || "")
-  const [termsPdfUrl, setTermsPdfUrl] = useState(departmentTermsPdfUrl || "")
-  const [metaError, setMetaError] = useState<string | null>(null)
-  const [metaSaving, setMetaSaving] = useState(false)
-  const [termsSaving, setTermsSaving] = useState(false)
-  const [pdfUploading, setPdfUploading] = useState(false)
+  const [programs, setPrograms] = useState<DepartmentYearProgramRow[]>([])
 
-  useEffect(() => {
-    let cancelled = false
-    void (async () => {
-      const result = await fetchDepartmentYearProgramsAction(departmentId)
-      if (cancelled) return
-      if (result.success) {
-        setCanEditMeta(result.data.canManageYears)
-      }
-    })()
-    return () => {
-      cancelled = true
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    const [overviewResult, programsResult] = await Promise.all([
+      fetchDepartmentWorkspaceOverviewAction(departmentId),
+      fetchDepartmentYearProgramsAction(departmentId),
+    ])
+
+    if (!overviewResult.success) {
+      setError(overviewResult.error)
+      setOverview(null)
+      setPrograms([])
+      setLoading(false)
+      return
     }
+
+    setOverview(overviewResult.overview)
+    if (programsResult.success) {
+      setPrograms(programsResult.data.openPrograms)
+    } else {
+      setPrograms([])
+    }
+    setLoading(false)
   }, [departmentId])
 
   useEffect(() => {
-    setDescriptionDraft(departmentDescription || "")
-  }, [departmentDescription])
+    void load()
+  }, [load])
 
-  useEffect(() => {
-    setDeptFlyerDraft(departmentFlyerUrl || "")
-  }, [departmentFlyerUrl])
-
-  useEffect(() => {
-    setTermsDraft(departmentTermsHtml || "")
-  }, [departmentTermsHtml])
-
-  useEffect(() => {
-    setTermsPdfUrl(departmentTermsPdfUrl || "")
-  }, [departmentTermsPdfUrl])
-
-  const descriptionDirty =
-    sanitizeRichTextHtml(descriptionDraft) !==
-    sanitizeRichTextHtml(departmentDescription || "")
-  const termsDirty =
-    sanitizeRichTextHtml(termsDraft) !==
-    sanitizeRichTextHtml(departmentTermsHtml || "")
-
-  async function saveDescription() {
-    setMetaError(null)
-    setMetaSaving(true)
-    try {
-      await updateDepartment({
-        id: departmentId,
-        name: departmentName,
-        description: descriptionDraft.trim() || undefined,
-        color: departmentColor || undefined,
-        flyerUrl: deptFlyerDraft || null,
-      })
-      onDepartmentMetaChanged?.()
-    } catch (saveError) {
-      setMetaError(
-        saveError instanceof Error ? saveError.message : "Could not save description."
-      )
-    } finally {
-      setMetaSaving(false)
-    }
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        Loading overview…
+      </div>
+    )
   }
 
-  async function saveDepartmentFlyer(nextUrl: string) {
-    setDeptFlyerDraft(nextUrl)
-    setMetaError(null)
-    try {
-      await updateDepartmentFlyer({
-        id: departmentId,
-        flyerUrl: nextUrl || null,
-      })
-      onDepartmentMetaChanged?.()
-    } catch (saveError) {
-      setMetaError(
-        saveError instanceof Error ? saveError.message : "Could not save flyer."
-      )
-    }
+  if (error || !overview) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Overview</CardTitle>
+          <CardDescription>{error || "Could not load overview."}</CardDescription>
+        </CardHeader>
+        <div className="px-6 pb-6">
+          <Button variant="outline" onClick={() => void load()}>
+            Retry
+          </Button>
+        </div>
+      </Card>
+    )
   }
 
-  async function saveTermsHtml() {
-    setMetaError(null)
-    setTermsSaving(true)
-    try {
-      await updateDepartmentTerms({
-        id: departmentId,
-        termsHtml: termsDraft,
-      })
-      onDepartmentMetaChanged?.()
-    } catch (saveError) {
-      setMetaError(
-        saveError instanceof Error
-          ? saveError.message
-          : "Could not save terms and conditions."
-      )
-    } finally {
-      setTermsSaving(false)
-    }
-  }
-
-  async function saveTermsPdf(nextUrl: string | null) {
-    setMetaError(null)
-    try {
-      await updateDepartmentTerms({
-        id: departmentId,
-        termsPdfUrl: nextUrl,
-      })
-      setTermsPdfUrl(nextUrl || "")
-      onDepartmentMetaChanged?.()
-    } catch (saveError) {
-      setMetaError(
-        saveError instanceof Error
-          ? saveError.message
-          : "Could not save terms PDF."
-      )
-    }
-  }
-
-  async function handlePdfUpload(file: File | undefined) {
-    if (!file) return
-    setMetaError(null)
-    setPdfUploading(true)
-    try {
-      const formData = new FormData()
-      formData.set("file", file)
-      formData.set("departmentId", departmentId)
-      const result = await uploadDepartmentTermsPdf(formData)
-      if (!result.success) {
-        setMetaError(result.error)
-        return
-      }
-      await saveTermsPdf(result.url)
-    } finally {
-      setPdfUploading(false)
-    }
-  }
+  const offeringsCount = programs.reduce(
+    (sum, program) => sum + Number(program.offeringCount || 0),
+    0
+  )
+  const programsHref = departmentGroupWorkspaceHref(departmentId, {
+    tab: "programs",
+  })
+  const employeesHref = departmentGroupWorkspaceHref(departmentId, {
+    tab: "employees",
+  })
+  const eventsHref = departmentGroupWorkspaceHref(departmentId, {
+    tab: "activity",
+  })
+  const financialHref = departmentGroupWorkspaceHref(departmentId, {
+    tab: "financial",
+    finance: "budget",
+  })
 
   return (
     <div className="space-y-8">
-      <section className="grid gap-6 lg:grid-cols-3 lg:items-stretch">
-        <div className="flex h-full min-h-[280px] flex-col lg:col-span-1">
-          {canEditMeta ? (
-            <ProgramFlyerField
-              value={deptFlyerDraft}
-              onValueChange={(value) => void saveDepartmentFlyer(value)}
-              hideHiddenInput
-              hideLabel
-              emptyLabel="Add Flyer"
-              frameClassName="h-auto min-h-0 flex-1"
-            />
-          ) : deptFlyerDraft ? (
-            <div className="h-full min-h-[280px] overflow-hidden rounded-lg border">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={deptFlyerDraft}
-                alt={`${departmentName} flyer`}
-                className="h-full w-full object-cover"
-              />
-            </div>
-          ) : (
-            <div
-              className={cn(
-                "flex h-full min-h-[280px] items-center justify-center rounded-lg text-3xl font-semibold text-white/90",
-                getFlyerPlaceholderColor(departmentId)
-              )}
-            >
-              {departmentName.trim().charAt(0).toUpperCase() || "D"}
-            </div>
-          )}
-        </div>
+      <div>
+        <h2 className="text-lg font-semibold tracking-tight">Overview</h2>
+        <p className="text-sm text-muted-foreground">
+          {overview.directorName
+            ? `Director: ${overview.directorName}. `
+            : null}
+          Snapshot of programs, offerings, staff, and activity for this
+          department.
+        </p>
+      </div>
 
-        <div className="flex flex-col space-y-2 lg:col-span-2">
-          <Label htmlFor="department-overview-description">Description</Label>
-          {canEditMeta ? (
-            <>
-              <RichTextEditor
-                value={descriptionDraft}
-                onChange={setDescriptionDraft}
-                placeholder="Describe this department…"
-                minHeightClassName="min-h-[220px]"
-              />
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={metaSaving || !descriptionDirty}
-                  onClick={() => void saveDescription()}
-                >
-                  {metaSaving ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : null}
-                  Save description
-                </Button>
-              </div>
-            </>
-          ) : (
-            <RichTextDisplay html={departmentDescription} />
-          )}
-        </div>
-      </section>
+      <StatCardsRow equal columns={5}>
+        <Link href={programsHref} className="min-w-0">
+          <StatCard
+            fill
+            tone="sky"
+            icon={BookOpen}
+            label="Programs"
+            value={formatCount(programs.length)}
+            hint="Years and seasons"
+          />
+        </Link>
+        <Link href={programsHref} className="min-w-0">
+          <StatCard
+            fill
+            tone="violet"
+            icon={Layers}
+            label="Offerings"
+            value={formatCount(offeringsCount)}
+            hint="Courses and classes"
+          />
+        </Link>
+        <Link href={employeesHref} className="min-w-0">
+          <StatCard
+            fill
+            tone="teal"
+            icon={Users}
+            label="Employees"
+            value={formatCount(overview.staffCount)}
+            hint="Assigned to this department"
+          />
+        </Link>
+        <Link href={programsHref} className="min-w-0">
+          <StatCard
+            fill
+            tone="emerald"
+            icon={UserCheck}
+            label="Students"
+            value={formatCount(overview.studentsCount)}
+            hint="On open programs"
+          />
+        </Link>
+        <Link href={eventsHref} className="min-w-0">
+          <StatCard
+            fill
+            tone="amber"
+            icon={CalendarDays}
+            label="Upcoming events"
+            value={formatCount(overview.upcomingEventsCount)}
+            hint="From today forward"
+          />
+        </Link>
+      </StatCardsRow>
 
-      <section className="space-y-4">
-        <div>
-          <h2 className="text-lg font-semibold tracking-tight">
-            Terms and Conditions
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Rich text shown to families, plus an optional PDF attachment.
-          </p>
-        </div>
+      <StatCardsRow equal columns={3}>
+        <Link href={financialHref} className="min-w-0">
+          <StatCard
+            fill
+            tone="blue"
+            icon={CircleDollarSign}
+            label="Collected"
+            value={formatUsd(overview.revenue)}
+            hint="Open programs"
+          />
+        </Link>
+        <Link href={financialHref} className="min-w-0">
+          <StatCard
+            fill
+            tone="orange"
+            icon={Wallet}
+            label="Payroll"
+            value={formatUsd(overview.expenses)}
+            hint="Approved payroll"
+          />
+        </Link>
+        <Link href={financialHref} className="min-w-0">
+          <StatCard
+            fill
+            tone={overview.net >= 0 ? "emerald" : "rose"}
+            icon={CircleDollarSign}
+            label="Net"
+            value={formatUsd(overview.net)}
+            hint="Collected minus payroll"
+          />
+        </Link>
+      </StatCardsRow>
 
-        <div className="space-y-2">
-          <Label htmlFor="department-overview-terms">Terms text</Label>
-          {canEditMeta ? (
-            <>
-              <RichTextEditor
-                value={termsDraft}
-                onChange={setTermsDraft}
-                placeholder="Enter department terms and conditions…"
-                minHeightClassName="min-h-[200px]"
-              />
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={termsSaving || !termsDirty}
-                  onClick={() => void saveTermsHtml()}
-                >
-                  {termsSaving ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : null}
-                  Save terms
-                </Button>
-              </div>
-            </>
-          ) : departmentTermsHtml ? (
-            <RichTextDisplay html={departmentTermsHtml} />
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              No terms and conditions yet.
-            </p>
-          )}
-        </div>
-
-        <div className="space-y-3 rounded-md border p-4">
+      <section className="space-y-3">
+        <div className="flex flex-wrap items-end justify-between gap-2">
           <div>
-            <p className="text-sm font-medium">Terms PDF</p>
+            <h3 className="text-base font-semibold tracking-tight">Programs</h3>
             <p className="text-sm text-muted-foreground">
-              Optional downloadable PDF of the full terms document.
+              Open a program to manage offerings, registrations, and schedule.
             </p>
           </div>
-          {termsPdfUrl ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <FileText className="h-4 w-4 text-muted-foreground" />
-              <a
-                href={termsPdfUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="text-sm font-medium text-primary underline-offset-4 hover:underline"
-              >
-                View terms PDF
-              </a>
-              {canEditMeta ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  disabled={pdfUploading}
-                  aria-label="Remove terms PDF"
-                  onClick={() => void saveTermsPdf(null)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              ) : null}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">No PDF uploaded.</p>
-          )}
-          {canEditMeta ? (
-            <>
-              <input
-                ref={pdfInputRef}
-                type="file"
-                accept=".pdf,application/pdf"
-                className="hidden"
-                onChange={(event) => {
-                  void handlePdfUpload(event.target.files?.[0])
-                  event.target.value = ""
-                }}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={pdfUploading}
-                onClick={() => pdfInputRef.current?.click()}
-              >
-                {pdfUploading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Uploading…
-                  </>
-                ) : (
-                  <>
-                    <Upload className="mr-2 h-4 w-4" />
-                    {termsPdfUrl ? "Replace PDF" : "Upload PDF"}
-                  </>
-                )}
-              </Button>
-            </>
-          ) : null}
+          <Link
+            href={programsHref}
+            className="text-sm font-medium text-sky-800 underline-offset-4 hover:underline"
+          >
+            View all programs
+          </Link>
         </div>
 
-        {metaError ? <p className="text-sm text-destructive">{metaError}</p> : null}
+        {programs.length === 0 ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>No programs</CardTitle>
+              <CardDescription>
+                Add a year or season in the Programs module.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        ) : (
+          <div className="divide-y rounded-lg border">
+            {programs.map((program) => (
+              <Link
+                key={program.id}
+                href={programWorkspaceHref(program.id)}
+                className="block px-4 py-3 text-sm transition-colors hover:bg-muted/40"
+              >
+                <span className="font-medium text-sky-800">{program.name}</span>
+                <span className="text-muted-foreground">
+                  {" "}
+                  —{" "}
+                  {getProgramStatusLabel(
+                    (program.status as ProgramStatus) || "active"
+                  )}{" "}
+                  — {programCountPhrase(program.offeringCount)} —{" "}
+                  {enrollmentPhrase(program.enrolled)}
+                </span>
+              </Link>
+            ))}
+          </div>
+        )}
       </section>
     </div>
   )

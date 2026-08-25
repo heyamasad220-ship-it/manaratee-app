@@ -18,14 +18,16 @@ function toVisibility(value: string | null | undefined): VisibilityType {
   return "public"
 }
 
-/** Year/program workspace Overview (`?tab=overview&year=`). */
+/** Year/program workspace Settings (`?tab=settings`). */
 export function DepartmentProgramOverviewPanel({
   departmentId,
   yearProgramId,
+  hideChrome = false,
   onProgramMetaChanged,
 }: {
   departmentId: string
   yearProgramId: string
+  hideChrome?: boolean
   onProgramMetaChanged?: () => void
 }) {
   const [loading, setLoading] = React.useState(true)
@@ -135,7 +137,7 @@ export function DepartmentProgramOverviewPanel({
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Overview</CardTitle>
+          <CardTitle>Settings</CardTitle>
           <CardDescription>
             {error || `Could not load this ${YEAR_SEASON_LABEL.toLowerCase()}.`}
           </CardDescription>
@@ -146,13 +148,15 @@ export function DepartmentProgramOverviewPanel({
 
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="text-lg font-semibold tracking-tight">Overview</h2>
-        <p className="text-sm text-muted-foreground">
-          Name, dates, eligibility, flyer, and publishing for this{" "}
-          {YEAR_SEASON_LABEL.toLowerCase()}.
-        </p>
-      </div>
+      {hideChrome ? null : (
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight">Settings</h2>
+          <p className="text-sm text-muted-foreground">
+            Name, dates, eligibility, flyer, and publishing for this{" "}
+            {YEAR_SEASON_LABEL.toLowerCase()}.
+          </p>
+        </div>
+      )}
 
       <form onSubmit={(event) => void handleSave(event)} className="space-y-4">
         {error ? (

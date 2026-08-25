@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 
-/** Service Needs moved to department Settings. */
+/** Service Needs moved to Event workspace Settings. */
 export default function ProgramServiceNeedsSettingsRedirectPage() {
-  redirect("/workforce?tab=departments")
+  redirect("/event-management")
 }

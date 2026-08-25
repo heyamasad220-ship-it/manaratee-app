@@ -674,3 +674,63 @@ export async function addEmployeeToDepartmentAction(input: {
     }
   }
 }
+
+export async function setDepartmentDirectorAction(input: {
+  departmentId: string
+  staffId: string | null
+}) {
+  const access = await requireStaffManage(input.departmentId)
+  if (!access.ok) return { success: false as const, error: access.error }
+
+  if (input.staffId) {
+    const { data: staff, error: staffError } = await access.supabase
+      .from("staff")
+      .select("id, department_id")
+      .eq("organization_id", access.organizationId)
+      .eq("id", input.staffId)
+      .maybeSingle()
+
+    if (staffError || !staff) {
+      return { success: false as const, error: "Employee not found." }
+    }
+    if (staff.department_id !== input.departmentId) {
+      return {
+        success: false as const,
+        error: "This employee is not assigned to this department.",
+      }
+    }
+  }
+
+  const { error: clearError } = await access.supabase
+    .from("staff")
+    .update({ is_department_head: false })
+    .eq("organization_id", access.organizationId)
+    .eq("department_id", input.departmentId)
+    .eq("is_department_head", true)
+
+  if (clearError) {
+    return {
+      success: false as const,
+      error: clearError.message || "Could not update the director.",
+    }
+  }
+
+  if (input.staffId) {
+    const { error: setError } = await access.supabase
+      .from("staff")
+      .update({ is_department_head: true })
+      .eq("organization_id", access.organizationId)
+      .eq("id", input.staffId)
+
+    if (setError) {
+      return {
+        success: false as const,
+        error: setError.message || "Could not update the director.",
+      }
+    }
+  }
+
+  revalidateDepartmentStaff(input.departmentId)
+  revalidatePath("/workforce/departments")
+  return { success: true as const }
+}

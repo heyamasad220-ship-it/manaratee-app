@@ -102,7 +102,6 @@ export function DonorPledgesTab({
   }, [donorId, embedded])
 
   const loadPledges = useCallback(async () => {
-    setLoading(true)
     setError(null)
     const result = await getDonorPledgesAction(donorId)
     if (!result.success) {
@@ -121,6 +120,7 @@ export function DonorPledgesTab({
   }, [donorId, embedded, loadReminderHistory, onCountChange])
 
   useEffect(() => {
+    setLoading(true)
     void loadPledges()
   }, [loadPledges])
 
@@ -262,14 +262,49 @@ export function DonorPledgesTab({
     </>
   )
 
+  const pledgeDetailsDialog = (
+    <PledgeDetailsDialog
+      open={detailsOpen}
+      onOpenChange={(open) => {
+        setDetailsOpen(open)
+        if (!open) {
+          setDetailsPledgeId(null)
+          setDetailsIsAdd(false)
+        }
+      }}
+      pledgeId={detailsIsAdd ? null : detailsPledgeId}
+      defaultContactId={detailsIsAdd ? contactId : null}
+      defaultContactLabel={detailsIsAdd ? donorName : null}
+      onSaved={() => {
+        void loadPledges()
+        onUpdated?.()
+      }}
+      onDeleted={() => {
+        setDetailsOpen(false)
+        setDetailsPledgeId(null)
+        setDetailsIsAdd(false)
+        void loadPledges()
+        onUpdated?.()
+      }}
+    />
+  )
+
   if (loading) {
     return (
-      <div className="py-8 text-center text-sm text-muted-foreground">Loading pledges...</div>
+      <>
+        <div className="py-8 text-center text-sm text-muted-foreground">Loading pledges...</div>
+        {pledgeDetailsDialog}
+      </>
     )
   }
 
   if (error) {
-    return <div className="py-8 text-center text-sm text-destructive">{error}</div>
+    return (
+      <>
+        <div className="py-8 text-center text-sm text-destructive">{error}</div>
+        {pledgeDetailsDialog}
+      </>
+    )
   }
 
   return (
@@ -287,33 +322,7 @@ export function DonorPledgesTab({
           <div className="p-6">{tableContent}</div>
         </div>
       )}
-
-      <PledgeDetailsDialog
-        open={detailsOpen}
-        onOpenChange={(open) => {
-          setDetailsOpen(open)
-          if (!open) {
-            setDetailsPledgeId(null)
-            setDetailsIsAdd(false)
-          }
-        }}
-        pledgeId={detailsIsAdd ? null : detailsPledgeId}
-        defaultContactId={detailsIsAdd ? contactId : null}
-        defaultContactLabel={detailsIsAdd ? donorName : null}
-        onSaved={(pledgeId) => {
-          setDetailsIsAdd(false)
-          setDetailsPledgeId(pledgeId)
-          void loadPledges()
-          onUpdated?.()
-        }}
-        onDeleted={() => {
-          setDetailsOpen(false)
-          setDetailsPledgeId(null)
-          setDetailsIsAdd(false)
-          void loadPledges()
-          onUpdated?.()
-        }}
-      />
+      {pledgeDetailsDialog}
     </>
   )
 }

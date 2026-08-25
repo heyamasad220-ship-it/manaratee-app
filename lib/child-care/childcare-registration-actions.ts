@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { hasEventCheckInPermission } from "@/lib/events/event-access"
+import { EVENT_MANAGEMENT_CHILDCARE_REPORTS_PATH } from "@/lib/events/event-management-reports-path"
 import { parseServiceRequirements } from "@/lib/events/event-service-requirements"
 import { hasMissingYouthForms } from "@/lib/child-care/youth-forms"
 import { getChildcareRegistrationsBundle } from "@/lib/child-care/childcare-registration-queries"
@@ -18,7 +19,7 @@ import type {
 function revalidateChildcarePaths() {
   revalidatePath("/customer/opportunities")
   revalidatePath("/event-management")
-  revalidatePath("/programs/reports/childcare")
+  revalidatePath(EVENT_MANAGEMENT_CHILDCARE_REPORTS_PATH)
   revalidatePath("/workforce/childcare/registrations")
   revalidatePath("/workforce/childcare")
   revalidatePath("/child-care/registrations")

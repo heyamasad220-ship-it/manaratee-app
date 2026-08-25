@@ -40,13 +40,12 @@ export async function getPrograms() {
   return (data || []).map((row) => withProgramKind(row)) as Program[]
 }
 
-/** Workspace years/seasons (includes closed; excludes archived). */
-export async function getOpenPrograms() {
+async function loadPrograms(options?: { statuses?: readonly string[] }) {
   const supabase = await createClient()
   const organizationId = await getSelectedOrganizationId()
 
   if (!organizationId) {
-    return []
+    return [] as Program[]
   }
 
   try {
@@ -58,19 +57,34 @@ export async function getOpenPrograms() {
     console.error("autoCloseExpiredYearPrograms:", error)
   }
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("programs")
     .select("*")
     .eq("organization_id", organizationId)
-    .in("status", [...DEPARTMENT_WORKSPACE_PROGRAM_STATUSES])
     .order("created_at", { ascending: false })
+
+  if (options?.statuses) {
+    query = query.in("status", [...options.statuses])
+  }
+
+  const { data, error } = await query
 
   if (error) {
     console.error(error)
-    throw new Error("Failed to load open programs")
+    throw new Error("Failed to load programs")
   }
 
   return (data || []).map((row) => withProgramKind(row)) as Program[]
+}
+
+/** Workspace years/seasons (includes closed; excludes archived). */
+export async function getOpenPrograms() {
+  return loadPrograms({ statuses: DEPARTMENT_WORKSPACE_PROGRAM_STATUSES })
+}
+
+/** Programs Home list: every status, including archived, so Status can reach Closed/Archived. */
+export async function getStaffListPrograms() {
+  return loadPrograms()
 }
 
 export async function getProgramById(id: string) {

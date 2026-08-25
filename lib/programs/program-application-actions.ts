@@ -17,6 +17,7 @@ import type {
 } from "@/lib/programs/program-application-types"
 import {
   EMPTY_PROGRAM_APPLICATION_ANSWERS,
+  EVALUATION_APPLICATION_STATUSES,
   normalizeProgramApplicationAnswers,
 } from "@/lib/programs/program-application-types"
 import { DEPARTMENT_WORKSPACE_PROGRAM_STATUSES } from "@/lib/departments/department-active-programs"
@@ -291,7 +292,8 @@ export async function getApplicationsForRegistrantContact(
  */
 export async function getDepartmentApplications(
   departmentId: string,
-  filter: DepartmentApplicationListFilter = "submitted"
+  filter: DepartmentApplicationListFilter = "all",
+  options?: { programId?: string | null }
 ): Promise<ProgramApplicationWithDetails[]> {
   const organizationId = await getSelectedOrganizationId()
   if (!organizationId) return []
@@ -299,12 +301,18 @@ export async function getDepartmentApplications(
   const supabase = await createClient()
 
   // Open years only — archived-year applications belong under Archive reports.
-  const { data: programs, error: programsError } = await supabase
+  let programsQuery = supabase
     .from("programs")
     .select("id, name")
     .eq("organization_id", organizationId)
     .eq("department_id", departmentId)
     .in("status", [...DEPARTMENT_WORKSPACE_PROGRAM_STATUSES])
+
+  if (options?.programId) {
+    programsQuery = programsQuery.eq("id", options.programId)
+  }
+
+  const { data: programs, error: programsError } = await programsQuery
 
   if (programsError || !programs?.length) {
     return []
@@ -326,16 +334,20 @@ export async function getDepartmentApplications(
     )
     .eq("organization_id", organizationId)
     .in("program_id", programIds)
+    .order("created_at", { ascending: false })
 
-  if (filter === "submitted") {
-    query = query.eq("status", "submitted").order("created_at", {
-      ascending: true,
-    })
-  } else {
-    query = query
-      .eq("status", "approved")
-      .is("enrollment_id", null)
-      .order("evaluated_at", { ascending: false })
+  if (filter === "submitted" || filter === "needs_review") {
+    query = query.eq("status", "submitted")
+  } else if (filter === "evaluation") {
+    query = query.in("status", [...EVALUATION_APPLICATION_STATUSES])
+  } else if (filter === "approved") {
+    query = query.eq("status", "approved")
+  } else if (filter === "approved_pending_registration") {
+    query = query.eq("status", "approved").is("enrollment_id", null)
+  } else if (filter === "waitlisted") {
+    query = query.eq("status", "waitlisted")
+  } else if (filter === "declined") {
+    query = query.in("status", ["not_approved", "declined"])
   }
 
   const { data, error } = await query
@@ -416,8 +428,16 @@ export async function evaluateProgramApplication(
     return { success: false, error: "Application not found." }
   }
 
-  if ((existing.status as string) !== "submitted") {
-    return { success: false, error: "Only pending applications can be evaluated." }
+  if (
+    (existing.status as string) !== "submitted" &&
+    !EVALUATION_APPLICATION_STATUSES.includes(
+      existing.status as (typeof EVALUATION_APPLICATION_STATUSES)[number]
+    )
+  ) {
+    return {
+      success: false,
+      error: "Only applications in review or evaluation can be approved or declined.",
+    }
   }
 
   const { data: programForAccess } = await supabase
@@ -511,6 +531,93 @@ export async function evaluateProgramApplication(
   revalidatePath(`/customer/programs/${existing.program_id as string}`)
   revalidatePath(`/customer/programs/${existing.program_id as string}/apply`)
 
+  return { success: true, application: mapApplication(data) }
+}
+
+export type ApplicationWorkflowStatus =
+  | "evaluation_required"
+  | "evaluation_scheduled"
+  | "evaluation_completed"
+  | "waitlisted"
+  | "withdrawn"
+
+export async function setProgramApplicationWorkflowStatus(input: {
+  applicationId: string
+  status: ApplicationWorkflowStatus
+}): Promise<
+  | { success: true; application: ProgramApplication }
+  | { success: false; error: string }
+> {
+  const organizationId = await getSelectedOrganizationId()
+  if (!organizationId) {
+    return { success: false, error: "No organization selected." }
+  }
+
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user?.id) {
+    return { success: false, error: "You must be signed in." }
+  }
+
+  const { data: existing, error: loadError } = await supabase
+    .from("program_applications")
+    .select("*")
+    .eq("id", input.applicationId)
+    .eq("organization_id", organizationId)
+    .maybeSingle()
+
+  if (loadError || !existing) {
+    return { success: false, error: "Application not found." }
+  }
+
+  const { data: programForAccess } = await supabase
+    .from("programs")
+    .select("department_id")
+    .eq("id", existing.program_id as string)
+    .eq("organization_id", organizationId)
+    .maybeSingle()
+
+  const departmentId = (programForAccess?.department_id as string | null) || null
+  if (departmentId) {
+    if (!(await canManageDepartment(departmentId))) {
+      return {
+        success: false,
+        error: "You do not have permission to update this application.",
+      }
+    }
+  } else if (!(await hasPermission(PERMISSIONS.PROGRAMS_MANAGE))) {
+    return {
+      success: false,
+      error: "You do not have permission to update this application.",
+    }
+  }
+
+  const now = new Date().toISOString()
+  const { data, error } = await supabase
+    .from("program_applications")
+    .update({
+      status: input.status,
+      updated_by_user_id: user.id,
+      updated_at: now,
+    })
+    .eq("id", input.applicationId)
+    .eq("organization_id", organizationId)
+    .select("*")
+    .single()
+
+  if (error || !data) {
+    return {
+      success: false,
+      error: error?.message || "Failed to update application.",
+    }
+  }
+
+  if (departmentId) {
+    revalidatePath(workforceDepartmentDetailPath(departmentId))
+  }
+  revalidatePath(`/programs/${existing.program_id as string}`)
   return { success: true, application: mapApplication(data) }
 }
 
@@ -663,10 +770,13 @@ export async function evaluateProgramApplicationsBatch(
 
 export async function fetchDepartmentApplicationsAction(
   departmentId: string,
-  filter: DepartmentApplicationListFilter = "submitted"
+  filter: DepartmentApplicationListFilter = "all",
+  programId?: string | null
 ) {
   try {
-    const rows = await getDepartmentApplications(departmentId, filter)
+    const rows = await getDepartmentApplications(departmentId, filter, {
+      programId,
+    })
     return { success: true as const, applications: rows }
   } catch (error) {
     return {

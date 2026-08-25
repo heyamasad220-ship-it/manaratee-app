@@ -306,7 +306,7 @@ export function OfferingSettingsBrandingRow({
   disabled?: boolean
 }) {
   return (
-    <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,260px)_minmax(0,1fr)]">
+    <div className="grid items-start gap-5 lg:grid-cols-[auto_minmax(0,1fr)]">
       <fieldset disabled={disabled} className="min-w-0 disabled:opacity-60">
         <ProgramBrandingColors
           programId={offeringId}

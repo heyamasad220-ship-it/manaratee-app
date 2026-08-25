@@ -3,7 +3,7 @@ import { redirect } from "next/navigation"
 
 import { Header } from "@/components/layout/header"
 import { AddonsReportTable } from "@/components/programs/addons-report-table"
-import { ProgramsReportsNav } from "@/components/programs/programs-reports-nav"
+import { ProgramsStaffSubnav } from "@/components/programs/programs-staff-subnav"
 import { getAddonReportRows } from "@/lib/programs/addons-report"
 import { hasPermission, PERMISSIONS } from "@/lib/permissions/permissions"
 
@@ -20,10 +20,7 @@ export default async function ProgramsAddonsReportPage() {
   return (
     <>
       <Header title="Reports" />
-
-      <Suspense fallback={null}>
-        <ProgramsReportsNav />
-      </Suspense>
+      <ProgramsStaffSubnav secondary="reports" />
 
       <div className="flex flex-col gap-6 p-6">
         <div>

@@ -79,8 +79,9 @@ async function canArchiveDepartmentYears() {
 function revalidateDepartmentYearPaths(departmentId: string, programId?: string) {
   revalidatePath(workforceDepartmentDetailPath(departmentId))
   revalidatePath("/workforce/departments")
-  revalidatePath("/programs/catalog")
   revalidatePath("/programs")
+  revalidatePath("/programs/list")
+  revalidatePath("/programs/catalog")
   revalidatePath("/programs/registrations")
   revalidatePath("/programs/reports")
   if (programId) {

@@ -35,6 +35,7 @@ import {
 } from "@/lib/programs/program-display-labels"
 import { getProgramStatusLabel, type ProgramStatus } from "@/lib/programs/program-status"
 import type { Program } from "@/lib/programs/program-types"
+import { FlyerThumbnail } from "@/components/ui/flyer-thumbnail"
 import { cn } from "@/lib/utils"
 
 export type { ProgramDetailOfferingRow }
@@ -421,23 +422,21 @@ function OverviewCard({
           Edit
         </Button>
       </CardHeader>
-      <CardContent className="grid gap-6 p-5 pt-4 lg:grid-cols-[140px_minmax(0,1fr)_220px]">
-        <div
-          className={cn(
-            "aspect-[3/4] w-full max-w-[140px] overflow-hidden rounded-lg",
-            !program.flyer_url && getFlyerPlaceholderColor(program.id)
-          )}
-        >
+      <CardContent className="grid gap-6 p-5 pt-4 lg:grid-cols-[7.5rem_minmax(0,1fr)_220px]">
+        <div className="shrink-0">
           {program.flyer_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <FlyerThumbnail
               src={program.flyer_url}
               alt={`${program.name} flyer`}
-              className="h-full w-full object-cover"
             />
           ) : (
-            <div className="flex h-full items-center justify-center">
-              <span className="text-3xl font-semibold text-white/90">
+            <div
+              className={cn(
+                "flex aspect-[3/4] w-28 items-center justify-center rounded-lg",
+                getFlyerPlaceholderColor(program.id)
+              )}
+            >
+              <span className="text-2xl font-semibold text-white/90">
                 {program.name.trim().charAt(0).toUpperCase() || "P"}
               </span>
             </div>

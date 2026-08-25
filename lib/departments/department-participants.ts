@@ -31,6 +31,10 @@ export type DepartmentParticipantRow = {
   programId: string
   offeringId: string | null
   status: string | null
+  paymentStatus: string | null
+  paymentRequired: boolean | null
+  amountPaid: number
+  totalAmount: number
   registeredAt: string | null
 }
 
@@ -128,6 +132,10 @@ export async function fetchDepartmentParticipants(
       parent_email,
       parent_phone,
       status,
+      payment_status,
+      payment_required,
+      amount_paid,
+      total_amount,
       enrollment_date,
       created_at,
       offering:offering_id (
@@ -215,7 +223,10 @@ export async function fetchDepartmentParticipants(
   )
 
   const participants: DepartmentParticipantRow[] = enrollments.map((row) => {
-    const offering = row.offering as { id: string; name: string | null } | null
+    const offering = row.offering as unknown as {
+      id: string
+      name: string | null
+    } | null
     const programId = row.program_id as string
     const offeringId = (row.offering_id as string | null) ?? null
     const parentContactId =
@@ -252,6 +263,10 @@ export async function fetchDepartmentParticipants(
       programId,
       offeringId,
       status: (row.status as string | null) ?? null,
+      paymentStatus: (row.payment_status as string | null) ?? null,
+      paymentRequired: (row.payment_required as boolean | null) ?? null,
+      amountPaid: Number(row.amount_paid || 0),
+      totalAmount: Number(row.total_amount || 0),
       registeredAt:
         (row.enrollment_date as string | null) ||
         (row.created_at as string | null) ||

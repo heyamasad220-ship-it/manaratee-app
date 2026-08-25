@@ -2,10 +2,12 @@
  * Offering overview page — edit via dialog (`?edit=1` to auto-open).
  * Legacy `?tab=` values still resolve to this page for bookmarks.
  *
- * Department-linked years/seasons open under
- * `/workforce/departments/{deptId}/programs/{programId}/offerings/{offeringId}`
- * so the Departments sidebar stays selected.
+ * Offering overview lives at
+ * `/programs/{programId}/offerings/{offeringId}`.
+ * Department-scoped URLs redirect into the Programs module.
  */
+
+import { programWorkspaceHref } from "@/lib/programs/program-workspace-path"
 
 export type OfferingManageTab = "settings"
 
@@ -51,8 +53,8 @@ export type OfferingManageHrefOptions = {
 }
 
 /**
- * Prefer department-scoped URL when `departmentId` is set so staff stay in
- * HR → Departments instead of bouncing to the Programs sidebar.
+ * Offering manage lives in the Programs module. `departmentId` is ignored
+ * for the path (kept on the options type for older call sites).
  */
 export function programOfferingManageHref(
   programId: string,
@@ -64,10 +66,7 @@ export function programOfferingManageHref(
       ? { tab: tabOrOptions }
       : tabOrOptions || {}
 
-  const departmentId = options.departmentId?.trim() || null
-  const base = departmentId
-    ? `/workforce/departments/${departmentId}/programs/${programId}/offerings/${offeringId}`
-    : `/programs/${programId}/offerings/${offeringId}`
+  const base = `/programs/${programId}/offerings/${offeringId}`
 
   const params = new URLSearchParams()
   if (options.edit) params.set("edit", "1")
@@ -77,7 +76,7 @@ export function programOfferingManageHref(
 }
 
 export function programOfferingsIndexHref(programId: string) {
-  return `/programs/${programId}/offerings`
+  return programWorkspaceHref(programId, { tab: "offerings" })
 }
 
 /** Standalone Programs-module URL (ignores department). */

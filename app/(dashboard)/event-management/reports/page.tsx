@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 
-/** Event Management Reports removed — childcare lives under Programs/ Events → Reports. */
-export default function EventManagementReportsRedirectPage() {
-  redirect("/programs/reports/childcare")
+import { EVENT_MANAGEMENT_CHILDCARE_REPORTS_PATH } from "@/lib/events/event-management-reports-path"
+
+export default function EventManagementReportsPage() {
+  redirect(EVENT_MANAGEMENT_CHILDCARE_REPORTS_PATH)
 }

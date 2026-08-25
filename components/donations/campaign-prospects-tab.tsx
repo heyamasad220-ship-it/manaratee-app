@@ -854,8 +854,7 @@ export function CampaignProspectsTab({
         organizationId={organizationId}
         defaultCampaignId={campaignId}
         canManage={canManage}
-        onSaved={(pledgeId) => {
-          setPledgeDetailsId(pledgeId)
+        onSaved={() => {
           setConvertProspectId(null)
           void loadProspects()
           void loadAssignees()

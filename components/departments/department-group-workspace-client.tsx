@@ -5,9 +5,7 @@ import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
   ArrowLeft,
-  BarChart3,
   BookOpen,
-  CalendarClock,
   CalendarDays,
   DollarSign,
   Heart,
@@ -26,11 +24,10 @@ import { DepartmentExpensesPanel } from "@/components/departments/department-exp
 import { DepartmentGroupGivingPanel } from "@/components/departments/department-group-giving-panel"
 import { DepartmentOverviewPanel } from "@/components/departments/department-overview-panel"
 import { DepartmentPayrollPanel } from "@/components/departments/department-payroll-panel"
+import { DepartmentProgramDashboardPanel } from "@/components/departments/department-program-dashboard-panel"
 import { DepartmentProgramOverviewPanel } from "@/components/departments/department-program-overview-panel"
-import { DepartmentProgramsCatalogPanel } from "@/components/departments/department-programs-catalog-panel"
+import { DepartmentProgramsDoorwayPanel } from "@/components/departments/department-programs-doorway-panel"
 import { DepartmentProgramsPanel } from "@/components/departments/department-programs-panel"
-import { DepartmentReportsPanel } from "@/components/departments/department-reports-panel"
-import { DepartmentSchedulePanel } from "@/components/departments/department-schedule-panel"
 import { DepartmentSettingsPanel } from "@/components/departments/department-settings-panel"
 import { DepartmentStudentsPanel } from "@/components/departments/department-students-panel"
 import { FinancePayrollQueuePanel } from "@/components/finance/finance-payroll-queue-panel"
@@ -62,9 +59,9 @@ import {
   isDepartmentYearRequiredTab,
   isDepartmentYearWorkspaceTab,
   parseDepartmentFinanceSection,
-  parseDepartmentScheduleSection,
   parseDepartmentStudentsSection,
   parseDepartmentWorkspaceTab,
+  isMovedDepartmentSettingsSection,
   type GroupWorkspaceTab,
 } from "@/lib/donations/donation-group-path"
 import { DONATIONS_GROUP_GIVING_REPORT_PATH } from "@/lib/donations/donor-giving-report"
@@ -82,6 +79,7 @@ import {
 } from "@/lib/programs/program-display-labels"
 import type { ProgramKind } from "@/lib/programs/program-kind"
 import { normalizeProgramKind } from "@/lib/programs/program-kind"
+import { programWorkspaceHrefFromDepartmentYearQuery } from "@/lib/programs/program-workspace-path"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 
@@ -133,10 +131,6 @@ export function DepartmentGroupWorkspaceClient({
   const activeTab = parseDepartmentWorkspaceTab(rawTab)
   const yearProgramId = searchParams.get("year")
   const financeSection = parseDepartmentFinanceSection(
-    rawTab,
-    searchParams.get("section")
-  )
-  const scheduleSection = parseDepartmentScheduleSection(
     rawTab,
     searchParams.get("section")
   )
@@ -291,14 +285,15 @@ export function DepartmentGroupWorkspaceClient({
     }
   }, [departmentId, supabase, yearProgramId])
 
-  // Year-required tabs need `?year=`. Department tabs (including Programs) clear year.
+  // Program management lives in the Programs module — bounce leftover ?year=.
   useEffect(() => {
     if (loading || !department) return
 
-    if (isDepartmentYearRequiredTab(activeTab) && !yearProgramId) {
+    const leftoverSettingsSection = searchParams.get("section")
+    if (rawTab === "financial" && leftoverSettingsSection === "employees") {
       router.replace(
         departmentGroupWorkspaceHref(departmentId, {
-          tab: "overview",
+          tab: "employees",
           returnTo: safeReturnTo,
         }),
         { scroll: false }
@@ -306,13 +301,73 @@ export function DepartmentGroupWorkspaceClient({
       return
     }
 
-    if (!isDepartmentYearWorkspaceTab(activeTab) && yearProgramId) {
+    if (
+      (rawTab === "settings" || Boolean(yearProgramId)) &&
+      leftoverSettingsSection === "service-needs"
+    ) {
       router.replace(
         departmentGroupWorkspaceHref(departmentId, {
-          tab: activeTab === "group-giving" && !pair ? "overview" : activeTab,
-          finance: activeTab === "financial" ? financeSection : undefined,
-          scheduleSection:
-            activeTab === "schedule" ? scheduleSection : undefined,
+          tab: "activity",
+          returnTo: safeReturnTo,
+        }),
+        { scroll: false }
+      )
+      return
+    }
+
+    if (yearProgramId) {
+      router.replace(
+        programWorkspaceHrefFromDepartmentYearQuery({
+          yearProgramId,
+          tab: rawTab,
+          section: leftoverSettingsSection,
+        }),
+        { scroll: false }
+      )
+      return
+    }
+
+    if (rawTab === "reports") {
+      router.replace(
+        departmentGroupWorkspaceHref(departmentId, {
+          tab: "financial",
+          finance: financeSection,
+          returnTo: safeReturnTo,
+        }),
+        { scroll: false }
+      )
+      return
+    }
+
+    if (rawTab === "schedule") {
+      router.replace(
+        departmentGroupWorkspaceHref(departmentId, {
+          tab: "programs",
+          returnTo: safeReturnTo,
+        }),
+        { scroll: false }
+      )
+      return
+    }
+
+    if (
+      rawTab === "settings" &&
+      isMovedDepartmentSettingsSection(leftoverSettingsSection)
+    ) {
+      router.replace(
+        departmentGroupWorkspaceHref(departmentId, {
+          tab: leftoverSettingsSection === "service-needs" ? "activity" : "programs",
+          returnTo: safeReturnTo,
+        }),
+        { scroll: false }
+      )
+      return
+    }
+
+    if (isDepartmentYearRequiredTab(activeTab) && !yearProgramId) {
+      router.replace(
+        departmentGroupWorkspaceHref(departmentId, {
+          tab: "overview",
           returnTo: safeReturnTo,
         }),
         { scroll: false }
@@ -325,9 +380,10 @@ export function DepartmentGroupWorkspaceClient({
     financeSection,
     loading,
     pair,
+    rawTab,
     router,
     safeReturnTo,
-    scheduleSection,
+    searchParams,
     yearProgramId,
   ])
 
@@ -336,51 +392,15 @@ export function DepartmentGroupWorkspaceClient({
     const hasGiving = Boolean(pair?.groupContactId)
     const safeTab = !hasGiving && next === "group-giving" ? "overview" : next
 
-    if (isDepartmentYearRequiredTab(safeTab)) {
-      if (!yearProgramId) {
-        router.replace(
-          departmentGroupWorkspaceHref(departmentId, {
-            tab: "overview",
-            returnTo: safeReturnTo,
-          }),
-          { scroll: false }
-        )
-        return
-      }
-      router.replace(
-        departmentGroupWorkspaceHref(departmentId, {
-          tab: safeTab,
-          finance: safeTab === "financial" ? financeSection : undefined,
-          studentsSection: safeTab === "students" ? studentsSection : undefined,
-          yearProgramId,
-          returnTo: safeReturnTo,
-        }),
-        { scroll: false }
-      )
-      return
-    }
-
-    // Dual-purpose: keep year when already in year workspace.
-    if (
-      (safeTab === "programs" || safeTab === "overview") &&
-      yearProgramId
-    ) {
-      router.replace(
-        departmentGroupWorkspaceHref(departmentId, {
-          tab: safeTab,
-          yearProgramId,
-          returnTo: safeReturnTo,
-        }),
-        { scroll: false }
-      )
-      return
-    }
-
     router.replace(
       departmentGroupWorkspaceHref(departmentId, {
         tab: safeTab,
-        finance: safeTab === "financial" ? financeSection : undefined,
-        scheduleSection: safeTab === "schedule" ? scheduleSection : undefined,
+        finance:
+          safeTab === "financial"
+            ? financeSection === "employees"
+              ? "payroll"
+              : financeSection
+            : undefined,
         returnTo: safeReturnTo,
       }),
       { scroll: false }
@@ -399,21 +419,9 @@ export function DepartmentGroupWorkspaceClient({
     )
   }
 
-  function handleScheduleSectionChange(section: string) {
-    const next = parseDepartmentScheduleSection("schedule", section)
-    router.replace(
-      departmentGroupWorkspaceHref(departmentId, {
-        tab: "schedule",
-        scheduleSection: next,
-        returnTo: safeReturnTo,
-      }),
-      { scroll: false }
-    )
-  }
-
   function handleStudentsSectionChange(section: string) {
     const next =
-      parseDepartmentStudentsSection("students", section) ?? "roster"
+      parseDepartmentStudentsSection("students", section) ?? "enrollments"
     router.replace(
       departmentGroupWorkspaceHref(departmentId, {
         tab: "students",
@@ -552,6 +560,10 @@ export function DepartmentGroupWorkspaceClient({
                     <Users className="size-4" />
                     Registrations
                   </TabsTrigger>
+                  <TabsTrigger value="settings" className="gap-2">
+                    <Settings className="size-4" />
+                    Settings
+                  </TabsTrigger>
                 </>
               ) : (
                 <>
@@ -563,17 +575,13 @@ export function DepartmentGroupWorkspaceClient({
                     <BookOpen className="size-4" />
                     {YEAR_SEASON_LABEL_PLURAL}
                   </TabsTrigger>
-                  <TabsTrigger value="schedule" className="gap-2">
-                    <CalendarClock className="size-4" />
-                    Schedule
+                  <TabsTrigger value="activity" className="gap-2">
+                    <CalendarDays className="size-4" />
+                    Events
                   </TabsTrigger>
-                  <TabsTrigger value="financial" className="gap-2">
-                    <PieChart className="size-4" />
-                    Financial
-                  </TabsTrigger>
-                  <TabsTrigger value="reports" className="gap-2">
-                    <BarChart3 className="size-4" />
-                    Reports
+                  <TabsTrigger value="employees" className="gap-2">
+                    <Users className="size-4" />
+                    Employees
                   </TabsTrigger>
                   {hasGiving ? (
                     <TabsTrigger value="group-giving" className="gap-2">
@@ -581,9 +589,9 @@ export function DepartmentGroupWorkspaceClient({
                       Group giving
                     </TabsTrigger>
                   ) : null}
-                  <TabsTrigger value="activity" className="gap-2">
-                    <CalendarDays className="size-4" />
-                    Events
+                  <TabsTrigger value="financial" className="gap-2">
+                    <PieChart className="size-4" />
+                    Financial
                   </TabsTrigger>
                   <TabsTrigger value="settings" className="gap-2">
                     <Settings className="size-4" />
@@ -596,15 +604,11 @@ export function DepartmentGroupWorkspaceClient({
 
           {showFinanceChrome ? (
             <Tabs
-              value={financeSection}
+              value={financeSection === "employees" ? "payroll" : financeSection}
               onValueChange={handleFinanceSectionChange}
               className="gap-0"
             >
               <TabsList className="flex h-auto flex-wrap justify-start gap-1">
-                <TabsTrigger value="employees" className="gap-2">
-                  <Users className="size-4" />
-                  Employees
-                </TabsTrigger>
                 <TabsTrigger value="payroll" className="gap-2">
                   <Wallet className="size-4" />
                   Payroll
@@ -623,42 +627,18 @@ export function DepartmentGroupWorkspaceClient({
         </div>
 
         {resolvedTab === "overview" && !yearProgramId ? (
-          <DepartmentOverviewPanel
-            departmentId={department.id}
-            departmentName={displayName}
-            departmentDescription={department.description}
-            departmentFlyerUrl={department.flyer_url}
-            departmentColor={department.color}
-            departmentTermsHtml={department.terms_html}
-            departmentTermsPdfUrl={department.terms_pdf_url}
-            onDepartmentMetaChanged={load}
-          />
+          <DepartmentOverviewPanel departmentId={department.id} />
         ) : null}
 
         {resolvedTab === "overview" && yearProgramId ? (
-          <DepartmentProgramOverviewPanel
+          <DepartmentProgramDashboardPanel
             departmentId={department.id}
             yearProgramId={yearProgramId}
-            onProgramMetaChanged={() => {
-              // Refresh header year name after rename.
-              void supabase
-                .from("programs")
-                .select("name")
-                .eq("id", yearProgramId)
-                .eq("department_id", departmentId)
-                .maybeSingle()
-                .then(({ data }) => {
-                  if (data?.name) setYearName(data.name as string)
-                })
-            }}
           />
         ) : null}
 
         {resolvedTab === "programs" && !yearProgramId ? (
-          <DepartmentProgramsCatalogPanel
-            departmentId={department.id}
-            departmentName={displayName}
-          />
+          <DepartmentProgramsDoorwayPanel departmentId={department.id} />
         ) : null}
 
         {resolvedTab === "programs" && yearProgramId ? (
@@ -678,28 +658,19 @@ export function DepartmentGroupWorkspaceClient({
           />
         ) : null}
 
-        {resolvedTab === "schedule" && !yearMode ? (
-          <DepartmentSchedulePanel
+        {resolvedTab === "employees" && !yearMode ? (
+          <DepartmentPayrollPanel
             departmentId={department.id}
             departmentName={displayName}
-            initialSection={scheduleSection}
-            onSectionChange={handleScheduleSectionChange}
+            staff={department.staff}
+            onStaffChanged={load}
+            stickyStatsTop={financeStatsStickyTop}
+            variant="roster"
           />
         ) : null}
 
         {resolvedTab === "financial" && !yearMode ? (
           <div className="space-y-4">
-            {financeSection === "employees" ? (
-              <DepartmentPayrollPanel
-                departmentId={department.id}
-                departmentName={displayName}
-                staff={department.staff}
-                onStaffChanged={load}
-                stickyStatsTop={financeStatsStickyTop}
-                variant="roster"
-              />
-            ) : null}
-
             {financeSection === "payroll" ? (
               <FinancePayrollQueuePanel
                 departmentId={department.id}
@@ -737,15 +708,6 @@ export function DepartmentGroupWorkspaceClient({
           </div>
         ) : null}
 
-        {resolvedTab === "reports" && !yearMode ? (
-          <DepartmentReportsPanel
-            departmentId={department.id}
-            departmentName={displayName}
-            staff={department.staff}
-            onStaffChanged={load}
-          />
-        ) : null}
-
         {resolvedTab === "group-giving" && pair ? (
           <DepartmentGroupGivingPanel
             groupContactId={pair.groupContactId}
@@ -764,10 +726,34 @@ export function DepartmentGroupWorkspaceClient({
           />
         ) : null}
 
-        {resolvedTab === "settings" ? (
+        {resolvedTab === "settings" && yearProgramId ? (
+          <DepartmentProgramOverviewPanel
+            departmentId={department.id}
+            yearProgramId={yearProgramId}
+            onProgramMetaChanged={() => {
+              void supabase
+                .from("programs")
+                .select("name")
+                .eq("id", yearProgramId)
+                .eq("department_id", departmentId)
+                .maybeSingle()
+                .then(({ data }) => {
+                  if (data?.name) setYearName(data.name as string)
+                })
+            }}
+          />
+        ) : null}
+
+        {resolvedTab === "settings" && !yearProgramId ? (
           <DepartmentSettingsPanel
             departmentId={department.id}
             departmentName={displayName}
+            departmentDescription={department.description}
+            departmentColor={department.color}
+            departmentTermsHtml={department.terms_html}
+            departmentTermsPdfUrl={department.terms_pdf_url}
+            staff={department.staff}
+            onDepartmentMetaChanged={load}
           />
         ) : null}
       </div>

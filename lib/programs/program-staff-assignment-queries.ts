@@ -1,10 +1,11 @@
-import { createClient } from "@/lib/supabase/server"
 import { getCustomerPortalSupabase } from "@/lib/auth/customer-portal-session"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
+import { primaryInstructorNameByOffering } from "@/lib/programs/primary-instructor"
 import type {
   ProgramStaffAssignment,
   ProgramStaffAssignmentWithDetails,
 } from "@/lib/programs/program-staff-assignment-types"
+import { createClient } from "@/lib/supabase/server"
 
 function mapAssignmentWithDetails(row: Record<string, unknown>): ProgramStaffAssignmentWithDetails {
   const contact = row.contact as Record<string, unknown> | null
@@ -369,6 +370,74 @@ export async function getOfferingRosterEnrollments(
   }
 
   return (data || []) as OfferingRosterEnrollment[]
+}
+
+export async function getPrimaryInstructorByOfferingIds(
+  offeringIds: string[],
+  organizationId: string
+): Promise<Map<string, string>> {
+  const names = new Map<string, string>()
+  if (offeringIds.length === 0) return names
+
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from("program_staff_assignments")
+    .select(
+      "offering_id, assignment_role, is_active, session_id, created_at, updated_at, contact:contact_id ( full_name )"
+    )
+    .eq("organization_id", organizationId)
+    .in("offering_id", offeringIds)
+    .eq("is_active", true)
+    .in("assignment_role", ["primary_instructor", "assistant_instructor", "instructor"])
+
+  if (error) {
+    console.error("getPrimaryInstructorByOfferingIds:", error.message)
+    return names
+  }
+
+  return primaryInstructorNameByOffering(
+    (data || []).map((row) => ({
+      offering_id: row.offering_id as string,
+      assignment_role: String(row.assignment_role || ""),
+      is_active: true,
+      session_id: (row.session_id as string | null) ?? null,
+      created_at: (row.created_at as string | null) ?? null,
+      updated_at: (row.updated_at as string | null) ?? null,
+      contact_name: (
+        (row.contact as { full_name?: string | null } | null)?.full_name || ""
+      ).trim(),
+    }))
+  )
+}
+
+export async function getEnrollmentCountsByOfferingIds(
+  offeringIds: string[],
+  organizationId: string
+): Promise<Map<string, number>> {
+  const counts = new Map<string, number>()
+  for (const offeringId of offeringIds) counts.set(offeringId, 0)
+  if (offeringIds.length === 0) return counts
+
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from("program_enrollments")
+    .select("offering_id")
+    .eq("organization_id", organizationId)
+    .in("offering_id", offeringIds)
+    .in("status", ["enrolled", "active"])
+
+  if (error) {
+    console.error("getEnrollmentCountsByOfferingIds:", error.message)
+    return counts
+  }
+
+  for (const row of data || []) {
+    const offeringId = row.offering_id as string | null
+    if (!offeringId) continue
+    counts.set(offeringId, (counts.get(offeringId) || 0) + 1)
+  }
+
+  return counts
 }
 
 export function asProgramStaffAssignment(

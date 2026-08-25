@@ -296,7 +296,7 @@ const moduleGroupOverride: Record<string, string> = {
 const moduleDefaultRouteOverride: Record<string, string> = {
   contacts: "/directory",
   spaces: "/facilities/overview",
-  programs: "/programs/catalog",
+  programs: "/programs",
   workforce: "/workforce/employees",
   hr: "/workforce/employees",
   finance: "/finance/transactions",
@@ -352,7 +352,7 @@ const moduleChildren: Record<string, SubItem[]> = {
       permissionKey: "spaces.view",
     },
   ],
-  // Programs catalog is a single page (no in-page Catalog/Calendar tabs).
+  // Programs uses in-page module tabs (Overview, Programs, Offerings, …).
   programs: [],
   finance: [
     {

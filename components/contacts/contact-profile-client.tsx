@@ -32,7 +32,6 @@ import { ContactProgramAssignmentsPanel } from "@/components/contacts/contact-pr
 import { ContactApplicationsPanel } from "@/components/contacts/contact-applications-panel"
 import { ContactProfileHeader } from "@/components/contacts/contact-profile-header"
 import { ContactProfileFinancialSummaryCard } from "@/components/contacts/contact-profile-financial-summary-card"
-import { ContactDirectoryRolesCard } from "@/components/directory/contact-directory-roles-card"
 import { createClient } from "@/lib/supabase/client"
 import {
   type ContactRoleValue,
@@ -680,12 +679,6 @@ export function ContactProfileClient({
 
       {activeTab === "overview" ? (
         <div className="space-y-6">
-          <ContactDirectoryRolesCard
-            contactId={contact.id}
-            roles={roles}
-            modules={modules}
-            staffRecordId={staffRecordId}
-          />
           {isGroup ? (
             <ContactGroupMembersPanel
               groupContactId={contact.id}

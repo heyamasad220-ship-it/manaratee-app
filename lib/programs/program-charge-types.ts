@@ -191,9 +191,12 @@ export function isPaymentRequiredAtRegistration(
 
 export function initialEnrollmentStatusForQuote(
   dueToday: number,
-  settings?: Pick<ProgramPaymentSettings, "require_payment_at_registration"> | null
+  settings?: Pick<ProgramPaymentSettings, "require_payment_at_registration"> | null,
+  seatActivationRule?: "on_registration" | "after_initial_payment" | null
 ) {
-  return isPaymentRequiredAtRegistration(dueToday, settings)
-    ? "pending_payment"
-    : "pending"
+  const paymentRequired = isPaymentRequiredAtRegistration(dueToday, settings)
+  if (seatActivationRule === "on_registration" || !seatActivationRule) {
+    return "enrolled"
+  }
+  return paymentRequired ? "pending_payment" : "pending"
 }

@@ -340,7 +340,6 @@ export default function CampaignDetailPage() {
   )
 
   const loadCampaign = useCallback(async () => {
-    setLoading(true)
     setErrorMessage(null)
 
     const result = await getCampaignDetailAction(campaignId)
@@ -448,7 +447,9 @@ export default function CampaignDetailPage() {
   }, [campaignId, supabase])
 
   useEffect(() => {
-    if (campaignId) void loadCampaign()
+    if (!campaignId) return
+    setLoading(true)
+    void loadCampaign()
   }, [campaignId, loadCampaign])
 
   if (loading) {
@@ -640,8 +641,7 @@ export default function CampaignDetailPage() {
         organizationId={campaign.organization_id}
         defaultCampaignId={campaign.id}
         canManage={canManage}
-        onSaved={(pledgeId) => {
-          setDetailsPledgeId(pledgeId)
+        onSaved={() => {
           void loadCampaign()
         }}
         onDeleted={() => {

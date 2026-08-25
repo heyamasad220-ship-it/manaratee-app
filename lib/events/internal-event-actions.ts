@@ -52,6 +52,7 @@ import {
   parseAttendanceMode,
   parseEventWorkspaceFeatures,
   resolveAttendanceMode,
+  resolveEventWorkspaceFeatures,
   type EventAttendanceMode,
   type EventWorkspaceFeatures,
 } from "./event-workspace-features"
@@ -1410,6 +1411,13 @@ export async function updateInternalEventModules(input: {
       updatePayload.requires_childcare = servicePayload.requires_childcare
       updatePayload.requires_vendors = servicePayload.requires_vendors
       updatePayload.service_requirements = servicePayload.service_requirements
+
+      const currentFeatures = resolveEventWorkspaceFeatures(existingEvent)
+      updatePayload.workspace_features = {
+        ...currentFeatures,
+        youth: currentFeatures.youth || servicePayload.requires_childcare,
+        vendors: currentFeatures.vendors || servicePayload.requires_vendors,
+      }
     }
 
     if (input.ticketingForm) {
@@ -1505,6 +1513,9 @@ export async function updateInternalEventModules(input: {
 
     revalidateInternalEventPaths(input.eventId)
     revalidatePath(`/event-management/${input.eventId}`)
+    if (input.serviceForm) {
+      revalidatePath("/customer/opportunities")
+    }
     return { success: true, eventId: input.eventId }
   } catch (error) {
     console.error(error)

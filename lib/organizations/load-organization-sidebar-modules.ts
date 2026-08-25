@@ -57,7 +57,7 @@ const SIDEBAR_MODULE_DEFAULTS: Record<
   },
   programs: {
     name: "Programs",
-    route: "/programs/catalog",
+    route: "/programs",
     icon_name: "GraduationCap",
     group_name: "Operations",
     sort_order: 40,

@@ -90,20 +90,29 @@ function StackedLines({ values }: { values: string[] }) {
   )
 }
 
-export function PaymentSummaryReportPanel() {
+export function PaymentSummaryReportPanel({
+  lockedProgramId,
+}: {
+  lockedProgramId?: string
+}) {
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
   const [items, setItems] = React.useState<PaymentSummaryRow[]>([])
-  const { kindFilter, setKindFilter } = useProgramKindReportPreset()
-  const [programFilter, setProgramFilter] = React.useState(ALL)
+  const { kindFilter: urlKindFilter, setKindFilter } =
+    useProgramKindReportPreset()
+  const kindFilter = lockedProgramId ? "all" : urlKindFilter
+  const [programFilter, setProgramFilter] = React.useState(
+    lockedProgramId || ALL
+  )
   const [offeringFilter, setOfferingFilter] = React.useState(ALL)
   const [page, setPage] = React.useState(1)
   const [pageSize, setPageSize] = React.useState(DEFAULT_LIST_PAGE_SIZE)
 
   React.useEffect(() => {
+    if (lockedProgramId) return
     setProgramFilter(ALL)
     setOfferingFilter(ALL)
-  }, [kindFilter])
+  }, [kindFilter, lockedProgramId])
 
   const reportLabels = getReportHierarchyLabels(
     kindFilter === "all" ? null : kindFilter
@@ -147,8 +156,9 @@ export function PaymentSummaryReportPanel() {
     if (kindFilter !== "all") {
       scoped = scoped.filter((row) => row.programKind === kindFilter)
     }
-    if (programFilter !== ALL) {
-      scoped = scoped.filter((row) => row.programId === programFilter)
+    const scopedProgramId = lockedProgramId || programFilter
+    if (scopedProgramId !== ALL) {
+      scoped = scoped.filter((row) => row.programId === scopedProgramId)
     }
     const map = new Map<string, string>()
     for (const row of scoped) {
@@ -160,16 +170,17 @@ export function PaymentSummaryReportPanel() {
     return [...map.entries()]
       .map(([id, label]) => ({ id, label }))
       .sort((a, b) => a.label.localeCompare(b.label))
-  }, [items, kindFilter, programFilter, reportLabels.offeringSingular])
+  }, [items, kindFilter, lockedProgramId, programFilter, reportLabels.offeringSingular])
 
   React.useEffect(() => {
+    if (lockedProgramId) return
     if (
       programFilter !== ALL &&
       !programOptions.some((option) => option.id === programFilter)
     ) {
       setProgramFilter(ALL)
     }
-  }, [programFilter, programOptions])
+  }, [lockedProgramId, programFilter, programOptions])
 
   React.useEffect(() => {
     if (
@@ -183,7 +194,12 @@ export function PaymentSummaryReportPanel() {
   const filteredRows = React.useMemo(() => {
     return items.filter((row) => {
       if (kindFilter !== "all" && row.programKind !== kindFilter) return false
-      if (programFilter !== ALL && row.programId !== programFilter) return false
+      if (
+        (lockedProgramId || programFilter !== ALL) &&
+        row.programId !== (lockedProgramId || programFilter)
+      ) {
+        return false
+      }
       if (
         offeringFilter !== ALL &&
         !row.offeringIds.includes(offeringFilter)
@@ -192,7 +208,7 @@ export function PaymentSummaryReportPanel() {
       }
       return true
     })
-  }, [items, kindFilter, programFilter, offeringFilter])
+  }, [items, kindFilter, lockedProgramId, programFilter, offeringFilter])
 
   React.useEffect(() => {
     setPage(1)
@@ -204,59 +220,65 @@ export function PaymentSummaryReportPanel() {
   )
 
   const filtersActive =
-    kindFilter !== "all" || programFilter !== ALL || offeringFilter !== ALL
+    (!lockedProgramId && kindFilter !== "all") ||
+    (!lockedProgramId && programFilter !== ALL) ||
+    offeringFilter !== ALL
 
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
-        <div className="space-y-1.5 sm:w-44">
-          <Label htmlFor="payment-summary-kind">Type</Label>
-          <Select
-            value={kindFilter}
-            onValueChange={(value) => {
-              setKindFilter(value as "all" | "academic" | "seasonal")
-              setProgramFilter(ALL)
-              setOfferingFilter(ALL)
-            }}
-          >
-            <SelectTrigger id="payment-summary-kind">
-              <SelectValue placeholder="All types" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All types</SelectItem>
-              <SelectItem value="academic">Academic</SelectItem>
-              <SelectItem value="seasonal">Seasonal</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-1.5 sm:w-56">
-          <Label htmlFor="payment-summary-program">
-            {reportLabels.containerSingular}
-          </Label>
-          <Select
-            value={programFilter}
-            onValueChange={(value) => {
-              setProgramFilter(value)
-              setOfferingFilter(ALL)
-            }}
-          >
-            <SelectTrigger id="payment-summary-program">
-              <SelectValue
-                placeholder={`All ${reportLabels.containerPlural.toLowerCase()}`}
-              />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL}>
-                All {reportLabels.containerPlural.toLowerCase()}
-              </SelectItem>
-              {programOptions.map((option) => (
-                <SelectItem key={option.id} value={option.id}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {lockedProgramId ? null : (
+          <>
+            <div className="space-y-1.5 sm:w-44">
+              <Label htmlFor="payment-summary-kind">Type</Label>
+              <Select
+                value={kindFilter}
+                onValueChange={(value) => {
+                  setKindFilter(value as "all" | "academic" | "seasonal")
+                  setProgramFilter(ALL)
+                  setOfferingFilter(ALL)
+                }}
+              >
+                <SelectTrigger id="payment-summary-kind">
+                  <SelectValue placeholder="All types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All types</SelectItem>
+                  <SelectItem value="academic">Academic</SelectItem>
+                  <SelectItem value="seasonal">Seasonal</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5 sm:w-56">
+              <Label htmlFor="payment-summary-program">
+                {reportLabels.containerSingular}
+              </Label>
+              <Select
+                value={programFilter}
+                onValueChange={(value) => {
+                  setProgramFilter(value)
+                  setOfferingFilter(ALL)
+                }}
+              >
+                <SelectTrigger id="payment-summary-program">
+                  <SelectValue
+                    placeholder={`All ${reportLabels.containerPlural.toLowerCase()}`}
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL}>
+                    All {reportLabels.containerPlural.toLowerCase()}
+                  </SelectItem>
+                  {programOptions.map((option) => (
+                    <SelectItem key={option.id} value={option.id}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </>
+        )}
         <div className="space-y-1.5 sm:w-56">
           <Label htmlFor="payment-summary-offering">
             {reportLabels.offeringSingular}
@@ -284,8 +306,10 @@ export function PaymentSummaryReportPanel() {
             type="button"
             variant="ghost"
             onClick={() => {
-              setKindFilter("all")
-              setProgramFilter(ALL)
+              if (!lockedProgramId) {
+                setKindFilter("all")
+                setProgramFilter(ALL)
+              }
               setOfferingFilter(ALL)
             }}
           >

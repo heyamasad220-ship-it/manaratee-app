@@ -4,6 +4,7 @@ import * as React from "react"
 import { Loader2, Plus, X } from "lucide-react"
 import { toast } from "sonner"
 
+import { FlyerThumbnail } from "@/components/ui/flyer-thumbnail"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { saveBazaarEventFlyer, uploadBazaarFlyer } from "@/lib/vendor-hub/bazaar-flyer-actions"
@@ -110,7 +111,7 @@ export function BazaarFlyerField({
   }
 
   return (
-    <div className={cn("space-y-2", compact && "max-w-[200px]")}>
+    <div className="w-fit max-w-full space-y-2">
       <Label>Event flyer</Label>
       <input
         ref={inputRef}
@@ -121,44 +122,51 @@ export function BazaarFlyerField({
         className="sr-only"
       />
 
-      <button
-        type="button"
-        onClick={() => !uploading && !disabled && inputRef.current?.click()}
-        disabled={uploading || disabled}
-        className={cn(
-          "group relative flex w-full items-center justify-center overflow-hidden rounded-lg border-2 border-dashed border-border bg-muted/40 transition-colors",
-          "hover:border-primary/50 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-          compact ? "h-36" : "h-48",
-          (uploading || disabled) && "cursor-not-allowed opacity-70"
-        )}
-      >
-        {flyerUrl ? (
-          <>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={flyerUrl} alt="Bazaar flyer preview" className="h-full w-full object-cover" />
-            <div className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition-opacity group-hover:bg-black/40 group-hover:opacity-100">
-              <Plus className="h-8 w-8 text-white" />
-            </div>
-          </>
-        ) : uploading ? (
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        ) : (
-          <Plus className="h-8 w-8 text-muted-foreground" />
-        )}
-      </button>
+      {flyerUrl ? (
+        <FlyerThumbnail src={flyerUrl} alt="Event flyer" />
+      ) : (
+        <button
+          type="button"
+          onClick={() => !uploading && !disabled && inputRef.current?.click()}
+          disabled={uploading || disabled}
+          className={cn(
+            "group relative flex aspect-[3/4] w-28 items-center justify-center overflow-hidden rounded-lg border-2 border-dashed border-border bg-muted/40 transition-colors",
+            "hover:border-primary/50 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+            (uploading || disabled) && "cursor-not-allowed opacity-70"
+          )}
+        >
+          {uploading ? (
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          ) : (
+            <Plus className="h-6 w-6 text-muted-foreground" />
+          )}
+        </button>
+      )}
 
       {flyerUrl ? (
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-8 px-2"
-          onClick={() => void handleRemove()}
-          disabled={uploading || disabled}
-        >
-          <X className="mr-1.5 h-4 w-4" />
-          Remove
-        </Button>
+        <div className="flex flex-wrap items-center gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8 px-2"
+            onClick={() => !uploading && !disabled && inputRef.current?.click()}
+            disabled={uploading || disabled}
+          >
+            Replace
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8 px-2"
+            onClick={() => void handleRemove()}
+            disabled={uploading || disabled}
+          >
+            <X className="mr-1.5 h-4 w-4" />
+            Remove
+          </Button>
+        </div>
       ) : null}
 
       {showHint ? (

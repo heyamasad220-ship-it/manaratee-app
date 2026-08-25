@@ -92,16 +92,20 @@ function uniqueOptions(
 
 export function AddonsReportTable({
   rows,
+  lockedProgramId,
 }: {
   rows: AddonReportRow[]
+  lockedProgramId?: string
 }) {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_LIST_PAGE_SIZE)
   const [searchInput, setSearchInput] = useState("")
   const [searchFilter, setSearchFilter] = useState("")
   const [departmentFilter, setDepartmentFilter] = useState(ALL)
-  const { kindFilter, setKindFilter } = useProgramKindReportPreset()
-  const [programFilter, setProgramFilter] = useState(ALL)
+  const { kindFilter: urlKindFilter, setKindFilter } =
+    useProgramKindReportPreset()
+  const kindFilter = lockedProgramId ? "all" : urlKindFilter
+  const [programFilter, setProgramFilter] = useState(lockedProgramId || ALL)
   const [offeringFilter, setOfferingFilter] = useState(ALL)
   const [statusFilter, setStatusFilter] =
     useState<OfferingActivityFilter>("active")
@@ -110,9 +114,10 @@ export function AddonsReportTable({
     useState<PaymentStatusFilter>(ALL)
 
   useEffect(() => {
+    if (lockedProgramId) return
     setProgramFilter(ALL)
     setOfferingFilter(ALL)
-  }, [kindFilter])
+  }, [kindFilter, lockedProgramId])
 
   const reportLabels = getReportHierarchyLabels(
     kindFilter === "all" ? null : kindFilter
@@ -169,13 +174,14 @@ export function AddonsReportTable({
   }, [rows])
 
   useEffect(() => {
+    if (lockedProgramId) return
     if (
       programFilter !== ALL &&
       !programOptions.some((option) => option.id === programFilter)
     ) {
       setProgramFilter(ALL)
     }
-  }, [programFilter, programOptions])
+  }, [lockedProgramId, programFilter, programOptions])
 
   useEffect(() => {
     if (
@@ -202,7 +208,10 @@ export function AddonsReportTable({
       if (kindFilter !== "all" && row.programKind !== kindFilter) {
         return false
       }
-      if (programFilter !== ALL && row.programId !== programFilter) {
+      if (
+        (lockedProgramId || programFilter !== ALL) &&
+        row.programId !== (lockedProgramId || programFilter)
+      ) {
         return false
       }
       if (offeringFilter !== ALL && row.offeringId !== offeringFilter) {
@@ -233,6 +242,7 @@ export function AddonsReportTable({
     })
   }, [
     rows,
+    lockedProgramId,
     departmentFilter,
     kindFilter,
     programFilter,
@@ -258,9 +268,9 @@ export function AddonsReportTable({
   ])
 
   const filtersActive =
-    departmentFilter !== ALL ||
-    kindFilter !== "all" ||
-    programFilter !== ALL ||
+    (!lockedProgramId && departmentFilter !== ALL) ||
+    (!lockedProgramId && kindFilter !== "all") ||
+    (!lockedProgramId && programFilter !== ALL) ||
     offeringFilter !== ALL ||
     statusFilter !== "active" ||
     addonTypeFilter !== ALL ||
@@ -279,75 +289,79 @@ export function AddonsReportTable({
             placeholder="Contact, participant, or add-on"
           />
         </div>
-        <div className="space-y-1.5 sm:w-44">
-          <Label>Department</Label>
-          <Select
-            value={departmentFilter}
-            onValueChange={(value) => {
-              setDepartmentFilter(value)
-              setProgramFilter(ALL)
-              setOfferingFilter(ALL)
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="All departments" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL}>All departments</SelectItem>
-              {departmentOptions.map((option) => (
-                <SelectItem key={option.id} value={option.id}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-1.5 sm:w-36">
-          <Label htmlFor="addons-kind">Type</Label>
-          <Select
-            value={kindFilter}
-            onValueChange={(value) => {
-              setKindFilter(value as "all" | "academic" | "seasonal")
-              setProgramFilter(ALL)
-              setOfferingFilter(ALL)
-            }}
-          >
-            <SelectTrigger id="addons-kind">
-              <SelectValue placeholder="All types" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All types</SelectItem>
-              <SelectItem value="academic">Academic</SelectItem>
-              <SelectItem value="seasonal">Seasonal</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-1.5 sm:w-44">
-          <Label>{reportLabels.containerSingular}</Label>
-          <Select
-            value={programFilter}
-            onValueChange={(value) => {
-              setProgramFilter(value)
-              setOfferingFilter(ALL)
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue
-                placeholder={`All ${reportLabels.containerPlural.toLowerCase()}`}
-              />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL}>
-                All {reportLabels.containerPlural.toLowerCase()}
-              </SelectItem>
-              {programOptions.map((option) => (
-                <SelectItem key={option.id} value={option.id}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {lockedProgramId ? null : (
+          <>
+            <div className="space-y-1.5 sm:w-44">
+              <Label>Department</Label>
+              <Select
+                value={departmentFilter}
+                onValueChange={(value) => {
+                  setDepartmentFilter(value)
+                  setProgramFilter(ALL)
+                  setOfferingFilter(ALL)
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="All departments" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL}>All departments</SelectItem>
+                  {departmentOptions.map((option) => (
+                    <SelectItem key={option.id} value={option.id}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5 sm:w-36">
+              <Label htmlFor="addons-kind">Type</Label>
+              <Select
+                value={kindFilter}
+                onValueChange={(value) => {
+                  setKindFilter(value as "all" | "academic" | "seasonal")
+                  setProgramFilter(ALL)
+                  setOfferingFilter(ALL)
+                }}
+              >
+                <SelectTrigger id="addons-kind">
+                  <SelectValue placeholder="All types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All types</SelectItem>
+                  <SelectItem value="academic">Academic</SelectItem>
+                  <SelectItem value="seasonal">Seasonal</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5 sm:w-44">
+              <Label>{reportLabels.containerSingular}</Label>
+              <Select
+                value={programFilter}
+                onValueChange={(value) => {
+                  setProgramFilter(value)
+                  setOfferingFilter(ALL)
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue
+                    placeholder={`All ${reportLabels.containerPlural.toLowerCase()}`}
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL}>
+                    All {reportLabels.containerPlural.toLowerCase()}
+                  </SelectItem>
+                  {programOptions.map((option) => (
+                    <SelectItem key={option.id} value={option.id}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </>
+        )}
         <div className="space-y-1.5 sm:w-44">
           <Label>{reportLabels.offeringSingular}</Label>
           <Select value={offeringFilter} onValueChange={setOfferingFilter}>
@@ -428,9 +442,11 @@ export function AddonsReportTable({
             variant="ghost"
             className="sm:mb-0.5"
             onClick={() => {
-              setDepartmentFilter(ALL)
-              setKindFilter("all")
-              setProgramFilter(ALL)
+              if (!lockedProgramId) {
+                setDepartmentFilter(ALL)
+                setKindFilter("all")
+                setProgramFilter(ALL)
+              }
               setOfferingFilter(ALL)
               setStatusFilter("active")
               setAddonTypeFilter(ALL)

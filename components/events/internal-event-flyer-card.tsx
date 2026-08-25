@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 
+import { FlyerThumbnail } from "@/components/ui/flyer-thumbnail"
 import { ProgramFlyerField } from "@/components/programs/edit/program-flyer-field"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { updateInternalEventFlyer } from "@/lib/events/internal-event-actions"
@@ -43,8 +44,8 @@ export function InternalEventFlyerCard({
       <CardHeader>
         <CardTitle className="text-base">Flyer</CardTitle>
         <p className="text-sm text-muted-foreground">
-          Optional promotional image for this event. The full flyer is shown
-          without cropping.
+          Optional promotional image for this event. Hover the thumbnail to
+          open the full flyer.
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -55,17 +56,9 @@ export function InternalEventFlyerCard({
             onValueChange={persistFlyer}
             hideHiddenInput
             hideLabel
-            fit="contain"
-            frameClassName="max-w-full"
-            imageClassName="max-h-72"
           />
         ) : value ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={value}
-            alt="Event flyer"
-            className="block h-auto max-h-72 w-auto max-w-full rounded-md object-contain"
-          />
+          <FlyerThumbnail src={value} alt="Event flyer" />
         ) : (
           <p className="text-sm text-muted-foreground">No flyer uploaded.</p>
         )}

@@ -33,33 +33,16 @@ import {
   slicePageItems,
 } from "@/lib/ui/list-pagination"
 import { useProgramKindReportPreset } from "@/hooks/use-program-kind-report-preset"
+import type {
+  EnrollmentRowStatus,
+  EnrollmentsReportTableRow,
+  OfferingActivityStatus,
+} from "@/lib/programs/enrollments-report-types"
 
-export type OfferingActivityStatus = "active" | "closed"
-export type EnrollmentRowStatus = "active" | "cancelled"
-
-export type EnrollmentsReportTableRow = {
-  id: string
-  participantPersonId: string | null
-  contactName: string
-  contactProfileId: string | null
-  contactEmail: string | null
-  contactPhone: string | null
-  participantName: string
-  dateOfBirthLabel: string
-  ageLabel: string
-  genderLabel: string
-  allergiesLabel: string
-  emergencyContactLabel: string
-  photoConsentLabel: string
-  enrollmentStatus: EnrollmentRowStatus
-  departmentId: string | null
-  departmentName: string
-  programId: string | null
-  programName: string
-  programKind: "academic" | "seasonal"
-  offeringId: string | null
-  offeringName: string
-  offeringActivity: OfferingActivityStatus
+export type {
+  EnrollmentRowStatus,
+  EnrollmentsReportTableRow,
+  OfferingActivityStatus,
 }
 
 type OfferingActivityFilter = "all" | OfferingActivityStatus
@@ -92,26 +75,31 @@ export function EnrollmentsReportTable({
   rows,
   emptyMessage = "No enrollments found",
   emptyDescription = "Try clearing filters, or enrollments will appear here after registration.",
+  lockedProgramId,
 }: {
   rows: EnrollmentsReportTableRow[]
   emptyMessage?: string
   emptyDescription?: string
+  lockedProgramId?: string
 }) {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_LIST_PAGE_SIZE)
   const [searchInput, setSearchInput] = useState("")
   const [searchFilter, setSearchFilter] = useState("")
   const [departmentFilter, setDepartmentFilter] = useState(ALL)
-  const { kindFilter, setKindFilter } = useProgramKindReportPreset()
-  const [programFilter, setProgramFilter] = useState(ALL)
+  const { kindFilter: urlKindFilter, setKindFilter } =
+    useProgramKindReportPreset()
+  const kindFilter = lockedProgramId ? "all" : urlKindFilter
+  const [programFilter, setProgramFilter] = useState(lockedProgramId || ALL)
   const [offeringFilter, setOfferingFilter] = useState(ALL)
   const [statusFilter, setStatusFilter] =
     useState<OfferingActivityFilter>("active")
 
   useEffect(() => {
+    if (lockedProgramId) return
     setProgramFilter(ALL)
     setOfferingFilter(ALL)
-  }, [kindFilter])
+  }, [kindFilter, lockedProgramId])
 
   const reportLabels = getReportHierarchyLabels(
     kindFilter === "all" ? null : kindFilter
@@ -143,11 +131,12 @@ export function EnrollmentsReportTable({
   }, [rows, departmentFilter, kindFilter])
 
   const safeProgramFilter = useMemo(() => {
+    if (lockedProgramId) return lockedProgramId
     if (programFilter === ALL) return ALL
     return programOptions.some((option) => option.id === programFilter)
       ? programFilter
       : ALL
-  }, [programFilter, programOptions])
+  }, [lockedProgramId, programFilter, programOptions])
 
   const offeringOptions = useMemo(() => {
     let scoped = rows
@@ -255,72 +244,76 @@ export function EnrollmentsReportTable({
             placeholder="Contact or participant"
           />
         </div>
-        <div className="space-y-1.5 sm:w-44">
-          <Label>Department</Label>
-          <Select
-            value={departmentFilter}
-            onValueChange={(value) => {
-              setDepartmentFilter(value)
-              setProgramFilter(ALL)
-              setOfferingFilter(ALL)
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="All departments" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL}>All departments</SelectItem>
-              {departmentOptions.map((option) => (
-                <SelectItem key={option.id} value={option.id}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-1.5 sm:w-40">
-          <Label>Type</Label>
-          <Select
-            value={kindFilter}
-            onValueChange={(value) => {
-              setKindFilter(value as "all" | "academic" | "seasonal")
-              setProgramFilter(ALL)
-              setOfferingFilter(ALL)
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="All types" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All types</SelectItem>
-              <SelectItem value="academic">Academic</SelectItem>
-              <SelectItem value="seasonal">Seasonal</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-1.5 sm:w-44">
-          <Label>{reportLabels.containerSingular}</Label>
-          <Select
-            value={safeProgramFilter}
-            onValueChange={(value) => setProgramFilter(value)}
-          >
-            <SelectTrigger>
-              <SelectValue
-                placeholder={`All ${reportLabels.containerPlural.toLowerCase()}`}
-              />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL}>
-                All {reportLabels.containerPlural.toLowerCase()}
-              </SelectItem>
-              {programOptions.map((option) => (
-                <SelectItem key={option.id} value={option.id}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {lockedProgramId ? null : (
+          <>
+            <div className="space-y-1.5 sm:w-44">
+              <Label>Department</Label>
+              <Select
+                value={departmentFilter}
+                onValueChange={(value) => {
+                  setDepartmentFilter(value)
+                  setProgramFilter(ALL)
+                  setOfferingFilter(ALL)
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="All departments" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL}>All departments</SelectItem>
+                  {departmentOptions.map((option) => (
+                    <SelectItem key={option.id} value={option.id}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5 sm:w-40">
+              <Label>Type</Label>
+              <Select
+                value={kindFilter}
+                onValueChange={(value) => {
+                  setKindFilter(value as "all" | "academic" | "seasonal")
+                  setProgramFilter(ALL)
+                  setOfferingFilter(ALL)
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="All types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All types</SelectItem>
+                  <SelectItem value="academic">Academic</SelectItem>
+                  <SelectItem value="seasonal">Seasonal</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5 sm:w-44">
+              <Label>{reportLabels.containerSingular}</Label>
+              <Select
+                value={safeProgramFilter}
+                onValueChange={(value) => setProgramFilter(value)}
+              >
+                <SelectTrigger>
+                  <SelectValue
+                    placeholder={`All ${reportLabels.containerPlural.toLowerCase()}`}
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL}>
+                    All {reportLabels.containerPlural.toLowerCase()}
+                  </SelectItem>
+                  {programOptions.map((option) => (
+                    <SelectItem key={option.id} value={option.id}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </>
+        )}
         <div className="space-y-1.5 sm:w-44">
           <Label>{reportLabels.offeringSingular}</Label>
           <Select
@@ -362,9 +355,9 @@ export function EnrollmentsReportTable({
             </SelectContent>
           </Select>
         </div>
-        {(departmentFilter !== ALL ||
-          kindFilter !== "all" ||
-          safeProgramFilter !== ALL ||
+          {(departmentFilter !== ALL ||
+          (!lockedProgramId && kindFilter !== "all") ||
+          (!lockedProgramId && safeProgramFilter !== ALL) ||
           safeOfferingFilter !== ALL ||
           statusFilter !== "active" ||
           searchFilter) && (
@@ -374,8 +367,10 @@ export function EnrollmentsReportTable({
             className="sm:mb-0.5"
             onClick={() => {
               setDepartmentFilter(ALL)
-              setKindFilter("all")
-              setProgramFilter(ALL)
+              if (!lockedProgramId) {
+                setKindFilter("all")
+                setProgramFilter(ALL)
+              }
               setOfferingFilter(ALL)
               setStatusFilter("active")
               setSearchInput("")

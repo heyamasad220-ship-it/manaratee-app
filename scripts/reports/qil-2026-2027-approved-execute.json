@@ -1,0 +1,1277 @@
+{
+  "importTag": "QIL_2026_27_APPROVED_V1",
+  "execute": true,
+  "file": "C:/Users/danan/Downloads/QIApproved.xlsx",
+  "counts": {
+    "rows": 110,
+    "matched": 94,
+    "createdStudents": 16,
+    "ambiguous": 0,
+    "toApprove": 2,
+    "toInsert": 48,
+    "skipped": 60,
+    "offeringsCreated": 3,
+    "teachersAdded": 1
+  },
+  "createdOfferings": [
+    {
+      "id": "fb1ff821-5b03-4e0e-b0f9-b7cd681a8c26",
+      "name": "Tajweed Level 2 (Non-Arabic Speaking)",
+      "delivery_format": "online",
+      "status": "active"
+    },
+    {
+      "id": "d2ffe31b-0a73-454a-9b76-77e78ac61209",
+      "name": "Tajweed Level 1 (Non-Arabic Speaking)",
+      "delivery_format": "online",
+      "status": "active"
+    },
+    {
+      "id": "8b887773-2208-4251-b911-4ac7868e2749",
+      "name": "Al Nouraniyyeh",
+      "delivery_format": "online",
+      "status": "active"
+    }
+  ],
+  "renamedOfferings": [
+    {
+      "id": "79cebc73-fda8-47fa-8bdc-b6799f79a5b4",
+      "name": "Memorization (Yusif - Annahl)",
+      "delivery_format": "online",
+      "status": "active"
+    },
+    {
+      "id": "79cebc73-fda8-47fa-8bdc-b6799f79a5b4",
+      "name": "Memorization (Yusif - Annahl)",
+      "delivery_format": "online",
+      "status": "active"
+    },
+    {
+      "id": "79cebc73-fda8-47fa-8bdc-b6799f79a5b4",
+      "name": "Memorization (Yusif - Annahl)",
+      "delivery_format": "online",
+      "status": "active"
+    },
+    {
+      "id": "79cebc73-fda8-47fa-8bdc-b6799f79a5b4",
+      "name": "Memorization (Yusif - Annahl)",
+      "delivery_format": "online",
+      "status": "active"
+    },
+    {
+      "id": "79cebc73-fda8-47fa-8bdc-b6799f79a5b4",
+      "name": "Memorization (Yusif - Annahl)",
+      "delivery_format": "online",
+      "status": "active"
+    },
+    {
+      "id": "79cebc73-fda8-47fa-8bdc-b6799f79a5b4",
+      "name": "Memorization (Yusif - Annahl)",
+      "delivery_format": "online",
+      "status": "active"
+    },
+    {
+      "id": "79cebc73-fda8-47fa-8bdc-b6799f79a5b4",
+      "name": "Memorization (Yusif - Annahl)",
+      "delivery_format": "online",
+      "status": "active"
+    },
+    {
+      "id": "79cebc73-fda8-47fa-8bdc-b6799f79a5b4",
+      "name": "Memorization (Yusif - Annahl)",
+      "delivery_format": "online",
+      "status": "active"
+    }
+  ],
+  "createdTeachers": [
+    {
+      "excel": "Asmaa Salim",
+      "canonical": "Asmaa Salim",
+      "createdContact": false,
+      "createdStaff": true
+    }
+  ],
+  "ambiguous": [],
+  "createdStudents": [
+    {
+      "excel": "Amber adnan",
+      "offering": "Recitation Improvement"
+    },
+    {
+      "excel": "Anum Zeeshan",
+      "offering": "Recitation Improvement"
+    },
+    {
+      "excel": "Ozlem Yurttas",
+      "offering": "Recitation Improvement"
+    },
+    {
+      "excel": "Sadia Shakeel",
+      "offering": "Recitation Improvement"
+    },
+    {
+      "excel": "Safa siddiqui",
+      "offering": "Tajweed Level 1 (Non-Arabic Speaking)"
+    },
+    {
+      "excel": "Shahina Shaik",
+      "offering": "Recitation Improvement"
+    },
+    {
+      "excel": "Uzma Shekha",
+      "offering": "Tajweed Level 1 (Non-Arabic Speaking)"
+    },
+    {
+      "excel": "Afnan Alaraj",
+      "offering": "Memorization (Surat Al-Omran)"
+    },
+    {
+      "excel": "Insaf Odeh",
+      "offering": "Memorization (Surat Al-Omran)"
+    },
+    {
+      "excel": "Zahraa Almadhi",
+      "offering": "Tajweed (Osool)"
+    },
+    {
+      "excel": "Zainab Alghwairi",
+      "offering": "Memorization (Surat Al-Omran)"
+    },
+    {
+      "excel": "Sahar Shqaidef",
+      "offering": "Al-Ajurrumiyyah"
+    },
+    {
+      "excel": "Suha Alsheikh",
+      "offering": "Tajweed (Osool)"
+    },
+    {
+      "excel": "Malak Hamimi",
+      "offering": "Al Nouraniyyeh"
+    },
+    {
+      "excel": "Wesam Taha",
+      "offering": "Memorization (Yusif - Annahl)"
+    },
+    {
+      "excel": "Yousra Aldemeri",
+      "offering": "Tajweed (Advanced)"
+    }
+  ],
+  "matched": [
+    {
+      "excel": "Aisha Diallo",
+      "matched": "Aisha Diallo",
+      "score": 100,
+      "offering": "Tajweed Level 2 (Non-Arabic Speaking)"
+    },
+    {
+      "excel": "Aisha Diallo",
+      "matched": "Aisha Diallo",
+      "score": 100,
+      "offering": "Recitation Improvement"
+    },
+    {
+      "excel": "Anhar Ahmed",
+      "matched": "Anhar Ahmed",
+      "score": 100,
+      "offering": "Recitation Improvement"
+    },
+    {
+      "excel": "Beyza Nur Sahin",
+      "matched": "Beyza Sahin",
+      "score": 100,
+      "offering": "Recitation Improvement"
+    },
+    {
+      "excel": "Heba Jandali",
+      "matched": "Heba Jandali",
+      "score": 100,
+      "offering": "Tajweed Level 1 (Non-Arabic Speaking)"
+    },
+    {
+      "excel": "Leah Şen",
+      "matched": "Leah Antoinette Sen",
+      "score": 100,
+      "offering": "Recitation Improvement"
+    },
+    {
+      "excel": "Noor Abushaaban",
+      "matched": "Noor Abushaaban",
+      "score": 100,
+      "offering": "Recitation Improvement"
+    },
+    {
+      "excel": "Raddwa Abdalla",
+      "matched": "Raddwa Abdalla",
+      "score": 100,
+      "offering": "Recitation Improvement"
+    },
+    {
+      "excel": "Safaa Mustafa",
+      "matched": "Safaa Mustafa",
+      "score": 100,
+      "offering": "Recitation Improvement"
+    },
+    {
+      "excel": "Selwaan Mahmoud",
+      "matched": "Selwaan Mahmoud",
+      "score": 100,
+      "offering": "Recitation Improvement"
+    },
+    {
+      "excel": "Tonazzina Zaman",
+      "matched": "TONAZZINA ZAMAN",
+      "score": 100,
+      "offering": "Recitation Improvement"
+    },
+    {
+      "excel": "Wafa Manasrah",
+      "matched": "Wafa Manasrah",
+      "score": 100,
+      "offering": "Recitation Improvement"
+    },
+    {
+      "excel": "Yasmeen Maligeli",
+      "matched": "Yasmeen Maligeli",
+      "score": 100,
+      "offering": "Recitation Improvement"
+    },
+    {
+      "excel": "Israa Alemairi",
+      "matched": "Israa Alaomairi",
+      "score": 100,
+      "offering": "Preparing for Ijaza"
+    },
+    {
+      "excel": "Iman Ettabeq",
+      "matched": "Iman Ettabaq",
+      "score": 100,
+      "offering": "Memorization (Surat Al-Omran)"
+    },
+    {
+      "excel": "Iman Ettabeq",
+      "matched": "Iman Ettabaq",
+      "score": 100,
+      "offering": "Al-Ajurrumiyyah"
+    },
+    {
+      "excel": "Iman Alghandour",
+      "matched": "IMAN IBRAHIM ELGHANDOUR",
+      "score": 100,
+      "offering": "Tajweed (Osool)"
+    },
+    {
+      "excel": "Iman Alarja",
+      "matched": "Eman Alarja",
+      "score": 100,
+      "offering": "Tajweed (Advanced)"
+    },
+    {
+      "excel": "Imene Latreche",
+      "matched": "Imene Latrehe",
+      "score": 100,
+      "offering": "Memorization (Surat Al-Omran)"
+    },
+    {
+      "excel": "Inas Alsaiegh",
+      "matched": "Enas Elsaegh",
+      "score": 100,
+      "offering": "Memorization (Surat Al-Omran)"
+    },
+    {
+      "excel": "Asmaa Mohammad",
+      "matched": "Asmaa Ali Ismail Mohamed",
+      "score": 100,
+      "offering": "Tajweed (Osool)"
+    },
+    {
+      "excel": "Asmaa Mohammad",
+      "matched": "Asmaa Ali Ismail Mohamed",
+      "score": 100,
+      "offering": "Al-Ajurrumiyyah"
+    },
+    {
+      "excel": "Ansam Izzat",
+      "matched": "Ansam Izzat",
+      "score": 100,
+      "offering": "Tajweed (Advanced)"
+    },
+    {
+      "excel": "Ayah Zahra",
+      "matched": "Ayah Zahra",
+      "score": 100,
+      "offering": "Al-Ajurrumiyyah"
+    },
+    {
+      "excel": "Ayah Waqqad",
+      "matched": "Ayah Wakkad",
+      "score": 100,
+      "offering": "Tajweed (Osool)"
+    },
+    {
+      "excel": "Buthaynah Alian (Daglas)",
+      "matched": "Buthaynah Alian (Daglas)",
+      "score": 100,
+      "offering": "Recitation Improvement"
+    },
+    {
+      "excel": "Buthaynah Alian (Daglas)",
+      "matched": "Buthaynah Alian (Daglas)",
+      "score": 100,
+      "offering": "Al-Ajurrumiyyah"
+    },
+    {
+      "excel": "Birlanti Alsawfta",
+      "matched": "Birlanti Alsawfta",
+      "score": 100,
+      "offering": "Recitation Improvement"
+    },
+    {
+      "excel": "Basma Ali",
+      "matched": "Basma Ali",
+      "score": 100,
+      "offering": "Tajweed (Osool)"
+    },
+    {
+      "excel": "Balqees Ali",
+      "matched": "Belqes Ali",
+      "score": 100,
+      "offering": "Al-Ajurrumiyyah"
+    },
+    {
+      "excel": "Bandar Hijaz",
+      "matched": "Bandar Hijaz",
+      "score": 100,
+      "offering": "Memorization (Yusif - Annahl)"
+    },
+    {
+      "excel": "Hanan Dibajah",
+      "matched": "Hanan Dabaja",
+      "score": 100,
+      "offering": "Recitation Improvement"
+    },
+    {
+      "excel": "Doaa Khdair",
+      "matched": "Doaa Khdair",
+      "score": 100,
+      "offering": "Tajweed (Beginner)"
+    },
+    {
+      "excel": "Rawand Shiblaq",
+      "matched": "Rawand Shiblaq",
+      "score": 100,
+      "offering": "Memorization (Surat Al-Omran)"
+    },
+    {
+      "excel": "Rawya Tawfeeq",
+      "matched": "Rawya Tawfig",
+      "score": 100,
+      "offering": "Tajweed (Osool)"
+    },
+    {
+      "excel": "Rajaa Issa",
+      "matched": "Raja Issa",
+      "score": 96,
+      "offering": "Recitation Improvement"
+    },
+    {
+      "excel": "Rihab Althamri",
+      "matched": "Rihab Alshamari",
+      "score": 100,
+      "offering": "Tajweed (Beginner)"
+    },
+    {
+      "excel": "Rasha Alzebn",
+      "matched": "Rasha Alzaben",
+      "score": 100,
+      "offering": "Tajweed (Osool)"
+    },
+    {
+      "excel": "Reda Elkoumi",
+      "matched": "Reda Elkomy",
+      "score": 100,
+      "offering": "Tajweed (Beginner)"
+    },
+    {
+      "excel": "Ruqayyah Aljanabi",
+      "matched": "Roqaiyah Sameer Janabee",
+      "score": 100,
+      "offering": "Tajweed (Advanced)"
+    },
+    {
+      "excel": "Rana Hamadmad",
+      "matched": "Rana Hamadmad",
+      "score": 100,
+      "offering": "Recitation Improvement"
+    },
+    {
+      "excel": "Rula Sabri",
+      "matched": "Rula Hashim Sabri",
+      "score": 100,
+      "offering": "Memorization (Yusif - Annahl)"
+    },
+    {
+      "excel": "Rowaida Ramadan",
+      "matched": "Rowaida M Ramadan",
+      "score": 100,
+      "offering": "Recitation Improvement"
+    },
+    {
+      "excel": "Zainab Irshid",
+      "matched": "Zainab Irshaid",
+      "score": 100,
+      "offering": "Preparing for Ijaza"
+    },
+    {
+      "excel": "Sarah Yousif",
+      "matched": "Sarah Yousif",
+      "score": 100,
+      "offering": "Memorization (Yusif - Annahl)"
+    },
+    {
+      "excel": "Sara Kenana",
+      "matched": "SARA KENANA",
+      "score": 100,
+      "offering": "Memorization (Surat Al-Omran)"
+    },
+    {
+      "excel": "Sara Kenana",
+      "matched": "SARA KENANA",
+      "score": 100,
+      "offering": "Tajweed (Osool)"
+    },
+    {
+      "excel": "Summayya Bohlal",
+      "matched": "Soumia Bouhlal",
+      "score": 100,
+      "offering": "Tajweed (Beginner)"
+    },
+    {
+      "excel": "Summayya Bohlal",
+      "matched": "Soumia Bouhlal",
+      "score": 100,
+      "offering": "Memorization (Surat Al-Omran)"
+    },
+    {
+      "excel": "Sanaa Hamdan",
+      "matched": "Sana Hamdan",
+      "score": 100,
+      "offering": "Recitation Improvement"
+    },
+    {
+      "excel": "Sanaa Hamdan",
+      "matched": "Sana Hamdan",
+      "score": 100,
+      "offering": "Al-Ajurrumiyyah"
+    },
+    {
+      "excel": "Sabreen Taha",
+      "matched": "Sabreen F I Taha",
+      "score": 100,
+      "offering": "Tajweed (Advanced)"
+    },
+    {
+      "excel": "Abeer Zoubi",
+      "matched": "ABEER ZOUBI",
+      "score": 100,
+      "offering": "Memorization (Surat Al-Omran)"
+    },
+    {
+      "excel": "Ola Alkhousi",
+      "matched": "Viola Mohamed Alkhousi",
+      "score": 100,
+      "offering": "Recitation Improvement"
+    },
+    {
+      "excel": "Ghada Abu Faraj",
+      "matched": "Ghada Abofarag",
+      "score": 100,
+      "offering": "Tajweed (Advanced)"
+    },
+    {
+      "excel": "Ghadeer Zarkani",
+      "matched": "Ghadeer Zakani",
+      "score": 100,
+      "offering": "Recitation Improvement"
+    },
+    {
+      "excel": "Fameh Hamdan",
+      "matched": "Fatima Hamdan",
+      "score": 100,
+      "offering": "Tajweed (Beginner)"
+    },
+    {
+      "excel": "Fameh Hamdan",
+      "matched": "Fatima Hamdan",
+      "score": 100,
+      "offering": "Al-Ajurrumiyyah"
+    },
+    {
+      "excel": "Farah Dabbourah",
+      "matched": "Farah Dabbura",
+      "score": 100,
+      "offering": "Preparing for Ijaza"
+    },
+    {
+      "excel": "Farah Dabbourah",
+      "matched": "Farah Dabbura",
+      "score": 100,
+      "offering": "Memorization (Yusif - Annahl)"
+    },
+    {
+      "excel": "Lubna Abdallah",
+      "matched": "Lubna Abdallah",
+      "score": 100,
+      "offering": "Tajweed (Advanced)"
+    },
+    {
+      "excel": "Lina Alkhateeb",
+      "matched": "Lena Alkhateeb",
+      "score": 100,
+      "offering": "Recitation Improvement"
+    },
+    {
+      "excel": "Madihah Ahmad",
+      "matched": "Madihah Ahmed",
+      "score": 100,
+      "offering": "Recitation Improvement"
+    },
+    {
+      "excel": "Marwa Aljamal",
+      "matched": "Marwa Elgamal",
+      "score": 100,
+      "offering": "Tajweed (Osool)"
+    },
+    {
+      "excel": "Maryam Doumah",
+      "matched": "Meriem Douma",
+      "score": 100,
+      "offering": "Tajweed (Beginner)"
+    },
+    {
+      "excel": "Maryam Doumah",
+      "matched": "Meriem Douma",
+      "score": 100,
+      "offering": "Al-Ajurrumiyyah"
+    },
+    {
+      "excel": "Manar Almahameed",
+      "matched": "Manar Almahameed",
+      "score": 100,
+      "offering": "Tajweed (Osool)"
+    },
+    {
+      "excel": "Mona Alnaeemi",
+      "matched": "Mona Alnaeemi",
+      "score": 100,
+      "offering": "Memorization (Surat Al-Omran)"
+    },
+    {
+      "excel": "Maha Aburadi",
+      "matched": "Maha Abouradi",
+      "score": 100,
+      "offering": "Al-Ajurrumiyyah"
+    },
+    {
+      "excel": "Maha Aburadi",
+      "matched": "Maha Abouradi",
+      "score": 100,
+      "offering": "Recitation Improvement"
+    },
+    {
+      "excel": "Maha Fakhri",
+      "matched": "Maha Fakhry",
+      "score": 100,
+      "offering": "Recitation Improvement"
+    },
+    {
+      "excel": "Maha Fakhri",
+      "matched": "Maha Fakhry",
+      "score": 100,
+      "offering": "Al-Ajurrumiyyah"
+    },
+    {
+      "excel": "Maisaa Hamdan",
+      "matched": "Maisa Hamdan",
+      "score": 96,
+      "offering": "Tajweed (Beginner)"
+    },
+    {
+      "excel": "Nahed Mahmoud",
+      "matched": "Nahid Mahmoud",
+      "score": 100,
+      "offering": "Al Nouraniyyeh"
+    },
+    {
+      "excel": "Nahed Mahmoud",
+      "matched": "Nahid Mahmoud",
+      "score": 100,
+      "offering": "Al-Ajurrumiyyah"
+    },
+    {
+      "excel": "Nermeen Alfahl",
+      "matched": "Narmeen gamal Alfahal",
+      "score": 100,
+      "offering": "Tajweed (Advanced)"
+    },
+    {
+      "excel": "Nermeen Alfahl",
+      "matched": "Narmeen gamal Alfahal",
+      "score": 100,
+      "offering": "Al-Ajurrumiyyah"
+    },
+    {
+      "excel": "Nesreen Almarie",
+      "matched": "Nisreen Mohamed Almaraghi",
+      "score": 100,
+      "offering": "Recitation Improvement"
+    },
+    {
+      "excel": "Nesreen Almarie",
+      "matched": "Nisreen Mohamed Almaraghi",
+      "score": 100,
+      "offering": "Tajweed (Osool)"
+    },
+    {
+      "excel": "Nemat Sedeeg Omer",
+      "matched": "Nemat Sedeeg Omer",
+      "score": 100,
+      "offering": "Memorization (Yusif - Annahl)"
+    }
+  ],
+  "toApprove": [
+    {
+      "id": "dd263bdb-3eb9-4a49-9448-3ba5fbe44c13",
+      "name": "Rihab Alshamari",
+      "fromStatus": "submitted",
+      "offering": "Tajweed (Beginner)"
+    },
+    {
+      "id": "9c5da474-ae4e-4a03-9679-370eb2a7c448",
+      "name": "Fatima Hamdan",
+      "fromStatus": "submitted",
+      "offering": "Tajweed (Beginner)"
+    }
+  ],
+  "toInsert": [
+    {
+      "name": "Aisha Diallo",
+      "excelName": "Aisha Diallo",
+      "offering": "Tajweed Level 2 (Non-Arabic Speaking)",
+      "teacher": "Alaa Elsarraj",
+      "applicant_type": "returning"
+    },
+    {
+      "name": "Aisha Diallo",
+      "excelName": "Aisha Diallo",
+      "offering": "Recitation Improvement",
+      "teacher": "Asmaa Salim",
+      "applicant_type": "returning"
+    },
+    {
+      "name": "Amber adnan",
+      "excelName": "Amber adnan",
+      "offering": "Recitation Improvement",
+      "teacher": "Rajaa Aljaber",
+      "applicant_type": "new"
+    },
+    {
+      "name": "Anhar Ahmed",
+      "excelName": "Anhar Ahmed",
+      "offering": "Recitation Improvement",
+      "teacher": "Rajaa Aljaber",
+      "applicant_type": "returning"
+    },
+    {
+      "name": "Anum Zeeshan",
+      "excelName": "Anum Zeeshan",
+      "offering": "Recitation Improvement",
+      "teacher": "Asmaa Salim",
+      "applicant_type": "new"
+    },
+    {
+      "name": "Beyza Sahin",
+      "excelName": "Beyza Nur Sahin",
+      "offering": "Recitation Improvement",
+      "teacher": "Rajaa Aljaber",
+      "applicant_type": "returning"
+    },
+    {
+      "name": "Heba Jandali",
+      "excelName": "Heba Jandali",
+      "offering": "Tajweed Level 1 (Non-Arabic Speaking)",
+      "teacher": "Alaa Elsarraj",
+      "applicant_type": "new"
+    },
+    {
+      "name": "Leah Antoinette Sen",
+      "excelName": "Leah Şen",
+      "offering": "Recitation Improvement",
+      "teacher": "Rajaa Aljaber",
+      "applicant_type": "new"
+    },
+    {
+      "name": "Noor Abushaaban",
+      "excelName": "Noor Abushaaban",
+      "offering": "Recitation Improvement",
+      "teacher": "Asmaa Salim",
+      "applicant_type": "returning"
+    },
+    {
+      "name": "Ozlem Yurttas",
+      "excelName": "Ozlem Yurttas",
+      "offering": "Recitation Improvement",
+      "teacher": "Rajaa Aljaber",
+      "applicant_type": "new"
+    },
+    {
+      "name": "Raddwa Abdalla",
+      "excelName": "Raddwa Abdalla",
+      "offering": "Recitation Improvement",
+      "teacher": "Asmaa Salim",
+      "applicant_type": "new"
+    },
+    {
+      "name": "Sadia Shakeel",
+      "excelName": "Sadia Shakeel",
+      "offering": "Recitation Improvement",
+      "teacher": "Rajaa Aljaber",
+      "applicant_type": "new"
+    },
+    {
+      "name": "Safa siddiqui",
+      "excelName": "Safa siddiqui",
+      "offering": "Tajweed Level 1 (Non-Arabic Speaking)",
+      "teacher": "Alaa Elsarraj",
+      "applicant_type": "new"
+    },
+    {
+      "name": "Safaa Mustafa",
+      "excelName": "Safaa Mustafa",
+      "offering": "Recitation Improvement",
+      "teacher": "Rajaa Aljaber",
+      "applicant_type": "new"
+    },
+    {
+      "name": "Selwaan Mahmoud",
+      "excelName": "Selwaan Mahmoud",
+      "offering": "Recitation Improvement",
+      "teacher": "Asmaa Salim",
+      "applicant_type": "returning"
+    },
+    {
+      "name": "Shahina Shaik",
+      "excelName": "Shahina Shaik",
+      "offering": "Recitation Improvement",
+      "teacher": "Asmaa Salim",
+      "applicant_type": "new"
+    },
+    {
+      "name": "TONAZZINA ZAMAN",
+      "excelName": "Tonazzina Zaman",
+      "offering": "Recitation Improvement",
+      "teacher": "Asmaa Salim",
+      "applicant_type": "returning"
+    },
+    {
+      "name": "Uzma Shekha",
+      "excelName": "Uzma Shekha",
+      "offering": "Tajweed Level 1 (Non-Arabic Speaking)",
+      "teacher": "Alaa Elsarraj",
+      "applicant_type": "new"
+    },
+    {
+      "name": "Wafa Manasrah",
+      "excelName": "Wafa Manasrah",
+      "offering": "Recitation Improvement",
+      "teacher": "Rajaa Aljaber",
+      "applicant_type": "new"
+    },
+    {
+      "name": "Yasmeen Maligeli",
+      "excelName": "Yasmeen Maligeli",
+      "offering": "Recitation Improvement",
+      "teacher": "Asmaa Salim",
+      "applicant_type": "new"
+    },
+    {
+      "name": "Afnan Alaraj",
+      "excelName": "Afnan Alaraj",
+      "offering": "Memorization (Surat Al-Omran)",
+      "teacher": "Abeer Abu Kiwan",
+      "applicant_type": "new"
+    },
+    {
+      "name": "Insaf Odeh",
+      "excelName": "Insaf Odeh",
+      "offering": "Memorization (Surat Al-Omran)",
+      "teacher": "Abeer Abu Kiwan",
+      "applicant_type": "new"
+    },
+    {
+      "name": "Eman Alarja",
+      "excelName": "Iman Alarja",
+      "offering": "Tajweed (Advanced)",
+      "teacher": "Abeer Abu Kiwan",
+      "applicant_type": "returning"
+    },
+    {
+      "name": "Ayah Wakkad",
+      "excelName": "Ayah Waqqad",
+      "offering": "Tajweed (Osool)",
+      "teacher": "Wedad Atwan",
+      "applicant_type": "returning"
+    },
+    {
+      "name": "Bandar Hijaz",
+      "excelName": "Bandar Hijaz",
+      "offering": "Memorization (Yusif - Annahl)",
+      "teacher": "Wedad Atwan",
+      "applicant_type": "returning"
+    },
+    {
+      "name": "Hanan Dabaja",
+      "excelName": "Hanan Dibajah",
+      "offering": "Recitation Improvement",
+      "teacher": "Rajaa Aljaber",
+      "applicant_type": "returning"
+    },
+    {
+      "name": "Rawand Shiblaq",
+      "excelName": "Rawand Shiblaq",
+      "offering": "Memorization (Surat Al-Omran)",
+      "teacher": "Abeer Abu Kiwan",
+      "applicant_type": "returning"
+    },
+    {
+      "name": "Raja Issa",
+      "excelName": "Rajaa Issa",
+      "offering": "Recitation Improvement",
+      "teacher": "Asmaa Salim",
+      "applicant_type": "returning"
+    },
+    {
+      "name": "Rowaida M Ramadan",
+      "excelName": "Rowaida Ramadan",
+      "offering": "Recitation Improvement",
+      "teacher": "Fadia Salameh",
+      "applicant_type": "returning"
+    },
+    {
+      "name": "Zahraa Almadhi",
+      "excelName": "Zahraa Almadhi",
+      "offering": "Tajweed (Osool)",
+      "teacher": "Wedad Atwan",
+      "applicant_type": "new"
+    },
+    {
+      "name": "Zainab Alghwairi",
+      "excelName": "Zainab Alghwairi",
+      "offering": "Memorization (Surat Al-Omran)",
+      "teacher": "Abeer Abu Kiwan",
+      "applicant_type": "new"
+    },
+    {
+      "name": "Sahar Shqaidef",
+      "excelName": "Sahar Shqaidef",
+      "offering": "Al-Ajurrumiyyah",
+      "teacher": "Wedad Atwan",
+      "applicant_type": "new"
+    },
+    {
+      "name": "Suha Alsheikh",
+      "excelName": "Suha Alsheikh",
+      "offering": "Tajweed (Osool)",
+      "teacher": "Wedad Atwan",
+      "applicant_type": "new"
+    },
+    {
+      "name": "Lubna Abdallah",
+      "excelName": "Lubna Abdallah",
+      "offering": "Tajweed (Advanced)",
+      "teacher": "Abeer Abu Kiwan",
+      "applicant_type": "returning"
+    },
+    {
+      "name": "Madihah Ahmed",
+      "excelName": "Madihah Ahmad",
+      "offering": "Recitation Improvement",
+      "teacher": "Amneh Ismail",
+      "applicant_type": "returning"
+    },
+    {
+      "name": "Meriem Douma",
+      "excelName": "Maryam Doumah",
+      "offering": "Al-Ajurrumiyyah",
+      "teacher": "Wedad Atwan",
+      "applicant_type": "returning"
+    },
+    {
+      "name": "Malak Hamimi",
+      "excelName": "Malak Hamimi",
+      "offering": "Al Nouraniyyeh",
+      "teacher": "Rajaa Aljaber",
+      "applicant_type": "new"
+    },
+    {
+      "name": "Manar Almahameed",
+      "excelName": "Manar Almahameed",
+      "offering": "Tajweed (Osool)",
+      "teacher": "Wedad Atwan",
+      "applicant_type": "returning"
+    },
+    {
+      "name": "Maha Abouradi",
+      "excelName": "Maha Aburadi",
+      "offering": "Al-Ajurrumiyyah",
+      "teacher": "Wedad Atwan",
+      "applicant_type": "returning"
+    },
+    {
+      "name": "Maha Fakhry",
+      "excelName": "Maha Fakhri",
+      "offering": "Recitation Improvement",
+      "teacher": "Fadia Salameh",
+      "applicant_type": "returning"
+    },
+    {
+      "name": "Nahid Mahmoud",
+      "excelName": "Nahed Mahmoud",
+      "offering": "Al Nouraniyyeh",
+      "teacher": "Rajaa Aljaber",
+      "applicant_type": "returning"
+    },
+    {
+      "name": "Nisreen Mohamed Almaraghi",
+      "excelName": "Nesreen Almarie",
+      "offering": "Recitation Improvement",
+      "teacher": "Fadia Salameh",
+      "applicant_type": "returning"
+    },
+    {
+      "name": "Hebatullah Hasan",
+      "excelName": "Heba Hasan",
+      "offering": "Tajweed (Osool)",
+      "teacher": "Wedad Atwan",
+      "applicant_type": "returning"
+    },
+    {
+      "name": "Wesam Taha",
+      "excelName": "Wesam Taha",
+      "offering": "Memorization (Yusif - Annahl)",
+      "teacher": "Wedad Atwan",
+      "applicant_type": "new"
+    },
+    {
+      "name": "Wafaa Yarro",
+      "excelName": "Wafaa Yarro",
+      "offering": "Memorization (Surat Al-Omran)",
+      "teacher": "Abeer Abu Kiwan",
+      "applicant_type": "returning"
+    },
+    {
+      "name": "Walaa Abdelghani",
+      "excelName": "Walaa Abdelghani",
+      "offering": "Tajweed (Advanced)",
+      "teacher": "Abeer Abu Kiwan",
+      "applicant_type": "returning"
+    },
+    {
+      "name": "Yasmeen Ali",
+      "excelName": "Yasmeen Ali",
+      "offering": "Tajweed (Osool)",
+      "teacher": "Wedad Atwan",
+      "applicant_type": "returning"
+    },
+    {
+      "name": "Yousra Aldemeri",
+      "excelName": "Yousra Aldemeri",
+      "offering": "Tajweed (Advanced)",
+      "teacher": "Abeer Abu Kiwan",
+      "applicant_type": "new"
+    }
+  ],
+  "skipped": [
+    {
+      "rowNumber": 23,
+      "name": "Israa Alemairi",
+      "matched": "Israa Alaomairi",
+      "offering": "Preparing for Ijaza",
+      "reason": "already approved for this offering"
+    },
+    {
+      "rowNumber": 25,
+      "name": "Iman Ettabeq",
+      "matched": "Iman Ettabaq",
+      "offering": "Memorization (Surat Al-Omran)",
+      "reason": "already approved for this offering"
+    },
+    {
+      "rowNumber": 26,
+      "name": "Iman Ettabeq",
+      "matched": "Iman Ettabaq",
+      "offering": "Al-Ajurrumiyyah",
+      "reason": "already approved for this offering"
+    },
+    {
+      "rowNumber": 27,
+      "name": "Iman Alghandour",
+      "matched": "IMAN IBRAHIM ELGHANDOUR",
+      "offering": "Tajweed (Osool)",
+      "reason": "already approved for this offering"
+    },
+    {
+      "rowNumber": 29,
+      "name": "Imene Latreche",
+      "matched": "Imene Latrehe",
+      "offering": "Memorization (Surat Al-Omran)",
+      "reason": "already approved for this offering"
+    },
+    {
+      "rowNumber": 30,
+      "name": "Inas Alsaiegh",
+      "matched": "Enas Elsaegh",
+      "offering": "Memorization (Surat Al-Omran)",
+      "reason": "already approved for this offering"
+    },
+    {
+      "rowNumber": 31,
+      "name": "Asmaa Mohammad",
+      "matched": "Asmaa Ali Ismail Mohamed",
+      "offering": "Tajweed (Osool)",
+      "reason": "already approved for this offering"
+    },
+    {
+      "rowNumber": 32,
+      "name": "Asmaa Mohammad",
+      "matched": "Asmaa Ali Ismail Mohamed",
+      "offering": "Al-Ajurrumiyyah",
+      "reason": "already approved for this offering"
+    },
+    {
+      "rowNumber": 33,
+      "name": "Ansam Izzat",
+      "matched": "Ansam Izzat",
+      "offering": "Tajweed (Advanced)",
+      "reason": "already approved for this offering"
+    },
+    {
+      "rowNumber": 34,
+      "name": "Ayah Zahra",
+      "matched": "Ayah Zahra",
+      "offering": "Al-Ajurrumiyyah",
+      "reason": "already approved for this offering"
+    },
+    {
+      "rowNumber": 36,
+      "name": "Buthaynah Alian (Daglas)",
+      "matched": "Buthaynah Alian (Daglas)",
+      "offering": "Recitation Improvement",
+      "reason": "already approved for this offering"
+    },
+    {
+      "rowNumber": 37,
+      "name": "Buthaynah Alian (Daglas)",
+      "matched": "Buthaynah Alian (Daglas)",
+      "offering": "Al-Ajurrumiyyah",
+      "reason": "already approved for this offering"
+    },
+    {
+      "rowNumber": 38,
+      "name": "Birlanti Alsawfta",
+      "matched": "Birlanti Alsawfta",
+      "offering": "Recitation Improvement",
+      "reason": "already approved for this offering"
+    },
+    {
+      "rowNumber": 39,
+      "name": "Basma Ali",
+      "matched": "Basma Ali",
+      "offering": "Tajweed (Osool)",
+      "reason": "already approved for this offering"
+    },
+    {
+      "rowNumber": 40,
+      "name": "Balqees Ali",
+      "matched": "Belqes Ali",
+      "offering": "Al-Ajurrumiyyah",
+      "reason": "already approved for this offering"
+    },
+    {
+      "rowNumber": 43,
+      "name": "Doaa Khdair",
+      "matched": "Doaa Khdair",
+      "offering": "Tajweed (Beginner)",
+      "reason": "already approved for this offering"
+    },
+    {
+      "rowNumber": 45,
+      "name": "Rawya Tawfeeq",
+      "matched": "Rawya Tawfig",
+      "offering": "Tajweed (Osool)",
+      "reason": "already approved for this offering"
+    },
+    {
+      "rowNumber": 48,
+      "name": "Rasha Alzebn",
+      "matched": "Rasha Alzaben",
+      "offering": "Tajweed (Osool)",
+      "reason": "already approved for this offering"
+    },
+    {
+      "rowNumber": 49,
+      "name": "Reda Elkoumi",
+      "matched": "Reda Elkomy",
+      "offering": "Tajweed (Beginner)",
+      "reason": "already approved for this offering"
+    },
+    {
+      "rowNumber": 50,
+      "name": "Ruqayyah Aljanabi",
+      "matched": "Roqaiyah Sameer Janabee",
+      "offering": "Tajweed (Advanced)",
+      "reason": "already approved for this offering"
+    },
+    {
+      "rowNumber": 51,
+      "name": "Rana Hamadmad",
+      "matched": "Rana Hamadmad",
+      "offering": "Recitation Improvement",
+      "reason": "already approved for this offering"
+    },
+    {
+      "rowNumber": 52,
+      "name": "Rula Sabri",
+      "matched": "Rula Hashim Sabri",
+      "offering": "Memorization (Yusif - Annahl)",
+      "reason": "already approved for this offering"
+    },
+    {
+      "rowNumber": 56,
+      "name": "Zainab Irshid",
+      "matched": "Zainab Irshaid",
+      "offering": "Preparing for Ijaza",
+      "reason": "already approved for this offering"
+    },
+    {
+      "rowNumber": 57,
+      "name": "Sarah Yousif",
+      "matched": "Sarah Yousif",
+      "offering": "Memorization (Yusif - Annahl)",
+      "reason": "already approved for this offering"
+    },
+    {
+      "rowNumber": 58,
+      "name": "Sara Kenana",
+      "matched": "SARA KENANA",
+      "offering": "Memorization (Surat Al-Omran)",
+      "reason": "already approved for this offering"
+    },
+    {
+      "rowNumber": 59,
+      "name": "Sara Kenana",
+      "matched": "SARA KENANA",
+      "offering": "Tajweed (Osool)",
+      "reason": "already approved for this offering"
+    },
+    {
+      "rowNumber": 61,
+      "name": "Summayya Bohlal",
+      "matched": "Soumia Bouhlal",
+      "offering": "Tajweed (Beginner)",
+      "reason": "already approved for this offering"
+    },
+    {
+      "rowNumber": 62,
+      "name": "Summayya Bohlal",
+      "matched": "Soumia Bouhlal",
+      "offering": "Memorization (Surat Al-Omran)",
+      "reason": "already approved for this offering"
+    },
+    {
+      "rowNumber": 63,
+      "name": "Sanaa Hamdan",
+      "matched": "Sana Hamdan",
+      "offering": "Recitation Improvement",
+      "reason": "already approved for this offering"
+    },
+    {
+      "rowNumber": 64,
+      "name": "Sanaa Hamdan",
+      "matched": "Sana Hamdan",
+      "offering": "Al-Ajurrumiyyah",
+      "reason": "already approved for this offering"
+    },
+    {
+      "rowNumber": 66,
+      "name": "Sabreen Taha",
+      "matched": "Sabreen F I Taha",
+      "offering": "Tajweed (Advanced)",
+      "reason": "already approved for this offering"
+    },
+    {
+      "rowNumber": 67,
+      "name": "Abeer Zoubi",
+      "matched": "ABEER ZOUBI",
+      "offering": "Memorization (Surat Al-Omran)",
+      "reason": "already approved for this offering"
+    },
+    {
+      "rowNumber": 68,
+      "name": "Ola Alkhousi",
+      "matched": "Viola Mohamed Alkhousi",
+      "offering": "Recitation Improvement",
+      "reason": "already approved for this offering"
+    },
+    {
+      "rowNumber": 69,
+      "name": "Ghada Abu Faraj",
+      "matched": "Ghada Abofarag",
+      "offering": "Tajweed (Advanced)",
+      "reason": "already approved for this offering"
+    },
+    {
+      "rowNumber": 70,
+      "name": "Ghadeer Zarkani",
+      "matched": "Ghadeer Zakani",
+      "offering": "Recitation Improvement",
+      "reason": "already approved for this offering"
+    },
+    {
+      "rowNumber": 72,
+      "name": "Fameh Hamdan",
+      "matched": "Fatima Hamdan",
+      "offering": "Al-Ajurrumiyyah",
+      "reason": "already approved for this offering"
+    },
+    {
+      "rowNumber": 73,
+      "name": "Farah Dabbourah",
+      "matched": "Farah Dabbura",
+      "offering": "Preparing for Ijaza",
+      "reason": "already approved for this offering"
+    },
+    {
+      "rowNumber": 74,
+      "name": "Farah Dabbourah",
+      "matched": "Farah Dabbura",
+      "offering": "Memorization (Yusif - Annahl)",
+      "reason": "already approved for this offering"
+    },
+    {
+      "rowNumber": 76,
+      "name": "Lina Alkhateeb",
+      "matched": "Lena Alkhateeb",
+      "offering": "Recitation Improvement",
+      "reason": "already approved for this offering"
+    },
+    {
+      "rowNumber": 78,
+      "name": "Marwa Aljamal",
+      "matched": "Marwa Elgamal",
+      "offering": "Tajweed (Osool)",
+      "reason": "already approved for this offering"
+    }
+  ]
+}

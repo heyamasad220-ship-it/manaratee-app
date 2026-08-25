@@ -166,7 +166,8 @@ function monthsTimesFromTotal(total: number, monthsHint: number) {
 }
 
 /**
- * Family/contact payment rollup for Programs → Reports → Payment Summary.
+ * Family/contact payment rollup for Programs Finance → Payment Summary
+ * (org-wide list remains `/programs/reports/tuition-plans`).
  */
 export async function getPaymentSummaryRows(): Promise<
   { success: true; rows: PaymentSummaryRow[] } | { success: false; error: string }

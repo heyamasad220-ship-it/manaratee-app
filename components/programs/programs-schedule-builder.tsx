@@ -220,10 +220,13 @@ function emptyForm(
 
 export function ProgramsScheduleBuilder({
   departmentId = null,
+  programId = null,
   embedded = false,
 }: {
   /** When set, only programs (and their activities) for this department. */
   departmentId?: string | null
+  /** When set, lock the builder to this program (no year/season picker). */
+  programId?: string | null
   /** Hide page chrome (Header / Programs section nav). */
   embedded?: boolean
 }) {
@@ -253,7 +256,7 @@ export function ProgramsScheduleBuilder({
   React.useEffect(() => {
     void fetchScheduleData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [departmentId])
+  }, [departmentId, programId])
 
   async function fetchScheduleData() {
     setLoading(true)
@@ -265,6 +268,9 @@ export function ProgramsScheduleBuilder({
         .order("name")
       if (departmentId) {
         programsQuery = programsQuery.eq("department_id", departmentId)
+      }
+      if (programId) {
+        programsQuery = programsQuery.eq("id", programId)
       }
 
       const [programsResult, categoriesResult, activitiesResult] = await Promise.all([
@@ -309,6 +315,9 @@ export function ProgramsScheduleBuilder({
         setPrograms(nextPrograms)
 
         setSelectedProgramId((current) => {
+          if (programId && nextPrograms.some((program) => program.id === programId)) {
+            return programId
+          }
           if (current && nextPrograms.some((program) => program.id === current)) {
             return current
           }
@@ -519,7 +528,7 @@ export function ProgramsScheduleBuilder({
       location: formData.location.trim() || null,
       staff_name: formData.staff_name.trim() || null,
       age_group_name: formData.age_group_name || null,
-      program_id: formData.program_id || null,
+      program_id: programId || formData.program_id || null,
       enrolled: formData.enrolled ? Number(formData.enrolled) : selectedProgramForForm?.enrolled || null,
       capacity: formData.capacity ? Number(formData.capacity) : selectedProgramForForm?.capacity || null,
       notes: formData.notes.trim() || null,
@@ -649,7 +658,9 @@ export function ProgramsScheduleBuilder({
               </h1>
               <p className="text-muted-foreground text-sm">
                 {embedded
-                  ? "Plan weekly activities for this department's programs."
+                  ? programId
+                    ? "Plan weekly activities for this program."
+                    : "Plan weekly activities for this department's programs."
                   : "Create and manage weekly schedules using your existing programs."}
               </p>
             </div>
@@ -684,24 +695,31 @@ export function ProgramsScheduleBuilder({
 
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between print:hidden">
             <div className="flex flex-wrap items-center gap-3">
-              <Select value={selectedProgramId} onValueChange={setSelectedProgramId}>
-                <SelectTrigger className="w-[260px]">
-                  <SelectValue placeholder="Select program" />
-                </SelectTrigger>
-                <SelectContent>
-                  {programs.length === 0 ? (
-                    <SelectItem value="no-programs" disabled>
-                      No programs found
-                    </SelectItem>
-                  ) : (
-                    programs.map((program) => (
-                      <SelectItem key={program.id} value={program.id}>
-                        {program.name}
+              {programId ? (
+                <div className="flex h-9 items-center rounded-md border bg-muted/40 px-3 text-sm">
+                  {programs.find((program) => program.id === programId)?.name ||
+                    "This program"}
+                </div>
+              ) : (
+                <Select value={selectedProgramId} onValueChange={setSelectedProgramId}>
+                  <SelectTrigger className="w-[260px]">
+                    <SelectValue placeholder="Select program" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {programs.length === 0 ? (
+                      <SelectItem value="no-programs" disabled>
+                        No programs found
                       </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
+                    ) : (
+                      programs.map((program) => (
+                        <SelectItem key={program.id} value={program.id}>
+                          {program.name}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              )}
 
               {view !== "age-group" && (
                 <Select value={selectedAgeGroupName} onValueChange={setSelectedAgeGroupName}>
@@ -891,37 +909,50 @@ export function ProgramsScheduleBuilder({
                 <div className="grid gap-4">
                   <div className="grid gap-2">
                     <Label>Program</Label>
-                    <Select
-                      value={formData.program_id}
-                      onValueChange={(value) => {
-                        const program = programs.find((item) => item.id === value)
-                        setFormData({
-                          ...formData,
-                          program_id: value,
-                          title: program?.name || formData.title,
-                          age_group_name: program?.age_groups?.[0] || formData.age_group_name,
-                          enrolled: program?.enrolled?.toString() || formData.enrolled,
-                          capacity: program?.capacity?.toString() || formData.capacity,
-                        })
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select program" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {programs.length === 0 ? (
-                          <SelectItem value="no-programs" disabled>
-                            No programs found
-                          </SelectItem>
-                        ) : (
-                          programs.map((program) => (
-                            <SelectItem key={program.id} value={program.id}>
-                              {program.name}
+                    {programId ? (
+                      <Input
+                        value={
+                          programs.find((item) => item.id === programId)?.name ||
+                          "This program"
+                        }
+                        disabled
+                      />
+                    ) : (
+                      <Select
+                        value={formData.program_id}
+                        onValueChange={(value) => {
+                          const program = programs.find((item) => item.id === value)
+                          setFormData({
+                            ...formData,
+                            program_id: value,
+                            title: program?.name || formData.title,
+                            age_group_name:
+                              program?.age_groups?.[0] || formData.age_group_name,
+                            enrolled:
+                              program?.enrolled?.toString() || formData.enrolled,
+                            capacity:
+                              program?.capacity?.toString() || formData.capacity,
+                          })
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select program" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {programs.length === 0 ? (
+                            <SelectItem value="no-programs" disabled>
+                              No programs found
                             </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
+                          ) : (
+                            programs.map((program) => (
+                              <SelectItem key={program.id} value={program.id}>
+                                {program.name}
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                    )}
                   </div>
 
                   <div className="grid gap-2">

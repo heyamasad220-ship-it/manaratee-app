@@ -3,7 +3,7 @@ import { redirect } from "next/navigation"
 
 import { Header } from "@/components/layout/header"
 import { PaymentSummaryReportPanel } from "@/components/programs/payment-summary-report-panel"
-import { ProgramsReportsNav } from "@/components/programs/programs-reports-nav"
+import { ProgramsStaffSubnav } from "@/components/programs/programs-staff-subnav"
 import { hasPermission, PERMISSIONS } from "@/lib/permissions/permissions"
 
 export default async function ProgramsPaymentSummaryReportPage() {
@@ -18,10 +18,7 @@ export default async function ProgramsPaymentSummaryReportPage() {
   return (
     <>
       <Header title="Reports" />
-
-      <Suspense fallback={null}>
-        <ProgramsReportsNav />
-      </Suspense>
+      <ProgramsStaffSubnav secondary="reports" />
 
       <div className="flex flex-col gap-6 p-6">
         <div>

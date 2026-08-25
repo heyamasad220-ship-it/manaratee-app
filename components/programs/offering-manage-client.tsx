@@ -6,11 +6,16 @@ import { usePathname, useRouter } from "next/navigation"
 import { ArrowLeft, CalendarDays, UserRound, Users } from "lucide-react"
 
 import { OfferingEditDialog } from "@/components/programs/offering-edit-dialog"
+import { MoveEnrollmentOfferingDialog } from "@/components/programs/move-enrollment-offering-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Label } from "@/components/ui/label"
 import { StatCard, StatCardsRow } from "@/components/ui/stat-card"
 import { Switch } from "@/components/ui/switch"
+import { moveEnrollmentToOfferingAction } from "@/lib/programs/move-enrollment-offering-actions"
+import {
+  canMoveEnrollmentStatus,
+  type MoveOfferingTarget,
+} from "@/lib/programs/move-enrollment-offering-shared"
 import type { OfferingManageSummary } from "@/lib/programs/offering-manage-summary"
 import {
   formatOfferingSessionDateLabel,
@@ -18,6 +23,7 @@ import {
   type OfferingSessionRoster,
 } from "@/lib/programs/offering-session-enrollment-types"
 import { getOfferingScheduleSummaryLines } from "@/lib/programs/offering-schedule-summary"
+import { pickPrimaryInstructorAssignment } from "@/lib/programs/primary-instructor"
 import type { OfferingWorkspaceData } from "@/lib/programs/offering-workspace-types"
 import type { ProgramCapacityGroupInput } from "@/lib/programs/program-capacity-group-types"
 import {
@@ -30,6 +36,7 @@ import {
 } from "@/lib/programs/program-offering-types"
 import { programOfferingManageHref } from "@/lib/programs/program-offering-paths"
 import { setSelectedSessionsOpen } from "@/lib/programs/selected-sessions-priority-actions"
+import type { OfferingRosterEnrollment } from "@/lib/programs/program-staff-assignment-queries"
 import type { Program } from "@/lib/programs/program-types"
 import { isSeasonalProgramKind } from "@/lib/programs/program-kind"
 import { cn } from "@/lib/utils"
@@ -44,25 +51,19 @@ export type OfferingManageNavigationContext = {
   departmentsListHref?: string
 }
 
+function enrollmentDisplayName(row: OfferingRosterEnrollment) {
+  return row.child_name || row.parent_name || "Participant"
+}
+
+export type OfferingMoveTarget = MoveOfferingTarget
+
 function getPrimaryInstructorLabel(
   workspaceData: OfferingWorkspaceData
 ): string {
-  const active = workspaceData.staffAssignments.filter(
-    (row) => row.is_active !== false
+  return (
+    pickPrimaryInstructorAssignment(workspaceData.staffAssignments)
+      ?.contact_name || "Unassigned"
   )
-  const offeringLevel = active.filter((row) => row.session_id == null)
-  const pool = offeringLevel.length > 0 ? offeringLevel : active
-  const primary = pool.find(
-    (row) => row.assignment_role === "primary_instructor"
-  )
-  if (primary?.contact_name) return primary.contact_name
-  const instructor = pool.find(
-    (row) =>
-      row.assignment_role === "assistant_instructor" ||
-      String(row.assignment_role) === "instructor"
-  )
-  if (instructor?.contact_name) return instructor.contact_name
-  return "Unassigned"
 }
 
 export function OfferingManageClient({
@@ -73,7 +74,9 @@ export function OfferingManageClient({
   capacityGroups: initialCapacityGroups,
   summary: initialSummary,
   navigationContext,
+  enrolledRoster: initialEnrolledRoster = [],
   enrolledNames = [],
+  siblingOfferings = [],
   sessionEnrollment = null,
   sessionRoster = null,
   initialEditOpen = false,
@@ -85,7 +88,9 @@ export function OfferingManageClient({
   capacityGroups: ProgramCapacityGroupInput[]
   summary: OfferingManageSummary
   navigationContext?: OfferingManageNavigationContext
+  enrolledRoster?: OfferingRosterEnrollment[]
   enrolledNames?: string[]
+  siblingOfferings?: OfferingMoveTarget[]
   sessionEnrollment?: OfferingSessionEnrollmentSummary | null
   sessionRoster?: OfferingSessionRoster | null
   initialEditOpen?: boolean
@@ -102,6 +107,9 @@ export function OfferingManageClient({
     initialCapacityGroups
   )
   const [summary, setSummary] = React.useState(initialSummary)
+  const [enrolledRoster, setEnrolledRoster] = React.useState(
+    initialEnrolledRoster
+  )
   const [editOpen, setEditOpen] = React.useState(initialEditOpen)
   const [selectedSessionsOpen, setSelectedSessionsOpenState] = React.useState(
     initialSelected.selected_sessions_open !== false
@@ -110,12 +118,18 @@ export function OfferingManageClient({
   const [priorityMessage, setPriorityMessage] = React.useState<string | null>(
     null
   )
+  const [moveTarget, setMoveTarget] =
+    React.useState<OfferingRosterEnrollment | null>(null)
+  const [moveToOfferingId, setMoveToOfferingId] = React.useState("")
+  const [moveBusy, setMoveBusy] = React.useState(false)
+  const [moveError, setMoveError] = React.useState<string | null>(null)
 
   React.useEffect(() => {
     setSelected(initialSelected)
     setWorkspaceData(initialWorkspaceData)
     setCapacityGroups(initialCapacityGroups)
     setSummary(initialSummary)
+    setEnrolledRoster(initialEnrolledRoster)
     setSelectedSessionsOpenState(
       initialSelected.selected_sessions_open !== false
     )
@@ -124,6 +138,7 @@ export function OfferingManageClient({
     initialWorkspaceData,
     initialCapacityGroups,
     initialSummary,
+    initialEnrolledRoster,
   ])
 
   React.useEffect(() => {
@@ -191,6 +206,61 @@ export function OfferingManageClient({
   function handleEditOpenChange(open: boolean) {
     setEditOpen(open)
     if (!open) clearEditQueryParam()
+  }
+
+  const canMoveStudents = siblingOfferings.length > 0
+  const enrolledRows =
+    enrolledRoster.length > 0
+      ? enrolledRoster
+      : enrolledNames.map((name, index) => ({
+          id: `name-${index}`,
+          child_name: name,
+          child_age: null,
+          parent_name: null,
+          parent_email: null,
+          parent_phone: null,
+          status: null,
+          enrollment_date: null,
+        }))
+
+  function openMoveDialog(row: OfferingRosterEnrollment) {
+    setMoveTarget(row)
+    setMoveToOfferingId(siblingOfferings[0]?.id ?? "")
+    setMoveError(null)
+  }
+
+  function closeMoveDialog(open?: boolean) {
+    if (open) return
+    if (moveBusy) return
+    setMoveTarget(null)
+    setMoveToOfferingId("")
+    setMoveError(null)
+  }
+
+  async function handleMoveStudent() {
+    if (!moveTarget || !moveToOfferingId) return
+    setMoveBusy(true)
+    setMoveError(null)
+    try {
+      const result = await moveEnrollmentToOfferingAction({
+        enrollmentId: moveTarget.id,
+        fromOfferingId: selected.id,
+        toOfferingId: moveToOfferingId,
+      })
+      if (!result.success) {
+        setMoveError(result.error)
+        return
+      }
+      setMoveTarget(null)
+      setMoveToOfferingId("")
+      router.refresh()
+    } catch (error) {
+      setMoveError(
+        error instanceof Error ? error.message : "Failed to move this student."
+      )
+    } finally {
+      setMoveBusy(false)
+    }
   }
 
   const subtitle = seasonalMode
@@ -496,26 +566,64 @@ export function OfferingManageClient({
               <h2 className="text-base font-semibold text-slate-900">
                 Enrolled students
               </h2>
-              {enrolledNames.length === 0 ? (
+              {enrolledRows.length === 0 ? (
                 <p className="rounded-md border border-dashed bg-white px-4 py-8 text-center text-sm text-muted-foreground">
                   No students enrolled yet.
                 </p>
               ) : (
                 <ul className="divide-y rounded-md border bg-white">
-                  {enrolledNames.map((name, index) => (
-                    <li
-                      key={`${name}-${index}`}
-                      className="px-4 py-2.5 text-sm text-slate-800"
-                    >
-                      {name}
-                    </li>
-                  ))}
+                  {enrolledRows.map((row) => {
+                    const name = enrollmentDisplayName(row)
+                    const showMove =
+                      canMoveStudents &&
+                      canMoveEnrollmentStatus(row.status) &&
+                      !row.id.startsWith("name-")
+                    return (
+                      <li
+                        key={row.id}
+                        className="flex items-center justify-between gap-3 px-4 py-2 text-sm text-slate-800"
+                      >
+                        <span className="min-w-0 truncate">{name}</span>
+                        {showMove ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 shrink-0 text-sky-700 hover:text-sky-800"
+                            onClick={() => openMoveDialog(row)}
+                          >
+                            Move
+                          </Button>
+                        ) : null}
+                      </li>
+                    )
+                  })}
                 </ul>
               )}
             </section>
           </>
         )}
       </div>
+
+      <MoveEnrollmentOfferingDialog
+        open={moveTarget !== null}
+        studentName={
+          moveTarget ? enrollmentDisplayName(moveTarget) : "student"
+        }
+        programName={program.name}
+        destinations={siblingOfferings}
+        selectedOfferingId={moveToOfferingId}
+        onSelectedOfferingIdChange={setMoveToOfferingId}
+        busy={moveBusy}
+        error={moveError}
+        extraDescription={
+          hasSessions
+            ? "Week access on this offering is cleared; assign weeks on the new class if needed."
+            : undefined
+        }
+        onOpenChange={closeMoveDialog}
+        onConfirm={() => void handleMoveStudent()}
+      />
 
       <OfferingEditDialog
         open={editOpen}
@@ -527,8 +635,15 @@ export function OfferingManageClient({
         workspaceData={workspaceData}
         capacityGroups={capacityGroups}
         summary={summary}
-        onSaved={(updated) => {
+        onSaved={(updated, extras) => {
           setSelected(updated)
+          const nextAssignments = extras?.staffAssignments
+          if (nextAssignments) {
+            setWorkspaceData((current) => ({
+              ...current,
+              staffAssignments: nextAssignments,
+            }))
+          }
         }}
       />
     </div>

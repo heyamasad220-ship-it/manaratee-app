@@ -6,6 +6,7 @@ import {
   DEPARTMENT_OPEN_PROGRAM_STATUSES,
   loadDepartmentOpenPrograms,
 } from "@/lib/departments/department-active-programs"
+import { summarizeDepartmentStaff } from "@/lib/departments/department-list-summary"
 import { roundMoney } from "@/lib/departments/department-period-helpers"
 import { fetchDepartmentPayrollList } from "@/lib/departments/department-payroll"
 import { fetchDepartmentStudentPaymentsMatrix } from "@/lib/departments/department-student-payments"
@@ -15,6 +16,7 @@ import { createClient } from "@/lib/supabase/server"
 export type DepartmentWorkspaceOverview = {
   studentsCount: number
   staffCount: number
+  directorName: string | null
   revenue: number
   expenses: number
   net: number
@@ -53,6 +55,7 @@ export async function fetchDepartmentWorkspaceOverview(
   const empty: DepartmentWorkspaceOverview = {
     studentsCount: 0,
     staffCount: 0,
+    directorName: null,
     revenue: 0,
     expenses: 0,
     net: 0,
@@ -106,6 +109,11 @@ export async function fetchDepartmentWorkspaceOverview(
 
   // Fallback if payments matrix is needed for revenue only
   const staffCount = detail?.staff.length ?? 0
+  const directorName = await loadDepartmentDirectorName(
+    supabase,
+    organizationId,
+    departmentId
+  )
   const revenue = roundMoney(
     tuition.rows.reduce((sum, row) => sum + Number(row.received || 0), 0)
   )
@@ -131,12 +139,39 @@ export async function fetchDepartmentWorkspaceOverview(
   return {
     studentsCount,
     staffCount,
+    directorName,
     revenue,
     expenses,
     net,
     upcomingEventsCount,
     hasOpenYears: openProgramIds.length > 0,
   }
+}
+
+async function loadDepartmentDirectorName(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  organizationId: string,
+  departmentId: string
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("staff")
+    .select("first_name, last_name, status, is_department_head")
+    .eq("organization_id", organizationId)
+    .eq("department_id", departmentId)
+
+  if (error) return null
+
+  return (
+    summarizeDepartmentStaff(
+      (data || []).map((row) => ({
+        department_id: departmentId,
+        first_name: row.first_name as string | null,
+        last_name: row.last_name as string | null,
+        status: row.status as string | null,
+        is_department_head: Boolean(row.is_department_head),
+      }))
+    ).get(departmentId)?.directorName ?? null
+  )
 }
 
 export async function fetchDepartmentWorkspaceOverviewAction(departmentId: string) {

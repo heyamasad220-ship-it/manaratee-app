@@ -50,6 +50,7 @@ import {
   type ProgramDefaultsSource,
 } from "@/lib/programs/program-offering-inherit"
 import { programOfferingManageHref } from "@/lib/programs/program-offering-paths"
+import { programWorkspaceHref } from "@/lib/programs/program-workspace-path"
 import {
   OFFERING_DELIVERY_FORMAT_LABELS,
   type ProgramOffering,
@@ -505,9 +506,7 @@ export function ProgramOfferingsListPanel({
           )
         } else {
           router.push(
-            departmentId
-              ? `/workforce/departments/${departmentId}?tab=programs&year=${created.programId}`
-              : `/programs/${created.programId}`
+            programWorkspaceHref(created.programId, { tab: "offerings" })
           )
         }
         router.refresh()
@@ -535,7 +534,7 @@ export function ProgramOfferingsListPanel({
         setAddOpen(false)
         resetCreateForm()
         router.push(
-          `/workforce/departments/${departmentId}?tab=programs&year=${created.programId}`
+          programWorkspaceHref(created.programId, { tab: "offerings" })
         )
         router.refresh()
         return

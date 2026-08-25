@@ -1,4 +1,4 @@
-import { notFound, redirect } from "next/navigation"
+import { notFound } from "next/navigation"
 
 import { Header } from "@/components/layout/header"
 import { OfferingManageClient } from "@/components/programs/offering-manage-client"
@@ -12,9 +12,10 @@ import { getOfferingWorkspaceData } from "@/lib/programs/offering-workspace-quer
 import { getOfferingCapacityGroups } from "@/lib/programs/program-capacity-group-queries"
 import { PROGRAM_LABEL_PLURAL } from "@/lib/programs/program-display-labels"
 import { getOfferingsForProgram } from "@/lib/programs/program-offering-queries"
-import { programOfferingManageHref } from "@/lib/programs/program-offering-paths"
 import { getProgramById } from "@/lib/programs/program-queries"
+import { listMoveOfferingTargets } from "@/lib/programs/move-enrollment-offering-targets"
 import { getOfferingRosterEnrollments } from "@/lib/programs/program-staff-assignment-queries"
+import { programWorkspaceHref } from "@/lib/programs/program-workspace-path"
 
 export default async function ManageProgramOfferingPage({
   params,
@@ -33,16 +34,6 @@ export default async function ManageProgramOfferingPage({
     notFound()
   }
 
-  // Department-linked programs stay under HR → Departments.
-  if (program.department_id) {
-    const target = programOfferingManageHref(id, offeringId, {
-      departmentId: program.department_id,
-      sessionId,
-      edit: resolvedSearchParams.edit === "1",
-    })
-    redirect(target)
-  }
-
   const [offerings, departments, capacityGroups] = await Promise.all([
     getOfferingsForProgram(id),
     getDepartments(),
@@ -56,7 +47,7 @@ export default async function ManageProgramOfferingPage({
     notFound()
   }
 
-  const [workspaceData, summary, roster, sessionEnrollment, sessionRoster] =
+  const [workspaceData, summary, roster, sessionEnrollment, sessionRoster, siblingOfferings] =
     await Promise.all([
       getOfferingWorkspaceData(id, selectedOffering, program.organization_id),
       getOfferingManageSummary(selectedOffering.id, program.organization_id),
@@ -75,25 +66,26 @@ export default async function ManageProgramOfferingPage({
             program.organization_id
           )
         : Promise.resolve(null),
+      listMoveOfferingTargets(
+        id,
+        program.organization_id,
+        selectedOffering.id
+      ),
     ])
 
   const departmentName =
     departments.find((department) => department.id === program.department_id)
       ?.name ?? null
 
-  const enrolledNames = roster.map(
-    (row) => row.child_name || row.parent_name || "Participant"
-  )
-
   return (
     <>
       <Header
         title="Programs"
         breadcrumbExtras={[
-          { label: program.name, href: `/programs/${program.id}` },
+          { label: program.name, href: programWorkspaceHref(program.id) },
           {
             label: PROGRAM_LABEL_PLURAL,
-            href: `/programs/${program.id}/offerings`,
+            href: programWorkspaceHref(program.id, { tab: "offerings" }),
           },
           {
             label: selectedOffering.name,
@@ -113,13 +105,14 @@ export default async function ManageProgramOfferingPage({
         workspaceData={workspaceData}
         capacityGroups={capacityGroups}
         summary={summary}
-        enrolledNames={enrolledNames}
+        enrolledRoster={roster}
+        siblingOfferings={siblingOfferings}
         sessionEnrollment={sessionEnrollment}
         sessionRoster={sessionRoster}
         initialEditOpen={resolvedSearchParams.edit === "1"}
         navigationContext={{
           mode: "programs",
-          backHref: "/programs/catalog",
+          backHref: programWorkspaceHref(program.id, { tab: "offerings" }),
         }}
       />
     </>

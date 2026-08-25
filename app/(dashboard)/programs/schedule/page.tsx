@@ -5,7 +5,7 @@ import { resolveProgramScheduleRedirect } from "@/lib/programs/program-schedule-
 /**
  * Legacy Programs → Schedule route.
  * - `?program=` → offering Schedule tab (unchanged)
- * - bare URL → Departments list (Schedule Builder lives on Department → Schedule)
+ * - bare URL → Programs list (Schedule lives on Program Workspace)
  */
 export default async function ProgramsSchedulePage({
   searchParams,
@@ -23,5 +23,5 @@ export default async function ProgramsSchedulePage({
     }
   }
 
-  redirect("/workforce/departments")
+  redirect("/programs/list")
 }

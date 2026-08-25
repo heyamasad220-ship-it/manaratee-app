@@ -6,7 +6,8 @@ import {
   ProgramsAttendanceReportPanel,
   ProgramsWaitlistReportPanel,
 } from "@/components/programs/programs-attendance-waitlist-report-panels"
-import { ProgramsReportsNav } from "@/components/programs/programs-reports-nav"
+import { ProgramsStaffSubnav } from "@/components/programs/programs-staff-subnav"
+import { EVENT_MANAGEMENT_CHILDCARE_REPORTS_PATH } from "@/lib/events/event-management-reports-path"
 
 export default async function ProgramsReportsPage({
   searchParams,
@@ -17,14 +18,17 @@ export default async function ProgramsReportsPage({
   const tabRaw = Array.isArray(resolved.tab) ? resolved.tab[0] : resolved.tab
   const tab = (tabRaw || "").trim().toLowerCase()
 
-  if (!tab || tab === "overview" || tab === "enrollment") {
+  if (!tab || tab === "overview") {
+    redirect("/programs/reports/enrollments")
+  }
+  if (tab === "enrollment") {
     redirect("/programs/registrations")
   }
   if (tab === "transactions") {
     redirect("/finance/transactions")
   }
   if (tab === "childcare") {
-    redirect("/programs/reports/childcare")
+    redirect(EVENT_MANAGEMENT_CHILDCARE_REPORTS_PATH)
   }
   if (tab === "enrollments") {
     redirect("/programs/reports/enrollments")
@@ -44,10 +48,7 @@ export default async function ProgramsReportsPage({
   return (
     <>
       <Header title="Reports" />
-
-      <Suspense fallback={null}>
-        <ProgramsReportsNav />
-      </Suspense>
+      <ProgramsStaffSubnav secondary="reports" />
 
       <div className="flex flex-col gap-6 p-6">
         <h1 className="text-2xl font-semibold tracking-tight">

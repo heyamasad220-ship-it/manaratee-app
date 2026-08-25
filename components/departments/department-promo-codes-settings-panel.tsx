@@ -52,8 +52,11 @@ function statusBadgeVariant(status: string) {
 
 export function DepartmentPromoCodesSettingsPanel({
   departmentId,
+  programId,
 }: {
   departmentId: string
+  /** When set, skip the year picker and lock sibling discounts to this program. */
+  programId?: string
 }) {
   const supabase = createClient()
 
@@ -99,7 +102,12 @@ export function DepartmentPromoCodesSettingsPanel({
 
         const nextPrograms = (data ?? []) as ProgramOption[]
         setPrograms(nextPrograms)
-        setSelectedProgramId((current) => current || nextPrograms[0]?.id || "")
+        setSelectedProgramId((current) => {
+          if (programId && nextPrograms.some((row) => row.id === programId)) {
+            return programId
+          }
+          return current || nextPrograms[0]?.id || ""
+        })
       } catch (loadError) {
         setError(
           loadError instanceof Error
@@ -113,7 +121,7 @@ export function DepartmentPromoCodesSettingsPanel({
     }
 
     void loadPrograms()
-  }, [departmentId, supabase])
+  }, [departmentId, programId, supabase])
 
   React.useEffect(() => {
     if (!selectedProgramId || !organizationId) {
@@ -241,7 +249,9 @@ export function DepartmentPromoCodesSettingsPanel({
             Promo Codes
           </CardTitle>
           <CardDescription>
-            Codes apply across all years and programs in this department.
+            {programId
+              ? "Codes for this department still apply to all programs. Sibling discounts below are for this program."
+              : "Codes apply across all years and programs in this department."}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -270,31 +280,33 @@ export function DepartmentPromoCodesSettingsPanel({
           ) : (
             <>
               <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label htmlFor="dept-promo-year">{YEAR_SEASON_LABEL}</Label>
-                  <Select
-                    value={selectedProgramId}
-                    onValueChange={setSelectedProgramId}
-                  >
-                    <SelectTrigger id="dept-promo-year">
-                      <SelectValue placeholder={`Select a ${YEAR_SEASON_LABEL.toLowerCase()}`} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {programs.map((program) => (
-                        <SelectItem key={program.id} value={program.id}>
-                          {program.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {selectedProgram ? (
-                    <div className="pt-1">
-                      <Badge variant={statusBadgeVariant(selectedProgram.status)}>
-                        {getProgramStatusLabel(selectedProgram.status)}
-                      </Badge>
-                    </div>
-                  ) : null}
-                </div>
+                {programId ? null : (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="dept-promo-year">{YEAR_SEASON_LABEL}</Label>
+                    <Select
+                      value={selectedProgramId}
+                      onValueChange={setSelectedProgramId}
+                    >
+                      <SelectTrigger id="dept-promo-year">
+                        <SelectValue placeholder={`Select a ${YEAR_SEASON_LABEL.toLowerCase()}`} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {programs.map((program) => (
+                          <SelectItem key={program.id} value={program.id}>
+                            {program.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {selectedProgram ? (
+                      <div className="pt-1">
+                        <Badge variant={statusBadgeVariant(selectedProgram.status)}>
+                          {getProgramStatusLabel(selectedProgram.status)}
+                        </Badge>
+                      </div>
+                    ) : null}
+                  </div>
+                )}
 
                 <div className="space-y-1.5">
                   <Label htmlFor="dept-promo-offering">Program</Label>

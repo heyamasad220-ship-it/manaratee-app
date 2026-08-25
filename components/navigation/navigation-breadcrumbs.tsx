@@ -57,8 +57,10 @@ export function NavigationBreadcrumbs({
   }
 
   function handleSegmentClick(segment: (typeof trail)[number]) {
+    const hasDrawerItems = Boolean(segment.module?.children?.length)
+
     // Open the module drawer (previous menu) when leaving a nested page.
-    if (segment.module) {
+    if (segment.module && hasDrawerItems) {
       openModuleDrawer(segment.module)
     }
     if (segment.expandKeys?.length) {
@@ -83,8 +85,10 @@ export function NavigationBreadcrumbs({
       return
     }
 
-    // Module root while already inside that module — open the menu only.
-    if (segment.module && !segment.expandKeys?.length) {
+    // Module root while already inside that module — open the menu only
+    // when there is a drawer to show. Empty-children modules (Programs)
+    // navigate back to the module home (Overview).
+    if (segment.module && hasDrawerItems && !segment.expandKeys?.length) {
       const prefixes = [
         segment.module.matchPrefix,
         ...(segment.module.alsoMatchPrefixes ?? []),

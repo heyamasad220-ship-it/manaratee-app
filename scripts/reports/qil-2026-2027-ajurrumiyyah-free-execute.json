@@ -1,0 +1,86 @@
+{
+  "importTag": "QIL_2026_27_AJURRUMIYYAH_FREE_V1",
+  "mode": "execute",
+  "generatedAt": "2026-08-24T23:21:26.351Z",
+  "offering": "Al-Ajurrumiyyah",
+  "offeringId": "844c123a-3301-4701-9de1-4d4e6f38a142",
+  "created": 15,
+  "updated": 0,
+  "students": [
+    {
+      "action": "created",
+      "enrollmentId": "d4ebe781-5ded-4bb9-89de-a789c4a98bc5",
+      "studentName": "Asmaa Ali"
+    },
+    {
+      "action": "created",
+      "enrollmentId": "cdd1698d-a555-4008-aad6-3d72a2e17d6a",
+      "studentName": "Ayah Zahra"
+    },
+    {
+      "action": "created",
+      "enrollmentId": "147465a5-ae5a-4836-a398-99204fb0e404",
+      "studentName": "Belqes Ali"
+    },
+    {
+      "action": "created",
+      "enrollmentId": "04d7ecb9-b6ae-49e2-85ba-4922d11044e1",
+      "studentName": "Buthaynah Alian (Daglas)"
+    },
+    {
+      "action": "created",
+      "enrollmentId": "0196c5d1-5f76-4903-b233-dec20df9ad6a",
+      "studentName": "Fatima Hamdan"
+    },
+    {
+      "action": "created",
+      "enrollmentId": "dafd3e25-e1b2-4a6e-8403-016861ab3afe",
+      "studentName": "Iman Ettabaq"
+    },
+    {
+      "action": "created",
+      "enrollmentId": "c33e6699-364e-44eb-8933-ddcf167b630a",
+      "studentName": "Maha Abouradi"
+    },
+    {
+      "action": "created",
+      "enrollmentId": "ed5f2482-bd4d-4fb3-a3f6-f4d8ac5b342d",
+      "studentName": "Maha Fakhry"
+    },
+    {
+      "action": "created",
+      "enrollmentId": "7fcd6c51-0a74-420e-b11e-b624bbef30d6",
+      "studentName": "Marwa Taissir Elgamal"
+    },
+    {
+      "action": "created",
+      "enrollmentId": "ff8821df-2dac-4b83-9d79-befb4140c13b",
+      "studentName": "Meriem Douma"
+    },
+    {
+      "action": "created",
+      "enrollmentId": "e6176f80-12cf-4433-a591-2cae9a5b332e",
+      "studentName": "Nahid Mahmoud"
+    },
+    {
+      "action": "created",
+      "enrollmentId": "20de381c-b07e-471e-bf0b-c260ef4ca928",
+      "studentName": "Narmeen Alfahal"
+    },
+    {
+      "action": "created",
+      "enrollmentId": "3a3d809a-5ddd-482c-9577-a624666b5dda",
+      "studentName": "Nimat Malas"
+    },
+    {
+      "action": "created",
+      "enrollmentId": "df7771b3-b5e3-412f-a69c-9f98add297cf",
+      "studentName": "Sahar Shqaidef"
+    },
+    {
+      "action": "created",
+      "enrollmentId": "6a790ae1-93c2-44ec-bf4b-6fead398dd31",
+      "studentName": "Sana Hamdan"
+    }
+  ]
+}

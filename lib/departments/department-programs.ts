@@ -4,6 +4,7 @@ import { loadDepartmentWorkspacePrograms } from "@/lib/departments/department-ac
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { getOfferingsForProgram } from "@/lib/programs/program-offering-queries"
 import type { ProgramOffering } from "@/lib/programs/program-offering-types"
+import { primaryInstructorNameByOffering } from "@/lib/programs/primary-instructor"
 import { getOfferingEnrollmentCount } from "@/lib/programs/program-staff-assignment-queries"
 import { createClient } from "@/lib/supabase/server"
 
@@ -208,7 +209,7 @@ export async function fetchDepartmentPrograms(
       supabase
         .from("program_staff_assignments")
         .select(
-          "offering_id, assignment_role, is_active, contact:contact_id ( full_name )"
+        "offering_id, assignment_role, is_active, session_id, created_at, updated_at, contact:contact_id ( full_name )"
         )
         .eq("organization_id", organizationId)
         .in("offering_id", offeringIds)
@@ -227,25 +228,17 @@ export async function fetchDepartmentPrograms(
         .in("offering_id", offeringIds),
     ])
 
-  const instructorByOffering = new Map<string, string>()
-  for (const row of assignments || []) {
-    const offeringId = row.offering_id as string
-    if (instructorByOffering.has(offeringId)) continue
-    const role = String(row.assignment_role || "")
-    if (role !== "primary_instructor" && role !== "instructor") continue
-    const contact = row.contact as { full_name?: string | null } | null
-    const name = (contact?.full_name || "").trim()
-    if (name) instructorByOffering.set(offeringId, name)
-  }
-
-  // Prefer primary_instructor over generic instructor when both exist.
-  for (const row of assignments || []) {
-    if (String(row.assignment_role || "") !== "primary_instructor") continue
-    const offeringId = row.offering_id as string
-    const contact = row.contact as { full_name?: string | null } | null
-    const name = (contact?.full_name || "").trim()
-    if (name) instructorByOffering.set(offeringId, name)
-  }
+  const instructorByOffering = primaryInstructorNameByOffering(
+    (assignments || []).map((row) => ({
+      offering_id: row.offering_id as string,
+      assignment_role: String(row.assignment_role || ""),
+      is_active: row.is_active !== false,
+      session_id: (row.session_id as string | null) ?? null,
+      created_at: (row.created_at as string | null) ?? null,
+      updated_at: (row.updated_at as string | null) ?? null,
+      contact: row.contact as { full_name?: string | null } | null,
+    }))
+  )
 
   const scheduleByOffering = new Map<
     string,

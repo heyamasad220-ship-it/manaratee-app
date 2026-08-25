@@ -72,12 +72,15 @@ Features:
 * **Quick Create** + program detail inline edit + offering manage (see `docs/programs-staff-setup-ui.md`)
 * Organization filtering
 * Program details
-* **Program Catalog** — staff `/programs/catalog`, customer `/customer/programs`, public `/o/[orgSlug]/programs` (public visibility; join to register)
+* **Program Catalog** — staff Offerings page `/programs/catalog` is an org-wide admin table of existing offerings (not a second model). Customer `/customer/programs` and public `/o/[orgSlug]/programs` remain card catalogs (public visibility; join to register)
+* **Programs Home** — rail item opens `/programs` (titled Overview; breadcrumb `Dashboard > Programs > Overview`; colored whole-card links; no module tabs). Nested pages keep **Programs** in the breadcrumb pointing at `/programs`. Reports and Finance keep their own secondary tab bars. `/programs/list` is all years/seasons with an Academic or Seasonal tag; cards show department, dates, offering count, and total enrolled. Filters: search, department, type, status (default Active; Closed / Archived / All available). **New Program** opens `/programs/create`. `/programs/[id]` is the program workspace (**Overview | Offerings | Registrations | Schedule | Finance | Reports | Settings**; Finance is Transactions | Payment Summary; Reports is Enrollments | Add-ons | Waitlist | Attendance; both are already filtered to that program). Overview is a compact health dashboard (KPIs, needs attention, offerings preview, financial summary, recent activity). Department Programs tab is a summary doorway into that workspace.
 * Eligibility rules (ages, grades, gender, capacity groups)
 * Registration model, eligibility, capacity, and fee plans (offering overview + edit dialog Advanced; unified fees + discounts save with dialog Save; run `scripts/200_program_pricing_billing_scope.sql`)
 * Program detail **Reports** — enrollments across offerings (filter + CSV)
 * Offering-scoped pricing (Phase 2A/2B)
-* **Department Settings** (`?tab=settings` on department workspace): General / Registration / Notifications stubs (`department_program_settings`); department-wide promo codes (`discount_codes.department_id`); Service Needs for that department’s years. Legacy `/programs/settings*` → `/workforce?tab=departments`. Run **`scripts/190_department_settings_promo_codes.sql`**.
+* **Move students between offerings** — offering overview Enrolled students **Move** and program **Registrations** roster **Move** keep the same enrollment (payments/history) and retarget it to another offering in the same year/season (`moveEnrollmentToOfferingAction`). Closed destinations allowed; archived/full/duplicate/terminal blocked. Session week access is cleared.
+* **Offering edit dialog** persists **Primary instructor** on Save (`setOfferingPrimaryInstructor`); picker is department employees (`staff.department_id`). One active offering-level primary per class (SQL **`278`**).
+* **Department Settings** (`?tab=settings` on department workspace): name and color on one row, **Director Name** (department employee / `staff.is_department_head`), Description, and Terms with one **Save** at the bottom. **Delete department** is at the bottom and is blocked when any programs, offerings, or employees exist. Program defaults / Registration / Notifications / Promo Codes live on Program Workspace Settings (`/programs/[id]?tab=settings`). **Service Needs** lives on Event workspace Settings (`/event-management/[id]?tab=settings`). Leftover `?section=year-defaults|registration|notifications|promo-codes` opens the Programs doorway; leftover `?section=service-needs` opens department Events. Legacy `/programs/settings` → `/workforce?tab=departments`; `/programs/settings/service-needs` → `/event-management`. Run **`scripts/190_department_settings_promo_codes.sql`**.
 * **Summer Camps 2026 Phase 1 import** (payments CSV → Recreational Camps / year + offerings / weeks / enrollments / FA / childcare addons): `scripts/import-summer-camps-2026.mjs`. **Merged** Camp One + Two → one **Summer Camp** (8 weeks, week-count tuition tiers + sibling 5%): `scripts/merge-summer-camps-2026.mjs` + SQL **`190`**. Master roster + staff payroll phases pending.
 * **QLH (Education) registrations import** (Excel roster → Education years `QLH 2024-2025` / `QLH 2025-2026` + default `QLH Registration` offering each): `scripts/import-qlh-registrations.mjs`.
 
@@ -115,9 +118,10 @@ Features:
 * Waitlist records
 * Registration detail pages
 * Status management
-* **Reports → Registrations** — family/contact payment view (`/programs/registrations`)
+* Program **Registrations** tab separates **Applications** (optional) from **Enrollments**; payment status is independent of enrollment status (`enrollment-process.ts`, SQL `280`)
+* **Registrations** — family/contact payment view (`/programs/registrations`)
 * **Reports → Enrollments** — one row per participant demographics/consent (`/programs/reports/enrollments`); row opens **Participant profile** (`/programs/participants/[personId]`: identity, household, enrollments, attendance, waitlist/applications, session access; no financials). Edit updates `people` (+ enrollment note sync); apply SQL `242`.
-* **Reports → Payment Summary** — family balances, program fees (months × monthly), additional fees (`/programs/reports/tuition-plans`)
+* **Finance → Payment Summary** (program workspace) / org **Reports → Payment Summary** — family balances, program fees (months × monthly), additional fees (`/programs/[id]?tab=finance&section=payment-summary`; org `/programs/reports/tuition-plans`)
 * **Reports → Add-ons** — one row per purchased add-on (materials, lunch, uniforms, field trips) (`/programs/reports/addons`)
 
 Known Issue:
@@ -202,11 +206,11 @@ Status: Working (not a subscription SKU — included with **Programs**. Financia
 Routes:
 
 * `/finance` → `/finance/transactions`
-* `/finance/transactions` — org payment transactions (Donations + Programs); voided hidden by default (Status column filter); **Reports** tab under Programs/ Events
-* `/finance/payroll` — org payroll queue (Mark paid); **Reports** tab under Programs/ Events
-* `/finance/financial-assistance` — FA hub (Overview / Submissions / Templates / Reports / Payment Plans); top-level **Programs/ Events** drawer item
+* `/finance/transactions` — org payment transactions (Donations + Programs); voided hidden by default (Status column filter); **Finance** card on Programs Home (Transactions | Payroll)
+* `/finance/payroll` — org payroll queue (Mark paid); Programs Home → Finance → Payroll
+* `/finance/financial-assistance` — FA hub (Overview / Submissions / Templates / Reports / Payment Plans); **Financial Assistance** card on Programs Home
 
-No separate Finance drawer group. Transactions and Payroll are tabs on **Reports**; Financial Assistance is its own drawer link.
+No separate Finance drawer when Programs is on. Transactions and Payroll are the Finance destination; Financial Assistance is its own Programs Home card.
 
 Permissions: `finance.view` (module; fallbacks include donations/staff/reports/applications view); child pages also accept `reports.view` / `staff.view` / `applications.view` as appropriate. Mark paid requires `finance.manage`.
 
@@ -367,7 +371,7 @@ Roster-only employee list using the shared HR directory shell (Export, Add Emplo
 
 Removed tabs (redirect to Overview):
 
-* Departments → `/workforce?tab=departments` (department workspace at `/workforce/departments/[id]`: **department-level** Overview / Programs / Schedule (**Class times** [space column + Facilities/Master Calendar CTAs] | **Activity planner**) / Financial / Reports / Group giving / Events (**View Master Calendar** / **Check space availability** / **Create event**) / Settings; **year-level** via `?year=` — Overview / Offerings / Registrations; department Overview = flyer + description + Terms (`terms_html` / `terms_pdf_url`, SQL `241`); Programs catalog = `?tab=programs` without year; click program → `?year=` Program Overview; offering manage under `/workforce/departments/[id]/programs/...`; legacy tab aliases unchanged; apply SQL `169`/`170`/`171`/`172`/`173`/`174`/`186`/`190`/`203`/`241`; scoped access via `lib/departments/department-access.ts`). Historical QIL load: `scripts/import-qil-year.mjs`; consolidate course-as-programs → offerings: `scripts/migrate-qil-courses-to-offerings.mjs` (after `174`).
+* Departments → `/workforce?tab=departments` (list at `/workforce/departments`: color + initial cards with Director and Employees; whole card opens the workspace. Department workspace at `/workforce/departments/[id]`: **department-level** Overview / Programs / Events / Employees / Group giving / Financial (**View Master Calendar** / **Check space availability** / **Create event** live on Events) / Settings; **Employees** is a top-level roster (`?tab=employees`; leftover `?tab=financial&section=employees` opens it); **Financial** sub-tabs are Payroll / Expenses / Financial Summary; **Programs** tab is a summary doorway into `/programs/[id]` (workspace tabs: Overview | Offerings | Registrations | **Schedule** [Class times + Activity planner] | **Finance** [Transactions / Payment Summary, locked to this program] | **Reports** [Enrollments / Add-ons / Waitlist / Attendance, locked to this program] | Settings); leftover `?year=` redirects to that workspace; leftover `?tab=schedule` opens the Programs doorway; offering manage under `/programs/[id]/offerings/...`; department Overview = snapshot KPIs (programs, offerings, employees, students, events, collected/payroll/net) + programs list; description + Terms live on Settings (`terms_html` / `terms_pdf_url`, SQL `241`; no flyer on Overview); one Save plus Delete department at the bottom of Settings (delete blocked if programs, offerings, or employees exist); apply SQL `169`/`170`/`171`/`172`/`173`/`174`/`186`/`190`/`203`/`241`; scoped access via `lib/departments/department-access.ts`). Historical QIL load: `scripts/import-qil-year.mjs`; 2026–2027 payments/registrations: `scripts/import-qil-payments-2026-2027.mjs` (SQL `277`); prune Approved to QIApproved.xlsx + QIPayments.csv: `scripts/prune-qil-approved-2026-2027.mjs`; free Al-Ajurrumiyyah enroll: `scripts/enroll-qil-ajurrumiyyah-2026-2027.mjs`; consolidate course-as-programs → offerings: `scripts/migrate-qil-courses-to-offerings.mjs` (after `174`).
 * Positions → `/workforce?tab=employees&view=positions`
 * Time Off, Work Schedule, Notifications, Teams, Applications
 
@@ -400,14 +404,14 @@ Status: Working (real data)
 **Customer apply:**
 * Volunteer → `/customer/apply/volunteer` (Profile → Applications; **Copy apply link** on Volunteers). Approve creates/links a `volunteers` roster row.
 * Childcare → `/customer/apply/childcare` (Profile → Applications; **Copy apply link** on providers). Approving creates/links a childcare `staff` row for payroll hour logging.
-**Registrations:** `/programs/reports/childcare` (Programs/ Events → Reports → Childcare)
+**Registrations:** `/event-management/reports/childcare` (Event Management → Reports → Childcare)
 
 Data source: approved `childcare_provider` applications (not mock data).
 
 Key files:
 
 * `app/(dashboard)/workforce/childcare/page.tsx`
-* `app/(dashboard)/programs/reports/childcare/page.tsx`
+* `app/(dashboard)/event-management/reports/childcare/page.tsx`
 * `components/hr/hr-childcare-panel.tsx`
 * `components/child-care/childcare-registrations-client.tsx`
 * `lib/hr/childcare-provider-actions.ts`
@@ -513,3 +517,4 @@ Status: In progress
 * Customer portal **My Tickets** `/customer/tickets` (codes + QR + resume checkout). SQL `256`
 * Youth forms / liability waiver on Opportunities + Youth tab Forms dialog (SQL `259`)
 * Event documents on Settings (`event_documents`, SQL `254`)
+* **Service Needs** on Event workspace Settings (volunteers / youth / vendors → `internal_events.requires_*` + `service_requirements`; `internal-event-service-needs-settings.tsx`)

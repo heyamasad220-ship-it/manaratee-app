@@ -6,6 +6,18 @@ export const PROGRAM_KIND_LABELS: Record<ProgramKind, string> = {
   seasonal: "Seasonal Programs",
 }
 
+/** Short tag for mixed lists (Academic | Seasonal). */
+export const PROGRAM_KIND_TAG_LABELS: Record<ProgramKind, string> = {
+  academic: "Academic",
+  seasonal: "Seasonal",
+}
+
+export function getProgramKindTagLabel(
+  kind: string | null | undefined
+): string {
+  return PROGRAM_KIND_TAG_LABELS[normalizeProgramKind(kind)]
+}
+
 export const PROGRAM_KIND_DESCRIPTIONS: Record<ProgramKind, string> = {
   academic:
     "School-year style: a year container with multiple offerings (courses, levels, tracks). Monthly and semester billing. Full-program registration — no day passes or à-la-carte sessions.",

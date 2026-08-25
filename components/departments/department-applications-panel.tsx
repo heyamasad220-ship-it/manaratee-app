@@ -31,13 +31,21 @@ import {
   fetchDepartmentApplicationsAction,
 } from "@/lib/programs/program-application-actions"
 import type {
+  ApplicationStatusChip,
   DepartmentApplicationListFilter,
   ProgramApplicantType,
+  ProgramApplicationStatus,
   ProgramApplicationWithDetails,
 } from "@/lib/programs/program-application-types"
-import { PROGRAM_APPLICANT_TYPE_LABELS } from "@/lib/programs/program-application-types"
+import {
+  PROGRAM_APPLICANT_TYPE_LABELS,
+  PROGRAM_APPLICATION_STATUS_LABELS,
+  applicationStatusChipFor,
+} from "@/lib/programs/program-application-types"
+import { customerProgramRegisterPath } from "@/lib/programs/enrollment-process"
 import { PROGRAM_LABEL, PROGRAM_LABEL_PLURAL } from "@/lib/programs/program-display-labels"
 import { createClient } from "@/lib/supabase/client"
+import { cn } from "@/lib/utils"
 import {
   DEFAULT_LIST_PAGE_SIZE,
   slicePageItems,
@@ -98,18 +106,57 @@ function applicationProgramName(application: ProgramApplicationWithDetails) {
 type DepartmentApplicationsPanelProps = {
   departmentId: string
   departmentName: string
-  /** Needs review vs approved but not yet registered. */
+  programId?: string | null
+  /** Server list filter. Prefer `all` plus status chips. */
   filter?: DepartmentApplicationListFilter
+  statusChip?: ApplicationStatusChip
+  onStatusChipChange?: (chip: ApplicationStatusChip) => void
+  chipCounts?: Record<ApplicationStatusChip, number>
+  evaluationRequired?: boolean
   /** Hide outer title when embedded in Registrations tab. */
   embedded?: boolean
   onCountsMayHaveChanged?: () => void
+}
+
+const APPLICATION_CHIPS: { id: ApplicationStatusChip; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "needs_review", label: "Needs Review" },
+  { id: "evaluation", label: "Evaluation" },
+  { id: "approved", label: "Approved" },
+  { id: "waitlisted", label: "Waitlisted" },
+  { id: "declined", label: "Declined" },
+]
+
+function applicationStatusLabel(status: ProgramApplicationStatus | string) {
+  return (
+    PROGRAM_APPLICATION_STATUS_LABELS[status as ProgramApplicationStatus] ||
+    status
+  )
+}
+
+function evaluationLabel(application: ProgramApplicationWithDetails) {
+  if (application.evaluated_at) return formatDate(application.evaluated_at)
+  const status = application.status
+  if (
+    status === "evaluation_required" ||
+    status === "evaluation_scheduled" ||
+    status === "evaluation_completed"
+  ) {
+    return applicationStatusLabel(status)
+  }
+  return "—"
 }
 
 /** Department head queue: applications awaiting evaluation or registration. */
 export function DepartmentApplicationsPanel({
   departmentId,
   departmentName,
-  filter = "submitted",
+  programId = null,
+  filter = "all",
+  statusChip = "all",
+  onStatusChipChange,
+  chipCounts,
+  evaluationRequired: _evaluationRequired = false,
   embedded = false,
   onCountsMayHaveChanged,
 }: DepartmentApplicationsPanelProps) {
@@ -132,12 +179,16 @@ export function DepartmentApplicationsPanel({
   const [page, setPage] = React.useState(1)
   const [pageSize, setPageSize] = React.useState(DEFAULT_LIST_PAGE_SIZE)
 
-  const isReview = filter === "submitted"
+  const isReview = statusChip === "needs_review" || statusChip === "evaluation"
 
   const load = React.useCallback(async () => {
     setLoading(true)
     setError(null)
-    const result = await fetchDepartmentApplicationsAction(departmentId, filter)
+    const result = await fetchDepartmentApplicationsAction(
+      departmentId,
+      filter,
+      programId
+    )
     if (!result.success) {
       setError(result.error)
       setApplications([])
@@ -153,7 +204,7 @@ export function DepartmentApplicationsPanel({
     )
     setLoading(false)
     return result.applications
-  }, [departmentId, filter])
+  }, [departmentId, filter, programId])
 
   React.useEffect(() => {
     void load()
@@ -187,13 +238,26 @@ export function DepartmentApplicationsPanel({
       ) {
         return false
       }
+      if (statusChip !== "all") {
+        const chip = applicationStatusChipFor(application.status)
+        if (statusChip === "approved") {
+          return application.status === "approved"
+        }
+        return chip === statusChip
+      }
       return true
     })
-  }, [applications, participantFilter, programFilter, applicantTypeFilter])
+  }, [
+    applications,
+    participantFilter,
+    programFilter,
+    applicantTypeFilter,
+    statusChip,
+  ])
 
   React.useEffect(() => {
     setPage(1)
-  }, [participantFilter, programFilter, applicantTypeFilter, filter])
+  }, [participantFilter, programFilter, applicantTypeFilter, filter, statusChip])
 
   const pagedApplications = React.useMemo(
     () => slicePageItems(filteredApplications, page, pageSize),
@@ -203,7 +267,8 @@ export function DepartmentApplicationsPanel({
   const filtersActive =
     Boolean(participantFilter.trim()) ||
     programFilter !== "all" ||
-    applicantTypeFilter !== "all"
+    applicantTypeFilter !== "all" ||
+    statusChip !== "all"
 
   const allSelected =
     pagedApplications.length > 0 &&
@@ -276,23 +341,21 @@ export function DepartmentApplicationsPanel({
     router.refresh()
   }
 
-  const title = isReview
-    ? embedded
-      ? "Applications"
-      : `Applications · ${departmentName}`
-    : embedded
-      ? "Approved"
-      : `Approved · ${departmentName}`
+  const title = embedded ? "Applications" : `Applications · ${departmentName}`
+  const description =
+    "Open a row to review. Select rows to batch approve or decline."
+  const emptyMessage = "No applications yet."
+  const columnCount = 8
 
-  const description = isReview
-    ? "Everyone applies. Select rows to batch approve, or open a row to review and approve inside the form."
-    : "Approved participants who have not registered yet. Open a row to edit or un-approve."
-
-  const emptyMessage = isReview
-    ? "No pending applications."
-    : "No approved participants waiting to register."
-
-  const columnCount = isReview ? 6 : 5
+  async function copyRegistrationLink(application: ProgramApplicationWithDetails) {
+    const path = customerProgramRegisterPath(application.program_id)
+    const url = `${window.location.origin}${path}`
+    try {
+      await navigator.clipboard.writeText(url)
+    } catch {
+      setError("Could not copy the registration link.")
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -309,17 +372,15 @@ export function DepartmentApplicationsPanel({
           </h2>
           <p className="text-sm text-muted-foreground">{description}</p>
         </div>
-        {isReview && applications.length > 0 ? (
+        {hasSelection ? (
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm text-muted-foreground">
-              {hasSelection
-                ? `${selectedIds.length} selected`
-                : "Select participants to batch approve"}
+              {selectedIds.length} selected
             </span>
             <Button
               type="button"
               size="sm"
-              disabled={!hasSelection || batchBusy}
+              disabled={batchBusy}
               onClick={() => void handleBatchDecision("approved")}
             >
               {batchBusy ? "Working…" : "Approve selected"}
@@ -328,13 +389,38 @@ export function DepartmentApplicationsPanel({
               type="button"
               size="sm"
               variant="outline"
-              disabled={!hasSelection || batchBusy}
+              disabled={batchBusy}
               onClick={() => void handleBatchDecision("not_approved")}
             >
-              Not approve selected
+              Decline selected
             </Button>
           </div>
         ) : null}
+      </div>
+
+      <div className="flex flex-wrap gap-1">
+        {APPLICATION_CHIPS.map((chip) => {
+          const count = chipCounts?.[chip.id]
+          const active = statusChip === chip.id
+          return (
+            <Button
+              key={chip.id}
+              type="button"
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "h-8 rounded-full px-3 text-zinc-600 hover:bg-amber-50/70 hover:text-amber-700",
+                active && "bg-amber-50 text-amber-700"
+              )}
+              onClick={() => onStatusChipChange?.(chip.id)}
+            >
+              {chip.label}
+              {count != null && (chip.id === "all" || count > 0) ? (
+                <span className="ml-1.5 tabular-nums text-xs">{count}</span>
+              ) : null}
+            </Button>
+          )
+        })}
       </div>
 
       {loading ? (
@@ -355,16 +441,14 @@ export function DepartmentApplicationsPanel({
           <Table>
             <TableHeader>
               <TableRow>
-                {isReview ? (
-                  <TableHead className="w-10">
-                    <Checkbox
-                      checked={allSelected}
-                      onCheckedChange={(checked) => toggleAll(checked === true)}
-                      aria-label="Select all applications"
-                      disabled={batchBusy}
-                    />
-                  </TableHead>
-                ) : null}
+                <TableHead className="w-10">
+                  <Checkbox
+                    checked={allSelected}
+                    onCheckedChange={(checked) => toggleAll(checked === true)}
+                    aria-label="Select all applications"
+                    disabled={batchBusy}
+                  />
+                </TableHead>
                 <TableHead>
                   <TableColumnHeaderFilter
                     label="Participant"
@@ -443,8 +527,11 @@ export function DepartmentApplicationsPanel({
                     )}
                   </TableColumnHeaderFilter>
                 </TableHead>
-                <TableHead>{isReview ? "Submitted" : "Approved"}</TableHead>
+                <TableHead>Application Status</TableHead>
+                <TableHead>Submitted</TableHead>
+                <TableHead>Evaluation</TableHead>
                 <TableHead>Last Updated</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -478,21 +565,19 @@ export function DepartmentApplicationsPanel({
                         }
                       }}
                     >
-                      {isReview ? (
-                        <TableCell
-                          onClick={(event) => event.stopPropagation()}
-                          onKeyDown={(event) => event.stopPropagation()}
-                        >
-                          <Checkbox
-                            checked={selected}
-                            onCheckedChange={(checked) =>
-                              toggleOne(application.id, checked === true)
-                            }
-                            aria-label={`Select ${application.participant_name}`}
-                            disabled={batchBusy}
-                          />
-                        </TableCell>
-                      ) : null}
+                      <TableCell
+                        onClick={(event) => event.stopPropagation()}
+                        onKeyDown={(event) => event.stopPropagation()}
+                      >
+                        <Checkbox
+                          checked={selected}
+                          onCheckedChange={(checked) =>
+                            toggleOne(application.id, checked === true)
+                          }
+                          aria-label={`Select ${application.participant_name}`}
+                          disabled={batchBusy}
+                        />
+                      </TableCell>
                       <TableCell className="font-medium text-sky-700">
                         {application.participant_name}
                       </TableCell>
@@ -514,14 +599,44 @@ export function DepartmentApplicationsPanel({
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {formatDate(
-                          isReview
-                            ? application.created_at
-                            : application.evaluated_at
-                        )}
+                        <Badge variant="secondary" className="font-normal">
+                          {applicationStatusLabel(application.status)}
+                          {application.status === "approved" &&
+                          !application.enrollment_id
+                            ? " · Registration pending"
+                            : null}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{formatDate(application.created_at)}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {evaluationLabel(application)}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {formatLastUpdated(application)}
+                      </TableCell>
+                      <TableCell
+                        className="text-right"
+                        onClick={(event) => event.stopPropagation()}
+                        onKeyDown={(event) => event.stopPropagation()}
+                      >
+                        {application.status === "approved" &&
+                        !application.enrollment_id ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-8"
+                            onClick={() =>
+                              void copyRegistrationLink(application)
+                            }
+                          >
+                            Copy registration link
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">
+                            Review
+                          </span>
+                        )}
                       </TableCell>
                     </TableRow>
                   )

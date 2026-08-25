@@ -3,7 +3,7 @@
 **Status:** Implementation started (July 2026) — steps 1–3 in progress.  
 **Scope:** Going forward only. Existing enrollments (e.g. QIL) are treated as already past this pipeline.
 
-**SQL:** Run `scripts/182_program_registration_applications.sql` after `180`–`181`. Run `scripts/236_program_application_answers.sql` for applicant form answers (`application_answers` JSONB).
+**SQL:** Run `scripts/182_program_registration_applications.sql` after `180`–`181`. Run `scripts/236_program_application_answers.sql` for applicant form answers (`application_answers` JSONB). Run **`scripts/280_program_enrollment_process.sql`** for program enrollment process / seat activation and expanded application statuses.
 
 ### Built so far
 
@@ -12,10 +12,11 @@
 | Reports: **Registrations** rename + **Payment transactions** tab | Done |
 | `program_applications` table + waitlist offering/offer columns | Done (SQL `182`) |
 | Customer apply (`/customer/programs/[id]/apply`) + application form | Done (full name, returning/new, new-student background, course, babysitter, payment preference → `application_answers`) |
-| Open enrollment (`application_required = false`) — Register & pay, no approve | Done (SQL **`194`**; Add program + Registration settings) |
-| Department workspace **Applications** (row opens form sheet; approve / not approve + batch) | Done (approve other offering next) |
-| Waitlist on full + offer deadline | Not yet |
-| Gate Register on approved + seat/offer; fee on register | Not yet |
+| Enrollment process setting (direct vs application/approval) + seat activation | Done (SQL **`280`**; Settings → Program defaults) |
+| Open enrollment (`application_required` synced from program process) | Done (SQL **`194`** / **`280`**) |
+| Program workspace **Registrations**: Applications + Enrollments (no Approved tab) | Done |
+| Waitlist on full + offer deadline | Not yet (status model ready) |
+| Gate Register on approved + seat/offer; fee on register | Partial — approved applicants complete registration; customer gate still uses offering `application_required` |
 | FA only after approval | Not yet |
 
 This document defines apply → evaluate/approve → waitlist/FA (optional) → register → reports, so Registrations and Payment transactions stay distinct.
@@ -72,31 +73,34 @@ Suggested statuses (names can be refined in implementation):
 
 | Status | Meaning |
 |--------|---------|
-| `submitted` | Application awaiting department evaluation |
-| `approved` | Approved for an offering (director evaluate / batch approve) |
-| `not_approved` | Rejected for the applied offering (comms outside app, or DH re-targets another offering) |
+| `draft` | Saved, not submitted |
+| `submitted` | Needs staff review |
+| `evaluation_required` | Evaluation required before approval |
+| `evaluation_scheduled` | Evaluation is scheduled |
+| `evaluation_completed` | Evaluation recorded; awaiting approval |
+| `approved` | Eligible to complete registration (not enrolled) |
+| `waitlisted` | Application waitlist (not an enrollment waitlist) |
+| `not_approved` / `declined` | Declined |
 | `withdrawn` | Applicant or staff cancelled |
 
 **Approve into different offering:** DH rejects current offering and approves the same person for another offering in one staff action (or equivalent two-step that ends in `approved` on the new offering).
 
-### Waitlist track (after approval only)
+Approved without an enrollment is the operational state **Approved — Registration Pending** (calculated, not a stored status).
 
-| Status | Meaning |
-|--------|---------|
-| `waiting` | Approved; offering at capacity |
-| `offered` | Seat opened; offer sent with **customizable deadline** (per offering, days) |
-| `expired` | Offer deadline passed without register |
-| `converted` | Registered from waitlist offer |
+### Waitlist track (two lists)
 
-Unapproved applicants are **not** on waitlist.
+Application waitlist (`program_applications.status = waitlisted`) is not the same as enrollment waitlist (`program_waitlist`). Do not combine them.
 
 ### Registration track
 
 | Status | Meaning |
 |--------|---------|
-| `registered` / enrolled | Completed register; **fee created**; appears on Registrations report |
+| `pending` / `pending_payment` | Checkout hold; not on the operational roster |
+| `enrolled` / `active` | Seat is active; appears on roster even with a balance |
+| `completed` | Term finished |
+| `cancelled` / `withdrawn` | Off the default roster |
 
-Payment progress (paid / partial / pending) stays on the enrollment/charge, not as enrollment lifecycle status.
+Payment status is independent (`pending`, `partial`/`balance due`, `paid`, plan, waived, refunded). Capacity counts **active/enrolled** seats, not applications.
 
 ### Financial assistance (optional)
 

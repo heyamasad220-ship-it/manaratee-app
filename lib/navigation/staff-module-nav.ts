@@ -1,8 +1,5 @@
 import type { SubItem } from "@/lib/navigation/sidebar-nav"
-import {
-  organizationProgramKindToggles,
-  type OrganizationProgramKindsEntitlement,
-} from "@/lib/programs/program-kind-policy"
+import type { OrganizationProgramKindsEntitlement } from "@/lib/programs/program-kind-policy"
 
 export const ADMINISTRATION_MODULE_LABEL = "Administration"
 export const ADMINISTRATION_MODULE_SLUG = "administration"
@@ -84,54 +81,9 @@ export function buildAdministrationChildren(slugs: StaffModuleSlugSet): SubItem[
 }
 
 export function buildProgramsChildren(
-  entitlement: OrganizationProgramKindsEntitlement
+  _entitlement: OrganizationProgramKindsEntitlement
 ): SubItem[] {
-  const { academic: allowAcademic, seasonal: allowSeasonal } =
-    organizationProgramKindToggles(entitlement)
-  const items: SubItem[] = []
-
-  if (allowAcademic) {
-    items.push({
-      label: "Academic",
-      href: "/programs/catalog?kind=academic",
-      matchPrefix: "/programs/catalog",
-      permissionKey: "programs.view",
-    })
-  }
-
-  if (allowSeasonal) {
-    items.push({
-      label: "Seasonal",
-      href: "/programs/catalog?kind=seasonal",
-      matchPrefix: "/programs/catalog",
-      permissionKey: "programs.view",
-    })
-  }
-
-  items.push(
-    {
-      label: "Financial Assistance",
-      href: "/finance/financial-assistance",
-      matchPrefix: "/finance/financial-assistance",
-      alsoMatchPrefixes: ["/programs/financial-assistance"],
-      permissionKey: "applications.view",
-      permissionKeys: ["finance.view", "applications.view"],
-    },
-    {
-      label: "Reports",
-      href: "/programs/registrations",
-      matchPrefix: "/programs/registrations",
-      alsoMatchPrefixes: [
-        "/programs/reports",
-        "/finance/transactions",
-        "/finance/payroll",
-      ],
-      permissionKey: "reports.view",
-      permissionKeys: ["reports.view", "finance.view", "staff.view"],
-    }
-  )
-
-  return items
+  return []
 }
 
 export function buildEventManagementChildren(): SubItem[] {
@@ -144,6 +96,7 @@ export function buildEventManagementChildren(): SubItem[] {
         "/event-management/calendar",
         "/event-management/ticketing",
         "/event-management/settings",
+        "/event-management/reports",
       ],
       permissionKey: "events.view",
     },
@@ -158,6 +111,12 @@ export function buildEventManagementChildren(): SubItem[] {
       href: "/event-management/ticketing",
       matchPrefix: "/event-management/ticketing",
       permissionKey: "ticketing.view",
+    },
+    {
+      label: "Reports",
+      href: "/event-management/reports",
+      matchPrefix: "/event-management/reports",
+      permissionKey: "events.view",
     },
     {
       label: "Settings",

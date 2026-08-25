@@ -1,39 +1,29 @@
 import { Header } from "@/components/layout/header"
-import { CopyPublicCatalogLinkButton } from "@/components/programs/copy-public-catalog-link-button"
-import { OfferingCatalogView } from "@/components/programs/offering-catalog-view"
-import { ProgramCatalogFilters } from "@/components/programs/program-catalog-filters"
-import { getDepartments } from "@/lib/departments/department-queries"
+import { OfferingsManagementPage } from "@/components/programs/offerings-management-page"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { getServiceRoleClient } from "@/lib/platform/require-platform-admin"
-import { getActiveOfferingsForCatalog } from "@/lib/programs/offering-catalog-queries"
 import {
-  buildProgramCatalogHref,
-  PROGRAM_CATALOG_PAGE_SIZE,
-} from "@/lib/programs/program-catalog-helpers"
-import { PROGRAM_LABEL_PLURAL } from "@/lib/programs/program-display-labels"
-import { programOfferingManageHref } from "@/lib/programs/program-offering-paths"
+  parseOfferingsManagementFilters,
+  parseOfferingsManagementView,
+} from "@/lib/programs/offerings-management"
+import { getStaffOfferingsForManagement } from "@/lib/programs/offerings-management-queries"
+import { getOpenPrograms } from "@/lib/programs/program-queries"
 import { buildPublicProgramCatalogUrl } from "@/lib/programs/public-paths"
 
 function getValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value
 }
 
-export default async function ProgramsPage({
+export default async function ProgramsOfferingsPage({
   searchParams,
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>
 }) {
   const resolvedSearchParams = await searchParams
-
-  const filters = {
-    q: getValue(resolvedSearchParams?.q) || "",
-    department: getValue(resolvedSearchParams?.department) || "all",
-    gender: getValue(resolvedSearchParams?.gender) || "all",
-    audience: getValue(resolvedSearchParams?.audience) || "all",
-    age: getValue(resolvedSearchParams?.age) || "",
-    page: getValue(resolvedSearchParams?.page) || "1",
-    kind: getValue(resolvedSearchParams?.kind) || "",
-  }
+  const filters = parseOfferingsManagementFilters(resolvedSearchParams || {})
+  const urlView = parseOfferingsManagementView(
+    getValue(resolvedSearchParams?.view)
+  )
 
   const organizationId = await getSelectedOrganizationId()
   let publicCatalogUrl: string | null = null
@@ -49,106 +39,30 @@ export default async function ProgramsPage({
     }
   }
 
-  const catalogTitle =
-    filters.kind === "academic"
-      ? "Academic Catalog"
-      : filters.kind === "seasonal"
-        ? "Seasonal Catalog"
-        : "Program Catalog"
-
-  const [offerings, departments] = await Promise.all([
-    getActiveOfferingsForCatalog({
-      q: filters.q,
-      department: filters.department,
-      gender: filters.gender,
-      audience: filters.audience,
-      age: filters.age,
-      kind: filters.kind,
-    }),
-    getDepartments(),
+  const [rows, programs] = await Promise.all([
+    getStaffOfferingsForManagement(),
+    getOpenPrograms(),
   ])
 
-  const totalCount = offerings.length
-  const totalPages = Math.max(
-    1,
-    Math.ceil(totalCount / PROGRAM_CATALOG_PAGE_SIZE)
-  )
-  const requestedPage = Math.max(
-    1,
-    Number.parseInt(filters.page || "1", 10) || 1
-  )
-  const page = Math.min(requestedPage, totalPages)
-  const pageOfferings = offerings.slice(
-    (page - 1) * PROGRAM_CATALOG_PAGE_SIZE,
-    page * PROGRAM_CATALOG_PAGE_SIZE
-  )
+  const createPrograms = programs
+    .map((program) => ({
+      id: program.id,
+      name: program.name,
+      departmentId: program.department_id,
+    }))
+    .sort((left, right) => left.name.localeCompare(right.name))
 
   return (
     <>
-      <Header title={catalogTitle} />
-
-      <div className="space-y-4 p-6">
-        {publicCatalogUrl ? (
-          <div className="flex flex-col gap-2 rounded-lg border bg-muted/30 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="min-w-0">
-              <p className="text-sm font-medium">Public catalog link</p>
-              <p className="truncate text-xs text-muted-foreground">
-                Share with families (no login required to browse). Only programs marked{" "}
-                <span className="font-medium">public</span> appear.{" "}
-                <span className="break-all">{publicCatalogUrl}</span>
-              </p>
-            </div>
-            <CopyPublicCatalogLinkButton url={publicCatalogUrl} />
-          </div>
-        ) : null}
-
-        <OfferingCatalogView
-          offerings={pageOfferings}
-          page={page}
-          totalPages={totalPages}
-          totalCount={totalCount}
-          pageSize={PROGRAM_CATALOG_PAGE_SIZE}
-          title={catalogTitle}
-          emptyTitle={`No active ${PROGRAM_LABEL_PLURAL.toLowerCase()} found`}
-          emptyDescription={`Add ${PROGRAM_LABEL_PLURAL.toLowerCase()} from a department workspace, or adjust your filters.`}
-          getOfferingHref={(offering) =>
-            programOfferingManageHref(offering.program_id, offering.id, {
-              departmentId: offering.department_id,
-            })
-          }
-          buildPageHref={(targetPage) =>
-            buildProgramCatalogHref(
-              "/programs/catalog",
-              {
-                q: filters.q,
-                status: "all",
-                department: filters.department,
-                gender: filters.gender,
-                audience: filters.audience,
-                age: filters.age,
-                view: "cards",
-                kind: filters.kind,
-              },
-              targetPage
-            )
-          }
-          filters={
-            <ProgramCatalogFilters
-              departments={departments}
-              hideStatusFilter
-              hideViewToggle
-              showFamilyFilters
-              initialFilters={{
-                q: filters.q || "",
-                status: "active",
-                department: filters.department || "all",
-                gender: filters.gender || "all",
-                audience: filters.audience || "all",
-                age: filters.age || "",
-                view: "cards",
-              }}
-            />
-          }
+      <Header title="Offerings" />
+      <div className="p-6">
+        <OfferingsManagementPage
+          rows={rows}
+          createPrograms={createPrograms}
+          publicCatalogUrl={publicCatalogUrl}
+          initialFilters={filters}
+          initialView={urlView || "table"}
+          urlHasView={Boolean(urlView)}
         />
       </div>
     </>

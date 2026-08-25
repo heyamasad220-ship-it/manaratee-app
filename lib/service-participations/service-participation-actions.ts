@@ -6,11 +6,12 @@ import { createClient } from "@/lib/supabase/server"
 import { getActiveOrganization } from "@/lib/organizations/get-active-organization"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { hasAnyPermission, PERMISSIONS } from "@/lib/permissions/permissions"
-import type { EventServiceRequirementsFormState } from "@/lib/events/event-service-requirements"
+import { EVENT_MANAGEMENT_CHILDCARE_REPORTS_PATH } from "@/lib/events/event-management-reports-path"
 import {
   buildServiceRequirementsPayload,
   parseServiceRequirements,
   serviceRequirementsFormFromEvent,
+  type EventServiceRequirementsFormState,
 } from "@/lib/events/event-service-requirements"
 
 import { ensureChildcareEventForSource } from "./childcare-source-sync"
@@ -254,7 +255,7 @@ export async function registerChildForOpportunityChildcare(input: {
   }
 
   revalidateParticipationPaths(input.sourceType, input.sourceId)
-  revalidatePath("/programs/reports/childcare")
+  revalidatePath(EVENT_MANAGEMENT_CHILDCARE_REPORTS_PATH)
   revalidatePath("/workforce/childcare/registrations")
 }
 

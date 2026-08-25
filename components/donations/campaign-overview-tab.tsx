@@ -137,7 +137,7 @@ export function CampaignOverviewTab({
           </CardContent>
         </Card>
 
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,0.9fr)] xl:items-start">
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,0.9fr)] xl:items-stretch">
           <CampaignOverviewMetricsTable
             breakdown={sourceBreakdown}
             metrics={metrics}
@@ -157,14 +157,8 @@ export function CampaignOverviewTab({
             }
           />
 
-          <Card className="flex w-full flex-col gap-2 py-4">
-            <CardHeader className="px-4 py-0">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Target className="h-4 w-4" />
-                Goal Progress
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col items-center gap-3 px-4 pb-2 pt-0">
+          <Card className="flex h-full w-full flex-col pt-4 pb-6" aria-label="Goal progress">
+            <CardContent className="flex flex-1 flex-col items-center justify-start gap-3 px-4 pb-2 pt-0">
               <CampaignProgressGauge
                 raised={committed}
                 goal={goalAmount}

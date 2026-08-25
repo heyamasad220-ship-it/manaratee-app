@@ -110,10 +110,6 @@ export function ProgramBasicsSection({
   const stacked = layout === "stack"
 
   const [flyerUrl, setFlyerUrl] = React.useState(program?.flyer_url ?? "")
-  const flyerColumnRef = React.useRef<HTMLDivElement>(null)
-  const [descriptionHeight, setDescriptionHeight] = React.useState<number | null>(
-    null
-  )
   const ageBounds = React.useMemo(
     () =>
       parseProgramAgeBounds({
@@ -131,36 +127,6 @@ export function ProgramBasicsSection({
   React.useEffect(() => {
     setFlyerUrl(program?.flyer_url ?? "")
   }, [program?.flyer_url])
-
-  React.useLayoutEffect(() => {
-    const column = flyerColumnRef.current
-    if (!column) return
-
-    const frame = column.querySelector<HTMLElement>("[data-flyer-frame]")
-    if (!frame) return
-
-    const syncHeight = () => {
-      const next = Math.round(frame.getBoundingClientRect().height)
-      setDescriptionHeight(next > 0 ? next : null)
-    }
-
-    syncHeight()
-    const observer = new ResizeObserver(syncHeight)
-    observer.observe(frame)
-    if (flyerUrl) {
-      const img = frame.querySelector("img")
-      if (img) {
-        if (img.complete) syncHeight()
-        else img.addEventListener("load", syncHeight)
-      }
-    }
-
-    return () => {
-      observer.disconnect()
-      const img = frame.querySelector("img")
-      img?.removeEventListener("load", syncHeight)
-    }
-  }, [flyerUrl])
 
   React.useEffect(() => {
     const next = parseProgramAgeBounds({
@@ -264,13 +230,12 @@ export function ProgramBasicsSection({
         </div>
 
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
-          <div ref={flyerColumnRef} className="w-fit max-w-full shrink-0">
+          <div className="w-fit max-w-full shrink-0">
             <ProgramBrandingColors
               flyerUrl={flyerUrl}
               onFlyerUrlChange={setFlyerUrl}
               programId={programId}
               initialBackgroundColor={program?.background_color}
-              flyerFit="contain"
             />
           </div>
           <div className="flex min-w-0 flex-1 flex-col space-y-1.5">
@@ -282,11 +247,6 @@ export function ProgramBasicsSection({
               defaultValue={program?.description || ""}
               placeholder="Describe what participants will experience..."
               className="field-sizing-fixed min-h-[16rem] resize-y"
-              style={
-                descriptionHeight
-                  ? { height: descriptionHeight, minHeight: descriptionHeight }
-                  : undefined
-              }
             />
           </div>
         </div>

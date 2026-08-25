@@ -46,6 +46,16 @@ function omitUnavailableProgramColumns<T extends Record<string, unknown>>(
     delete next.drop_in_registration_enabled
   }
 
+  if (message.includes("enrollment_process")) {
+    delete next.enrollment_process
+  }
+  if (message.includes("evaluation_required")) {
+    delete next.evaluation_required
+  }
+  if (message.includes("seat_activation_rule")) {
+    delete next.seat_activation_rule
+  }
+
   return next
 }
 
@@ -186,6 +196,12 @@ export async function createProgram(input: CreateProgramInput) {
       waitlist: 0,
       status,
       visibility: input.visibility || "public",
+      enrollment_process:
+        programKind === "seasonal" || input.application_required === false
+          ? "direct_registration"
+          : "application_approval",
+      evaluation_required: false,
+      seat_activation_rule: "on_registration",
   }
 
   let { data, error } = await supabase
@@ -204,7 +220,7 @@ export async function createProgram(input: CreateProgramInput) {
       .single())
   }
 
-  if (error) {
+  if (error || !data) {
     console.error(error)
     throw new Error("Failed to create program")
   }
@@ -294,6 +310,9 @@ type UpdateProgramInput = {
 
   enable_waitlist?: boolean
   waitlist_capacity?: number | null
+  enrollment_process?: "direct_registration" | "application_approval"
+  evaluation_required?: boolean
+  seat_activation_rule?: "on_registration" | "after_initial_payment"
 
   /** @deprecated Fee plans live on offerings — not written (S4). */
   billing_type?:
@@ -400,6 +419,17 @@ export async function updateProgram(input: UpdateProgramInput) {
     waitlist_capacity: input.waitlist_capacity ?? null,
 
     updated_at: new Date().toISOString(),
+  }
+
+  if (input.enrollment_process) {
+    programPayload.enrollment_process = input.enrollment_process
+    programPayload.evaluation_required =
+      input.enrollment_process === "application_approval"
+        ? Boolean(input.evaluation_required)
+        : false
+  }
+  if (input.seat_activation_rule) {
+    programPayload.seat_activation_rule = input.seat_activation_rule
   }
 
   if (input.program_kind) {

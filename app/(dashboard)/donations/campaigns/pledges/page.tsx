@@ -743,8 +743,7 @@ export default function PledgesPage() {
         defaultCampaignId={detailsCampaignId}
         defaultContactId={detailsContactId}
         prospectId={detailsProspectId}
-        onSaved={(pledgeId) => {
-          setDetailsPledgeId(pledgeId);
+        onSaved={() => {
           setDetailsProspectId(null);
           void fetchPledges();
         }}

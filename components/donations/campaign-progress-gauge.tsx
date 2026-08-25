@@ -91,7 +91,7 @@ export function CampaignProgressGauge({
       ) : null}
 
       <svg
-        viewBox="0 0 320 210"
+        viewBox="0 18 320 192"
         width={fluid ? undefined : config.width}
         height={fluid ? undefined : config.height}
         className={cn(fluid && "h-auto w-full")}

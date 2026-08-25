@@ -37,6 +37,40 @@ export function isOfferingEnrollmentOpen(
   return true
 }
 
+export type OfferingRegistrationState = "open" | "closed" | "upcoming"
+
+export const OFFERING_REGISTRATION_STATE_LABELS: Record<
+  OfferingRegistrationState,
+  string
+> = {
+  open: "Open",
+  closed: "Closed",
+  upcoming: "Upcoming",
+}
+
+/**
+ * Registration window for staff lists. Reuses enrollment-open logic and
+ * surfaces a distinct Upcoming state when the open date is still in the future.
+ */
+export function getOfferingRegistrationState(
+  offering: Pick<
+    ProgramOffering,
+    "enrollment_open_date" | "enrollment_close_date"
+  >,
+  programFallback?: {
+    enrollment_open_date?: string | null
+    enrollment_close_date?: string | null
+  }
+): OfferingRegistrationState {
+  const openDate = dateOnly(
+    offering.enrollment_open_date ?? programFallback?.enrollment_open_date
+  )
+  const today = todayDateOnly()
+  if (openDate && today < openDate) return "upcoming"
+  if (isOfferingEnrollmentOpen(offering, programFallback)) return "open"
+  return "closed"
+}
+
 /** Enrollment window using F1 inherit_dates resolution. */
 export function isOfferingEnrollmentOpenForProgram(
   offering: ProgramOffering,

@@ -51,7 +51,8 @@ const DAY_ORDER: Record<string, number> = {
 }
 
 export async function fetchDepartmentSchedule(
-  departmentId: string
+  departmentId: string,
+  options?: { programId?: string }
 ): Promise<DepartmentScheduleSummary> {
   const organizationId = await getSelectedOrganizationId()
   if (!organizationId) {
@@ -59,13 +60,19 @@ export async function fetchDepartmentSchedule(
   }
 
   const supabase = await createClient()
-  const { data: programs, error: programsError } = await supabase
+  let programsQuery = supabase
     .from("programs")
     .select("id, name")
     .eq("organization_id", organizationId)
     .eq("department_id", departmentId)
     .in("status", [...DEPARTMENT_WORKSPACE_PROGRAM_STATUSES])
     .order("name", { ascending: true })
+
+  if (options?.programId) {
+    programsQuery = programsQuery.eq("id", options.programId)
+  }
+
+  const { data: programs, error: programsError } = await programsQuery
 
   if (programsError) {
     throw new Error(programsError.message || "Could not load programs.")
@@ -214,9 +221,12 @@ export async function fetchDepartmentSchedule(
   }
 }
 
-export async function fetchDepartmentScheduleAction(departmentId: string) {
+export async function fetchDepartmentScheduleAction(
+  departmentId: string,
+  options?: { programId?: string }
+) {
   try {
-    const summary = await fetchDepartmentSchedule(departmentId)
+    const summary = await fetchDepartmentSchedule(departmentId, options)
     return { success: true as const, summary }
   } catch (error) {
     return {

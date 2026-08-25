@@ -151,6 +151,7 @@ function ReportFilters({
   offeringLabelSingular,
   offeringLabelPlural,
   loading,
+  hideScopeFilters = false,
 }: {
   departments: ReportDepartmentOption[]
   departmentId: string
@@ -163,42 +164,47 @@ function ReportFilters({
   offeringLabelSingular: string
   offeringLabelPlural: string
   loading: boolean
+  hideScopeFilters?: boolean
 }) {
   return (
     <div className="flex w-full flex-col gap-3 sm:max-w-3xl sm:flex-row sm:items-end">
-      <div className="min-w-0 flex-1 space-y-1.5">
-        <Label htmlFor="report-department-filter">Department</Label>
-        <select
-          id="report-department-filter"
-          value={departmentId}
-          onChange={(event) => onDepartmentChange(event.target.value)}
-          disabled={loading || departments.length === 0}
-          className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-        >
-          <option value="">All departments</option>
-          {departments.map((department) => (
-            <option key={department.id} value={department.id}>
-              {department.name}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="min-w-0 flex-1 space-y-1.5">
-        <Label htmlFor="report-kind-filter">Type</Label>
-        <select
-          id="report-kind-filter"
-          value={kindFilter}
-          onChange={(event) =>
-            onKindChange(event.target.value as "all" | ProgramKind)
-          }
-          disabled={loading}
-          className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-        >
-          <option value="all">All types</option>
-          <option value="academic">Academic</option>
-          <option value="seasonal">Seasonal</option>
-        </select>
-      </div>
+      {hideScopeFilters ? null : (
+        <>
+          <div className="min-w-0 flex-1 space-y-1.5">
+            <Label htmlFor="report-department-filter">Department</Label>
+            <select
+              id="report-department-filter"
+              value={departmentId}
+              onChange={(event) => onDepartmentChange(event.target.value)}
+              disabled={loading || departments.length === 0}
+              className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+            >
+              <option value="">All departments</option>
+              {departments.map((department) => (
+                <option key={department.id} value={department.id}>
+                  {department.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="min-w-0 flex-1 space-y-1.5">
+            <Label htmlFor="report-kind-filter">Type</Label>
+            <select
+              id="report-kind-filter"
+              value={kindFilter}
+              onChange={(event) =>
+                onKindChange(event.target.value as "all" | ProgramKind)
+              }
+              disabled={loading}
+              className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+            >
+              <option value="all">All types</option>
+              <option value="academic">Academic</option>
+              <option value="seasonal">Seasonal</option>
+            </select>
+          </div>
+        </>
+      )}
       <div className="min-w-0 flex-1 space-y-1.5">
         <Label htmlFor="report-offering-filter">{offeringLabelSingular}</Label>
         <select
@@ -226,11 +232,13 @@ function ReportFilters({
   )
 }
 
-function useReportOfferings() {
+function useReportOfferings(lockedProgramId?: string) {
   const [loading, setLoading] = React.useState(true)
   const [offerings, setOfferings] = React.useState<ReportOfferingOption[]>([])
   const [departmentId, setDepartmentId] = React.useState("")
-  const { kindFilter, setKindFilter } = useProgramKindReportPreset()
+  const { kindFilter: urlKindFilter, setKindFilter } =
+    useProgramKindReportPreset()
+  const kindFilter = lockedProgramId ? "all" : urlKindFilter
   const [selectedId, setSelectedId] = React.useState("")
 
   const reportLabels = getReportHierarchyLabels(
@@ -264,6 +272,9 @@ function useReportOfferings() {
 
   const filteredOfferings = React.useMemo(() => {
     return offerings.filter((offering) => {
+      if (lockedProgramId && offering.programId !== lockedProgramId) {
+        return false
+      }
       if (departmentId && offering.departmentId !== departmentId) {
         return false
       }
@@ -272,7 +283,7 @@ function useReportOfferings() {
       }
       return true
     })
-  }, [offerings, departmentId, kindFilter])
+  }, [offerings, lockedProgramId, departmentId, kindFilter])
 
   React.useEffect(() => {
     setSelectedId((current) => {
@@ -290,6 +301,7 @@ function useReportOfferings() {
   }
 
   function handleKindChange(next: "all" | ProgramKind) {
+    if (lockedProgramId) return
     setKindFilter(next)
     setSelectedId("")
   }
@@ -306,11 +318,16 @@ function useReportOfferings() {
     selected,
     selectedId,
     setSelectedId,
+    hideScopeFilters: Boolean(lockedProgramId),
   }
 }
 
 /** Programs → Reports → Attendance (filter by department + offering). */
-export function ProgramsAttendanceReportPanel() {
+export function ProgramsAttendanceReportPanel({
+  lockedProgramId,
+}: {
+  lockedProgramId?: string
+}) {
   const {
     loading,
     departments,
@@ -323,7 +340,8 @@ export function ProgramsAttendanceReportPanel() {
     selected,
     selectedId,
     setSelectedId,
-  } = useReportOfferings()
+    hideScopeFilters,
+  } = useReportOfferings(lockedProgramId)
 
   if (loading) {
     return (
@@ -338,8 +356,9 @@ export function ProgramsAttendanceReportPanel() {
     return (
       <Card>
         <CardContent className="py-10 text-center text-sm text-muted-foreground">
-          No active programs available. Create a program first, then enable
-          attendance under Overview → Feature packs.
+          {lockedProgramId
+            ? "No active offerings for this program. Enable attendance under Overview → Feature packs."
+            : "No active programs available. Create a program first, then enable attendance under Overview → Feature packs."}
         </CardContent>
       </Card>
     )
@@ -372,6 +391,7 @@ export function ProgramsAttendanceReportPanel() {
           offeringLabelSingular={reportLabels.offeringSingular}
           offeringLabelPlural={reportLabels.offeringPlural}
           loading={loading}
+          hideScopeFilters={hideScopeFilters}
         />
       </div>
 
@@ -416,7 +436,11 @@ export function ProgramsAttendanceReportPanel() {
 }
 
 /** Programs → Reports → Waitlist (filter by department + offering). */
-export function ProgramsWaitlistReportPanel() {
+export function ProgramsWaitlistReportPanel({
+  lockedProgramId,
+}: {
+  lockedProgramId?: string
+}) {
   const {
     loading,
     departments,
@@ -429,7 +453,8 @@ export function ProgramsWaitlistReportPanel() {
     selected,
     selectedId,
     setSelectedId,
-  } = useReportOfferings()
+    hideScopeFilters,
+  } = useReportOfferings(lockedProgramId)
 
   if (loading) {
     return (
@@ -444,8 +469,9 @@ export function ProgramsWaitlistReportPanel() {
     return (
       <Card>
         <CardContent className="py-10 text-center text-sm text-muted-foreground">
-          No active programs available. Create a program and turn on waitlist
-          under Enrollment when capacity is limited.
+          {lockedProgramId
+            ? "No active offerings for this program. Turn waitlist on under Enrollment when capacity is limited."
+            : "No active programs available. Create a program and turn on waitlist under Enrollment when capacity is limited."}
         </CardContent>
       </Card>
     )
@@ -478,6 +504,7 @@ export function ProgramsWaitlistReportPanel() {
           offeringLabelSingular={reportLabels.offeringSingular}
           offeringLabelPlural={reportLabels.offeringPlural}
           loading={loading}
+          hideScopeFilters={hideScopeFilters}
         />
       </div>
 

@@ -14,7 +14,6 @@ export type ProgramsReportsTabId =
   | "enrollments"
   | "attendance"
   | "waitlist"
-  | "childcare"
   | "transactions"
   | "tuition-plans"
   | "addons"
@@ -28,19 +27,9 @@ export type ProgramsReportsTab = {
 
 export const PROGRAMS_REPORTS_TABS: ProgramsReportsTab[] = [
   {
-    id: "enrollment",
-    label: "Registration",
-    href: "/programs/registrations",
-  },
-  {
     id: "enrollments",
     label: "Enrollments",
     href: "/programs/reports/enrollments",
-  },
-  {
-    id: "transactions",
-    label: "Transactions",
-    href: "/finance/transactions",
   },
   {
     id: "addons",
@@ -61,16 +50,6 @@ export const PROGRAMS_REPORTS_TABS: ProgramsReportsTab[] = [
     id: "attendance",
     label: "Attendance",
     href: "/programs/reports?tab=attendance",
-  },
-  {
-    id: "childcare",
-    label: "Child Care",
-    href: "/programs/reports/childcare",
-  },
-  {
-    id: "payroll",
-    label: "Payroll",
-    href: "/finance/payroll",
   },
 ]
 
@@ -109,12 +88,6 @@ export function resolveProgramsReportsTab(
     return "enrollments"
   }
   if (
-    pathname === "/programs/reports/childcare" ||
-    pathname.startsWith("/programs/reports/childcare/")
-  ) {
-    return "childcare"
-  }
-  if (
     pathname === "/programs/registrations" ||
     pathname.startsWith("/programs/registrations/")
   ) {
@@ -132,8 +105,7 @@ export function resolveProgramsReportsTab(
     return "addons"
   }
 
-  // Overview merged into Registrations — treat bare /programs/reports as enrollment.
-  return "enrollment"
+  return "enrollments"
 }
 
 export function ProgramsReportsNav() {

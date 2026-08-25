@@ -149,10 +149,14 @@ async function loadDonationPayments(
 }
 
 async function loadProgramPayments(
-  limit: number
+  limit: number,
+  programId?: string | null
 ): Promise<OrgPaymentTransactionRow[]> {
   try {
-    const rows = await getProgramPaymentTransactions({ limit })
+    const rows = await getProgramPaymentTransactions({
+      limit,
+      programId: programId || null,
+    })
     return rows.map((row) => ({
       id: `program:${row.id}`,
       module: "programs" as const,
@@ -186,26 +190,32 @@ async function loadProgramPayments(
 export async function getOrgPaymentTransactions(filters?: {
   failedOnly?: boolean
   limit?: number
+  programId?: string | null
 }): Promise<OrgPaymentTransactionRow[]> {
   const organizationId = await getSelectedOrganizationId()
   if (!organizationId) return []
 
   const limit = filters?.limit ?? 300
+  const programId = filters?.programId || null
+  const resultLimit = programId ? Math.max(limit, 1000) : limit
   const [donations, programs] = await Promise.all([
-    loadDonationPayments(organizationId, limit),
-    loadProgramPayments(limit),
+    programId
+      ? Promise.resolve([])
+      : loadDonationPayments(organizationId, limit),
+    loadProgramPayments(resultLimit, programId),
   ])
 
   let rows = [...donations, ...programs].sort(sortByDateDesc)
   if (filters?.failedOnly) {
     rows = rows.filter((row) => row.status === "Failed")
   }
-  return rows.slice(0, limit)
+  return rows.slice(0, resultLimit)
 }
 
 export async function fetchOrgPaymentTransactionsAction(filters?: {
   failedOnly?: boolean
   limit?: number
+  programId?: string | null
 }) {
   try {
     const rows = await getOrgPaymentTransactions(filters)
