@@ -432,7 +432,9 @@ export function OfferingEditDialog({
             statusOptions={
               status === "closed"
                 ? (["draft", "active", "closed"] as ProgramOfferingStatus[])
-                : STATUS_OPTIONS
+                : status === "cancelled"
+                  ? (["cancelled", "draft", "active"] as ProgramOfferingStatus[])
+                  : STATUS_OPTIONS
             }
             kindRadioName="edit-offering-kind"
             values={{

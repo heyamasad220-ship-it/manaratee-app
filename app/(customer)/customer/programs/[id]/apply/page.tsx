@@ -21,6 +21,9 @@ import {
   PROGRAM_APPLICATION_STATUS_LABELS,
 } from "@/lib/programs/program-application-types"
 import { isOfferingOpenEnrollment } from "@/lib/programs/offering-enrollment-path"
+import {
+  customerProgramRegisterPath,
+} from "@/lib/programs/enrollment-process"
 import { getCustomerOfferingsForProgram } from "@/lib/programs/program-offering-queries"
 import {
   getCustomerContactForUser,
@@ -90,10 +93,10 @@ export default async function ProgramApplyPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ offering?: string }>
+  searchParams: Promise<{ offering?: string; error?: string }>
 }) {
   const { id: programId } = await params
-  const { offering: offeringParam } = await searchParams
+  const { offering: offeringParam, error: errorParam } = await searchParams
 
   const cookieStore = await cookies()
   const organizations = (await getMyOrganizations()) as CustomerOrganization[]
@@ -116,7 +119,7 @@ export default async function ProgramApplyPage({
   const supabase = await createClient()
   const { data: program } = await supabase
     .from("programs")
-    .select("id, name, organization_id, status")
+    .select("id, name, organization_id, status, enrollment_process, program_kind")
     .eq("id", programId)
     .eq("organization_id", organizationId)
     .maybeSingle()
@@ -182,9 +185,9 @@ export default async function ProgramApplyPage({
       : null) ??
     (openOfferings.length === 1 ? openOfferings[0] : null)
 
-  if (preferredOffering && isOfferingOpenEnrollment(preferredOffering)) {
+  if (preferredOffering && isOfferingOpenEnrollment(preferredOffering, program)) {
     redirect(
-      `/customer/programs/${programId}/register?offering=${preferredOffering.id}`
+      customerProgramRegisterPath(programId, preferredOffering.id)
     )
   }
 
@@ -205,6 +208,13 @@ export default async function ProgramApplyPage({
             Tell us if the student is returning or new. All applications are
             reviewed by the department before registration.
           </p>
+          {errorParam === "approval-required" ? (
+            <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              This program requires an approved application before you can
+              register. Submit an application, or wait for approval if you
+              already applied.
+            </p>
+          ) : null}
         </div>
       </div>
 
@@ -269,10 +279,11 @@ export default async function ProgramApplyPage({
                   {application.status === "approved" ? (
                     <Button size="sm" variant="outline" asChild>
                       <Link
-                        href={`/customer/programs/${programId}/register?offering=${
+                        href={customerProgramRegisterPath(
+                          programId,
                           application.approved_offering_id ||
-                          application.offering_id
-                        }`}
+                            application.offering_id
+                        )}
                       >
                         Register
                       </Link>

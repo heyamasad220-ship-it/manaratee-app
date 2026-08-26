@@ -2,6 +2,10 @@
 
 import { DEPARTMENT_WORKSPACE_PROGRAM_STATUSES } from "@/lib/departments/department-active-programs"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
+import {
+  primaryInstructorNameByOffering,
+  resolveClassTimeInstructorName,
+} from "@/lib/programs/primary-instructor"
 import { createClient } from "@/lib/supabase/server"
 
 export type DepartmentScheduleWeeklyRow = {
@@ -143,6 +147,35 @@ export async function fetchDepartmentSchedule(
     ])
   )
 
+  const offeringIds = [...offeringNameById.keys()]
+  const instructorByOfferingId = new Map<string, string>()
+  if (offeringIds.length > 0) {
+    const { data: assignments } = await supabase
+      .from("program_staff_assignments")
+      .select(
+        "offering_id, assignment_role, is_active, session_id, created_at, updated_at, contact:contact_id ( full_name )"
+      )
+      .eq("organization_id", organizationId)
+      .in("offering_id", offeringIds)
+      .eq("is_active", true)
+      .in("assignment_role", ["primary_instructor", "instructor"])
+
+    const names = primaryInstructorNameByOffering(
+      (assignments || []).map((row) => ({
+        offering_id: row.offering_id as string,
+        assignment_role: String(row.assignment_role || ""),
+        is_active: row.is_active !== false,
+        session_id: (row.session_id as string | null) ?? null,
+        created_at: (row.created_at as string | null) ?? null,
+        updated_at: (row.updated_at as string | null) ?? null,
+        contact: row.contact as { full_name?: string | null } | null,
+      }))
+    )
+    for (const [offeringId, name] of names) {
+      instructorByOfferingId.set(offeringId, name)
+    }
+  }
+
   const defaultOfferingByProgram = new Map<string, string>()
   for (const row of offerings || []) {
     if (row.is_default === true) {
@@ -166,14 +199,15 @@ export async function fetchDepartmentSchedule(
       const venueName = Array.isArray(venueEmbed)
         ? venueEmbed[0]?.name
         : venueEmbed?.name
+      const offeringId = (row.offering_id as string | null) ?? null
 
       return {
         id: row.id as string,
         programId: row.program_id as string,
         programName: programNameById.get(row.program_id as string) || "Program",
-        offeringId: (row.offering_id as string | null) ?? null,
-        offeringName: row.offering_id
-          ? offeringNameById.get(row.offering_id as string) || null
+        offeringId,
+        offeringName: offeringId
+          ? offeringNameById.get(offeringId) || null
           : null,
         title: (row.title as string) || "Class",
         dayOfWeek: (row.day_of_week as string) || "",
@@ -181,7 +215,10 @@ export async function fetchDepartmentSchedule(
         endTime: (row.end_time as string) || "",
         spaceName: (venueName as string | null | undefined) ?? null,
         location: (row.location as string | null) ?? null,
-        instructorName: (row.instructor_name as string | null) ?? null,
+        instructorName: resolveClassTimeInstructorName(
+          row.instructor_name as string | null,
+          offeringId ? instructorByOfferingId.get(offeringId) : null
+        ),
       }
     })
     .sort((a, b) => {

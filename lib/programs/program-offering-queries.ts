@@ -138,6 +138,7 @@ export async function getOfferingCountsByProgramIds(programIds: string[]) {
     .eq("organization_id", organizationId)
     .in("program_id", programIds)
     .neq("status", "archived")
+    .neq("status", "cancelled")
 
   if (error) {
     console.error("getOfferingCountsByProgramIds:", error.message)
@@ -185,6 +186,7 @@ export async function getProgramListStatsByProgramIds(
     .eq("organization_id", organizationId)
     .in("program_id", programIds)
     .neq("status", "archived")
+    .neq("status", "cancelled")
 
   if (offeringsError) {
     console.error(
@@ -264,6 +266,7 @@ export async function getCatalogCapacityByProgramIds(programIds: string[]) {
     .eq("organization_id", organizationId)
     .in("program_id", programIds)
     .neq("status", "archived")
+    .neq("status", "cancelled")
 
   if (error) {
     console.error("getCatalogCapacityByProgramIds:", error.message)

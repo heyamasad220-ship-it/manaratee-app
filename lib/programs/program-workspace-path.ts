@@ -1,12 +1,12 @@
 import {
   parseDepartmentScheduleSection,
   type DepartmentScheduleSection,
-  type DepartmentStudentsSection,
 } from "@/lib/donations/donation-group-path"
 
 export type ProgramWorkspaceTab =
   | "overview"
   | "offerings"
+  | "applications"
   | "students"
   | "schedule"
   | "finance"
@@ -20,24 +20,37 @@ export type ProgramSettingsSection =
   | "notifications"
   | "promo-codes"
 
-export type ProgramFinanceSection = "transactions" | "payment-summary"
-
-export type ProgramReportsSection =
-  | "enrollments"
+export type ProgramFinanceSection =
+  | "transactions"
+  | "payment-summary"
   | "addons"
-  | "waitlist"
-  | "attendance"
+
+export type ProgramReportsSection = "enrollments" | "attendance" | "trends"
 
 export function parseProgramWorkspaceTab(
   value: string | null | undefined
 ): ProgramWorkspaceTab {
   if (value === "offerings" || value === "programs") return "offerings"
+  if (value === "applications") return "applications"
   if (value === "students" || value === "registrations") return "students"
   if (value === "schedule") return "schedule"
   if (value === "finance") return "finance"
   if (value === "reports") return "reports"
   if (value === "settings") return "settings"
   return "overview"
+}
+
+/** Leftover Registrations sub-tab bookmarks (`?tab=students&section=applications`). */
+export function isLegacyProgramApplicationsQuery(
+  tab: string | null | undefined,
+  section: string | null | undefined
+) {
+  if (parseProgramWorkspaceTab(tab) !== "students") return false
+  return (
+    section === "applications" ||
+    section === "review" ||
+    section === "approved"
+  )
 }
 
 export function parseProgramSettingsSection(
@@ -67,6 +80,7 @@ export function parseProgramFinanceSection(
   if (section === "payment-summary" || section === "tuition-plans") {
     return "payment-summary"
   }
+  if (section === "addons" || section === "add-ons") return "addons"
   return "transactions"
 }
 
@@ -80,36 +94,84 @@ export function isLegacyReportsPaymentSummary(
   )
 }
 
+export function isLegacyReportsWaitlist(
+  tab: string | null | undefined,
+  section: string | null | undefined
+) {
+  return (
+    parseProgramWorkspaceTab(tab) === "reports" && section === "waitlist"
+  )
+}
+
+export function isLegacyReportsAddons(
+  tab: string | null | undefined,
+  section: string | null | undefined
+) {
+  return (
+    parseProgramWorkspaceTab(tab) === "reports" &&
+    (section === "addons" || section === "add-ons")
+  )
+}
+
 export function parseProgramReportsSection(
   section: string | null | undefined
 ): ProgramReportsSection {
-  if (section === "addons" || section === "add-ons") return "addons"
-  if (section === "waitlist") return "waitlist"
   if (section === "attendance") return "attendance"
+  if (section === "trends") return "trends"
   return "enrollments"
+}
+
+export type RegistrationStatusFilter =
+  | "all"
+  | "active"
+  | "waitlisted"
+  | "cancelled"
+  | "pending"
+
+export function parseRegistrationStatusParam(
+  value: string | null | undefined
+): RegistrationStatusFilter | null {
+  const normalized = String(value || "").trim().toLowerCase()
+  if (!normalized) return null
+  if (normalized === "all") return "all"
+  if (normalized === "enrolled" || normalized === "active") return "active"
+  if (normalized === "waitlisted") return "waitlisted"
+  if (
+    normalized === "cancelled" ||
+    normalized === "canceled" ||
+    normalized === "withdrawn"
+  ) {
+    return "cancelled"
+  }
+  if (normalized === "pending" || normalized === "pending_checkout") {
+    return "pending"
+  }
+  return null
+}
+
+export function registrationStatusParam(
+  value: RegistrationStatusFilter
+): string | null {
+  if (value === "all") return "all"
+  if (value === "active") return "enrolled"
+  return value
 }
 
 export function programWorkspaceHref(
   programId: string,
   options?: {
     tab?: ProgramWorkspaceTab
-    studentsSection?: DepartmentStudentsSection
     scheduleSection?: DepartmentScheduleSection
     financeSection?: ProgramFinanceSection
     reportsSection?: ProgramReportsSection
     settingsSection?: ProgramSettingsSection
+    registrationStatus?: RegistrationStatusFilter
+    offeringId?: string
   }
 ): string {
   const params = new URLSearchParams()
   if (options?.tab && options.tab !== "overview") {
     params.set("tab", options.tab)
-  }
-  if (
-    options?.tab === "students" &&
-    options.studentsSection &&
-    options.studentsSection !== "enrollments"
-  ) {
-    params.set("section", options.studentsSection)
   }
   if (
     options?.tab === "schedule" &&
@@ -139,6 +201,13 @@ export function programWorkspaceHref(
   ) {
     params.set("section", options.settingsSection)
   }
+  if (options?.tab === "students") {
+    if (options.registrationStatus) {
+      const status = registrationStatusParam(options.registrationStatus)
+      if (status) params.set("status", status)
+    }
+    if (options.offeringId) params.set("offering", options.offeringId)
+  }
   const query = params.toString()
   return query ? `/programs/${programId}?${query}` : `/programs/${programId}`
 }
@@ -151,17 +220,12 @@ export function programWorkspaceHrefFromDepartmentYearQuery(input: {
 }): string {
   const tab = parseProgramWorkspaceTab(input.tab)
   if (tab === "students") {
-    const section =
+    const isApplications =
       input.section === "review" ||
       input.section === "approved" ||
       input.section === "applications"
-        ? "applications"
-        : input.section === "roster" || input.section === "enrollments"
-          ? "enrollments"
-          : undefined
     return programWorkspaceHref(input.yearProgramId, {
-      tab: "students",
-      studentsSection: section,
+      tab: isApplications ? "applications" : "students",
     })
   }
   if (tab === "schedule") {
@@ -181,6 +245,12 @@ export function programWorkspaceHrefFromDepartmentYearQuery(input: {
       return programWorkspaceHref(input.yearProgramId, {
         tab: "finance",
         financeSection: "payment-summary",
+      })
+    }
+    if (isLegacyReportsAddons("reports", input.section)) {
+      return programWorkspaceHref(input.yearProgramId, {
+        tab: "finance",
+        financeSection: "addons",
       })
     }
     return programWorkspaceHref(input.yearProgramId, {

@@ -16,7 +16,7 @@
 | Open enrollment (`application_required` synced from program process) | Done (SQL **`194`** / **`280`**) |
 | Program workspace **Registrations**: Applications + Enrollments (no Approved tab) | Done |
 | Waitlist on full + offer deadline | Not yet (status model ready) |
-| Gate Register on approved + seat/offer; fee on register | Partial — approved applicants complete registration; customer gate still uses offering `application_required` |
+| Gate Register on approved + seat/offer; fee on register | Done — customer Register requires an unused approved application for that offering; Apply is shown until then |
 | FA only after approval | Not yet |
 
 This document defines apply → evaluate/approve → waitlist/FA (optional) → register → reports, so Registrations and Payment transactions stay distinct.
@@ -41,7 +41,7 @@ This document defines apply → evaluate/approve → waitlist/FA (optional) → 
 | Customer (participant / parent) | Apply; answer returning vs new; register when eligible; apply for FA after approval; respond to waitlist offer |
 | Staff | Create application on behalf of customer; same actions as customer where allowed |
 | Admin | Anything the customer can do, plus staff overrides |
-| Department head | Evaluate new applicants; Approve / Not approve; approve into a **different offering** |
+| Department head | Evaluate new applicants; Approve / Not approve; Withdraw before registration; approve into a **different offering** |
 | FA committee | Review/approve full or partial scholarship (existing FA module) |
 
 Exact permission keys to map during implementation (`programs.manage`, `applications.*`, department-scoped roles).
@@ -74,7 +74,7 @@ Suggested statuses (names can be refined in implementation):
 | Status | Meaning |
 |--------|---------|
 | `draft` | Saved, not submitted |
-| `submitted` | Needs staff review |
+| `submitted` | Evaluation queue (staff review) |
 | `evaluation_required` | Evaluation required before approval |
 | `evaluation_scheduled` | Evaluation is scheduled |
 | `evaluation_completed` | Evaluation recorded; awaiting approval |
@@ -153,7 +153,7 @@ flowchart TD
 
 ### Department workspace
 
-- Queue of **new** applications for department offerings (evaluate → approve / not approve / approve other offering).
+- Queue of **new** applications for department offerings (evaluate → approve / not approve / withdraw / approve other offering).
 - Visibility into approved + waitlist + registered for that department (details may reuse Rosters / offering tabs).
 
 ### Offering manage (optional later)

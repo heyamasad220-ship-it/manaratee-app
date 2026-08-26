@@ -18,16 +18,28 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
   evaluateProgramApplication,
   fetchProgramApplicationOfferingsAction,
   unapproveProgramApplication,
   updateProgramApplicationDetails,
+  withdrawProgramApplication,
 } from "@/lib/programs/program-application-actions"
 import type { ProgramApplicationWithDetails } from "@/lib/programs/program-application-types"
 import {
   EMPTY_PROGRAM_APPLICATION_ANSWERS,
   PROGRAM_APPLICATION_STATUS_LABELS,
   PROGRAM_APPLICANT_TYPE_LABELS,
+  canWithdrawProgramApplication,
   normalizeProgramApplicationAnswers,
   resolveRequestedOfferingIds,
 } from "@/lib/programs/program-application-types"
@@ -68,20 +80,29 @@ export function DepartmentApplicationDetailDialog({
   const [loadingOfferings, setLoadingOfferings] = React.useState(false)
   const [saving, setSaving] = React.useState(false)
   const [deciding, setDeciding] = React.useState<
-    "approved" | "not_approved" | "unapprove" | null
+    "approved" | "not_approved" | "unapprove" | "withdraw" | null
   >(null)
+  const [confirmWithdraw, setConfirmWithdraw] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
 
   const canEvaluate = application?.status === "submitted"
   const canUnapprove =
     application?.status === "approved" && application.enrollment_id == null
+  const canWithdraw = application
+    ? canWithdrawProgramApplication(application)
+    : false
   const canEdit =
     application?.status === "submitted" ||
     (application?.status === "approved" && application.enrollment_id == null)
 
   React.useEffect(() => {
-    if (!application || !open) return
+    if (!open) {
+      setConfirmWithdraw(false)
+      return
+    }
+    if (!application) return
     setError(null)
+    setConfirmWithdraw(false)
     const answers = normalizeProgramApplicationAnswers(
       application.application_answers
     )
@@ -221,9 +242,27 @@ export function DepartmentApplicationDetailDialog({
     onOpenChange(false)
   }
 
+  async function handleWithdraw() {
+    if (!application || !canWithdraw) return
+    setDeciding("withdraw")
+    setError(null)
+    const result = await withdrawProgramApplication({
+      applicationId: application.id,
+    })
+    setDeciding(null)
+    setConfirmWithdraw(false)
+    if (!result.success) {
+      setError(result.error)
+      return
+    }
+    onChanged?.()
+    onOpenChange(false)
+  }
+
   const busy = saving || deciding !== null
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[90vh] w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-xl">
         <DialogHeader className="space-y-1 border-b px-6 py-4 text-left">
@@ -280,16 +319,18 @@ export function DepartmentApplicationDetailDialog({
           ) : null}
         </div>
 
-        {application && canEdit ? (
+        {application && (canEdit || canWithdraw) ? (
           <DialogFooter className="gap-2 border-t px-6 py-4 sm:justify-start">
-            <Button
-              type="button"
-              variant="outline"
-              disabled={busy}
-              onClick={() => void handleSave()}
-            >
-              {saving ? "Saving…" : "Save"}
-            </Button>
+            {canEdit ? (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={busy}
+                onClick={() => void handleSave()}
+              >
+                {saving ? "Saving…" : "Save"}
+              </Button>
+            ) : null}
             {canEvaluate ? (
               <>
                 <Button
@@ -319,10 +360,53 @@ export function DepartmentApplicationDetailDialog({
                 {deciding === "unapprove" ? "Working…" : "Un-approve"}
               </Button>
             ) : null}
+            {canWithdraw ? (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={busy}
+                onClick={() => setConfirmWithdraw(true)}
+              >
+                Withdraw
+              </Button>
+            ) : null}
           </DialogFooter>
         ) : null}
       </DialogContent>
     </Dialog>
+
+    <AlertDialog
+      open={confirmWithdraw}
+      onOpenChange={(open) => {
+        if (!busy) setConfirmWithdraw(open)
+      }}
+    >
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>
+            Withdraw {application?.participant_name || "this applicant"}?
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            They leave Pending or Approved — Registration pending and appear
+            under Withdrawn. This application can no longer be used to
+            register.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            disabled={busy}
+            onClick={(event) => {
+              event.preventDefault()
+              void handleWithdraw()
+            }}
+          >
+            {deciding === "withdraw" ? "Working…" : "Withdraw"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   )
 }
 

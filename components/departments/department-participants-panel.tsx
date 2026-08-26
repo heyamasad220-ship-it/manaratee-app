@@ -2,13 +2,32 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import Link from "next/link"
-import { Download, Loader2, Users } from "lucide-react"
+import { useRouter, useSearchParams } from "next/navigation"
+import {
+  ChevronDown,
+  Columns3,
+  Download,
+  Loader2,
+  SlidersHorizontal,
+  Users,
+  X,
+} from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { StatCard, StatCardsRow } from "@/components/ui/stat-card"
 import {
   Table,
@@ -18,8 +37,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { TableColumnHeaderFilter } from "@/components/ui/table-column-header-filter"
-import { MoveEnrollmentOfferingDialog } from "@/components/programs/move-enrollment-offering-dialog"
+import { ListPagination } from "@/components/ui/list-pagination"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
 import { DEPARTMENT_OPEN_PROGRAM_STATUSES } from "@/lib/departments/department-program-statuses"
 import {
@@ -37,70 +62,45 @@ import {
   type MoveOfferingTarget,
 } from "@/lib/programs/move-enrollment-offering-shared"
 import {
-  PROGRAM_LABEL,
-  PROGRAM_LABEL_PLURAL,
   YEAR_SEASON_LABEL,
   YEAR_SEASON_LABEL_PLURAL,
 } from "@/lib/programs/program-display-labels"
 import { programOfferingManageHref } from "@/lib/programs/program-offering-paths"
 import {
   DISPLAY_ENROLLMENT_STATUS_LABELS,
-  DISPLAY_PAYMENT_STATUS_LABELS,
   displayEnrollmentStatus,
   displayEnrollmentStatusLabel,
-  displayPaymentStatusLabel,
   enrollmentStatusBadgeClass,
   isCancelledEnrollmentStatus,
-  paymentStatusBadgeClass,
-  resolveDisplayPaymentStatus,
   type DisplayEnrollmentStatus,
-  type DisplayPaymentStatus,
 } from "@/lib/programs/enrollment-process"
-
+import {
+  DEFAULT_REGISTRATION_COLUMNS,
+  FULL_REGISTRATION_EXPORT_COLUMNS,
+  LOCKED_REGISTRATION_COLUMNS,
+  REGISTRATION_COLUMN_DEFINITIONS,
+  loadRegistrationColumns,
+  saveRegistrationColumns,
+  toggleRegistrationColumn,
+  type RegistrationColumnId,
+} from "@/lib/programs/registration-table-columns"
+import {
+  EMPTY_CELL,
+  displayCell,
+  getRegistrationCsvValue,
+  getRegistrationDisplayValue,
+  registrationDateKey,
+} from "@/lib/programs/registration-table-values"
+import {
+  parseRegistrationStatusParam,
+  programWorkspaceHref,
+  type RegistrationStatusFilter,
+} from "@/lib/programs/program-workspace-path"
+import {
+  DEFAULT_LIST_PAGE_SIZE,
+  slicePageItems,
+} from "@/lib/ui/list-pagination"
 import { cn } from "@/lib/utils"
-
-function formatDate(value: string | null) {
-  if (!value) return "—"
-  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value)
-  if (match) {
-    const date = new Date(
-      Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
-    )
-    return date.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      timeZone: "UTC",
-    })
-  }
-  return new Date(value).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  })
-}
-
-function formatMoney(value: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  }).format(value)
-}
-
-function rowPaymentStatus(row: DepartmentParticipantRow): DisplayPaymentStatus {
-  return resolveDisplayPaymentStatus({
-    paymentStatus: row.paymentStatus,
-    paymentRequired: row.paymentRequired,
-    totalAmount: row.totalAmount,
-    amountPaid: row.amountPaid,
-  })
-}
-
-function rowBalance(row: DepartmentParticipantRow) {
-  return Math.max(Number(row.totalAmount || 0) - Number(row.amountPaid || 0), 0)
-}
 
 function matchesFilter(value: string | null | undefined, filter: string) {
   const needle = filter.trim().toLowerCase()
@@ -126,6 +126,159 @@ function downloadCsv(filename: string, rows: string[][]) {
   URL.revokeObjectURL(url)
 }
 
+function tableHeaderLabel(id: RegistrationColumnId) {
+  if (id === "participant") return "Participant"
+  if (id === "status") return "Status"
+  if (id === "registered") return "Registered"
+  if (id === "actions") return "Actions"
+  return (
+    REGISTRATION_COLUMN_DEFINITIONS.find((column) => column.id === id)?.label ||
+    id
+  )
+}
+
+function EnrollmentOfferingSelect({
+  row,
+  departmentId,
+  targets,
+  busy,
+  error,
+  onSelect,
+}: {
+  row: DepartmentParticipantRow
+  departmentId: string
+  targets: MoveOfferingTarget[]
+  busy: boolean
+  error: string | null
+  onSelect: (row: DepartmentParticipantRow, toOfferingId: string) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const destinations = targets.filter((target) => target.id !== row.offeringId)
+  const canMove =
+    Boolean(row.offeringId) &&
+    canMoveEnrollmentStatus(row.status) &&
+    destinations.length > 0
+
+  if (!row.offeringId) {
+    return <>{row.courseName}</>
+  }
+
+  const offeringLink = (
+    <Link
+      href={programOfferingManageHref(row.programId, row.offeringId, {
+        departmentId,
+      })}
+      className="min-w-0 truncate text-primary hover:underline"
+    >
+      {row.courseName}
+    </Link>
+  )
+
+  if (!canMove) {
+    return offeringLink
+  }
+
+  const currentOption = targets.find((target) => target.id === row.offeringId) ?? {
+    id: row.offeringId,
+    name: row.courseName,
+  }
+  const options = [currentOption, ...destinations]
+
+  return (
+    <div className="max-w-[18rem] space-y-1">
+      {busy ? (
+        <span className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+          <span className="truncate">Moving…</span>
+        </span>
+      ) : editing ? (
+        <Select
+          value={row.offeringId}
+          open
+          onOpenChange={(open) => {
+            if (!open) setEditing(false)
+          }}
+          onValueChange={(value) => {
+            if (value && value !== row.offeringId) onSelect(row, value)
+            setEditing(false)
+          }}
+        >
+          <SelectTrigger
+            size="sm"
+            className="h-8 w-full min-w-[11rem] text-left"
+            aria-label={`Change offering for ${row.studentName}`}
+          >
+            <span className="min-w-0 flex-1 truncate">{row.courseName}</span>
+          </SelectTrigger>
+          <SelectContent className="max-w-[min(90vw,28rem)]">
+            {options.map((offering) => (
+              <SelectItem
+                key={offering.id}
+                value={offering.id}
+                className="whitespace-normal"
+              >
+                {offering.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      ) : (
+        <div className="flex min-w-0 items-center gap-1.5">
+          {offeringLink}
+          <Badge
+            asChild
+            variant="outline"
+            className="cursor-pointer px-1.5 py-0 text-[10px] font-medium uppercase tracking-wide text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <button
+              type="button"
+              aria-label={`Change offering for ${row.studentName}`}
+              onClick={() => setEditing(true)}
+            >
+              Change
+            </button>
+          </Badge>
+        </div>
+      )}
+      {error ? <p className="text-xs text-destructive">{error}</p> : null}
+    </div>
+  )
+}
+
+function RosterContactBlock({
+  name,
+  contactId,
+  email,
+  phone,
+}: {
+  name: string | null
+  contactId: string | null
+  email: string | null
+  phone: string | null
+}) {
+  if (!name && !contactId && !email && !phone) return <>{EMPTY_CELL}</>
+  return (
+    <div>
+      {contactId ? (
+        <Link
+          href={contactProfileHref(contactId)}
+          className="font-medium text-primary hover:underline"
+        >
+          {name || "View contact"}
+        </Link>
+      ) : name ? (
+        <div className="font-medium text-foreground">{name}</div>
+      ) : null}
+      {email ? (
+        <div className="text-xs font-normal text-muted-foreground">{email}</div>
+      ) : null}
+      {phone ? (
+        <div className="text-xs font-normal text-muted-foreground">{phone}</div>
+      ) : null}
+    </div>
+  )
+}
+
 export function DepartmentParticipantsPanel({
   departmentId,
   departmentName,
@@ -135,28 +288,18 @@ export function DepartmentParticipantsPanel({
   showRoster = true,
   showKpis = true,
   alternateContent = null,
-  applicationsCount = 0,
-  approvedPendingCount = 0,
 }: {
   departmentId: string
   departmentName: string
-  /** Lock the list to one program (program workspace Registrations). */
   programId?: string | null
-  /** Hide outer card title chrome when embedded in Registrations tab. */
   embedded?: boolean
-  /** Rendered under KPI cards (e.g. Applications / Enrollments stage tabs). */
   stageNav?: ReactNode
-  /** When false, hide the roster table (stats + stageNav still show). */
   showRoster?: boolean
-  /** When false, parent renders compact attention metrics. */
   showKpis?: boolean
-  /** Content shown instead of the roster when `showRoster` is false. */
   alternateContent?: ReactNode
-  /** Pending applications (submitted) for KPI cards. */
-  applicationsCount?: number
-  /** Approved but not yet registered for KPI cards. */
-  approvedPendingCount?: number
 }) {
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [participants, setParticipants] = useState<DepartmentParticipantRow[]>([])
@@ -165,42 +308,50 @@ export function DepartmentParticipantsPanel({
   const [yearFilterSelect, setYearFilterSelect] = useState<string>(
     programId || "all"
   )
-  const [courseFilterSelect, setCourseFilterSelect] = useState<string>("all")
   const [includeInactive, setIncludeInactive] = useState(Boolean(programId))
-  const [enrollmentFilter, setEnrollmentFilter] = useState<
+  const [localEnrollmentFilter, setLocalEnrollmentFilter] = useState<
     "all" | DisplayEnrollmentStatus
-  >("all")
-  const [paymentFilter, setPaymentFilter] = useState<"all" | DisplayPaymentStatus>(
-    "all"
-  )
+  >("active")
   const [studentFilter, setStudentFilter] = useState("")
-  const [studentFilterInput, setStudentFilterInput] = useState("")
-  const [courseFilter, setCourseFilter] = useState("")
-  const [courseFilterInput, setCourseFilterInput] = useState("")
-  const [teacherFilter, setTeacherFilter] = useState("")
-  const [teacherFilterInput, setTeacherFilterInput] = useState("")
+  const [teacherFilter, setTeacherFilter] = useState("all")
+  const [localOfferingFilter, setLocalOfferingFilter] = useState("all")
+  const [ageMin, setAgeMin] = useState("")
+  const [ageMax, setAgeMax] = useState("")
+  const [genderFilter, setGenderFilter] = useState("all")
+  const [registeredFrom, setRegisteredFrom] = useState("")
+  const [registeredTo, setRegisteredTo] = useState("")
+  const [visibleColumns, setVisibleColumns] = useState<RegistrationColumnId[]>(
+    DEFAULT_REGISTRATION_COLUMNS
+  )
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(DEFAULT_LIST_PAGE_SIZE)
   const didDefaultYear = useRef(false)
   const destinationsCache = useRef(
     new Map<string, { programName: string; targets: MoveOfferingTarget[] }>()
   )
-  const [moveTarget, setMoveTarget] = useState<DepartmentParticipantRow | null>(
+  const [targetsByProgram, setTargetsByProgram] = useState<
+    Record<string, MoveOfferingTarget[]>
+  >({})
+  const [movingEnrollmentId, setMovingEnrollmentId] = useState<string | null>(
     null
   )
-  const [moveToOfferingId, setMoveToOfferingId] = useState("")
-  const [moveBusy, setMoveBusy] = useState(false)
-  const [moveError, setMoveError] = useState<string | null>(null)
-  const [moveDestinations, setMoveDestinations] = useState<MoveOfferingTarget[]>(
-    []
-  )
-  const [moveDestinationsLoading, setMoveDestinationsLoading] = useState(false)
-  const [moveProgramName, setMoveProgramName] = useState("")
+  const [moveError, setMoveError] = useState<{
+    enrollmentId: string
+    message: string
+  } | null>(null)
+
+  const urlStatus = parseRegistrationStatusParam(searchParams.get("status"))
+  const urlOffering = searchParams.get("offering") || "all"
+  const enrollmentFilter: RegistrationStatusFilter = programId
+    ? urlStatus ?? "active"
+    : localEnrollmentFilter
+  const offeringFilter = programId ? urlOffering : localOfferingFilter
 
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     const result = await fetchDepartmentParticipantsAction(departmentId, {
       programId: programId || (yearFilterSelect === "all" ? null : yearFilterSelect),
-      offeringId: courseFilterSelect === "all" ? null : courseFilterSelect,
       includeInactive: programId ? true : includeInactive,
     })
     if (!result.success) {
@@ -215,11 +366,15 @@ export function DepartmentParticipantsPanel({
     setYears(result.years)
     setCourses(result.courses)
     setLoading(false)
-  }, [departmentId, programId, yearFilterSelect, courseFilterSelect, includeInactive])
+  }, [departmentId, programId, yearFilterSelect, includeInactive])
 
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    setVisibleColumns(loadRegistrationColumns())
+  }, [])
 
   useEffect(() => {
     if (programId) {
@@ -246,293 +401,582 @@ export function DepartmentParticipantsPanel({
   }, [years, yearFilterSelect, programId])
 
   useEffect(() => {
-    if (courseFilterSelect === "all") return
-    if (!courses.some((course) => course.id === courseFilterSelect)) {
-      setCourseFilterSelect("all")
-    }
-  }, [courses, courseFilterSelect])
-
-  const programOptions = useMemo(() => {
-    if (yearFilterSelect === "all") return courses
-    return courses.filter((course) => course.programId === yearFilterSelect)
-  }, [courses, yearFilterSelect])
-
-  const offeringCountByProgram = useMemo(() => {
-    const map = new Map<string, number>()
-    for (const course of courses) {
-      map.set(course.programId, (map.get(course.programId) || 0) + 1)
-    }
-    return map
-  }, [courses])
-
-  const filteredParticipants = useMemo(
-    () =>
-      participants.filter((row) => {
-        if (!matchesFilter(row.studentName, studentFilter)) return false
-        if (!matchesFilter(row.courseName, courseFilter)) return false
-        if (!matchesFilter(row.teacherName, teacherFilter)) return false
-        const enrollment = displayEnrollmentStatus(row.status)
-        if (enrollmentFilter !== "all" && enrollment !== enrollmentFilter) {
-          return false
-        }
-        if (
-          enrollmentFilter === "all" &&
-          !includeInactive &&
-          isCancelledEnrollmentStatus(row.status)
-        ) {
-          return false
-        }
-        const payment = rowPaymentStatus(row)
-        if (paymentFilter === "balance_due") {
-          return rowBalance(row) > 0.009
-        }
-        if (paymentFilter !== "all" && payment !== paymentFilter) {
-          return false
-        }
-        return true
-      }),
-    [
-      participants,
-      studentFilter,
-      courseFilter,
-      teacherFilter,
-      enrollmentFilter,
-      paymentFilter,
-      includeInactive,
+    const programIds = [
+      ...new Set(participants.map((row) => row.programId).filter(Boolean)),
     ]
-  )
+    if (programIds.length === 0) return
+    let cancelled = false
 
-  const filtersActive =
-    Boolean(studentFilter.trim()) ||
-    Boolean(courseFilter.trim()) ||
-    Boolean(teacherFilter.trim()) ||
-    yearFilterSelect !== "all" ||
-    courseFilterSelect !== "all" ||
-    includeInactive
-
-  function applyMoveDestinations(
-    programName: string,
-    targets: MoveOfferingTarget[],
-    fromOfferingId: string
-  ) {
-    const destinations = targets.filter((target) => target.id !== fromOfferingId)
-    setMoveProgramName(programName)
-    setMoveDestinations(destinations)
-    setMoveToOfferingId(destinations[0]?.id ?? "")
-  }
-
-  async function openMoveDialog(row: DepartmentParticipantRow) {
-    if (!row.offeringId) return
-    setMoveTarget(row)
-    setMoveError(null)
-    setMoveToOfferingId("")
-    const cached = destinationsCache.current.get(row.programId)
-    if (cached) {
-      applyMoveDestinations(cached.programName, cached.targets, row.offeringId)
-      return
-    }
-    setMoveDestinations([])
-    setMoveDestinationsLoading(true)
-    const result = await getMoveOfferingTargetsAction(row.programId)
-    setMoveDestinationsLoading(false)
-    if (!result.success) {
-      setMoveError(result.error)
-      return
-    }
-    destinationsCache.current.set(row.programId, {
-      programName: result.programName,
-      targets: result.targets,
-    })
-    applyMoveDestinations(result.programName, result.targets, row.offeringId)
-  }
-
-  function closeMoveDialog(open?: boolean) {
-    if (open) return
-    if (moveBusy) return
-    setMoveTarget(null)
-    setMoveError(null)
-  }
-
-  async function handleMoveStudent() {
-    if (!moveTarget?.offeringId || !moveToOfferingId) return
-    setMoveBusy(true)
-    setMoveError(null)
-    try {
-      const result = await moveEnrollmentToOfferingAction({
-        enrollmentId: moveTarget.enrollmentId,
-        fromOfferingId: moveTarget.offeringId,
-        toOfferingId: moveToOfferingId,
-      })
-      if (!result.success) {
-        setMoveError(result.error)
-        return
+    async function loadTargets() {
+      const next: Record<string, MoveOfferingTarget[]> = {}
+      for (const id of programIds) {
+        const cached = destinationsCache.current.get(id)
+        if (cached) {
+          next[id] = cached.targets
+          continue
+        }
+        const result = await getMoveOfferingTargetsAction(id)
+        if (cancelled) return
+        if (!result.success) continue
+        destinationsCache.current.set(id, {
+          programName: result.programName,
+          targets: result.targets,
+        })
+        next[id] = result.targets
       }
-      destinationsCache.current.delete(moveTarget.programId)
-      setMoveTarget(null)
-      setMoveToOfferingId("")
-      await load()
-    } catch (error) {
-      setMoveError(
-        error instanceof Error ? error.message : "Failed to move this student."
-      )
-    } finally {
-      setMoveBusy(false)
+      if (!cancelled) {
+        setTargetsByProgram((current) => ({ ...current, ...next }))
+      }
     }
-  }
 
-  function handleExport() {
-    downloadCsv(
-      `${departmentName.replace(/[^\w-]+/g, "-").toLowerCase()}-enrollments.csv`,
-      [
-        [
-          "Participant",
-          PROGRAM_LABEL,
-          "Teacher",
-          "Enrollment status",
-          "Payment status",
-          "Amount",
-          "Paid",
-          "Balance",
-          "Parent",
-          "Parent email",
-          "Parent phone",
-          "Registered",
-        ],
-        ...filteredParticipants.map((row) => [
-          row.studentName,
-          row.courseName,
-          row.teacherName || "",
-          displayEnrollmentStatusLabel(row.status),
-          displayPaymentStatusLabel(rowPaymentStatus(row)),
-          String(row.totalAmount || 0),
-          String(row.amountPaid || 0),
-          String(rowBalance(row)),
-          row.parentName || "",
-          row.parentEmail || "",
-          row.parentPhone || "",
-          row.registeredAt || "",
-        ]),
-      ]
+    void loadTargets()
+    return () => {
+      cancelled = true
+    }
+  }, [participants])
+
+  function updateWorkspaceFilters(next: {
+    status?: RegistrationStatusFilter
+    offeringId?: string
+  }) {
+    if (!programId) return
+    const status = next.status ?? enrollmentFilter
+    const offering = next.offeringId ?? offeringFilter
+    router.replace(
+      programWorkspaceHref(programId, {
+        tab: "students",
+        registrationStatus: status,
+        offeringId: offering !== "all" ? offering : undefined,
+      }),
+      { scroll: false }
     )
   }
 
+  function handleEnrollmentFilterChange(value: string) {
+    const next = (value || "all") as RegistrationStatusFilter
+    if (programId) {
+      updateWorkspaceFilters({ status: next })
+      return
+    }
+    setLocalEnrollmentFilter(next as "all" | DisplayEnrollmentStatus)
+  }
+
+  function handleOfferingFilterChange(value: string) {
+    const next = value || "all"
+    if (programId) {
+      updateWorkspaceFilters({ offeringId: next })
+      return
+    }
+    setLocalOfferingFilter(next)
+  }
+
+  const offeringOptions = useMemo(() => {
+    const scopedProgramId =
+      programId || (yearFilterSelect === "all" ? null : yearFilterSelect)
+    return courses.filter((course) =>
+      scopedProgramId ? course.programId === scopedProgramId : true
+    )
+  }, [courses, programId, yearFilterSelect])
+
+  const teacherOptions = useMemo(() => {
+    return [
+      ...new Set(
+        participants
+          .map((row) => row.teacherName?.trim())
+          .filter((name): name is string => Boolean(name))
+      ),
+    ].sort((a, b) => a.localeCompare(b))
+  }, [participants])
+
+  const genderOptions = useMemo(() => {
+    return [
+      ...new Set(
+        participants
+          .map((row) => row.gender?.trim())
+          .filter((value): value is string => Boolean(value))
+      ),
+    ].sort((a, b) => a.localeCompare(b))
+  }, [participants])
+
+  const filteredParticipants = useMemo(() => {
+    const minAge = ageMin.trim() === "" ? null : Number(ageMin)
+    const maxAge = ageMax.trim() === "" ? null : Number(ageMax)
+    return participants.filter((row) => {
+      if (!matchesFilter(row.studentName, studentFilter)) {
+        const alsoMatches =
+          matchesFilter(row.studentEmail, studentFilter) ||
+          matchesFilter(row.studentPhone, studentFilter) ||
+          matchesFilter(row.parentName, studentFilter) ||
+          matchesFilter(row.parentEmail, studentFilter) ||
+          matchesFilter(row.parentPhone, studentFilter)
+        if (!alsoMatches) return false
+      }
+      if (offeringFilter !== "all" && row.offeringId !== offeringFilter) {
+        return false
+      }
+      if (teacherFilter === "unassigned") {
+        if (row.teacherName?.trim()) return false
+      } else if (teacherFilter !== "all" && row.teacherName !== teacherFilter) {
+        return false
+      }
+      const enrollment = displayEnrollmentStatus(row.status)
+      if (enrollmentFilter !== "all" && enrollment !== enrollmentFilter) {
+        return false
+      }
+      if (
+        enrollmentFilter === "all" &&
+        !includeInactive &&
+        isCancelledEnrollmentStatus(row.status)
+      ) {
+        return false
+      }
+      if (minAge != null && Number.isFinite(minAge)) {
+        if (row.age == null || row.age < minAge) return false
+      }
+      if (maxAge != null && Number.isFinite(maxAge)) {
+        if (row.age == null || row.age > maxAge) return false
+      }
+      if (genderFilter !== "all") {
+        if ((row.gender || "").trim().toLowerCase() !== genderFilter.toLowerCase()) {
+          return false
+        }
+      }
+      const registeredKey = registrationDateKey(row.registeredAt)
+      if (registeredFrom && (!registeredKey || registeredKey < registeredFrom)) {
+        return false
+      }
+      if (registeredTo && (!registeredKey || registeredKey > registeredTo)) {
+        return false
+      }
+      return true
+    })
+  }, [
+    participants,
+    studentFilter,
+    offeringFilter,
+    teacherFilter,
+    enrollmentFilter,
+    includeInactive,
+    ageMin,
+    ageMax,
+    genderFilter,
+    registeredFrom,
+    registeredTo,
+  ])
+
+  const visibleSet = useMemo(() => new Set(visibleColumns), [visibleColumns])
+  const tableColumns = REGISTRATION_COLUMN_DEFINITIONS.filter((column) =>
+    visibleSet.has(column.id)
+  )
+
+  useEffect(() => {
+    setPage(1)
+  }, [
+    studentFilter,
+    offeringFilter,
+    teacherFilter,
+    enrollmentFilter,
+    includeInactive,
+    yearFilterSelect,
+    ageMin,
+    ageMax,
+    genderFilter,
+    registeredFrom,
+    registeredTo,
+  ])
+
+  const pagedParticipants = useMemo(
+    () => slicePageItems(filteredParticipants, page, pageSize),
+    [filteredParticipants, page, pageSize]
+  )
+
+  const advancedFilterCount = [
+    ageMin.trim(),
+    ageMax.trim(),
+    genderFilter !== "all" ? genderFilter : "",
+    registeredFrom,
+    registeredTo,
+  ].filter(Boolean).length
+
+  const filtersActive =
+    Boolean(studentFilter.trim()) ||
+    offeringFilter !== "all" ||
+    teacherFilter !== "all" ||
+    enrollmentFilter !== "active" ||
+    (!programId && yearFilterSelect !== "all") ||
+    (!programId && includeInactive) ||
+    advancedFilterCount > 0
+
+  function clearFilters() {
+    setStudentFilter("")
+    setTeacherFilter("all")
+    setAgeMin("")
+    setAgeMax("")
+    setGenderFilter("all")
+    setRegisteredFrom("")
+    setRegisteredTo("")
+    if (programId) {
+      router.replace(
+        programWorkspaceHref(programId, {
+          tab: "students",
+          registrationStatus: "all",
+        }),
+        { scroll: false }
+      )
+      return
+    }
+    setLocalEnrollmentFilter("all")
+    setLocalOfferingFilter("all")
+  }
+
+  function handleColumnToggle(id: RegistrationColumnId, visible: boolean) {
+    const next = toggleRegistrationColumn(visibleColumns, id, visible)
+    setVisibleColumns(next)
+    saveRegistrationColumns(next)
+  }
+
+  async function handleOfferingChange(
+    row: DepartmentParticipantRow,
+    toOfferingId: string
+  ) {
+    if (!row.offeringId || toOfferingId === row.offeringId) return
+    setMovingEnrollmentId(row.enrollmentId)
+    setMoveError(null)
+    try {
+      const result = await moveEnrollmentToOfferingAction({
+        enrollmentId: row.enrollmentId,
+        fromOfferingId: row.offeringId,
+        toOfferingId,
+      })
+      if (!result.success) {
+        setMoveError({
+          enrollmentId: row.enrollmentId,
+          message: result.error,
+        })
+        return
+      }
+      destinationsCache.current.delete(row.programId)
+      await load()
+      const refreshed = await getMoveOfferingTargetsAction(row.programId)
+      if (refreshed.success) {
+        destinationsCache.current.set(row.programId, {
+          programName: refreshed.programName,
+          targets: refreshed.targets,
+        })
+        setTargetsByProgram((current) => ({
+          ...current,
+          [row.programId]: refreshed.targets,
+        }))
+      }
+    } catch (caught) {
+      setMoveError({
+        enrollmentId: row.enrollmentId,
+        message:
+          caught instanceof Error
+            ? caught.message
+            : "Failed to move this student.",
+      })
+    } finally {
+      setMovingEnrollmentId(null)
+    }
+  }
+
+  function exportFileName() {
+    const programName =
+      years.find((year) => year.id === (programId || yearFilterSelect))?.name ||
+      departmentName
+    return `${programName.replace(/[^\w-]+/g, "-").toLowerCase()}-registrations.csv`
+  }
+
+  function handleExport(mode: "view" | "full") {
+    const columns =
+      mode === "full"
+        ? FULL_REGISTRATION_EXPORT_COLUMNS
+        : tableColumns
+            .map((column) => column.id)
+            .filter((id) => id !== "actions")
+    if (columns.length === 0) return
+    downloadCsv(exportFileName(), [
+      columns.map((id) => tableHeaderLabel(id)),
+      ...filteredParticipants.map((row) =>
+        columns.map((id) => getRegistrationCsvValue(row, id))
+      ),
+    ])
+  }
+
+  const hasUnassignedTeacher = participants.some((row) => !row.teacherName?.trim())
+
   const rosterBody = (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-end gap-4 rounded-lg border bg-muted/20 p-3">
-        {programId ? null : (
-          <div className="space-y-1.5">
-            <Label htmlFor="roster-year">{YEAR_SEASON_LABEL}</Label>
-            <select
-              id="roster-year"
-              value={yearFilterSelect}
-              onChange={(event) => {
-                setYearFilterSelect(event.target.value)
-                setCourseFilterSelect("all")
-              }}
-              className="h-9 min-w-[12rem] rounded-md border bg-background px-3 text-sm"
-            >
-              <option value="all">
-                All {YEAR_SEASON_LABEL_PLURAL.toLowerCase()}
-              </option>
-              {years.map((year) => (
-                <option key={year.id} value={year.id}>
-                  {year.name}
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-end gap-2">
+          {programId ? null : (
+            <div className="space-y-1.5">
+              <Label htmlFor="roster-year">{YEAR_SEASON_LABEL}</Label>
+              <select
+                id="roster-year"
+                value={yearFilterSelect}
+                onChange={(event) => {
+                  setYearFilterSelect(event.target.value)
+                }}
+                className="h-9 min-w-[12rem] rounded-md border bg-background px-3 text-sm"
+              >
+                <option value="all">
+                  All {YEAR_SEASON_LABEL_PLURAL.toLowerCase()}
                 </option>
-              ))}
-            </select>
-          </div>
-        )}
-        <div className="space-y-1.5">
-          <Label htmlFor="roster-course">{PROGRAM_LABEL}</Label>
-          <select
-            id="roster-course"
-            value={courseFilterSelect}
-            onChange={(event) => setCourseFilterSelect(event.target.value)}
-            className="h-9 min-w-[12rem] rounded-md border bg-background px-3 text-sm"
-          >
-            <option value="all">All {PROGRAM_LABEL_PLURAL.toLowerCase()}</option>
-            {programOptions.map((course) => (
-              <option key={course.id} value={course.id}>
-                {course.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="roster-enrollment-status">Enrollment status</Label>
-          <select
-            id="roster-enrollment-status"
-            value={enrollmentFilter}
-            onChange={(event) =>
-              setEnrollmentFilter(
-                event.target.value as "all" | DisplayEnrollmentStatus
-              )
-            }
-            className="h-9 min-w-[10rem] rounded-md border bg-background px-3 text-sm"
-          >
-            <option value="all">All</option>
-            {(
-              Object.keys(DISPLAY_ENROLLMENT_STATUS_LABELS) as DisplayEnrollmentStatus[]
-            ).map((status) => (
-              <option key={status} value={status}>
-                {DISPLAY_ENROLLMENT_STATUS_LABELS[status]}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="roster-payment-status">Payment status</Label>
-          <select
-            id="roster-payment-status"
-            value={paymentFilter}
-            onChange={(event) =>
-              setPaymentFilter(
-                event.target.value as "all" | DisplayPaymentStatus
-              )
-            }
-            className="h-9 min-w-[10rem] rounded-md border bg-background px-3 text-sm"
-          >
-            <option value="all">All payment statuses</option>
-            <option value="paid">{DISPLAY_PAYMENT_STATUS_LABELS.paid}</option>
-            <option value="partially_paid">
-              {DISPLAY_PAYMENT_STATUS_LABELS.partially_paid}
-            </option>
-            <option value="payment_plan">
-              {DISPLAY_PAYMENT_STATUS_LABELS.payment_plan}
-            </option>
-            <option value="balance_due">
-              {DISPLAY_PAYMENT_STATUS_LABELS.balance_due}
-            </option>
-            <option value="overdue">{DISPLAY_PAYMENT_STATUS_LABELS.overdue}</option>
-            <option value="waived">{DISPLAY_PAYMENT_STATUS_LABELS.waived}</option>
-            <option value="refunded">
-              {DISPLAY_PAYMENT_STATUS_LABELS.refunded}
-            </option>
-          </select>
-        </div>
-        {programId ? null : (
-          <label className="flex items-center gap-2 pb-2 text-sm">
-            <input
-              type="checkbox"
-              className="size-3.5"
-              checked={includeInactive}
-              onChange={(event) => setIncludeInactive(event.target.checked)}
+                {years.map((year) => (
+                  <option key={year.id} value={year.id}>
+                    {year.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          <div className="space-y-1.5">
+            <Label htmlFor="roster-search" className="sr-only">
+              Search
+            </Label>
+            <Input
+              id="roster-search"
+              placeholder="Search by name"
+              value={studentFilter}
+              onChange={(event) => setStudentFilter(event.target.value)}
+              className="h-9 w-[12rem] sm:w-[16rem]"
             />
-            Include cancelled / withdrawn
-          </label>
-        )}
-        <div className="ml-auto pb-0.5">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleExport}
-            disabled={loading || filteredParticipants.length === 0}
+          </div>
+          <Select value={offeringFilter} onValueChange={handleOfferingFilterChange}>
+            <SelectTrigger className="h-9 w-[12rem]" aria-label="Offering">
+              <SelectValue placeholder="Offering" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All offerings</SelectItem>
+              {offeringOptions.map((course) => (
+                <SelectItem key={course.id} value={course.id}>
+                  {course.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={teacherFilter} onValueChange={setTeacherFilter}>
+            <SelectTrigger className="h-9 w-[11rem]" aria-label="Teacher">
+              <SelectValue placeholder="Teacher" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All teachers</SelectItem>
+              {hasUnassignedTeacher ? (
+                <SelectItem value="unassigned">Unassigned</SelectItem>
+              ) : null}
+              {teacherOptions.map((name) => (
+                <SelectItem key={name} value={name}>
+                  {name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={enrollmentFilter}
+            onValueChange={handleEnrollmentFilterChange}
           >
-            <Download className="mr-1.5 h-4 w-4" />
-            Export CSV
-          </Button>
+            <SelectTrigger className="h-9 w-[10rem]" aria-label="Status">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              {(
+                Object.keys(
+                  DISPLAY_ENROLLMENT_STATUS_LABELS
+                ) as DisplayEnrollmentStatus[]
+              ).map((status) => (
+                <SelectItem key={status} value={status}>
+                  {DISPLAY_ENROLLMENT_STATUS_LABELS[status]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {programId ? null : (
+            <label className="flex items-center gap-2 pb-2 text-sm">
+              <input
+                type="checkbox"
+                className="size-3.5"
+                checked={includeInactive}
+                onChange={(event) => setIncludeInactive(event.target.checked)}
+              />
+              Include cancelled / withdrawn
+            </label>
+          )}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button type="button" variant="outline" size="sm" className="h-9 gap-1.5">
+                <SlidersHorizontal className="h-3.5 w-3.5" />
+                Filters
+                {advancedFilterCount > 0 ? (
+                  <span className="rounded-full bg-muted px-1.5 text-[11px]">
+                    {advancedFilterCount}
+                  </span>
+                ) : null}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-80 space-y-3">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="roster-age-min">Min age</Label>
+                  <Input
+                    id="roster-age-min"
+                    type="number"
+                    min={0}
+                    max={120}
+                    value={ageMin}
+                    onChange={(event) => setAgeMin(event.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="roster-age-max">Max age</Label>
+                  <Input
+                    id="roster-age-max"
+                    type="number"
+                    min={0}
+                    max={120}
+                    value={ageMax}
+                    onChange={(event) => setAgeMax(event.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Gender</Label>
+                <Select value={genderFilter} onValueChange={setGenderFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    {genderOptions.map((value) => (
+                      <SelectItem key={value} value={value}>
+                        {value}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="roster-from">Registered from</Label>
+                <Input
+                  id="roster-from"
+                  type="date"
+                  value={registeredFrom}
+                  onChange={(event) => setRegisteredFrom(event.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="roster-to">Registered to</Label>
+                <Input
+                  id="roster-to"
+                  type="date"
+                  value={registeredTo}
+                  onChange={(event) => setRegisteredTo(event.target.value)}
+                />
+              </div>
+            </PopoverContent>
+          </Popover>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button type="button" variant="outline" size="sm" className="h-9 gap-1.5">
+                <Columns3 className="h-3.5 w-3.5" />
+                Columns
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-64">
+              <DropdownMenuLabel>Participant</DropdownMenuLabel>
+              {REGISTRATION_COLUMN_DEFINITIONS.filter(
+                (column) => column.group === "participant"
+              ).map((column) => (
+                <DropdownMenuCheckboxItem
+                  key={column.id}
+                  checked={visibleSet.has(column.id)}
+                  disabled={LOCKED_REGISTRATION_COLUMNS.includes(column.id)}
+                  onCheckedChange={(checked) =>
+                    handleColumnToggle(column.id, Boolean(checked))
+                  }
+                  onSelect={(event) => event.preventDefault()}
+                >
+                  {column.label}
+                </DropdownMenuCheckboxItem>
+              ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>Registration</DropdownMenuLabel>
+              {REGISTRATION_COLUMN_DEFINITIONS.filter(
+                (column) => column.group === "registration"
+              ).map((column) => (
+                <DropdownMenuCheckboxItem
+                  key={column.id}
+                  checked={visibleSet.has(column.id)}
+                  disabled={LOCKED_REGISTRATION_COLUMNS.includes(column.id)}
+                  onCheckedChange={(checked) =>
+                    handleColumnToggle(column.id, Boolean(checked))
+                  }
+                  onSelect={(event) => event.preventDefault()}
+                >
+                  {column.label}
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-9 gap-1.5"
+                disabled={loading || filteredParticipants.length === 0}
+              >
+                <Download className="h-3.5 w-3.5" />
+                Export CSV
+                <ChevronDown className="h-3.5 w-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => handleExport("view")}>
+                Export Current View
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExport("full")}>
+                Export Full Registration Data
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          {filtersActive ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-9 gap-1.5"
+              onClick={clearFilters}
+            >
+              <X className="h-3.5 w-3.5" />
+              Clear filters
+            </Button>
+          ) : null}
         </div>
+        {filtersActive ? (
+          <p className="text-xs text-muted-foreground">
+            Showing {filteredParticipants.length} of {participants.length}{" "}
+            registrations
+            {enrollmentFilter !== "all"
+              ? ` · Status: ${
+                  enrollmentFilter === "active"
+                    ? "Enrolled"
+                    : DISPLAY_ENROLLMENT_STATUS_LABELS[
+                        enrollmentFilter as DisplayEnrollmentStatus
+                      ] || enrollmentFilter
+                }`
+              : " · All statuses"}
+            {offeringFilter !== "all"
+              ? ` · Offering: ${
+                  offeringOptions.find((course) => course.id === offeringFilter)
+                    ?.name || "Selected"
+                }`
+              : ""}
+          </p>
+        ) : null}
       </div>
 
       {loading ? (
@@ -548,204 +992,72 @@ export function DepartmentParticipantsPanel({
         </p>
       ) : (
         <div className="overflow-x-auto rounded-md border">
-          <Table>
+          <Table className="min-w-[720px]">
             <TableHeader>
               <TableRow>
-                <TableHead>
-                  <TableColumnHeaderFilter
-                    label="Participant"
-                    active={Boolean(studentFilter.trim())}
-                  >
-                    {({ close }) => (
-                      <Input
-                        placeholder="Search by name"
-                        value={studentFilterInput}
-                        onChange={(event) => {
-                          setStudentFilterInput(event.target.value)
-                          setStudentFilter(event.target.value)
-                        }}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter") {
-                            setStudentFilter(studentFilterInput)
-                            close()
-                          }
-                        }}
-                      />
+                {tableColumns.map((column, index) => (
+                  <TableHead
+                    key={column.id}
+                    className={cn(
+                      "whitespace-nowrap",
+                      index === 0 &&
+                        "sticky left-0 z-10 min-w-[14rem] bg-background",
+                      column.id === "actions" && "w-[8rem]"
                     )}
-                  </TableColumnHeaderFilter>
-                </TableHead>
-                <TableHead>
-                  <TableColumnHeaderFilter
-                    label={PROGRAM_LABEL}
-                    active={Boolean(courseFilter.trim())}
                   >
-                    {({ close }) => (
-                      <Input
-                        placeholder={`Search by ${PROGRAM_LABEL.toLowerCase()}`}
-                        value={courseFilterInput}
-                        onChange={(event) => {
-                          setCourseFilterInput(event.target.value)
-                          setCourseFilter(event.target.value)
-                        }}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter") {
-                            setCourseFilter(courseFilterInput)
-                            close()
-                          }
-                        }}
-                      />
-                    )}
-                  </TableColumnHeaderFilter>
-                </TableHead>
-                <TableHead>
-                  <TableColumnHeaderFilter
-                    label="Teacher"
-                    active={Boolean(teacherFilter.trim())}
-                  >
-                    {({ close }) => (
-                      <Input
-                        placeholder="Search by teacher"
-                        value={teacherFilterInput}
-                        onChange={(event) => {
-                          setTeacherFilterInput(event.target.value)
-                          setTeacherFilter(event.target.value)
-                        }}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter") {
-                            setTeacherFilter(teacherFilterInput)
-                            close()
-                          }
-                        }}
-                      />
-                    )}
-                  </TableColumnHeaderFilter>
-                </TableHead>
-                <TableHead>Enrollment status</TableHead>
-                <TableHead>Payment status</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead className="text-right">Paid</TableHead>
-                <TableHead className="text-right">Balance</TableHead>
-                <TableHead>Parent / Guardian</TableHead>
-                <TableHead>Registered</TableHead>
+                    {tableHeaderLabel(column.id)}
+                  </TableHead>
+                ))}
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredParticipants.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={11}
+                    colSpan={Math.max(tableColumns.length, 1)}
                     className="py-8 text-center text-sm text-muted-foreground"
                   >
                     No enrollments match these filters.
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredParticipants.map((row) => (
+                pagedParticipants.map((row) => (
                   <TableRow key={row.enrollmentId}>
-                    <TableCell className="font-medium">
-                      <div>{row.studentName}</div>
-                      <div className="flex flex-wrap items-center gap-x-2">
-                        <Link
-                          href={`/programs/registrations/${row.enrollmentId}`}
-                          className="text-xs text-muted-foreground hover:underline"
-                        >
-                          View registration
-                        </Link>
-                        {row.offeringId &&
-                        canMoveEnrollmentStatus(row.status) &&
-                        (offeringCountByProgram.get(row.programId) || 0) >
-                          1 ? (
-                          <button
-                            type="button"
-                            className="text-xs text-sky-700 hover:underline"
-                            onClick={() => void openMoveDialog(row)}
-                          >
-                            Move
-                          </button>
-                        ) : null}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {row.offeringId ? (
-                        <Link
-                          href={programOfferingManageHref(
-                            row.programId,
-                            row.offeringId,
-                            { departmentId }
-                          )}
-                          className="text-primary hover:underline"
-                        >
-                          {row.courseName}
-                        </Link>
-                      ) : (
-                        row.courseName
-                      )}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {row.teacherName || "—"}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant="secondary"
+                    {tableColumns.map((column, index) => (
+                      <TableCell
+                        key={column.id}
                         className={cn(
-                          "font-normal",
-                          enrollmentStatusBadgeClass(
-                            displayEnrollmentStatus(row.status)
-                          )
+                          index === 0 &&
+                            "sticky left-0 z-10 bg-background font-medium",
+                          column.id !== "participant" &&
+                            column.id !== "offering" &&
+                            column.id !== "guardian" &&
+                            column.id !== "status" &&
+                            column.id !== "actions"
+                            ? "text-muted-foreground"
+                            : null
                         )}
                       >
-                        {displayEnrollmentStatusLabel(row.status)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant="secondary"
-                        className={cn(
-                          "font-normal",
-                          paymentStatusBadgeClass(rowPaymentStatus(row))
-                        )}
-                      >
-                        {displayPaymentStatusLabel(rowPaymentStatus(row))}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatMoney(row.totalAmount)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatMoney(row.amountPaid)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatMoney(rowBalance(row))}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {row.parentName || row.parentContactId ? (
-                        <div>
-                          {row.parentContactId ? (
-                            <Link
-                              href={contactProfileHref(row.parentContactId)}
-                              className="font-medium text-primary hover:underline"
-                            >
-                              {row.parentName || "View contact"}
-                            </Link>
-                          ) : (
-                            <div className="font-medium text-foreground">
-                              {row.parentName}
-                            </div>
-                          )}
-                          {row.parentEmail ? (
-                            <div className="text-xs">{row.parentEmail}</div>
-                          ) : null}
-                          {row.parentPhone ? (
-                            <div className="text-xs">{row.parentPhone}</div>
-                          ) : null}
-                        </div>
-                      ) : (
-                        "—"
-                      )}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {formatDate(row.registeredAt)}
-                    </TableCell>
+                        <RegistrationCell
+                          row={row}
+                          columnId={column.id}
+                          departmentId={departmentId}
+                          targets={targetsByProgram[row.programId] || []}
+                          busy={movingEnrollmentId === row.enrollmentId}
+                          moveError={
+                            moveError?.enrollmentId === row.enrollmentId
+                              ? moveError.message
+                              : null
+                          }
+                          showInlineContact={
+                            !visibleSet.has("email") && !visibleSet.has("phone")
+                          }
+                          onSelect={(nextRow, toOfferingId) =>
+                            void handleOfferingChange(nextRow, toOfferingId)
+                          }
+                        />
+                      </TableCell>
+                    ))}
                   </TableRow>
                 ))
               )}
@@ -753,6 +1065,20 @@ export function DepartmentParticipantsPanel({
           </Table>
         </div>
       )}
+
+      {!loading && !error && filteredParticipants.length > 0 ? (
+        <ListPagination
+          page={page}
+          pageSize={pageSize}
+          total={filteredParticipants.length}
+          entryLabel="registrations"
+          onPageChange={setPage}
+          onPageSizeChange={(next) => {
+            setPageSize(next)
+            setPage(1)
+          }}
+        />
+      ) : null}
     </div>
   )
 
@@ -802,21 +1128,96 @@ export function DepartmentParticipantsPanel({
       ) : (
         alternateContent
       )}
-
-      <MoveEnrollmentOfferingDialog
-        open={moveTarget !== null}
-        studentName={moveTarget?.studentName || "student"}
-        programName={moveProgramName || moveTarget?.yearSeasonName || "this year"}
-        destinations={moveDestinations}
-        selectedOfferingId={moveToOfferingId}
-        onSelectedOfferingIdChange={setMoveToOfferingId}
-        busy={moveBusy}
-        loading={moveDestinationsLoading}
-        error={moveError}
-        onOpenChange={closeMoveDialog}
-        onConfirm={() => void handleMoveStudent()}
-      />
     </div>
   )
 }
 
+function RegistrationCell({
+  row,
+  columnId,
+  departmentId,
+  targets,
+  busy,
+  moveError,
+  showInlineContact,
+  onSelect,
+}: {
+  row: DepartmentParticipantRow
+  columnId: RegistrationColumnId
+  departmentId: string
+  targets: MoveOfferingTarget[]
+  busy: boolean
+  moveError: string | null
+  showInlineContact: boolean
+  onSelect: (row: DepartmentParticipantRow, toOfferingId: string) => void
+}) {
+  if (columnId === "participant") {
+    if (row.isYouth) {
+      return (
+        <div className="font-medium text-foreground">
+          {row.studentName || EMPTY_CELL}
+        </div>
+      )
+    }
+    return (
+      <RosterContactBlock
+        name={row.studentName}
+        contactId={row.studentContactId}
+        email={showInlineContact ? row.studentEmail : null}
+        phone={showInlineContact ? row.studentPhone : null}
+      />
+    )
+  }
+
+  if (columnId === "offering") {
+    return (
+      <EnrollmentOfferingSelect
+        row={row}
+        departmentId={departmentId}
+        targets={targets}
+        busy={busy}
+        error={moveError}
+        onSelect={onSelect}
+      />
+    )
+  }
+
+  if (columnId === "status") {
+    return (
+      <Badge
+        variant="secondary"
+        className={cn(
+          "font-normal",
+          enrollmentStatusBadgeClass(displayEnrollmentStatus(row.status))
+        )}
+      >
+        {displayEnrollmentStatusLabel(row.status)}
+      </Badge>
+    )
+  }
+
+  if (columnId === "guardian") {
+    if (!row.showsGuardian) return EMPTY_CELL
+    return (
+      <RosterContactBlock
+        name={row.parentName}
+        contactId={row.parentContactId}
+        email={showInlineContact ? row.parentEmail : null}
+        phone={showInlineContact ? row.parentPhone : null}
+      />
+    )
+  }
+
+  if (columnId === "actions") {
+    return (
+      <Link
+        href={`/programs/registrations/${row.enrollmentId}`}
+        className="text-sm text-primary hover:underline"
+      >
+        View registration
+      </Link>
+    )
+  }
+
+  return displayCell(getRegistrationDisplayValue(row, columnId))
+}

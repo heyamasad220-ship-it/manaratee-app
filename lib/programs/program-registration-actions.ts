@@ -2,11 +2,17 @@
 
 import { redirect } from "next/navigation"
 
-import { readParticipantSelections } from "@/lib/programs/registration-form-parsing"
+import {
+  readParticipantSelections,
+  type ParticipantRegistrationSelection,
+} from "@/lib/programs/registration-form-parsing"
 import { getActiveOrganization } from "@/lib/organizations/get-active-organization"
 import { resolveCustomerPortalSession } from "@/lib/auth/customer-portal-session"
 import { createClient } from "@/lib/supabase/server"
-import { getDefaultOfferingForProgramByOrg } from "@/lib/programs/program-offering-queries"
+import {
+  getDefaultOfferingForProgramByOrg,
+  getOfferingByIdForOrg,
+} from "@/lib/programs/program-offering-queries"
 import {
   getRegistrationOptionById,
   isRegistrationOptionAvailable,
@@ -19,7 +25,14 @@ import {
   verifyParticipantPersonInRegistrantFamily,
 } from "@/lib/programs/registration-contact-resolver"
 import { userHasActiveMembership } from "@/lib/memberships/membership-queries"
-import { enrollmentStatusForSeatActivation, normalizeSeatActivationRule } from "@/lib/programs/enrollment-process"
+import {
+  claimApprovedApplicationsForParticipants,
+  customerProgramApplyPath,
+  customerProgramRegisterPath,
+  enrollmentStatusForSeatActivation,
+  isApplicationBasedProgram,
+  normalizeSeatActivationRule,
+} from "@/lib/programs/enrollment-process"
 import {
   isEnrollmentWindowOpen,
   isProgramPublishedForRegistration,
@@ -37,6 +50,11 @@ type RegisterForProgramRpcResult = {
   payment_required?: boolean
   due_today?: number
   total_amount?: number
+}
+
+function withRegisterError(redirectBase: string, error: string) {
+  const joiner = redirectBase.includes("?") ? "&" : "?"
+  return `${redirectBase}${joiner}error=${encodeURIComponent(error)}`
 }
 
 function isFull(program: { capacity: number; enrolled: number }) {
@@ -111,35 +129,35 @@ function mapRegisterForProgramError(
   const normalized = message || ""
 
   if (normalized.includes("register_for_program:unauthorized")) {
-    redirect(`${redirectBase}?error=unauthorized`)
+    redirect(withRegisterError(redirectBase, "unauthorized"))
   }
 
   if (normalized.includes("register_for_program:invalid-participant")) {
-    redirect(`${redirectBase}?error=invalid-participant`)
+    redirect(withRegisterError(redirectBase, "invalid-participant"))
   }
 
   if (normalized.includes("register_for_program:missing-participant-contact")) {
-    redirect(`${redirectBase}?error=missing-participant-contact`)
+    redirect(withRegisterError(redirectBase, "missing-participant-contact"))
   }
 
   if (normalized.includes("register_for_program:capacity-full")) {
-    redirect(`${redirectBase}?error=capacity-full`)
+    redirect(withRegisterError(redirectBase, "capacity-full"))
   }
 
   if (normalized.includes("grant_enrollment_session_access:capacity-full")) {
-    redirect(`${redirectBase}?error=capacity-full`)
+    redirect(withRegisterError(redirectBase, "capacity-full"))
   }
 
   if (normalized.includes("selected-weeks-priority")) {
-    redirect(`${redirectBase}?error=selected-weeks-priority`)
+    redirect(withRegisterError(redirectBase, "selected-weeks-priority"))
   }
 
   if (normalized.includes("register_for_program:already-enrolled")) {
-    redirect(`${redirectBase}?error=already-enrolled`)
+    redirect(withRegisterError(redirectBase, "already-enrolled"))
   }
 
   if (normalized.includes("register_for_program:already-waitlisted")) {
-    redirect(`${redirectBase}?error=already-waitlisted`)
+    redirect(withRegisterError(redirectBase, "already-waitlisted"))
   }
 
   if (
@@ -153,23 +171,23 @@ function mapRegisterForProgramError(
     normalized.includes("register_for_program:invalid-option") ||
     normalized.includes("register_for_program:invalid-offering")
   ) {
-    redirect(`${redirectBase}?error=invalid-option`)
+    redirect(withRegisterError(redirectBase, "invalid-option"))
   }
 
   if (normalized.includes("register_for_program:invalid-session")) {
-    redirect(`${redirectBase}?error=invalid-session`)
+    redirect(withRegisterError(redirectBase, "invalid-session"))
   }
 
   if (normalized.includes("quote:no-fee-plan")) {
-    redirect(`${redirectBase}?error=no-fee-plan`)
+    redirect(withRegisterError(redirectBase, "no-fee-plan"))
   }
 
   if (normalized.includes("quote:invalid-fee-plan")) {
-    redirect(`${redirectBase}?error=invalid-fee-plan`)
+    redirect(withRegisterError(redirectBase, "invalid-fee-plan"))
   }
 
   if (normalized.includes("quote:invalid-lunch")) {
-    redirect(`${redirectBase}?error=invalid-lunch`)
+    redirect(withRegisterError(redirectBase, "invalid-lunch"))
   }
 
   if (
@@ -177,20 +195,18 @@ function mapRegisterForProgramError(
     normalized.includes("quote:invalid-option") ||
     normalized.includes("quote:invalid-offering")
   ) {
-    redirect(`${redirectBase}?error=invalid-session`)
+    redirect(withRegisterError(redirectBase, "invalid-session"))
   }
 
   if (
     normalized.includes("quote:pricing-error") ||
     normalized.includes("quote:failed")
   ) {
-    redirect(`${redirectBase}?error=pricing-error`)
+    redirect(withRegisterError(redirectBase, "pricing-error"))
   }
 
-  redirect(`${redirectBase}?error=save-failed`)
+  redirect(withRegisterError(redirectBase, "save-failed"))
 }
-
-import type { ParticipantRegistrationSelection } from "@/lib/programs/registration-form-parsing"
 
 async function resolveLunchType(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -211,7 +227,7 @@ async function resolveLunchType(
     .maybeSingle()
 
   if (lunchError || !lunchOption) {
-    redirect(`${redirectBase}?error=invalid-lunch`)
+    redirect(withRegisterError(redirectBase, "invalid-lunch"))
   }
 
   return {
@@ -238,6 +254,7 @@ async function registerSingleParticipant(input: {
   notes: string | null
   pricedSessions: Array<{ id: string; name: string }>
   redirectBase: string
+  applicationId?: string | null
 }) {
   const lunch = await resolveLunchType(
     input.supabase,
@@ -295,7 +312,7 @@ async function registerSingleParticipant(input: {
   const result = rpcData as RegisterForProgramRpcResult | null
 
   if (!result?.ok) {
-    redirect(`${input.redirectBase}?error=save-failed`)
+    redirect(withRegisterError(input.redirectBase, "save-failed"))
   }
 
   if (result.enrollment_id && result.mode !== "waitlist") {
@@ -313,6 +330,7 @@ async function registerSingleParticipant(input: {
       enrollmentId: result.enrollment_id,
       participantContactId: input.participant.participantContactId,
       participantPersonId: input.participant.participantPersonId,
+      applicationId: input.applicationId,
     })
   }
 
@@ -335,6 +353,7 @@ async function finalizeEnrollmentAfterRegistration(input: {
   enrollmentId: string
   participantContactId?: string | null
   participantPersonId?: string | null
+  applicationId?: string | null
 }) {
   const { data: program } = await input.supabase
     .from("programs")
@@ -364,24 +383,29 @@ async function finalizeEnrollmentAfterRegistration(input: {
     }
   }
 
-  let applicationQuery = input.supabase
-    .from("program_applications")
-    .select("id")
-    .eq("organization_id", input.organizationId)
-    .eq("program_id", input.programId)
-    .eq("status", "approved")
-    .is("enrollment_id", null)
-    .limit(1)
+  let applicationId = input.applicationId || null
+  if (!applicationId) {
+    let applicationQuery = input.supabase
+      .from("program_applications")
+      .select("id")
+      .eq("organization_id", input.organizationId)
+      .eq("program_id", input.programId)
+      .eq("status", "approved")
+      .is("enrollment_id", null)
+      .limit(1)
 
-  if (input.participantContactId) {
-    applicationQuery = applicationQuery.eq(
-      "participant_contact_id",
-      input.participantContactId
-    )
+    if (input.participantContactId) {
+      applicationQuery = applicationQuery.eq(
+        "participant_contact_id",
+        input.participantContactId
+      )
+    }
+
+    const { data: application } = await applicationQuery.maybeSingle()
+    applicationId = (application?.id as string | undefined) || null
   }
 
-  const { data: application } = await applicationQuery.maybeSingle()
-  if (!application?.id) return
+  if (!applicationId) return
 
   await input.supabase
     .from("program_applications")
@@ -389,13 +413,13 @@ async function finalizeEnrollmentAfterRegistration(input: {
       enrollment_id: input.enrollmentId,
       updated_at: new Date().toISOString(),
     })
-    .eq("id", application.id)
+    .eq("id", applicationId)
     .eq("organization_id", input.organizationId)
 
   await input.supabase
     .from("program_enrollments")
     .update({
-      application_id: application.id,
+      application_id: applicationId,
       updated_at: new Date().toISOString(),
     })
     .eq("id", input.enrollmentId)
@@ -431,16 +455,17 @@ export async function registerForProgram(formData: FormData) {
     .map((sessionId) => String(sessionId))
     .filter(Boolean)
 
-  const redirectBase = `/customer/programs/${programId}/register`
+  const offeringIdFromForm = String(formData.get("offering_id") || "")
+  let redirectBase = customerProgramRegisterPath(programId, offeringIdFromForm || null)
 
   if (!programId || !registrationOptionId) {
-    redirect(`${redirectBase}?error=missing-fields`)
+    redirect(withRegisterError(redirectBase, "missing-fields"))
   }
 
   const customerContact = await getCustomerContactForUser(organizationId, userId)
 
   if (!customerContact) {
-    redirect(`${redirectBase}?error=unauthorized`)
+    redirect(withRegisterError(redirectBase, "unauthorized"))
   }
 
   const { data: program, error: programError } = await supabase
@@ -489,7 +514,7 @@ export async function registerForProgram(formData: FormData) {
   if (program.visibility === "members_only") {
     const hasMembership = await userHasActiveMembership(organizationId, userId)
     if (!hasMembership) {
-      redirect(`${redirectBase}?error=members-only`)
+      redirect(withRegisterError(redirectBase, "members-only"))
     }
   }
 
@@ -500,7 +525,7 @@ export async function registerForProgram(formData: FormData) {
   const isAdultProgram = program.program_type === "adult"
 
   if (!isAdultProgram && participants.length === 0) {
-    redirect(`${redirectBase}?error=missing-fields`)
+    redirect(withRegisterError(redirectBase, "missing-fields"))
   }
 
   const registrantPersonId = customerContact.person_id
@@ -508,7 +533,7 @@ export async function registerForProgram(formData: FormData) {
     for (const participant of participants) {
       const participantPersonId = participant.participantPersonId
       if (!participantPersonId) {
-        redirect(`${redirectBase}?error=invalid-participant`)
+        redirect(withRegisterError(redirectBase, "invalid-participant"))
       }
       const isFamilyParticipant = await verifyParticipantPersonInRegistrantFamily(
         {
@@ -519,15 +544,53 @@ export async function registerForProgram(formData: FormData) {
       )
 
       if (!isFamilyParticipant) {
-        redirect(`${redirectBase}?error=invalid-participant`)
+        redirect(withRegisterError(redirectBase, "invalid-participant"))
       }
     }
   }
 
-  const offering = await getDefaultOfferingForProgramByOrg(programId, organizationId)
+  const offering = offeringIdFromForm
+    ? await getOfferingByIdForOrg(offeringIdFromForm, organizationId)
+    : await getDefaultOfferingForProgramByOrg(programId, organizationId)
 
-  if (!offering) {
-    redirect(`${redirectBase}?error=invalid-option`)
+  if (!offering || offering.program_id !== programId) {
+    redirect(withRegisterError(redirectBase, "invalid-option"))
+  }
+
+  redirectBase = customerProgramRegisterPath(programId, offering.id)
+
+  let claimedApplicationIds: string[] = []
+  if (isApplicationBasedProgram(program)) {
+    const { data: applicationRows } = await supabase
+      .from("program_applications")
+      .select(
+        "id, status, enrollment_id, offering_id, approved_offering_id, participant_contact_id, application_answers"
+      )
+      .eq("organization_id", organizationId)
+      .eq("program_id", programId)
+      .eq("registrant_contact_id", customerContact.id)
+      .eq("status", "approved")
+      .is("enrollment_id", null)
+
+    const registrationTargetsForGate =
+      isAdultProgram && participants.length === 0
+        ? [{ participantContactId: customerContact.id }]
+        : participants
+
+    const claimed = claimApprovedApplicationsForParticipants(
+      applicationRows || [],
+      {
+        offeringId: offering.id,
+        participants: registrationTargetsForGate,
+      }
+    )
+
+    if (!claimed.ok) {
+      redirect(
+        customerProgramApplyPath(programId, offering.id, "approval-required")
+      )
+    }
+    claimedApplicationIds = claimed.claimed.map((application) => application.id)
   }
 
   const registrationOption = await getRegistrationOptionById(
@@ -541,7 +604,7 @@ export async function registerForProgram(formData: FormData) {
     registrationOption.program_id !== programId ||
     !isRegistrationOptionAvailable(registrationOption)
   ) {
-    redirect(`${redirectBase}?error=invalid-option`)
+    redirect(withRegisterError(redirectBase, "invalid-option"))
   }
 
   const enrollmentOpen =
@@ -569,7 +632,7 @@ export async function registerForProgram(formData: FormData) {
       selectedSessionIds,
     })
   } catch {
-    redirect(`${redirectBase}?error=invalid-session`)
+    redirect(withRegisterError(redirectBase, "invalid-session"))
   }
 
   const pricedSessions =
@@ -603,7 +666,7 @@ export async function registerForProgram(formData: FormData) {
   })
 
   if (forceWaitlistForPriority && !offering.enable_waitlist) {
-    redirect(`${redirectBase}?error=selected-weeks-priority`)
+    redirect(withRegisterError(redirectBase, "selected-weeks-priority"))
   }
 
   const rpcMode =
@@ -629,7 +692,7 @@ export async function registerForProgram(formData: FormData) {
 
   const results = []
 
-  for (const participant of registrationTargets) {
+  for (const [index, participant] of registrationTargets.entries()) {
     const result = await registerSingleParticipant({
       supabase,
       organizationId,
@@ -648,6 +711,7 @@ export async function registerForProgram(formData: FormData) {
       notes: notes || null,
       pricedSessions: pricedSessions as Array<{ id: string; name: string }>,
       redirectBase,
+      applicationId: claimedApplicationIds[index] ?? null,
     })
     results.push(result)
   }

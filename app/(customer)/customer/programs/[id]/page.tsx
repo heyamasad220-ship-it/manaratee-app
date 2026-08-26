@@ -34,6 +34,10 @@ import {
   formatOfferingDateRange,
   isOfferingEnrollmentOpen,
 } from "@/lib/programs/program-offering-display"
+import {
+  customerProgramApplyPath,
+  customerProgramRegisterPath,
+} from "@/lib/programs/enrollment-process"
 import { isOfferingOpenEnrollment } from "@/lib/programs/offering-enrollment-path"
 import type { ProgramOffering } from "@/lib/programs/program-offering-types"
 
@@ -62,6 +66,8 @@ type Program = {
   enrolled: number
   waitlist: number
   status: string
+  enrollment_process?: string | null
+  program_kind?: string | null
 }
 
 type ScheduleItem = {
@@ -264,7 +270,9 @@ export default async function CustomerProgramDetailsPage({
       capacity,
       enrolled,
       waitlist,
-      status
+      status,
+      enrollment_process,
+      program_kind
     `
     )
     .eq("id", id)
@@ -302,7 +310,7 @@ export default async function CustomerProgramDetailsPage({
       return "Not open yet"
     }
 
-    return isOfferingOpenEnrollment(offering) ? "Register" : "Apply"
+    return isOfferingOpenEnrollment(offering, program) ? "Register" : "Apply"
   }
 
   function isOfferingApplyDisabled(offering: ProgramOffering) {
@@ -313,10 +321,10 @@ export default async function CustomerProgramDetailsPage({
   }
 
   function offeringCtaHref(offering: ProgramOffering) {
-    const base = isOfferingOpenEnrollment(offering)
-      ? `/customer/programs/${program.id}/register`
-      : `/customer/programs/${program.id}/apply`
-    return `${base}?offering=${offering.id}`
+    const base = isOfferingOpenEnrollment(offering, program)
+      ? customerProgramRegisterPath(program.id, offering.id)
+      : customerProgramApplyPath(program.id, offering.id)
+    return base
   }
 
   return (
@@ -383,7 +391,7 @@ export default async function CustomerProgramDetailsPage({
                       : "Program Full"}
                   </span>
                 ) : (
-                  <Link href={`/customer/programs/${program.id}/apply`}>
+                  <Link href={customerProgramApplyPath(program.id)}>
                     Apply
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
@@ -410,7 +418,7 @@ export default async function CustomerProgramDetailsPage({
               </CardTitle>
               <CardDescription>
                 {offerings.length === 1
-                  ? isOfferingOpenEnrollment(offerings[0])
+                  ? isOfferingOpenEnrollment(offerings[0], program)
                     ? "Register and pay for this program."
                     : "Apply for the available offering under this program."
                   : "Select the level, camp, or track you want."}

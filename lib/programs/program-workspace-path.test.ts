@@ -33,7 +33,7 @@ describe("program workspace paths", () => {
         tab: "students",
         section: "review",
       }),
-      "/programs/abc?tab=students&section=applications"
+      "/programs/abc?tab=applications"
     )
     assert.equal(
       programWorkspaceHrefFromDepartmentYearQuery({
@@ -62,6 +62,14 @@ describe("program workspace paths", () => {
     assert.equal(
       programWorkspaceHrefFromDepartmentYearQuery({
         yearProgramId: "abc",
+        tab: "reports",
+        section: "addons",
+      }),
+      "/programs/abc?tab=finance&section=addons"
+    )
+    assert.equal(
+      programWorkspaceHrefFromDepartmentYearQuery({
+        yearProgramId: "abc",
         tab: "finance",
         section: "payment-summary",
       }),
@@ -74,6 +82,23 @@ describe("program workspace paths", () => {
         section: "registration",
       }),
       "/programs/abc?tab=settings&section=registration"
+    )
+  })
+
+  it("opens the applications tab", () => {
+    assert.equal(
+      programWorkspaceHref("abc", { tab: "applications" }),
+      "/programs/abc?tab=applications"
+    )
+  })
+
+  it("keeps leftover enrollment bookmarks on Registrations", () => {
+    assert.equal(
+      programWorkspaceHrefFromDepartmentYearQuery({
+        yearProgramId: "abc",
+        tab: "students",
+      }),
+      "/programs/abc?tab=students"
     )
   })
 
@@ -100,6 +125,7 @@ describe("program workspace paths", () => {
 
   it("treats programs as the offerings tab", () => {
     assert.equal(parseProgramWorkspaceTab("programs"), "offerings")
+    assert.equal(parseProgramWorkspaceTab("applications"), "applications")
     assert.equal(parseProgramWorkspaceTab("schedule"), "schedule")
     assert.equal(parseProgramWorkspaceTab("finance"), "finance")
     assert.equal(parseProgramWorkspaceTab("reports"), "reports")
@@ -118,6 +144,13 @@ describe("program workspace paths", () => {
       "/programs/abc?tab=finance&section=payment-summary"
     )
     assert.equal(
+      programWorkspaceHref("abc", {
+        tab: "finance",
+        financeSection: "addons",
+      }),
+      "/programs/abc?tab=finance&section=addons"
+    )
+    assert.equal(
       programWorkspaceHref("abc", { tab: "reports" }),
       "/programs/abc?tab=reports"
     )
@@ -127,6 +160,50 @@ describe("program workspace paths", () => {
         reportsSection: "attendance",
       }),
       "/programs/abc?tab=reports&section=attendance"
+    )
+    assert.equal(
+      programWorkspaceHref("abc", {
+        tab: "reports",
+        reportsSection: "trends",
+      }),
+      "/programs/abc?tab=reports&section=trends"
+    )
+  })
+
+  it("opens registrations with status and offering filters", () => {
+    assert.equal(
+      programWorkspaceHref("abc", {
+        tab: "students",
+        registrationStatus: "active",
+      }),
+      "/programs/abc?tab=students&status=enrolled"
+    )
+    assert.equal(
+      programWorkspaceHref("abc", {
+        tab: "students",
+        registrationStatus: "all",
+        offeringId: "off-1",
+      }),
+      "/programs/abc?tab=students&status=all&offering=off-1"
+    )
+    assert.equal(
+      programWorkspaceHref("abc", {
+        tab: "students",
+        registrationStatus: "waitlisted",
+        offeringId: "off-1",
+      }),
+      "/programs/abc?tab=students&status=waitlisted&offering=off-1"
+    )
+  })
+
+  it("maps leftover waitlist report bookmarks to overview", () => {
+    assert.equal(
+      programWorkspaceHrefFromDepartmentYearQuery({
+        yearProgramId: "abc",
+        tab: "reports",
+        section: "waitlist",
+      }),
+      "/programs/abc?tab=reports"
     )
   })
 })

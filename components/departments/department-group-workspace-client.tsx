@@ -419,20 +419,6 @@ export function DepartmentGroupWorkspaceClient({
     )
   }
 
-  function handleStudentsSectionChange(section: string) {
-    const next =
-      parseDepartmentStudentsSection("students", section) ?? "enrollments"
-    router.replace(
-      departmentGroupWorkspaceHref(departmentId, {
-        tab: "students",
-        studentsSection: next,
-        yearProgramId: yearProgramId || undefined,
-        returnTo: safeReturnTo,
-      }),
-      { scroll: false }
-    )
-  }
-
   if (loading) {
     return (
       <>
@@ -653,8 +639,11 @@ export function DepartmentGroupWorkspaceClient({
           <DepartmentStudentsPanel
             departmentId={department.id}
             departmentName={displayName}
-            initialSection={studentsSection}
-            onSectionChange={handleStudentsSectionChange}
+            view={
+              studentsSection === "applications"
+                ? "applications"
+                : "enrollments"
+            }
           />
         ) : null}
 

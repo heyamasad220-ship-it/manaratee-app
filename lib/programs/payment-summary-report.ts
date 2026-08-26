@@ -14,6 +14,12 @@ import {
   contactLabel,
   loadContactsByIds,
 } from "@/lib/programs/registration-display-helpers"
+import {
+  enrollmentShowsContact,
+  isFreeOfferingFeePlan,
+  isPaymentSummaryEnrollment,
+  isYouthEnrollment,
+} from "@/lib/programs/payment-summary-report-helpers"
 import { createClient } from "@/lib/supabase/server"
 
 export type PaymentSummaryStatus = "paid" | "partial" | "unpaid" | "refunded"
@@ -23,13 +29,24 @@ export type PaymentSummaryFeeLine = {
   type: string
 }
 
+export type PaymentSummaryParticipant = {
+  name: string
+  contactId: string | null
+  email: string | null
+  phone: string | null
+  isYouth: boolean
+}
+
 export type PaymentSummaryRow = {
   id: string
   contactName: string
   contactProfileId: string | null
   contactEmail: string | null
   contactPhone: string | null
+  /** Parent / payer column — youth, or an adult registered by someone else. */
+  showsContact: boolean
   participantNames: string[]
+  participants: PaymentSummaryParticipant[]
   programFeeLines: string[]
   additionalFeeLines: PaymentSummaryFeeLine[]
   received: number
@@ -47,11 +64,14 @@ type EnrollmentRow = {
   program_id: string | null
   offering_id: string | null
   child_name: string | null
+  child_person_id: string | null
+  participant_contact_id: string | null
   parent_name: string | null
   parent_email: string | null
   parent_phone: string | null
   registrant_contact_id: string | null
   payment_status: string | null
+  payment_required: boolean | null
   total_amount: number | null
   amount_paid: number | null
 }
@@ -203,11 +223,14 @@ export async function getPaymentSummaryRows(): Promise<
         program_id,
         offering_id,
         child_name,
+        child_person_id,
+        participant_contact_id,
         parent_name,
         parent_email,
         parent_phone,
         registrant_contact_id,
         payment_status,
+        payment_required,
         total_amount,
         amount_paid
       `
@@ -223,16 +246,66 @@ export async function getPaymentSummaryRows(): Promise<
       }
     }
 
-    const enrollments = (enrollmentData || []) as EnrollmentRow[]
-    const enrollmentIds = enrollments.map((row) => row.id)
-
+    const allEnrollments = (enrollmentData || []) as EnrollmentRow[]
     const offeringIds = [
       ...new Set(
-        enrollments
+        allEnrollments
           .map((row) => row.offering_id)
           .filter((id): id is string => Boolean(id))
       ),
     ]
+
+    const feePlanRows =
+      offeringIds.length === 0
+        ? []
+        : await fetchByIdChunks(offeringIds, async (chunk) => {
+            const { data, error } = await supabase
+              .from("program_offering_fee_plans")
+              .select("offering_id, plan_type, is_default, is_active, metadata")
+              .eq("organization_id", organizationId)
+              .in("offering_id", chunk)
+            if (error) {
+              console.error("payment summary fee plans:", error.message)
+              return []
+            }
+            return (data || []) as Array<{
+              offering_id: string | null
+              plan_type: string | null
+              is_default: boolean | null
+              is_active: boolean | null
+              metadata: Record<string, unknown> | null
+            }>
+          })
+
+    const defaultPlanByOffering = new Map<
+      string,
+      { planType: string; tuition: number | null }
+    >()
+    for (const row of feePlanRows) {
+      if (row.is_active === false || !row.offering_id) continue
+      const tuitionRaw = Number(row.metadata?.total_tuition ?? NaN)
+      const tuition = Number.isFinite(tuitionRaw) ? tuitionRaw : null
+      const current = defaultPlanByOffering.get(row.offering_id)
+      if (!current || row.is_default === true) {
+        defaultPlanByOffering.set(row.offering_id, {
+          planType: String(row.plan_type || ""),
+          tuition,
+        })
+      }
+    }
+
+    const enrollments = allEnrollments.filter((enrollment) => {
+      const plan = enrollment.offering_id
+        ? defaultPlanByOffering.get(enrollment.offering_id)
+        : undefined
+      return isPaymentSummaryEnrollment({
+        offeringIsFree: isFreeOfferingFeePlan(plan),
+        paymentRequired: enrollment.payment_required,
+        totalAmount: enrollment.total_amount,
+        amountPaid: enrollment.amount_paid,
+      })
+    })
+    const enrollmentIds = enrollments.map((row) => row.id)
 
     const [offeringRows, planRows, charges, contactMap] = await Promise.all([
       offeringIds.length === 0
@@ -279,9 +352,10 @@ export async function getPaymentSummaryRows(): Promise<
       }),
       loadContactsByIds(
         organizationId,
-        enrollments
-          .map((row) => row.registrant_contact_id)
-          .filter((id): id is string => Boolean(id))
+        enrollments.flatMap((row) => [
+          row.registrant_contact_id,
+          row.participant_contact_id,
+        ])
       ),
     ])
 
@@ -371,6 +445,8 @@ export async function getPaymentSummaryRows(): Promise<
           )
         }
 
+        const participants: PaymentSummaryParticipant[] = []
+        const seenPeople = new Set<string>()
         const participantNames: string[] = []
         const programFeeLines: string[] = []
         const additionalByType = new Map<string, number>()
@@ -378,8 +454,43 @@ export async function getPaymentSummaryRows(): Promise<
         let total = 0
         const paymentStatuses: string[] = []
         let familyMonthsHint = 0
+        let showsContact = false
 
         for (const member of members) {
+          const studentContactId = member.participant_contact_id
+          const studentContact = studentContactId
+            ? contactMap.get(studentContactId)
+            : undefined
+          const isYouth = isYouthEnrollment({
+            childPersonId: member.child_person_id,
+            participantContactId: studentContactId,
+          })
+          if (
+            enrollmentShowsContact({
+              childPersonId: member.child_person_id,
+              participantContactId: studentContactId,
+              registrantContactId: member.registrant_contact_id,
+            })
+          ) {
+            showsContact = true
+          }
+
+          const personKey =
+            member.child_person_id ||
+            studentContactId ||
+            member.child_name ||
+            member.id
+          if (!seenPeople.has(personKey)) {
+            seenPeople.add(personKey)
+            participants.push({
+              name: contactLabel(studentContact, member.child_name),
+              contactId: isYouth ? null : studentContactId,
+              email: isYouth ? null : studentContact?.email?.trim() || null,
+              phone: isYouth ? null : studentContact?.phone?.trim() || null,
+              isYouth,
+            })
+          }
+
           const memberCharges = chargesByEnrollment.get(member.id) || []
           const planAmounts = plansByEnrollment.get(member.id) || []
           const planSummary = summarizeInstallments(planAmounts)
@@ -396,7 +507,9 @@ export async function getPaymentSummaryRows(): Promise<
             0
           )
 
-          const name = member.child_name?.trim() || "Participant"
+          const name =
+            contactLabel(studentContact, member.child_name).trim() ||
+            "Participant"
           if (!participantNames.includes(name)) {
             participantNames.push(name)
             if (planSummary.months > 0 && planSummary.monthlyFee > 0) {
@@ -506,7 +619,9 @@ export async function getPaymentSummaryRows(): Promise<
           contactProfileId: primary.registrant_contact_id,
           contactEmail: registrant?.email || primary.parent_email || null,
           contactPhone: registrant?.phone || primary.parent_phone || null,
+          showsContact,
           participantNames,
+          participants,
           programFeeLines,
           additionalFeeLines,
           received,

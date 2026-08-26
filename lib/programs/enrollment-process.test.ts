@@ -3,8 +3,10 @@ import { describe, it } from "node:test"
 
 import {
   capacityCountingEnrollmentStatuses,
+  claimApprovedApplicationsForParticipants,
   displayEnrollmentStatus,
   enrollmentStatusForSeatActivation,
+  findApprovedApplicationForRegistration,
   isApplicationBasedProgram,
   isApprovedRegistrationPending,
   isRosterEnrollmentStatus,
@@ -88,5 +90,53 @@ describe("enrollment process", () => {
       }),
       false
     )
+  })
+
+  it("requires an unused approved application for the offering before register", () => {
+    const applications = [
+      {
+        id: "app-1",
+        status: "approved",
+        enrollment_id: null,
+        offering_id: "off-a",
+        approved_offering_id: null,
+        participant_contact_id: "c-1",
+        application_answers: { requested_offering_ids: ["off-a"] },
+      },
+      {
+        id: "app-2",
+        status: "submitted",
+        enrollment_id: null,
+        offering_id: "off-a",
+        approved_offering_id: null,
+        participant_contact_id: "c-2",
+      },
+    ]
+    assert.equal(
+      findApprovedApplicationForRegistration(applications, {
+        offeringId: "off-a",
+        participantContactId: "c-1",
+      })?.id,
+      "app-1"
+    )
+    assert.equal(
+      findApprovedApplicationForRegistration(applications, {
+        offeringId: "off-b",
+      }),
+      null
+    )
+    const claimed = claimApprovedApplicationsForParticipants(applications, {
+      offeringId: "off-a",
+      participants: [{ participantContactId: "c-1" }],
+    })
+    assert.equal(claimed.ok, true)
+    const blocked = claimApprovedApplicationsForParticipants(applications, {
+      offeringId: "off-a",
+      participants: [
+        { participantContactId: "c-1" },
+        { participantContactId: "c-2" },
+      ],
+    })
+    assert.equal(blocked.ok, false)
   })
 })

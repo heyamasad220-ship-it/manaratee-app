@@ -168,6 +168,9 @@ export async function moveEnrollmentToOfferingAction(input: {
     if (String(target.status || "").toLowerCase() === "archived") {
       return { success: false, error: "That offering is archived." }
     }
+    if (String(target.status || "").toLowerCase() === "cancelled") {
+      return { success: false, error: "That offering is cancelled." }
+    }
 
     const { data: source, error: sourceError } = await supabase
       .from("program_offerings")

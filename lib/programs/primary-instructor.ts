@@ -73,3 +73,11 @@ export function primaryInstructorNameByOffering<
   }
   return names
 }
+
+/** Class-time slot instructor wins; otherwise the offering primary instructor. */
+export function resolveClassTimeInstructorName(
+  slotInstructorName: string | null | undefined,
+  offeringInstructorName: string | null | undefined
+): string | null {
+  return slotInstructorName?.trim() || offeringInstructorName?.trim() || null
+}

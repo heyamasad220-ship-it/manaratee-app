@@ -2,6 +2,7 @@ import {
   formatMoveOfferingTargetLabel,
   type MoveOfferingTarget,
 } from "@/lib/programs/move-enrollment-offering-shared"
+import { isOfferingAvailableAsMoveTarget } from "@/lib/programs/program-offering-display"
 import { getOfferingsForProgram } from "@/lib/programs/program-offering-queries"
 import {
   getEnrollmentCountsByOfferingIds,
@@ -16,7 +17,8 @@ export async function listMoveOfferingTargets(
   const offerings = await getOfferingsForProgram(programId)
   const candidates = offerings.filter(
     (offering) =>
-      offering.status !== "archived" && offering.id !== excludeOfferingId
+      isOfferingAvailableAsMoveTarget(offering.status) &&
+      offering.id !== excludeOfferingId
   )
   if (candidates.length === 0) return []
 

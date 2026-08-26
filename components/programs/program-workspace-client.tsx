@@ -7,6 +7,7 @@ import {
   BarChart3,
   BookOpen,
   CalendarClock,
+  ClipboardList,
   Landmark,
   LayoutDashboard,
   Settings,
@@ -24,10 +25,9 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   departmentGroupWorkspaceHref,
-  parseDepartmentStudentsSection,
   type DepartmentScheduleSection,
-  type DepartmentStudentsSection,
 } from "@/lib/donations/donation-group-path"
+import { isApplicationBasedProgram } from "@/lib/programs/enrollment-process"
 import { getHierarchyLabels } from "@/lib/programs/program-display-labels"
 import { getProgramKindTagLabel } from "@/lib/programs/program-kind"
 import {
@@ -36,7 +36,10 @@ import {
 } from "@/lib/programs/program-status"
 import type { Program } from "@/lib/programs/program-types"
 import {
+  isLegacyProgramApplicationsQuery,
+  isLegacyReportsAddons,
   isLegacyReportsPaymentSummary,
+  isLegacyReportsWaitlist,
   parseProgramFinanceSection,
   parseProgramReportsSection,
   parseProgramScheduleSection,
@@ -66,53 +69,100 @@ export function ProgramWorkspaceClient({
     searchTab,
     searchSection
   )
-  const activeTab = leftoverPaymentSummary
-    ? "finance"
-    : parseProgramWorkspaceTab(searchTab)
-  const studentsSection = parseDepartmentStudentsSection(
-    "students",
+  const leftoverAddons = isLegacyReportsAddons(searchTab, searchSection)
+  const leftoverWaitlist = isLegacyReportsWaitlist(searchTab, searchSection)
+  const leftoverFinanceSection = leftoverPaymentSummary || leftoverAddons
+  const applicationBased = isApplicationBasedProgram(program)
+  const leftoverApplications = isLegacyProgramApplicationsQuery(
+    searchTab,
     searchSection
   )
+  const parsedTab = leftoverFinanceSection
+    ? "finance"
+    : leftoverApplications && applicationBased
+      ? "applications"
+      : parseProgramWorkspaceTab(searchTab)
+  const activeTab: ProgramWorkspaceTab =
+    parsedTab === "applications" && !applicationBased ? "students" : parsedTab
   const scheduleSection = parseProgramScheduleSection(
     activeTab === "schedule" ? "schedule" : null,
     searchSection
   )
   const financeSection = leftoverPaymentSummary
     ? "payment-summary"
-    : parseProgramFinanceSection(
-        activeTab === "finance" ? searchSection : null
-      )
+    : leftoverAddons
+      ? "addons"
+      : parseProgramFinanceSection(
+          activeTab === "finance" ? searchSection : null
+        )
   const reportsSection = parseProgramReportsSection(
     activeTab === "reports" ? searchSection : null
   )
   const labels = getHierarchyLabels(program.program_kind)
 
   useEffect(() => {
-    if (!leftoverPaymentSummary) return
+    if (leftoverPaymentSummary) {
+      router.replace(
+        programWorkspaceHref(program.id, {
+          tab: "finance",
+          financeSection: "payment-summary",
+        }),
+        { scroll: false }
+      )
+      return
+    }
+    if (leftoverAddons) {
+      router.replace(
+        programWorkspaceHref(program.id, {
+          tab: "finance",
+          financeSection: "addons",
+        }),
+        { scroll: false }
+      )
+      return
+    }
+    if (!leftoverWaitlist) return
     router.replace(
-      programWorkspaceHref(program.id, {
-        tab: "finance",
-        financeSection: "payment-summary",
-      }),
+      programWorkspaceHref(program.id, { tab: "reports" }),
       { scroll: false }
     )
-  }, [leftoverPaymentSummary, program.id, router])
+  }, [
+    leftoverAddons,
+    leftoverPaymentSummary,
+    leftoverWaitlist,
+    program.id,
+    router,
+  ])
+
+  useEffect(() => {
+    if (leftoverApplications && applicationBased) {
+      router.replace(
+        programWorkspaceHref(program.id, { tab: "applications" }),
+        { scroll: false }
+      )
+      return
+    }
+    if (
+      leftoverApplications ||
+      (parsedTab === "applications" && !applicationBased)
+    ) {
+      router.replace(programWorkspaceHref(program.id, { tab: "students" }), {
+        scroll: false,
+      })
+    }
+  }, [
+    leftoverApplications,
+    applicationBased,
+    parsedTab,
+    program.id,
+    router,
+  ])
 
   function handleTabChange(tab: string) {
     const next = parseProgramWorkspaceTab(tab)
     router.replace(programWorkspaceHref(program.id, { tab: next }), {
       scroll: false,
     })
-  }
-
-  function handleStudentsSectionChange(section: DepartmentStudentsSection) {
-    router.replace(
-      programWorkspaceHref(program.id, {
-        tab: "students",
-        studentsSection: section,
-      }),
-      { scroll: false }
-    )
   }
 
   function handleScheduleSectionChange(section: DepartmentScheduleSection) {
@@ -181,6 +231,12 @@ export function ProgramWorkspaceClient({
             <BookOpen className="size-4" />
             {labels.offeringPlural}
           </TabsTrigger>
+          {applicationBased ? (
+            <TabsTrigger value="applications" className="gap-2">
+              <ClipboardList className="size-4" />
+              Applications
+            </TabsTrigger>
+          ) : null}
           <TabsTrigger value="students" className="gap-2">
             <Users className="size-4" />
             Registrations
@@ -219,13 +275,21 @@ export function ProgramWorkspaceClient({
         />
       ) : null}
 
+      {activeTab === "applications" ? (
+        <DepartmentStudentsPanel
+          departmentId={departmentId}
+          departmentName={departmentName}
+          program={program}
+          view="applications"
+        />
+      ) : null}
+
       {activeTab === "students" ? (
         <DepartmentStudentsPanel
           departmentId={departmentId}
           departmentName={departmentName}
           program={program}
-          initialSection={studentsSection}
-          onSectionChange={handleStudentsSectionChange}
+          view="enrollments"
         />
       ) : null}
 

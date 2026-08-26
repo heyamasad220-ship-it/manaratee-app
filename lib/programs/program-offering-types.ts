@@ -10,7 +10,12 @@ export type ProgramOfferingType =
   | "season"
   | "recurring"
 
-export type ProgramOfferingStatus = "draft" | "active" | "closed" | "archived"
+export type ProgramOfferingStatus =
+  | "draft"
+  | "active"
+  | "closed"
+  | "archived"
+  | "cancelled"
 
 export interface ProgramOffering extends ProgramOfferingAttributes {
   id: string
@@ -66,6 +71,20 @@ export const PROGRAM_OFFERING_STATUS_LABELS: Record<
   active: "Active",
   closed: "Closed",
   archived: "Archived",
+  cancelled: "Cancelled",
+}
+
+export function isCancelledOfferingStatus(
+  status: string | null | undefined
+): boolean {
+  return String(status || "").toLowerCase() === "cancelled"
+}
+
+/** Staff Offerings list: Active vs Cancelled. Closed/draft still count as Active. */
+export function offeringListStatusLabel(
+  status: string | null | undefined
+): "Active" | "Cancelled" {
+  return isCancelledOfferingStatus(status) ? "Cancelled" : "Active"
 }
 
 export const OFFERING_DELIVERY_FORMAT_LABELS: Record<

@@ -110,6 +110,11 @@ export function isOfferingVisibleToCustomers(status: ProgramOfferingStatus) {
   return status === "active" || status === "closed"
 }
 
+export function isOfferingAvailableAsMoveTarget(status: string | null | undefined) {
+  const normalized = String(status || "").toLowerCase()
+  return normalized !== "archived" && normalized !== "cancelled"
+}
+
 export function isOfferingCurrentlyActive(
   offering: {
     status: string

@@ -395,7 +395,7 @@ Programs module home (`/programs`) titled **Overview**, with breadcrumb `Dashboa
 | `/programs/list` | All programs (years/seasons) with Academic/Seasonal tags |
 | `/programs/catalog` | Offerings catalog (active offerings; flyer inherits from parent program when offering has none) |
 | `/programs/create` | **Quick Create** — basics + eligibility; redirects to `/programs/[id]` after save |
-| `/programs/[id]` | Program workspace (Overview / Offerings / Registrations / Schedule / Finance / Reports / Settings). Finance and Reports are locked to that program. Orphan years keep standalone detail. |
+| `/programs/[id]` | Program workspace (Overview / Offerings / Registrations / Schedule / Finance / Reports / Settings). **Schedule → Class times** is a Week Board of offering times (plus List). **Registrations** is the operational roster. **Reports** is Overview / Trends / Attendance (drill-down into Registrations). Finance and Reports are locked to that program. Orphan years keep standalone detail. |
 | `/programs/[id]/offerings` | Redirects to first non-archived offering manage page (or program detail if none) |
 | `/programs/[id]/offerings/[offeringId]` | **Offering manage** (orphan years). Department-linked years use `/workforce/departments/[id]/programs/[programId]/offerings/[offeringId]` instead. |
 | `/programs/[id]/edit` | **Retired** — redirects to detail or offering manage (legacy deep links) |

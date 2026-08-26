@@ -292,6 +292,107 @@ export function isApprovedRegistrationPending(application: {
   )
 }
 
-export function customerProgramRegisterPath(programId: string) {
-  return `/customer/programs/${programId}/register`
+export type ApplicationRegistrationMatch = {
+  id: string
+  status?: string | null
+  enrollment_id?: string | null
+  offering_id?: string | null
+  approved_offering_id?: string | null
+  participant_contact_id?: string | null
+  application_answers?: { requested_offering_ids?: string[] | null } | null
+}
+
+export function applicationTargetOfferingIds(
+  application: ApplicationRegistrationMatch
+): string[] {
+  const ids = [
+    application.approved_offering_id,
+    application.offering_id,
+    ...(application.application_answers?.requested_offering_ids || []),
+  ]
+  return [...new Set(ids.filter((id): id is string => Boolean(id)))]
+}
+
+export function applicationCoversOffering(
+  application: ApplicationRegistrationMatch,
+  offeringId: string
+) {
+  if (!offeringId) return false
+  return applicationTargetOfferingIds(application).includes(offeringId)
+}
+
+export function findApprovedApplicationForRegistration<
+  T extends ApplicationRegistrationMatch,
+>(
+  applications: T[],
+  input: {
+    offeringId: string
+    participantContactId?: string | null
+  }
+): T | null {
+  const ready = applications.filter(
+    (application) =>
+      isApprovedRegistrationPending(application) &&
+      applicationCoversOffering(application, input.offeringId)
+  )
+  if (ready.length === 0) return null
+  const participantContactId = input.participantContactId || null
+  if (participantContactId) {
+    const byContact = ready.find(
+      (application) => application.participant_contact_id === participantContactId
+    )
+    if (byContact) return byContact
+  }
+  return ready[0] ?? null
+}
+
+export function claimApprovedApplicationsForParticipants<
+  T extends ApplicationRegistrationMatch,
+>(
+  applications: T[],
+  input: {
+    offeringId: string
+    participants: Array<{ participantContactId?: string | null }>
+  }
+): { ok: true; claimed: T[] } | { ok: false } {
+  let remaining = [...applications]
+  const claimed: T[] = []
+  for (const participant of input.participants) {
+    const match = findApprovedApplicationForRegistration(remaining, {
+      offeringId: input.offeringId,
+      participantContactId: participant.participantContactId,
+    })
+    if (!match) return { ok: false }
+    claimed.push(match)
+    remaining = remaining.filter((application) => application.id !== match.id)
+  }
+  return { ok: true, claimed }
+}
+
+export function customerProgramApplyPath(
+  programId: string,
+  offeringId?: string | null,
+  error?: string | null
+) {
+  const params = new URLSearchParams()
+  if (offeringId) params.set("offering", offeringId)
+  if (error) params.set("error", error)
+  const query = params.toString()
+  return query
+    ? `/customer/programs/${programId}/apply?${query}`
+    : `/customer/programs/${programId}/apply`
+}
+
+export function customerProgramRegisterPath(
+  programId: string,
+  offeringId?: string | null,
+  error?: string | null
+) {
+  const params = new URLSearchParams()
+  if (offeringId) params.set("offering", offeringId)
+  if (error) params.set("error", error)
+  const query = params.toString()
+  return query
+    ? `/customer/programs/${programId}/register?${query}`
+    : `/customer/programs/${programId}/register`
 }

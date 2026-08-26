@@ -171,11 +171,10 @@ export function DepartmentProgramDashboardPanel({
     if (section === "finance") {
       return programWorkspaceHref(yearProgramId, { tab: "finance" })
     }
-    return programWorkspaceHref(yearProgramId, {
-      tab: "students",
-      studentsSection:
-        section === "applications" ? "applications" : "enrollments",
-    })
+    if (section === "applications") {
+      return programWorkspaceHref(yearProgramId, { tab: "applications" })
+    }
+    return programWorkspaceHref(yearProgramId, { tab: "students" })
   }
 
   if (loading) {

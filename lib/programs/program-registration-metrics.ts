@@ -15,8 +15,7 @@ import {
 import { createClient } from "@/lib/supabase/server"
 
 export type ProgramRegistrationMetrics = {
-  needsReview: number
-  awaitingEvaluation: number
+  evaluation: number
   approvedPending: number
   enrolled: number
   balanceDue: number
@@ -33,11 +32,11 @@ const EMPTY_CHIP_COUNTS: Record<ApplicationStatusChip, number> = {
   approved: 0,
   waitlisted: 0,
   declined: 0,
+  withdrawn: 0,
 }
 
 const EMPTY_METRICS: ProgramRegistrationMetrics = {
-  needsReview: 0,
-  awaitingEvaluation: 0,
+  evaluation: 0,
   approvedPending: 0,
   enrolled: 0,
   balanceDue: 0,
@@ -127,16 +126,14 @@ async function fetchProgramRegistrationMetrics(
   const chipCounts: Record<ApplicationStatusChip, number> = {
     ...EMPTY_CHIP_COUNTS,
   }
-  let needsReview = 0
-  let awaitingEvaluation = 0
+  let evaluation = 0
   let approvedPending = 0
 
   for (const row of applicationsResult.data || []) {
     chipCounts.all += 1
     const chip = applicationStatusChipFor(String(row.status || ""))
     if (chip && chip !== "all") chipCounts[chip] += 1
-    if (row.status === "submitted") needsReview += 1
-    if (chip === "evaluation") awaitingEvaluation += 1
+    if (chip === "evaluation") evaluation += 1
     if (row.status === "approved" && !row.enrollment_id) approvedPending += 1
   }
 
@@ -173,8 +170,7 @@ async function fetchProgramRegistrationMetrics(
   }
 
   return {
-    needsReview,
-    awaitingEvaluation,
+    evaluation,
     approvedPending,
     enrolled,
     balanceDue,

@@ -18,7 +18,10 @@ import type {
 import {
   EMPTY_PROGRAM_APPLICATION_ANSWERS,
   EVALUATION_APPLICATION_STATUSES,
+  EVALUATION_QUEUE_STATUSES,
+  canWithdrawProgramApplication,
   normalizeProgramApplicationAnswers,
+  withdrawProgramApplicationBlockReason,
 } from "@/lib/programs/program-application-types"
 import { DEPARTMENT_WORKSPACE_PROGRAM_STATUSES } from "@/lib/departments/department-active-programs"
 import { canManageDepartment } from "@/lib/departments/department-access"
@@ -287,7 +290,7 @@ export async function getApplicationsForRegistrantContact(
 
 /**
  * Department Students stages:
- * - submitted → needs review
+ * - submitted / evaluation → Evaluation queue
  * - approved_pending_registration → approved, no enrollment yet
  */
 export async function getDepartmentApplications(
@@ -336,10 +339,12 @@ export async function getDepartmentApplications(
     .in("program_id", programIds)
     .order("created_at", { ascending: false })
 
-  if (filter === "submitted" || filter === "needs_review") {
-    query = query.eq("status", "submitted")
-  } else if (filter === "evaluation") {
-    query = query.in("status", [...EVALUATION_APPLICATION_STATUSES])
+  if (
+    filter === "submitted" ||
+    filter === "needs_review" ||
+    filter === "evaluation"
+  ) {
+    query = query.in("status", [...EVALUATION_QUEUE_STATUSES])
   } else if (filter === "approved") {
     query = query.eq("status", "approved")
   } else if (filter === "approved_pending_registration") {
@@ -348,6 +353,8 @@ export async function getDepartmentApplications(
     query = query.eq("status", "waitlisted")
   } else if (filter === "declined") {
     query = query.in("status", ["not_approved", "declined"])
+  } else if (filter === "withdrawn") {
+    query = query.eq("status", "withdrawn")
   }
 
   const { data, error } = await query
@@ -594,6 +601,16 @@ export async function setProgramApplicationWorkflowStatus(input: {
     }
   }
 
+  if (input.status === "withdrawn") {
+    const blocked = withdrawProgramApplicationBlockReason({
+      status: existing.status as string,
+      enrollment_id: existing.enrollment_id as string | null,
+    })
+    if (blocked) {
+      return { success: false, error: blocked }
+    }
+  }
+
   const now = new Date().toISOString()
   const { data, error } = await supabase
     .from("program_applications")
@@ -719,6 +736,142 @@ export async function unapproveProgramApplication(input: {
   revalidatePath(`/customer/programs/${existing.program_id as string}/apply`)
 
   return { success: true, application: mapApplication(data) }
+}
+
+/**
+ * Mark an application withdrawn before registration.
+ * Registered students must be withdrawn from Registrations instead.
+ */
+export async function withdrawProgramApplication(input: {
+  applicationId: string
+}): Promise<
+  | { success: true; application: ProgramApplication }
+  | { success: false; error: string }
+> {
+  const organizationId = await getSelectedOrganizationId()
+  if (!organizationId) {
+    return { success: false, error: "No organization selected." }
+  }
+
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user?.id) {
+    return { success: false, error: "You must be signed in." }
+  }
+
+  const { data: existing, error: loadError } = await supabase
+    .from("program_applications")
+    .select("*")
+    .eq("id", input.applicationId)
+    .eq("organization_id", organizationId)
+    .maybeSingle()
+
+  if (loadError || !existing) {
+    return { success: false, error: "Application not found." }
+  }
+
+  const blocked = withdrawProgramApplicationBlockReason({
+    status: existing.status as string,
+    enrollment_id: existing.enrollment_id as string | null,
+  })
+  if (blocked) {
+    return { success: false, error: blocked }
+  }
+  if (
+    !canWithdrawProgramApplication({
+      status: existing.status as string,
+      enrollment_id: existing.enrollment_id as string | null,
+    })
+  ) {
+    return { success: false, error: "This application cannot be withdrawn." }
+  }
+
+  const { data: programForAccess } = await supabase
+    .from("programs")
+    .select("department_id")
+    .eq("id", existing.program_id as string)
+    .eq("organization_id", organizationId)
+    .maybeSingle()
+
+  const departmentId = (programForAccess?.department_id as string | null) || null
+  if (departmentId) {
+    if (!(await canManageDepartment(departmentId))) {
+      return {
+        success: false,
+        error:
+          "You do not have permission to withdraw applications for this department.",
+      }
+    }
+  } else if (!(await hasPermission(PERMISSIONS.PROGRAMS_MANAGE))) {
+    return {
+      success: false,
+      error: "You do not have permission to withdraw applications.",
+    }
+  }
+
+  const now = new Date().toISOString()
+  const { data, error } = await supabase
+    .from("program_applications")
+    .update({
+      status: "withdrawn",
+      updated_by_user_id: user.id,
+      updated_at: now,
+    })
+    .eq("id", input.applicationId)
+    .eq("organization_id", organizationId)
+    .select("*")
+    .single()
+
+  if (error || !data) {
+    console.error("withdrawProgramApplication:", error?.message)
+    return {
+      success: false,
+      error: error?.message || "Failed to withdraw application.",
+    }
+  }
+
+  if (departmentId) {
+    revalidatePath(workforceDepartmentDetailPath(departmentId))
+  }
+  revalidatePath(`/programs/${existing.program_id as string}`)
+  revalidatePath(`/customer/programs/${existing.program_id as string}`)
+  revalidatePath(`/customer/programs/${existing.program_id as string}/apply`)
+
+  return { success: true, application: mapApplication(data) }
+}
+
+export async function withdrawProgramApplicationsBatch(input: {
+  applicationIds: string[]
+}): Promise<
+  | { success: true; withdrawn: number; failed: number; errors: string[] }
+  | { success: false; error: string }
+> {
+  const ids = [
+    ...new Set(
+      (input.applicationIds || []).map((id) => String(id || "").trim()).filter(Boolean)
+    ),
+  ]
+  if (ids.length === 0) {
+    return { success: false, error: "Select at least one application." }
+  }
+
+  let withdrawn = 0
+  let failed = 0
+  const errors: string[] = []
+
+  for (const applicationId of ids) {
+    const result = await withdrawProgramApplication({ applicationId })
+    if (result.success) {
+      withdrawn += 1
+    } else {
+      failed += 1
+      errors.push(result.error)
+    }
+  }
+
+  return { success: true, withdrawn, failed, errors }
 }
 
 export type EvaluateProgramApplicationsBatchInput = {
@@ -985,7 +1138,7 @@ export async function fetchProgramApplicationOfferingsAction(programId: string) 
     return {
       success: true as const,
       offerings: offerings
-        .filter((row) => row.status !== "archived")
+        .filter((row) => row.status !== "archived" && row.status !== "cancelled")
         .map((row) => ({ id: row.id, name: row.name })),
     }
   } catch (error) {

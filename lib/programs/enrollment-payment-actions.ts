@@ -383,6 +383,9 @@ export async function updateEnrollmentRegistrationAction(input: {
       if (String(offering.status || "").toLowerCase() === "archived") {
         return { success: false, error: "That offering is archived." }
       }
+      if (String(offering.status || "").toLowerCase() === "cancelled") {
+        return { success: false, error: "That offering is cancelled." }
+      }
 
       const program = offering.program as
         | { name?: string | null; department_id?: string | null }

@@ -26,6 +26,7 @@ export type DepartmentApplicationListFilter =
   | "approved_pending_registration"
   | "waitlisted"
   | "declined"
+  | "withdrawn"
 
 export type ApplicationStatusChip =
   | "all"
@@ -34,6 +35,7 @@ export type ApplicationStatusChip =
   | "approved"
   | "waitlisted"
   | "declined"
+  | "withdrawn"
 
 /** New-student prior learning path. */
 export type ProgramApplicationPriorBackground =
@@ -63,7 +65,7 @@ export const PROGRAM_APPLICATION_STATUS_LABELS: Record<
   string
 > = {
   draft: "Draft",
-  submitted: "Needs Review",
+  submitted: "Pending",
   evaluation_required: "Evaluation Required",
   evaluation_scheduled: "Evaluation Scheduled",
   evaluation_completed: "Evaluation Completed",
@@ -85,15 +87,60 @@ export const DECLINED_APPLICATION_STATUSES: ProgramApplicationStatus[] = [
   "declined",
 ]
 
-export const NEEDS_REVIEW_APPLICATION_STATUSES: ProgramApplicationStatus[] = [
+/** Applicant or staff cancelled before registration. */
+export const WITHDRAWABLE_APPLICATION_STATUSES: ProgramApplicationStatus[] = [
   "submitted",
+  "evaluation_required",
+  "evaluation_scheduled",
+  "evaluation_completed",
+  "approved",
+  "waitlisted",
 ]
+
+export function canWithdrawProgramApplication(application: {
+  status?: string | null
+  enrollment_id?: string | null
+}): boolean {
+  if (application.enrollment_id) return false
+  return WITHDRAWABLE_APPLICATION_STATUSES.includes(
+    (application.status || "").toLowerCase() as ProgramApplicationStatus
+  )
+}
+
+export function withdrawProgramApplicationBlockReason(application: {
+  status?: string | null
+  enrollment_id?: string | null
+}): string | null {
+  if (canWithdrawProgramApplication(application)) return null
+  if (application.enrollment_id) {
+    return "This applicant already registered. Withdraw the enrollment from Registrations."
+  }
+  const status = (application.status || "").toLowerCase()
+  if (status === "withdrawn") {
+    return "This application is already withdrawn."
+  }
+  if (status === "not_approved" || status === "declined") {
+    return "Declined applications cannot be withdrawn."
+  }
+  return "This application cannot be withdrawn."
+}
+
+export const EVALUATION_QUEUE_STATUSES: ProgramApplicationStatus[] = [
+  "submitted",
+  ...EVALUATION_APPLICATION_STATUSES,
+]
+
+export function isEvaluationQueueChip(
+  chip: ApplicationStatusChip | string
+): boolean {
+  return chip === "evaluation" || chip === "needs_review"
+}
 
 export function applicationStatusChipFor(
   status: ProgramApplicationStatus | string
 ): ApplicationStatusChip | null {
-  if (status === "submitted") return "needs_review"
   if (
+    status === "submitted" ||
     status === "evaluation_required" ||
     status === "evaluation_scheduled" ||
     status === "evaluation_completed"
@@ -103,6 +150,7 @@ export function applicationStatusChipFor(
   if (status === "approved") return "approved"
   if (status === "waitlisted") return "waitlisted"
   if (status === "not_approved" || status === "declined") return "declined"
+  if (status === "withdrawn") return "withdrawn"
   return null
 }
 

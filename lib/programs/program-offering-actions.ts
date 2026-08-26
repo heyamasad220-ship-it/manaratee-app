@@ -13,6 +13,11 @@ import type {
   ProgramOfferingInput,
   ProgramOfferingType,
 } from "@/lib/programs/program-offering-types"
+import { isCancelledOfferingStatus } from "@/lib/programs/program-offering-types"
+import {
+  PENDING_SEAT_HOLD_STATUSES,
+  ROSTER_ENROLLMENT_STATUSES,
+} from "@/lib/programs/enrollment-process"
 import { syncRegistrationOptionsFromProgramFlags } from "@/lib/programs/program-registration-option-actions"
 
 const PROGRAM_ATTRIBUTE_SELECT =
@@ -121,6 +126,7 @@ export async function syncDefaultOfferingDates(input: {
     .eq("organization_id", input.organizationId)
     .eq("program_id", input.programId)
     .eq("is_default", true)
+    .neq("status", "cancelled")
 
   if (error) {
     console.error("syncDefaultOfferingDates:", error)
@@ -502,6 +508,69 @@ export async function archiveProgramOffering(offeringId: string) {
 
   if (error) {
     throw new Error(error.message)
+  }
+
+  revalidateProgramPaths(offering.program_id as string)
+}
+
+const CANCEL_BLOCKING_ENROLLMENT_STATUSES = [
+  ...ROSTER_ENROLLMENT_STATUSES,
+  ...PENDING_SEAT_HOLD_STATUSES,
+] as const
+
+export async function cancelProgramOffering(offeringId: string) {
+  const supabase = await createClient()
+  const organizationId = await getSelectedOrganizationId()
+
+  if (!organizationId) {
+    throw new Error("No organization selected")
+  }
+
+  const { data: offering, error: fetchError } = await supabase
+    .from("program_offerings")
+    .select("id, program_id, name, status")
+    .eq("id", offeringId)
+    .eq("organization_id", organizationId)
+    .single()
+
+  if (fetchError || !offering) {
+    throw new Error("Offering not found")
+  }
+
+  if (isCancelledOfferingStatus(offering.status as string)) {
+    throw new Error("This offering is already cancelled.")
+  }
+
+  const { count, error: enrollmentError } = await supabase
+    .from("program_enrollments")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", organizationId)
+    .eq("offering_id", offeringId)
+    .in("status", [...CANCEL_BLOCKING_ENROLLMENT_STATUSES])
+
+  if (enrollmentError) {
+    console.error("cancelProgramOffering enrollment check:", enrollmentError)
+    throw new Error("Could not verify enrollments for this offering")
+  }
+
+  if ((count ?? 0) > 0) {
+    throw new Error(
+      "Move enrolled students to another offering or cancel their registration before cancelling this offering."
+    )
+  }
+
+  const { error: updateError } = await supabase
+    .from("program_offerings")
+    .update({
+      status: "cancelled",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", offeringId)
+    .eq("organization_id", organizationId)
+
+  if (updateError) {
+    console.error("cancelProgramOffering:", updateError)
+    throw new Error(updateError.message)
   }
 
   revalidateProgramPaths(offering.program_id as string)

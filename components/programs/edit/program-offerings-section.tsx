@@ -99,6 +99,7 @@ function getStatusBadgeVariant(status: ProgramOfferingStatus) {
       return "default" as const
     case "closed":
       return "outline" as const
+    case "cancelled":
     case "archived":
       return "secondary" as const
     default:

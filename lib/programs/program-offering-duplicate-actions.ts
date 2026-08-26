@@ -172,7 +172,9 @@ export async function duplicateProgramOffering(
 
   const programId = source.program_id as string
   const offeringStatus =
-    source.status === "archived" ? "draft" : (source.status as string)
+    source.status === "archived" || source.status === "cancelled"
+      ? "draft"
+      : (source.status as string)
 
   const sortOrder = await (async () => {
     const { data: maxRow } = await supabase

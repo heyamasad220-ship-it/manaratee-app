@@ -2,12 +2,13 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { Loader2 } from "lucide-react"
+import { AlertCircle, Download, Loader2 } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { ListPagination } from "@/components/ui/list-pagination"
+import { StatCard, StatCardsRow } from "@/components/ui/stat-card"
 import {
   Select,
   SelectContent,
@@ -39,7 +40,8 @@ import {
 import { useProgramKindReportPreset } from "@/hooks/use-program-kind-report-preset"
 
 const ALL = "all"
-const TABLE_COLSPAN = 8
+
+type StatusFilter = "all" | "outstanding" | "paid" | "partial" | "unpaid" | "refunded"
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("en-US", {
@@ -90,6 +92,66 @@ function StackedLines({ values }: { values: string[] }) {
   )
 }
 
+function SummaryContactBlock({
+  name,
+  contactId,
+  email,
+  phone,
+}: {
+  name: string | null
+  contactId: string | null
+  email: string | null
+  phone: string | null
+}) {
+  if (!name && !contactId && !email && !phone) {
+    return <span className="text-muted-foreground">—</span>
+  }
+  return (
+    <div className="space-y-0.5">
+      {contactId ? (
+        <Link
+          href={contactProfileHref(contactId)}
+          className="font-medium text-primary hover:underline"
+        >
+          {name || "View contact"}
+        </Link>
+      ) : name ? (
+        <span className="font-medium">{name}</span>
+      ) : null}
+      {email ? (
+        <div className="text-xs font-normal text-muted-foreground">{email}</div>
+      ) : null}
+      {phone ? (
+        <div className="text-xs font-normal text-muted-foreground">{phone}</div>
+      ) : null}
+    </div>
+  )
+}
+
+function escapeCsv(value: string) {
+  if (/[",\n]/.test(value)) {
+    return `"${value.replace(/"/g, '""')}"`
+  }
+  return value
+}
+
+function downloadCsv(filename: string, rows: string[][]) {
+  const content = rows.map((row) => row.map(escapeCsv).join(",")).join("\n")
+  const blob = new Blob([content], { type: "text/csv;charset=utf-8" })
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement("a")
+  anchor.href = url
+  anchor.download = filename
+  anchor.click()
+  URL.revokeObjectURL(url)
+}
+
+function matchesStatusFilter(status: PaymentSummaryStatus, filter: StatusFilter) {
+  if (filter === "all") return true
+  if (filter === "outstanding") return status === "unpaid" || status === "partial"
+  return status === filter
+}
+
 export function PaymentSummaryReportPanel({
   lockedProgramId,
 }: {
@@ -105,6 +167,7 @@ export function PaymentSummaryReportPanel({
     lockedProgramId || ALL
   )
   const [offeringFilter, setOfferingFilter] = React.useState(ALL)
+  const [statusFilter, setStatusFilter] = React.useState<StatusFilter>(ALL)
   const [page, setPage] = React.useState(1)
   const [pageSize, setPageSize] = React.useState(DEFAULT_LIST_PAGE_SIZE)
 
@@ -112,6 +175,7 @@ export function PaymentSummaryReportPanel({
     if (lockedProgramId) return
     setProgramFilter(ALL)
     setOfferingFilter(ALL)
+    setStatusFilter(ALL)
   }, [kindFilter, lockedProgramId])
 
   const reportLabels = getReportHierarchyLabels(
@@ -191,7 +255,7 @@ export function PaymentSummaryReportPanel({
     }
   }, [offeringFilter, offeringOptions])
 
-  const filteredRows = React.useMemo(() => {
+  const scopedRows = React.useMemo(() => {
     return items.filter((row) => {
       if (kindFilter !== "all" && row.programKind !== kindFilter) return false
       if (
@@ -210,22 +274,130 @@ export function PaymentSummaryReportPanel({
     })
   }, [items, kindFilter, lockedProgramId, programFilter, offeringFilter])
 
-  React.useEffect(() => {
-    setPage(1)
-  }, [kindFilter, programFilter, offeringFilter, items])
+  const filteredRows = React.useMemo(
+    () =>
+      scopedRows.filter((row) => matchesStatusFilter(row.status, statusFilter)),
+    [scopedRows, statusFilter]
+  )
+
+  const totals = React.useMemo(() => {
+    let received = 0
+    let balance = 0
+    let outstanding = 0
+    for (const row of scopedRows) {
+      received += row.received
+      balance += row.balance
+      if (row.balance > 0.009) outstanding += 1
+    }
+    return { received, balance, outstanding }
+  }, [scopedRows])
 
   const pageRows = React.useMemo(
     () => slicePageItems(filteredRows, page, pageSize),
     [filteredRows, page, pageSize]
   )
 
+  const showContactColumn = filteredRows.some((row) => row.showsContact)
+  const tableColSpan = showContactColumn ? 9 : 8
+
+  React.useEffect(() => {
+    setPage(1)
+  }, [kindFilter, programFilter, offeringFilter, statusFilter, items])
+
+  function handleExport() {
+    downloadCsv("payment-summary.csv", [
+      [
+        "Participants",
+        "Email",
+        "Phone",
+        "Offerings",
+        "Program fees",
+        "Additional fees",
+        "Fee types",
+        "Received",
+        "Balance",
+        "Status",
+        ...(showContactColumn
+          ? ["Contact", "Contact email", "Contact phone"]
+          : []),
+      ],
+      ...filteredRows.map((row) => [
+        row.participantNames.join("; "),
+        (row.participants || [])
+          .filter((participant) => !participant.isYouth && participant.email)
+          .map((participant) => participant.email as string)
+          .join("; "),
+        (row.participants || [])
+          .filter((participant) => !participant.isYouth && participant.phone)
+          .map((participant) => participant.phone as string)
+          .join("; "),
+        row.offeringNames.join("; "),
+        row.programFeeLines.join("; "),
+        row.additionalFeeLines.map((fee) => fee.label).join("; "),
+        row.additionalFeeLines.map((fee) => fee.type).join("; "),
+        String(row.received),
+        String(row.balance),
+        row.status,
+        ...(showContactColumn
+          ? [
+              row.showsContact ? row.contactName : "",
+              row.showsContact ? row.contactEmail || "" : "",
+              row.showsContact ? row.contactPhone || "" : "",
+            ]
+          : []),
+      ]),
+    ])
+  }
+
   const filtersActive =
     (!lockedProgramId && kindFilter !== "all") ||
     (!lockedProgramId && programFilter !== ALL) ||
-    offeringFilter !== ALL
+    offeringFilter !== ALL ||
+    statusFilter !== ALL
 
   return (
     <div className="space-y-4">
+      {!loading && !error ? (
+        <StatCardsRow equal columns={3} className="gap-3">
+          <button
+            type="button"
+            className="min-w-0 w-full text-left"
+            onClick={() =>
+              setStatusFilter(
+                statusFilter === "outstanding" ? ALL : "outstanding"
+              )
+            }
+          >
+            <StatCard
+              layout="compact"
+              fill
+              tone="orange"
+              label="Balance Due"
+              value={totals.outstanding}
+              icon={AlertCircle}
+              valueClassName="text-xl"
+              hint={formatCurrency(totals.balance)}
+            />
+          </button>
+          <StatCard
+            layout="compact"
+            fill
+            tone="emerald"
+            label="Received"
+            value={formatCurrency(totals.received)}
+            valueClassName="text-xl"
+          />
+          <StatCard
+            layout="compact"
+            fill
+            tone="slate"
+            label="Outstanding"
+            value={formatCurrency(totals.balance)}
+            valueClassName="text-xl"
+          />
+        </StatCardsRow>
+      ) : null}
+
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
         {lockedProgramId ? null : (
           <>
@@ -237,6 +409,7 @@ export function PaymentSummaryReportPanel({
                   setKindFilter(value as "all" | "academic" | "seasonal")
                   setProgramFilter(ALL)
                   setOfferingFilter(ALL)
+                  setStatusFilter(ALL)
                 }}
               >
                 <SelectTrigger id="payment-summary-kind">
@@ -301,6 +474,25 @@ export function PaymentSummaryReportPanel({
             </SelectContent>
           </Select>
         </div>
+        <div className="space-y-1.5 sm:w-44">
+          <Label htmlFor="payment-summary-status">Status</Label>
+          <Select
+            value={statusFilter}
+            onValueChange={(value) => setStatusFilter(value as StatusFilter)}
+          >
+            <SelectTrigger id="payment-summary-status">
+              <SelectValue placeholder="All statuses" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>All statuses</SelectItem>
+              <SelectItem value="outstanding">Balance due</SelectItem>
+              <SelectItem value="paid">Paid</SelectItem>
+              <SelectItem value="partial">Partial</SelectItem>
+              <SelectItem value="unpaid">Unpaid</SelectItem>
+              <SelectItem value="refunded">Refunded</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
         {filtersActive ? (
           <Button
             type="button"
@@ -311,32 +503,46 @@ export function PaymentSummaryReportPanel({
                 setProgramFilter(ALL)
               }
               setOfferingFilter(ALL)
+              setStatusFilter(ALL)
             }}
           >
             Clear filters
           </Button>
         ) : null}
+        <div className="ml-auto pb-0.5">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleExport}
+            disabled={loading || filteredRows.length === 0}
+          >
+            <Download className="mr-1.5 h-4 w-4" />
+            Export CSV
+          </Button>
+        </div>
       </div>
 
       <div className="overflow-x-auto rounded-lg border bg-card">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Contact</TableHead>
               <TableHead>Participants</TableHead>
+              <TableHead>Offering</TableHead>
               <TableHead>Program Fees</TableHead>
               <TableHead>Additional Fees</TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Received</TableHead>
               <TableHead>Balance</TableHead>
               <TableHead>Status</TableHead>
+              {showContactColumn ? <TableHead>Contact</TableHead> : null}
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
                 <TableCell
-                  colSpan={TABLE_COLSPAN}
+                  colSpan={tableColSpan}
                   className="py-10 text-center text-muted-foreground"
                 >
                   <span className="inline-flex items-center gap-2">
@@ -348,7 +554,7 @@ export function PaymentSummaryReportPanel({
             ) : error ? (
               <TableRow>
                 <TableCell
-                  colSpan={TABLE_COLSPAN}
+                  colSpan={tableColSpan}
                   className="py-10 text-center text-destructive"
                 >
                   {error}
@@ -357,7 +563,7 @@ export function PaymentSummaryReportPanel({
             ) : pageRows.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={TABLE_COLSPAN}
+                  colSpan={tableColSpan}
                   className="py-10 text-center text-muted-foreground"
                 >
                   No payment summaries found.
@@ -366,32 +572,36 @@ export function PaymentSummaryReportPanel({
             ) : (
               pageRows.map((row) => (
                 <TableRow key={row.id}>
-                  <TableCell className="min-w-[12rem] align-top">
-                    <div className="space-y-0.5">
-                      {row.contactProfileId ? (
-                        <Link
-                          href={contactProfileHref(row.contactProfileId)}
-                          className="font-medium text-primary hover:underline"
-                        >
-                          {row.contactName}
-                        </Link>
-                      ) : (
-                        <span className="font-medium">{row.contactName}</span>
+                  <TableCell className="min-w-[10rem] align-top font-medium">
+                    <div className="space-y-2">
+                      {(row.participants?.length
+                        ? row.participants
+                        : row.participantNames.map((name) => ({
+                            name,
+                            contactId: null,
+                            email: null,
+                            phone: null,
+                            isYouth: true,
+                          }))
+                      ).map((participant, index) =>
+                        participant.isYouth ? (
+                          <div key={`${row.id}-${participant.name}-${index}`}>
+                            {participant.name}
+                          </div>
+                        ) : (
+                          <SummaryContactBlock
+                            key={`${row.id}-${participant.contactId || participant.name}-${index}`}
+                            name={participant.name}
+                            contactId={participant.contactId}
+                            email={participant.email}
+                            phone={participant.phone}
+                          />
+                        )
                       )}
-                      {row.contactEmail ? (
-                        <div className="text-xs text-muted-foreground">
-                          {row.contactEmail}
-                        </div>
-                      ) : null}
-                      {row.contactPhone ? (
-                        <div className="text-xs text-muted-foreground">
-                          {row.contactPhone}
-                        </div>
-                      ) : null}
                     </div>
                   </TableCell>
-                  <TableCell className="min-w-[10rem] align-top font-medium">
-                    <StackedLines values={row.participantNames} />
+                  <TableCell className="min-w-[10rem] align-top text-sm">
+                    <StackedLines values={row.offeringNames} />
                   </TableCell>
                   <TableCell className="whitespace-nowrap align-top">
                     <StackedLines values={row.programFeeLines} />
@@ -415,6 +625,20 @@ export function PaymentSummaryReportPanel({
                   <TableCell className="align-top">
                     {statusBadge(row.status)}
                   </TableCell>
+                  {showContactColumn ? (
+                    <TableCell className="min-w-[12rem] align-top">
+                      {row.showsContact ? (
+                        <SummaryContactBlock
+                          name={row.contactName}
+                          contactId={row.contactProfileId}
+                          email={row.contactEmail}
+                          phone={row.contactPhone}
+                        />
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                  ) : null}
                 </TableRow>
               ))
             )}

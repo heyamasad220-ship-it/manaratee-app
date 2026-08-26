@@ -3,12 +3,13 @@
 import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Copy, Eye, GripVertical, Link2, Loader2, MoreHorizontal, Plus, Trash2 } from "lucide-react"
+import { Ban, Copy, Eye, GripVertical, Link2, Loader2, MoreHorizontal, Plus, Trash2 } from "lucide-react"
 
 import type { ProgramGender } from "@/components/programs/edit/types"
 import { ADULT_MIN_AGE } from "@/components/programs/edit/utils"
 import { OfferingBasicsForm } from "@/components/programs/offering-basics-form"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import {
   Dialog,
@@ -53,6 +54,8 @@ import { programOfferingManageHref } from "@/lib/programs/program-offering-paths
 import { programWorkspaceHref } from "@/lib/programs/program-workspace-path"
 import {
   OFFERING_DELIVERY_FORMAT_LABELS,
+  offeringListStatusLabel,
+  isCancelledOfferingStatus,
   type ProgramOffering,
 } from "@/lib/programs/program-offering-types"
 import {
@@ -193,6 +196,9 @@ export function ProgramOfferingsListPanel({
   const [deletingOfferingId, setDeletingOfferingId] = React.useState<string | null>(
     null
   )
+  const [cancellingOfferingId, setCancellingOfferingId] = React.useState<
+    string | null
+  >(null)
   const [duplicateTarget, setDuplicateTarget] =
     React.useState<ProgramOffering | null>(null)
   const [duplicateName, setDuplicateName] = React.useState("")
@@ -643,6 +649,7 @@ export function ProgramOfferingsListPanel({
                   <TableHead>Days</TableHead>
                   <TableHead>Times</TableHead>
                   <TableHead>Enrollment</TableHead>
+                  <TableHead>Offering Status</TableHead>
                   <TableHead className="w-12">
                     <span className="sr-only">Actions</span>
                   </TableHead>
@@ -684,6 +691,8 @@ export function ProgramOfferingsListPanel({
                       key={offering.id}
                       className={cn(
                         "cursor-pointer hover:bg-muted/40",
+                        isCancelledOfferingStatus(offering.status) &&
+                          "opacity-70",
                         draggedIndex === index && "opacity-50",
                         dropTargetIndex === index &&
                           draggedIndex !== index &&
@@ -775,16 +784,32 @@ export function ProgramOfferingsListPanel({
                           <p
                             className={cn(
                               "text-xs",
-                              enrollmentOpen
-                                ? "text-emerald-700"
-                                : "text-muted-foreground"
+                              isCancelledOfferingStatus(offering.status)
+                                ? "text-muted-foreground"
+                                : enrollmentOpen
+                                  ? "text-emerald-700"
+                                  : "text-muted-foreground"
                             )}
                           >
-                            {enrollmentOpen
-                              ? "Registration open"
-                              : "Registration closed"}
+                            {isCancelledOfferingStatus(offering.status)
+                              ? "Cancelled"
+                              : enrollmentOpen
+                                ? "Registration open"
+                                : "Registration closed"}
                           </p>
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="secondary"
+                          className={
+                            isCancelledOfferingStatus(offering.status)
+                              ? "bg-zinc-100 font-normal text-zinc-700"
+                              : "bg-emerald-50 font-normal text-emerald-800"
+                          }
+                        >
+                          {offeringListStatusLabel(offering.status)}
+                        </Badge>
                       </TableCell>
                       <TableCell
                         className="text-right"
@@ -799,7 +824,10 @@ export function ProgramOfferingsListPanel({
                               size="icon"
                               className="h-8 w-8"
                               aria-label={`Actions for ${offering.name}`}
-                              disabled={deletingOfferingId === offering.id}
+                              disabled={
+                                deletingOfferingId === offering.id ||
+                                cancellingOfferingId === offering.id
+                              }
                             >
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
@@ -835,7 +863,8 @@ export function ProgramOfferingsListPanel({
                                   try {
                                     const url = buildProgramRegistrationUrl(
                                       program.id,
-                                      window.location.origin
+                                      window.location.origin,
+                                      offering.id
                                     )
                                     await navigator.clipboard.writeText(url)
                                     showActionFeedback(
@@ -856,6 +885,51 @@ export function ProgramOfferingsListPanel({
                               <Copy className="mr-2 h-4 w-4" />
                               Duplicate
                             </DropdownMenuItem>
+                            {!isCancelledOfferingStatus(offering.status) ? (
+                              <DropdownMenuItem
+                                disabled={enrolled > 0}
+                                title={
+                                  enrolled > 0
+                                    ? "Move enrolled students to another offering or cancel their registration first."
+                                    : undefined
+                                }
+                                onClick={() => {
+                                  void (async () => {
+                                    if (enrolled > 0) {
+                                      showActionFeedback(
+                                        "Move enrolled students to another offering or cancel their registration before cancelling this offering."
+                                      )
+                                      return
+                                    }
+                                    const confirmed = window.confirm(
+                                      `Cancel ${offering.name}? Families will no longer see this offering. Students must already be moved or have their registration cancelled.`
+                                    )
+                                    if (!confirmed) return
+                                    setCancellingOfferingId(offering.id)
+                                    try {
+                                      const { cancelProgramOffering } =
+                                        await import(
+                                          "@/lib/programs/program-offering-actions"
+                                        )
+                                      await cancelProgramOffering(offering.id)
+                                      showActionFeedback("Offering cancelled.")
+                                      await refreshOfferingsList()
+                                    } catch (error) {
+                                      showActionFeedback(
+                                        error instanceof Error
+                                          ? error.message
+                                          : "Could not cancel offering."
+                                      )
+                                    } finally {
+                                      setCancellingOfferingId(null)
+                                    }
+                                  })()
+                                }}
+                              >
+                                <Ban className="mr-2 h-4 w-4" />
+                                Cancel offering
+                              </DropdownMenuItem>
+                            ) : null}
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               className="text-destructive focus:text-destructive"

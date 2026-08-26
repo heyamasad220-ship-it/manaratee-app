@@ -10,6 +10,16 @@ import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -29,6 +39,7 @@ import { ListPagination } from "@/components/ui/list-pagination"
 import {
   evaluateProgramApplicationsBatch,
   fetchDepartmentApplicationsAction,
+  withdrawProgramApplicationsBatch,
 } from "@/lib/programs/program-application-actions"
 import type {
   ApplicationStatusChip,
@@ -41,6 +52,8 @@ import {
   PROGRAM_APPLICANT_TYPE_LABELS,
   PROGRAM_APPLICATION_STATUS_LABELS,
   applicationStatusChipFor,
+  canWithdrawProgramApplication,
+  isEvaluationQueueChip,
 } from "@/lib/programs/program-application-types"
 import { customerProgramRegisterPath } from "@/lib/programs/enrollment-process"
 import { PROGRAM_LABEL, PROGRAM_LABEL_PLURAL } from "@/lib/programs/program-display-labels"
@@ -120,11 +133,11 @@ type DepartmentApplicationsPanelProps = {
 
 const APPLICATION_CHIPS: { id: ApplicationStatusChip; label: string }[] = [
   { id: "all", label: "All" },
-  { id: "needs_review", label: "Needs Review" },
-  { id: "evaluation", label: "Evaluation" },
+  { id: "evaluation", label: "Pending" },
   { id: "approved", label: "Approved" },
   { id: "waitlisted", label: "Waitlisted" },
   { id: "declined", label: "Declined" },
+  { id: "withdrawn", label: "Withdrawn" },
 ]
 
 function applicationStatusLabel(status: ProgramApplicationStatus | string) {
@@ -176,10 +189,11 @@ export function DepartmentApplicationsPanel({
   >("all")
   const [detailApplication, setDetailApplication] =
     React.useState<ProgramApplicationWithDetails | null>(null)
+  const [withdrawIds, setWithdrawIds] = React.useState<string[] | null>(null)
   const [page, setPage] = React.useState(1)
   const [pageSize, setPageSize] = React.useState(DEFAULT_LIST_PAGE_SIZE)
 
-  const isReview = statusChip === "needs_review" || statusChip === "evaluation"
+  const isReview = isEvaluationQueueChip(statusChip)
 
   const load = React.useCallback(async () => {
     setLoading(true)
@@ -242,6 +256,9 @@ export function DepartmentApplicationsPanel({
         const chip = applicationStatusChipFor(application.status)
         if (statusChip === "approved") {
           return application.status === "approved"
+        }
+        if (isEvaluationQueueChip(statusChip)) {
+          return chip === "evaluation"
         }
         return chip === statusChip
       }
@@ -341,14 +358,70 @@ export function DepartmentApplicationsPanel({
     router.refresh()
   }
 
+  const withdrawableSelected = React.useMemo(
+    () =>
+      applications.filter(
+        (application) =>
+          selectedIds.includes(application.id) &&
+          canWithdrawProgramApplication(application)
+      ),
+    [applications, selectedIds]
+  )
+
+  async function handleBatchWithdraw() {
+    const ids = withdrawIds || withdrawableSelected.map((row) => row.id)
+    if (ids.length === 0) {
+      setError(
+        "None of the selected applications can be withdrawn. Registered students must be withdrawn from Registrations."
+      )
+      setWithdrawIds(null)
+      return
+    }
+
+    setBatchBusy(true)
+    setError(null)
+    const result = await withdrawProgramApplicationsBatch({
+      applicationIds: ids,
+    })
+    setBatchBusy(false)
+    setWithdrawIds(null)
+
+    if (!result.success) {
+      setError(result.error)
+      return
+    }
+
+    if (result.failed > 0) {
+      setError(
+        `Withdrew ${result.withdrawn}, failed ${result.failed}${
+          result.errors[0] ? `: ${result.errors[0]}` : "."
+        }`
+      )
+    }
+
+    setSelectedIds([])
+    await load()
+    onCountsMayHaveChanged?.()
+    router.refresh()
+  }
+
   const title = embedded ? "Applications" : `Applications · ${departmentName}`
   const description =
-    "Open a row to review. Select rows to batch approve or decline."
+    "Open a row to review. Select rows to batch approve, decline, or withdraw."
   const emptyMessage = "No applications yet."
   const columnCount = 8
+  const withdrawConfirmCount = withdrawIds?.length || 0
+  const withdrawConfirmName =
+    withdrawConfirmCount === 1
+      ? applications.find((row) => row.id === withdrawIds?.[0])
+          ?.participant_name || "this applicant"
+      : `${withdrawConfirmCount} applications`
 
   async function copyRegistrationLink(application: ProgramApplicationWithDetails) {
-    const path = customerProgramRegisterPath(application.program_id)
+    const path = customerProgramRegisterPath(
+      application.program_id,
+      application.approved_offering_id || application.offering_id
+    )
     const url = `${window.location.origin}${path}`
     try {
       await navigator.clipboard.writeText(url)
@@ -393,6 +466,17 @@ export function DepartmentApplicationsPanel({
               onClick={() => void handleBatchDecision("not_approved")}
             >
               Decline selected
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={batchBusy || withdrawableSelected.length === 0}
+              onClick={() =>
+                setWithdrawIds(withdrawableSelected.map((row) => row.id))
+              }
+            >
+              Withdraw selected
             </Button>
           </div>
         ) : null}
@@ -599,7 +683,14 @@ export function DepartmentApplicationsPanel({
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="secondary" className="font-normal">
+                        <Badge
+                          variant="secondary"
+                          className={cn(
+                            "font-normal",
+                            application.status === "withdrawn" &&
+                              "bg-muted text-muted-foreground"
+                          )}
+                        >
                           {applicationStatusLabel(application.status)}
                           {application.status === "approved" &&
                           !application.enrollment_id
@@ -619,24 +710,39 @@ export function DepartmentApplicationsPanel({
                         onClick={(event) => event.stopPropagation()}
                         onKeyDown={(event) => event.stopPropagation()}
                       >
-                        {application.status === "approved" &&
-                        !application.enrollment_id ? (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="h-8"
-                            onClick={() =>
-                              void copyRegistrationLink(application)
-                            }
-                          >
-                            Copy registration link
-                          </Button>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">
-                            Review
-                          </span>
-                        )}
+                        <div className="flex justify-end gap-1">
+                          {application.status === "approved" &&
+                          !application.enrollment_id ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-8"
+                              onClick={() =>
+                                void copyRegistrationLink(application)
+                              }
+                            >
+                              Copy registration link
+                            </Button>
+                          ) : null}
+                          {canWithdrawProgramApplication(application) ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 text-muted-foreground hover:text-foreground"
+                              disabled={batchBusy}
+                              onClick={() => setWithdrawIds([application.id])}
+                            >
+                              Withdraw
+                            </Button>
+                          ) : application.status === "approved" &&
+                            !application.enrollment_id ? null : (
+                            <span className="text-xs text-muted-foreground">
+                              Review
+                            </span>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   )
@@ -685,6 +791,39 @@ export function DepartmentApplicationsPanel({
           })
         }}
       />
+
+      <AlertDialog
+        open={Boolean(withdrawIds && withdrawIds.length)}
+        onOpenChange={(open) => {
+          if (!open && !batchBusy) setWithdrawIds(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Withdraw {withdrawConfirmName}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              They leave Pending or Approved — Registration pending and appear
+              under Withdrawn. This application can no longer be used to
+              register. Registered students must be withdrawn from
+              Registrations instead.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={batchBusy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={batchBusy}
+              onClick={(event) => {
+                event.preventDefault()
+                void handleBatchWithdraw()
+              }}
+            >
+              {batchBusy ? "Working…" : "Withdraw"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

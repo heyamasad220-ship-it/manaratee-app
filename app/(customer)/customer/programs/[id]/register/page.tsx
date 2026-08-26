@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { cookies } from "next/headers"
-import { notFound } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
 import {
   ArrowLeft,
   BookOpen,
@@ -33,6 +33,13 @@ import {
   formatProgramGradeRangeShort,
 } from "@/lib/programs/program-eligibility-display"
 import { enrollmentStatusBlocksDuplicate } from "@/lib/programs/enrollment-status-helpers"
+import {
+  applicationCoversOffering,
+  customerProgramApplyPath,
+  isApplicationBasedProgram,
+  isApprovedRegistrationPending,
+} from "@/lib/programs/enrollment-process"
+import { getApplicationsForRegistrantContact } from "@/lib/programs/program-application-actions"
 import { lookupContactsByPersonIds } from "@/lib/programs/registration-contact-resolver"
 import { getMyOrganizations } from "@/lib/organizations/get-my-organizations"
 import { Badge } from "@/components/ui/badge"
@@ -71,6 +78,8 @@ type Program = {
   enrolled: number
   waitlist: number
   status: string
+  enrollment_process?: string | null
+  program_kind?: string | null
 }
 
 type ProgramSession = {
@@ -421,7 +430,9 @@ export default async function CustomerProgramRegisterPage({
       capacity,
       enrolled,
       waitlist,
-      status
+      status,
+      enrollment_process,
+      program_kind
     `
     )
     .eq("id", id)
@@ -444,8 +455,31 @@ export default async function CustomerProgramRegisterPage({
     notFound()
   }
 
-  if (offering.status === "draft" || offering.status === "archived") {
+  if (
+    offering.status === "draft" ||
+    offering.status === "archived" ||
+    offering.status === "cancelled"
+  ) {
     notFound()
+  }
+
+  if (isApplicationBasedProgram(program)) {
+    if (!customerContact?.id) {
+      redirect(customerProgramApplyPath(program.id, offering.id, "approval-required"))
+    }
+    const applications = await getApplicationsForRegistrantContact(
+      organizationId,
+      customerContact.id,
+      program.id
+    )
+    const hasApprovedForOffering = applications.some(
+      (application) =>
+        isApprovedRegistrationPending(application) &&
+        applicationCoversOffering(application, offering.id)
+    )
+    if (!hasApprovedForOffering) {
+      redirect(customerProgramApplyPath(program.id, offering.id, "approval-required"))
+    }
   }
 
   const allOptions = offering
@@ -665,6 +699,7 @@ export default async function CustomerProgramRegisterPage({
                 ) : (
                   <form id="program-register-form" action={registerForProgram} className="space-y-6">
                     <input type="hidden" name="program_id" value={program.id} />
+                    <input type="hidden" name="offering_id" value={offering.id} />
                     <input type="hidden" name="mode" value={mode} />
 
                     <CustomerRegistrationOptionPicker options={registrationOptions} />

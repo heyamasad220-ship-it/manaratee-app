@@ -1,13 +1,18 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { CalendarDays, ExternalLink, Loader2, MapPin } from "lucide-react"
+import { CalendarDays, ExternalLink, MapPin } from "lucide-react"
 
 import { ProgramsScheduleBuilder } from "@/components/programs/programs-schedule-builder"
+import { ScheduleListView } from "@/components/programs/schedule/schedule-list-view"
+import { ScheduleViewToggle, type ScheduleBoardView } from "@/components/programs/schedule/schedule-view-toggle"
+import { WeeklyScheduleBoard } from "@/components/programs/schedule/weekly-schedule-board"
+import { WeeklyScheduleBoardSkeleton } from "@/components/programs/schedule/weekly-schedule-board-skeleton"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { EmptyState } from "@/components/ui/states"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Table,
@@ -20,6 +25,7 @@ import {
 import {
   fetchDepartmentScheduleAction,
   type DepartmentScheduleSummary,
+  type DepartmentScheduleWeeklyRow,
 } from "@/lib/departments/department-schedule"
 import { eventManagementMasterCalendarHref } from "@/lib/events/event-management-section-path"
 import {
@@ -30,6 +36,11 @@ import {
 import { YEAR_SEASON_LABEL } from "@/lib/programs/program-display-labels"
 import { programOfferingManageHref } from "@/lib/programs/program-offering-paths"
 import { programWorkspaceHref } from "@/lib/programs/program-workspace-path"
+import {
+  buildWeeklyScheduleColumns,
+  sortVisualScheduleItems,
+  type VisualScheduleItem,
+} from "@/lib/programs/weekly-schedule-board"
 
 function formatDate(value: string | null) {
   if (!value) return "—"
@@ -40,31 +51,6 @@ function formatDate(value: string | null) {
   })
 }
 
-function formatDay(value: string) {
-  if (!value) return "—"
-  return value.charAt(0).toUpperCase() + value.slice(1)
-}
-
-function formatTime(value: string) {
-  if (!value) return "—"
-  const match = /^(\d{1,2}):(\d{2})/.exec(value)
-  if (!match) return value
-  const hour = Number(match[1])
-  const minute = match[2]
-  const suffix = hour >= 12 ? "PM" : "AM"
-  const displayHour = hour % 12 || 12
-  return `${displayHour}:${minute} ${suffix}`
-}
-
-function spaceOrLocationLabel(row: {
-  spaceName: string | null
-  location: string | null
-}) {
-  if (row.spaceName) return row.spaceName
-  if (row.location) return row.location
-  return "—"
-}
-
 type ScheduleSection = "class-times" | "activity-planner"
 
 function scheduleReturnTo(departmentId: string, programId?: string) {
@@ -72,6 +58,32 @@ function scheduleReturnTo(departmentId: string, programId?: string) {
     return programWorkspaceHref(programId, { tab: "schedule" })
   }
   return `/workforce/departments/${departmentId}?tab=programs`
+}
+
+function scheduleViewStorageKey(departmentId: string, programId?: string) {
+  return programId
+    ? `program-schedule-view:${programId}`
+    : `department-schedule-view:${departmentId}`
+}
+
+function toVisualScheduleItem(
+  row: DepartmentScheduleWeeklyRow,
+  departmentId: string
+): VisualScheduleItem {
+  const spaceName = (row.spaceName || row.location || "").trim()
+  return {
+    id: row.id,
+    offeringId: row.offeringId,
+    offeringName: (row.offeringName || row.title || "Class").trim(),
+    dayOfWeek: row.dayOfWeek,
+    startTime: row.startTime,
+    endTime: row.endTime,
+    instructorName: row.instructorName?.trim() || null,
+    spaceName: spaceName || null,
+    href: row.offeringId
+      ? programOfferingManageHref(row.programId, row.offeringId, { departmentId })
+      : null,
+  }
 }
 
 export function DepartmentSchedulePanel({
@@ -90,15 +102,35 @@ export function DepartmentSchedulePanel({
   onSectionChange?: (section: ScheduleSection) => void
 }) {
   const [section, setSection] = useState<ScheduleSection>(initialSection)
+  const [view, setView] = useState<ScheduleBoardView>("board")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [summary, setSummary] = useState<DepartmentScheduleSummary | null>(null)
   const scopedToProgram = Boolean(programId)
   const scopeLabel = programName || departmentName
+  const viewStorageKey = scheduleViewStorageKey(departmentId, programId)
 
   useEffect(() => {
     setSection(initialSection)
   }, [initialSection])
+
+  useEffect(() => {
+    try {
+      const stored = sessionStorage.getItem(viewStorageKey)
+      if (stored === "board" || stored === "list") setView(stored)
+    } catch {
+      // sessionStorage may be unavailable
+    }
+  }, [viewStorageKey])
+
+  function handleViewChange(next: ScheduleBoardView) {
+    setView(next)
+    try {
+      sessionStorage.setItem(viewStorageKey, next)
+    } catch {
+      // sessionStorage may be unavailable
+    }
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -133,6 +165,24 @@ export function DepartmentSchedulePanel({
     departmentId,
     returnTo,
   })
+  const offeringsHref = programId
+    ? programWorkspaceHref(programId, { tab: "offerings" })
+    : `/workforce/departments/${departmentId}?tab=programs`
+
+  const visualItems = useMemo(
+    () =>
+      sortVisualScheduleItems(
+        (summary?.weekly || []).map((row) =>
+          toVisualScheduleItem(row, departmentId)
+        )
+      ),
+    [departmentId, summary]
+  )
+  const boardColumns = useMemo(
+    () => buildWeeklyScheduleColumns(visualItems),
+    [visualItems]
+  )
+  const hasWeekly = visualItems.length > 0
 
   return (
     <div className="space-y-4">
@@ -169,172 +219,138 @@ export function DepartmentSchedulePanel({
         </TabsList>
 
         <TabsContent value="class-times" className="mt-4 space-y-6">
-          {loading ? (
-            <p className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" />
-              Loading schedule...
-            </p>
-          ) : null}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="space-y-1">
+              <h3 className="text-base font-semibold tracking-tight">
+                Weekly Class Schedule
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                Recurring class times, instructors, and spaces for this{" "}
+                {scopedToProgram ? "program's" : "department's"} offerings.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Schedule details are managed within each offering.
+              </p>
+            </div>
+            {!loading && !error && hasWeekly ? (
+              <ScheduleViewToggle value={view} onChange={handleViewChange} />
+            ) : null}
+          </div>
+
+          {loading ? <WeeklyScheduleBoardSkeleton /> : null}
 
           {error ? <p className="py-6 text-sm text-destructive">{error}</p> : null}
 
-          {!loading && !error && (!summary || summary.programs.length === 0) ? (
-            <p className="rounded-md border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
-              No schedule for {scopeLabel} yet. Add offerings and set weekly times on each
-              offering&apos;s Schedule tab.
-            </p>
+          {!loading && !error && !hasWeekly ? (
+            <EmptyState
+              icon={<CalendarDays className="h-8 w-8 text-muted-foreground" />}
+              title="No class times scheduled"
+              description={
+                scopedToProgram
+                  ? "Class schedules will appear here after times are added to the program's offerings."
+                  : `Class schedules will appear here after times are added to ${scopeLabel}'s offerings.`
+              }
+            >
+              <Button variant="outline" asChild>
+                <Link href={offeringsHref}>View Offerings</Link>
+              </Button>
+            </EmptyState>
+          ) : null}
+
+          {!loading && !error && hasWeekly && view === "board" ? (
+            <WeeklyScheduleBoard columns={boardColumns} />
+          ) : null}
+
+          {!loading && !error && hasWeekly && view === "list" ? (
+            <ScheduleListView items={visualItems} />
           ) : null}
 
           {!loading && !error && summary && summary.programs.length > 0 ? (
-            <>
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Weekly class times</CardTitle>
-                  <CardDescription>
-                    Day, time, and space for recurring classes (from each offering). Assign rooms
-                    on the offering Schedule tab.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {summary.weekly.length === 0 ? (
-                    <p className="py-6 text-center text-sm text-muted-foreground">
-                      No weekly times yet. Open an offering&apos;s Schedule tab to add them.
-                    </p>
-                  ) : (
-                    <div className="overflow-x-auto rounded-md border">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Day</TableHead>
-                            <TableHead>Time</TableHead>
-                            <TableHead>Title</TableHead>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Sessions / terms</CardTitle>
+                <CardDescription>
+                  Date ranges for terms or camp sessions (capacity and enrollment).
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {summary.sessions.length === 0 ? (
+                  <p className="py-6 text-center text-sm text-muted-foreground">
+                    No sessions yet. Open an offering&apos;s Schedule tab to add terms.
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Session</TableHead>
+                          <TableHead>Program</TableHead>
+                          {scopedToProgram ? null : (
+                            <TableHead>{YEAR_SEASON_LABEL}</TableHead>
+                          )}
+                          <TableHead>Dates</TableHead>
+                          <TableHead>Enrollment</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="w-[100px]" />
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {summary.sessions.map((row) => (
+                          <TableRow key={row.id}>
+                            <TableCell className="font-medium">{row.name}</TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {row.offeringName || "—"}
+                            </TableCell>
                             {scopedToProgram ? null : (
-                              <TableHead>{YEAR_SEASON_LABEL}</TableHead>
+                              <TableCell className="text-muted-foreground">
+                                {row.programName}
+                              </TableCell>
                             )}
-                            <TableHead>Program</TableHead>
-                            <TableHead>Space</TableHead>
-                            <TableHead>Instructor</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {summary.weekly.map((row) => (
-                            <TableRow key={row.id}>
-                              <TableCell className="font-medium">
-                                {formatDay(row.dayOfWeek)}
-                              </TableCell>
-                              <TableCell className="tabular-nums text-muted-foreground">
-                                {formatTime(row.startTime)} – {formatTime(row.endTime)}
-                              </TableCell>
-                              <TableCell>{row.title}</TableCell>
-                              {scopedToProgram ? null : (
-                                <TableCell className="text-muted-foreground">
-                                  {row.programName}
-                                </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {formatDate(row.startDate)} – {formatDate(row.endDate)}
+                            </TableCell>
+                            <TableCell className="tabular-nums text-muted-foreground">
+                              {row.enrolled}/{row.capacity || "—"}
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant="secondary"
+                                className="capitalize font-normal"
+                              >
+                                {row.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {row.offeringId ? (
+                                <Button type="button" size="sm" variant="outline" asChild>
+                                  <Link
+                                    href={programOfferingManageHref(
+                                      row.programId,
+                                      row.offeringId,
+                                      { departmentId }
+                                    )}
+                                  >
+                                    Edit
+                                    <ExternalLink className="ml-1.5 size-3.5" />
+                                  </Link>
+                                </Button>
+                              ) : (
+                                <Button type="button" size="sm" variant="outline" asChild>
+                                  <Link href={`/programs/${row.programId}/sessions`}>
+                                    Edit
+                                    <ExternalLink className="ml-1.5 size-3.5" />
+                                  </Link>
+                                </Button>
                               )}
-                              <TableCell className="text-muted-foreground">
-                                {row.offeringName || "—"}
-                              </TableCell>
-                              <TableCell className="text-muted-foreground">
-                                {spaceOrLocationLabel(row)}
-                              </TableCell>
-                              <TableCell className="text-muted-foreground">
-                                {row.instructorName || "—"}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Sessions / terms</CardTitle>
-                  <CardDescription>
-                    Date ranges for terms or camp sessions (capacity and enrollment).
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {summary.sessions.length === 0 ? (
-                    <p className="py-6 text-center text-sm text-muted-foreground">
-                      No sessions yet. Open an offering&apos;s Schedule tab to add terms.
-                    </p>
-                  ) : (
-                    <div className="overflow-x-auto rounded-md border">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Session</TableHead>
-                            <TableHead>Program</TableHead>
-                            {scopedToProgram ? null : (
-                              <TableHead>{YEAR_SEASON_LABEL}</TableHead>
-                            )}
-                            <TableHead>Dates</TableHead>
-                            <TableHead>Enrollment</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead className="w-[100px]" />
+                            </TableCell>
                           </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {summary.sessions.map((row) => (
-                            <TableRow key={row.id}>
-                              <TableCell className="font-medium">{row.name}</TableCell>
-                              <TableCell className="text-muted-foreground">
-                                {row.offeringName || "—"}
-                              </TableCell>
-                              {scopedToProgram ? null : (
-                                <TableCell className="text-muted-foreground">
-                                  {row.programName}
-                                </TableCell>
-                              )}
-                              <TableCell className="text-sm text-muted-foreground">
-                                {formatDate(row.startDate)} – {formatDate(row.endDate)}
-                              </TableCell>
-                              <TableCell className="tabular-nums text-muted-foreground">
-                                {row.enrolled}/{row.capacity || "—"}
-                              </TableCell>
-                              <TableCell>
-                                <Badge
-                                  variant="secondary"
-                                  className="capitalize font-normal"
-                                >
-                                  {row.status}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                {row.offeringId ? (
-                                  <Button type="button" size="sm" variant="outline" asChild>
-                                    <Link
-                                      href={programOfferingManageHref(
-                                        row.programId,
-                                        row.offeringId,
-                                        { departmentId }
-                                      )}
-                                    >
-                                      Edit
-                                      <ExternalLink className="ml-1.5 size-3.5" />
-                                    </Link>
-                                  </Button>
-                                ) : (
-                                  <Button type="button" size="sm" variant="outline" asChild>
-                                    <Link href={`/programs/${row.programId}/sessions`}>
-                                      Edit
-                                      <ExternalLink className="ml-1.5 size-3.5" />
-                                    </Link>
-                                  </Button>
-                                )}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           ) : null}
         </TabsContent>
 

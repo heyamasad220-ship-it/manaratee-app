@@ -93,6 +93,7 @@ function statusBadgeClass(status: ProgramOfferingStatus) {
   if (status === "active") return "border-emerald-200 bg-emerald-50 text-emerald-700"
   if (status === "draft") return "border-slate-200 bg-slate-50 text-slate-600"
   if (status === "closed") return "border-slate-200 bg-slate-100 text-slate-700"
+  if (status === "cancelled") return "border-rose-200 bg-rose-50 text-rose-800"
   return "border-zinc-200 bg-zinc-100 text-zinc-600"
 }
 
@@ -100,6 +101,7 @@ function statusDotClass(status: ProgramOfferingStatus) {
   if (status === "active") return "bg-emerald-500"
   if (status === "draft") return "bg-slate-400"
   if (status === "closed") return "bg-slate-500"
+  if (status === "cancelled") return "bg-rose-500"
   return "bg-zinc-400"
 }
 
@@ -590,6 +592,10 @@ export function OfferingsManagementPage({
                 { value: "active", label: PROGRAM_OFFERING_STATUS_LABELS.active },
                 { value: "draft", label: PROGRAM_OFFERING_STATUS_LABELS.draft },
                 { value: "closed", label: PROGRAM_OFFERING_STATUS_LABELS.closed },
+                {
+                  value: "cancelled",
+                  label: PROGRAM_OFFERING_STATUS_LABELS.cancelled,
+                },
                 {
                   value: "archived",
                   label: PROGRAM_OFFERING_STATUS_LABELS.archived,

@@ -4,6 +4,11 @@ import { DEPARTMENT_WORKSPACE_PROGRAM_STATUSES } from "@/lib/departments/departm
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { YEAR_SEASON_LABEL } from "@/lib/programs/program-display-labels"
 import { contactLabel, loadContactsByIds } from "@/lib/programs/registration-display-helpers"
+import {
+  calculateAgeFromDateOfBirth,
+  extractAllergiesFromNotes,
+  extractPhotoConsentFromNotes,
+} from "@/lib/programs/registration-report-helpers"
 import { createClient } from "@/lib/supabase/server"
 
 const DEFAULT_ENROLLMENT_STATUSES = [
@@ -20,6 +25,12 @@ export type DepartmentParticipantRow = {
   studentName: string
   /** Participant contact when present; minors typically have none / no profile page. */
   studentContactId: string | null
+  studentEmail: string | null
+  studentPhone: string | null
+  /** Youth enrollments use a child person, not a participant contact. */
+  isYouth: boolean
+  /** Show Parent / Guardian when the registrant is not the participant. */
+  showsGuardian: boolean
   parentName: string | null
   parentEmail: string | null
   parentPhone: string | null
@@ -36,6 +47,11 @@ export type DepartmentParticipantRow = {
   amountPaid: number
   totalAmount: number
   registeredAt: string | null
+  dateOfBirth: string | null
+  age: number | null
+  gender: string | null
+  allergies: string | null
+  photoConsent: string | null
 }
 
 export type DepartmentParticipantYearOption = {
@@ -126,6 +142,7 @@ export async function fetchDepartmentParticipants(
       program_id,
       offering_id,
       child_name,
+      child_person_id,
       participant_contact_id,
       registrant_contact_id,
       parent_name,
@@ -138,6 +155,8 @@ export async function fetchDepartmentParticipants(
       total_amount,
       enrollment_date,
       created_at,
+      notes,
+      child_age,
       offering:offering_id (
         id,
         name
@@ -222,6 +241,46 @@ export async function fetchDepartmentParticipants(
     )
   )
 
+  const personIds = [
+    ...new Set(
+      enrollments.flatMap((row) => {
+        const ids: string[] = []
+        const childPersonId = row.child_person_id as string | null
+        if (childPersonId) ids.push(childPersonId)
+        const studentContactId = row.participant_contact_id as string | null
+        const contactPersonId = studentContactId
+          ? contactsById.get(studentContactId)?.person_id
+          : null
+        if (contactPersonId) ids.push(contactPersonId)
+        return ids
+      })
+    ),
+  ]
+
+  const peopleById = new Map<
+    string,
+    { date_of_birth: string | null; gender: string | null }
+  >()
+  const chunkSize = 150
+  for (let index = 0; index < personIds.length; index += chunkSize) {
+    const chunk = personIds.slice(index, index + chunkSize)
+    const { data: people, error: peopleError } = await supabase
+      .from("people")
+      .select("id, date_of_birth, gender")
+      .eq("organization_id", organizationId)
+      .in("id", chunk)
+    if (peopleError) {
+      console.warn("fetchDepartmentParticipants people:", peopleError.message)
+      continue
+    }
+    for (const person of people || []) {
+      peopleById.set(person.id as string, {
+        date_of_birth: (person.date_of_birth as string | null) ?? null,
+        gender: (person.gender as string | null) ?? null,
+      })
+    }
+  }
+
   const participants: DepartmentParticipantRow[] = enrollments.map((row) => {
     const offeringRaw = Array.isArray(row.offering)
       ? row.offering[0]
@@ -238,15 +297,44 @@ export async function fetchDepartmentParticipants(
       ? contactsById.get(parentContactId)
       : undefined
 
+    const studentContactId =
+      (row.participant_contact_id as string | null) ?? null
+    const studentContact = studentContactId
+      ? contactsById.get(studentContactId)
+      : undefined
+    const isYouth =
+      Boolean(row.child_person_id) || !studentContactId
+    const showsGuardian =
+      isYouth ||
+      Boolean(parentContactId && parentContactId !== studentContactId)
+
+    const person =
+      (row.child_person_id
+        ? peopleById.get(row.child_person_id as string)
+        : undefined) ||
+      (studentContact?.person_id
+        ? peopleById.get(studentContact.person_id)
+        : undefined)
+    const dateOfBirth = person?.date_of_birth || null
+    const ageFromDob = calculateAgeFromDateOfBirth(dateOfBirth)
+    const childAge =
+      row.child_age == null ? null : Number(row.child_age)
+    const age =
+      ageFromDob != null
+        ? ageFromDob
+        : childAge != null && Number.isFinite(childAge)
+          ? childAge
+          : null
+    const notes = (row.notes as string | null) ?? null
+
     return {
       enrollmentId: row.id as string,
-      studentName: contactLabel(
-        row.participant_contact_id
-          ? contactsById.get(row.participant_contact_id as string)
-          : undefined,
-        row.child_name as string
-      ),
-      studentContactId: (row.participant_contact_id as string | null) ?? null,
+      studentName: contactLabel(studentContact, row.child_name as string),
+      studentContactId,
+      studentEmail: studentContact?.email?.trim() || null,
+      studentPhone: studentContact?.phone?.trim() || null,
+      isYouth,
+      showsGuardian,
       parentName:
         parentContact?.full_name?.trim() ||
         (row.parent_name as string | null) ||
@@ -274,6 +362,11 @@ export async function fetchDepartmentParticipants(
         (row.enrollment_date as string | null) ||
         (row.created_at as string | null) ||
         null,
+      dateOfBirth,
+      age,
+      gender: person?.gender?.trim() || null,
+      allergies: extractAllergiesFromNotes(notes),
+      photoConsent: extractPhotoConsentFromNotes(notes),
     }
   })
 
