@@ -2,7 +2,9 @@
 
 import { donationCampaignWorkspaceHref } from "@/lib/donations/campaign-workspace-paths"
 import {
+  CAMPAIGN_PROSPECT_ASK_TYPE_LABELS,
   CAMPAIGN_PROSPECT_STAGE_LABELS,
+  normalizeProspectAskType,
   normalizeProspectStage,
 } from "@/lib/donations/campaign-prospect-types"
 import { formatDonationCurrency } from "@/lib/donations/campaign-analytics"
@@ -46,7 +48,7 @@ export async function loadContactFundDevelopmentHistoryAction(contactId: string)
     const { data: asProspect, error: prospectError } = await writeClient
       .from("campaign_prospects")
       .select(
-        "id, campaign_id, stage, suggested_ask_amount, next_follow_up_at, last_contacted_at, converted_pledge_id, updated_at, created_at"
+        "id, campaign_id, stage, ask_type, suggested_ask_amount, next_follow_up_at, last_contacted_at, converted_pledge_id, updated_at, created_at"
       )
       .eq("organization_id", organizationId)
       .eq("contact_id", trimmedContactId)
@@ -102,6 +104,7 @@ export async function loadContactFundDevelopmentHistoryAction(contactId: string)
 
     for (const row of asProspect || []) {
       const stage = normalizeProspectStage(row.stage as string)
+      const askType = normalizeProspectAskType(row.ask_type as string)
       const campaignName = campaignNames.get(row.campaign_id as string) || "Campaign"
       items.push({
         id: `prospect-${row.id}`,
@@ -111,7 +114,7 @@ export async function loadContactFundDevelopmentHistoryAction(contactId: string)
           (row.next_follow_up_at as string | null) ||
           (row.updated_at as string | null) ||
           (row.created_at as string | null),
-        title: `Prospect · ${campaignName}`,
+        title: `${CAMPAIGN_PROSPECT_ASK_TYPE_LABELS[askType]} prospect · ${campaignName}`,
         detail: CAMPAIGN_PROSPECT_STAGE_LABELS[stage],
         href: donationCampaignWorkspaceHref(row.campaign_id as string, { tab: "prospects" }),
         amountLabel:

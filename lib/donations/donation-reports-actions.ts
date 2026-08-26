@@ -22,6 +22,7 @@ import {
   fetchCampaignAskLevels,
 } from "@/lib/donations/campaign-ask-level-actions"
 import { fetchCampaignProspectAskLevelStats } from "@/lib/donations/campaign-prospect-actions"
+import { sumActiveCampaignSponsorships } from "@/lib/donations/campaign-sponsorship-actions"
 import { syncCampaignPhases } from "@/lib/donations/campaign-phase-actions"
 import { ensureCampaignDonationFund } from "@/lib/donations/ensure-campaign-donation-fund"
 import { createServiceRoleClient } from "@/lib/supabase/service-role"
@@ -267,6 +268,15 @@ export async function getCampaignDetailAction(campaignId: string) {
         campaignId
       ),
     })
+
+    const sponsorshipTotals = await sumActiveCampaignSponsorships(
+      access.orgId,
+      campaignId
+    )
+    if (sponsorshipTotals.committed > 0) {
+      entry.metrics.totalCommitted += sponsorshipTotals.committed
+      sourceBreakdown.totalRaised += sponsorshipTotals.committed
+    }
 
     return {
       success: true as const,

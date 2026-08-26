@@ -12,6 +12,7 @@ import { PledgeDetailsDialog } from "@/components/donations/pledge-details-dialo
 import { CampaignGroupsTab } from "@/components/donations/campaign-groups-tab"
 import { CampaignOverviewTab } from "@/components/donations/campaign-overview-tab"
 import { CampaignProspectsTab } from "@/components/donations/campaign-prospects-tab"
+import { CampaignSponsorsTab } from "@/components/donations/campaign-sponsors-tab"
 import { CampaignStrategyTab } from "@/components/donations/campaign-strategy-tab"
 import { CampaignWorkspaceNav } from "@/components/donations/campaign-workspace-nav"
 import { CampaignWishlistTab } from "@/components/donations/campaign-wishlist-tab"
@@ -593,6 +594,14 @@ export default function CampaignDetailPage() {
                 setDetailsPledgeId(pledgeId)
                 setDetailsOpen(true)
               }}
+            />
+          ) : null}
+
+          {activeTab === "sponsors" ? (
+            <CampaignSponsorsTab
+              campaignId={campaign.id}
+              canManage={canManageProspects}
+              onChanged={() => void loadCampaign()}
             />
           ) : null}
 

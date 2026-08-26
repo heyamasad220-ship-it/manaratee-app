@@ -1,7 +1,8 @@
 import { Badge } from "@/components/ui/badge"
 import {
-  CAMPAIGN_PROSPECT_STAGE_LABELS,
+  campaignProspectStageLabel,
   displayCampaignProspectStage,
+  type CampaignProspectAskType,
   type CampaignProspectStage,
 } from "@/lib/donations/campaign-prospect-types"
 import { cn } from "@/lib/utils"
@@ -19,16 +20,18 @@ const STAGE_CLASS: Record<CampaignProspectStage, string> = {
 
 export function CampaignProspectStageBadge({
   stage,
+  askType,
   className,
 }: {
   stage: CampaignProspectStage | string
+  askType?: CampaignProspectAskType | null
   className?: string
 }) {
   const key = displayCampaignProspectStage(stage)
 
   return (
     <Badge variant="secondary" className={cn(STAGE_CLASS[key], className)}>
-      {CAMPAIGN_PROSPECT_STAGE_LABELS[key]}
+      {campaignProspectStageLabel(key, askType)}
     </Badge>
   )
 }

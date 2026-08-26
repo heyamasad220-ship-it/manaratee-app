@@ -8,11 +8,17 @@ import { ensureDonorExtensionForContact } from "@/lib/donations/donor-contact-br
 import { handleDonationAffiliationSync } from "@/lib/contacts/contact-affiliation-sync"
 import {
   CAMPAIGN_PROSPECT_ASKED_STAGES,
+  CAMPAIGN_PROSPECT_ACTIVITY_SELECT,
   CAMPAIGN_PROSPECT_SELECT,
+  activityUpdatesLastContact,
   campaignProspectStageFilterValues,
   displayCampaignProspectStage,
+  normalizeProspectActivityType,
+  normalizeProspectAskType,
   normalizeProspectPriority,
   normalizeProspectStage,
+  type CampaignProspectActivityRow,
+  type CampaignProspectActivityWriteInput,
   type CampaignProspectListItem,
   type CampaignProspectRow,
   type CampaignProspectsPageInput,
@@ -26,15 +32,33 @@ function revalidateProspectPaths(campaignId: string) {
   revalidatePath("/donations")
 }
 
+function missingProspectSchemaError(message: string) {
+  if (/campaign_prospects/i.test(message) || message.includes("42P01")) {
+    return "Prospects are not available yet. Run scripts/262_campaign_prospects.sql in Supabase."
+  }
+  if (
+    /ask_type|sponsorship_package|campaign_prospect_activities|converted_sponsorship/i.test(
+      message
+    ) ||
+    message.includes("42703")
+  ) {
+    return "Prospect sponsorship fields are not available yet. Run scripts/284_campaign_sponsorship_prospects.sql in Supabase."
+  }
+  return null
+}
+
 function mapProspectRow(row: Record<string, unknown>): CampaignProspectRow {
   return {
     id: row.id as string,
     organization_id: row.organization_id as string,
     campaign_id: row.campaign_id as string,
     contact_id: row.contact_id as string,
+    ask_type: normalizeProspectAskType(row.ask_type as string),
     ask_level_id: (row.ask_level_id as string | null) ?? null,
     suggested_ask_amount:
       row.suggested_ask_amount == null ? null : Number(row.suggested_ask_amount),
+    event_id: (row.event_id as string | null) ?? null,
+    sponsorship_package_id: (row.sponsorship_package_id as string | null) ?? null,
     assigned_to_contact_id: (row.assigned_to_contact_id as string | null) ?? null,
     stage: displayCampaignProspectStage(row.stage as string),
     priority: normalizeProspectPriority(row.priority as string),
@@ -42,9 +66,41 @@ function mapProspectRow(row: Record<string, unknown>): CampaignProspectRow {
     next_follow_up_at: (row.next_follow_up_at as string | null) ?? null,
     notes: (row.notes as string | null) ?? null,
     converted_pledge_id: (row.converted_pledge_id as string | null) ?? null,
+    converted_sponsorship_id: (row.converted_sponsorship_id as string | null) ?? null,
     created_at: (row.created_at as string | null) ?? null,
     updated_at: (row.updated_at as string | null) ?? null,
   }
+}
+
+function mapActivityRow(row: Record<string, unknown>): CampaignProspectActivityRow {
+  return {
+    id: row.id as string,
+    organization_id: row.organization_id as string,
+    campaign_id: row.campaign_id as string,
+    prospect_id: row.prospect_id as string,
+    activity_type: normalizeProspectActivityType(row.activity_type as string),
+    activity_date: (row.activity_date as string) || "",
+    notes: (row.notes as string | null) ?? null,
+    created_by: (row.created_by as string | null) ?? null,
+    created_by_name: (row.created_by_name as string | null) ?? null,
+    created_at: (row.created_at as string | null) ?? null,
+  }
+}
+
+async function resolveStaffDisplayName(
+  orgId: string,
+  userId: string,
+  email: string | null
+): Promise<string> {
+  const writeClient = createServiceRoleClient()
+  const { data } = await writeClient
+    .from("contacts")
+    .select("full_name")
+    .eq("organization_id", orgId)
+    .eq("auth_user_id", userId)
+    .maybeSingle()
+  const name = (data?.full_name as string | null)?.trim()
+  return name || email || "Staff"
 }
 
 async function loadContactNames(
@@ -110,6 +166,67 @@ async function loadPledgeAmounts(
   return map
 }
 
+async function loadSponsorshipAmounts(
+  orgId: string,
+  sponsorshipIds: string[]
+): Promise<Map<string, number>> {
+  const map = new Map<string, number>()
+  if (sponsorshipIds.length === 0) return map
+
+  const writeClient = createServiceRoleClient()
+  const { data, error } = await writeClient
+    .from("campaign_sponsorships")
+    .select("id, committed_amount")
+    .eq("organization_id", orgId)
+    .in("id", sponsorshipIds)
+
+  if (error) return map
+
+  for (const row of data || []) {
+    map.set(row.id as string, Number(row.committed_amount || 0))
+  }
+  return map
+}
+
+async function loadEventNames(orgId: string, eventIds: string[]): Promise<Map<string, string>> {
+  const map = new Map<string, string>()
+  if (eventIds.length === 0) return map
+
+  const writeClient = createServiceRoleClient()
+  const { data } = await writeClient
+    .from("internal_events")
+    .select("id, name")
+    .eq("organization_id", orgId)
+    .in("id", eventIds)
+
+  for (const row of data || []) {
+    map.set(row.id as string, (row.name as string) || "Event")
+  }
+  return map
+}
+
+async function loadPackageNames(
+  orgId: string,
+  packageIds: string[]
+): Promise<Map<string, string>> {
+  const map = new Map<string, string>()
+  if (packageIds.length === 0) return map
+
+  const writeClient = createServiceRoleClient()
+  const { data, error } = await writeClient
+    .from("sponsorship_packages")
+    .select("id, name")
+    .eq("organization_id", orgId)
+    .in("id", packageIds)
+
+  if (error) return map
+
+  for (const row of data || []) {
+    map.set(row.id as string, (row.name as string) || "Package")
+  }
+  return map
+}
+
 async function enrichProspects(
   orgId: string,
   rows: CampaignProspectRow[]
@@ -117,18 +234,27 @@ async function enrichProspects(
   const contactIds = new Set<string>()
   const askLevelIds = new Set<string>()
   const pledgeIds = new Set<string>()
+  const sponsorshipIds = new Set<string>()
+  const eventIds = new Set<string>()
+  const packageIds = new Set<string>()
 
   for (const row of rows) {
     contactIds.add(row.contact_id)
     if (row.assigned_to_contact_id) contactIds.add(row.assigned_to_contact_id)
     if (row.ask_level_id) askLevelIds.add(row.ask_level_id)
     if (row.converted_pledge_id) pledgeIds.add(row.converted_pledge_id)
+    if (row.converted_sponsorship_id) sponsorshipIds.add(row.converted_sponsorship_id)
+    if (row.event_id) eventIds.add(row.event_id)
+    if (row.sponsorship_package_id) packageIds.add(row.sponsorship_package_id)
   }
 
-  const [contacts, askLevels, pledges] = await Promise.all([
+  const [contacts, askLevels, pledges, sponsorships, events, packages] = await Promise.all([
     loadContactNames(orgId, [...contactIds]),
     loadAskLevelAmounts(orgId, [...askLevelIds]),
     loadPledgeAmounts(orgId, [...pledgeIds]),
+    loadSponsorshipAmounts(orgId, [...sponsorshipIds]),
+    loadEventNames(orgId, [...eventIds]),
+    loadPackageNames(orgId, [...packageIds]),
   ])
 
   return rows.map((row) => ({
@@ -141,6 +267,13 @@ async function enrichProspects(
     askLevelAmount: row.ask_level_id ? askLevels.get(row.ask_level_id) ?? null : null,
     pledgeAmount: row.converted_pledge_id
       ? pledges.get(row.converted_pledge_id) ?? null
+      : null,
+    sponsorshipAmount: row.converted_sponsorship_id
+      ? sponsorships.get(row.converted_sponsorship_id) ?? null
+      : null,
+    eventName: row.event_id ? events.get(row.event_id) ?? null : null,
+    packageName: row.sponsorship_package_id
+      ? packages.get(row.sponsorship_package_id) ?? null
       : null,
   }))
 }
@@ -203,6 +336,9 @@ export async function fetchCampaignProspectsPageAction(input: CampaignProspectsP
     if (input.askLevelId) {
       query = query.eq("ask_level_id", input.askLevelId)
     }
+    if (input.askType && input.askType !== "all") {
+      query = query.eq("ask_type", input.askType)
+    }
     if (input.stage && input.stage !== "all") {
       query = query.in("stage", campaignProspectStageFilterValues(input.stage))
     }
@@ -246,14 +382,10 @@ export async function fetchCampaignProspectsPageAction(input: CampaignProspectsP
     const { data, error, count } = await query.range(from, to)
 
     if (error) {
-      if (error.code === "42P01" || /campaign_prospects/i.test(error.message || "")) {
-        return {
-          success: false as const,
-          error:
-            "Prospects are not available yet. Run scripts/262_campaign_prospects.sql in Supabase.",
-        }
+      return {
+        success: false as const,
+        error: missingProspectSchemaError(error.message) || error.message,
       }
-      return { success: false as const, error: error.message }
     }
 
     let rows = ((data || []) as Record<string, unknown>[]).map(mapProspectRow)
@@ -266,7 +398,9 @@ export async function fetchCampaignProspectsPageAction(input: CampaignProspectsP
           row.contactName.toLowerCase().includes(search) ||
           (row.contactEmail || "").toLowerCase().includes(search) ||
           (row.assignedToName || "").toLowerCase().includes(search) ||
-          (row.notes || "").toLowerCase().includes(search)
+          (row.notes || "").toLowerCase().includes(search) ||
+          (row.packageName || "").toLowerCase().includes(search) ||
+          (row.eventName || "").toLowerCase().includes(search)
       )
       return {
         success: true as const,
@@ -377,7 +511,8 @@ export async function createCampaignProspectAction(
     if (contactError) return { success: false as const, error: contactError.message }
     if (!contact) return { success: false as const, error: "Contact not found" }
 
-    let stage = normalizeProspectStage(input.stage)
+    const askType = normalizeProspectAskType(input.ask_type)
+    const stage = normalizeProspectStage(input.stage)
 
     const { data, error } = await writeClient
       .from("campaign_prospects")
@@ -385,8 +520,12 @@ export async function createCampaignProspectAction(
         organization_id: access.orgId,
         campaign_id: campaignId,
         contact_id: contactId,
-        ask_level_id: input.ask_level_id || null,
+        ask_type: askType,
+        ask_level_id: askType === "donation" ? input.ask_level_id || null : null,
         suggested_ask_amount: input.suggested_ask_amount ?? null,
+        event_id: askType === "sponsorship" ? input.event_id || null : null,
+        sponsorship_package_id:
+          askType === "sponsorship" ? input.sponsorship_package_id || null : null,
         assigned_to_contact_id: input.assigned_to_contact_id || null,
         stage,
         priority: normalizeProspectPriority(input.priority),
@@ -401,17 +540,16 @@ export async function createCampaignProspectAction(
       if (error.code === "23505") {
         return {
           success: false as const,
-          error: "This contact is already a prospect for this campaign",
-        }
-      }
-      if (error.code === "42P01" || /campaign_prospects/i.test(error.message || "")) {
-        return {
-          success: false as const,
           error:
-            "Prospects are not available yet. Run scripts/262_campaign_prospects.sql in Supabase.",
+            askType === "sponsorship"
+              ? "This contact is already a sponsorship prospect for this campaign"
+              : "This contact is already a donation prospect for this campaign",
         }
       }
-      return { success: false as const, error: error.message }
+      return {
+        success: false as const,
+        error: missingProspectSchemaError(error.message) || error.message,
+      }
     }
 
     revalidateProspectPaths(campaignId)
@@ -443,11 +581,43 @@ export async function updateCampaignProspectAction(
     if (existingError) return { success: false as const, error: existingError.message }
     if (!existing) return { success: false as const, error: "Prospect not found" }
 
+    const currentAskType = normalizeProspectAskType(existing.ask_type as string)
+    if (
+      input.ask_type !== undefined &&
+      normalizeProspectAskType(input.ask_type) !== currentAskType &&
+      (existing.converted_pledge_id || existing.converted_sponsorship_id)
+    ) {
+      return {
+        success: false as const,
+        error: "Ask type cannot change after this prospect is converted",
+      }
+    }
+
     const patch: Record<string, unknown> = {}
     if (input.contact_id !== undefined) patch.contact_id = input.contact_id
-    if (input.ask_level_id !== undefined) patch.ask_level_id = input.ask_level_id || null
+    if (input.ask_type !== undefined) patch.ask_type = normalizeProspectAskType(input.ask_type)
+    const nextAskType =
+      input.ask_type !== undefined
+        ? normalizeProspectAskType(input.ask_type)
+        : normalizeProspectAskType(existing.ask_type as string)
+    if (input.ask_level_id !== undefined) {
+      patch.ask_level_id = nextAskType === "donation" ? input.ask_level_id || null : null
+    } else if (input.ask_type !== undefined && nextAskType !== "donation") {
+      patch.ask_level_id = null
+    }
     if (input.suggested_ask_amount !== undefined) {
       patch.suggested_ask_amount = input.suggested_ask_amount
+    }
+    if (input.event_id !== undefined) {
+      patch.event_id = nextAskType === "sponsorship" ? input.event_id || null : null
+    } else if (input.ask_type !== undefined && nextAskType !== "sponsorship") {
+      patch.event_id = null
+    }
+    if (input.sponsorship_package_id !== undefined) {
+      patch.sponsorship_package_id =
+        nextAskType === "sponsorship" ? input.sponsorship_package_id || null : null
+    } else if (input.ask_type !== undefined && nextAskType !== "sponsorship") {
+      patch.sponsorship_package_id = null
     }
     if (input.assigned_to_contact_id !== undefined) {
       patch.assigned_to_contact_id = input.assigned_to_contact_id || null
@@ -476,7 +646,7 @@ export async function updateCampaignProspectAction(
       if (error?.code === "23505") {
         return {
           success: false as const,
-          error: "This contact is already a prospect for this campaign",
+          error: "This contact is already a prospect of that ask type for this campaign",
         }
       }
       return { success: false as const, error: error?.message || "Failed to update prospect" }
@@ -548,7 +718,7 @@ export async function deleteCampaignProspectAction(prospectId: string) {
     const writeClient = createServiceRoleClient()
     const { data: existing, error: existingError } = await writeClient
       .from("campaign_prospects")
-      .select("id, campaign_id, converted_pledge_id")
+      .select("id, campaign_id, converted_pledge_id, converted_sponsorship_id")
       .eq("organization_id", access.orgId)
       .eq("id", prospectId)
       .maybeSingle()
@@ -559,6 +729,12 @@ export async function deleteCampaignProspectAction(prospectId: string) {
       return {
         success: false as const,
         error: "This prospect is linked to a pledge and cannot be deleted",
+      }
+    }
+    if (existing.converted_sponsorship_id) {
+      return {
+        success: false as const,
+        error: "This prospect is linked to a sponsorship and cannot be deleted",
       }
     }
 
@@ -607,6 +783,12 @@ export async function getCampaignProspectForConversionAction(prospectId: string)
     if (!data) return { success: false as const, error: "Prospect not found" }
 
     const prospect = mapProspectRow(data as Record<string, unknown>)
+    if (prospect.ask_type !== "donation") {
+      return {
+        success: false as const,
+        error: "Use Create Sponsorship for sponsorship prospects",
+      }
+    }
     if (prospect.converted_pledge_id) {
       return {
         success: false as const,
@@ -674,6 +856,12 @@ export async function convertCampaignProspectToPledgeAction(input: {
     if (!existing) return { success: false as const, error: "Prospect not found" }
 
     const prospect = mapProspectRow(existing as Record<string, unknown>)
+    if (prospect.ask_type !== "donation") {
+      return {
+        success: false as const,
+        error: "Use Create Sponsorship for sponsorship prospects",
+      }
+    }
     if (prospect.converted_pledge_id) {
       return {
         success: false as const,
@@ -808,6 +996,123 @@ export async function convertCampaignProspectToPledgeAction(input: {
       suggestedAskAmount: prospect.suggested_ask_amount,
       campaignId: prospect.campaign_id,
       contactId: prospect.contact_id,
+    }
+  } catch (error) {
+    return { success: false as const, error: (error as Error).message }
+  }
+}
+
+export async function listCampaignProspectActivitiesAction(prospectId: string) {
+  const access = await requireDonationStaffAccess("view")
+  if (!access.ok) return { success: false as const, error: access.error }
+
+  if (!prospectId.trim()) {
+    return { success: false as const, error: "Prospect is required" }
+  }
+
+  try {
+    const writeClient = createServiceRoleClient()
+    const { data, error } = await writeClient
+      .from("campaign_prospect_activities")
+      .select(CAMPAIGN_PROSPECT_ACTIVITY_SELECT)
+      .eq("organization_id", access.orgId)
+      .eq("prospect_id", prospectId)
+      .order("activity_date", { ascending: false })
+      .order("created_at", { ascending: false })
+
+    if (error) {
+      if (error.code === "42P01" || /campaign_prospect_activities/i.test(error.message || "")) {
+        return { success: true as const, activities: [] as CampaignProspectActivityRow[] }
+      }
+      return { success: false as const, error: error.message }
+    }
+
+    return {
+      success: true as const,
+      activities: ((data || []) as Record<string, unknown>[]).map(mapActivityRow),
+    }
+  } catch (error) {
+    return { success: false as const, error: (error as Error).message }
+  }
+}
+
+export async function logCampaignProspectActivityAction(
+  prospectId: string,
+  input: CampaignProspectActivityWriteInput
+) {
+  const access = await requireDonationStaffAccess("prospects")
+  if (!access.ok) return { success: false as const, error: access.error }
+
+  if (!prospectId.trim()) {
+    return { success: false as const, error: "Prospect is required" }
+  }
+
+  const activityType = normalizeProspectActivityType(input.activity_type)
+  const activityDate =
+    (input.activity_date && input.activity_date.slice(0, 10)) ||
+    new Date().toISOString().slice(0, 10)
+
+  try {
+    const writeClient = createServiceRoleClient()
+    const { data: existing, error: existingError } = await writeClient
+      .from("campaign_prospects")
+      .select("id, campaign_id, last_contacted_at")
+      .eq("organization_id", access.orgId)
+      .eq("id", prospectId)
+      .maybeSingle()
+
+    if (existingError) return { success: false as const, error: existingError.message }
+    if (!existing) return { success: false as const, error: "Prospect not found" }
+
+    const createdByName = await resolveStaffDisplayName(
+      access.orgId,
+      access.userId,
+      access.userEmail
+    )
+
+    const { data, error } = await writeClient
+      .from("campaign_prospect_activities")
+      .insert({
+        organization_id: access.orgId,
+        campaign_id: existing.campaign_id,
+        prospect_id: prospectId,
+        activity_type: activityType,
+        activity_date: activityDate,
+        notes: input.notes?.trim() || null,
+        created_by: access.userId,
+        created_by_name: createdByName,
+      })
+      .select(CAMPAIGN_PROSPECT_ACTIVITY_SELECT)
+      .single()
+
+    if (error || !data) {
+      return {
+        success: false as const,
+        error:
+          missingProspectSchemaError(error?.message || "") ||
+          error?.message ||
+          "Failed to log activity",
+      }
+    }
+
+    let lastContactedAt = (existing.last_contacted_at as string | null) ?? null
+    if (activityUpdatesLastContact(activityType)) {
+      const previous = lastContactedAt || ""
+      if (!previous || activityDate >= previous) {
+        const { error: touchError } = await writeClient
+          .from("campaign_prospects")
+          .update({ last_contacted_at: activityDate })
+          .eq("organization_id", access.orgId)
+          .eq("id", prospectId)
+        if (!touchError) lastContactedAt = activityDate
+      }
+    }
+
+    revalidateProspectPaths(existing.campaign_id as string)
+    return {
+      success: true as const,
+      activity: mapActivityRow(data as Record<string, unknown>),
+      lastContactedAt,
     }
   } catch (error) {
     return { success: false as const, error: (error as Error).message }

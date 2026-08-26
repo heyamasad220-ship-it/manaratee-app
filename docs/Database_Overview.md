@@ -357,9 +357,13 @@ Import CSV flow writes directly to `payments` + `payment_import_batches` (no row
 * campaigns (`goal_amount`, `description`, `start_date`, `end_date`, `status`, `code`, `overview_metric_keys` — migration `134`; `flyer_url` — migration `160` for customer portal campaign cards; `goal_breakdown_enabled` — migration `260`)
 * campaign_phases (unused — Goal Breakdown retired; table kept; clear with `270_disable_campaign_goal_phases.sql`)
 * campaign_ask_levels (strategy gift chart — migration `261`; `campaign_phase_id` unused)
-* campaign_prospects (pre-pledge pipeline — migration `262`; contact + optional ask level / assignee / converted pledge; unique contact per campaign; RLS via donations helpers)
+* campaign_prospects (outreach pipeline for donation and sponsorship asks — migration `262`, ask type/activity/sponsorship link — `284`; unique contact + ask_type per campaign; RLS via donations helpers)
 * campaign_groups (campaign fundraising teams — migration `263`; optional org group contact + lead; opaque `public_token`; staff RLS; public pages resolve via service role)
 * campaign_wishlist_items (campaign funding priorities — migration `267`; optional fund/department; `campaign_phase_id` unused; opaque `public_token`; staff RLS; public `/donate/w/{token}` via service role)
+* sponsorship_packages (event packages — migration `284`; name/amount/order; not a Contact role)
+* sponsorship_package_benefits (package benefit catalog — `284`; fulfillment later on committed sponsorships)
+* campaign_prospect_activities (prospect outreach history — `284`)
+* campaign_sponsorships (committed sponsorships — `284`; cash/in-kind/mixed; not donations or pledges)
 * donors
 * donation_categories
 * donation_subcategories (`is_active` — migration `161`; when false the fund is closed and hidden from new donation pickers; migration `162` blocks customer portal `payments` inserts to closed funds)
@@ -392,7 +396,9 @@ Import CSV flow writes directly to `payments` + `payment_import_batches` (no row
 
 **Campaign ask levels (migration `261_campaign_ask_levels.sql`):** `campaign_ask_levels` (org + campaign scoped, optional phase FK). Nullable `pledges.ask_level_id`. Strategy metrics via `computeCampaignAskLevelMetrics` (target value = ask × count; secured from linked pledges or soft amount match; prospects/asked filled when prospects exist).
 
-**Campaign prospects (migration `262_campaign_prospects.sql`):** `campaign_prospects` (org + campaign scoped; FK to contacts, optional ask level / assignee contact / converted pledge). Unique `(campaign_id, contact_id)`. Nullable `pledges.campaign_prospect_id`. RLS via donations view/manage helpers.
+**Campaign prospects (migration `262_campaign_prospects.sql`, extended `284_campaign_sponsorship_prospects.sql`):** `campaign_prospects` (org + campaign scoped; FK to contacts, optional ask level / assignee / event / package / converted pledge / converted sponsorship). `ask_type` (`donation` | `sponsorship`; existing rows default donation). Unique `(campaign_id, contact_id, ask_type)`. Nullable `pledges.campaign_prospect_id`. Outreach history: `campaign_prospect_activities`. RLS via donations view/manage helpers.
+
+**Campaign sponsorships (migration `284_campaign_sponsorship_prospects.sql`):** `sponsorship_packages` (event-scoped), `sponsorship_package_benefits`, `campaign_sponsorships` (committed sponsor records; optional `prospect_id` / `event_id` / `package_id`). Separate from `pledges` and `payments`. Active committed amounts are added to campaign `totalCommitted` / `totalRaised` without creating a donation. RLS via donations view/manage helpers.
 
 **Campaign groups (migration `263_campaign_groups.sql`):** `campaign_groups` with opaque `public_token`, optional `organizational_group_id` / `lead_contact_id`. `goal_amount` exists but is unused in the UI. Nullable `campaign_group_id` on `pledges` and `payments`. Staff RLS; public `/donate/g/{token}` resolves via service role (no anon table dump).
 
@@ -415,6 +421,7 @@ npx supabase db query --linked -f scripts/264_campaign_group_checkout.sql
 npx supabase db query --linked -f scripts/265_donations_granular_permissions.sql
 npx supabase db query --linked -f scripts/266_group_recurring_and_fd_emails.sql
 npx supabase db query --linked -f scripts/267_campaign_wishlist.sql
+npx supabase db query --linked -f scripts/284_campaign_sponsorship_prospects.sql
 npm run validate:donations-security
 ```
 
@@ -458,6 +465,21 @@ campaign_prospects.contact_id → contacts.id
 campaign_prospects.ask_level_id → campaign_ask_levels.id
 campaign_prospects.assigned_to_contact_id → contacts.id
 campaign_prospects.converted_pledge_id → pledges.id
+campaign_prospects.event_id → internal_events.id
+campaign_prospects.sponsorship_package_id → sponsorship_packages.id
+campaign_prospects.converted_sponsorship_id → campaign_sponsorships.id
+campaign_prospect_activities.organization_id → organizations.id
+campaign_prospect_activities.campaign_id → campaigns.id
+campaign_prospect_activities.prospect_id → campaign_prospects.id
+sponsorship_packages.organization_id → organizations.id
+sponsorship_packages.event_id → internal_events.id
+sponsorship_package_benefits.package_id → sponsorship_packages.id
+campaign_sponsorships.organization_id → organizations.id
+campaign_sponsorships.campaign_id → campaigns.id
+campaign_sponsorships.event_id → internal_events.id
+campaign_sponsorships.contact_id → contacts.id
+campaign_sponsorships.prospect_id → campaign_prospects.id
+campaign_sponsorships.sponsorship_package_id → sponsorship_packages.id
 campaign_groups.organization_id → organizations.id
 campaign_groups.campaign_id → campaigns.id
 campaign_groups.organizational_group_id → contacts.id
