@@ -23,6 +23,7 @@ import {
 } from "@/components/bookings/venue-rental-create-dialog"
 import type { RoomSetupStyle } from "@/lib/setup-styles/setup-style-types"
 import type { RentalAddonCatalogItem } from "@/lib/bookings/venue-rental-types"
+import { PhoneText } from "@/components/ui/phone-text"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -319,7 +320,7 @@ export function VenueRentalRequestsQueue({
                           ) : null}
                           {row.customerPhone ? (
                             <div className="text-xs text-muted-foreground">
-                              {row.customerPhone}
+                              <PhoneText value={row.customerPhone} empty="" />
                             </div>
                           ) : null}
                         </TableCell>

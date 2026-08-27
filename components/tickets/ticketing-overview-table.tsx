@@ -125,7 +125,7 @@ export function TicketingOverviewTable({
           tickets.
         </p>
         <Button className="mt-4" asChild>
-          <Link href="/event-management">Go to Event Management</Link>
+          <Link href="/event-management/events">Go to Events</Link>
         </Button>
       </div>
     )

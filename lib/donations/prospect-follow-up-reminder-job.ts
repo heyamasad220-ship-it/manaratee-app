@@ -4,7 +4,7 @@ import {
   normalizeProspectStage,
   type CampaignProspectStage,
 } from "@/lib/donations/campaign-prospect-types"
-import { getAppBaseUrl } from "@/lib/stripe/stripe-server"
+import { donationCampaignWorkspaceHref } from "@/lib/donations/campaign-workspace-paths"
 import { createServiceRoleClient } from "@/lib/supabase/service-role"
 
 type OverdueProspectRow = {
@@ -142,7 +142,11 @@ export async function runProspectFollowUpReminderJob(input?: { asOf?: Date }) {
       prospectName: contactDisplayName(prospect || {}),
       campaignName: campaignNameById.get(row.campaign_id) || "Campaign",
       followUpDate: formatFollowUpDate(row.next_follow_up_at || reminderDate),
-      href: `${baseUrl}/donations/campaigns/${row.campaign_id}?tab=prospects&followUp=overdue`,
+      href: `${baseUrl}${donationCampaignWorkspaceHref(row.campaign_id, {
+        tab: "plan",
+        section: "prospects",
+        followUp: "overdue",
+      })}`,
     })
   }
 

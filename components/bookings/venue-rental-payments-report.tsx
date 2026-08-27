@@ -13,6 +13,7 @@ import {
   type VenueRentalStaffNextActionKey,
 } from "@/lib/bookings/venue-rental-payment-ledger"
 import type { VenueRentalPaymentReportRow } from "@/lib/bookings/venue-rental-types"
+import { PhoneText } from "@/components/ui/phone-text"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -447,7 +448,7 @@ export function VenueRentalPaymentsReport({
                                   </div>
                                 </TooltipTrigger>
                                 <TooltipContent>
-                                  Phone: {row.customerPhone}
+                                  Phone: <PhoneText value={row.customerPhone} empty="" />
                                 </TooltipContent>
                               </Tooltip>
                             ) : (

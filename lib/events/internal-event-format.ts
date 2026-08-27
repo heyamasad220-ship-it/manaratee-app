@@ -62,3 +62,16 @@ export function daysUntil(date: Date, from = new Date()) {
   target.setHours(0, 0, 0, 0)
   return Math.round((target.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
 }
+
+export function eventHasEnded(
+  event: { start_at: string | null; end_at: string | null },
+  now = new Date()
+) {
+  if (event.end_at) {
+    return new Date(event.end_at) < now
+  }
+  if (event.start_at) {
+    return new Date(event.start_at) < now
+  }
+  return false
+}

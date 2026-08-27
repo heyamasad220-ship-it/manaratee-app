@@ -18,6 +18,14 @@ export type InternalEventCalendarColor = "green" | "yellow" | "orange"
 /** Simplified workspace visibility: Draft or Published. */
 export type InternalEventWorkspaceStatus = "draft" | "published"
 
+/** Compact event-workspace status menu. */
+export type InternalEventStatusMenuValue =
+  | "draft"
+  | "pending"
+  | "approved"
+  | "completed"
+  | "cancelled"
+
 const STATUS_LABELS: Record<InternalEventStatus, string> = {
   draft: "Draft",
   submitted: "Submitted",
@@ -73,6 +81,59 @@ export function getInternalEventStatusOptions(includeWorkflow = true) {
 /** Options for event workspace: Draft | Published only. */
 export function getInternalEventWorkspaceStatusOptions() {
   return getInternalEventStatusOptions(false)
+}
+
+const STATUS_MENU_LABELS: Record<InternalEventStatusMenuValue, string> = {
+  draft: "Draft",
+  pending: "Pending",
+  approved: "Approved",
+  completed: "Completed",
+  cancelled: "Cancelled",
+}
+
+export function toInternalEventStatusMenuValue(
+  status: InternalEventStatus | string
+): InternalEventStatusMenuValue {
+  if (status === INTERNAL_EVENT_STATUSES.draft) return "draft"
+  if (
+    status === INTERNAL_EVENT_STATUSES.submitted ||
+    status === INTERNAL_EVENT_STATUSES.awaitingApproval
+  ) {
+    return "pending"
+  }
+  if (status === INTERNAL_EVENT_STATUSES.completed) return "completed"
+  if (
+    status === INTERNAL_EVENT_STATUSES.cancelled ||
+    status === INTERNAL_EVENT_STATUSES.declined
+  ) {
+    return "cancelled"
+  }
+  return "approved"
+}
+
+export function fromInternalEventStatusMenuValue(
+  value: InternalEventStatusMenuValue
+): InternalEventStatus {
+  if (value === "draft") return INTERNAL_EVENT_STATUSES.draft
+  if (value === "pending") return INTERNAL_EVENT_STATUSES.awaitingApproval
+  if (value === "completed") return INTERNAL_EVENT_STATUSES.completed
+  if (value === "cancelled") return INTERNAL_EVENT_STATUSES.cancelled
+  return INTERNAL_EVENT_STATUSES.confirmed
+}
+
+export function getInternalEventStatusMenuLabel(
+  status: InternalEventStatus | string
+): string {
+  return STATUS_MENU_LABELS[toInternalEventStatusMenuValue(status)]
+}
+
+export function getInternalEventStatusMenuOptions() {
+  return (Object.keys(STATUS_MENU_LABELS) as InternalEventStatusMenuValue[]).map(
+    (value) => ({
+      value,
+      label: STATUS_MENU_LABELS[value],
+    })
+  )
 }
 
 export function isInternalEventPendingApproval(status: string): boolean {

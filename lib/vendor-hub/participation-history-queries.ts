@@ -5,6 +5,9 @@ import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-orga
 export type ParticipationHistoryRow = {
   contactId: string
   businessName: string
+  contactName: string | null
+  email: string | null
+  phone: string | null
   vendorType: string | null
   eventCount: number
   lastEventId: string | null
@@ -46,6 +49,14 @@ function vendorTypeIdFromFormData(formData: unknown) {
   return trimmed || null
 }
 
+type ContactMeta = {
+  fullName: string | null
+  email: string | null
+  phone: string | null
+  contactType: string | null
+  primaryContactName: string | null
+}
+
 async function loadVendorMetaByContact(
   supabase: Awaited<ReturnType<typeof createClient>>,
   organizationId: string,
@@ -53,8 +64,9 @@ async function loadVendorMetaByContact(
 ) {
   const nameByContact = new Map<string, string>()
   const typeIdByContact = new Map<string, string>()
+  const contactById = new Map<string, ContactMeta>()
   if (contactIds.length === 0) {
-    return { nameByContact, typeIdByContact }
+    return { nameByContact, typeIdByContact, contactById }
   }
 
   const chunkSize = 200
@@ -82,21 +94,39 @@ async function loadVendorMetaByContact(
       }
     }
 
-    const missingNames = chunk.filter((id) => !nameByContact.has(id))
-    if (missingNames.length === 0) continue
-
     const { data: contacts } = await supabase
       .from("contacts")
-      .select("id, full_name, email")
-      .in("id", missingNames)
+      .select("id, full_name, email, phone, contact_type, primary_contact_name")
+      .in("id", chunk)
 
     for (const contact of contacts || []) {
-      const fallback = (contact.full_name || contact.email || "").trim()
-      if (fallback) nameByContact.set(contact.id, fallback)
+      const fullName = ((contact.full_name as string | null) || "").trim() || null
+      const email = ((contact.email as string | null) || "").trim() || null
+      const phone = ((contact.phone as string | null) || "").trim() || null
+      contactById.set(contact.id, {
+        fullName,
+        email,
+        phone,
+        contactType: (contact.contact_type as string | null) || null,
+        primaryContactName:
+          ((contact.primary_contact_name as string | null) || "").trim() || null,
+      })
+      if (!nameByContact.has(contact.id)) {
+        const fallback = fullName || email
+        if (fallback) nameByContact.set(contact.id, fallback)
+      }
     }
   }
 
-  return { nameByContact, typeIdByContact }
+  return { nameByContact, typeIdByContact, contactById }
+}
+
+function primaryContactLabel(contact: ContactMeta | undefined) {
+  if (!contact) return null
+  if (contact.contactType === "organization") {
+    return contact.primaryContactName || contact.fullName
+  }
+  return contact.fullName
 }
 
 type PaymentRow = {
@@ -302,7 +332,7 @@ export async function getParticipationHistory(
     return []
   }
 
-  const { nameByContact, typeIdByContact } = await loadVendorMetaByContact(
+  const { nameByContact, typeIdByContact, contactById } = await loadVendorMetaByContact(
     supabase,
     organizationId,
     contactIds
@@ -381,9 +411,14 @@ export async function getParticipationHistory(
       boothTypeByContact.get(agg.contactId) ||
       null
 
+    const contact = contactById.get(agg.contactId)
+
     return {
       contactId: agg.contactId,
       businessName: nameByContact.get(agg.contactId) || "Unknown vendor",
+      contactName: primaryContactLabel(contact),
+      email: contact?.email ?? null,
+      phone: contact?.phone ?? null,
       vendorType,
       eventCount: agg.eventIds.size,
       lastEventId: lastEvent?.id ?? null,

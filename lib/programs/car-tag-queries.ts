@@ -1,4 +1,5 @@
 import { splitFullName } from "@/lib/contacts/contact-constants"
+import { formatPhoneDisplay } from "@/lib/ui/format-phone"
 import { createClient } from "@/lib/supabase/server"
 import {
   CAR_TAG_OPERATIONAL_STATUSES,
@@ -11,15 +12,6 @@ import { getProgramSessions } from "@/lib/programs/program-session-queries"
 function extractLastName(fullName: string | null | undefined) {
   if (!fullName?.trim()) return ""
   return splitFullName(fullName.trim()).last_name
-}
-
-function formatPhone(phone: string | null | undefined) {
-  if (!phone?.trim()) return null
-  const digits = phone.replace(/\D/g, "")
-  if (digits.length === 10) {
-    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`
-  }
-  return phone.trim()
 }
 
 async function loadAuthorizedPickupNamesByPersonIds(
@@ -264,9 +256,9 @@ export async function getCarTagRowsForProgram(
     authorizedPickupNames.forEach((name) => pickupSet.add(name))
 
     const contactPhone =
-      formatPhone(registrantContact?.phone) ||
-      formatPhone(enrollment.parent_phone as string | null) ||
-      formatPhone(participantContact?.phone)
+      formatPhoneDisplay(registrantContact?.phone) ||
+      formatPhoneDisplay(enrollment.parent_phone as string | null) ||
+      formatPhoneDisplay(participantContact?.phone)
 
     return {
       enrollmentId: enrollment.id as string,

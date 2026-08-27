@@ -8,6 +8,7 @@ import { FamilyContactPicker } from "@/components/contacts/family-contact-picker
 import { FamilySettingsPanel } from "@/components/contacts/family-settings-panel"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
+import { PhoneText } from "@/components/ui/phone-text"
 import { BirthDateInput } from "@/components/ui/birth-date-input"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -468,7 +469,7 @@ export function ContactFamilyPanel({
                           {member.phone ? (
                             <>
                               <span className="text-muted-foreground/50">|</span>
-                              <span>{member.phone}</span>
+                              <span><PhoneText value={member.phone} empty="" /></span>
                             </>
                           ) : null}
                         </div>

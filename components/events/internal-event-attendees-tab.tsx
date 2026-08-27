@@ -24,14 +24,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
 import { setEventTicketCheckIn, promoteWaitlistedTicket, checkInEventTicketByCode, resendEventTicketConfirmation, completePendingEventTicketOrder, refundEventTicketOrder } from "@/lib/tickets/ticket-order-actions"
 import type { EventAttendeeListItem } from "@/lib/tickets/ticket-order-queries"
 import type { EventTicketType } from "@/lib/tickets/ticket-types"
 import { formatTicketPrice } from "@/lib/tickets/ticket-types"
+import { InternalEventAttendeeOrderSheet } from "@/components/events/internal-event-attendee-order-sheet"
 import { InternalEventAddAttendeeDialog } from "@/components/events/internal-event-add-attendee-dialog"
 import { InternalEventTransferAttendeeDialog } from "@/components/events/internal-event-transfer-attendee-dialog"
 import { InternalEventRefundDialog } from "@/components/events/internal-event-refund-dialog"
 import { ticketOrderRemainingCents } from "@/lib/tickets/ticket-refund-math"
+import { formatPhoneDisplay } from "@/lib/ui/format-phone"
 
 function ticketStatusLabel(status: EventAttendeeListItem["status"]) {
   if (status === "checked_in") return "Checked in"
@@ -50,6 +53,31 @@ function formatWhen(value: string | null) {
     hour: "numeric",
     minute: "2-digit",
   })
+}
+
+function attendeeOrderActions(row: EventAttendeeListItem, canManage: boolean) {
+  const remainingCents = ticketOrderRemainingCents({
+    status: row.orderStatus,
+    totalCents: row.orderTotalCents,
+    refundedAmountCents: row.orderRefundedCents,
+  })
+  return {
+    canMarkPaid: canManage && row.orderStatus === "pending",
+    canRefund:
+      canManage &&
+      (row.orderStatus === "completed" ||
+        row.orderStatus === "partially_refunded") &&
+      remainingCents > 0 &&
+      row.status !== "refunded" &&
+      row.status !== "canceled",
+    canTransfer:
+      canManage && row.status !== "canceled" && row.status !== "refunded",
+    canResend:
+      canManage &&
+      row.status !== "canceled" &&
+      row.status !== "refunded" &&
+      Boolean(row.purchaserEmail || row.attendeeEmail),
+  }
 }
 
 export function InternalEventAttendeesTab({
@@ -80,6 +108,7 @@ export function InternalEventAttendeesTab({
   >("active")
   const [typeFilter, setTypeFilter] = useState<string>("all")
   const [refundTarget, setRefundTarget] = useState<EventAttendeeListItem | null>(null)
+  const [orderTargetId, setOrderTargetId] = useState<string | null>(null)
 
   const ticketTypeFilterOptions = useMemo(() => {
     const names = new Set<string>()
@@ -129,6 +158,7 @@ export function InternalEventAttendeesTab({
         row.attendeeEmail,
         row.purchaserName,
         row.purchaserEmail,
+        row.purchaserPhone,
         row.ticketTypeName,
         row.ticketCode,
         row.orderNumber,
@@ -139,6 +169,21 @@ export function InternalEventAttendeesTab({
       return haystack.includes(q)
     })
   }, [attendees, search, statusFilter, typeFilter])
+
+  const orderTarget = useMemo(
+    () => attendees.find((row) => row.id === orderTargetId) ?? null,
+    [attendees, orderTargetId]
+  )
+  const orderTickets = useMemo(
+    () =>
+      orderTarget
+        ? attendees.filter((row) => row.orderId === orderTarget.orderId)
+        : [],
+    [attendees, orderTarget]
+  )
+  const orderActions = orderTarget
+    ? attendeeOrderActions(orderTarget, canManage)
+    : null
 
   function handleScanCheckIn() {
     setError(null)
@@ -458,53 +503,28 @@ export function InternalEventAttendeesTab({
                     <TableHead>Amount</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Check-in</TableHead>
-                    <TableHead>Order</TableHead>
-                    <TableHead>Purchaser</TableHead>
-                    {canManage || canCheckIn ? <TableHead className="w-[340px]" /> : null}
+                    <TableHead>Contact</TableHead>
+                    {canManage || canCheckIn ? <TableHead className="w-[140px]" /> : null}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filtered.map((row) => {
-                    const name =
-                      row.attendeeName || row.purchaserName || "Guest"
-                    const email = row.attendeeEmail || row.purchaserEmail
+                    const name = row.attendeeName || "Guest"
+                    const purchaserPhone = formatPhoneDisplay(row.purchaserPhone)
                     const canToggleCheckIn =
                       canCheckIn &&
                       (row.status === "valid" || row.status === "checked_in")
                     const canPromote =
                       canManage && waitlistEnabled && row.status === "waitlisted"
-                    const canTransfer =
-                      canManage &&
-                      row.status !== "canceled" &&
-                      row.status !== "refunded"
-                    const canMarkPaid =
-                      canManage && row.orderStatus === "pending"
-                    const remainingCents = ticketOrderRemainingCents({
-                      status: row.orderStatus,
-                      totalCents: row.orderTotalCents,
-                      refundedAmountCents: row.orderRefundedCents,
-                    })
-                    const canRefund =
-                      canManage &&
-                      (row.orderStatus === "completed" ||
-                        row.orderStatus === "partially_refunded") &&
-                      remainingCents > 0 &&
-                      row.status !== "refunded" &&
-                      row.status !== "canceled"
-                    const canResend =
-                      canManage &&
-                      row.status !== "canceled" &&
-                      row.status !== "refunded" &&
-                      Boolean(row.attendeeEmail || row.purchaserEmail)
+                    const showRowActions = canToggleCheckIn || canPromote
                     return (
-                      <TableRow key={row.id}>
+                      <TableRow
+                        key={row.id}
+                        className="cursor-pointer hover:bg-muted/40"
+                        onClick={() => setOrderTargetId(row.id)}
+                      >
                         <TableCell>
                           <div className="font-medium">{name}</div>
-                          {email ? (
-                            <div className="text-xs text-muted-foreground">
-                              {email}
-                            </div>
-                          ) : null}
                           {row.ticketCode ? (
                             <div className="text-xs text-muted-foreground">
                               {row.ticketCode}
@@ -529,102 +549,65 @@ export function InternalEventAttendeesTab({
                           {formatWhen(row.checkedInAt)}
                         </TableCell>
                         <TableCell>
-                          <div className="text-sm">{row.orderNumber}</div>
-                          {row.orderStatus === "pending" ? (
-                            <Badge variant="outline" className="mt-1">
-                              Payment pending
-                            </Badge>
+                          {row.contactId && row.purchaserName ? (
+                            <Link
+                              href={contactProfileHref(row.contactId)}
+                              prefetch={false}
+                              className="font-medium text-primary hover:underline"
+                              onClick={(event) => event.stopPropagation()}
+                            >
+                              {row.purchaserName}
+                            </Link>
+                          ) : (
+                            <div className="font-medium">
+                              {row.purchaserName || "—"}
+                            </div>
+                          )}
+                          {row.purchaserEmail ? (
+                            <div className="text-xs text-muted-foreground">
+                              {row.purchaserEmail}
+                            </div>
                           ) : null}
-                          {row.orderStatus === "refunded" ? (
-                            <Badge variant="outline" className="mt-1">
-                              Refunded
-                            </Badge>
+                          {purchaserPhone ? (
+                            <div className="text-xs text-muted-foreground">
+                              {purchaserPhone}
+                            </div>
                           ) : null}
-                          {row.orderStatus === "partially_refunded" ? (
-                            <Badge variant="outline" className="mt-1">
-                              Partially refunded
-                            </Badge>
-                          ) : null}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {row.purchaserName || "—"}
                         </TableCell>
                         {canManage || canCheckIn ? (
-                          <TableCell>
-                            <div className="flex flex-wrap justify-end gap-2">
-                              {canMarkPaid ? (
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="outline"
-                                  disabled={isPending}
-                                  onClick={() => handleMarkPaid(row.orderId)}
-                                >
-                                  Mark paid
-                                </Button>
-                              ) : null}
-                              {canRefund ? (
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="outline"
-                                  disabled={isPending}
-                                  onClick={() => handleRefund(row)}
-                                >
-                                  Refund
-                                </Button>
-                              ) : null}
-                              {canPromote ? (
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  disabled={isPending}
-                                  onClick={() => handlePromote(row.id)}
-                                >
-                                  Promote
-                                </Button>
-                              ) : null}
-                              {canToggleCheckIn ? (
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="outline"
-                                  disabled={isPending}
-                                  onClick={() =>
-                                    handleCheckIn(
-                                      row.id,
-                                      row.status !== "checked_in"
-                                    )
-                                  }
-                                >
-                                  {row.status === "checked_in"
-                                    ? "Undo"
-                                    : "Check in"}
-                                </Button>
-                              ) : null}
-                              {canTransfer ? (
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="outline"
-                                  disabled={isPending}
-                                  onClick={() => setTransferTarget(row)}
-                                >
-                                  Transfer
-                                </Button>
-                              ) : null}
-                              {canResend ? (
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="ghost"
-                                  disabled={isPending}
-                                  onClick={() => handleResend(row.id)}
-                                >
-                                  Resend
-                                </Button>
-                              ) : null}
-                            </div>
+                          <TableCell onClick={(event) => event.stopPropagation()}>
+                            {showRowActions ? (
+                              <div className="flex flex-wrap justify-end gap-2">
+                                {canPromote ? (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    disabled={isPending}
+                                    onClick={() => handlePromote(row.id)}
+                                  >
+                                    Promote
+                                  </Button>
+                                ) : null}
+                                {canToggleCheckIn ? (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={isPending}
+                                    onClick={() =>
+                                      handleCheckIn(
+                                        row.id,
+                                        row.status !== "checked_in"
+                                      )
+                                    }
+                                  >
+                                    {row.status === "checked_in"
+                                      ? "Undo"
+                                      : "Check in"}
+                                  </Button>
+                                ) : null}
+                              </div>
+                            ) : null}
                           </TableCell>
                         ) : null}
                       </TableRow>
@@ -636,6 +619,35 @@ export function InternalEventAttendeesTab({
           )}
         </CardContent>
       </Card>
+
+      <InternalEventAttendeeOrderSheet
+        open={orderTarget != null}
+        onOpenChange={(open) => {
+          if (!open) setOrderTargetId(null)
+        }}
+        attendee={orderTarget}
+        orderTickets={orderTickets}
+        canManage={canManage}
+        isPending={isPending}
+        canRefund={orderActions?.canRefund ?? false}
+        canTransfer={orderActions?.canTransfer ?? false}
+        canResend={orderActions?.canResend ?? false}
+        canMarkPaid={orderActions?.canMarkPaid ?? false}
+        lockOpen={refundTarget != null || transferTarget != null}
+        onSelectTicket={(ticket) => setOrderTargetId(ticket.id)}
+        onRefund={() => {
+          if (orderTarget) handleRefund(orderTarget)
+        }}
+        onTransfer={() => {
+          if (orderTarget) setTransferTarget(orderTarget)
+        }}
+        onResend={() => {
+          if (orderTarget) handleResend(orderTarget.id)
+        }}
+        onMarkPaid={() => {
+          if (orderTarget) handleMarkPaid(orderTarget.orderId)
+        }}
+      />
 
       <InternalEventAddAttendeeDialog
         open={addOpen}

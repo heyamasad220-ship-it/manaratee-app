@@ -5,6 +5,7 @@ import Link from "next/link"
 import { Search, ChevronUp, ChevronDown, Plus } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { PhoneText } from "@/components/ui/phone-text"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import {
@@ -278,7 +279,7 @@ export function OrganizationsList({ basePath = "/people/organizations" }: Organi
                       </Link>
                     </TableCell>
                     <TableCell className="text-muted-foreground">{org.contact}</TableCell>
-                    <TableCell className="text-muted-foreground">{org.phone}</TableCell>
+                    <TableCell className="text-muted-foreground"><PhoneText value={org.phone} empty="" /></TableCell>
                     <TableCell className="text-muted-foreground">
                       {new Date(org.dateAdded).toLocaleDateString("en-US", {
                         year: "numeric",

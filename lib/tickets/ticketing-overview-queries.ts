@@ -6,12 +6,33 @@ import type { TicketingSalesStatus } from "./ticket-types"
 import type { TicketedEventOverviewRow } from "./ticketing-overview-types"
 import { ticketOrderNetRevenueCents } from "@/lib/tickets/ticket-refund-math"
 
+const PAGE_SIZE = 1000
+
 function resolveSalesStatus(config: Record<string, unknown> | null | undefined): TicketingSalesStatus {
   const status = config?.salesStatus
   if (status === "published" || status === "draft" || status === "sales_closed") {
     return status
   }
   return "draft"
+}
+
+async function fetchAllPages<T>(
+  query: (
+    from: number,
+    to: number
+  ) => PromiseLike<{
+    data: T[] | null
+    error: { message?: string; code?: string } | null
+  }>
+): Promise<{ data: T[]; error: { message?: string; code?: string } | null }> {
+  const rows: T[] = []
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await query(from, from + PAGE_SIZE - 1)
+    if (error) return { data: rows, error }
+    rows.push(...(data || []))
+    if (!data || data.length < PAGE_SIZE) break
+  }
+  return { data: rows, error: null }
 }
 
 export async function getTicketedEventsOverview(): Promise<TicketedEventOverviewRow[]> {
@@ -22,62 +43,87 @@ export async function getTicketedEventsOverview(): Promise<TicketedEventOverview
     return []
   }
 
-  const { data: events, error: eventsError } = await supabase
-    .from("internal_events")
-    .select(`
-      id,
-      name,
-      start_at,
-      end_at,
-      location_label,
-      ticketing_config,
-      venues:venue_id ( name )
-    `)
-    .eq("organization_id", organizationId)
-    .eq("requires_ticketing", true)
-    .order("start_at", { ascending: false, nullsFirst: false })
+  const eventsResult = await fetchAllPages((from, to) =>
+    supabase
+      .from("internal_events")
+      .select(
+        `
+        id,
+        name,
+        start_at,
+        end_at,
+        location_label,
+        ticketing_config,
+        venues:venue_id ( name )
+      `
+      )
+      .eq("organization_id", organizationId)
+      .eq("requires_ticketing", true)
+      .order("start_at", { ascending: false, nullsFirst: false })
+      .range(from, to)
+  )
 
-  if (eventsError) {
-    if (eventsError.code === "42P01" || eventsError.code === "42703") return []
-    console.error(eventsError)
+  if (eventsResult.error) {
+    if (eventsResult.error.code === "42P01" || eventsResult.error.code === "42703") {
+      return []
+    }
+    console.error(eventsResult.error)
     throw new Error("Failed to load ticketed events")
   }
 
-  if (!events?.length) {
+  const events = eventsResult.data
+  if (!events.length) {
     return []
   }
 
   const eventIds = events.map((row) => row.id as string)
+  const eventIdSet = new Set(eventIds)
 
   const [typesResult, ordersResult] = await Promise.all([
-    supabase
-      .from("event_ticket_types")
-      .select("internal_event_id, quantity_total, quantity_sold, is_active")
-      .eq("organization_id", organizationId)
-      .in("internal_event_id", eventIds),
-    supabase
-      .from("ticket_orders")
-      .select("internal_event_id, total_cents, refunded_amount_cents, currency, status")
-      .eq("organization_id", organizationId)
-      .in("internal_event_id", eventIds)
-      .in("status", ["completed", "partially_refunded"]),
+    fetchAllPages((from, to) =>
+      supabase
+        .from("event_ticket_types")
+        .select("internal_event_id, quantity_total, quantity_sold")
+        .eq("organization_id", organizationId)
+        .range(from, to)
+    ),
+    fetchAllPages((from, to) =>
+      supabase
+        .from("ticket_orders")
+        .select("internal_event_id, total_cents, refunded_amount_cents, currency, status")
+        .eq("organization_id", organizationId)
+        .in("status", ["completed", "partially_refunded"])
+        .range(from, to)
+    ),
   ])
 
-  let orderRows: Array<{
-    internal_event_id?: string
-    total_cents?: number | null
-    refunded_amount_cents?: number | null
-    currency?: string | null
-    status?: string | null
-  }> = ordersResult.data || []
+  let orderRows = ordersResult.data
   if (ordersResult.error?.code === "42703") {
-    const fallback = await supabase
-      .from("ticket_orders")
-      .select("internal_event_id, total_cents, currency, status")
-      .eq("organization_id", organizationId)
-      .in("internal_event_id", eventIds)
-      .in("status", ["completed", "partially_refunded"])
-    orderRows = fallback.data || []
+    const fallback = await fetchAllPages((from, to) =>
+      supabase
+        .from("ticket_orders")
+        .select("internal_event_id, total_cents, currency, status")
+        .eq("organization_id", organizationId)
+        .in("status", ["completed", "partially_refunded"])
+        .range(from, to)
+    )
+    if (fallback.error && fallback.error.code !== "42P01") {
+      console.error(fallback.error)
+      throw new Error("Failed to load ticketed event revenue")
+    }
+    orderRows = fallback.data
+  } else if (ordersResult.error) {
+    if (ordersResult.error.code === "42P01") {
+      orderRows = []
+    } else {
+      console.error(ordersResult.error)
+      throw new Error("Failed to load ticketed event revenue")
+    }
+  }
+
+  if (typesResult.error && typesResult.error.code !== "42P01" && typesResult.error.code !== "42703") {
+    console.error(typesResult.error)
+    throw new Error("Failed to load ticket types")
   }
 
   const typesByEvent = new Map<string, { issued: number; capacity: number | null }>()
@@ -87,8 +133,8 @@ export async function getTicketedEventsOverview(): Promise<TicketedEventOverview
   }
 
   for (const row of typesResult.data || []) {
-    if (row.is_active === false) continue
     const eventId = row.internal_event_id as string
+    if (!eventIdSet.has(eventId)) continue
     const current = typesByEvent.get(eventId) || { issued: 0, capacity: 0 }
     current.issued += Number(row.quantity_sold || 0)
 
@@ -104,6 +150,7 @@ export async function getTicketedEventsOverview(): Promise<TicketedEventOverview
   const revenueByEvent = new Map<string, { cents: number; currency: string }>()
   for (const row of orderRows) {
     const eventId = row.internal_event_id as string
+    if (!eventIdSet.has(eventId)) continue
     const existing = revenueByEvent.get(eventId) || { cents: 0, currency: "USD" }
     existing.cents += ticketOrderNetRevenueCents({
       status: row.status as string,
@@ -126,7 +173,7 @@ export async function getTicketedEventsOverview(): Promise<TicketedEventOverview
     return {
       id: row.id as string,
       name: row.name as string,
-      venueName: row.venues?.name ?? null,
+      venueName: Array.isArray(row.venues) ? row.venues[0]?.name ?? null : row.venues?.name ?? null,
       locationLabel: row.location_label ?? null,
       startAt: row.start_at ?? null,
       endAt: row.end_at ?? null,

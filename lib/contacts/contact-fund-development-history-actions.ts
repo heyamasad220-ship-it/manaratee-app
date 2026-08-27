@@ -116,7 +116,10 @@ export async function loadContactFundDevelopmentHistoryAction(contactId: string)
           (row.created_at as string | null),
         title: `${CAMPAIGN_PROSPECT_ASK_TYPE_LABELS[askType]} prospect · ${campaignName}`,
         detail: CAMPAIGN_PROSPECT_STAGE_LABELS[stage],
-        href: donationCampaignWorkspaceHref(row.campaign_id as string, { tab: "prospects" }),
+        href: donationCampaignWorkspaceHref(row.campaign_id as string, {
+          tab: "plan",
+          section: "prospects",
+        }),
         amountLabel:
           row.suggested_ask_amount != null
             ? `Ask ${formatDonationCurrency(Number(row.suggested_ask_amount))}`
@@ -137,7 +140,10 @@ export async function loadContactFundDevelopmentHistoryAction(contactId: string)
           (row.created_at as string | null),
         title: `Assigned · ${campaignName}`,
         detail: `${prospectName} · ${CAMPAIGN_PROSPECT_STAGE_LABELS[stage]}`,
-        href: donationCampaignWorkspaceHref(row.campaign_id as string, { tab: "prospects" }),
+        href: donationCampaignWorkspaceHref(row.campaign_id as string, {
+          tab: "plan",
+          section: "prospects",
+        }),
         amountLabel: null,
       })
     }

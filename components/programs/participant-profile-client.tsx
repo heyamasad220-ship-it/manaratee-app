@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/table"
 import { ParticipantProfileEditButton } from "@/components/programs/participant-profile-edit-dialog"
 import { cn } from "@/lib/utils"
+import { formatPhonesInText } from "@/lib/ui/format-phone"
 
 function getInitials(name: string) {
   return (name?.trim() || "?")
@@ -34,27 +35,6 @@ function getInitials(name: string) {
     .join("")
     .toUpperCase()
     .slice(0, 2)
-}
-
-function formatPhoneNumber(phone: string | null | undefined) {
-  if (!phone?.trim()) return null
-  const digits = phone.replace(/\D/g, "")
-  if (digits.length === 11 && digits.startsWith("1")) {
-    const national = digits.slice(1)
-    return `(${national.slice(0, 3)}) ${national.slice(3, 6)}-${national.slice(6)}`
-  }
-  if (digits.length === 10) {
-    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`
-  }
-  return phone.trim()
-}
-
-/** Format any 10/11-digit phone sequences inside a free-text emergency contact line. */
-function formatPhonesInText(value: string | null | undefined) {
-  if (!value?.trim()) return null
-  return value.replace(/\+?1?[\d\s().-]{9,}\d/g, (match) => {
-    return formatPhoneNumber(match) || match
-  })
 }
 
 function DetailItem({

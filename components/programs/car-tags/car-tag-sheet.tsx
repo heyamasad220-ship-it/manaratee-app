@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import type { CarTagLayout, CarTagRow } from "@/lib/programs/car-tag-types"
+import { formatPhoneDisplay } from "@/lib/ui/format-phone"
 
 function CarTagCard({ tag }: { tag: CarTagRow }) {
   return (
@@ -52,7 +53,8 @@ function CarTagCard({ tag }: { tag: CarTagRow }) {
         ) : null}
         {tag.contactPhone ? (
           <p>
-            <span className="font-semibold">Phone:</span> {tag.contactPhone}
+            <span className="font-semibold">Phone:</span>{" "}
+            {formatPhoneDisplay(tag.contactPhone)}
           </p>
         ) : null}
       </div>
@@ -254,7 +256,9 @@ export function CarTagSheet({
                         ? `${tag.familyLastName} family`
                         : "Family name unavailable"}
                       {tag.sessionLabel ? ` · ${tag.sessionLabel}` : ""}
-                      {tag.contactPhone ? ` · ${tag.contactPhone}` : ""}
+                      {tag.contactPhone
+                        ? ` · ${formatPhoneDisplay(tag.contactPhone)}`
+                        : ""}
                     </p>
                   </div>
                 </li>

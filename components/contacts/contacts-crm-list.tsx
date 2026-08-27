@@ -31,10 +31,15 @@ import {
   type ContactRecordType,
   type ContactRoleValue,
   getContactRecordTypeLabel,
+  getRoleFilterOptionsForRecordType,
   ROLE_COLORS,
   STATUS_COLORS,
   usesPrimaryContactField,
 } from "@/lib/contacts/contact-constants"
+import { fetchContactDirectoryExportAction } from "@/lib/contacts/contact-report-actions"
+import { downloadContactDirectoryCsv } from "@/lib/contacts/contact-report-csv"
+import { formatPhoneDisplay } from "@/lib/ui/format-phone"
+import { PhoneText } from "@/components/ui/phone-text"
 import { createClient } from "@/lib/supabase/client"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -76,6 +81,7 @@ import { ListPagination } from "@/components/ui/list-pagination"
 import { DEFAULT_LIST_PAGE_SIZE } from "@/lib/ui/list-pagination"
 import {
   Building2,
+  Download,
   Loader2,
   Plus,
   Search,
@@ -230,9 +236,16 @@ function ContactsCrmListInner({
   const [entityNameFilter, setEntityNameFilter] = useState("")
   const [entitySortKey, setEntitySortKey] = useState("recent")
   const [recordTypeFilter, setRecordTypeFilter] = useState<ContactRecordType | "all">("all")
+  const [roleFilter, setRoleFilter] = useState<ContactRoleValue | "all">("all")
+  const [exportingCsv, setExportingCsv] = useState(false)
 
   const usesEntityColumnControls =
     lockedRecordType === "organization" || lockedRecordType === "group"
+  const roleOptions = useMemo(
+    () => getRoleFilterOptionsForRecordType(lockedRecordType || "all"),
+    [lockedRecordType]
+  )
+  const canExportCsv = !lockedRoleKey
 
   const [showAddDialog, setShowAddDialog] = useState(false)
 
@@ -258,7 +271,7 @@ function ContactsCrmListInner({
 
   useEffect(() => {
     setPage(1)
-  }, [debouncedSearch, recordTypeFilter, entityNameFilter, entitySortKey])
+  }, [debouncedSearch, recordTypeFilter, entityNameFilter, entitySortKey, roleFilter])
 
   useEffect(() => {
     if (searchParams.get("add") === "1") {
@@ -296,6 +309,7 @@ function ContactsCrmListInner({
         nameFilter: usesEntityColumnControls ? entityNameFilter || undefined : undefined,
         recordType: lockedRecordType ? "all" : recordTypeFilter,
         lockedRecordType,
+        role: roleFilter,
         sortBy: usesEntityColumnControls ? sort.sortBy : undefined,
         sortAsc: usesEntityColumnControls ? sort.sortAsc : undefined,
         page,
@@ -321,6 +335,7 @@ function ContactsCrmListInner({
     page,
     pageSize,
     recordTypeFilter,
+    roleFilter,
     usesEntityColumnControls,
   ])
 
@@ -342,7 +357,8 @@ function ContactsCrmListInner({
       (!usesEntityColumnControls && debouncedSearch) ||
         recordTypeFiltered ||
         entityNameFiltered ||
-        entitySortActive
+        entitySortActive ||
+        roleFilter !== "all"
     )
   }, [
     debouncedSearch,
@@ -350,6 +366,7 @@ function ContactsCrmListInner({
     entitySortKey,
     lockedRecordType,
     recordTypeFilter,
+    roleFilter,
     usesEntityColumnControls,
   ])
 
@@ -363,6 +380,7 @@ function ContactsCrmListInner({
     setEntityNameFilterInput("")
     setEntityNameFilter("")
     setEntitySortKey("recent")
+    setRoleFilter("all")
     if (!lockedRecordType) {
       setRecordTypeFilter("all")
     }
@@ -465,6 +483,66 @@ function ContactsCrmListInner({
 
   const extraColumns = lockedRoleKey ? directoryRoleExtraColumns(lockedRoleKey) : []
 
+  async function handleExportCsv() {
+    if (!canExportCsv) return
+
+    setExportingCsv(true)
+    try {
+      const sort = parseEntitySortKey(entitySortKey)
+      const result = await fetchContactDirectoryExportAction({
+        search: usesEntityColumnControls ? undefined : debouncedSearch || undefined,
+        nameFilter: usesEntityColumnControls ? entityNameFilter || undefined : undefined,
+        recordType: lockedRecordType || (recordTypeFilter !== "all" ? recordTypeFilter : "all"),
+        lockedRecordType,
+        role: roleFilter,
+        sortBy: usesEntityColumnControls ? sort.sortBy : undefined,
+        sortAsc: usesEntityColumnControls ? sort.sortAsc : undefined,
+      })
+
+      if (!result.success) {
+        alert(result.error || "Export failed")
+        return
+      }
+
+      if (result.contacts.length === 0) {
+        alert(`No ${entityLabel.toLowerCase()} match the current filters.`)
+        return
+      }
+
+      const filterParts = [`Record type: ${entityLabel}`]
+      if (entityNameFilter.trim()) {
+        filterParts.push(`Name: "${entityNameFilter.trim()}"`)
+      }
+      if (!usesEntityColumnControls && debouncedSearch.trim()) {
+        filterParts.push(`Search: "${debouncedSearch.trim()}"`)
+      }
+      if (roleFilter !== "all") {
+        const roleLabel = roleOptions.find((option) => option.value === roleFilter)?.label
+        filterParts.push(`Role: ${roleLabel || roleFilter}`)
+      }
+
+      const fileStem =
+        lockedRecordType === "organization"
+          ? "directory-organizations"
+          : lockedRecordType === "individual"
+            ? "directory-people"
+            : lockedRecordType === "group"
+              ? "directory-groups"
+              : "directory-contacts"
+
+      downloadContactDirectoryCsv(
+        result.contacts,
+        result.generatedAt,
+        filterParts.join("; "),
+        fileStem
+      )
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Export failed")
+    } finally {
+      setExportingCsv(false)
+    }
+  }
+
   const tableColumnCount =
     (!lockedRecordType
       ? 7
@@ -508,23 +586,34 @@ function ContactsCrmListInner({
           </Button>
         )}
 
-        {showUniversalAdd ? (
-          <div className="ml-auto shrink-0">
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          {canExportCsv ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={exportingCsv || loading || total === 0}
+              onClick={() => void handleExportCsv()}
+            >
+              <Download className="mr-1.5 h-4 w-4" />
+              {exportingCsv ? "Exporting..." : "Export CSV"}
+            </Button>
+          ) : null}
+          {showUniversalAdd ? (
             <DirectoryAddMenu />
-          </div>
-        ) : (
-        <Button
-          size="sm"
-          className="ml-auto shrink-0"
-          onClick={() => {
-            resetAddForm()
-            setShowAddDialog(true)
-          }}
-        >
-          <Plus className="mr-1.5 h-4 w-4" />
-          {addButtonLabel}
-        </Button>
-        )}
+          ) : (
+            <Button
+              size="sm"
+              onClick={() => {
+                resetAddForm()
+                setShowAddDialog(true)
+              }}
+            >
+              <Plus className="mr-1.5 h-4 w-4" />
+              {addButtonLabel}
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
@@ -591,7 +680,35 @@ function ContactsCrmListInner({
                 ) : null}
                 <TableHead className="hidden md:table-cell">Email</TableHead>
                 <TableHead className="hidden md:table-cell">Phone</TableHead>
-                <TableHead className="hidden lg:table-cell">Roles</TableHead>
+                <TableHead className="hidden lg:table-cell">
+                  {lockedRoleKey ? (
+                    "Roles"
+                  ) : (
+                    <TableColumnHeaderFilter label="Roles" active={roleFilter !== "all"}>
+                      {({ close }) => (
+                        <Select
+                          value={roleFilter}
+                          onValueChange={(value) => {
+                            setRoleFilter(value as ContactRoleValue | "all")
+                            close()
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="All roles" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All roles</SelectItem>
+                            {roleOptions.map((option) => (
+                              <SelectItem key={option.value} value={option.value}>
+                                {option.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </TableColumnHeaderFilter>
+                  )}
+                </TableHead>
                 {extraColumns.map((column) => (
                   <TableHead key={column.key} className="hidden lg:table-cell">
                     {column.label}
@@ -653,7 +770,7 @@ function ContactsCrmListInner({
                             {contact.name}
                           </span>
                           <span className="text-sm text-muted-foreground md:hidden">
-                            {contact.email || contact.phone || "—"}
+                            {contact.email || formatPhoneDisplay(contact.phone) || "—"}
                           </span>
                         </div>
                       </div>
@@ -670,7 +787,7 @@ function ContactsCrmListInner({
                     </TableCell>
 
                     <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
-                      {contact.phone || "—"}
+                      <PhoneText value={contact.phone} />
                     </TableCell>
 
                     <TableCell className="hidden lg:table-cell">

@@ -3,6 +3,7 @@ import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-orga
 
 import {
   daysUntil,
+  eventHasEnded,
   formatEventDate,
 } from "./internal-event-format"
 import type {
@@ -64,19 +65,6 @@ function eventOverlapsPeriod(
   }
 
   return createdAt >= start && createdAt <= end
-}
-
-export function eventHasEnded(
-  event: InternalEventWithRelations,
-  now = new Date()
-) {
-  if (event.end_at) {
-    return new Date(event.end_at) < now
-  }
-  if (event.start_at) {
-    return new Date(event.start_at) < now
-  }
-  return false
 }
 
 function isListableStatus(status: string) {

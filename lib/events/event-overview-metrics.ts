@@ -238,7 +238,7 @@ export async function getEventOverviewSummary(input: {
   const incomplete = input.attendees.filter(
     (row) =>
       (row.status === "valid" || row.status === "checked_in") &&
-      (!row.attendeeName || !row.attendeeEmail)
+      (!row.attendeeName || !row.purchaserEmail)
   )
   if (incomplete.length > 0) {
     alerts.push({

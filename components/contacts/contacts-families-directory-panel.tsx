@@ -8,6 +8,7 @@ import { fetchFamilyListSummariesAction } from "@/lib/contacts/family-actions"
 import type { FamilyListSummary } from "@/lib/contacts/family-types"
 import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
 import { directoryFamilyPath } from "@/lib/directory/directory-paths"
+import { PhoneText } from "@/components/ui/phone-text"
 import { Card, CardContent } from "@/components/ui/card"
 import { ListPagination } from "@/components/ui/list-pagination"
 import {
@@ -126,7 +127,7 @@ export function ContactsFamiliesDirectoryPanel({
                         {household.primaryEmail || "—"}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
-                        {household.primaryPhone || "—"}
+                        <PhoneText value={household.primaryPhone} />
                       </TableCell>
                       <TableCell className="max-w-[16rem] text-muted-foreground">
                         {household.primaryAddress || "—"}

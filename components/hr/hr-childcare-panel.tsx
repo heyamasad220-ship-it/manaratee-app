@@ -43,6 +43,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
+import { PhoneText } from "@/components/ui/phone-text"
+import { formatPhoneDisplay } from "@/lib/ui/format-phone"
 import {
   Select,
   SelectContent,
@@ -107,7 +109,7 @@ function downloadProvidersCsv(rows: ChildcareProviderRecord[]) {
       [
         row.name,
         row.email,
-        row.phone,
+        formatPhoneDisplay(row.phone),
         row.experience,
         row.ageGroups,
         row.totalHours,
@@ -411,7 +413,7 @@ export function HrChildcarePanel({ providers, stats }: HrChildcarePanelProps) {
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="text-sm">{provider.phone}</TableCell>
+                    <TableCell className="text-sm"><PhoneText value={provider.phone} empty="" /></TableCell>
                     <TableCell>{provider.experience}</TableCell>
                     <TableCell>{provider.ageGroups}</TableCell>
                     <TableCell className="tabular-nums font-medium">
@@ -498,7 +500,9 @@ export function HrChildcarePanel({ providers, stats }: HrChildcarePanelProps) {
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div className="flex flex-col gap-1">
                         <span className="text-xs text-muted-foreground">Phone</span>
-                        <span className="text-sm font-medium">{selectedProvider.phone}</span>
+                        <span className="text-sm font-medium">
+                          <PhoneText value={selectedProvider.phone} empty="" />
+                        </span>
                       </div>
                       <div className="flex flex-col gap-1">
                         <span className="text-xs text-muted-foreground">Email</span>

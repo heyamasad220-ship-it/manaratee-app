@@ -290,7 +290,7 @@ North star: **One Contact · Many Roles · Many Activities · No Duplicate Ident
 
 Routes: `/directory` (Overview), `/directory/people`, `/directory/families`, `/directory/families/[id]`, `/directory/organizations`, `/directory/role/[role]`, `/directory/reports`, `/directory/settings`, `/directory/[id]` (contact profile). Legacy `/directory/groups` and `/contacts/groups` redirect to Fund Development Group Giving. Legacy `/contacts/...` list URLs redirect into Directory. Permissions remain `contacts.view` / `contacts.manage` (UI labels: View/Manage Directory).
 
-**People / Organizations lists:** `components/contacts/contacts-crm-list.tsx` loads via `fetchContactsList`. Shared list types (`ContactListRow`, filters, stats) are in `lib/contacts/contact-list-types.ts` — not the `"use server"` actions file — so the client does not hit a `ContactListRow is not defined` runtime error.
+**People / Organizations lists:** `components/contacts/contacts-crm-list.tsx` loads via `fetchContactsList`. Shared list types (`ContactListRow`, filters, stats) are in `lib/contacts/contact-list-types.ts` — not the `"use server"` actions file — so the client does not hit a `ContactListRow is not defined` runtime error. People and Organizations include **Export CSV** (filtered rows, `fetchContactDirectoryExportAction`) and a Roles column filter. Phone columns and CSV/PDF exports display US numbers as `(###) ###-####` (`lib/ui/format-phone.ts`); stored values are unchanged.
 
 **Contact profile Overview:** Module-gated right rail with Quick Actions, Financial Summary, and Activity (`components/contacts/contact-profile-overview-rail.tsx`).
 
@@ -328,7 +328,7 @@ Transactions and Giving Summary share a date range (`?range=`) that filters KPIs
 
 Permissions: `donations.view`, `donations.manage`, `donations.campaigns.manage`, `donations.prospects.manage`, `donations.reports.manage`.
 
-Campaign workspace tabs: Overview, Strategy, Prospects, Pledges, Donations, **Sponsors**, Groups, **Wishlist**. Each campaign has one goal (`campaigns.goal_amount`); Goal Breakdown phases are retired (`scripts/270_disable_campaign_goal_phases.sql`). Prospects is a shared donation/sponsorship outreach pipeline (`ask_type` on `campaign_prospects`; activity log; convert donations to pledges and sponsorships to `campaign_sponsorships`). Sponsors shows committed sponsorships only. Wishlist items are campaign priorities (`campaign_wishlist_items`); pledged/collected come from `pledges`/`payments.wishlist_item_id`. Public donate: `/donate/w/{token}`. SQL: `scripts/267_campaign_wishlist.sql`, `scripts/284_campaign_sponsorship_prospects.sql`. Staff add/edit/collect pledges through one **Pledge Details** window (`components/donations/pledge-details-dialog.tsx`) on the global Pledges page, campaign workspace, prospects, and contact Financial pledges.
+Campaign workspace tabs: Overview, **Fundraising Plan**, Pledges, Donations, **Sponsorship**, Groups, **Wishlist**. Fundraising Plan has internal views **Ask Strategy | Prospects** (`?tab=plan`, `?tab=plan&section=prospects`). Legacy `?tab=strategy` and `?tab=prospects` still open those views. Each campaign has one goal (`campaigns.goal_amount`); Goal Breakdown phases are retired (`scripts/270_disable_campaign_goal_phases.sql`). Prospects is a shared donation/sponsorship outreach pipeline (`ask_type` on `campaign_prospects`; people and Directory organizations can both be prospects; activity log; convert donations to pledges and sponsorships to `campaign_sponsorships`). **Sponsorship** has internal views **Sponsors | Packages**: committed sponsorships plus campaign-owned sponsorship packages and benefit fulfillment. Wishlist items are campaign priorities (`campaign_wishlist_items`); pledged/collected come from `pledges`/`payments.wishlist_item_id`. Public donate: `/donate/w/{token}`. SQL: `scripts/267_campaign_wishlist.sql`, `scripts/284_campaign_sponsorship_prospects.sql`, `scripts/285_campaign_sponsorship_packages.sql`. Staff add/edit/collect pledges through one **Pledge Details** window (`components/donations/pledge-details-dialog.tsx`) on the global Pledges page, campaign workspace, prospects, and contact Financial pledges.
 
 ---
 
@@ -508,6 +508,9 @@ Status: Working (shared)
 
 Status: In progress
 
+* Staff flyout: **Overview** (`/event-management`) · **Events** (`/event-management/events`) · Master Calendar · Ticketing · Reports · Settings
+* Ticketing Overview issued/revenue includes inactive historical ticket types and pages all completed orders (not the first 1,000 only)
+* Events catalog is the view/manage list (search, department, Active/Draft/Past). Opening a row goes to `/event-management/[id]`.
 * Progressive tabs via `workspace_features` + `ticketing_config.attendanceMode` (SQL `252`)
 * Expenses ledger: `event_expenses` / `event-expense-actions.ts`
 * UI: overview dashboard, registration workspace, finance, reports (attendee CSV), feature switches
@@ -519,3 +522,4 @@ Status: In progress
 * Youth forms / liability waiver on Opportunities + Youth tab Forms dialog (SQL `259`)
 * Event documents on Settings (`event_documents`, SQL `254`)
 * **Service Needs** on Event workspace Settings (volunteers / youth / vendors → `internal_events.requires_*` + `service_requirements`; `internal-event-service-needs-settings.tsx`)
+* **TicketOrders.csv Event Management import (August 2026):** Historical Eventbrite ticket orders → `internal_events` + `event_ticket_types` + `ticket_orders` + `tickets`. Groups repeated Eventbrite order totals into one order per buyer/event/date. Skips vendor/bazaar booths, QLH/QIL/Sunday School, and processing-fee rows. Attaches Sep 12 2026 Crystal Banquet tickets to the existing Annual Fundraising Dinner. Attendee = ticket holder; Contact column is the Directory contact (name + email + phone, name links to profile). SQL **`286`**. Tag `TICKET_ORDERS_CSV_V1`. Script: `node scripts/import-ticket-orders-csv.mjs` / `--execute`. Reports: `scripts/reports/ticket-orders-import-dry-run.json`, `ticket-orders-import-execute.json`.

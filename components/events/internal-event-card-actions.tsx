@@ -84,7 +84,7 @@ export function InternalEventCardActions({
   compact = false,
   showEdit = true,
   deleteBlockedReason = null,
-  redirectAfterDelete = "/event-management",
+  redirectAfterDelete = "/event-management/events",
 }: {
   eventId: string
   eventName: string

@@ -1,6 +1,8 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import Link from "next/link"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Plus, Search } from "lucide-react"
 
 import { CampaignProspectActivityPanel } from "@/components/donations/campaign-prospect-activity-panel"
@@ -64,10 +66,9 @@ import {
   type CampaignProspectStage,
 } from "@/lib/donations/campaign-prospect-types"
 import {
-  createSponsorshipPackageAction,
   listCampaignLinkedEventsAction,
-  listSponsorshipPackagesForEventAction,
 } from "@/lib/donations/campaign-sponsorship-actions"
+import { listSponsorshipPackagesForCampaignAction } from "@/lib/donations/campaign-sponsorship-package-actions"
 import {
   CUSTOM_SPONSORSHIP_PACKAGE_VALUE,
   formatCampaignEventOptionLabel,
@@ -75,6 +76,7 @@ import {
   type CampaignLinkedEventOption,
   type SponsorshipPackageRow,
 } from "@/lib/donations/campaign-sponsorship-types"
+import { donationCampaignWorkspaceHref } from "@/lib/donations/campaign-workspace-paths"
 import { DONATIONS_PAGE_SIZE } from "@/lib/donations/donation-pagination"
 import { cn } from "@/lib/utils"
 
@@ -100,6 +102,9 @@ type CampaignProspectsTabProps = {
   initialAssignee?: string | null
   initialStage?: string | null
   initialPledged?: "pledged" | "not_pledged" | null
+  initialAskType?: CampaignProspectAskType | null
+  initialAskLevelId?: string | null
+  initialAsked?: boolean
 }
 
 type ProspectFormState = {
@@ -179,7 +184,12 @@ export function CampaignProspectsTab({
   initialAssignee = null,
   initialStage = null,
   initialPledged = null,
+  initialAskType = null,
+  initialAskLevelId = null,
+  initialAsked = false,
 }: CampaignProspectsTabProps) {
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const [prospects, setProspects] = useState<CampaignProspectListItem[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -187,7 +197,15 @@ export function CampaignProspectsTab({
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [search, setSearch] = useState("")
   const [debouncedSearch, setDebouncedSearch] = useState("")
-  const [askTypeFilter, setAskTypeFilter] = useState<"all" | CampaignProspectAskType>("all")
+  const [askTypeFilter, setAskTypeFilter] = useState<"all" | CampaignProspectAskType>(
+    initialAskType === "donation" || initialAskType === "sponsorship" ? initialAskType : "all"
+  )
+  const [askLevelFilter, setAskLevelFilter] = useState(() =>
+    initialAskLevelId && askLevels.some((row) => row.id === initialAskLevelId)
+      ? initialAskLevelId
+      : ALL
+  )
+  const [askedFilter, setAskedFilter] = useState(Boolean(initialAsked))
   const [stageFilter, setStageFilter] = useState(initialStage || ALL)
   const [followUpFilter] = useState(initialFollowUp || ALL)
   const [pledgedFilter] = useState(initialPledged || ALL)
@@ -199,6 +217,7 @@ export function CampaignProspectsTab({
   const [form, setForm] = useState<ProspectFormState>(() => emptyForm(askLevels))
   const [saving, setSaving] = useState(false)
   const [showQuickAdd, setShowQuickAdd] = useState(false)
+  const [prospectContactQuery, setProspectContactQuery] = useState("")
   const [bulkAssigneeId, setBulkAssigneeId] = useState("")
   const [bulkAssigneeLabel, setBulkAssigneeLabel] = useState("")
   const [convertProspectId, setConvertProspectId] = useState<string | null>(null)
@@ -216,15 +235,23 @@ export function CampaignProspectsTab({
   } | null>(null)
   const [events, setEvents] = useState<CampaignLinkedEventOption[]>([])
   const [packages, setPackages] = useState<SponsorshipPackageRow[]>([])
-  const [showAddPackage, setShowAddPackage] = useState(false)
-  const [newPackageName, setNewPackageName] = useState("")
-  const [newPackageAmount, setNewPackageAmount] = useState("")
-  const [savingPackage, setSavingPackage] = useState(false)
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 300)
     return () => window.clearTimeout(timer)
   }, [search])
+
+  useEffect(() => {
+    const urlAskType = searchParams.get("askType")
+    setAskTypeFilter(
+      urlAskType === "donation" || urlAskType === "sponsorship" ? urlAskType : "all"
+    )
+    const urlAskLevel = searchParams.get("askLevel")
+    setAskLevelFilter(
+      urlAskLevel && askLevels.some((row) => row.id === urlAskLevel) ? urlAskLevel : ALL
+    )
+    setAskedFilter(searchParams.get("asked") === "1")
+  }, [searchParams, askLevels])
 
   const loadProspects = useCallback(async () => {
     setLoading(true)
@@ -235,6 +262,8 @@ export function CampaignProspectsTab({
       pageSize: DONATIONS_PAGE_SIZE,
       search: debouncedSearch || undefined,
       askType: askTypeFilter,
+      askLevelId: askLevelFilter !== ALL && askTypeFilter !== "sponsorship" ? askLevelFilter : null,
+      asked: askedFilter && askTypeFilter !== "sponsorship" ? true : null,
       stage: stageFilter === ALL ? null : stageFilter,
       followUp:
         followUpFilter === "overdue" || followUpFilter === "upcoming"
@@ -265,6 +294,8 @@ export function CampaignProspectsTab({
     page,
     debouncedSearch,
     askTypeFilter,
+    askLevelFilter,
+    askedFilter,
     stageFilter,
     followUpFilter,
     pledgedFilter,
@@ -287,7 +318,7 @@ export function CampaignProspectsTab({
   useEffect(() => {
     setPage(1)
     setSelectedIds([])
-  }, [debouncedSearch, askTypeFilter, stageFilter, followUpFilter, pledgedFilter, assigneeFilter])
+  }, [debouncedSearch, askTypeFilter, askLevelFilter, askedFilter, stageFilter, followUpFilter, pledgedFilter, assigneeFilter])
 
   useEffect(() => {
     if (!showDialog) return
@@ -304,14 +335,17 @@ export function CampaignProspectsTab({
   }, [showDialog, campaignId, editing])
 
   useEffect(() => {
-    if (!showDialog || form.askType !== "sponsorship" || !form.eventId) {
+    if (!showDialog || form.askType !== "sponsorship") {
       setPackages([])
       return
     }
-    void listSponsorshipPackagesForEventAction(form.eventId).then((result) => {
-      if (result.success) setPackages(result.packages)
-    })
-  }, [showDialog, form.askType, form.eventId])
+    void listSponsorshipPackagesForCampaignAction(campaignId, { activeOnly: false }).then(
+      (result) => {
+        if (!result.success) return
+        setPackages(result.packages)
+      }
+    )
+  }, [showDialog, form.askType, campaignId])
 
   const totalPages = Math.max(1, Math.ceil(total / DONATIONS_PAGE_SIZE))
   const tableColSpan = canManage ? 9 : 8
@@ -324,10 +358,83 @@ export function CampaignProspectsTab({
     [askLevels]
   )
 
+  const selectedAskLevel = askLevelOptions.find((row) => row.id === askLevelFilter) || null
+  const showAskLevelContext = Boolean(
+    askTypeFilter !== "sponsorship" && (selectedAskLevel || askedFilter)
+  )
+
+  function replaceProspectsUrl(next: {
+    askType: "all" | CampaignProspectAskType
+    askLevelId: string
+    asked: boolean
+  }) {
+    const askLevelId =
+      next.askType === "sponsorship" || next.askLevelId === ALL ? undefined : next.askLevelId
+    router.replace(
+      donationCampaignWorkspaceHref(campaignId, {
+        tab: "plan",
+        section: "prospects",
+        askType: next.askType === "all" ? undefined : next.askType,
+        askLevelId,
+        asked: next.asked && next.askType !== "sponsorship" ? true : undefined,
+        followUp:
+          followUpFilter === "overdue" || followUpFilter === "upcoming"
+            ? followUpFilter
+            : undefined,
+        assignee:
+          assigneeFilter === ALL
+            ? undefined
+            : assigneeFilter === UNASSIGNED
+              ? "unassigned"
+              : assigneeFilter,
+        stage: stageFilter === ALL ? undefined : stageFilter,
+        pledged:
+          pledgedFilter === "pledged" || pledgedFilter === "not_pledged"
+            ? pledgedFilter
+            : undefined,
+      })
+    )
+  }
+
+  function applyAskTypeFilter(value: "all" | CampaignProspectAskType) {
+    const nextAskLevel = value === "sponsorship" ? ALL : askLevelFilter
+    const nextAsked = value === "sponsorship" ? false : askedFilter
+    setAskTypeFilter(value)
+    setAskLevelFilter(nextAskLevel)
+    setAskedFilter(nextAsked)
+    replaceProspectsUrl({
+      askType: value,
+      askLevelId: nextAskLevel,
+      asked: nextAsked,
+    })
+  }
+
+  function applyAskLevelFilter(value: string) {
+    const nextAskType =
+      value !== ALL && askTypeFilter === "sponsorship" ? "donation" : askTypeFilter
+    setAskTypeFilter(nextAskType)
+    setAskLevelFilter(value)
+    replaceProspectsUrl({
+      askType: nextAskType,
+      askLevelId: value,
+      asked: askedFilter,
+    })
+  }
+
+  function clearAskLevelContext() {
+    setAskTypeFilter("all")
+    setAskLevelFilter(ALL)
+    setAskedFilter(false)
+    replaceProspectsUrl({
+      askType: "all",
+      askLevelId: ALL,
+      asked: false,
+    })
+  }
+
   function openCreate() {
     setEditing(null)
     setForm(emptyForm(askLevels))
-    setShowAddPackage(false)
     setShowDialog(true)
   }
 
@@ -349,7 +456,6 @@ export function CampaignProspectsTab({
       nextFollowUpAt: prospect.next_follow_up_at || "",
       notes: prospect.notes || "",
     })
-    setShowAddPackage(false)
     setShowDialog(true)
   }
 
@@ -431,37 +537,6 @@ export function CampaignProspectsTab({
     onChanged()
   }
 
-  async function handleCreatePackage() {
-    if (!form.eventId) {
-      alert("Select an event first")
-      return
-    }
-    if (!newPackageName.trim()) {
-      alert("Package name is required")
-      return
-    }
-    setSavingPackage(true)
-    const result = await createSponsorshipPackageAction({
-      event_id: form.eventId,
-      name: newPackageName.trim(),
-      amount: Number(newPackageAmount) || 0,
-    })
-    setSavingPackage(false)
-    if (!result.success) {
-      alert(result.error)
-      return
-    }
-    setPackages((prev) => [...prev, result.package].sort((a, b) => a.display_order - b.display_order))
-    setForm((prev) => ({
-      ...prev,
-      sponsorshipPackageId: result.package.id,
-      suggestedAskAmount: String(result.package.amount),
-    }))
-    setNewPackageName("")
-    setNewPackageAmount("")
-    setShowAddPackage(false)
-  }
-
   function toggleSelected(id: string, checked: boolean) {
     setSelectedIds((prev) =>
       checked ? [...prev, id] : prev.filter((value) => value !== id)
@@ -500,38 +575,45 @@ export function CampaignProspectsTab({
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <ToggleGroup
-          type="single"
-          value={askTypeFilter}
-          onValueChange={(value) => {
-            if (value === "all" || value === "donation" || value === "sponsorship") {
-              setAskTypeFilter(value)
-            }
-          }}
-          variant="outline"
-          size="sm"
-          aria-label="Ask type filter"
-          className="bg-muted/40"
-        >
-          <ToggleGroupItem
-            value="all"
-            className="px-3 data-[state=on]:bg-background data-[state=on]:shadow-sm"
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Ask Type</span>
+          <Select
+            value={askTypeFilter}
+            onValueChange={(value) => {
+              if (value === "all" || value === "donation" || value === "sponsorship") {
+                applyAskTypeFilter(value)
+              }
+            }}
           >
-            All
-          </ToggleGroupItem>
-          <ToggleGroupItem
-            value="donation"
-            className="px-3 data-[state=on]:bg-background data-[state=on]:shadow-sm"
-          >
-            Donations
-          </ToggleGroupItem>
-          <ToggleGroupItem
-            value="sponsorship"
-            className="px-3 data-[state=on]:bg-background data-[state=on]:shadow-sm"
-          >
-            Sponsorships
-          </ToggleGroupItem>
-        </ToggleGroup>
+            <SelectTrigger className="w-[150px]" aria-label="Ask type">
+              <SelectValue placeholder="All" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>All</SelectItem>
+              <SelectItem value="donation">Donations</SelectItem>
+              <SelectItem value="sponsorship">Sponsorships</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {askTypeFilter !== "sponsorship" && askLevelOptions.length > 0 ? (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Ask Level</span>
+            <Select value={askLevelFilter} onValueChange={applyAskLevelFilter}>
+              <SelectTrigger className="w-[150px]" aria-label="Ask level">
+                <SelectValue placeholder="All" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL}>All</SelectItem>
+                {askLevelOptions.map((level) => (
+                  <SelectItem key={level.id} value={level.id}>
+                    {formatDonationCurrency(level.ask_amount)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        ) : null}
 
         <div className="relative min-w-[220px] max-w-md flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -543,6 +625,25 @@ export function CampaignProspectsTab({
           />
         </div>
       </div>
+
+      {showAskLevelContext ? (
+        <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+          <span>
+            {askedFilter ? "Asked donation prospects" : "Donation prospects"}
+            {selectedAskLevel
+              ? ` · ${formatDonationCurrency(selectedAskLevel.ask_amount)} ask level`
+              : ""}
+          </span>
+          <Button
+            type="button"
+            variant="link"
+            className="h-auto px-0 text-sm"
+            onClick={clearAskLevelContext}
+          >
+            Clear filter
+          </Button>
+        </div>
+      ) : null}
 
       {canManage && selectedIds.length > 0 ? (
         <div className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-muted/30 p-3">
@@ -815,18 +916,12 @@ export function CampaignProspectsTab({
               contactLabel={form.contactLabel}
               label="Prospect Contact"
               inputId="prospect-contact-picker"
+              onQueryChange={setProspectContactQuery}
+              onCreateClick={() => setShowQuickAdd(true)}
               onChange={(contactId, label) =>
                 setForm((prev) => ({ ...prev, contactId, contactLabel: label }))
               }
             />
-            <Button
-              type="button"
-              variant="link"
-              className="h-auto justify-start px-0"
-              onClick={() => setShowQuickAdd(true)}
-            >
-              Contact not found? Create one
-            </Button>
 
             <div className="flex flex-col gap-2">
               <Label>Ask Type</Label>
@@ -926,7 +1021,6 @@ export function CampaignProspectsTab({
                       setForm((prev) => ({
                         ...prev,
                         eventId,
-                        sponsorshipPackageId: CUSTOM_SPONSORSHIP_PACKAGE_VALUE,
                       }))
                     }}
                   >
@@ -956,61 +1050,46 @@ export function CampaignProspectsTab({
                         suggestedAskAmount: pkg
                           ? String(pkg.amount)
                           : prev.suggestedAskAmount,
+                        eventId: pkg?.event_id || prev.eventId,
                       }))
                     }}
-                    disabled={!form.eventId}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder={form.eventId ? "Select a package" : "Select an event first"} />
+                      <SelectValue placeholder="Select a package" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value={CUSTOM_SPONSORSHIP_PACKAGE_VALUE}>
                         Custom / Undecided
                       </SelectItem>
-                      {packages.map((pkg) => (
-                        <SelectItem key={pkg.id} value={pkg.id}>
-                          {formatSponsorshipPackageOptionLabel(pkg)}
-                        </SelectItem>
-                      ))}
+                      {packages
+                        .filter(
+                          (pkg) =>
+                            pkg.active || pkg.id === form.sponsorshipPackageId
+                        )
+                        .map((pkg) => {
+                        const eventName = pkg.event_id
+                          ? events.find((event) => event.id === pkg.event_id)?.name
+                          : null
+                        return (
+                          <SelectItem key={pkg.id} value={pkg.id}>
+                            {formatSponsorshipPackageOptionLabel(pkg)}
+                            {eventName ? ` · ${eventName}` : ""}
+                          </SelectItem>
+                        )
+                      })}
                     </SelectContent>
                   </Select>
-                  {form.eventId && canManage ? (
-                    <Button
-                      type="button"
-                      variant="link"
-                      className="h-auto justify-start px-0"
-                      onClick={() => setShowAddPackage((open) => !open)}
-                    >
-                      {showAddPackage ? "Cancel new package" : "Add package"}
-                    </Button>
-                  ) : null}
-                  {showAddPackage ? (
-                    <div className="grid gap-2 rounded-md border border-border p-3 sm:grid-cols-[1fr_7rem_auto]">
-                      <Input
-                        placeholder="Gold Sponsor"
-                        value={newPackageName}
-                        onChange={(event) => setNewPackageName(event.target.value)}
-                      />
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                          $
-                        </span>
-                        <Input
-                          type="number"
-                          className="pl-7"
-                          value={newPackageAmount}
-                          onChange={(event) => setNewPackageAmount(event.target.value)}
-                        />
-                      </div>
-                      <Button
-                        type="button"
-                        size="sm"
-                        disabled={savingPackage}
-                        onClick={() => void handleCreatePackage()}
+                  {canManage ? (
+                    <Button variant="link" className="h-auto justify-start px-0" asChild>
+                      <Link
+                        href={donationCampaignWorkspaceHref(campaignId, {
+                          tab: "sponsors",
+                          section: "packages",
+                        })}
                       >
-                        {savingPackage ? "Saving..." : "Save"}
-                      </Button>
-                    </div>
+                        Manage packages
+                      </Link>
+                    </Button>
                   ) : null}
                 </div>
                 <div className="flex flex-col gap-2">
@@ -1229,6 +1308,7 @@ export function CampaignProspectsTab({
       <QuickAddContactDialog
         open={showQuickAdd}
         onOpenChange={setShowQuickAdd}
+        searchHint={prospectContactQuery}
         onCreated={(contact) => {
           setForm((prev) => ({
             ...prev,
@@ -1277,6 +1357,7 @@ export function CampaignProspectsTab({
             setConvertProspectId(null)
             setSponsorshipId(null)
             setSponsorshipPrefill(null)
+            void loadProspects()
           }
         }}
         campaignId={campaignId}

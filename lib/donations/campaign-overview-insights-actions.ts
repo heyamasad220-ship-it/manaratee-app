@@ -177,7 +177,8 @@ export async function getCampaignOverviewInsightsAction(campaignId: string) {
         id: "overdue-follow-ups",
         label: `${overdue.length} overdue prospect follow-up${overdue.length === 1 ? "" : "s"}`,
         href: donationCampaignWorkspaceHref(campaignId, {
-          tab: "prospects",
+          tab: "plan",
+          section: "prospects",
           followUp: "overdue",
         }),
         severity: "urgent",
@@ -188,7 +189,8 @@ export async function getCampaignOverviewInsightsAction(campaignId: string) {
         id: "upcoming-follow-ups",
         label: `${upcoming.length} follow-up${upcoming.length === 1 ? "" : "s"} due in the next 7 days`,
         href: donationCampaignWorkspaceHref(campaignId, {
-          tab: "prospects",
+          tab: "plan",
+          section: "prospects",
           followUp: "upcoming",
         }),
         severity: "attention",
@@ -199,7 +201,8 @@ export async function getCampaignOverviewInsightsAction(campaignId: string) {
         id: "unassigned-prospects",
         label: `${unassigned.length} open prospect${unassigned.length === 1 ? "" : "s"} unassigned`,
         href: donationCampaignWorkspaceHref(campaignId, {
-          tab: "prospects",
+          tab: "plan",
+          section: "prospects",
           assignee: "unassigned",
         }),
         severity: "attention",
@@ -210,7 +213,8 @@ export async function getCampaignOverviewInsightsAction(campaignId: string) {
         id: "asked-without-pledge",
         label: `${askedWithoutPledge.length} asked prospect${askedWithoutPledge.length === 1 ? "" : "s"} still need a pledge`,
         href: donationCampaignWorkspaceHref(campaignId, {
-          tab: "prospects",
+          tab: "plan",
+          section: "prospects",
           stage: "asked",
           pledged: "not_pledged",
         }),

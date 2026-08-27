@@ -31,6 +31,7 @@ import { createGivingGroupAction } from "@/lib/donations/giving-group-actions"
 import { formatDonationCurrency } from "@/lib/donations/campaign-analytics"
 import { DONATIONS_PAGE_SIZE } from "@/lib/donations/donation-pagination"
 import { ListPagination } from "@/components/ui/list-pagination"
+import { PhoneText } from "@/components/ui/phone-text"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -1140,7 +1141,7 @@ export function DonorsReportPanel() {
                       </Link>
                     </TableCell>
                     <TableCell>{formatContactField(donor.email)}</TableCell>
-                    <TableCell>{formatContactField(donor.phone)}</TableCell>
+                    <TableCell><PhoneText value={donor.phone} /></TableCell>
                     <TableCell>
                       {formatDonationCurrency(Number(donor.total_donations || 0))}
                     </TableCell>
@@ -1183,7 +1184,7 @@ export function DonorsReportPanel() {
                       )}
                     </TableCell>
                     <TableCell>{formatContactField(household.primary_email)}</TableCell>
-                    <TableCell>{formatContactField(household.primary_phone)}</TableCell>
+                    <TableCell><PhoneText value={household.primary_phone} /></TableCell>
                     <TableCell>{household.member_count}</TableCell>
                     <TableCell>
                       {formatDonationCurrency(Number(household.total_donations || 0))}

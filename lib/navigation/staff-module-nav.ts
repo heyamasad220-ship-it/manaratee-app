@@ -89,8 +89,15 @@ export function buildProgramsChildren(
 export function buildEventManagementChildren(): SubItem[] {
   return [
     {
-      label: "Events",
+      label: "Overview",
       href: "/event-management",
+      matchPrefix: "/event-management",
+      exact: true,
+      permissionKey: "events.view",
+    },
+    {
+      label: "Events",
+      href: "/event-management/events",
       matchPrefix: "/event-management",
       excludeMatchPrefixes: [
         "/event-management/calendar",

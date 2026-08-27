@@ -177,17 +177,21 @@ User Invitations
 
 **Public Community Calendar (August 2026)** — No-login browse at `/o/[orgSlug]/community-calendar` (events/bazaars with calendar status `published` only). Featured upcoming event, event-type category circles, All/Today/This weekend tabs, 4-up cards; ticketed events open `/o/[orgSlug]/events/[id]`.
 
+**TicketOrders.csv Event Management import (August 2026)** — Eventbrite `TicketOrders.csv` loaded into Event Management for MAS Dallas (6,457 orders / 11,989 tickets / $516,377.91). Vendors, QLH/QIL/Sunday School, and donation/fee lines skipped. Crystal Banquet tickets attached to the existing Annual Fundraising Dinner. Script: `scripts/import-ticket-orders-csv.mjs`.
+
 **Event Workspace redesign (August 2026)** — Progressive event tabs (registration / staff / youth / vendors / finance / reports) driven by `workspace_features` + attendance mode. Expenses ledger (`event_expenses`). Public event checkout (Stripe Connect when ready) + customer **My Tickets** + event documents + staff Stripe ticket refunds (including partials) + youth forms/waivers + `events.checkin` door-staff permission. Run SQL **`252_event_workspace_redesign.sql`**, **`253_event_youth_checkin_waitlist.sql`**, **`254_event_documents.sql`**, **`255_ticket_order_stripe.sql`**, **`256_customer_ticket_order_rls.sql`**, **`257_events_checkin_permission.sql`**, **`258_ticket_order_refunded_amount.sql`**, **`259_youth_waiver_forms.sql`**.
 
-**Fund Development campaign workspace Phase A (August 2026)** — Campaign detail is a tabbed workspace (Overview / Strategy / Prospects / Pledges / Donations / Sponsors / Groups / Wishlist). One campaign goal (`goal_amount`); Goal Breakdown phases retired (`scripts/270_disable_campaign_goal_phases.sql`). Committed/Collected/Outstanding overview. Migration **`260_campaign_phases.sql`** is historical.
+**Fund Development campaign workspace Phase A (August 2026)** — Campaign detail is a tabbed workspace (Overview / Fundraising Plan / Pledges / Donations / Sponsorship / Groups / Wishlist). Fundraising Plan contains Ask Strategy | Prospects. One campaign goal (`goal_amount`); Goal Breakdown phases retired (`scripts/270_disable_campaign_goal_phases.sql`). Committed/Collected/Outstanding overview. Migration **`260_campaign_phases.sql`** is historical.
 
-**Fund Development strategy ask levels Phase B (August 2026)** — Campaign → Strategy gift chart (`campaign_ask_levels`). Migration **`261_campaign_ask_levels.sql`**.
+**Fund Development strategy ask levels Phase B (August 2026)** — Campaign → Fundraising Plan → Ask Strategy gift chart (`campaign_ask_levels`). Migration **`261_campaign_ask_levels.sql`**.
 
-**Fund Development prospects Phase C (August 2026)** — Campaign → Prospects pipeline/assignments (`campaign_prospects`). Staff stage options: Identified (default), Contacted, Pledged, Declined, No Response. Migration **`262_campaign_prospects.sql`**. Prospect→pledge conversion linking is Phase D.
+**Fund Development prospects Phase C (August 2026)** — Campaign → Fundraising Plan → Prospects pipeline/assignments (`campaign_prospects`). Staff stage options: Identified (default), Contacted, Pledged, Declined, No Response. Migration **`262_campaign_prospects.sql`**. Prospect→pledge conversion linking is Phase D.
 
 **Fund Development prospect conversion Phase D (August 2026)** — Record Pledge from a donation prospect fully creates one ledger pledge (including wishlist item) on the Prospects tab; links `converted_pledge_id` / `campaign_prospect_id`; suggested ask preserved.
 
-**Fund Development unified prospects + sponsorships (August 2026)** — Prospects tracks donation and sponsorship outreach (`ask_type`, activity history, event/package for sponsorship asks). Committed sponsorships are first-class `campaign_sponsorships` records (not donations). Campaign **Sponsors** tab. Migration **`284_campaign_sponsorship_prospects.sql`**.
+**Fund Development unified prospects + sponsorships (August 2026)** — Prospects tracks donation and sponsorship outreach (`ask_type`, activity history, event/package for sponsorship asks). Committed sponsorships are first-class `campaign_sponsorships` records (not donations). Campaign **Sponsorship** tab includes **Sponsors | Packages**. Packages are campaign-owned (`scripts/285_campaign_sponsorship_packages.sql`). Migrations **`284_campaign_sponsorship_prospects.sql`**, **`285_campaign_sponsorship_packages.sql`**.
+
+**Fund Development Fundraising Plan nav (August 2026)** — Campaign workspace combines Strategy and Prospects under **Fundraising Plan** (`?tab=plan` with **Ask Strategy | Prospects**; `section=prospects` for Prospects). Ask Strategy remains donation gift levels only; sponsorship packages stay under Sponsorship → Packages. Clicking a Prospects/Asked count on an ask-level row opens Prospects filtered to that donation ask level. Legacy `?tab=strategy` and `?tab=prospects` redirect to the new URLs.
 
 **Fund Development campaign groups Phase E (August 2026)** — Campaign → Groups with donation tokens (`/donate/g/{token}`), copy-link and copy-QR icons. Group goals are not set in the UI. Migration **`263_campaign_groups.sql`**.
 

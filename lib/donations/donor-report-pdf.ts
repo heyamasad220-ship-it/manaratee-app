@@ -1,5 +1,6 @@
 import type { DonorSummaryReportRow } from "@/lib/donations/donation-list-actions"
 import { downloadReceiptPdf } from "@/lib/donations/receipt-pdf"
+import { formatPhoneDisplayOrDash } from "@/lib/ui/format-phone"
 
 function formatMoney(amount: number) {
   return new Intl.NumberFormat("en-US", {
@@ -46,7 +47,7 @@ export function buildDonorGivingReportHtml(input: DonorGivingReportPdfInput): st
       (donor) => `<tr>
         <td>${escapeHtml(donor.full_name || "Unnamed")}</td>
         <td>${escapeHtml(donor.email || "—")}</td>
-        <td>${escapeHtml(donor.phone || "—")}</td>
+        <td>${escapeHtml(formatPhoneDisplayOrDash(donor.phone))}</td>
         <td style="text-align:right">${formatMoney(Number(donor.total_donations || 0))}</td>
         <td style="text-align:right">${donor.donation_count ?? 0}</td>
         <td>${escapeHtml(formatReportDate(donor.last_donation_date))}</td>

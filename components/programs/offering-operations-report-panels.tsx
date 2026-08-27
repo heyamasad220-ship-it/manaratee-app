@@ -15,6 +15,7 @@ import {
   removeWaitlistEntryAction,
 } from "@/app/(dashboard)/programs/registrations/actions"
 import { Badge } from "@/components/ui/badge"
+import { PhoneText } from "@/components/ui/phone-text"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -368,7 +369,7 @@ export function OfferingWaitlistPanel({
                     ) : null}
                     {item.parent_phone ? (
                       <div className="text-xs text-muted-foreground">
-                        {item.parent_phone}
+                        <PhoneText value={item.parent_phone} empty="" />
                       </div>
                     ) : null}
                   </TableCell>

@@ -47,6 +47,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { PhoneText } from "@/components/ui/phone-text"
 import {
   Select,
   SelectContent,
@@ -1497,7 +1498,7 @@ export function ContactsListView({
                           {vendorNetworkLayout && (
                             <span className="flex items-center gap-1 text-sm text-muted-foreground">
                               <Phone className="h-3 w-3" />
-                              {contact.phone || "-"}
+                              <PhoneText value={contact.phone} empty="-" />
                             </span>
                           )}
                         </div>
@@ -1540,7 +1541,7 @@ export function ContactsListView({
                         <TableCell className="hidden md:table-cell">
                           <div className="flex items-center gap-1 text-sm text-muted-foreground">
                             <Phone className="h-3 w-3" />
-                            {contact.phone || "-"}
+                            <PhoneText value={contact.phone} empty="-" />
                           </div>
                         </TableCell>
 

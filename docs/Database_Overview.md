@@ -224,10 +224,10 @@ npm run validate:contacts-security -- --post-m4   # after 111
 * internal_events — **`flyer_url` (migration `214`):** optional event flyer on workspace Overview; uploads reuse `program-flyers` storage. Run `scripts/214_internal_event_flyer_url.sql` in Supabase SQL Editor (`NOTIFY pgrst, 'reload schema'`). **`flyer_focal_x` / `flyer_focal_y` (migration `249`):** Community Calendar featured banner crop (object-position %). **`community_calendar_status` (migration `247`):** Community Calendar visibility — UI is **Private** / **Public** (`not_published` | `published`; legacy `community_visible` still accepted). Set on event Overview. Shared Community Calendar at `/community-calendar` also lists Vendor Hub bazaars via `vendor_hub_events.calendar_status`. **Event Workspace redesign (`252`):** `workspace_features` (JSONB toggles), `audience` / `event_tags` (text[]), `coordinator_contact_id`, `estimated_attendance`, `internal_notes`; attendance mode lives in `ticketing_config.attendanceMode`; optional **`ticketing_config.linkedCampaignId`** for Finance tab campaign rollup; optional **`ticketing_config.communications`** for confirmation/reservation email subject + message overrides.
 * event_ticket_types — **`252`:** per-offering `visibility`, `min_per_order`, `max_per_order`, `offering_kind`, optional `sales_start_at` / `sales_end_at` (inherit event `ticketing_config.salesOpenAt` / `salesCloseAt` when null).
 * event_documents — **`254`:** files attached to an internal event (`title`, `file_url`, `visibility` staff|public). Uploads reuse `program-flyers` storage under `event-docs/{org}/{event}/`. Public rows listed on `/o/[orgSlug]/events/[eventId]`.
-* ticket_orders — **`255`:** `stripe_checkout_session_id`, `stripe_payment_intent_id` for public paid Checkout on the org Connect account. Unique partial indexes when set. If columns are missing, session id is also stored in `ticket_orders.metadata`. Staff refunds write `metadata.stripeRefundId` / `refunded_at`. **`256`:** customer SELECT policy on own orders (`contact_id IN auth_user_contact_ids()`). Portal listing still uses service role after verifying the signed-in contact (also matches purchaser email). **`258`:** `refunded_amount_cents` (integer ≥ 0, default 0). Partial refunds increment this amount and set status `partially_refunded` without voiding seats; when remaining is $0, status is `refunded` and tickets are canceled. Backfill sets the column to `total_cents` for existing fully refunded orders.
+* ticket_orders — MAS Dallas historical Eventbrite import (`TICKET_ORDERS_CSV_V1`, August 2026): `scripts/import-ticket-orders-csv.mjs`. **`255`:** `stripe_checkout_session_id`, `stripe_payment_intent_id` for public paid Checkout on the org Connect account. Unique partial indexes when set. If columns are missing, session id is also stored in `ticket_orders.metadata`. Staff refunds write `metadata.stripeRefundId` / `refunded_at`. **`256`:** customer SELECT policy on own orders (`contact_id IN auth_user_contact_ids()`). Portal listing still uses service role after verifying the signed-in contact (also matches purchaser email). **`258`:** `refunded_amount_cents` (integer ≥ 0, default 0). Partial refunds increment this amount and set status `partially_refunded` without voiding seats; when remaining is $0, status is `refunded` and tickets are canceled. Backfill sets the column to `total_cents` for existing fully refunded orders.
 * event_expenses — Per-event expense ledger (`252`): `amount_cents`, category, payee, dates; org-scoped RLS. Used by Finance tab + overview net.
 * childcare_registrations — **`253`:** `checked_in_at`, `checked_out_at`, `checked_in_by`, `checked_out_by`, `pickup_authorization` for Youth Check-In tab. **`259`:** `waiver_signed_at`, `waiver_signed_by`, `photo_consent` for youth forms / liability waiver workflow.
-* tickets — **`253`:** `status` may be `waitlisted` (registration waitlist promote flow on Attendees tab).
+* tickets — **`253`:** `status` may be `waitlisted` (registration waitlist promote flow on Attendees tab). **`286`:** purchaser/contact email is not stored on `tickets.attendee_email` when it matches `ticket_orders.purchaser_email` (kid seats keep the attendee name only).
 * age_groups
 * program_sessions — week/session rows under an offering. `capacity` 0 inherits offering limited capacity (`244` `program_session_effective_capacity`).
 * program_schedule_items
@@ -360,8 +360,9 @@ Import CSV flow writes directly to `payments` + `payment_import_batches` (no row
 * campaign_prospects (outreach pipeline for donation and sponsorship asks — migration `262`, ask type/activity/sponsorship link — `284`; unique contact + ask_type per campaign; RLS via donations helpers)
 * campaign_groups (campaign fundraising teams — migration `263`; optional org group contact + lead; opaque `public_token`; staff RLS; public pages resolve via service role)
 * campaign_wishlist_items (campaign funding priorities — migration `267`; optional fund/department; `campaign_phase_id` unused; opaque `public_token`; staff RLS; public `/donate/w/{token}` via service role)
-* sponsorship_packages (event packages — migration `284`; name/amount/order; not a Contact role)
-* sponsorship_package_benefits (package benefit catalog — `284`; fulfillment later on committed sponsorships)
+* sponsorship_packages (campaign packages — migrations `284`/`285`; required `campaign_id`, optional `event_id`; name/amount/order/status; not a Contact role)
+* sponsorship_package_benefits (package benefit catalog — `284`/`285`; optional `benefit_type` + `value`; copied onto committed sponsorships)
+* campaign_sponsorship_benefits (per-sponsorship benefit snapshot + fulfillment — `285`)
 * campaign_prospect_activities (prospect outreach history — `284`)
 * campaign_sponsorships (committed sponsorships — `284`; cash/in-kind/mixed; not donations or pledges)
 * donors
@@ -394,11 +395,11 @@ Import CSV flow writes directly to `payments` + `payment_import_batches` (no row
 
 **Campaign phases (migration `260_campaign_phases.sql`):** `campaign_phases` table (org + campaign scoped) with RLS using `auth_user_can_view_donations` / `auth_user_can_manage_donations`. Nullable `campaign_phase_id` on `pledges` and `payments`. `campaigns.goal_breakdown_enabled`. Recreates `pledge_status_view` / `donor_summary_view` to expose `campaign_phase_id`. Phase metrics are computed in `computeCampaignPhaseMetrics` (Committed / Collected / Outstanding; payments inherit pledge phase when payment phase is null — no double count).
 
-**Campaign ask levels (migration `261_campaign_ask_levels.sql`):** `campaign_ask_levels` (org + campaign scoped, optional phase FK). Nullable `pledges.ask_level_id`. Strategy metrics via `computeCampaignAskLevelMetrics` (target value = ask × count; secured from linked pledges or soft amount match; prospects/asked filled when prospects exist).
+**Campaign ask levels (migration `261_campaign_ask_levels.sql`):** `campaign_ask_levels` (org + campaign scoped, optional phase FK). Nullable `pledges.ask_level_id`. Fundraising Plan → Ask Strategy metrics via `computeCampaignAskLevelMetrics` (target value = ask × count; secured from linked pledges or soft amount match; prospects/asked filled from donation prospects; Asked = stages Asked and Pledged).
 
 **Campaign prospects (migration `262_campaign_prospects.sql`, extended `284_campaign_sponsorship_prospects.sql`):** `campaign_prospects` (org + campaign scoped; FK to contacts, optional ask level / assignee / event / package / converted pledge / converted sponsorship). `ask_type` (`donation` | `sponsorship`; existing rows default donation). Unique `(campaign_id, contact_id, ask_type)`. Nullable `pledges.campaign_prospect_id`. Outreach history: `campaign_prospect_activities`. RLS via donations view/manage helpers.
 
-**Campaign sponsorships (migration `284_campaign_sponsorship_prospects.sql`):** `sponsorship_packages` (event-scoped), `sponsorship_package_benefits`, `campaign_sponsorships` (committed sponsor records; optional `prospect_id` / `event_id` / `package_id`). Separate from `pledges` and `payments`. Active committed amounts are added to campaign `totalCommitted` / `totalRaised` without creating a donation. RLS via donations view/manage helpers.
+**Campaign sponsorships (migration `284_campaign_sponsorship_prospects.sql`, extended `285_campaign_sponsorship_packages.sql`):** `sponsorship_packages` (campaign-scoped; optional related event), `sponsorship_package_benefits`, `campaign_sponsorships` (committed sponsor records; optional `prospect_id` / `event_id` / `sponsorship_package_id`), `campaign_sponsorship_benefits` (copied benefits + fulfillment). Separate from `pledges` and `payments`. Cash sponsorship commitments add to campaign `totalCommitted` only — not `totalRaised` (avoids double-counting payments). In-kind is reported separately and is not treated as cash collected. RLS via donations view/manage helpers.
 
 **Campaign groups (migration `263_campaign_groups.sql`):** `campaign_groups` with opaque `public_token`, optional `organizational_group_id` / `lead_contact_id`. `goal_amount` exists but is unused in the UI. Nullable `campaign_group_id` on `pledges` and `payments`. Staff RLS; public `/donate/g/{token}` resolves via service role (no anon table dump).
 
@@ -422,6 +423,7 @@ npx supabase db query --linked -f scripts/265_donations_granular_permissions.sql
 npx supabase db query --linked -f scripts/266_group_recurring_and_fd_emails.sql
 npx supabase db query --linked -f scripts/267_campaign_wishlist.sql
 npx supabase db query --linked -f scripts/284_campaign_sponsorship_prospects.sql
+npx supabase db query --linked -f scripts/285_campaign_sponsorship_packages.sql
 npm run validate:donations-security
 ```
 
@@ -472,6 +474,7 @@ campaign_prospect_activities.organization_id → organizations.id
 campaign_prospect_activities.campaign_id → campaigns.id
 campaign_prospect_activities.prospect_id → campaign_prospects.id
 sponsorship_packages.organization_id → organizations.id
+sponsorship_packages.campaign_id → campaigns.id
 sponsorship_packages.event_id → internal_events.id
 sponsorship_package_benefits.package_id → sponsorship_packages.id
 campaign_sponsorships.organization_id → organizations.id
@@ -480,6 +483,9 @@ campaign_sponsorships.event_id → internal_events.id
 campaign_sponsorships.contact_id → contacts.id
 campaign_sponsorships.prospect_id → campaign_prospects.id
 campaign_sponsorships.sponsorship_package_id → sponsorship_packages.id
+campaign_sponsorship_benefits.organization_id → organizations.id
+campaign_sponsorship_benefits.sponsorship_id → campaign_sponsorships.id
+campaign_sponsorship_benefits.package_benefit_id → sponsorship_package_benefits.id
 campaign_groups.organization_id → organizations.id
 campaign_groups.campaign_id → campaigns.id
 campaign_groups.organizational_group_id → contacts.id

@@ -309,19 +309,19 @@ export function InternalEventWorkspace({
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="outline">{overview.operationalPhaseLabel}</Badge>
             {canManage ? (
-              <>
-                <InternalEventStatusSelect
-                  eventId={event.id}
-                  status={event.status}
-                />
-                <InternalEventCardActions
-                  eventId={event.id}
-                  eventName={event.name}
-                  showEdit={false}
-                  deleteBlockedReason={deleteBlockedReason}
-                  redirectAfterDelete="/event-management"
-                />
-              </>
+              <InternalEventStatusSelect
+                eventId={event.id}
+                status={event.status}
+              />
+            ) : null}
+            {canManage ? (
+              <InternalEventCardActions
+                eventId={event.id}
+                eventName={event.name}
+                showEdit={false}
+                deleteBlockedReason={deleteBlockedReason}
+                redirectAfterDelete="/event-management/events"
+              />
             ) : null}
           </div>
         </div>

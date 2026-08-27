@@ -16,7 +16,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { PhoneText } from "@/components/ui/phone-text"
 import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
+import { formatPhoneDisplay } from "@/lib/ui/format-phone"
 import {
   fetchProgramEnrollmentReportAction,
   type ProgramEnrollmentReportRow,
@@ -148,7 +150,7 @@ export function ProgramEnrollmentsReportPanel({
           row.status || "",
           row.parentName || "",
           row.parentEmail || "",
-          row.parentPhone || "",
+          formatPhoneDisplay(row.parentPhone),
           row.enrolledAt || "",
         ]),
       ]
@@ -314,7 +316,7 @@ export function ProgramEnrollmentsReportPanel({
                     ) : null}
                     {row.parentPhone ? (
                       <div className="text-xs text-muted-foreground">
-                        {row.parentPhone}
+                        <PhoneText value={row.parentPhone} empty="" />
                       </div>
                     ) : null}
                   </TableCell>

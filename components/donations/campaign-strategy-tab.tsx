@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import Link from "next/link"
 import { Plus, Trash2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -26,6 +27,7 @@ import {
   type CampaignAskLevelRow,
 } from "@/lib/donations/campaign-ask-level-types"
 import { formatDonationCurrency } from "@/lib/donations/campaign-analytics"
+import { donationCampaignWorkspaceHref } from "@/lib/donations/campaign-workspace-paths"
 
 type CampaignStrategyTabProps = {
   campaignId: string
@@ -120,10 +122,10 @@ export function CampaignStrategyTab({
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold text-foreground">Gift / Ask Level Chart</h2>
+          <h2 className="text-base font-semibold text-foreground">Gift / Ask Strategy</h2>
           <p className="text-sm text-muted-foreground">
-            Plan how many gifts you need at each ask amount. Prospects can exceed the target
-            count.
+            Plan how many gifts you need at each ask level and track progress toward your campaign
+            target.
           </p>
         </div>
         {canManage ? (
@@ -300,8 +302,41 @@ export function CampaignStrategyTab({
                       <TableCell className="text-right tabular-nums">
                         {formatDonationCurrency(row.targetValue)}
                       </TableCell>
-                      <TableCell className="text-right tabular-nums">{row.prospects}</TableCell>
-                      <TableCell className="text-right tabular-nums">{row.asked}</TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {row.prospects > 0 ? (
+                          <Link
+                            href={donationCampaignWorkspaceHref(campaignId, {
+                              tab: "plan",
+                              section: "prospects",
+                              askType: "donation",
+                              askLevelId: row.askLevelId,
+                            })}
+                            className="font-medium text-primary underline-offset-4 hover:underline"
+                          >
+                            {row.prospects}
+                          </Link>
+                        ) : (
+                          row.prospects
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {row.asked > 0 ? (
+                          <Link
+                            href={donationCampaignWorkspaceHref(campaignId, {
+                              tab: "plan",
+                              section: "prospects",
+                              askType: "donation",
+                              askLevelId: row.askLevelId,
+                              asked: true,
+                            })}
+                            className="font-medium text-primary underline-offset-4 hover:underline"
+                          >
+                            {row.asked}
+                          </Link>
+                        ) : (
+                          row.asked
+                        )}
+                      </TableCell>
                       <TableCell className="text-right tabular-nums">
                         {row.securedCount}/{row.targetCount}
                       </TableCell>
@@ -346,9 +381,9 @@ export function CampaignStrategyTab({
       )}
 
       <p className="text-xs text-muted-foreground">
-        Prospects and Asked update when you add prospects on the Prospects tab. Secured uses
-        pledges linked to an ask level (or matching ask amount until then). Prospects may exceed
-        the target number of gifts.
+        Prospects counts donation prospects assigned to that ask level. Asked uses the Asked and
+        Pledged stages. Secured uses valid pledges linked to the ask level (or matching ask amount),
+        not a manually set prospect stage. Prospects may exceed the target number of gifts.
       </p>
     </div>
   )

@@ -273,9 +273,10 @@ export async function getCampaignDetailAction(campaignId: string) {
       access.orgId,
       campaignId
     )
-    if (sponsorshipTotals.committed > 0) {
-      entry.metrics.totalCommitted += sponsorshipTotals.committed
-      sourceBreakdown.totalRaised += sponsorshipTotals.committed
+    // Cash sponsorship commitments roll into campaign committed totals. Do not add them to
+    // totalRaised — collected donations already live on payments, and in-kind is not cash.
+    if (sponsorshipTotals.cash > 0) {
+      entry.metrics.totalCommitted += sponsorshipTotals.cash
     }
 
     return {

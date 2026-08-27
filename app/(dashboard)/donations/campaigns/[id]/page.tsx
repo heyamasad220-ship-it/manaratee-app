@@ -11,9 +11,8 @@ import { CampaignEditDialog } from "@/components/donations/campaign-edit-dialog"
 import { PledgeDetailsDialog } from "@/components/donations/pledge-details-dialog"
 import { CampaignGroupsTab } from "@/components/donations/campaign-groups-tab"
 import { CampaignOverviewTab } from "@/components/donations/campaign-overview-tab"
-import { CampaignProspectsTab } from "@/components/donations/campaign-prospects-tab"
+import { CampaignFundraisingPlanTab } from "@/components/donations/campaign-fundraising-plan-tab"
 import { CampaignSponsorsTab } from "@/components/donations/campaign-sponsors-tab"
-import { CampaignStrategyTab } from "@/components/donations/campaign-strategy-tab"
 import { CampaignWorkspaceNav } from "@/components/donations/campaign-workspace-nav"
 import { CampaignWishlistTab } from "@/components/donations/campaign-wishlist-tab"
 import { Card, CardContent } from "@/components/ui/card"
@@ -41,6 +40,8 @@ import type {
   CampaignAskLevelRow,
 } from "@/lib/donations/campaign-ask-level-types"
 import {
+  canonicalizeCampaignWorkspaceHref,
+  isFundraisingPlanTab,
   parseCampaignWorkspaceTab,
 } from "@/lib/donations/campaign-workspace-paths"
 import { donationPledgesHref } from "@/lib/donations/donation-pledge-paths"
@@ -269,6 +270,9 @@ export default function CampaignDetailPage() {
   const prospectAssignee = searchParams.get("assignee")
   const prospectStage = searchParams.get("stage")
   const prospectPledged = searchParams.get("pledged")
+  const prospectAskType = searchParams.get("askType")
+  const prospectAskLevelId = searchParams.get("askLevel")
+  const prospectAsked = searchParams.get("asked") === "1"
 
   const [campaign, setCampaign] = useState<CampaignRow | null>(null)
   const [entry, setEntry] = useState<CampaignAnalyticsEntry | null>(null)
@@ -453,6 +457,16 @@ export default function CampaignDetailPage() {
     void loadCampaign()
   }, [campaignId, loadCampaign])
 
+  useEffect(() => {
+    if (!campaignId) return
+    const canonical = canonicalizeCampaignWorkspaceHref(campaignId, searchParams)
+    if (!canonical) return
+    const current = `${window.location.pathname}${window.location.search}`
+    if (canonical !== current) {
+      router.replace(canonical)
+    }
+  }, [campaignId, router, searchParams])
+
   if (loading) {
     return <div className="p-6 text-muted-foreground">Loading campaign...</div>
   }
@@ -525,23 +539,16 @@ export default function CampaignDetailPage() {
             />
           ) : null}
 
-          {activeTab === "strategy" ? (
-            <CampaignStrategyTab
-              campaignId={campaign.id}
-              askLevels={askLevels}
-              askLevelMetrics={askLevelMetrics}
-              canManage={canManageCampaigns}
-              onSaved={() => void loadCampaign()}
-            />
-          ) : null}
-
-          {activeTab === "prospects" ? (
-            <CampaignProspectsTab
+          {isFundraisingPlanTab(activeTab) ? (
+            <CampaignFundraisingPlanTab
               campaignId={campaign.id}
               organizationId={campaign.organization_id}
               askLevels={askLevels}
-              canManage={canManageProspects}
-              onChanged={() => void loadCampaign()}
+              askLevelMetrics={askLevelMetrics}
+              canManageStrategy={canManageCampaigns}
+              canManageProspects={canManageProspects}
+              onStrategySaved={() => void loadCampaign()}
+              onProspectsChanged={() => void loadCampaign()}
               initialFollowUp={
                 prospectFollowUp === "overdue" || prospectFollowUp === "upcoming"
                   ? prospectFollowUp
@@ -554,6 +561,13 @@ export default function CampaignDetailPage() {
                   ? prospectPledged
                   : null
               }
+              initialAskType={
+                prospectAskType === "donation" || prospectAskType === "sponsorship"
+                  ? prospectAskType
+                  : null
+              }
+              initialAskLevelId={prospectAskLevelId}
+              initialAsked={prospectAsked}
             />
           ) : null}
 

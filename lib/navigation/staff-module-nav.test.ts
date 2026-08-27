@@ -54,18 +54,25 @@ describe("staff module nav", () => {
   })
 
   it("puts Reports on Event Management with Childcare under that prefix", () => {
-    const labels = buildEventManagementChildren().map((item) => item.label)
+    const children = buildEventManagementChildren()
+    const labels = children.map((item) => item.label)
     assert.deepEqual(labels, [
+      "Overview",
       "Events",
       "Master Calendar",
       "Ticketing",
       "Reports",
       "Settings",
     ])
-    const reports = buildEventManagementChildren().find(
-      (item) => item.label === "Reports"
-    )
+    const reports = children.find((item) => item.label === "Reports")
     assert.equal(reports?.href, "/event-management/reports")
     assert.equal(reports?.matchPrefix, "/event-management/reports")
+
+    const overview = children.find((item) => item.label === "Overview")
+    const events = children.find((item) => item.label === "Events")
+    assert.equal(overview?.href, "/event-management")
+    assert.equal(overview?.exact, true)
+    assert.equal(events?.href, "/event-management/events")
+    assert.equal(events?.matchPrefix, "/event-management")
   })
 })

@@ -39,6 +39,7 @@ import {
 } from "@/components/workforce/hr-directory-shell"
 import { StatCard, StatCardsRow } from "@/components/ui/stat-card"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { formatPhoneDisplay } from "@/lib/ui/format-phone"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -110,7 +111,7 @@ function downloadVolunteersCsv(rows: VolunteerListRow[]) {
       [
         row.name,
         row.email,
-        row.phone,
+        formatPhoneDisplay(row.phone),
         formatStatusLabel(row.status),
         row.joinDate || "",
         row.skills.join("; "),
@@ -459,11 +460,11 @@ export function VolunteersList() {
                           <div className="min-w-0">
                             <p className="font-medium">{row.name}</p>
                             <p className="truncate text-xs text-muted-foreground">
-                              {row.email || row.phone || "—"}
+                              {row.email || formatPhoneDisplay(row.phone) || "—"}
                             </p>
                             {row.email && row.phone ? (
                               <p className="truncate text-xs text-muted-foreground">
-                                {row.phone}
+                                {formatPhoneDisplay(row.phone)}
                               </p>
                             ) : null}
                           </div>

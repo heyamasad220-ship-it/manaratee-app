@@ -4,7 +4,7 @@ function getValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value
 }
 
-/** Former Dashboard — merged into Events (`/event-management`). */
+/** Former Dashboard — merged into Overview (`/event-management`). */
 export default async function EventManagementOverviewRedirectPage({
   searchParams,
 }: {

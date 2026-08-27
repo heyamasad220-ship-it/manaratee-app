@@ -168,6 +168,7 @@ export function isChildActive(
       other.label !== child.label &&
       subItemHasActiveDescendant(other, pathname, profileListSegment, searchParams) &&
       (other.matchPrefix.length > child.matchPrefix.length ||
+        Boolean(other.exact) ||
         Boolean(other.alsoMatchPrefixes?.length) ||
         Boolean(other.children?.length))
   )

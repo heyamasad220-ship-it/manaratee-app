@@ -5,6 +5,7 @@ import Link from "next/link"
 import { Search, ChevronUp, ChevronDown, Plus } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { PhoneText } from "@/components/ui/phone-text"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -320,7 +321,7 @@ export function CustomerList() {
                       {customer.email}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {customer.phone}
+                      <PhoneText value={customer.phone} empty="" />
                     </TableCell>
                     <TableCell>
                       <Badge

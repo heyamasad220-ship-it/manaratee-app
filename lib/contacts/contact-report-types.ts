@@ -3,14 +3,18 @@ import type {
   ContactRoleValue,
   ContactStatus,
 } from "@/lib/contacts/contact-constants"
-import type { ContactListRow } from "@/lib/contacts/contact-list-types"
+import type { ContactListRow, ContactListSortBy } from "@/lib/contacts/contact-list-types"
 
 export type ContactDirectoryReportFilters = {
   search?: string
+  nameFilter?: string
   recordType?: ContactRecordType | "all"
+  lockedRecordType?: ContactRecordType
   role?: ContactRoleValue | "all"
   status?: ContactStatus | "all"
   teamId?: string | "all"
+  sortBy?: ContactListSortBy
+  sortAsc?: boolean
 }
 
 export type ContactDirectoryReportSummary = {

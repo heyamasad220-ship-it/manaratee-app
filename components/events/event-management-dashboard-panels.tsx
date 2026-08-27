@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useTransition, type ReactNode } from "react"
+import { useTransition } from "react"
 import {
   CalendarCheck,
   Baby,
@@ -26,6 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { EVENT_MANAGEMENT_EVENTS_PATH } from "@/lib/events/event-management-section-path"
 import { CREATE_EVENT_CTA_LABEL } from "@/lib/events/facility-event-request-href"
 import type {
   DashboardAttentionItem,
@@ -118,17 +119,15 @@ function KpiCard({
   )
 }
 
-/** KPI header + attention panels; `eventsList` renders between them. */
+/** KPI header + attention panels. */
 export function EventManagementDashboardPanels({
   data,
   period,
   canManage,
-  eventsList,
 }: {
   data: EventManagementDashboardData
   period: DashboardTimePeriod
   canManage: boolean
-  eventsList: ReactNode
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -163,11 +162,14 @@ export function EventManagementDashboardPanels({
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Overview</h1>
           <p className="text-muted-foreground">
-            Monitor operations and manage internal department-owned events.
+            Monitor operations for internal department-owned events.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
+          <Button asChild size="sm" variant="outline">
+            <Link href={EVENT_MANAGEMENT_EVENTS_PATH}>View all events</Link>
+          </Button>
           {canManage ? (
             <Button asChild size="sm">
               <Link href="/facilities/calendar?openNew=1">
@@ -227,8 +229,6 @@ export function EventManagementDashboardPanels({
           label="Ticketed Events"
         />
       </div>
-
-      {eventsList}
 
       <section id="attention-required" className="space-y-3">
         <div>

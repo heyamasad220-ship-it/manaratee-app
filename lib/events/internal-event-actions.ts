@@ -32,8 +32,12 @@ import {
 } from "@/lib/community-calendar/calendar-visibility"
 import { COMMUNITY_CALENDAR_PATH } from "@/lib/community-calendar/routes"
 
-import type { InternalEventStatus } from "./internal-event-status"
-import { INTERNAL_EVENT_STATUSES } from "./internal-event-status"
+import type { InternalEventStatus, InternalEventStatusMenuValue } from "./internal-event-status"
+import {
+  INTERNAL_EVENT_STATUSES,
+  fromInternalEventStatusMenuValue,
+  isInternalEventPendingApproval,
+} from "./internal-event-status"
 import {
   INTERNAL_EVENT_LOCATION_TYPES,
   isInternalEventLocationType,
@@ -450,6 +454,7 @@ async function assertInternalEventSpacesAvailable(input: {
 
 function revalidateInternalEventPaths(eventId?: string) {
   revalidatePath("/event-management")
+  revalidatePath("/event-management/events")
   revalidatePath("/event-management/calendar")
   revalidatePath(COMMUNITY_CALENDAR_PATH)
   revalidatePath("/facilities/availability")
@@ -1152,6 +1157,29 @@ export async function updateInternalEventStatus(
 
   revalidateInternalEventPaths(id)
   revalidatePath(`/event-management/${id}`)
+}
+
+export async function setInternalEventStatusFromMenu(
+  eventId: string,
+  menuValue: InternalEventStatusMenuValue
+) {
+  const event = await getInternalEventRecordById(eventId)
+  if (!event) {
+    throw new Error("Event not found.")
+  }
+
+  if (
+    menuValue === "approved" &&
+    isInternalEventPendingApproval(event.status)
+  ) {
+    await approveInternalEventRequest(eventId)
+    return
+  }
+
+  await updateInternalEventStatus(
+    eventId,
+    fromInternalEventStatusMenuValue(menuValue)
+  )
 }
 
 export async function deleteInternalEvent(
