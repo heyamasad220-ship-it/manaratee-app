@@ -142,7 +142,7 @@ type TicketingOrdersClientProps = {
 export function TicketingOrdersClient({
   orders,
   events,
-  initialEventFilter = "all",
+  initialEventFilter = "active",
   canManage,
 }: TicketingOrdersClientProps) {
   const router = useRouter()
@@ -310,7 +310,7 @@ export function TicketingOrdersClient({
               <Label>Events</Label>
               <Select value={eventFilter} onValueChange={setEventFilter}>
                 <SelectTrigger>
-                  <SelectValue placeholder="All events" />
+                  <SelectValue placeholder="Active events" />
                 </SelectTrigger>
                 <SelectContent className="max-h-80">
                   <SelectItem value="all">All events</SelectItem>

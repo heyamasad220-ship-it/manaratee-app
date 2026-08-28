@@ -57,6 +57,81 @@ export function buildEventRecentActivity(input: {
     .slice(0, input.limit ?? 12)
 }
 
+export function buildEventRecentOrders(
+  attendees: Array<{
+    orderId: string
+    orderNumber: string
+    orderStatus: string
+    orderTotalCents: number
+    orderRefundedCents: number
+    currency: string
+    purchaserName: string | null
+    attendeeName: string | null
+    orderCreatedAt: string | null
+    createdAt: string
+  }>,
+  limit = 4
+): EventRecentActivityItem[] {
+  const orders = new Map<
+    string,
+    {
+      orderNumber: string
+      orderStatus: string
+      orderTotalCents: number
+      orderRefundedCents: number
+      currency: string
+      name: string
+      when: string
+    }
+  >()
+
+  for (const row of attendees) {
+    if (!row.orderId) continue
+    const when = row.orderCreatedAt || row.createdAt
+    if (!when) continue
+    if (orders.has(row.orderId)) continue
+    orders.set(row.orderId, {
+      orderNumber: row.orderNumber || "Order",
+      orderStatus: row.orderStatus,
+      orderTotalCents: row.orderTotalCents,
+      orderRefundedCents: row.orderRefundedCents,
+      currency: row.currency || "USD",
+      name: row.purchaserName || row.attendeeName || "Guest",
+      when,
+    })
+  }
+
+  return [...orders.entries()]
+    .map(([orderId, order]) => {
+      const refunded = order.orderRefundedCents > 0
+      const amount = formatOrderAmount(
+        refunded ? order.orderRefundedCents : order.orderTotalCents,
+        order.currency
+      )
+      const isPartial =
+        refunded &&
+        (order.orderStatus === "partially_refunded" ||
+          order.orderRefundedCents < order.orderTotalCents)
+      const label = refunded
+        ? `${isPartial ? "Partial refund" : "Refund"} · ${order.orderNumber} · ${amount}`
+        : `Order ${order.orderNumber} · ${order.name} · ${amount}`
+      return {
+        id: `order-${orderId}`,
+        when: order.when,
+        label,
+      }
+    })
+    .sort((a, b) => new Date(b.when).getTime() - new Date(a.when).getTime())
+    .slice(0, limit)
+}
+
+function formatOrderAmount(cents: number, currency: string) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+  }).format(cents / 100)
+}
+
 export function formatActivityWhen(value: string) {
   return new Date(value).toLocaleString(undefined, {
     month: "short",

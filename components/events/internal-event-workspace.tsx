@@ -31,7 +31,7 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { formatInternalEventLocation } from "@/lib/events/internal-event-location"
-import { buildEventRecentActivity } from "@/lib/events/event-recent-activity"
+import { buildEventRecentOrders } from "@/lib/events/event-recent-activity"
 import type { EventOverviewSummary } from "@/lib/events/event-overview-metrics"
 import type { EventExpense } from "@/lib/events/event-expense-types"
 import type {
@@ -165,10 +165,7 @@ export function InternalEventWorkspace({
   const staffTaskDefinitions = getEventTaskDefinitionsFromRequirements(
     event.service_requirements
   )
-  const recentActivity = buildEventRecentActivity({
-    attendees,
-    staffParticipations: participations,
-  })
+  const recentActivity = buildEventRecentOrders(attendees, 4)
 
   function handleTabChange(value: string) {
     const nextTab = resolveWorkspaceTabId(value)
@@ -340,8 +337,6 @@ export function InternalEventWorkspace({
               overview={overview}
               canManage={canManage}
               eventId={event.id}
-              departmentName={departmentName}
-              eventTypeName={eventTypeName}
               coordinatorName={coordinatorName}
               details={overviewDetails}
               recentActivity={recentActivity}

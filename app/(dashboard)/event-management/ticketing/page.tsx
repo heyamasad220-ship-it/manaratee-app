@@ -19,7 +19,8 @@ export default async function EventManagementTicketingOverviewPage() {
       <div>
         <h2 className="text-lg font-semibold tracking-tight">Overview</h2>
         <p className="text-sm text-muted-foreground">
-          Ticket sales and capacity for each ticketed event.
+          Ticket sales and capacity across all ticketed events. The table lists
+          active events. Use the Events tab to browse by category.
         </p>
       </div>
       <TicketingOverviewTable events={events} canManage={canManage} />

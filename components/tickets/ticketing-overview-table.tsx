@@ -1,112 +1,18 @@
 "use client"
 
 import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { useState, useTransition } from "react"
-import { CheckCircle2, Ticket } from "lucide-react"
+import { useMemo } from "react"
+import { CalendarCheck, CalendarDays, DollarSign, Ticket } from "lucide-react"
 
+import { TicketingEventSalesTable } from "@/components/tickets/ticketing-event-sales-table"
 import { Button } from "@/components/ui/button"
-import { Progress } from "@/components/ui/progress"
+import { StatCard, StatCardsRow } from "@/components/ui/stat-card"
+import { filterTicketedEventsByWhen } from "@/lib/tickets/ticketing-event-category-groups"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import { cn } from "@/lib/utils"
-import { updateEventTicketingSalesStatus } from "@/lib/tickets/ticket-order-actions"
-import {
-  formatEventSchedule,
+  summarizeTicketedEventsOverview,
   type TicketedEventOverviewRow,
 } from "@/lib/tickets/ticketing-overview-types"
-import {
-  TICKETING_SALES_STATUS_LABELS,
-  formatTicketPrice,
-  type TicketingSalesStatus,
-} from "@/lib/tickets/ticket-types"
-
-function salesStatusClass(status: TicketingSalesStatus) {
-  if (status === "published") {
-    return "border-emerald-200 bg-emerald-50 text-emerald-700"
-  }
-  if (status === "sales_closed") {
-    return "border-slate-200 bg-slate-50 text-slate-700"
-  }
-  return "border-amber-200 bg-amber-50 text-amber-700"
-}
-
-function EventSalesStatusSelect({
-  eventId,
-  value,
-  disabled,
-}: {
-  eventId: string
-  value: TicketingSalesStatus
-  disabled?: boolean
-}) {
-  const router = useRouter()
-  const [isPending, startTransition] = useTransition()
-  const [error, setError] = useState<string | null>(null)
-
-  function handleChange(next: TicketingSalesStatus) {
-    setError(null)
-    startTransition(async () => {
-      try {
-        await updateEventTicketingSalesStatus(eventId, next)
-        router.refresh()
-      } catch (changeError) {
-        setError(
-          changeError instanceof Error
-            ? changeError.message
-            : "Could not update status."
-        )
-      }
-    })
-  }
-
-  return (
-    <div className="space-y-1">
-      <Select
-        value={value}
-        onValueChange={handleChange}
-        disabled={disabled || isPending}
-      >
-        <SelectTrigger
-          className={cn(
-            "h-8 w-[150px] border text-xs font-medium",
-            salesStatusClass(value)
-          )}
-        >
-          <div className="flex items-center gap-1.5">
-            {value === "published" ? (
-              <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-            ) : null}
-            <SelectValue />
-          </div>
-        </SelectTrigger>
-        <SelectContent>
-          {(
-            Object.keys(TICKETING_SALES_STATUS_LABELS) as TicketingSalesStatus[]
-          ).map((status) => (
-            <SelectItem key={status} value={status}>
-              {TICKETING_SALES_STATUS_LABELS[status]}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      {error ? <p className="text-xs text-red-600">{error}</p> : null}
-    </div>
-  )
-}
+import { formatTicketPrice } from "@/lib/tickets/ticket-types"
 
 export function TicketingOverviewTable({
   events,
@@ -115,6 +21,12 @@ export function TicketingOverviewTable({
   events: TicketedEventOverviewRow[]
   canManage: boolean
 }) {
+  const summary = useMemo(() => summarizeTicketedEventsOverview(events), [events])
+  const activeEvents = useMemo(
+    () => filterTicketedEventsByWhen(events, "active"),
+    [events]
+  )
+
   if (events.length === 0) {
     return (
       <div className="rounded-lg border bg-card p-10 text-center">
@@ -132,82 +44,67 @@ export function TicketingOverviewTable({
   }
 
   return (
-    <div className="overflow-hidden rounded-lg border bg-card">
-      <Table>
-        <TableHeader>
-          <TableRow className="hover:bg-transparent">
-            <TableHead className="min-w-[280px]">Event</TableHead>
-            <TableHead className="w-[170px]">Status</TableHead>
-            <TableHead className="w-[90px] text-right">Issued</TableHead>
-            <TableHead className="w-[110px] text-right">Remaining</TableHead>
-            <TableHead className="w-[120px] text-right">Revenue</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {events.map((event) => {
-            const location =
-              event.venueName || event.locationLabel || "Location TBD"
-            const schedule = formatEventSchedule(event.startAt, event.endAt)
-            const progressValue =
-              event.ticketsCapacity && event.ticketsCapacity > 0
-                ? Math.min(
-                    Math.round(
-                      (event.ticketsIssued / event.ticketsCapacity) * 100
-                    ),
-                    100
-                  )
-                : event.ticketsIssued > 0
-                  ? 100
-                  : 0
+    <div className="space-y-4">
+      <StatCardsRow equal columns={4}>
+        <StatCard
+          label="Total events"
+          value={summary.totalEvents.toLocaleString()}
+          icon={CalendarDays}
+          hint={`${summary.pastEvents.toLocaleString()} past`}
+          layout="compact"
+          fill
+          tone="slate"
+        />
+        <StatCard
+          label="Active events"
+          value={summary.activeEvents.toLocaleString()}
+          icon={CalendarCheck}
+          hint="Upcoming or in progress"
+          layout="compact"
+          fill
+          tone="emerald"
+        />
+        <StatCard
+          label="Tickets issued"
+          value={summary.ticketsIssued.toLocaleString()}
+          icon={Ticket}
+          hint="All ticketed events"
+          layout="compact"
+          fill
+          tone="violet"
+        />
+        <StatCard
+          label="Revenue"
+          value={formatTicketPrice(summary.revenueCents, summary.currency)}
+          icon={DollarSign}
+          hint="Completed ticket sales"
+          layout="compact"
+          fill
+          tone="blue"
+        />
+      </StatCardsRow>
 
-            return (
-              <TableRow key={event.id}>
-                <TableCell>
-                  <div className="space-y-0.5">
-                    <Link
-                      href={`/event-management/${event.id}`}
-                      className="font-medium text-primary hover:underline"
-                    >
-                      {event.name}
-                    </Link>
-                    <p className="text-sm text-muted-foreground">{location}</p>
-                    <p className="text-sm text-muted-foreground">{schedule}</p>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <EventSalesStatusSelect
-                    eventId={event.id}
-                    value={event.salesStatus}
-                    disabled={!canManage}
-                  />
-                </TableCell>
-                <TableCell className="align-top text-right font-medium">
-                  <div className="space-y-2">
-                    <span>{event.ticketsIssued}</span>
-                    <Progress value={progressValue} className="h-2" />
-                  </div>
-                </TableCell>
-                <TableCell className="align-top text-right font-medium">
-                  <div className="space-y-2">
-                    <span>
-                      {event.ticketsRemaining == null
-                        ? "—"
-                        : event.ticketsRemaining}
-                    </span>
-                    <Progress
-                      value={100 - progressValue}
-                      className="h-2 opacity-40"
-                    />
-                  </div>
-                </TableCell>
-                <TableCell className="align-top text-right font-medium">
-                  {formatTicketPrice(event.revenueCents, event.currency)}
-                </TableCell>
-              </TableRow>
-            )
-          })}
-        </TableBody>
-      </Table>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm font-medium">Active events</p>
+          <Button asChild size="sm" variant="outline">
+            <Link href="/event-management/ticketing/events">View all events</Link>
+          </Button>
+        </div>
+        {activeEvents.length === 0 ? (
+          <div className="rounded-lg border bg-card p-10 text-center text-sm text-muted-foreground">
+            No active ticketed events.{" "}
+            <Link
+              href="/event-management/ticketing/events"
+              className="font-medium text-primary hover:underline"
+            >
+              View all events
+            </Link>
+          </div>
+        ) : (
+          <TicketingEventSalesTable events={activeEvents} canManage={canManage} />
+        )}
+      </div>
     </div>
   )
 }

@@ -14,7 +14,7 @@ export default async function EventManagementTicketingOrdersPage({
   await requireAnyPermission(PERMISSIONS.EVENTS_VIEW, PERMISSIONS.PROGRAMS_VIEW)
 
   const params = await searchParams
-  const initialEventFilter = params.event || "all"
+  const initialEventFilter = params.event || "active"
 
   const [orders, events, canManage] = await Promise.all([
     getTicketOrders(),

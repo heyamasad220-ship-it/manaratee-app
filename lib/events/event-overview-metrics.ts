@@ -165,17 +165,6 @@ export async function getEventOverviewSummary(input: {
       value: operationalPhaseLabel,
     },
   ]
-  if (attendanceMode !== "open_public" || registered > 0) {
-    kpis.push({
-      id: "attendees",
-      label: "Registered",
-      value:
-        capacityFromTypes != null
-          ? `${registered} / ${capacityFromTypes}`
-          : String(registered),
-      hint: capacityFromTypes != null ? "vs offering capacity" : undefined,
-    })
-  }
   if (features.registration || finance.ticketRevenueCents > 0) {
     if (finance.ticketRevenueCents > 0 || attendanceMode === "paid" || attendanceMode === "paid_and_free") {
       kpis.push({
@@ -226,12 +215,6 @@ export async function getEventOverviewSummary(input: {
         hint: "Linked donations campaign",
       })
     }
-    kpis.push({
-      id: "net",
-      label: "Event net",
-      value: formatMoney(finance.netCents, finance.currency),
-      hint: "Tickets + gifts − refunds − expenses",
-    })
   }
 
   const alerts: EventOverviewAlert[] = []

@@ -2,6 +2,7 @@ import { revalidatePath } from "next/cache"
 
 const TICKETING_PATHS = [
   "/event-management/ticketing",
+  "/event-management/ticketing/events",
   "/event-management/ticketing/orders",
   "/event-management/ticketing/reports",
   "/event-management/ticketing/settings",

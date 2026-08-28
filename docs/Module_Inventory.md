@@ -509,11 +509,13 @@ Status: Working (shared)
 Status: In progress
 
 * Staff flyout: **Overview** (`/event-management`) · **Events** (`/event-management/events`) · Master Calendar · Ticketing · Reports · Settings
-* Ticketing Overview issued/revenue includes inactive historical ticket types and pages all completed orders (not the first 1,000 only)
+* Ticketing Overview KPI cards show total events, active events, tickets issued, and revenue; the table lists active events with a **View all events** link to the Events tab. Issued/revenue include inactive historical ticket types and page all completed orders (not the first 1,000 only)
+* Ticketing Orders defaults the Events filter to **Active events** (All / Past / a specific event remain available)
+* Ticketing **Events** tab is one table with Overview sales columns plus a **Category** dropdown after Event (`ticketing_event_categories`, SQL `287`); Overview is the sales snapshot with KPI cards
 * Events catalog is the view/manage list (search, department, Active/Draft/Past). Opening a row goes to `/event-management/[id]`.
 * Progressive tabs via `workspace_features` + `ticketing_config.attendanceMode` (SQL `252`)
 * Expenses ledger: `event_expenses` / `event-expense-actions.ts`
-* UI: overview dashboard, registration workspace, finance, reports (attendee CSV), feature switches
+* UI: overview dashboard (colorful KPI row, Finance with revenue/expenses/net, Recent orders at bottom), registration workspace, finance, reports (attendee CSV), feature switches
 * Public registration on `/o/[orgSlug]/events/[eventId]` with sale-window enforcement (`createPublicEventRegistration`)
 * Paid public tickets: Stripe Checkout on org Connect (`ticket-stripe.ts`); same donations webhook `POST /api/webhooks/stripe/donations` when `manaratee_module=ticketing`. Fallback: pay at event + staff **Mark paid**. SQL `255`
 * Staff **Refund** / Ticketing **Cancel/refund** refund Stripe Connect charges (`refundEventTicketOrder`). Full remaining voids tickets; partial keeps seats valid (`partially_refunded`, SQL `258` `refunded_amount_cents`). Dashboard `charge.refunded` is idempotent and applies Stripe’s refunded total.

@@ -35,19 +35,19 @@ async function fetchAllPages<T>(
   return { data: rows, error: null }
 }
 
-export async function getTicketedEventsOverview(): Promise<TicketedEventOverviewRow[]> {
-  const supabase = await createClient()
-  const organizationId = await getSelectedOrganizationId()
+const EVENT_SELECT = `
+        id,
+        name,
+        start_at,
+        end_at,
+        location_label,
+        ticketing_config,
+        ticketing_category_id,
+        ticketing_event_categories:ticketing_category_id ( name ),
+        venues:venue_id ( name )
+      `
 
-  if (!organizationId) {
-    return []
-  }
-
-  const eventsResult = await fetchAllPages((from, to) =>
-    supabase
-      .from("internal_events")
-      .select(
-        `
+const EVENT_SELECT_WITHOUT_CATEGORY = `
         id,
         name,
         start_at,
@@ -56,12 +56,30 @@ export async function getTicketedEventsOverview(): Promise<TicketedEventOverview
         ticketing_config,
         venues:venue_id ( name )
       `
-      )
-      .eq("organization_id", organizationId)
-      .eq("requires_ticketing", true)
-      .order("start_at", { ascending: false, nullsFirst: false })
-      .range(from, to)
-  )
+
+export async function getTicketedEventsOverview(): Promise<TicketedEventOverviewRow[]> {
+  const supabase = await createClient()
+  const organizationId = await getSelectedOrganizationId()
+
+  if (!organizationId) {
+    return []
+  }
+
+  const loadEvents = (select: string) =>
+    fetchAllPages((from, to) =>
+      supabase
+        .from("internal_events")
+        .select(select)
+        .eq("organization_id", organizationId)
+        .eq("requires_ticketing", true)
+        .order("start_at", { ascending: false, nullsFirst: false })
+        .range(from, to)
+    )
+
+  let eventsResult = await loadEvents(EVENT_SELECT)
+  if (eventsResult.error?.code === "42703") {
+    eventsResult = await loadEvents(EVENT_SELECT_WITHOUT_CATEGORY)
+  }
 
   if (eventsResult.error) {
     if (eventsResult.error.code === "42P01" || eventsResult.error.code === "42703") {
@@ -183,6 +201,11 @@ export async function getTicketedEventsOverview(): Promise<TicketedEventOverview
       ticketsRemaining: remaining,
       revenueCents: revenue.cents,
       currency: revenue.currency,
+      ticketingCategoryId: (row.ticketing_category_id as string | null) ?? null,
+      ticketingCategoryName:
+        (Array.isArray(row.ticketing_event_categories)
+          ? row.ticketing_event_categories[0]?.name
+          : row.ticketing_event_categories?.name) ?? null,
     }
   })
 }
