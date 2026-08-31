@@ -33,6 +33,9 @@ export default async function ProgramsReportsPage({
   if (tab === "enrollments") {
     redirect("/programs/reports/enrollments")
   }
+  if (tab === "year-comparison" || tab === "growth" || tab === "year-over-year") {
+    redirect("/programs/reports/year-comparison")
+  }
   if (tab === "tuition-plans" || tab === "payment-summary") {
     redirect("/programs/reports/tuition-plans")
   }

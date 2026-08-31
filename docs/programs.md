@@ -385,7 +385,7 @@ Programs module home (`/programs`) titled **Overview**, with breadcrumb `Dashboa
 | Registrations | `/programs/registrations` | `reports.view` / `programs.view` |
 | Finance | `/finance/transactions` (Payroll `/finance/payroll`) | `finance.view` / `staff.view` |
 | Financial Assistance | `/finance/financial-assistance` (legacy `/programs/financial-assistance` redirects) | `applications.view` / `finance.view` |
-| Reports | `/programs/reports/enrollments` | `reports.view` — Enrollments / Add-ons / Payment Summary / Waitlist / Attendance |
+| Reports | `/programs/reports/enrollments` | `reports.view` — Enrollments / Year comparison / Add-ons / Payment Summary / Waitlist / Attendance |
 
 ### Program management routes
 
@@ -395,7 +395,7 @@ Programs module home (`/programs`) titled **Overview**, with breadcrumb `Dashboa
 | `/programs/list` | All programs (years/seasons) with Academic/Seasonal tags |
 | `/programs/catalog` | Offerings catalog (active offerings; flyer inherits from parent program when offering has none) |
 | `/programs/create` | **Quick Create** — basics + eligibility; redirects to `/programs/[id]` after save |
-| `/programs/[id]` | Program workspace (Overview / Offerings / Registrations / Schedule / Finance / Reports / Settings). **Schedule → Class times** is a Week Board of offering times (plus List). **Registrations** is the operational roster. **Reports** is Overview / Trends / Attendance (drill-down into Registrations). Finance and Reports are locked to that program. Orphan years keep standalone detail. |
+| `/programs/[id]` | Program workspace (Overview / Offerings / Registrations / Schedule / Finance / Reports / Settings). **Schedule → Class times** is a Week Board of offering times (plus List). **Registrations** is the operational roster. **Reports** is Overview / Trends / Year comparison / Attendance (drill-down into Registrations). Finance and Reports are locked to that program. Orphan years keep standalone detail. |
 | `/programs/[id]/offerings` | Redirects to first non-archived offering manage page (or program detail if none) |
 | `/programs/[id]/offerings/[offeringId]` | **Offering manage** (orphan years). Department-linked years use `/workforce/departments/[id]/programs/[programId]/offerings/[offeringId]` instead. |
 | `/programs/[id]/edit` | **Retired** — redirects to detail or offering manage (legacy deep links) |
@@ -409,6 +409,7 @@ Programs module home (`/programs`) titled **Overview**, with breadcrumb `Dashboa
 | `/programs/schedule` | Legacy redirect: `?program=` → offering Schedule; bare → `/programs/list`. Activity planner is on Program Workspace → Schedule → Activity planner |
 | `/programs/calendar` | Legacy redirect → `/facilities/calendar` (space availability) |
 | `/programs/reports` | Reports |
+| `/programs/reports/year-comparison` | Year-to-year enrollment growth (participants, families, new vs returning). Year and program names open `/programs/[id]?tab=reports&section=year-comparison` (a shared year opens the largest program). |
 | `/programs/settings` | Redirects to `/workforce?tab=departments` (settings live on each department / program / event) |
 | `/programs/settings/service-needs` | Redirects to `/event-management` (Service Needs is on Event workspace Settings) |
 

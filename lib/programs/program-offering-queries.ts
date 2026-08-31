@@ -155,6 +155,36 @@ export async function getOfferingCountsByProgramIds(programIds: string[]) {
   return counts
 }
 
+/** Exact enrollment totals per program. Avoids the PostgREST 1,000-row select cap. */
+export async function countEnrollmentsByProgramIds(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  organizationId: string,
+  programIds: string[],
+  statuses: string[]
+): Promise<Map<string, number>> {
+  const counts = new Map<string, number>(programIds.map((id) => [id, 0]))
+  if (programIds.length === 0) return counts
+
+  const results = await Promise.all(
+    programIds.map(async (programId) => {
+      const { count, error } = await supabase
+        .from("program_enrollments")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", organizationId)
+        .eq("program_id", programId)
+        .in("status", statuses)
+      if (error) {
+        console.error("countEnrollmentsByProgramIds:", error.message)
+        return [programId, 0] as const
+      }
+      return [programId, count ?? 0] as const
+    })
+  )
+
+  for (const [id, n] of results) counts.set(id, n)
+  return counts
+}
+
 export type ProgramListStats = {
   offeringCount: number
   enrolled: number
@@ -182,7 +212,7 @@ export async function getProgramListStatsByProgramIds(
 
   const { data: offerings, error: offeringsError } = await supabase
     .from("program_offerings")
-    .select("id, program_id")
+    .select("program_id")
     .eq("organization_id", organizationId)
     .in("program_id", programIds)
     .neq("status", "archived")
@@ -197,44 +227,20 @@ export async function getProgramListStatsByProgramIds(
   }
 
   const offeringCountByProgram = new Map<string, number>()
-  const offeringToProgram = new Map<string, string>()
-  const offeringIds: string[] = []
   for (const row of offerings || []) {
     const programId = row.program_id as string
-    const offeringId = row.id as string
     offeringCountByProgram.set(
       programId,
       (offeringCountByProgram.get(programId) || 0) + 1
     )
-    offeringToProgram.set(offeringId, programId)
-    offeringIds.push(offeringId)
   }
 
-  const enrolledByProgram = new Map<string, number>()
-  if (offeringIds.length > 0) {
-    const { data: enrollments, error: enrollmentsError } = await supabase
-      .from("program_enrollments")
-      .select("offering_id")
-      .eq("organization_id", organizationId)
-      .in("offering_id", offeringIds)
-      .in("status", ["enrolled", "active"])
-
-    if (enrollmentsError) {
-      console.error(
-        "getProgramListStatsByProgramIds enrollments:",
-        enrollmentsError.message
-      )
-    } else {
-      for (const row of enrollments || []) {
-        const programId = offeringToProgram.get(row.offering_id as string)
-        if (!programId) continue
-        enrolledByProgram.set(
-          programId,
-          (enrolledByProgram.get(programId) || 0) + 1
-        )
-      }
-    }
-  }
+  const enrolledByProgram = await countEnrollmentsByProgramIds(
+    supabase,
+    organizationId,
+    programIds,
+    ["enrolled", "active"]
+  )
 
   for (const programId of programIds) {
     result.set(programId, {

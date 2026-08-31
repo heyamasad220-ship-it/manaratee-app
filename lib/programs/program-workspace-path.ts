@@ -25,7 +25,11 @@ export type ProgramFinanceSection =
   | "payment-summary"
   | "addons"
 
-export type ProgramReportsSection = "enrollments" | "attendance" | "trends"
+export type ProgramReportsSection =
+  | "enrollments"
+  | "attendance"
+  | "trends"
+  | "year-comparison"
 
 export function parseProgramWorkspaceTab(
   value: string | null | undefined
@@ -118,6 +122,9 @@ export function parseProgramReportsSection(
 ): ProgramReportsSection {
   if (section === "attendance") return "attendance"
   if (section === "trends") return "trends"
+  if (section === "year-comparison" || section === "growth") {
+    return "year-comparison"
+  }
   return "enrollments"
 }
 

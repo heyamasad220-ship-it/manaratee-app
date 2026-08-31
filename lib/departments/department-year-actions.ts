@@ -25,6 +25,7 @@ import {
   getCurrentUserPermissionContext,
   hasPermission,
 } from "@/lib/permissions/permissions"
+import { countEnrollmentsByProgramIds } from "@/lib/programs/program-offering-queries"
 import { createProgram } from "@/lib/programs/program-actions"
 import { copyOfferingCapacityGroups } from "@/lib/programs/program-capacity-group-actions"
 import { createProgramOffering } from "@/lib/programs/program-offering-actions"
@@ -114,25 +115,20 @@ async function mapProgramsWithOfferingCounts(
   const supabase = await createClient()
   const ids = programs.map((p) => p.id)
 
-  const [{ data: offerings }, { data: enrollments }] = await Promise.all([
+  const [{ data: offerings }, enrolledByProgram] = await Promise.all([
     supabase
       .from("program_offerings")
       .select("program_id, capacity, capacity_mode")
       .eq("organization_id", organizationId)
       .in("program_id", ids)
       .neq("status", "archived"),
-    supabase
-      .from("program_enrollments")
-      .select("program_id")
-      .eq("organization_id", organizationId)
-      .in("program_id", ids)
-      .in("status", [
-        "pending_payment",
-        "pending",
-        "enrolled",
-        "active",
-        "completed",
-      ]),
+    countEnrollmentsByProgramIds(supabase, organizationId, ids, [
+      "pending_payment",
+      "pending",
+      "enrolled",
+      "active",
+      "completed",
+    ]),
   ])
 
   const offeringCounts = new Map<string, number>()
@@ -150,12 +146,6 @@ async function mapProgramsWithOfferingCounts(
     } else {
       unlimitedPrograms.add(pid)
     }
-  }
-
-  const enrolledByProgram = new Map<string, number>()
-  for (const row of enrollments || []) {
-    const pid = row.program_id as string
-    enrolledByProgram.set(pid, (enrolledByProgram.get(pid) || 0) + 1)
   }
 
   return programs.map((p) => {

@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils"
 export type ProgramsReportsTabId =
   | "enrollment"
   | "enrollments"
+  | "year-comparison"
   | "attendance"
   | "waitlist"
   | "transactions"
@@ -30,6 +31,11 @@ export const PROGRAMS_REPORTS_TABS: ProgramsReportsTab[] = [
     id: "enrollments",
     label: "Enrollments",
     href: "/programs/reports/enrollments",
+  },
+  {
+    id: "year-comparison",
+    label: "Year comparison",
+    href: "/programs/reports/year-comparison",
   },
   {
     id: "addons",
@@ -86,6 +92,12 @@ export function resolveProgramsReportsTab(
     pathname.startsWith("/programs/reports/enrollments/")
   ) {
     return "enrollments"
+  }
+  if (
+    pathname === "/programs/reports/year-comparison" ||
+    pathname.startsWith("/programs/reports/year-comparison/")
+  ) {
+    return "year-comparison"
   }
   if (
     pathname === "/programs/registrations" ||

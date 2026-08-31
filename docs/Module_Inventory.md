@@ -73,10 +73,11 @@ Features:
 * Organization filtering
 * Program details
 * **Program Catalog** — staff Offerings page `/programs/catalog` is an org-wide admin table of existing offerings (not a second model). Customer `/customer/programs` and public `/o/[orgSlug]/programs` remain card catalogs (public visibility; join to register)
-* **Programs Home** — rail item opens `/programs` (titled Overview; breadcrumb `Dashboard > Programs > Overview`; colored whole-card links; no module tabs). Nested pages keep **Programs** in the breadcrumb pointing at `/programs`. Reports and Finance keep their own secondary tab bars. `/programs/list` is all years/seasons with an Academic or Seasonal tag; cards show department, dates, offering count, and total enrolled. Filters: search, department, type, status (default Active; Closed / Archived / All available). **New Program** opens `/programs/create`. `/programs/[id]` is the program workspace (**Overview | Offerings | Applications** (Application & Approval only) **| Registrations | Schedule | Finance | Reports | Settings**; Finance is Transactions | Payment Summary | Add-ons; Reports is Overview | Trends | Attendance; both are already filtered to that program). Overview is a compact health dashboard (KPIs, needs attention, offerings preview, financial summary, recent activity). **Schedule → Class times** is a weekly **Week Board** of offering cards (plus **List** table); Activity planner is unchanged. Department Programs tab is a summary doorway into that workspace.
+* **Programs Home** — rail item opens `/programs` (titled Overview; breadcrumb `Dashboard > Programs > Overview`; colored whole-card links; no module tabs). Nested pages keep **Programs** in the breadcrumb pointing at `/programs`. Reports and Finance keep their own secondary tab bars. `/programs/list` is all years/seasons with an Academic or Seasonal tag; cards show department, dates, offering count, and total enrolled. Filters: search, department, type, status (default Active; Closed / Archived / All available). **New Program** opens `/programs/create`. `/programs/[id]` is the program workspace (**Overview | Offerings | Applications** (Application & Approval only) **| Registrations | Schedule | Finance | Reports | Settings**; Finance is Transactions | Payment Summary | Add-ons; Reports is Overview | Trends | Year comparison | Attendance; both are already filtered to that program). Overview is a compact health dashboard (KPIs, needs attention, offerings preview, financial summary, recent activity). **Schedule → Class times** is a weekly **Week Board** of offering cards (plus **List** table); Activity planner is unchanged. Department Programs tab is a summary doorway into that workspace.
 * Eligibility rules (ages, grades, gender, capacity groups)
 * Registration model, eligibility, capacity, and fee plans (offering overview + edit dialog Advanced; unified fees + discounts save with dialog Save; run `scripts/200_program_pricing_billing_scope.sql`)
 * Program detail **Reports** — Overview (enrollment summary + by offering, drill-down to Registrations), Trends, Attendance
+* **Year comparison** (org-wide Programs → Reports, and Program Workspace → Reports) — participants/families, new vs returning vs dropped, participant line chart + family stacked bars by program series or department. Year/program names open the matching workspace (a shared year opens the largest program). Org: `/programs/reports/year-comparison`. Program: `/programs/[id]?tab=reports&section=year-comparison`.
 * Offering-scoped pricing (Phase 2A/2B)
 * **Move students between offerings** — program **Registrations** roster **Change** tag (opens an offering drop-down) and offering overview Enrolled students **Move** keep the same enrollment (payments/history) and retarget it to another offering in the same year/season (`moveEnrollmentToOfferingAction`). Closed destinations allowed; archived/cancelled/full/duplicate/terminal blocked. Session week access is cleared.
 * **Cancel offering** — Offerings list **⋯** → Cancel offering (`cancelProgramOffering`); blocked while students are enrolled. Staff list shows **Offering Status** Active or Cancelled. Run SQL **`283`**. Cancelled classes are hidden from families.
@@ -84,6 +85,9 @@ Features:
 * **Department Settings** (`?tab=settings` on department workspace): name and color on one row, **Director Name** (department employee / `staff.is_department_head`), Description, and Terms with one **Save** at the bottom. **Delete department** is at the bottom and is blocked when any programs, offerings, or employees exist. Program defaults / Registration / Notifications / Promo Codes live on Program Workspace Settings (`/programs/[id]?tab=settings`). **Service Needs** lives on Event workspace Settings (`/event-management/[id]?tab=settings`). Leftover `?section=year-defaults|registration|notifications|promo-codes` opens the Programs doorway; leftover `?section=service-needs` opens department Events. Legacy `/programs/settings` → `/workforce?tab=departments`; `/programs/settings/service-needs` → `/event-management`. Run **`scripts/190_department_settings_promo_codes.sql`**.
 * **Summer Camps 2026 Phase 1 import** (payments CSV → Recreational Camps / year + offerings / weeks / enrollments / FA / childcare addons): `scripts/import-summer-camps-2026.mjs`. **Merged** Camp One + Two → one **Summer Camp** (8 weeks, week-count tuition tiers + sibling 5%): `scripts/merge-summer-camps-2026.mjs` + SQL **`190`**. Enrollment process is **Direct Registration** (SQL **`281`**). Master roster + staff payroll phases pending.
 * **QLH (Education) registrations import** (Excel roster → Education years `QLH 2024-2025` / `QLH 2025-2026` + default `QLH Registration` offering each): `scripts/import-qlh-registrations.mjs`.
+* **Education historical enrollments import** (cleaned `EducationPrograms.xlsx` + `EduPrograms2.csv` → Education year programs 2022–27 plus **Istiqamah Institute** department; people + enrollments only): `scripts/import-edu-historical-enrollments.mjs`. Tag `EDU_HISTORICAL_V1`.
+* **QIL historical payments** (`New_PAYMENT_TRANSACTION_REPORT.csv` → closed years **QIL 2022-2023** / **2023-2024** / **2024-2025**; 2025-26 left as-is; 2026-27 new Stripe IDs only, matched to existing offerings): `scripts/import-qil-historical-payments.mjs`. Tag `QIL_HISTORICAL_PAYMENTS_V1`.
+* **QIL 2024-2025 gap fill** (`QIL24-25.csv` → missing students only on existing offerings): `scripts/import-qil-2024-2025-gap.mjs`. Tag `QIL_2024_25_GAP_V1`.
 
 Pending:
 
@@ -503,6 +507,15 @@ Status: Working (shared)
 * Legacy: `/vendor-hub/community-calendar` redirects
 * Publish: bazaar create/edit; Event workspace Overview → Community Calendar card
 * Key files: `lib/community-calendar/*`, `public-community-calendar-view.tsx`, `community-calendar-client.tsx`
+
+## Vendor Hub
+
+Status: Working
+
+* Staff flyout: **Overview** (`/vendor-hub`, exact) · **Vendor Network** · **Bazaar Events** · **Reports** · **Settings**
+* Overview merges former Dashboard health KPIs with the former Reports Overview snapshot (revenue by category, top vendors)
+* Reports tabs: **Vendor Sales** · **Booth Performance** · **Participation History** (`?tab=history`). Legacy `/vendor-hub/network/history` redirects
+* Vendor Network tabs: Vendors, Onboarding, Documents, Invitations
 
 ## Event Management (workspace)
 

@@ -168,6 +168,13 @@ describe("program workspace paths", () => {
       }),
       "/programs/abc?tab=reports&section=trends"
     )
+    assert.equal(
+      programWorkspaceHref("abc", {
+        tab: "reports",
+        reportsSection: "year-comparison",
+      }),
+      "/programs/abc?tab=reports&section=year-comparison"
+    )
   })
 
   it("opens registrations with status and offering filters", () => {
