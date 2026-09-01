@@ -80,6 +80,7 @@ export function ProgramBasicsSection({
   allowedStatuses,
   layout = "columns",
   hideDepartment = false,
+  hideEligibility = false,
 }: {
   program?: ProgramBasicsDefaults | null
   programId?: string
@@ -93,6 +94,8 @@ export function ProgramBasicsSection({
   layout?: "columns" | "stack"
   /** Hide department picker when already scoped to a department workspace. */
   hideDepartment?: boolean
+  /** Hide gender/age when a richer eligibility section is shown on the same page. */
+  hideEligibility?: boolean
 }) {
   const currentStatus = status ?? programStatusFallback
   const statusOptions = (() => {
@@ -299,6 +302,7 @@ export function ProgramBasicsSection({
           </div>
         </BasicsSubsection>
 
+        {hideEligibility ? null : (
         <BasicsSubsection
           title="Eligibility"
           description="Gender and age apply to the whole program. Offerings inherit these for years like QIL; summer camps can still use capacity groups per offering when needed."
@@ -370,6 +374,7 @@ export function ProgramBasicsSection({
             </div>
           </div>
         </BasicsSubsection>
+        )}
 
         {stacked ? publishingFields : null}
       </div>

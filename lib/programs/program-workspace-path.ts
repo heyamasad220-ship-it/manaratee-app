@@ -15,8 +15,6 @@ export type ProgramWorkspaceTab =
 
 export type ProgramSettingsSection =
   | "general"
-  | "defaults"
-  | "registration"
   | "notifications"
   | "promo-codes"
 
@@ -60,14 +58,10 @@ export function isLegacyProgramApplicationsQuery(
 export function parseProgramSettingsSection(
   section: string | null | undefined
 ): ProgramSettingsSection {
-  if (section === "defaults" || section === "year-defaults") return "defaults"
-  if (
-    section === "registration" ||
-    section === "notifications" ||
-    section === "promo-codes"
-  ) {
+  if (section === "notifications" || section === "promo-codes") {
     return section
   }
+  // Leftover General / Program defaults / Registration bookmarks all open General.
   return "general"
 }
 

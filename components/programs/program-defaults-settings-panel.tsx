@@ -55,8 +55,13 @@ const ENROLLMENT_TYPE_OPTIONS = [
  */
 export function ProgramDefaultsSettingsPanel({
   program,
+  hideDates = false,
+  hideIntro = false,
 }: {
   program: ProgramDefaultsSource
+  /** When dates already appear on the same Settings page. */
+  hideDates?: boolean
+  hideIntro?: boolean
 }) {
   const router = useRouter()
   const ageBounds = React.useMemo(
@@ -170,10 +175,14 @@ export function ProgramDefaultsSettingsPanel({
 
     const result = await saveProgramEnrollmentDefaults({
       programId: program.id,
-      start_date: startDate || null,
-      end_date: endDate || null,
-      enrollment_open_date: enrollmentOpenDate || null,
-      enrollment_close_date: enrollmentCloseDate || null,
+      ...(hideDates
+        ? {}
+        : {
+            start_date: startDate || null,
+            end_date: endDate || null,
+            enrollment_open_date: enrollmentOpenDate || null,
+            enrollment_close_date: enrollmentCloseDate || null,
+          }),
       program_type: audienceType,
       min_age: minAge,
       max_age: maxAge,
@@ -206,11 +215,13 @@ export function ProgramDefaultsSettingsPanel({
 
   return (
     <div className="space-y-4">
+      {hideIntro ? null : (
       <div className="rounded-lg border border-sky-100 bg-sky-50/60 px-4 py-3 text-sm text-sky-950">
         Set these once for the program. New offerings inherit them.
         Existing offerings keep their own values unless they still have inherit
         turned on.
       </div>
+      )}
 
       <EditSectionCard
         title="Enrollment process"
@@ -295,6 +306,7 @@ export function ProgramDefaultsSettingsPanel({
         </div>
       </EditSectionCard>
 
+      {hideDates ? null : (
       <EditSectionCard
         title="Program dates & enrollment window"
         description="Default term and registration window for offerings that inherit dates."
@@ -342,6 +354,7 @@ export function ProgramDefaultsSettingsPanel({
           </div>
         </div>
       </EditSectionCard>
+      )}
 
       <EditSectionCard
         title="Audience"
@@ -458,7 +471,7 @@ export function ProgramDefaultsSettingsPanel({
               Saving…
             </>
           ) : (
-            "Save defaults"
+            "Save enrollment settings"
           )}
         </Button>
       </div>

@@ -23,11 +23,13 @@ export function DepartmentProgramOverviewPanel({
   departmentId,
   yearProgramId,
   hideChrome = false,
+  hideEligibility = false,
   onProgramMetaChanged,
 }: {
   departmentId: string
   yearProgramId: string
   hideChrome?: boolean
+  hideEligibility?: boolean
   onProgramMetaChanged?: () => void
 }) {
   const [loading, setLoading] = React.useState(true)
@@ -97,19 +99,23 @@ export function DepartmentProgramOverviewPanel({
         String(formData.get("enrollment_open_date") || "").trim() || null,
       enrollment_close_date:
         String(formData.get("enrollment_close_date") || "").trim() || null,
-      gender: String(formData.get("gender") || "All").trim() || "All",
-      min_age: (() => {
-        const raw = String(formData.get("min_age") || "").trim()
-        if (!raw) return null
-        const n = Number(raw)
-        return Number.isFinite(n) ? n : null
-      })(),
-      max_age: (() => {
-        const raw = String(formData.get("max_age") || "").trim()
-        if (!raw) return null
-        const n = Number(raw)
-        return Number.isFinite(n) ? n : null
-      })(),
+      ...(hideEligibility
+        ? {}
+        : {
+            gender: String(formData.get("gender") || "All").trim() || "All",
+            min_age: (() => {
+              const raw = String(formData.get("min_age") || "").trim()
+              if (!raw) return null
+              const n = Number(raw)
+              return Number.isFinite(n) ? n : null
+            })(),
+            max_age: (() => {
+              const raw = String(formData.get("max_age") || "").trim()
+              if (!raw) return null
+              const n = Number(raw)
+              return Number.isFinite(n) ? n : null
+            })(),
+          }),
       syncOfferingDates: true,
     })
 
@@ -176,6 +182,7 @@ export function DepartmentProgramOverviewPanel({
           programStatusFallback={program.status}
           layout="stack"
           hideDepartment
+          hideEligibility={hideEligibility}
         />
 
         {canEdit ? (
@@ -187,7 +194,7 @@ export function DepartmentProgramOverviewPanel({
                   Saving…
                 </>
               ) : (
-                "Save"
+                "Save program details"
               )}
             </Button>
           </div>
